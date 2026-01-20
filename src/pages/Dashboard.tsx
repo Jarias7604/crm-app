@@ -39,7 +39,7 @@ export default function Dashboard() {
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const filterRef = useRef<HTMLDivElement>(null);
     const [selectedDateRange, setSelectedDateRange] = useState<DateRange>('this_month');
-    const [loading, setLoading] = useState(true);
+    // const [loading, setLoading] = useState(true); // typescript error fix: unused variable
 
     // Real data states
     const [stats, setStats] = useState({
@@ -87,7 +87,7 @@ export default function Dashboard() {
     }, []);
 
     const loadSuperAdminData = async () => {
-        setLoading(true);
+        // setLoading(false);
         try {
             const companies = await adminService.getCompanies();
             const totalCompanies = companies.length;
@@ -109,7 +109,7 @@ export default function Dashboard() {
         } catch (error) {
             console.error('Failed to load admin data', error);
         } finally {
-            setLoading(false);
+            // setLoading(false);
         }
     };
 
@@ -139,7 +139,7 @@ export default function Dashboard() {
     };
 
     const loadCRMData = async () => {
-        setLoading(true);
+        // // setLoading(false);
         try {
             // Calculate date range
             const now = new Date();
@@ -216,7 +216,7 @@ export default function Dashboard() {
         } catch (error) {
             console.error('Failed to load CRM data', error);
         } finally {
-            setLoading(false);
+            // // setLoading(false);
         }
     };
 
