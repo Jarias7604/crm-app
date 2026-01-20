@@ -234,6 +234,10 @@ export default function Leads() {
         }
     };
 
+    const handleDownloadTemplate = () => {
+        csvHelper.generateTemplate();
+    };
+
     const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -261,6 +265,7 @@ export default function Leads() {
             e.target.value = '';
         }
     };
+
 
     const loadTeamMembers = async () => {
         try {
@@ -406,6 +411,16 @@ export default function Leads() {
                     </div>
 
                     <div className="flex items-center gap-2 flex-1 sm:flex-none">
+                        <Button
+                            variant="outline"
+                            className="hidden sm:flex items-center gap-2 h-9"
+                            onClick={handleDownloadTemplate}
+                            title="Descargar Plantilla CSV"
+                        >
+                            <Download className="w-4 h-4" />
+                            <span className="hidden lg:inline">Plantilla</span>
+                        </Button>
+
                         <div className="relative flex-1 sm:flex-none">
                             <input
                                 type="file"
