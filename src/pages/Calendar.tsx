@@ -120,42 +120,66 @@ export default function Calendar() {
     const renderMonthView = () => {
         const monthStart = startOfMonth(currentDate);
         const monthEnd = endOfMonth(monthStart);
-        const startDate = startOfWeek(monthStart, { weekStartsOn: 0 });
+        const startDate = startOfWeek(monthStart, { weekStartsOn: 0 }); // Sunday start
         const endDate = endOfWeek(monthEnd, { weekStartsOn: 0 });
         const days = eachDayOfInterval({ start: startDate, end: endDate });
         const weekDays = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
         return (
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 animate-in fade-in">
-                <div className="grid grid-cols-7 mb-4">
+                {/* Desktop Headers */}
+                <div className="grid grid-cols-7 mb-2 border-b border-gray-100 pb-2">
                     {weekDays.map(d => (
-                        <div key={d} className="text-center text-xs font-bold text-gray-400 uppercase tracking-widest">{d}</div>
+                        <div key={d} className="text-center text-xs font-black text-gray-400 uppercase tracking-widest">{d}</div>
                     ))}
                 </div>
-                <div className="grid grid-cols-7 gap-px bg-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+
+                <div className="grid grid-cols-7 bg-gray-200 gap-px border border-gray-200 rounded-xl overflow-hidden shadow-sm">
                     {days.map((day) => {
                         const dayLeads = getDailyLeads(day);
                         const isCurrent = isSameMonth(day, monthStart);
                         const isDayToday = isToday(day);
 
                         return (
-                            <div key={day.toISOString()} className={`min-h-[100px] bg-white p-2 ${!isCurrent ? 'bg-gray-50/50' : ''}`}>
-                                <div className="flex justify-between">
-                                    <span className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full ${isDayToday ? 'bg-blue-600 text-white' : 'text-gray-700'}`}>
+                            <div
+                                key={day.toISOString()}
+                                className={`min-h-[140px] bg-white p-3 transition-colors flex flex-col gap-2 ${!isCurrent ? 'bg-gray-50 text-gray-400' : 'text-gray-900'} ${isDayToday ? 'bg-blue-50/20' : ''}`}
+                            >
+                                {/* Date Header Row */}
+                                <div className="flex justify-between items-start">
+                                    <span className={`text-sm font-bold ${isDayToday ? 'bg-blue-600 text-white w-7 h-7 flex items-center justify-center rounded-full shadow-sm' : ''}`}>
                                         {format(day, 'd')}
                                     </span>
+
+                                    {/* Day Name (Faint) - Visible on larger cells */}
+                                    <span className="text-[10px] font-bold text-gray-300 uppercase hidden lg:block">
+                                        {format(day, 'EEEE', { locale: es })}
+                                    </span>
+
+                                    {/* Lead Count Badge */}
                                     {dayLeads.length > 0 && (
-                                        <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">
-                                            {dayLeads.length}
+                                        <span className="bg-blue-100 text-blue-700 text-[10px] font-black px-2 py-0.5 rounded-sm uppercase tracking-tight">
+                                            {dayLeads.length} {dayLeads.length === 1 ? 'LEAD' : 'LEADS'}
                                         </span>
                                     )}
                                 </div>
-                                <div className="mt-1 space-y-1">
-                                    {dayLeads.slice(0, 3).map(lead => (
-                                        <div key={lead.id} className="text-[9px] truncate px-1 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-100">
-                                            {lead.name}
-                                        </div>
+
+                                {/* Lead Cards List */}
+                                <div className="space-y-1 mt-1 flex-1">
+                                    {dayLeads.slice(0, 4).map(lead => (
+                                        <button
+                                            key={lead.id}
+                                            onClick={() => navigate('/leads', { state: { priority: lead.priority } })}
+                                            className="w-full text-left text-[10px] p-1.5 rounded bg-gray-50 hover:bg-white hover:shadow-md hover:text-blue-700 hover:border-blue-200 transition-all border border-gray-100 border-l-2 border-l-blue-500 overflow-hidden group"
+                                        >
+                                            <span className="font-bold block truncate">{lead.name}</span>
+                                        </button>
                                     ))}
+                                    {dayLeads.length > 4 && (
+                                        <div className="text-[9px] text-center text-gray-400 font-medium pt-1">
+                                            + {dayLeads.length - 4} más
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         );
@@ -185,8 +209,8 @@ export default function Calendar() {
                                     key={day.toISOString()}
                                     onClick={() => setSelectedDate(day)}
                                     className={`flex flex-col items-center min-w-[3rem] p-2 rounded-2xl transition-all ${isSelected
-                                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 transform scale-105'
-                                            : 'hover:bg-gray-50'
+                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 transform scale-105'
+                                        : 'hover:bg-gray-50'
                                         }`}
                                 >
                                     <span className={`text-[10px] font-bold uppercase mb-1 ${isSelected ? 'text-blue-200' : 'text-gray-400'}`}>
