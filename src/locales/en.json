@@ -1,0 +1,102 @@
+{
+    "app": {
+        "title": "CRM Enterprise"
+    },
+    "auth": {
+        "loginTitle": "Sign In",
+        "loginSubtitle": "Sign in to your account",
+        "emailLabel": "Email Address",
+        "passwordLabel": "Password",
+        "signInButton": "Sign In",
+        "signingIn": "Signing in...",
+        "registerLink": "No account? Sign up for a trial",
+        "signUpTitle": "Register Company",
+        "signUpSubtitle": "Start your 15-day trial today",
+        "companyNameLabel": "Company Name",
+        "createAccountButton": "Create Account",
+        "creatingAccount": "Creating...",
+        "loginLink": "Already have an account? Sign in"
+    },
+    "sidebar": {
+        "dashboard": "Dashboard",
+        "leads": "Leads",
+        "calendar": "Calendar",
+        "companies": "Companies",
+        "team": "Team",
+        "signOut": "Sign Out"
+    },
+    "roles": {
+        "superAdmin": "Super Admin",
+        "companyAdmin": "Company Admin",
+        "user": "User"
+    },
+    "leads": {
+        "title": "Leads Management",
+        "subtitle": "Track and manage your potential customers",
+        "addCheck": "Add Lead",
+        "noLeads": "No leads",
+        "noLeadsSub": "Get started by creating a new lead."
+    },
+    "dashboard": {
+        "superAdmin": {
+            "title": "Global Dashboard",
+            "totalCompanies": "Total Companies",
+            "activeTrials": "Active Trials",
+            "activeLicenses": "Active Licenses",
+            "recentCompaniesTitle": "Recent Companies",
+            "columnName": "Company Name",
+            "columnDate": "Registration Date",
+            "columnStatus": "Status",
+            "companyGrowthTitle": "Company Growth",
+            "companyGrowthSubtitle": "New registrations per time",
+            "licenseDistTitle": "License Distribution",
+            "licenseDistSubtitle": "Active subscription types"
+        },
+        "financial": {
+            "netIncome": "Net Income",
+            "income": "Income",
+            "expenses": "Expenses",
+            "activeLeads": "Active Leads",
+            "profitAndLoss": "Profit & Loss",
+            "expensesBreakdown": "Expenses Breakdown",
+            "incomeStatus": "Income Status",
+            "unpaid": "Unpaid",
+            "paid": "Paid",
+            "openInvoices": "Open Invoices",
+            "overdue": "Overdue",
+            "paidLast30": "Paid (30 Days)",
+            "recentClients": "Recent Clients",
+            "viewAll": "View All"
+        },
+        "crm": {
+            "title": "CRM Dashboard",
+            "last30Days": "Last 30 Days",
+            "totalPipeline": "Total Pipeline",
+            "totalLeads": "Total Leads",
+            "wonDeals": "Won Deals",
+            "conversionRate": "Conversion Rate",
+            "funnelTitle": "Sales Funnel",
+            "funnelSubtitle": "Leads by Qualification Stage",
+            "sourcesTitle": "Lead Sources",
+            "sourcesSubtitle": "Where are leads coming from?",
+            "topOppTitle": "Top Opportunities",
+            "topOppSubtitle": "Highest value deals in pipeline",
+            "viewAll": "View All",
+            "columnName": "Lead Name",
+            "columnStatus": "Status",
+            "columnValue": "Value",
+            "columnDate": "Date",
+            "leadGrowthTitle": "Lead Growth",
+            "leadGrowthSubtitle": "New leads over time",
+            "filterLast7Days": "Last 7 Days",
+            "filterLastMonth": "Last Month",
+            "filterLastYear": "Last Year"
+        }
+    },
+    "common": {
+        "loading": "Loading...",
+        "cancel": "Cancel",
+        "save": "Save",
+        "error": "Error"
+    }
+}

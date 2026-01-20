@@ -1,0 +1,86 @@
+import { supabase } from './supabase';
+import type { Profile, Role } from '../types';
+
+export interface Invitation {
+    id: string;
+    email: string;
+    role: Role;
+    status: 'pending' | 'accepted' | 'expired';
+    created_at: string;
+}
+
+export const teamService = {
+    // Get current company license info - Optimized
+    async getCompanyLimit(companyId: string) {
+        const { data: company, error } = await supabase
+            .from('companies')
+            .select('max_users')
+            .eq('id', companyId)
+            .single();
+
+        if (error) throw error;
+        return company.max_users || 5;
+    },
+
+    // Get all members of my company - Optimized
+    async getTeamMembers(companyId: string) {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('id, email, role, created_at, company_id, full_name') // Selective select
+            .eq('company_id', companyId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data as Profile[];
+    },
+
+    // Get pending invitations - Optimized & Secured
+    async getInvitations(companyId: string) {
+        const { data, error } = await supabase
+            .from('company_invitations')
+            .select('*')
+            .eq('company_id', companyId)
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data as Invitation[];
+    },
+
+    // Invite a new member - Optimized
+    async inviteMember(email: string, role: Role, companyId: string, createdBy: string) {
+        const { data, error } = await supabase
+            .from('company_invitations')
+            .insert({
+                email,
+                role,
+                company_id: companyId,
+                created_by: createdBy
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data as Invitation;
+    },
+
+    // Revoke invitation
+    async revokeInvitation(id: string) {
+        const { error } = await supabase
+            .from('company_invitations')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+    },
+
+    // Delete a team member (profile)
+    async deleteMember(id: string) {
+        const { error } = await supabase
+            .from('profiles')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+    }
+};

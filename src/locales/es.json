@@ -1,0 +1,102 @@
+{
+    "app": {
+        "title": "CRM Enterprise"
+    },
+    "auth": {
+        "loginTitle": "Iniciar Sesión",
+        "loginSubtitle": "Accede a tu cuenta",
+        "emailLabel": "Correo Electrónico",
+        "passwordLabel": "Contraseña",
+        "signInButton": "Entrar",
+        "signingIn": "Entrando...",
+        "registerLink": "¿No tienes cuenta? Regístrate para una prueba",
+        "signUpTitle": "Registrar Empresa",
+        "signUpSubtitle": "Comienza tu prueba de 15 días hoy",
+        "companyNameLabel": "Nombre de la Empresa",
+        "createAccountButton": "Crear Cuenta",
+        "creatingAccount": "Creando...",
+        "loginLink": "¿Ya tienes cuenta? Inicia sesión"
+    },
+    "sidebar": {
+        "dashboard": "Panel Principal",
+        "leads": "Leads",
+        "calendar": "Calendario",
+        "companies": "Empresas",
+        "team": "Equipo",
+        "signOut": "Cerrar Sesión"
+    },
+    "roles": {
+        "superAdmin": "Super Admin",
+        "companyAdmin": "Admin Empresa",
+        "user": "Usuario"
+    },
+    "leads": {
+        "title": "Gestión de Leads",
+        "subtitle": "Administra tus clientes potenciales",
+        "addCheck": "Agregar Lead",
+        "noLeads": "No hay leads",
+        "noLeadsSub": "Comienza agregando un nuevo lead."
+    },
+    "dashboard": {
+        "superAdmin": {
+            "title": "Panel Global",
+            "totalCompanies": "Total Empresas",
+            "activeTrials": "Pruebas Activas",
+            "activeLicenses": "Licencias Activas",
+            "recentCompaniesTitle": "Empresas Recientes",
+            "columnName": "Nombre Empresa",
+            "columnDate": "Fecha Registro",
+            "columnStatus": "Estado",
+            "companyGrowthTitle": "Crecimiento de Empresas",
+            "companyGrowthSubtitle": "Nuevos registros por mes",
+            "licenseDistTitle": "Distribución de Licencias",
+            "licenseDistSubtitle": "Tipos de suscripción activos"
+        },
+        "financial": {
+            "netIncome": "Beneficio Neto",
+            "income": "Ingresos",
+            "expenses": "Gastos",
+            "activeLeads": "Leads Activos",
+            "profitAndLoss": "Pérdidas y Ganancias",
+            "expensesBreakdown": "Desglose de Gastos",
+            "incomeStatus": "Estado de Ingresos",
+            "unpaid": "No Pagado",
+            "paid": "Pagado",
+            "openInvoices": "Facturas Abiertas",
+            "overdue": "Vencido",
+            "paidLast30": "Pagado (30 días)",
+            "recentClients": "Clientes Recientes",
+            "viewAll": "Ver Todos"
+        },
+        "crm": {
+            "title": "Dashboard CRM",
+            "last30Days": "Últimos 30 Días",
+            "totalPipeline": "Pipeline Total",
+            "totalLeads": "Total Leads",
+            "wonDeals": "Tratos Ganados",
+            "conversionRate": "Tasa de Conversión",
+            "funnelTitle": "Embudo de Ventas",
+            "funnelSubtitle": "Leads por Etapa",
+            "sourcesTitle": "Fuentes de Leads",
+            "sourcesSubtitle": "¿De dónde vienen tus clientes?",
+            "topOppTitle": "Mejores Oportunidades",
+            "topOppSubtitle": "Negocios de mayor valor en pipeline",
+            "viewAll": "Ver Todos",
+            "columnName": "Nombre",
+            "columnStatus": "Estado",
+            "columnValue": "Valor",
+            "columnDate": "Fecha",
+            "leadGrowthTitle": "Crecimiento de Leads",
+            "leadGrowthSubtitle": "Nuevos leads por mes",
+            "filterLast7Days": "Últimos 7 días",
+            "filterLastMonth": "Último mes",
+            "filterLastYear": "Último año"
+        }
+    },
+    "common": {
+        "loading": "Cargando...",
+        "cancel": "Cancelar",
+        "save": "Guardar",
+        "error": "Error"
+    }
+}
