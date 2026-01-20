@@ -63,6 +63,19 @@ export default function Leads() {
         }
     }, [location]);
 
+    // Force grid view on mobile
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth < 768) {
+                setViewMode('grid');
+            }
+        };
+        // Initial check
+        handleResize();
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
     // Update local state when lead is selected
     useEffect(() => {
         if (selectedLead) {
@@ -221,10 +234,6 @@ export default function Leads() {
         }
     };
 
-    const handleDownloadTemplate = () => {
-        csvHelper.generateTemplate();
-    };
-
     const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -354,14 +363,15 @@ export default function Leads() {
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Gestión de Leads</h1>
-                    <div className="flex items-center gap-4 mt-1">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-1">
                         <p className="text-sm text-gray-500">
                             {leads.length} leads · ${leads.reduce((sum, l) => sum + (l.value || 0), 0).toLocaleString()} en pipeline
                         </p>
-                        <div className="flex items-center gap-2 ml-4">
+                        <div className="hidden sm:block w-px h-4 bg-gray-300"></div>
+                        <div className="flex items-center gap-2">
                             <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Filtrar:</span>
                             <select
                                 value={priorityFilter}
@@ -376,7 +386,8 @@ export default function Leads() {
                         </div>
                     </div>
                 </div>
-                <div className="flex gap-3">
+
+                <div className="flex flex-wrap gap-2 w-full xl:w-auto">
                     <div className="flex bg-gray-100 rounded-lg p-1 border border-gray-200">
                         <button
                             onClick={() => setViewMode('grid')}
@@ -394,17 +405,8 @@ export default function Leads() {
                         </button>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <Button
-                            variant="outline"
-                            className="flex items-center gap-2 h-9"
-                            onClick={handleDownloadTemplate}
-                        >
-                            <Download className="w-4 h-4" />
-                            <span className="hidden sm:inline">Plantilla CSV</span>
-                        </Button>
-
-                        <div className="relative">
+                    <div className="flex items-center gap-2 flex-1 sm:flex-none">
+                        <div className="relative flex-1 sm:flex-none">
                             <input
                                 type="file"
                                 accept=".csv"
@@ -414,18 +416,18 @@ export default function Leads() {
                             />
                             <Button
                                 variant="outline"
-                                className="flex items-center gap-2 h-9"
+                                className="flex items-center gap-2 h-9 w-full sm:w-auto justify-center"
                                 disabled={isImporting}
                             >
                                 {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                                <span className="hidden sm:inline">Importar CSV</span>
+                                <span className="inline">Importar</span>
                             </Button>
                         </div>
                     </div>
 
-                    <Button onClick={() => setIsModalOpen(true)}>
+                    <Button onClick={() => setIsModalOpen(true)} className="flex-1 sm:flex-none justify-center">
                         <Plus className="w-4 h-4 mr-2" />
-                        Nuevo Lead
+                        Nuevo
                     </Button>
                 </div>
             </div>

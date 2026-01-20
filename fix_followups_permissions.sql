@@ -17,6 +17,7 @@ DROP POLICY IF EXISTS "Users can view follow ups" ON public.follow_ups;
 DROP POLICY IF EXISTS "Users can create follow ups" ON public.follow_ups;
 DROP POLICY IF EXISTS "Enable read access for all users" ON public.follow_ups;
 DROP POLICY IF EXISTS "Enable insert access for all users" ON public.follow_ups;
+DROP POLICY IF EXISTS "Users can update delete follow ups" ON public.follow_ups;
 
 -- Crear nuevas políticas simples y permisivas para usuarios autenticados
 -- 1. Ver seguimientos (Lectura)
