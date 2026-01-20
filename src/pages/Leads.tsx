@@ -336,7 +336,7 @@ export default function Leads() {
     const PriorityBadge = ({ priority }: { priority: LeadPriority }) => {
         const config = PRIORITY_CONFIG[priority] || PRIORITY_CONFIG.medium;
         return (
-            <span className={`px-2 py-0.5 text-xs font-bold rounded ${config.color} ${config.textColor}`}>
+            <span className={`inline-block w-[100px] text-center px-2 py-0.5 text-xs font-bold rounded ${config.color} ${config.textColor}`}>
                 {config.label}
             </span>
         );
@@ -345,7 +345,7 @@ export default function Leads() {
     const StatusBadge = ({ status }: { status: LeadStatus }) => {
         const config = STATUS_CONFIG[status] || STATUS_CONFIG['Nuevo lead'];
         return (
-            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${config.bgColor} ${config.color}`}>
+            <span className={`inline-block w-[140px] text-center px-2 py-0.5 text-xs font-medium rounded-full ${config.bgColor} ${config.color}`}>
                 {config.label}
             </span>
         );
@@ -720,24 +720,43 @@ export default function Leads() {
                         {/* Header */}
                         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                             <div>
-                                <h2 className="text-lg font-bold text-gray-900">
-                                    {selectedLead.name}
-                                </h2>
-                                <div className="space-y-0.5">
-                                    {selectedLead.company_name && <p className="text-sm text-gray-500 font-medium">{selectedLead.company_name}</p>}
+                                {/* Editable Name */}
+                                <input
+                                    type="text"
+                                    defaultValue={selectedLead.name}
+                                    onBlur={(e) => handleUpdateLead({ name: e.target.value })}
+                                    className="block w-full text-lg font-bold text-gray-900 border-none hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 rounded px-2 -ml-2 transition-all bg-transparent"
+                                />
+                                <div className="space-y-1 mt-1">
+                                    {/* Editable Company */}
+                                    <input
+                                        type="text"
+                                        defaultValue={selectedLead.company_name || ''}
+                                        placeholder="Agregar Empresa..."
+                                        onBlur={(e) => handleUpdateLead({ company_name: e.target.value })}
+                                        className="block w-full text-sm font-medium text-gray-500 border-none hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 rounded px-2 -ml-2 transition-all bg-transparent"
+                                    />
                                     <div className="flex flex-wrap gap-x-4 gap-y-1">
-                                        {selectedLead.phone && (
-                                            <a href={`tel:${selectedLead.phone}`} className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 font-bold">
-                                                <Phone className="w-3 h-3" />
-                                                {selectedLead.phone}
-                                            </a>
-                                        )}
-                                        {selectedLead.email && (
-                                            <a href={`mailto:${selectedLead.email}`} className="text-xs text-gray-500 hover:text-blue-600 flex items-center gap-1">
-                                                <Mail className="w-3 h-3" />
-                                                {selectedLead.email}
-                                            </a>
-                                        )}
+                                        <div className="flex items-center gap-1 group">
+                                            <Phone className="w-3 h-3 text-gray-400" />
+                                            <input
+                                                type="text"
+                                                defaultValue={selectedLead.phone || ''}
+                                                placeholder="Agregar teléfono..."
+                                                onBlur={(e) => handleUpdateLead({ phone: e.target.value })}
+                                                className="text-xs text-blue-600 font-bold border-none hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 rounded px-1 -ml-1 w-32 bg-transparent"
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-1 group">
+                                            <Mail className="w-3 h-3 text-gray-400" />
+                                            <input
+                                                type="text"
+                                                defaultValue={selectedLead.email || ''}
+                                                placeholder="Agregar email..."
+                                                onBlur={(e) => handleUpdateLead({ email: e.target.value })}
+                                                className="text-xs text-gray-500 hover:text-blue-600 border-none hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 rounded px-1 -ml-1 w-48 bg-transparent"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             </div>
