@@ -474,7 +474,16 @@ export default function Leads() {
                                     {lead.next_followup_date && (
                                         <div className="flex items-center text-xs text-blue-600 col-span-2 font-medium">
                                             <Clock className="w-3.5 h-3.5 mr-1" />
-                                            Seguimiento: {format(new Date(lead.next_followup_date.split('T')[0] + 'T12:00:00'), 'EEEE dd MMM yyyy', { locale: es })}
+                                            Seguimiento: {(() => {
+                                                try {
+                                                    const dateStr = lead.next_followup_date.split('T')[0];
+                                                    const dateObj = new Date(dateStr + 'T12:00:00');
+                                                    if (isNaN(dateObj.getTime())) return 'Fecha inválida';
+                                                    return format(dateObj, 'EEEE dd MMM yyyy', { locale: es });
+                                                } catch (e) {
+                                                    return 'Error fecha';
+                                                }
+                                            })()}
                                         </div>
                                     )}
                                     {lead.assigned_to && (
@@ -554,7 +563,15 @@ export default function Leads() {
                                             ) : <span className="text-gray-400">-</span>}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {lead.created_at ? format(new Date(lead.created_at), 'dd MMM yyyy', { locale: es }) : '-'}
+                                            {lead.created_at ? (() => {
+                                                try {
+                                                    const dateObj = new Date(lead.created_at);
+                                                    if (isNaN(dateObj.getTime())) return '-';
+                                                    return format(dateObj, 'dd MMM yyyy', { locale: es });
+                                                } catch (e) {
+                                                    return '-';
+                                                }
+                                            })() : '-'}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <div className="flex justify-end gap-2">
@@ -828,7 +845,16 @@ export default function Leads() {
                                         <h4 className="text-sm font-semibold text-blue-700">📅 Próximo Seguimiento</h4>
                                         {nextFollowUpData.date && (
                                             <p className="text-[10px] text-blue-500 font-bold capitalize">
-                                                {format(new Date(nextFollowUpData.date + 'T12:00:00'), 'EEEE dd MMMM', { locale: es })}
+                                                {(() => {
+                                                    try {
+                                                        const safeDate = nextFollowUpData.date + 'T12:00:00';
+                                                        const dateObj = new Date(safeDate);
+                                                        if (isNaN(dateObj.getTime())) return 'Fecha inválida';
+                                                        return format(dateObj, 'EEEE dd MMMM', { locale: es });
+                                                    } catch (e) {
+                                                        return 'Error fecha';
+                                                    }
+                                                })()}
                                             </p>
                                         )}
                                     </div>
@@ -952,7 +978,18 @@ export default function Leads() {
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-sm text-gray-800 truncate">{fu.notes || 'Sin notas'}</p>
                                                     <p className="text-xs text-gray-500">
-                                                        {format(new Date(fu.date + 'T12:00:00'), 'dd/MM/yyyy')} · {fu.profiles?.email?.split('@')[0] || 'Usuario'}
+                                                        {(() => {
+                                                            try {
+                                                                if (!fu.date) return 'Sin fecha';
+                                                                // Ensure date string is safe for parsing
+                                                                const safeDate = fu.date.includes('T') ? fu.date : `${fu.date}T12:00:00`;
+                                                                const dateObj = new Date(safeDate);
+                                                                if (isNaN(dateObj.getTime())) return 'Fecha inválida';
+                                                                return format(dateObj, 'dd/MM/yyyy');
+                                                            } catch (e) {
+                                                                return 'Error fecha';
+                                                            }
+                                                        })()} · {fu.profiles?.email?.split('@')[0] || 'Usuario'}
                                                     </p>
                                                 </div>
                                             </div>
