@@ -29,7 +29,7 @@ USING (
   OR 
   (
     (SELECT role FROM profiles WHERE id = auth.uid()) = 'sales_agent'
-    AND assigned_to = auth.uid()
+    AND (assigned_to = auth.uid() OR next_followup_assignee = auth.uid())
   )
 );
 
@@ -48,7 +48,7 @@ USING (
   OR 
   (
     (SELECT role FROM profiles WHERE id = auth.uid()) = 'sales_agent'
-    AND lead_id IN (SELECT id FROM leads WHERE assigned_to = auth.uid())
+    AND lead_id IN (SELECT id FROM leads WHERE assigned_to = auth.uid() OR next_followup_assignee = auth.uid())
   )
 );
 
