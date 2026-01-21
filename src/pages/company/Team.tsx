@@ -3,7 +3,7 @@ import { teamService, type Invitation } from '../../services/team';
 import type { Profile, Role } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Plus, Trash2, Mail, User, Shield, Phone, Lock } from 'lucide-react';
+import { Plus, Trash2, Mail, User, Shield, Phone, Lock, Edit2 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import Switch from '../../components/ui/Switch';
 
@@ -15,6 +15,10 @@ export default function Team() {
     const [maxUsers, setMaxUsers] = useState(5);
     const [loading, setLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
+
+    // Edit state
+    const [editingMember, setEditingMember] = useState<Profile | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -131,6 +135,37 @@ export default function Team() {
         } catch (error: any) {
             console.error('Delete failed:', error);
             alert(`❌ Error al eliminar: ${error.message}`);
+        }
+    };
+
+    const handleEditMember = (member: Profile) => {
+        setEditingMember(member);
+    };
+
+    const handleCancelEdit = () => {
+        setEditingMember(null);
+    };
+
+    const handleSaveEdit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingMember) return;
+
+        setIsSaving(true);
+        try {
+            await teamService.updateMember(editingMember.id, {
+                full_name: editingMember.full_name || undefined,
+                phone: editingMember.phone || undefined,
+                role: editingMember.role
+            });
+
+            alert('✅ Miembro actualizado correctamente');
+            setEditingMember(null);
+            loadData();
+        } catch (error: any) {
+            console.error('Update failed:', error);
+            alert(`❌ Error al actualizar: ${error.message}`);
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -260,6 +295,64 @@ export default function Team() {
                 </div>
             )}
 
+            {/* Edit Member Modal */}
+            {editingMember && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="p-6 border-b border-gray-200">
+                            <h2 className="text-xl font-bold text-gray-900">Editar Miembro</h2>
+                            <p className="text-sm text-gray-500 mt-1">{editingMember.email}</p>
+                        </div>
+
+                        <form onSubmit={handleSaveEdit} className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo *</label>
+                                <Input
+                                    required
+                                    value={editingMember.full_name || ''}
+                                    onChange={e => setEditingMember({ ...editingMember, full_name: e.target.value })}
+                                    placeholder="Ej: Juan Pérez"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono (Opcional)</label>
+                                <Input
+                                    value={editingMember.phone || ''}
+                                    onChange={e => setEditingMember({ ...editingMember, phone: e.target.value })}
+                                    placeholder="+503 ..."
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Rol Asignado</label>
+                                <select
+                                    className="w-full rounded-md border border-gray-300 p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                                    value={editingMember.role}
+                                    onChange={e => setEditingMember({ ...editingMember, role: e.target.value as Role })}
+                                >
+                                    <option value="sales_agent">Agente de Ventas (Solo ve sus leads)</option>
+                                    <option value="company_admin">Admin de Empresa (Ve todo)</option>
+                                </select>
+                            </div>
+
+                            <div className="flex gap-3 pt-4">
+                                <Button type="submit" disabled={isSaving} className="flex-1">
+                                    {isSaving ? 'Guardando...' : 'Guardar Cambios'}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={handleCancelEdit}
+                                    className="flex-1 bg-gray-500 hover:bg-gray-600"
+                                >
+                                    Cancelar
+                                </Button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
             {/* Active Members */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
@@ -300,13 +393,22 @@ export default function Team() {
                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <div className="flex justify-end gap-2">
                                         {isAdmin && member.id !== myProfile?.id && (
-                                            <button
-                                                onClick={() => handleMemberDelete(member.id, member.email)}
-                                                className="text-gray-400 hover:text-red-600 transition-colors p-1"
-                                                title="Eliminar Miembro"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
+                                            <>
+                                                <button
+                                                    onClick={() => handleEditMember(member)}
+                                                    className="text-gray-400 hover:text-blue-600 transition-colors p-1"
+                                                    title="Editar Miembro"
+                                                >
+                                                    <Edit2 className="w-4 h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleMemberDelete(member.id, member.email)}
+                                                    className="text-gray-400 hover:text-red-600 transition-colors p-1"
+                                                    title="Eliminar Miembro"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                            </>
                                         )}
                                         {member.id === myProfile?.id && (
                                             <span className="text-blue-600 text-xs font-bold px-2 py-1 bg-blue-50 rounded">Tú</span>

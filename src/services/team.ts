@@ -72,6 +72,16 @@ export const teamService = {
         if (error) throw error;
     },
 
+    // Update member details
+    async updateMember(userId: string, updates: { full_name?: string; phone?: string; role?: Role }) {
+        const { error } = await supabase
+            .from('profiles')
+            .update(updates)
+            .eq('id', userId);
+
+        if (error) throw error;
+    },
+
     // Invite a new member - Legacy / Optional if you still want to keep invitations
     async inviteMember(email: string, role: Role, companyId: string, createdBy: string) {
         const { data, error } = await supabase
