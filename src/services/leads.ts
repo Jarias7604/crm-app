@@ -316,7 +316,7 @@ export const leadsService = {
 
         const { data, error } = await supabase
             .from('profiles')
-            .select('id, email, role')
+            .select('id, email, role, full_name')
             .eq('company_id', profile.company_id);
 
         if (error) throw error;
