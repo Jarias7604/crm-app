@@ -216,6 +216,7 @@ export const leadsService = {
             const leadsToInsert = leads.map(lead => {
                 const cleanedLead: any = {
                     company_id: profile.company_id,
+                    assigned_to: lead.assigned_to || user.id, // Auto-assign to importer if not specified
                     priority: lead.priority || 'medium',
                     status: lead.status || 'Nuevo lead',
                     value: lead.value || 0
