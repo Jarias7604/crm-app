@@ -12,7 +12,9 @@ export interface Profile {
     role: Role;
     company_id: string;
     full_name: string | null;
+    phone: string | null;
     status: CompanyStatus;
+    is_active?: boolean;
     created_at: string;
 }
 

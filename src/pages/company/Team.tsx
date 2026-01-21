@@ -3,7 +3,7 @@ import { teamService, type Invitation } from '../../services/team';
 import type { Profile, Role } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Plus, Trash2, Mail, User, Shield } from 'lucide-react';
+import { Plus, Trash2, Mail, User, Shield, Phone, Lock, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 
 export default function Team() {
@@ -13,11 +13,16 @@ export default function Team() {
     const [invitations, setInvitations] = useState<Invitation[]>([]);
     const [maxUsers, setMaxUsers] = useState(5);
     const [loading, setLoading] = useState(true);
-    const [isInviting, setIsInviting] = useState(false);
+    const [isCreating, setIsCreating] = useState(false);
 
     // Form state
-    const [inviteEmail, setInviteEmail] = useState('');
-    const [inviteRole, setInviteRole] = useState<Role>('sales_agent');
+    const [formData, setFormData] = useState({
+        email: '',
+        password: '',
+        fullName: '',
+        phone: '',
+        role: 'sales_agent' as Role
+    });
 
     useEffect(() => {
         if (myProfile?.company_id) {
@@ -45,23 +50,60 @@ export default function Team() {
 
     const isLimitReached = (members.length + invitations.length) >= maxUsers;
 
-    const handleInvite = async (e: React.FormEvent) => {
+    const handleCreateMember = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!myProfile?.company_id || !myProfile?.id) return;
+        if (!myProfile?.company_id) return;
+
         if (isLimitReached) {
             alert('Has alcanzado el límite de usuarios permitidos por tu licencia.');
             return;
         }
-        setIsInviting(true);
+
+        if (formData.password.length < 6) {
+            alert('La contraseña debe tener al menos 6 caracteres.');
+            return;
+        }
+
+        setIsCreating(true);
         try {
-            await teamService.inviteMember(inviteEmail, inviteRole, myProfile.company_id, myProfile.id);
-            setInviteEmail('');
-            alert(`✅ Invitación enviada a ${inviteEmail}`);
+            await teamService.createMember({
+                email: formData.email,
+                password: formData.password,
+                fullName: formData.fullName,
+                phone: formData.phone,
+                role: formData.role,
+                companyId: myProfile.company_id
+            });
+
+            setFormData({
+                email: '',
+                password: '',
+                fullName: '',
+                phone: '',
+                role: 'sales_agent'
+            });
+
+            alert(`✅ Usuario creado correctamente. Puedes compartirle sus credenciales.`);
             loadData();
         } catch (error: any) {
-            alert(`❌ Error al invitar: ${error.message}`);
+            console.error(error);
+            alert(`❌ Error al crear usuario: ${error.message}`);
         } finally {
-            setIsInviting(false);
+            setIsCreating(false);
+        }
+    };
+
+    const handleToggleStatus = async (id: string, currentStatus: boolean | undefined) => {
+        // Default to true if undefined
+        const newStatus = !(currentStatus ?? true);
+        try {
+            // Optimistic update
+            setMembers(members.map(m => m.id === id ? { ...m, is_active: newStatus } : m));
+            await teamService.toggleMemberStatus(id, newStatus);
+        } catch (error: any) {
+            console.error('Toggle failed:', error);
+            alert(`Error: ${error.message}`);
+            loadData(); // Revert on error
         }
     };
 
@@ -118,37 +160,71 @@ export default function Team() {
                 <p className="text-gray-500">Administra los accesos y colaboradores de tu empresa.</p>
             </div>
 
-            {/* Invite Form */}
+            {/* Create User Form */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                 <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                     <Plus className="w-5 h-5 text-blue-600" />
-                    Invitar Colaborador
+                    Crear Nuevo Usuario
                 </h2>
-                <form onSubmit={handleInvite} className="flex gap-4 items-end flex-wrap">
-                    <div className="flex-1 min-w-[250px]">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Email del Colaborador</label>
-                        <Input
-                            type="email"
-                            required
-                            placeholder="ejemplo@empresa.com"
-                            value={inviteEmail}
-                            onChange={e => setInviteEmail(e.target.value)}
-                        />
+                <form onSubmit={handleCreateMember} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo *</label>
+                            <Input
+                                required
+                                placeholder="Ej: Juan Pérez"
+                                value={formData.fullName}
+                                onChange={e => setFormData({ ...formData, fullName: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Email (Usuario) *</label>
+                            <Input
+                                type="email"
+                                required
+                                placeholder="juan@empresa.com"
+                                value={formData.email}
+                                onChange={e => setFormData({ ...formData, email: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña *</label>
+                            <div className="relative">
+                                <Input
+                                    type="text" // Visible by default for admin convenience on creation
+                                    required
+                                    placeholder="Contraseña inicial"
+                                    value={formData.password}
+                                    onChange={e => setFormData({ ...formData, password: e.target.value })}
+                                />
+                                <Lock className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono (Opcional)</label>
+                            <Input
+                                placeholder="+503 ..."
+                                value={formData.phone}
+                                onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Rol Asignado</label>
+                            <select
+                                className="w-full rounded-md border border-gray-300 p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                                value={formData.role}
+                                onChange={e => setFormData({ ...formData, role: e.target.value as Role })}
+                            >
+                                <option value="sales_agent">Agente de Ventas (Solo ve sus leads)</option>
+                                <option value="company_admin">Admin de Empresa (Ve todo)</option>
+                            </select>
+                        </div>
+                        <div className="flex items-end">
+                            <Button type="submit" disabled={isCreating} className="w-full">
+                                {isCreating ? 'Creando...' : 'Crear Usuario'}
+                            </Button>
+                        </div>
                     </div>
-                    <div className="flex-1 min-w-[200px]">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Rol Asignado</label>
-                        <select
-                            className="w-full rounded-md border border-gray-300 p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
-                            value={inviteRole}
-                            onChange={e => setInviteRole(e.target.value as Role)}
-                        >
-                            <option value="sales_agent">Agente de Ventas (Solo ve sus leads)</option>
-                            <option value="company_admin">Admin de Empresa (Ve todo)</option>
-                        </select>
-                    </div>
-                    <Button type="submit" disabled={isInviting} className="mb-[2px]">
-                        {isInviting ? 'Enviando...' : 'Enviar Invitación'}
-                    </Button>
                 </form>
             </div>
 
@@ -211,8 +287,9 @@ export default function Team() {
                                             </div>
                                         </div>
                                         <div className="ml-4">
-                                            <div className="text-sm font-medium text-gray-900">{member.email}</div>
-                                            <div className="text-xs text-gray-500">Unido el {new Date(member.created_at).toLocaleDateString()}</div>
+                                            <div className="text-sm font-medium text-gray-900">{member.full_name || 'Sin nombre'}</div>
+                                            <div className="text-xs text-gray-500">{member.email}</div>
+                                            {member.phone && <div className="text-xs text-blue-600 flex items-center mt-0.5"><Phone className="w-3 h-3 mr-1" /> {member.phone}</div>}
                                         </div>
                                     </div>
                                 </td>
@@ -234,6 +311,16 @@ export default function Team() {
                                             <span className="text-blue-600 text-xs font-bold px-2 py-1 bg-blue-50 rounded">Tú</span>
                                         ) : (
                                             <span className="text-gray-400 text-xs">Activo</span>
+                                        )}
+
+                                        {isAdmin && member.id !== myProfile?.id && (
+                                            <button
+                                                onClick={() => handleToggleStatus(member.id, member.is_active)}
+                                                className={`ml-2 p-1 rounded transition-colors ${member.is_active !== false ? 'text-green-600 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-100'}`}
+                                                title={member.is_active !== false ? "Desactivar usuario" : "Activar usuario"}
+                                            >
+                                                {member.is_active !== false ? <ToggleRight className="w-6 h-6" /> : <ToggleLeft className="w-6 h-6" />}
+                                            </button>
                                         )}
                                     </div>
                                 </td>

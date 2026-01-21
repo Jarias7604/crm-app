@@ -26,7 +26,7 @@ export const teamService = {
     async getTeamMembers(companyId: string) {
         const { data, error } = await supabase
             .from('profiles')
-            .select('id, email, role, created_at, company_id, full_name') // Selective select
+            .select('id, email, role, created_at, company_id, full_name, phone, is_active') // Selective select
             .eq('company_id', companyId)
             .order('created_at', { ascending: false });
 
@@ -47,7 +47,32 @@ export const teamService = {
         return data as Invitation[];
     },
 
-    // Invite a new member - Optimized
+    // Create a new member directly (Admin only)
+    async createMember(data: { email: string; password: string; role: Role; fullName: string; phone?: string; companyId: string }) {
+        const { data: stringId, error } = await supabase.rpc('admin_create_user', {
+            new_email: data.email,
+            new_password: data.password,
+            new_role: data.role,
+            new_full_name: data.fullName,
+            new_phone: data.phone || null,
+            new_company_id: data.companyId
+        });
+
+        if (error) throw error;
+        return stringId;
+    },
+
+    // Toggle member status
+    async toggleMemberStatus(userId: string, status: boolean) {
+        const { error } = await supabase.rpc('toggle_user_status', {
+            user_id: userId,
+            status: status
+        });
+
+        if (error) throw error;
+    },
+
+    // Invite a new member - Legacy / Optional if you still want to keep invitations
     async inviteMember(email: string, role: Role, companyId: string, createdBy: string) {
         const { data, error } = await supabase
             .from('company_invitations')
