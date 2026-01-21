@@ -62,6 +62,10 @@ export default function Permissions() {
     };
 
     const isEnabled = (role: string, key: string) => {
+        // Super Admin SIEMPRE tiene todos los permisos habilitados
+        if (role === 'super_admin') {
+            return true;
+        }
         return rolePermissions.find(p => p.role === role && p.permission_key === key)?.is_enabled ?? false;
     };
 
