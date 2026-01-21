@@ -115,14 +115,16 @@ export const csvHelper = {
                                         val = parseFloat(val.replace(/[^0-9.]/g, '')) || 0;
                                     }
 
-                                    // Parse created_at date (DD-MM-YYYY format)
+                                    // Parse created_at date (DD-MM-YYYY or DD/MM/YYYY format)
                                     if (col.key === 'created_at' && val) {
                                         const cleanDate = val.split('(')[0].trim();
-                                        const match = cleanDate.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+                                        // Support both - and / as delimiters
+                                        const match = cleanDate.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
                                         if (match) {
                                             const day = match[1].padStart(2, '0');
                                             const month = match[2].padStart(2, '0');
                                             const year = match[3];
+                                            // Ensure ISO format YYYY-MM-DD
                                             const dateObj = new Date(`${year}-${month}-${day}T12:00:00Z`);
                                             if (!isNaN(dateObj.getTime())) val = dateObj.toISOString();
                                             else val = undefined;
