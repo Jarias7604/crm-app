@@ -56,69 +56,58 @@ export const csvHelper = {
                         return;
                     }
 
-                    // Handle different line endings
-                    const lines = text.split(/\r?\n/);
+                    // Handle different line endings and filter out empty lines
+                    const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0);
                     if (lines.length < 2) {
                         resolve([]);
                         return;
                     }
 
-                    const headers = lines[0].split(',').map(h => h.trim().replace(/^[\uFEFF]/, ''));
+                    // Detect delimiter (comma or semicolon)
+                    const firstLine = lines[0];
+                    const commaCount = (firstLine.match(/,/g) || []).length;
+                    const semicolonCount = (firstLine.match(/;/g) || []).length;
+                    const delimiter = semicolonCount > commaCount ? ';' : ',';
+
+                    // Process headers: normalize for robust matching
+                    const rawHeaders = lines[0].split(delimiter).map(h => h.trim().replace(/^[\uFEFF]/, '').toLowerCase());
 
                     const data = lines.slice(1)
-                        .filter(row => row.trim().length > 0)
                         .map(row => {
-                            // Basic CSV parsing (not handling complex quotes, but better than before)
-                            const values = row.split(',').map(v => v.trim().replace(/^"(.*)"$/, '$1'));
+                            const values = row.split(delimiter).map(v => v.trim().replace(/^"(.*)"$/, '$1'));
                             const lead: any = {};
+                            let hasName = false;
 
                             CSV_COLUMNS.forEach((col) => {
-                                const headerIndex = headers.indexOf(col.label);
+                                // Find header index by checking multiple possible matches (Spanish, English, or exact match)
+                                const possibleHeaders = [
+                                    col.label.toLowerCase(),
+                                    col.key.toLowerCase(),
+                                    col.label.split('(')[0].trim().toLowerCase() // e.g., "Empresa" for "Empresa (opcional)"
+                                ];
+
+                                const headerIndex = rawHeaders.findIndex(h => possibleHeaders.includes(h));
+
                                 if (headerIndex !== -1 && headerIndex < values.length) {
                                     let val: any = values[headerIndex];
 
-                                    // Clean instruction text from fields (text in parentheses)
-                                    if (['priority', 'status', 'source'].includes(col.key) && val) {
-                                        // Remove any instruction text in parentheses
-                                        val = val.split('(')[0].trim();
-                                    }
-
-                                    // Map Spanish priority names to database codes
+                                    // Map Spanish priority names
                                     if (col.key === 'priority' && val) {
                                         const priorityMap: Record<string, string> = {
-                                            'muy alta': 'very_high',
-                                            'muy_alta': 'very_high',
-                                            'altísima': 'very_high',
-                                            'alta': 'high',
-                                            'media': 'medium',
-                                            'baja': 'low',
-                                            // English fallbacks
-                                            'very_high': 'very_high',
-                                            'high': 'high',
-                                            'medium': 'medium',
-                                            'low': 'low'
+                                            'muy alta': 'very_high', 'altísima': 'very_high', 'alta': 'high', 'media': 'medium', 'baja': 'low'
                                         };
-                                        val = priorityMap[val.toLowerCase()] || val;
+                                        const normalizedVal = val.split('(')[0].trim().toLowerCase();
+                                        val = priorityMap[normalizedVal] || normalizedVal;
                                     }
 
-                                    // Map Spanish source names to database codes
+                                    // Map Spanish source names
                                     if (col.key === 'source' && val) {
                                         const sourceMap: Record<string, string> = {
-                                            'redes sociales': 'redes_sociales',
-                                            'redes_sociales': 'redes_sociales',
-                                            'referidos': 'referidos',
-                                            'visita campo': 'visita_campo',
-                                            'visita de campo': 'visita_campo',
-                                            'visita_campo': 'visita_campo',
-                                            'sitio web': 'sitio_web',
-                                            'sitio_web': 'sitio_web',
-                                            'llamada fría': 'llamada_fria',
-                                            'llamada fria': 'llamada_fria',
-                                            'llamada_fria': 'llamada_fria',
-                                            'otro': 'otro',
-                                            'otros': 'otro'
+                                            'redes sociales': 'redes_sociales', 'referidos': 'referidos', 'visita campo': 'visita_campo',
+                                            'sitio web': 'sitio_web', 'llamada fría': 'llamada_fria', 'otro': 'otro'
                                         };
-                                        val = sourceMap[val.toLowerCase()] || val;
+                                        const normalizedVal = val.split('(')[0].trim().toLowerCase();
+                                        val = sourceMap[normalizedVal] || normalizedVal;
                                     }
 
                                     // Parse value as number
@@ -128,42 +117,28 @@ export const csvHelper = {
 
                                     // Parse created_at date (DD-MM-YYYY format)
                                     if (col.key === 'created_at' && val) {
-                                        // Remove any instruction text in parentheses
-                                        val = val.split('(')[0].trim();
-
-                                        // Validate date format DD-MM-YYYY
-                                        const dateRegex = /^(\d{1,2})-(\d{1,2})-(\d{4})$/;
-                                        const match = val.match(dateRegex);
-
+                                        const cleanDate = val.split('(')[0].trim();
+                                        const match = cleanDate.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
                                         if (match) {
                                             const day = match[1].padStart(2, '0');
                                             const month = match[2].padStart(2, '0');
                                             const year = match[3];
-
-                                            // Convert DD-MM-YYYY to ISO format YYYY-MM-DD
-                                            const isoDate = `${year}-${month}-${day}`;
-
-                                            // Validate the date is valid
-                                            const dateObj = new Date(isoDate + 'T12:00:00Z');
-                                            if (!isNaN(dateObj.getTime())) {
-                                                val = dateObj.toISOString();
-                                            } else {
-                                                // Invalid date, skip it
-                                                val = undefined;
-                                            }
-                                        } else {
-                                            // Invalid format, skip it
-                                            val = undefined;
-                                        }
+                                            const dateObj = new Date(`${year}-${month}-${day}T12:00:00Z`);
+                                            if (!isNaN(dateObj.getTime())) val = dateObj.toISOString();
+                                            else val = undefined;
+                                        } else val = undefined;
                                     }
 
                                     if (val !== undefined && val !== '') {
                                         lead[col.key] = val;
+                                        if (col.key === 'name') hasName = true;
                                     }
                                 }
                             });
-                            return lead;
-                        });
+
+                            return hasName ? lead : null;
+                        })
+                        .filter(l => l !== null); // Remove rows without a name
 
                     resolve(data);
                 } catch (error) {
