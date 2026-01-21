@@ -63,17 +63,11 @@ export default function Leads() {
         }
     }, [location]);
 
-    // Force grid view on mobile
+    // Force grid view on mobile initially, but allow changes
     useEffect(() => {
-        const handleResize = () => {
-            if (window.innerWidth < 768) {
-                setViewMode('grid');
-            }
-        };
-        // Initial check
-        handleResize();
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
+        if (window.innerWidth < 768) {
+            setViewMode('grid');
+        }
     }, []);
 
     // Update local state when lead is selected
