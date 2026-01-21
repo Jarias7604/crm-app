@@ -14,6 +14,7 @@ import { storageService } from '../services/storage';
 import { useAuth } from '../auth/AuthProvider';
 import { useMemo } from 'react';
 import { CreateLeadFullscreen } from '../components/CreateLeadFullscreen';
+import { MobileQuickActions } from '../components/MobileQuickActions';
 
 export default function Leads() {
     const { profile } = useAuth();
@@ -974,6 +975,9 @@ export default function Leads() {
                     </div>
                 </div>
             )}
+
+            {/* Mobile Quick Actions */}
+            <MobileQuickActions onCreateLead={() => setIsModalOpen(true)} />
         </div>
     );
 }
