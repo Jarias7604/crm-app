@@ -52,6 +52,7 @@ export default function Leads() {
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [isImporting, setIsImporting] = useState(false);
     const [priorityFilter, setPriorityFilter] = useState<string>('all');
+    const [filteredLeadId, setFilteredLeadId] = useState<string | null>(null);
 
     const [isUploading, setIsUploading] = useState(false);
     const location = useLocation();
@@ -68,7 +69,9 @@ export default function Leads() {
                 const targetLead = leads.find(l => l.id === state.leadId);
                 if (targetLead) {
                     setSelectedLead(targetLead);
+                    setFilteredLeadId(state.leadId); // Filter list to show only this lead
                     setIsDetailOpen(true);
+
                     // Clear state to prevent reopening on reload (optional but good practice)
                     window.history.replaceState({}, document.title);
                 }
@@ -162,10 +165,11 @@ export default function Leads() {
 
     const filteredLeads = useMemo(() => {
         return leads.filter(lead => {
+            if (filteredLeadId) return lead.id === filteredLeadId;
             if (priorityFilter !== 'all' && lead.priority !== priorityFilter) return false;
             return true;
         });
-    }, [leads, priorityFilter]);
+    }, [leads, priorityFilter, filteredLeadId]);
 
     const handleDeleteLead = async (id: string, name: string) => {
         if (!confirm(`¿Estás seguro de eliminar el lead "${name}"? Esta acción no se puede deshacer.`)) return;
@@ -387,7 +391,10 @@ export default function Leads() {
                             <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Filtrar:</span>
                             <select
                                 value={priorityFilter}
-                                onChange={(e) => setPriorityFilter(e.target.value)}
+                                onChange={(e) => {
+                                    setPriorityFilter(e.target.value);
+                                    setFilteredLeadId(null); // Clear specific lead filter
+                                }}
                                 className="text-xs border-gray-300 rounded-md py-1 pr-8 focus:ring-blue-500 focus:border-blue-500"
                             >
                                 <option value="all">Todas las Prioridades</option>
