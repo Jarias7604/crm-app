@@ -318,6 +318,7 @@ export default function Team() {
                                                     checked={member.is_active !== false}
                                                     onChange={() => handleToggleStatus(member.id, member.is_active)}
                                                     size="sm"
+                                                    colorVariant="green"
                                                 />
                                             </div>
                                         )}

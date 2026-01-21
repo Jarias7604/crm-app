@@ -4,9 +4,10 @@ interface SwitchProps {
     disabled?: boolean;
     label?: string;
     size?: 'sm' | 'md' | 'lg';
+    colorVariant?: 'blue' | 'green';
 }
 
-export default function Switch({ checked, onChange, disabled = false, label, size = 'md' }: SwitchProps) {
+export default function Switch({ checked, onChange, disabled = false, label, size = 'md', colorVariant = 'blue' }: SwitchProps) {
     const sizeClasses = {
         sm: {
             track: 'w-8 h-4',
@@ -25,7 +26,13 @@ export default function Switch({ checked, onChange, disabled = false, label, siz
         }
     };
 
+    const colorClasses = {
+        blue: 'bg-blue-600',
+        green: 'bg-green-600'
+    };
+
     const currentSize = sizeClasses[size];
+    const activeColor = colorClasses[colorVariant];
 
     return (
         <label className={`flex items-center cursor-pointer ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
@@ -37,7 +44,7 @@ export default function Switch({ checked, onChange, disabled = false, label, siz
                     onChange={(e) => !disabled && onChange(e.target.checked)}
                     disabled={disabled}
                 />
-                <div className={`${currentSize.track} ${checked ? 'bg-blue-600' : 'bg-gray-300'} rounded-full shadow-inner transition-colors duration-300 ease-in-out`}></div>
+                <div className={`${currentSize.track} ${checked ? activeColor : 'bg-gray-300'} rounded-full shadow-inner transition-colors duration-300 ease-in-out`}></div>
                 <div className={`absolute left-0.5 top-0.5 ${currentSize.thumb} bg-white rounded-full shadow transform transition-transform duration-300 ease-in-out ${checked ? currentSize.translate : 'translate-x-0'}`}></div>
             </div>
             {label && <span className="ml-3 text-sm font-medium text-gray-700">{label}</span>}
