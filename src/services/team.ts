@@ -109,12 +109,11 @@ export const teamService = {
         if (error) throw error;
     },
 
-    // Delete a team member (profile)
+    // Delete a team member (Auth + Profile)
     async deleteMember(id: string) {
-        const { error } = await supabase
-            .from('profiles')
-            .delete()
-            .eq('id', id);
+        const { error } = await supabase.rpc('admin_delete_user', {
+            target_user_id: id
+        });
 
         if (error) throw error;
     }
