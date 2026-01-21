@@ -13,6 +13,7 @@ import { csvHelper } from '../utils/csvHelper';
 import { storageService } from '../services/storage';
 import { useAuth } from '../auth/AuthProvider';
 import { useMemo } from 'react';
+import { CreateLeadFullscreen } from '../components/CreateLeadFullscreen';
 
 export default function Leads() {
     const { profile } = useAuth();
