@@ -17,33 +17,23 @@ import {
     isToday
 } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, Plus, MapPin, Phone, Mail } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, Plus, MapPin, Phone, Mail } from 'lucide-react';
 import { leadsService } from '../services/leads';
 import type { Lead } from '../types';
 import { Button } from '../components/ui/Button';
 
 export default function Calendar() {
     const navigate = useNavigate();
-    const [currentDate, setCurrentDate] = useState(new Date()); // Controls the visible range (Month/Week)
+    const [currentDate, setCurrentDate] = useState(new Date()); // Shared state for both views, though they might diverge in UX usually.
+    // For simplicity, Month View uses currentDate as the month anchor.
+    // Timeline View uses currentDate as the week anchor.
+
     const [selectedDate, setSelectedDate] = useState(new Date()); // Controls the specific day selected in Week view
     const [leads, setLeads] = useState<Lead[]>([]);
     const [loading, setLoading] = useState(true);
-    const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
 
     useEffect(() => {
         loadData();
-
-        // Auto-detect mobile to switch to week view
-        const handleResize = () => {
-            if (window.innerWidth < 768) {
-                setViewMode('week');
-            } else {
-                setViewMode('month');
-            }
-        };
-        handleResize(); // Initial check
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
     }, []);
 
     const loadData = async () => {
@@ -58,20 +48,20 @@ export default function Calendar() {
         }
     };
 
-    const next = () => {
-        if (viewMode === 'month') {
-            setCurrentDate(addMonths(currentDate, 1));
-        } else {
-            setCurrentDate(addWeeks(currentDate, 1));
-        }
-    };
+    // Desktop Navigation (Month)
+    const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
+    const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
 
-    const prev = () => {
-        if (viewMode === 'month') {
-            setCurrentDate(subMonths(currentDate, 1));
-        } else {
-            setCurrentDate(subWeeks(currentDate, 1));
-        }
+    // Mobile Navigation (Week)
+    const nextWeek = () => {
+        const newDate = addWeeks(currentDate, 1);
+        setCurrentDate(newDate);
+        setSelectedDate(addWeeks(selectedDate, 1));
+    };
+    const prevWeek = () => {
+        const newDate = subWeeks(currentDate, 1);
+        setCurrentDate(newDate);
+        setSelectedDate(subWeeks(selectedDate, 1));
     };
 
     // Helper to parse "YYYY-MM-DD" safely in LOCAL time
@@ -93,24 +83,42 @@ export default function Calendar() {
     const renderHeader = () => (
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
             <div>
-                <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                    {viewMode === 'week' ? 'Mi Agenda' : 'Calendario'}
+                {/* Mobile Title */}
+                <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2 md:hidden">
+                    Mi Agenda
                 </h1>
+                {/* Desktop Title */}
+                <h1 className="hidden md:flex text-2xl font-bold text-gray-900 items-center gap-2">
+                    Calendario
+                </h1>
+
                 <p className="text-sm text-gray-500">
-                    {viewMode === 'week'
-                        ? format(selectedDate, "EEEE d 'de' MMMM", { locale: es })
-                        : 'Vista General del Mes'}
+                    <span className="md:hidden capitalize">{format(selectedDate, "EEEE d 'de' MMMM", { locale: es })}</span>
+                    <span className="hidden md:inline">Vista General del Mes</span>
                 </p>
             </div>
 
             <div className="flex items-center justify-between bg-white p-1.5 rounded-xl shadow-sm border border-gray-200 w-full md:w-auto">
-                <button onClick={prev} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600">
+                {/* Desktop Buttons */}
+                <button onClick={prevMonth} className="hidden md:block p-2 hover:bg-gray-100 rounded-lg text-gray-600" title="Mes Anterior">
                     <ChevronLeft className="w-5 h-5" />
                 </button>
+                {/* Mobile Buttons */}
+                <button onClick={prevWeek} className="md:hidden p-2 hover:bg-gray-100 rounded-lg text-gray-600" title="Semana Anterior">
+                    <ChevronLeft className="w-5 h-5" />
+                </button>
+
+                {/* Date Label (Desktop Month / Mobile Month) */}
                 <span className="text-sm font-bold text-gray-800 capitalize min-w-[120px] text-center">
-                    {format(currentDate, viewMode === 'month' ? 'MMMM yyyy' : 'MMM yyyy', { locale: es })}
+                    {format(currentDate, 'MMMM yyyy', { locale: es })}
                 </span>
-                <button onClick={next} className="p-2 hover:bg-gray-100 rounded-lg text-gray-600">
+
+                {/* Desktop Buttons */}
+                <button onClick={nextMonth} className="hidden md:block p-2 hover:bg-gray-100 rounded-lg text-gray-600" title="Mes Siguiente">
+                    <ChevronRight className="w-5 h-5" />
+                </button>
+                {/* Mobile Buttons */}
+                <button onClick={nextWeek} className="md:hidden p-2 hover:bg-gray-100 rounded-lg text-gray-600" title="Semana Siguiente">
                     <ChevronRight className="w-5 h-5" />
                 </button>
             </div>
@@ -126,7 +134,7 @@ export default function Calendar() {
         const weekDays = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
         return (
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 animate-in fade-in">
+            <div className="hidden md:block bg-white p-6 rounded-2xl shadow-sm border border-gray-100 animate-in fade-in">
                 {/* Desktop Headers */}
                 <div className="grid grid-cols-7 mb-2 border-b border-gray-100 pb-2">
                     {weekDays.map(d => (
@@ -195,7 +203,7 @@ export default function Calendar() {
         const todaysLeads = getDailyLeads(selectedDate);
 
         return (
-            <div className="space-y-6 animate-in slide-in-from-right duration-300">
+            <div className="md:hidden space-y-6 animate-in slide-in-from-right duration-300">
                 {/* Week Strip */}
                 <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 overflow-x-auto hide-scrollbar">
                     <div className="flex justify-between md:justify-around min-w-max gap-4 md:gap-0">
@@ -209,8 +217,8 @@ export default function Calendar() {
                                     key={day.toISOString()}
                                     onClick={() => setSelectedDate(day)}
                                     className={`flex flex-col items-center min-w-[3rem] p-2 rounded-2xl transition-all ${isSelected
-                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 transform scale-105'
-                                        : 'hover:bg-gray-50'
+                                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 transform scale-105'
+                                            : 'hover:bg-gray-50'
                                         }`}
                                 >
                                     <span className={`text-[10px] font-bold uppercase mb-1 ${isSelected ? 'text-blue-200' : 'text-gray-400'}`}>
@@ -241,7 +249,7 @@ export default function Calendar() {
 
                     {todaysLeads.length > 0 ? (
                         <div className="relative space-y-4 before:absolute before:left-4 before:top-2 before:bottom-0 before:w-0.5 before:bg-gray-200">
-                            {todaysLeads.map((lead, idx) => (
+                            {todaysLeads.map((lead) => (
                                 <div key={lead.id} className="relative pl-10">
                                     {/* Timeline Dot */}
                                     <span className="absolute left-[11px] top-4 w-3 h-3 bg-white border-[3px] border-blue-600 rounded-full z-10" />
@@ -256,7 +264,7 @@ export default function Calendar() {
                                                 Reunión / Llamada
                                             </span>
                                             <span className="text-xs font-bold text-gray-400">
-                                                {format(new Date(), 'h:00 a')} {/* Mock time */}
+                                                {format(new Date(), 'h:00 a')} {/* Mock time, real apps would use lead.time */}
                                             </span>
                                         </div>
                                         <h4 className="font-bold text-gray-900 text-base mb-1">{lead.name}</h4>
@@ -300,7 +308,10 @@ export default function Calendar() {
             {loading ? (
                 <div className="flex justify-center p-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>
             ) : (
-                viewMode === 'month' ? renderMonthView() : renderTimelineView()
+                <>
+                    {renderMonthView()}
+                    {renderTimelineView()}
+                </>
             )}
         </div>
     );
