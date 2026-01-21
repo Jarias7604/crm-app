@@ -210,7 +210,7 @@ export const leadsService = {
                 'name', 'company_name', 'email', 'phone', 'source',
                 'status', 'priority', 'value', 'closing_amount',
                 'next_followup_date', 'next_followup_assignee', 'next_action_notes',
-                'company_id', 'assigned_to'
+                'company_id', 'assigned_to', 'created_at'
             ];
 
             const leadsToInsert = leads.map(lead => {
