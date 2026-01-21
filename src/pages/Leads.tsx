@@ -2,11 +2,10 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { leadsService } from '../services/leads';
 import type { Lead, LeadStatus, LeadPriority, FollowUp } from '../types';
-import { PRIORITY_CONFIG, STATUS_CONFIG, ACTION_TYPES, SOURCE_CONFIG, SOURCE_OPTIONS } from '../types';
+import { PRIORITY_CONFIG, STATUS_CONFIG, ACTION_TYPES, SOURCE_CONFIG } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Modal } from '../components/ui/Modal';
-import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2, Shield } from 'lucide-react';
+import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { csvHelper } from '../utils/csvHelper';
@@ -29,18 +28,18 @@ export default function Leads() {
 
     const [formData, setFormData] = useState({
         name: '',
-        company_name: '',
-        email: '',
-        phone: '',
+        company_name: '' as string | undefined,
+        email: '' as string | null,
+        phone: '' as string | null,
         status: 'Nuevo lead' as LeadStatus,
         priority: 'medium' as LeadPriority,
         value: 0,
         closing_amount: 0,
-        source: '',
-        next_followup_date: '',
-        next_followup_assignee: '',
-        next_action_notes: '',
-        assigned_to: '', // Permanent owner
+        source: '' as string | null,
+        next_followup_date: '' as string | null,
+        next_followup_assignee: '' as string | null,
+        next_action_notes: '' as string | null,
+        assigned_to: '' as string | null, // Permanent owner
     });
 
     // State for Next Follow Up section (manual save)
@@ -654,7 +653,7 @@ export default function Leads() {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 formData={formData}
-                setFormData={setFormData}
+                setFormData={(data) => setFormData(prev => ({ ...prev, ...data }))}
                 teamMembers={teamMembers}
                 onSubmit={handleSubmit}
             />
