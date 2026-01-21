@@ -66,7 +66,7 @@ export const teamService = {
     async toggleMemberStatus(userId: string, status: boolean) {
         const { error } = await supabase.rpc('toggle_user_status', {
             user_id: userId,
-            status: status
+            new_status: status
         });
 
         if (error) throw error;
