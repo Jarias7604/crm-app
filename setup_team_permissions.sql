@@ -90,7 +90,7 @@ BEGIN
         VALUES (
             new.id, 
             new.email, 
-            v_role, -- Use invited role
+            v_role::app_role, -- Use invited role casted
             v_company_id, -- Use invited company
             true
         );
@@ -109,7 +109,7 @@ BEGIN
         VALUES (
             new.id, 
             new.email, 
-            'company_admin', -- Creator is always admin
+            'company_admin'::app_role, -- Creator is always admin
             v_company_id, 
             true
         );

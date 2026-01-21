@@ -71,12 +71,12 @@ BEGIN
         false
     ) RETURNING id INTO new_user_id;
 
-    -- Create profile (without 'status' column)
+    -- Create profile (without 'status' column, cast role)
     INSERT INTO public.profiles (id, email, role, company_id, full_name, phone, is_active)
     VALUES (
         new_user_id,
         new_email,
-        new_role,
+        new_role::app_role,
         new_company_id,
         new_full_name,
         new_phone,
