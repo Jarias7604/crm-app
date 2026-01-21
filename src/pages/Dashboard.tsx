@@ -4,7 +4,7 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
-import { BadgeDollarSign, TrendingUp, Users, Target, Building, Calendar, CheckCircle, ChevronDown, Search, Edit2 } from 'lucide-react';
+import { BadgeDollarSign, TrendingUp, Users, Target, Building, Calendar, CheckCircle, ChevronDown, Edit2 } from 'lucide-react';
 import { adminService } from '../services/admin';
 import { useEffect, useState, useRef } from 'react';
 import {
