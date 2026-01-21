@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -35,15 +36,14 @@ const PIE_COLORS = [THEME.primary, THEME.success, THEME.accent, '#8b5cf6', '#647
 
 const FunnelInfographic = ({ data }: { data: any[] }) => {
     // Process data to get specific funnel layers
-    // We expect data to be sorted by status flow
-    const getLayerValue = (name: string) => data.find(d => d.name === name)?.value || 0;
+    const getLayerValue = (key: string) => data.find(d => d.key === key)?.value || 0;
 
     // In this simplified dashboard, we'll map status names to 3 main layers
     const layers = [
         { label: 'Leads Totales', value: data.reduce((sum, d) => sum + d.value, 0), color: '#007BFF' },
-        { label: 'En Seguimiento', value: getLayerValue('Nuevo lead') + getLayerValue('Contactado') + getLayerValue('En seguimiento'), color: '#3b82f6' },
-        { label: 'Potenciales', value: getLayerValue('En negociación') + getLayerValue('Propuesta enviada'), color: '#60a5fa' },
-        { label: 'Ventas Ganadas', value: getLayerValue('Ganado'), color: '#3DCC91' }
+        { label: 'En Seguimiento', value: getLayerValue('Nuevo lead') + getLayerValue('Potencial – En seguimiento'), color: '#3b82f6' },
+        { label: 'Ventas Ganadas', value: getLayerValue('Cliente 2025') + getLayerValue('Cliente 2026'), color: '#3DCC91' },
+        { label: 'Leads Perdidos', value: getLayerValue('Lead perdido') + getLayerValue('Lead erróneo'), color: '#94a3b8' }
     ].filter(l => l.value > 0 || l.label === 'Ventas Ganadas');
 
     if (layers.length === 0) return <div className="text-gray-400 text-center py-10">No hay datos suficientes</div>;
@@ -180,8 +180,10 @@ export default function Dashboard() {
             });
             setIsCompanyModalOpen(false);
             loadSuperAdminData();
+            toast.success('Configuración de empresa actualizada');
         } catch (error: any) {
             console.error('Update company failed', error);
+            toast.error(`Error: ${error.message}`);
         } finally {
             setIsUpdatingCompany(false);
         }
@@ -236,6 +238,7 @@ export default function Dashboard() {
             });
 
             setFunnelData(statusData.map((item: any) => ({
+                key: item.name,
                 name: STATUS_CONFIG[item.name as keyof typeof STATUS_CONFIG]?.label || item.name,
                 value: item.value
             })));

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { teamService, type Invitation } from '../../services/team';
 import type { Profile, Role } from '../../types';
 import { Button } from '../../components/ui/Button';
@@ -60,12 +61,12 @@ export default function Team() {
         if (!myProfile?.company_id) return;
 
         if (isLimitReached) {
-            alert('Has alcanzado el límite de usuarios permitidos por tu licencia.');
+            toast.error('Has alcanzado el límite de usuarios permitidos por tu licencia.');
             return;
         }
 
         if (formData.password.length < 6) {
-            alert('La contraseña debe tener al menos 6 caracteres.');
+            toast.error('La contraseña debe tener al menos 6 caracteres.');
             return;
         }
 
@@ -88,11 +89,11 @@ export default function Team() {
                 role: 'sales_agent'
             });
 
-            alert(`✅ Usuario creado correctamente. Puedes compartirle sus credenciales.`);
+            toast.success('Usuario creado correctamente');
             loadData();
         } catch (error: any) {
             console.error(error);
-            alert(`❌ Error al crear usuario: ${error.message}`);
+            toast.error(`Error al crear usuario: ${error.message}`);
         } finally {
             setIsCreating(false);
         }
@@ -105,9 +106,10 @@ export default function Team() {
             // Optimistic update
             setMembers(members.map(m => m.id === id ? { ...m, is_active: newStatus } : m));
             await teamService.toggleMemberStatus(id, newStatus);
+            toast.success(newStatus ? 'Usuario activado' : 'Usuario desactivado');
         } catch (error: any) {
             console.error('Toggle failed:', error);
-            alert(`Error: ${error.message}`);
+            toast.error(`Error: ${error.message}`);
             loadData(); // Revert on error
         }
     };
@@ -116,25 +118,26 @@ export default function Team() {
         if (!confirm('¿Estás seguro de cancelar esta invitación?')) return;
         try {
             await teamService.revokeInvitation(id);
+            toast.success('Invitación cancelada');
             loadData();
         } catch (error: any) {
-            alert(`Error: ${error.message}`);
+            toast.error(`Error: ${error.message}`);
         }
     };
 
     const handleMemberDelete = async (id: string, email: string) => {
         if (id === myProfile?.id) {
-            alert('No puedes eliminarte a ti mismo.');
+            toast.error('No puedes eliminarte a ti mismo.');
             return;
         }
         if (!confirm(`¿Estás seguro de eliminar a ${email} del equipo? Perderá el acceso de inmediato.`)) return;
         try {
             await teamService.deleteMember(id);
-            alert('✅ Miembro eliminado correctamente');
+            toast.success('Miembro eliminado');
             loadData();
         } catch (error: any) {
             console.error('Delete failed:', error);
-            alert(`❌ Error al eliminar: ${error.message}`);
+            toast.error(`Error al eliminar: ${error.message}`);
         }
     };
 
@@ -158,12 +161,12 @@ export default function Team() {
                 role: editingMember.role
             });
 
-            alert('✅ Miembro actualizado correctamente');
+            toast.success('Miembro actualizado');
             setEditingMember(null);
             loadData();
         } catch (error: any) {
             console.error('Update failed:', error);
-            alert(`❌ Error al actualizar: ${error.message}`);
+            toast.error(`Error al actualizar: ${error.message}`);
         } finally {
             setIsSaving(false);
         }

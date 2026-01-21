@@ -179,6 +179,7 @@ export const leadsService = {
             .insert({
                 ...lead,
                 company_id: profile.company_id,
+                assigned_to: lead.assigned_to || user.id, // Auto-assign to creator if not specified
                 priority: lead.priority || 'medium',
                 value: lead.value || 0
             })

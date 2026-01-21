@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { useLocation } from 'react-router-dom';
 import { leadsService } from '../services/leads';
 import type { Lead, LeadStatus, LeadPriority, FollowUp } from '../types';
@@ -150,10 +151,10 @@ export default function Leads() {
             // Reset form
             setNextFollowUpData({ date: '', assignee: '', notes: '' });
 
-            alert('✅ Próximo seguimiento actualizado y registrado en historial');
+            toast.success('Próximo seguimiento actualizado y registrado');
         } catch (error: any) {
             console.error('Save failed:', error);
-            alert(`❌ Error al guardar: ${error.message}`);
+            toast.error(`Error al guardar: ${error.message}`);
         } finally {
             setIsSavingFollowUp(false);
         }
@@ -176,12 +177,12 @@ export default function Leads() {
         if (!confirm(`¿Estás seguro de eliminar el lead "${name}"? Esta acción no se puede deshacer.`)) return;
         try {
             await leadsService.deleteLead(id);
-            alert('✅ Lead eliminado correctamente');
+            toast.success(`Lead "${name}" eliminado correctamente`);
             if (selectedLead?.id === id) setIsDetailOpen(false);
             loadLeads();
         } catch (error: any) {
             console.error('Delete failed:', error);
-            alert(`❌ Error al eliminar: ${error.message}`);
+            toast.error(`Error al eliminar: ${error.message}`);
         }
     };
 
@@ -190,7 +191,7 @@ export default function Leads() {
         if (!file || !selectedLead || !profile?.company_id) return;
 
         if (file.type !== 'application/pdf') {
-            alert('Solo se permiten archivos PDF');
+            toast.error('Solo se permiten archivos PDF');
             return;
         }
 
@@ -200,10 +201,10 @@ export default function Leads() {
             await leadsService.updateLead(selectedLead.id, { document_path: path });
             setSelectedLead({ ...selectedLead, document_path: path });
             setLeads(leads.map(l => l.id === selectedLead.id ? { ...l, document_path: path } : l));
-            alert('✅ PDF cargado correctamente');
+            toast.success('PDF cargado correctamente');
         } catch (error: any) {
             console.error('Upload failed:', error);
-            alert('❌ Error al subir el archivo: ' + error.message);
+            toast.error('Error al subir el archivo: ' + error.message);
         } finally {
             setIsUploading(false);
         }
@@ -215,7 +216,7 @@ export default function Leads() {
             const url = await storageService.getDownloadUrl(selectedLead.document_path);
             window.open(url, '_blank');
         } catch (error: any) {
-            alert('❌ Error al descargar: ' + error.message);
+            toast.error('Error al descargar: ' + error.message);
         }
     };
 
@@ -228,9 +229,9 @@ export default function Leads() {
             await leadsService.updateLead(selectedLead.id, { document_path: null });
             setSelectedLead({ ...selectedLead, document_path: null });
             setLeads(leads.map(l => l.id === selectedLead.id ? { ...l, document_path: null } : l));
-            alert('✅ Documento eliminado');
+            toast.success('Documento eliminado');
         } catch (error: any) {
-            alert('❌ Error al eliminar: ' + error.message);
+            toast.error('Error al eliminar: ' + error.message);
         }
     };
 
@@ -259,18 +260,18 @@ export default function Leads() {
             const data = await csvHelper.parse(file);
 
             if (data.length === 0) {
-                alert('El archivo CSV está vacío.');
+                toast.error('El archivo CSV está vacío.');
                 return;
             }
 
             if (confirm(`¿Estás seguro de que quieres importar ${data.length} leads?`)) {
                 await leadsService.importLeads(data);
-                alert('✅ Leads importados correctamente');
+                toast.success('Leads importados correctamente');
                 loadLeads(); // Refresh list
             }
         } catch (error: any) {
             console.error('Import failed:', error);
-            alert(`❌ Error al importar: ${error.message}`);
+            toast.error(`Error al importar: ${error.message}`);
         } finally {
             setIsImporting(false);
             // Reset input
@@ -310,9 +311,10 @@ export default function Leads() {
             setIsModalOpen(false);
             resetForm();
             loadLeads();
+            toast.success('Nuevo lead creado');
         } catch (error: any) {
             console.error('Failed to create lead', error);
-            alert(`Error: ${error.message}`);
+            toast.error(`Error: ${error.message}`);
         }
     };
 
@@ -334,11 +336,20 @@ export default function Leads() {
             const updatedLead = await leadsService.updateLead(selectedLead.id, cleanUpdates);
             setSelectedLead({ ...selectedLead, ...updatedLead });
             loadLeads();
-            // Visual feedback - brief color change could be added
-            console.log('Lead updated successfully:', cleanUpdates);
+
+            // Show specific feedback based on what changed
+            if ('status' in cleanUpdates) {
+                toast.success(`Estado cambiado a: ${STATUS_CONFIG[cleanUpdates.status as LeadStatus]?.label || cleanUpdates.status}`);
+            } else if ('priority' in cleanUpdates) {
+                toast.success(`Prioridad cambiada a: ${PRIORITY_CONFIG[cleanUpdates.priority as LeadPriority]?.label || cleanUpdates.priority}`);
+            } else if ('assigned_to' in cleanUpdates) {
+                toast.success('Responsable actualizado');
+            } else {
+                toast.success('Cambio guardado');
+            }
         } catch (error: any) {
             console.error('Update failed:', error);
-            alert(`Error al guardar: ${error.message}`);
+            toast.error(`Error al guardar: ${error.message}`);
         }
     };
 
@@ -385,7 +396,7 @@ export default function Leads() {
                     <h1 className="text-2xl font-bold text-gray-900">Gestión de Leads</h1>
                     <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-1">
                         <p className="text-sm text-gray-500">
-                            {leads.length} leads · ${leads.reduce((sum, l) => sum + (l.value || 0), 0).toLocaleString()} en pipeline
+                            {leads.length} leads {!isAdmin && '(Mis asignaciones)'} · ${leads.reduce((sum, l) => sum + (l.value || 0), 0).toLocaleString()} en pipeline
                         </p>
                         <div className="hidden sm:block w-px h-4 bg-gray-300"></div>
                         <div className="flex items-center gap-2">

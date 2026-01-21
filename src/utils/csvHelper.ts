@@ -83,7 +83,8 @@ export const csvHelper = {
                                 const possibleHeaders = [
                                     col.label.toLowerCase(),
                                     col.key.toLowerCase(),
-                                    col.label.split('(')[0].trim().toLowerCase() // e.g., "Empresa" for "Empresa (opcional)"
+                                    col.label.split('(')[0].trim().toLowerCase(), // e.g., "Empresa" for "Empresa (opcional)"
+                                    col.label.split(' ')[0].toLowerCase() // e.g., "Nombre" for "Nombre completo"
                                 ];
 
                                 const headerIndex = rawHeaders.findIndex(h => possibleHeaders.includes(h));
@@ -91,23 +92,37 @@ export const csvHelper = {
                                 if (headerIndex !== -1 && headerIndex < values.length) {
                                     let val: any = values[headerIndex];
 
+                                    // Map Spanish status names for robust import
+                                    if (col.key === 'status' && val) {
+                                        const statusMap: Record<string, string> = {
+                                            'nuevo': 'Nuevo lead', 'nuevo lead': 'Nuevo lead',
+                                            'en seguimiento': 'Potencial – En seguimiento', 'seguimiento': 'Potencial – En seguimiento', 'potencial': 'Potencial – En seguimiento',
+                                            'cliente 2025': 'Cliente 2025', 'cliente 2026': 'Cliente 2026',
+                                            'perdido': 'Lead perdido', 'lead perdido': 'Lead perdido',
+                                            'erroneo': 'Lead erróneo', 'erróneo': 'Lead erróneo', 'error': 'Lead erróneo'
+                                        };
+                                        const normalizedVal = val.toLowerCase().trim();
+                                        val = statusMap[normalizedVal] || val;
+                                    }
+
                                     // Map Spanish priority names
                                     if (col.key === 'priority' && val) {
                                         const priorityMap: Record<string, string> = {
-                                            'muy alta': 'very_high', 'altísima': 'very_high', 'alta': 'high', 'media': 'medium', 'baja': 'low'
+                                            'muy alta': 'very_high', 'altisima': 'very_high', 'altísima': 'very_high', 'urgente': 'very_high',
+                                            'alta': 'high', 'media': 'medium', 'baja': 'low'
                                         };
                                         const normalizedVal = val.split('(')[0].trim().toLowerCase();
-                                        val = priorityMap[normalizedVal] || normalizedVal;
+                                        val = priorityMap[normalizedVal] || val;
                                     }
 
                                     // Map Spanish source names
                                     if (col.key === 'source' && val) {
                                         const sourceMap: Record<string, string> = {
                                             'redes sociales': 'redes_sociales', 'referidos': 'referidos', 'visita campo': 'visita_campo',
-                                            'sitio web': 'sitio_web', 'llamada fría': 'llamada_fria', 'otro': 'otro'
+                                            'sitio web': 'sitio_web', 'llamada fria': 'llamada_fria', 'llamada fría': 'llamada_fria', 'otro': 'otro'
                                         };
                                         const normalizedVal = val.split('(')[0].trim().toLowerCase();
-                                        val = sourceMap[normalizedVal] || normalizedVal;
+                                        val = sourceMap[normalizedVal] || val;
                                     }
 
                                     // Parse value as number
