@@ -928,7 +928,11 @@ export default function Leads() {
                                             className="block w-full rounded-md border-gray-300 shadow-sm text-sm"
                                         >
                                             <option value="">Sin asignar</option>
-                                            {teamMembers.map(m => <option key={m.id} value={m.id}>{m.email}</option>)}
+                                            {teamMembers.map(m => (
+                                                <option key={m.id} value={m.id}>
+                                                    {m.full_name ? `${m.full_name} (${m.email.split('@')[0]})` : m.email}
+                                                </option>
+                                            ))}
                                         </select>
                                     </div>
                                 </div>
