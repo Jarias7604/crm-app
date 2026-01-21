@@ -6,7 +6,7 @@ import { PRIORITY_CONFIG, STATUS_CONFIG, ACTION_TYPES, SOURCE_CONFIG, SOURCE_OPT
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
-import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2 } from 'lucide-react';
+import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2, Shield } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { csvHelper } from '../utils/csvHelper';
@@ -647,98 +647,252 @@ export default function Leads() {
                 </div>
             )}
 
-            {/* Create Lead Modal */}
-            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Nuevo Lead">
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="col-span-2">
-                            <label className="block text-sm font-medium text-gray-700">Nombre Contacto *</label>
-                            <Input required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Empresa</label>
-                            <Input value={formData.company_name} onChange={(e) => setFormData({ ...formData, company_name: e.target.value })} />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Valor Potencial ($)</label>
-                            <Input type="number" value={formData.value} onChange={(e) => setFormData({ ...formData, value: Number(e.target.value) })} />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Email</label>
-                            <Input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Teléfono</label>
-                            <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Fuente</label>
-                            <select value={formData.source} onChange={(e) => setFormData({ ...formData, source: e.target.value })} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                                <option value="">Seleccionar...</option>
-                                {SOURCE_OPTIONS.map(opt => (
-                                    <option key={opt.value} value={opt.value}>{opt.icon} {opt.label}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Prioridad</label>
-                            <select value={formData.priority} onChange={(e) => setFormData({ ...formData, priority: e.target.value as LeadPriority })} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                                <option value="very_high">🔴 Altísima</option>
-                                <option value="high">🟠 Alta</option>
-                                <option value="medium">🟡 Media</option>
-                                <option value="low">⚪ Baja</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Estado</label>
-                            <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value as LeadStatus })} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                                <option value="Nuevo lead">Nuevo lead</option>
-                                <option value="Potencial – En seguimiento">En seguimiento</option>
-                                <option value="Cliente 2025">Cliente 2025</option>
-                                <option value="Cliente 2026">Cliente 2026</option>
-                                <option value="Lead perdido">Perdido</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 flex items-center gap-1">
-                                <TrendingUp className="w-4 h-4 text-green-600" /> Monto de Cierre ($)
-                            </label>
-                            <Input type="number" value={formData.closing_amount} onChange={(e) => setFormData({ ...formData, closing_amount: Number(e.target.value) })} placeholder="0 si aún no cerró" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Próximo Seguimiento</label>
-                            <Input type="date" value={formData.next_followup_date} onChange={(e) => setFormData({ ...formData, next_followup_date: e.target.value })} />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 font-bold text-blue-600">Responsable Principal *</label>
-                            <select required value={formData.assigned_to} onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })} className="mt-1 block w-full rounded-md border-blue-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-blue-50">
-                                <option value="">Seleccionar responsable...</option>
-                                {teamMembers.map(m => (
-                                    <option key={m.id} value={m.id}>
-                                        {m.full_name ? `${m.full_name} (${m.email.split('@')[0]})` : m.email}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 italic">Seguimiento por</label>
-                            <select value={formData.next_followup_assignee} onChange={(e) => setFormData({ ...formData, next_followup_assignee: e.target.value })} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
-                                <option value="">Igual al responsable</option>
-                                {teamMembers.map(m => (
-                                    <option key={m.id} value={m.id}>
-                                        {m.full_name ? `${m.full_name} (${m.email.split('@')[0]})` : m.email}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="col-span-2">
-                            <label className="block text-sm font-medium text-gray-700">Notas próxima acción</label>
-                            <textarea value={formData.next_action_notes} onChange={(e) => setFormData({ ...formData, next_action_notes: e.target.value })} rows={2} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm" />
+            {/* Create Lead Modal - Modern Professional Design */}
+            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="">
+                <form onSubmit={handleSubmit} className="bg-gradient-to-br from-blue-50 to-indigo-50">
+                    {/* Header with gradient */}
+                    <div className="px-8 py-6 bg-gradient-to-r from-blue-600 to-indigo-600 -mt-6 -mx-6 mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                                <Plus className="w-6 h-6 text-white" />
+                            </div>
+                            <div>
+                                <h2 className="text-2xl font-bold text-white">Nuevo Lead</h2>
+                                <p className="text-blue-100 text-sm">Registra una nueva oportunidad de negocio</p>
+                            </div>
                         </div>
                     </div>
-                    <div className="flex justify-end gap-2 pt-4">
-                        <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
-                        <Button type="submit">Crear Lead</Button>
+
+                    <div className="px-8 pb-6 space-y-6">
+                        {/* Section 1: Contact Information */}
+                        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                            <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                <User className="w-4 h-4 text-blue-600" />
+                                Información de Contacto
+                            </h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="col-span-2">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Nombre Contacto *
+                                    </label>
+                                    <div className="relative">
+                                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                        <Input
+                                            required
+                                            value={formData.name}
+                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                            className="pl-10"
+                                            placeholder="Ej: Juan Pérez"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Empresa
+                                    </label>
+                                    <Input
+                                        value={formData.company_name}
+                                        onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
+                                        placeholder="Nombre de la empresa"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Teléfono
+                                    </label>
+                                    <div className="relative">
+                                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                        <Input
+                                            value={formData.phone}
+                                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                            className="pl-10"
+                                            placeholder="+503 ..."
+                                        />
+                                    </div>
+                                </div>
+                                <div className="col-span-2">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Email
+                                    </label>
+                                    <div className="relative">
+                                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                        <Input
+                                            type="email"
+                                            value={formData.email}
+                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                            className="pl-10"
+                                            placeholder="contacto@empresa.com"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Section 2: Lead Details */}
+                        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                            <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                <TrendingUp className="w-4 h-4 text-green-600" />
+                                Detalles del Lead
+                            </h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Fuente
+                                    </label>
+                                    <select
+                                        value={formData.source}
+                                        onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                                        className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                    >
+                                        <option value="">Seleccionar...</option>
+                                        {SOURCE_OPTIONS.map(opt => (
+                                            <option key={opt.value} value={opt.value}>{opt.icon} {opt.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Prioridad
+                                    </label>
+                                    <select
+                                        value={formData.priority}
+                                        onChange={(e) => setFormData({ ...formData, priority: e.target.value as LeadPriority })}
+                                        className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                    >
+                                        <option value="very_high">🔴 Altísima</option>
+                                        <option value="high">🟠 Alta</option>
+                                        <option value="medium">🟡 Media</option>
+                                        <option value="low">⚪ Baja</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Estado
+                                    </label>
+                                    <select
+                                        value={formData.status}
+                                        onChange={(e) => setFormData({ ...formData, status: e.target.value as LeadStatus })}
+                                        className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                    >
+                                        <option value="Nuevo lead">Nuevo lead</option>
+                                        <option value="Potencial – En seguimiento">En seguimiento</option>
+                                        <option value="Cliente 2025">Cliente 2025</option>
+                                        <option value="Cliente 2026">Cliente 2026</option>
+                                        <option value="Lead perdido">Perdido</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                                        <DollarSign className="w-4 h-4 text-green-600" />
+                                        Valor Potencial ($)
+                                    </label>
+                                    <Input
+                                        type="number"
+                                        value={formData.value}
+                                        onChange={(e) => setFormData({ ...formData, value: Number(e.target.value) })}
+                                        placeholder="0"
+                                    />
+                                </div>
+                                <div className="col-span-2">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center gap-1">
+                                        <TrendingUp className="w-4 h-4 text-green-600" />
+                                        Monto de Cierre ($)
+                                    </label>
+                                    <Input
+                                        type="number"
+                                        value={formData.closing_amount}
+                                        onChange={(e) => setFormData({ ...formData, closing_amount: Number(e.target.value) })}
+                                        placeholder="0 si aún no cerró"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Section 3: Assignment & Follow-up */}
+                        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                            <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                <Clock className="w-4 h-4 text-purple-600" />
+                                Asignación y Seguimiento
+                            </h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="col-span-2 bg-blue-50 p-4 rounded-lg border-2 border-blue-200">
+                                    <label className="block text-sm font-bold text-blue-700 mb-1 flex items-center gap-1">
+                                        <Shield className="w-4 h-4" />
+                                        Responsable Principal *
+                                    </label>
+                                    <select
+                                        required
+                                        value={formData.assigned_to}
+                                        onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
+                                        className="mt-1 block w-full rounded-lg border-blue-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
+                                    >
+                                        <option value="">Seleccionar responsable...</option>
+                                        {teamMembers.map(m => (
+                                            <option key={m.id} value={m.id}>
+                                                {m.full_name ? `${m.full_name} (${m.email.split('@')[0]})` : m.email}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Próximo Seguimiento
+                                    </label>
+                                    <Input
+                                        type="date"
+                                        value={formData.next_followup_date}
+                                        onChange={(e) => setFormData({ ...formData, next_followup_date: e.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Seguimiento por
+                                    </label>
+                                    <select
+                                        value={formData.next_followup_assignee}
+                                        onChange={(e) => setFormData({ ...formData, next_followup_assignee: e.target.value })}
+                                        className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                    >
+                                        <option value="">Igual al responsable</option>
+                                        {teamMembers.map(m => (
+                                            <option key={m.id} value={m.id}>
+                                                {m.full_name ? `${m.full_name} (${m.email.split('@')[0]})` : m.email}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="col-span-2">
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Notas próxima acción
+                                    </label>
+                                    <textarea
+                                        value={formData.next_action_notes}
+                                        onChange={(e) => setFormData({ ...formData, next_action_notes: e.target.value })}
+                                        rows={3}
+                                        className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                        placeholder="¿Qué se debe hacer en el próximo contacto?"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex justify-end gap-3 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setIsModalOpen(false)}
+                                className="px-6 py-2.5 rounded-lg border-2 border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition-all"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="submit"
+                                className="px-6 py-2.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold hover:from-blue-700 hover:to-indigo-700 shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2"
+                            >
+                                <Plus className="w-5 h-5" />
+                                Crear Lead
+                            </button>
+                        </div>
                     </div>
                 </form>
             </Modal>

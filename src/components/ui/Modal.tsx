@@ -14,7 +14,7 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-opacity">
-            <div className={cn("bg-white rounded-lg shadow-xl w-full max-w-lg mx-4 flex flex-col max-h-[90vh]", className)}>
+            <div className={cn("bg-white rounded-lg shadow-xl w-full max-w-4xl mx-4 flex flex-col max-h-[90vh]", className)}>
                 <div className="flex justify-between items-center p-4 border-b border-gray-100">
                     <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
                     <button
