@@ -21,16 +21,72 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 
-const COLORS = {
-    blue: '#3b82f6',
-    green: '#10b981',
-    yellow: '#f59e0b',
-    red: '#ef4444',
-    purple: '#8b5cf6',
-    slate: '#64748b'
+const THEME = {
+    primary: '#007BFF',   // Azul Eléctrico
+    background: '#FFFFFF', // Blanco Nieve
+    surface: '#F5F7FA',    // Gris Ultra-Claro
+    text: '#4449AA',       // Gris Carbón
+    accent: '#FFA500',     // Naranja Coral
+    success: '#3DCC91',     // Verde Menta
+    neutral: '#94a3b8'
 };
 
-const PIE_COLORS = [COLORS.blue, COLORS.green, COLORS.yellow, COLORS.purple, COLORS.red, COLORS.slate];
+const PIE_COLORS = [THEME.primary, THEME.success, THEME.accent, '#8b5cf6', '#64748b', '#E2E8F0'];
+
+const FunnelInfographic = ({ data }: { data: any[] }) => {
+    // Process data to get specific funnel layers
+    // We expect data to be sorted by status flow
+    const getLayerValue = (name: string) => data.find(d => d.name === name)?.value || 0;
+
+    // In this simplified dashboard, we'll map status names to 3 main layers
+    const layers = [
+        { label: 'Leads Totales', value: data.reduce((sum, d) => sum + d.value, 0), color: '#007BFF' },
+        { label: 'En Seguimiento', value: getLayerValue('Nuevo lead') + getLayerValue('Contactado') + getLayerValue('En seguimiento'), color: '#3b82f6' },
+        { label: 'Potenciales', value: getLayerValue('En negociación') + getLayerValue('Propuesta enviada'), color: '#60a5fa' },
+        { label: 'Ventas Ganadas', value: getLayerValue('Ganado'), color: '#3DCC91' }
+    ].filter(l => l.value > 0 || l.label === 'Ventas Ganadas');
+
+    if (layers.length === 0) return <div className="text-gray-400 text-center py-10">No hay datos suficientes</div>;
+
+
+    return (
+        <div className="flex flex-col items-center justify-center w-full py-4">
+            <div className="relative w-full max-w-md space-y-2">
+                {layers.map((layer, index) => {
+                    const maxWidthPercent = 100 - (index * 15);
+
+                    return (
+                        <div key={layer.label} className="relative group flex flex-col items-center">
+                            {/* Shape */}
+                            <div
+                                className="h-16 flex items-center justify-center text-white font-bold text-lg shadow-lg relative transition-all duration-300 group-hover:scale-[1.02]"
+                                style={{
+                                    width: `${maxWidthPercent}%`,
+                                    backgroundColor: layer.color,
+                                    clipPath: `polygon(0 0, 100% 0, ${100 - 5}% 100%, 5% 100%)`,
+                                    zIndex: layers.length - index
+                                }}
+                            >
+                                <div className="flex flex-col items-center">
+                                    <span className="text-xs opacity-80 uppercase tracking-wider">{layer.label}</span>
+                                    <span className="text-xl">{layer.value.toLocaleString()}</span>
+                                </div>
+                            </div>
+
+                            {/* Conversion Arrow */}
+                            {index < layers.length - 1 && (
+                                <div className="flex items-center gap-1 text-[10px] text-gray-400 font-bold -my-1 z-0">
+                                    <TrendingUp className="w-3 h-3 text-blue-400" />
+                                    <span>{Math.round((layers[index + 1].value / layer.value) * 100) || 0}% CONVERSIÓN</span>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
 
 export default function Dashboard() {
     const { t } = useTranslation();
@@ -39,7 +95,6 @@ export default function Dashboard() {
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const filterRef = useRef<HTMLDivElement>(null);
     const [selectedDateRange, setSelectedDateRange] = useState<DateRange>('this_month');
-    // const [loading, setLoading] = useState(true); // typescript error fix: unused variable
 
     // Real data states
     const [stats, setStats] = useState({
@@ -75,7 +130,6 @@ export default function Dashboard() {
         }
     }, [profile, selectedDateRange]);
 
-    // Close filter when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
@@ -87,7 +141,6 @@ export default function Dashboard() {
     }, []);
 
     const loadSuperAdminData = async () => {
-        // setLoading(false);
         try {
             const companies = await adminService.getCompanies();
             const totalCompanies = companies.length;
@@ -95,9 +148,8 @@ export default function Dashboard() {
             const activeLicenses = companies.filter(c => c.license_status === 'active').length || 0;
 
             setAdminStats({ totalCompanies, activeTrials, activeLicenses });
-            setRecentCompanies(companies.slice(0, 8)); // Show more for super admin
+            setRecentCompanies(companies.slice(0, 8));
 
-            // Mock trend data
             setCompanyTrend([
                 { name: 'Ene', value: Math.max(1, totalCompanies - 5) },
                 { name: 'Feb', value: Math.max(1, totalCompanies - 4) },
@@ -108,8 +160,6 @@ export default function Dashboard() {
             ]);
         } catch (error) {
             console.error('Failed to load admin data', error);
-        } finally {
-            // setLoading(false);
         }
     };
 
@@ -130,18 +180,15 @@ export default function Dashboard() {
             });
             setIsCompanyModalOpen(false);
             loadSuperAdminData();
-            alert('✅ Empresa actualizada correctamente');
         } catch (error: any) {
-            alert(`❌ Error: ${error.message}`);
+            console.error('Update company failed', error);
         } finally {
             setIsUpdatingCompany(false);
         }
     };
 
     const loadCRMData = async () => {
-        // // setLoading(false);
         try {
-            // Calculate date range
             const now = new Date();
             let startDate: string | undefined;
             let endDate: string | undefined;
@@ -173,9 +220,6 @@ export default function Dashboard() {
                     break;
             }
 
-            console.log('Dashboard loading data for range:', selectedDateRange, { startDate, endDate });
-
-            // Fetch all data in parallel for speed
             const [realStats, statusData, sources, topOpps, priorities] = await Promise.all([
                 leadsService.getLeadStats(startDate, endDate),
                 leadsService.getLeadsByStatus(startDate, endDate),
@@ -215,8 +259,6 @@ export default function Dashboard() {
 
         } catch (error) {
             console.error('Failed to load CRM data', error);
-        } finally {
-            // // setLoading(false);
         }
     };
 
@@ -224,15 +266,15 @@ export default function Dashboard() {
         <div className="relative" ref={filterRef}>
             <button
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className="flex items-center space-x-2 bg-white border border-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-all shadow-sm"
+                className="flex items-center space-x-2 bg-white border border-gray-100 text-[#4449AA] px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-all shadow-sm"
             >
-                <Calendar className="h-4 w-4 text-gray-500" />
+                <Calendar className="h-4 w-4 text-[#007BFF]" />
                 <span>{DATE_RANGE_OPTIONS[selectedDateRange].label}</span>
                 <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {isFilterOpen && (
-                <div className="absolute left-0 sm:right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="absolute left-0 sm:right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-gray-50 z-50 py-2 animate-in fade-in slide-in-from-top-2">
                     {(Object.entries(DATE_RANGE_OPTIONS) as [DateRange, { label: string }][]).map(([key, option]) => (
                         <button
                             key={key}
@@ -240,8 +282,8 @@ export default function Dashboard() {
                                 setSelectedDateRange(key);
                                 setIsFilterOpen(false);
                             }}
-                            className={`w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center justify-between ${selectedDateRange === key
-                                ? 'bg-blue-50 text-blue-700 font-semibold'
+                            className={`w-full text-left px-4 py-3 text-sm transition-colors flex items-center justify-between ${selectedDateRange === key
+                                ? 'bg-blue-50 text-[#007BFF] font-bold'
                                 : 'text-gray-600 hover:bg-gray-50'
                                 }`}
                         >
@@ -257,140 +299,119 @@ export default function Dashboard() {
     // SUPER ADMIN VIEW
     if (profile?.role === 'super_admin') {
         return (
-            <div className="space-y-6">
+            <div className="space-y-8 pb-10">
                 <div className="flex justify-between items-center">
-                    <h2 className="text-2xl font-bold text-gray-800">{t('dashboard.superAdmin.title')}</h2>
+                    <h2 className="text-3xl font-extrabold text-[#4449AA]">{t('dashboard.superAdmin.title')}</h2>
                 </div>
 
                 {/* KPI Cards */}
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                     {[
-                        { name: t('dashboard.superAdmin.totalCompanies'), value: adminStats.totalCompanies, icon: Building, color: 'bg-blue-600' },
-                        { name: t('dashboard.superAdmin.activeTrials'), value: adminStats.activeTrials, icon: Calendar, color: 'bg-yellow-500' },
-                        { name: t('dashboard.superAdmin.activeLicenses'), value: adminStats.activeLicenses, icon: CheckCircle, color: 'bg-green-600' },
+                        { name: t('dashboard.superAdmin.totalCompanies'), value: adminStats.totalCompanies, icon: Building, color: 'text-[#007BFF]', bg: 'bg-blue-50' },
+                        { name: t('dashboard.superAdmin.activeTrials'), value: adminStats.activeTrials, icon: Calendar, color: 'text-[#FFA500]', bg: 'bg-orange-50' },
+                        { name: t('dashboard.superAdmin.activeLicenses'), value: adminStats.activeLicenses, icon: CheckCircle, color: 'text-[#3DCC91]', bg: 'bg-green-50' },
                     ].map((item) => (
-                        <div key={item.name} className="relative overflow-hidden rounded-xl bg-white p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all">
-                            <dt>
-                                <div className={`absolute rounded-lg p-3 ${item.color}`}>
-                                    <item.icon className="h-6 w-6 text-white" />
-                                </div>
-                                <p className="ml-16 text-sm font-medium text-gray-500">{item.name}</p>
-                            </dt>
-                            <dd className="ml-16 text-2xl font-bold text-gray-900">{item.value}</dd>
+                        <div key={item.name} className="group relative overflow-hidden rounded-2xl bg-white p-8 shadow-sm border border-gray-50 hover:shadow-lg transition-all duration-300">
+                            <div className={`p-4 rounded-2xl ${item.bg} w-fit mb-4 transition-transform group-hover:scale-110`}>
+                                <item.icon className={`h-8 w-8 ${item.color}`} />
+                            </div>
+                            <dt className="text-sm font-bold text-gray-400 uppercase tracking-widest">{item.name}</dt>
+                            <dd className="mt-1 text-4xl font-extrabold text-[#4449AA]">{item.value}</dd>
                         </div>
                     ))}
                 </div>
 
-                {/* Charts */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                        <h3 className="text-lg font-bold text-gray-900 mb-4">{t('dashboard.superAdmin.companyGrowthTitle')}</h3>
-                        <div className="h-64">
+                {/* Main Content Area */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    {/* Growth Chart */}
+                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-50">
+                        <h3 className="text-xl font-bold text-[#4449AA] mb-6">{t('dashboard.superAdmin.companyGrowthTitle')}</h3>
+                        <div className="h-72">
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={companyTrend}>
                                     <defs>
                                         <linearGradient id="colorAdmin" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                                            <stop offset="5%" stopColor="#007BFF" stopOpacity={0.2} />
+                                            <stop offset="95%" stopColor="#007BFF" stopOpacity={0} />
                                         </linearGradient>
                                     </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                                    <YAxis axisLine={false} tickLine={false} />
-                                    <Tooltip />
-                                    <Area type="monotone" dataKey="value" stroke="#3b82f6" fill="url(#colorAdmin)" />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F5F7FA" />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                                    <Tooltip
+                                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                    />
+                                    <Area type="monotone" dataKey="value" stroke="#007BFF" strokeWidth={4} fill="url(#colorAdmin)" dot={{ fill: '#007BFF', strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                        <div className="p-6 border-b border-gray-100">
-                            <h3 className="text-lg font-bold text-gray-900">{t('dashboard.superAdmin.recentCompaniesTitle')}</h3>
+                    {/* Recent Companies */}
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-50 overflow-hidden">
+                        <div className="p-8 border-b border-gray-50 flex justify-between items-center">
+                            <h3 className="text-xl font-bold text-[#4449AA]">{t('dashboard.superAdmin.recentCompaniesTitle')}</h3>
                         </div>
                         <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
+                            <table className="min-w-full">
+                                <thead className="bg-[#F5F7FA]">
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('dashboard.superAdmin.columnName')}</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Miembros</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('dashboard.superAdmin.columnStatus')}</th>
-                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Acción</th>
+                                        <th className="px-8 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">{t('dashboard.superAdmin.columnName')}</th>
+                                        <th className="px-8 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Plan</th>
+                                        <th className="px-8 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wider">Acción</th>
                                     </tr>
                                 </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {recentCompanies.length > 0 ? recentCompanies.map((comp) => (
-                                        <tr key={comp.id} className="hover:bg-gray-50">
-                                            <td className="px-6 py-4 text-sm font-medium text-gray-900">{comp.name}</td>
-                                            <td className="px-6 py-4 text-sm text-gray-500">
-                                                {comp.user_count || 0} / {comp.max_users || 5}
+                                <tbody className="divide-y divide-gray-50">
+                                    {recentCompanies.map((comp) => (
+                                        <tr key={comp.id} className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-8 py-5">
+                                                <div className="text-sm font-bold text-[#4449AA]">{comp.name}</div>
+                                                <div className="text-xs text-gray-400">{comp.user_count || 0} usuarios</div>
                                             </td>
-                                            <td className="px-6 py-4">
-                                                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${comp.license_status === 'active' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                            <td className="px-8 py-5">
+                                                <span className={`px-3 py-1 text-[10px] font-bold uppercase rounded-full ${comp.license_status === 'active' ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'
+                                                    }`}>
                                                     {comp.license_status || 'trial'}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <button
-                                                    onClick={() => handleEditCompany(comp)}
-                                                    className="text-blue-600 hover:text-blue-900 p-1"
-                                                >
+                                            <td className="px-8 py-5 text-right">
+                                                <button onClick={() => handleEditCompany(comp)} className="text-[#007BFF] hover:bg-blue-50 p-2 rounded-xl transition-all">
                                                     <Edit2 className="w-4 h-4" />
                                                 </button>
                                             </td>
                                         </tr>
-                                    )) : (
-                                        <tr>
-                                            <td colSpan={2} className="px-6 py-12 text-center">
-                                                <Search className="mx-auto h-8 w-8 text-gray-300 mb-2" />
-                                                <p className="text-sm text-gray-500">No hay empresas registradas.</p>
-                                            </td>
-                                        </tr>
-                                    )}
+                                    ))}
                                 </tbody>
                             </table>
                         </div>
                     </div>
                 </div>
 
-                {/* Edit Company Modal */}
-                <Modal isOpen={isCompanyModalOpen} onClose={() => setIsCompanyModalOpen(false)} title="Editar Empresa">
+                <Modal isOpen={isCompanyModalOpen} onClose={() => setIsCompanyModalOpen(false)} title="Configuración de Empresa">
                     {editingCompany && (
-                        <form onSubmit={handleUpdateCompany} className="space-y-4">
+                        <form onSubmit={handleUpdateCompany} className="p-2 space-y-6">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Nombre de la Empresa</label>
-                                <Input
-                                    required
-                                    value={editingCompany.name}
-                                    onChange={e => setEditingCompany({ ...editingCompany, name: e.target.value })}
-                                />
+                                <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Nombre Jurídico</label>
+                                <Input required value={editingCompany.name} onChange={e => setEditingCompany({ ...editingCompany, name: e.target.value })} className="rounded-xl border-gray-100 focus:border-[#007BFF]" />
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 gap-6">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700">Estado de Licencia</label>
-                                    <select
-                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 text-sm"
-                                        value={editingCompany.license_status}
-                                        onChange={e => setEditingCompany({ ...editingCompany, license_status: e.target.value })}
-                                    >
-                                        <option value="trial">Prueba (Trial)</option>
-                                        <option value="active">Activa</option>
-                                        <option value="suspended">Suspendida</option>
+                                    <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Licencia</label>
+                                    <select className="w-full bg-[#F5F7FA] border-none rounded-xl p-3 text-sm font-semibold text-[#4449AA]" value={editingCompany.license_status} onChange={e => setEditingCompany({ ...editingCompany, license_status: e.target.value })}>
+                                        <option value="trial">PRUEBA</option>
+                                        <option value="active">ACTIVA</option>
+                                        <option value="suspended">SUSPENDIDA</option>
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700">Límite de Usuarios</label>
-                                    <Input
-                                        type="number"
-                                        value={editingCompany.max_users || 5}
-                                        onChange={e => setEditingCompany({ ...editingCompany, max_users: Number(e.target.value) })}
-                                    />
+                                    <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Usuarios Máx.</label>
+                                    <Input type="number" value={editingCompany.max_users || 5} onChange={e => setEditingCompany({ ...editingCompany, max_users: Number(e.target.value) })} className="rounded-xl border-gray-100" />
                                 </div>
                             </div>
-                            <div className="flex justify-end gap-2 pt-4">
-                                <Button type="button" variant="ghost" onClick={() => setIsCompanyModalOpen(false)}>Cancelar</Button>
-                                <Button type="submit" disabled={isUpdatingCompany}>
-                                    {isUpdatingCompany ? 'Guardando...' : 'Guardar Cambios'}
+                            <div className="flex justify-end gap-3 pt-4">
+                                <Button type="button" variant="ghost" onClick={() => setIsCompanyModalOpen(false)}>Descartar</Button>
+                                <Button type="submit" disabled={isUpdatingCompany} className="bg-[#007BFF] text-white rounded-xl px-8">
+                                    {isUpdatingCompany ? 'Aplicando...' : 'Confirmar Cambios'}
                                 </Button>
                             </div>
                         </form>
@@ -400,190 +421,175 @@ export default function Dashboard() {
         );
     }
 
-    // CRM DASHBOARD
+    // CRM DASHBOARD VIEW
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <h2 className="text-2xl font-bold text-gray-800">{t('dashboard.crm.title')}</h2>
+        <div className="space-y-8 pb-10">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+                <div>
+                    <h2 className="text-3xl font-extrabold text-[#4449AA] leading-tight">{t('dashboard.crm.title')}</h2>
+                    <p className="text-gray-400 font-medium">Resumen integral de ventas y prospección</p>
+                </div>
                 <FilterDropdown />
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                 {[
-                    { name: t('dashboard.crm.totalPipeline'), value: `$${stats.totalPipeline.toLocaleString()}`, icon: BadgeDollarSign, color: 'bg-blue-600' },
-                    { name: t('dashboard.crm.totalLeads'), value: stats.totalLeads, icon: Users, color: 'bg-indigo-600' },
-                    { name: t('dashboard.crm.wonDeals'), value: stats.wonDeals, icon: Target, color: 'bg-green-600' },
-                    { name: t('dashboard.crm.conversionRate'), value: `${stats.conversionRate}%`, icon: TrendingUp, color: 'bg-purple-600' },
+                    { name: t('dashboard.crm.totalPipeline'), value: `$${stats.totalPipeline.toLocaleString()}`, icon: BadgeDollarSign, color: 'text-[#007BFF]', bg: 'bg-blue-50' },
+                    { name: t('dashboard.crm.totalLeads'), value: stats.totalLeads, icon: Users, color: 'text-[#4449AA]', bg: 'bg-slate-100' },
+                    { name: t('dashboard.crm.wonDeals'), value: stats.wonDeals, icon: Target, color: 'text-[#3DCC91]', bg: 'bg-green-50' },
+                    { name: t('dashboard.crm.conversionRate'), value: `${stats.conversionRate}%`, icon: TrendingUp, color: 'text-[#FFA500]', bg: 'bg-orange-50' },
                 ].map((item) => (
-                    <div key={item.name} className="relative overflow-hidden rounded-xl bg-white p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all">
-                        <dt>
-                            <div className={`absolute rounded-lg p-3 ${item.color}`}>
-                                <item.icon className="h-6 w-6 text-white" />
-                            </div>
-                            <p className="ml-16 text-sm font-medium text-gray-500">{item.name}</p>
-                        </dt>
-                        <dd className="ml-16 text-2xl font-bold text-gray-900">{item.value}</dd>
+                    <div key={item.name} className="group relative overflow-hidden rounded-3xl bg-white p-8 shadow-sm border border-gray-50 hover:shadow-xl transition-all duration-300">
+                        <div className={`p-4 rounded-2xl ${item.bg} w-fit mb-4 transition-transform group-hover:scale-110`}>
+                            <item.icon className={`h-8 w-8 ${item.color}`} />
+                        </div>
+                        <dt className="text-sm font-bold text-gray-400 uppercase tracking-widest">{item.name}</dt>
+                        <dd className="mt-1 text-3xl font-extrabold text-[#4449AA]">{item.value}</dd>
                     </div>
                 ))}
             </div>
 
-            {/* Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Funnel */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <h3 className="text-lg font-bold text-gray-900 mb-4">{t('dashboard.crm.funnelTitle')}</h3>
-                    <div className="h-80">
-                        {funnelData.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={funnelData} layout="vertical">
-                                    <CartesianGrid strokeDasharray="3 3" horizontal vertical={false} />
-                                    <XAxis type="number" hide />
-                                    <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 12 }} />
-                                    <Tooltip />
-                                    <Bar dataKey="value" fill={COLORS.blue} radius={[0, 4, 4, 0]} barSize={20} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        ) : (
-                            <div className="h-full flex items-center justify-center text-gray-400">
-                                <p>No hay datos de leads</p>
-                            </div>
-                        )}
+            {/* Main Content Area */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                {/* Funnel Infographic (Spans more columns) */}
+                <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-50 lg:col-span-12 xl:col-span-8 flex flex-col">
+                    <div className="flex justify-between items-center mb-10">
+                        <h3 className="text-xl font-bold text-[#4449AA]">{t('dashboard.crm.funnelTitle')}</h3>
+                        <div className="bg-[#F5F7FA] px-4 py-1 rounded-full text-[10px] font-bold text-gray-400 tracking-wider">KPI: VISUAL FUNNEL</div>
+                    </div>
+                    <div className="flex-grow flex items-center justify-center">
+                        <FunnelInfographic data={funnelData} />
                     </div>
                 </div>
 
-                {/* Sources Pie */}
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                    <h3 className="text-lg font-bold text-gray-900 mb-4">{t('dashboard.crm.sourcesTitle')}</h3>
-                    <div className="flex flex-col md:flex-row items-center justify-center">
-                        <div className="h-64 w-64 relative">
+                {/* Sources Pie (Smaller, on the side) */}
+                <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-50 lg:col-span-12 xl:col-span-4">
+                    <h3 className="text-xl font-bold text-[#4449AA] mb-8">{t('dashboard.crm.sourcesTitle')}</h3>
+                    <div className="flex flex-col items-center">
+                        <div className="h-64 w-full relative">
                             {sourceData.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
-                                        <Pie data={sourceData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                        <Pie data={sourceData} cx="50%" cy="50%" innerRadius={70} outerRadius={90} paddingAngle={8} dataKey="value" stroke="none">
                                             {sourceData.map((_, index) => (
                                                 <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                                             ))}
                                         </Pie>
-                                        <Tooltip />
+                                        <Tooltip
+                                            contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                        />
                                     </PieChart>
                                 </ResponsiveContainer>
                             ) : (
-                                <div className="h-full flex items-center justify-center text-gray-400">
-                                    <p>Sin datos</p>
-                                </div>
+                                <div className="h-full flex items-center justify-center text-gray-300 font-bold">SIN DATOS</div>
                             )}
                         </div>
-                        <div className="mt-4 md:mt-0 md:ml-6 space-y-2">
-                            {sourceData.map((entry, index) => (
-                                <div key={entry.name} className="flex items-center gap-2">
-                                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} />
-                                    <span className="text-sm text-gray-600">{entry.name}</span>
-                                    <span className="text-sm font-bold text-gray-800">{entry.value}%</span>
+                        <div className="grid grid-cols-2 gap-4 w-full mt-8">
+                            {sourceData.slice(0, 4).map((entry, index) => (
+                                <div key={entry.name} className="flex flex-col">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} />
+                                        <span className="text-[10px] font-bold text-gray-400 uppercase truncate">{entry.name}</span>
+                                    </div>
+                                    <span className="text-lg font-extrabold text-[#4449AA] ml-4">{entry.value}%</span>
                                 </div>
                             ))}
                         </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Leads by Priority - Action Directa */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-                    <Target className="w-5 h-5 text-red-500" />
-                    Priorización Directa
-                </h3>
-                <p className="text-sm text-gray-500 mb-6">Acción inmediata: Haz clic en una prioridad para ver y llamar a los leads.</p>
-                <div className="h-64">
-                    {priorityData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={priorityData}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 600 }} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
-                                <Tooltip
-                                    cursor={{ fill: '#f8fafc' }}
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                />
-                                <Bar
-                                    dataKey="value"
-                                    radius={[4, 4, 0, 0]}
-                                    barSize={40}
-                                    onClick={(data) => {
-                                        if (data && data.key) {
-                                            console.log('Bar clicked directly:', data.key);
-                                            navigate('/leads', { state: { priority: data.key } });
-                                        }
-                                    }}
-                                >
-                                    {priorityData.map((entry, index) => (
-                                        <Cell
-                                            key={`cell-${index}`}
-                                            onClick={(e) => {
-                                                e?.stopPropagation(); // Prevent double trigger if Bar also fires
-                                                console.log('Cell clicked:', entry.key);
-                                                navigate('/leads', { state: { priority: entry.key } });
-                                            }}
-                                            fill={
-                                                entry.key === 'very_high' ? '#ef4444' :
-                                                    entry.key === 'high' ? '#f97316' :
-                                                        entry.key === 'medium' ? '#facc15' : '#94a3b8'
-                                            }
-                                            className="cursor-pointer hover:opacity-80 transition-opacity"
-                                        />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
-                    ) : (
-                        <div className="h-full flex items-center justify-center text-gray-400">
-                            <p>No hay datos de prioridad aún</p>
+                {/* Priority Chart (Full Width) */}
+                <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-50 lg:col-span-12">
+                    <div className="flex justify-between items-center mb-8">
+                        <div>
+                            <h3 className="text-xl font-bold text-[#4449AA] flex items-center gap-2">
+                                <Target className="w-6 h-6 text-[#FFA500]" />
+                                Priorización Estratégica
+                            </h3>
+                            <p className="text-sm text-gray-400 font-medium">Haz clic en una categoría para gestionar los leads</p>
                         </div>
-                    )}
+                    </div>
+                    <div className="h-72">
+                        {priorityData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={priorityData}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F5F7FA" />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: '#94a3b8' }} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                                    <Tooltip
+                                        cursor={{ fill: '#F5F7FA' }}
+                                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                    />
+                                    <Bar
+                                        dataKey="value"
+                                        radius={[8, 8, 8, 8]}
+                                        barSize={45}
+                                    >
+                                        {priorityData.map((entry, index) => (
+                                            <Cell
+                                                key={`cell-${index}`}
+                                                onClick={() => navigate('/leads', { state: { priority: entry.key } })}
+                                                fill={
+                                                    entry.key === 'very_high' ? '#3DCC91' :
+                                                        entry.key === 'high' ? '#007BFF' :
+                                                            entry.key === 'medium' ? '#FFA500' : '#E2E8F0'
+                                                }
+                                                className="cursor-pointer hover:opacity-80 transition-opacity"
+                                            />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-gray-300 font-bold uppercase tracking-widest">Esperando actividad de leads</div>
+                        )}
+                    </div>
                 </div>
-            </div>
 
-            {/* Top Opportunities */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-6 border-b border-gray-100">
-                    <h3 className="text-lg font-bold text-gray-900">{t('dashboard.crm.topOppTitle')}</h3>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('dashboard.crm.columnName')}</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Creado</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('dashboard.crm.columnValue')}</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">{t('dashboard.crm.columnStatus')}</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                            {topOpportunities.length > 0 ? topOpportunities.map((lead) => (
-                                <tr key={lead.id} className="hover:bg-gray-50">
-                                    <td className="px-6 py-4">
-                                        <div className="text-sm font-medium text-gray-900">{lead.name}</div>
-                                        {lead.company_name && <div className="text-xs text-gray-500">{lead.company_name}</div>}
-                                    </td>
-                                    <td className="px-6 py-4 text-xs text-gray-500">{lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '-'}</td>
-                                    <td className="px-6 py-4 text-sm font-mono text-green-600">${(lead.value || 0).toLocaleString()}</td>
-                                    <td className="px-6 py-4">
-                                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                                            {STATUS_CONFIG[lead.status as keyof typeof STATUS_CONFIG]?.label || lead.status}
-                                        </span>
-                                    </td>
-                                </tr>
-                            )) : (
+                {/* Top Opportunities Table (Full Width) */}
+                <div className="bg-white rounded-3xl shadow-sm border border-gray-50 overflow-hidden lg:col-span-12">
+                    <div className="p-8 border-b border-gray-50">
+                        <h3 className="text-xl font-bold text-[#4449AA]">{t('dashboard.crm.topOppTitle')}</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full">
+                            <thead className="bg-[#F5F7FA]">
                                 <tr>
-                                    <td colSpan={3} className="px-6 py-8 text-center text-gray-500">
-                                        No hay oportunidades. Crea tu primer lead.
-                                    </td>
+                                    <th className="px-8 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">{t('dashboard.crm.columnName')}</th>
+                                    <th className="px-8 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Fecha</th>
+                                    <th className="px-8 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">{t('dashboard.crm.columnValue')}</th>
+                                    <th className="px-8 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wider">{t('dashboard.crm.columnStatus')}</th>
                                 </tr>
-                            )}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {topOpportunities.length > 0 ? topOpportunities.map((lead) => (
+                                    <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
+                                        <td className="px-8 py-6">
+                                            <div className="text-sm font-bold text-[#4449AA]">{lead.name}</div>
+                                            {lead.company_name && <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{lead.company_name}</div>}
+                                        </td>
+                                        <td className="px-8 py-6 text-xs text-[#94a3b8] font-bold">{lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '-'}</td>
+                                        <td className="px-8 py-6 text-lg font-extrabold text-[#3DCC91] font-mono">${(lead.value || 0).toLocaleString()}</td>
+                                        <td className="px-8 py-6 text-right">
+                                            <span className="px-4 py-1.5 text-[10px] font-extrabold uppercase rounded-full bg-blue-50 text-[#007BFF]">
+                                                {STATUS_CONFIG[lead.status as keyof typeof STATUS_CONFIG]?.label || lead.status}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                )) : (
+                                    <tr>
+                                        <td colSpan={4} className="px-8 py-16 text-center text-gray-400 font-bold uppercase tracking-widest">
+                                            Sin oportunidades activas
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
     );
 }
+
