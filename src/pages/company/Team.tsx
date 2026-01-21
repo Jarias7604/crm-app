@@ -3,8 +3,9 @@ import { teamService, type Invitation } from '../../services/team';
 import type { Profile, Role } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Plus, Trash2, Mail, User, Shield, Phone, Lock, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Plus, Trash2, Mail, User, Shield, Phone, Lock } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
+import Switch from '../../components/ui/Switch';
 
 export default function Team() {
     const { profile: myProfile } = useAuth();
@@ -307,20 +308,18 @@ export default function Team() {
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
                                         )}
-                                        {member.id === myProfile?.id ? (
+                                        {member.id === myProfile?.id && (
                                             <span className="text-blue-600 text-xs font-bold px-2 py-1 bg-blue-50 rounded">Tú</span>
-                                        ) : (
-                                            <span className="text-gray-400 text-xs">Activo</span>
                                         )}
 
                                         {isAdmin && member.id !== myProfile?.id && (
-                                            <button
-                                                onClick={() => handleToggleStatus(member.id, member.is_active)}
-                                                className={`ml-2 p-1 rounded transition-colors ${member.is_active !== false ? 'text-green-600 hover:bg-green-50' : 'text-gray-400 hover:bg-gray-100'}`}
-                                                title={member.is_active !== false ? "Desactivar usuario" : "Activar usuario"}
-                                            >
-                                                {member.is_active !== false ? <ToggleRight className="w-6 h-6" /> : <ToggleLeft className="w-6 h-6" />}
-                                            </button>
+                                            <div className="ml-2" title={member.is_active !== false ? "Desactivar usuario" : "Activar usuario"}>
+                                                <Switch
+                                                    checked={member.is_active !== false}
+                                                    onChange={() => handleToggleStatus(member.id, member.is_active)}
+                                                    size="sm"
+                                                />
+                                            </div>
                                         )}
                                     </div>
                                 </td>
