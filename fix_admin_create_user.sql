@@ -1,23 +1,21 @@
--- Add new columns to profiles if they don't exist
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS phone text;
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT true;
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS full_name text; -- Should exist, but confirming
+-- Fix para el error de crear usuarios
+-- El problema es que la función admin_create_user intenta usar una columna 'status' que no existe
 
--- Enable pgcrypto for password hashing if not enabled
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- Primero, eliminar la función anterior
+DROP FUNCTION IF EXISTS admin_create_user(text, text, text, text, uuid, text);
 
--- Function to create a user directly (Admin only)
+-- Recrear la función sin la columna 'status'
 CREATE OR REPLACE FUNCTION admin_create_user(
     new_email text,
     new_password text,
     new_role text,
     new_full_name text,
-    new_company_id uuid, -- Passed from client or derived
+    new_company_id uuid,
     new_phone text DEFAULT NULL
 )
 RETURNS uuid
 LANGUAGE plpgsql
-SECURITY DEFINER -- Run as database owner to access auth.users
+SECURITY DEFINER
 AS $$
 DECLARE
     new_user_id uuid;
@@ -71,7 +69,7 @@ BEGIN
         false
     ) RETURNING id INTO new_user_id;
 
-    -- Create profile (without 'status' column)
+    -- Create profile (SIN la columna 'status')
     INSERT INTO public.profiles (id, email, role, company_id, full_name, phone, is_active)
     VALUES (
         new_user_id,
@@ -93,30 +91,5 @@ BEGIN
 END;
 $$;
 
--- Function to toggle user active status
-CREATE OR REPLACE FUNCTION toggle_user_status(user_id uuid, status boolean)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-    -- Check permissions (simple check)
-    IF NOT EXISTS (
-        SELECT 1 FROM profiles 
-        WHERE id = auth.uid() 
-        AND role IN ('super_admin', 'company_admin')
-        AND company_id = (SELECT company_id FROM profiles WHERE id = user_id)
-    ) THEN
-        RAISE EXCEPTION 'Unauthorized';
-    END IF;
-
-    -- Update is_active
-    UPDATE profiles 
-    SET is_active = status 
-    WHERE id = user_id;
-    
-    -- IMPORTANT: We should also ideally block them in auth.users, but Supabase doesn't easily support "banning" via SQL without modifying auth.users directly which we are doing anyway.
-    -- Better practice: use RLS policies that check profiles.is_active
-    -- We will assume app checks profiles.is_active
-END;
-$$;
+-- Verificar que la función se creó correctamente
+SELECT 'Función admin_create_user actualizada correctamente ✅' as resultado;
