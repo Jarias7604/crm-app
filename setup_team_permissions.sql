@@ -63,6 +63,11 @@ DECLARE
     v_role TEXT;
     v_invitation RECORD;
 BEGIN
+    -- Skip trigger if created by admin
+    IF new.raw_app_meta_data->>'skip_trigger' = 'true' THEN
+        RETURN new;
+    END IF;
+
     -- Check for valid pending invitation
     SELECT * INTO v_invitation 
     FROM public.company_invitations 
@@ -81,33 +86,32 @@ BEGIN
         WHERE id = v_invitation.id;
         
         -- Create Profile linked to existing company
-        INSERT INTO public.profiles (id, email, role, company_id, status)
+        INSERT INTO public.profiles (id, email, role, company_id, is_active)
         VALUES (
             new.id, 
             new.email, 
             v_role, -- Use invited role
             v_company_id, -- Use invited company
-            'active'
+            true
         );
         
     ELSE
         -- SCENARIO B: No invitation. Create new company (Self Signup).
         -- Create a new company for this user
-        INSERT INTO public.companies (name, status)
+        INSERT INTO public.companies (name)
         VALUES (
-            COALESCE(new.raw_user_meta_data->>'company_name', 'Mi Empresa'),
-            'active' -- Default to active for now (or trial)
+            COALESCE(new.raw_user_meta_data->>'company_name', 'Mi Empresa')
         )
         RETURNING id INTO v_company_id;
         
         -- Create Profile linked to NEW company as Admin
-        INSERT INTO public.profiles (id, email, role, company_id, status)
+        INSERT INTO public.profiles (id, email, role, company_id, is_active)
         VALUES (
             new.id, 
             new.email, 
             'company_admin', -- Creator is always admin
             v_company_id, 
-            'active'
+            true
         );
     END IF;
 
@@ -129,4 +133,3 @@ CREATE POLICY "View team members" ON public.profiles
     USING (
         company_id = (SELECT company_id FROM public.profiles WHERE id = auth.uid())
     );
-
