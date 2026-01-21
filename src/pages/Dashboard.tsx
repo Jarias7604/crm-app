@@ -59,7 +59,7 @@ const FunnelInfographic = ({ data }: { data: any[] }) => {
                         <div key={layer.label} className="relative group flex flex-col items-center">
                             {/* Shape */}
                             <div
-                                className="h-16 flex items-center justify-center text-white font-bold text-lg shadow-lg relative transition-all duration-300 group-hover:scale-[1.02]"
+                                className="h-12 flex items-center justify-center text-white font-bold text-base shadow-md relative transition-all duration-300 group-hover:scale-[1.02]"
                                 style={{
                                     width: `${maxWidthPercent}%`,
                                     backgroundColor: layer.color,
@@ -68,8 +68,8 @@ const FunnelInfographic = ({ data }: { data: any[] }) => {
                                 }}
                             >
                                 <div className="flex flex-col items-center">
-                                    <span className="text-xs opacity-80 uppercase tracking-wider">{layer.label}</span>
-                                    <span className="text-xl">{layer.value.toLocaleString()}</span>
+                                    <span className="text-[10px] opacity-80 uppercase tracking-wider">{layer.label}</span>
+                                    <span className="text-lg">{layer.value.toLocaleString()}</span>
                                 </div>
                             </div>
 
@@ -299,34 +299,34 @@ export default function Dashboard() {
     // SUPER ADMIN VIEW
     if (profile?.role === 'super_admin') {
         return (
-            <div className="space-y-8 pb-10">
+            <div className="space-y-6 pb-6">
                 <div className="flex justify-between items-center">
-                    <h2 className="text-3xl font-extrabold text-[#4449AA]">{t('dashboard.superAdmin.title')}</h2>
+                    <h2 className="text-2xl font-extrabold text-[#4449AA]">{t('dashboard.superAdmin.title')}</h2>
                 </div>
 
                 {/* KPI Cards */}
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     {[
                         { name: t('dashboard.superAdmin.totalCompanies'), value: adminStats.totalCompanies, icon: Building, color: 'text-[#007BFF]', bg: 'bg-blue-50' },
                         { name: t('dashboard.superAdmin.activeTrials'), value: adminStats.activeTrials, icon: Calendar, color: 'text-[#FFA500]', bg: 'bg-orange-50' },
                         { name: t('dashboard.superAdmin.activeLicenses'), value: adminStats.activeLicenses, icon: CheckCircle, color: 'text-[#3DCC91]', bg: 'bg-green-50' },
                     ].map((item) => (
-                        <div key={item.name} className="group relative overflow-hidden rounded-2xl bg-white p-8 shadow-sm border border-gray-50 hover:shadow-lg transition-all duration-300">
-                            <div className={`p-4 rounded-2xl ${item.bg} w-fit mb-4 transition-transform group-hover:scale-110`}>
-                                <item.icon className={`h-8 w-8 ${item.color}`} />
+                        <div key={item.name} className="group relative overflow-hidden rounded-2xl bg-white p-5 shadow-sm border border-gray-50 hover:shadow-md transition-all duration-300">
+                            <div className={`p-3 rounded-xl ${item.bg} w-fit mb-3 transition-transform group-hover:scale-110`}>
+                                <item.icon className={`h-6 w-6 ${item.color}`} />
                             </div>
-                            <dt className="text-sm font-bold text-gray-400 uppercase tracking-widest">{item.name}</dt>
-                            <dd className="mt-1 text-4xl font-extrabold text-[#4449AA]">{item.value}</dd>
+                            <dt className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{item.name}</dt>
+                            <dd className="mt-1 text-2xl font-extrabold text-[#4449AA]">{item.value}</dd>
                         </div>
                     ))}
                 </div>
 
                 {/* Main Content Area */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Growth Chart */}
-                    <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-50">
-                        <h3 className="text-xl font-bold text-[#4449AA] mb-6">{t('dashboard.superAdmin.companyGrowthTitle')}</h3>
-                        <div className="h-72">
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-50">
+                        <h3 className="text-lg font-bold text-[#4449AA] mb-4">{t('dashboard.superAdmin.companyGrowthTitle')}</h3>
+                        <div className="h-64">
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={companyTrend}>
                                     <defs>
@@ -336,12 +336,12 @@ export default function Dashboard() {
                                         </linearGradient>
                                     </defs>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F5F7FA" />
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 11 }} />
                                     <Tooltip
-                                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                     />
-                                    <Area type="monotone" dataKey="value" stroke="#007BFF" strokeWidth={4} fill="url(#colorAdmin)" dot={{ fill: '#007BFF', strokeWidth: 2, r: 4 }} activeDot={{ r: 6 }} />
+                                    <Area type="monotone" dataKey="value" stroke="#007BFF" strokeWidth={3} fill="url(#colorAdmin)" dot={{ fill: '#007BFF', strokeWidth: 1, r: 3 }} activeDot={{ r: 5 }} />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
@@ -349,34 +349,34 @@ export default function Dashboard() {
 
                     {/* Recent Companies */}
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-50 overflow-hidden">
-                        <div className="p-8 border-b border-gray-50 flex justify-between items-center">
-                            <h3 className="text-xl font-bold text-[#4449AA]">{t('dashboard.superAdmin.recentCompaniesTitle')}</h3>
+                        <div className="p-6 border-b border-gray-50 flex justify-between items-center">
+                            <h3 className="text-lg font-bold text-[#4449AA]">{t('dashboard.superAdmin.recentCompaniesTitle')}</h3>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="min-w-full">
                                 <thead className="bg-[#F5F7FA]">
                                     <tr>
-                                        <th className="px-8 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">{t('dashboard.superAdmin.columnName')}</th>
-                                        <th className="px-8 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Plan</th>
-                                        <th className="px-8 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wider">Acción</th>
+                                        <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t('dashboard.superAdmin.columnName')}</th>
+                                        <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Plan</th>
+                                        <th className="px-6 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">Acción</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
                                     {recentCompanies.map((comp) => (
                                         <tr key={comp.id} className="hover:bg-gray-50 transition-colors">
-                                            <td className="px-8 py-5">
-                                                <div className="text-sm font-bold text-[#4449AA]">{comp.name}</div>
-                                                <div className="text-xs text-gray-400">{comp.user_count || 0} usuarios</div>
+                                            <td className="px-6 py-4">
+                                                <div className="text-xs font-bold text-[#4449AA]">{comp.name}</div>
+                                                <div className="text-[9px] text-gray-400">{comp.user_count || 0} usuarios</div>
                                             </td>
-                                            <td className="px-8 py-5">
-                                                <span className={`px-3 py-1 text-[10px] font-bold uppercase rounded-full ${comp.license_status === 'active' ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'
+                                            <td className="px-6 py-4">
+                                                <span className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded-full ${comp.license_status === 'active' ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'
                                                     }`}>
                                                     {comp.license_status || 'trial'}
                                                 </span>
                                             </td>
-                                            <td className="px-8 py-5 text-right">
-                                                <button onClick={() => handleEditCompany(comp)} className="text-[#007BFF] hover:bg-blue-50 p-2 rounded-xl transition-all">
-                                                    <Edit2 className="w-4 h-4" />
+                                            <td className="px-6 py-4 text-right">
+                                                <button onClick={() => handleEditCompany(comp)} className="text-[#007BFF] hover:bg-blue-50 p-1.5 rounded-lg transition-all">
+                                                    <Edit2 className="w-3.5 h-3.5" />
                                                 </button>
                                             </td>
                                         </tr>
@@ -423,108 +423,105 @@ export default function Dashboard() {
 
     // CRM DASHBOARD VIEW
     return (
-        <div className="space-y-8 pb-10">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+        <div className="space-y-5 pb-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h2 className="text-3xl font-extrabold text-[#4449AA] leading-tight">{t('dashboard.crm.title')}</h2>
-                    <p className="text-gray-400 font-medium">Resumen integral de ventas y prospección</p>
+                    <h2 className="text-2xl font-extrabold text-[#4449AA] leading-tight">{t('dashboard.crm.title')}</h2>
+                    <p className="text-xs text-gray-400 font-medium italic">Ventas y prospección en tiempo real</p>
                 </div>
                 <FilterDropdown />
             </div>
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {[
                     { name: t('dashboard.crm.totalPipeline'), value: `$${stats.totalPipeline.toLocaleString()}`, icon: BadgeDollarSign, color: 'text-[#007BFF]', bg: 'bg-blue-50' },
                     { name: t('dashboard.crm.totalLeads'), value: stats.totalLeads, icon: Users, color: 'text-[#4449AA]', bg: 'bg-slate-100' },
                     { name: t('dashboard.crm.wonDeals'), value: stats.wonDeals, icon: Target, color: 'text-[#3DCC91]', bg: 'bg-green-50' },
                     { name: t('dashboard.crm.conversionRate'), value: `${stats.conversionRate}%`, icon: TrendingUp, color: 'text-[#FFA500]', bg: 'bg-orange-50' },
                 ].map((item) => (
-                    <div key={item.name} className="group relative overflow-hidden rounded-3xl bg-white p-8 shadow-sm border border-gray-50 hover:shadow-xl transition-all duration-300">
-                        <div className={`p-4 rounded-2xl ${item.bg} w-fit mb-4 transition-transform group-hover:scale-110`}>
-                            <item.icon className={`h-8 w-8 ${item.color}`} />
+                    <div key={item.name} className="group relative overflow-hidden rounded-2xl bg-white p-5 shadow-sm border border-gray-50 hover:shadow-md transition-all duration-300">
+                        <div className={`p-3 rounded-xl ${item.bg} w-fit mb-3 transition-transform group-hover:scale-110`}>
+                            <item.icon className={`h-6 w-6 ${item.color}`} />
                         </div>
-                        <dt className="text-sm font-bold text-gray-400 uppercase tracking-widest">{item.name}</dt>
-                        <dd className="mt-1 text-3xl font-extrabold text-[#4449AA]">{item.value}</dd>
+                        <dt className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{item.name}</dt>
+                        <dd className="mt-1 text-2xl font-extrabold text-[#4449AA]">{item.value}</dd>
                     </div>
                 ))}
             </div>
 
             {/* Main Content Area */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Funnel Infographic (Spans more columns) */}
-                <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-50 lg:col-span-12 xl:col-span-8 flex flex-col">
-                    <div className="flex justify-between items-center mb-10">
-                        <h3 className="text-xl font-bold text-[#4449AA]">{t('dashboard.crm.funnelTitle')}</h3>
-                        <div className="bg-[#F5F7FA] px-4 py-1 rounded-full text-[10px] font-bold text-gray-400 tracking-wider">KPI: VISUAL FUNNEL</div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Funnel Infographic */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-50 lg:col-span-12 xl:col-span-8 flex flex-col">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-lg font-bold text-[#4449AA]">{t('dashboard.crm.funnelTitle')}</h3>
+                        <div className="bg-[#F5F7FA] px-3 py-0.5 rounded-full text-[9px] font-bold text-gray-400 tracking-wider">VISUAL KPI</div>
                     </div>
                     <div className="flex-grow flex items-center justify-center">
                         <FunnelInfographic data={funnelData} />
                     </div>
                 </div>
 
-                {/* Sources Pie (Smaller, on the side) */}
-                <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-50 lg:col-span-12 xl:col-span-4">
-                    <h3 className="text-xl font-bold text-[#4449AA] mb-8">{t('dashboard.crm.sourcesTitle')}</h3>
+                {/* Sources Pie */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-50 lg:col-span-12 xl:col-span-4">
+                    <h3 className="text-lg font-bold text-[#4449AA] mb-4">{t('dashboard.crm.sourcesTitle')}</h3>
                     <div className="flex flex-col items-center">
-                        <div className="h-64 w-full relative">
+                        <div className="h-52 w-full relative">
                             {sourceData.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
-                                        <Pie data={sourceData} cx="50%" cy="50%" innerRadius={70} outerRadius={90} paddingAngle={8} dataKey="value" stroke="none">
+                                        <Pie data={sourceData} cx="50%" cy="50%" innerRadius={55} outerRadius={70} paddingAngle={8} dataKey="value" stroke="none">
                                             {sourceData.map((_, index) => (
                                                 <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                                             ))}
                                         </Pie>
                                         <Tooltip
-                                            contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                         />
                                     </PieChart>
                                 </ResponsiveContainer>
                             ) : (
-                                <div className="h-full flex items-center justify-center text-gray-300 font-bold">SIN DATOS</div>
+                                <div className="h-full flex items-center justify-center text-gray-300 font-bold text-[10px]">SIN DATOS</div>
                             )}
                         </div>
-                        <div className="grid grid-cols-2 gap-4 w-full mt-8">
+                        <div className="grid grid-cols-2 gap-3 w-full mt-4">
                             {sourceData.slice(0, 4).map((entry, index) => (
                                 <div key={entry.name} className="flex flex-col">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} />
-                                        <span className="text-[10px] font-bold text-gray-400 uppercase truncate">{entry.name}</span>
+                                    <div className="flex items-center gap-1.5 mb-0.5">
+                                        <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} />
+                                        <span className="text-[9px] font-bold text-gray-400 uppercase truncate">{entry.name}</span>
                                     </div>
-                                    <span className="text-lg font-extrabold text-[#4449AA] ml-4">{entry.value}%</span>
+                                    <span className="text-base font-extrabold text-[#4449AA] ml-3">{entry.value}%</span>
                                 </div>
                             ))}
                         </div>
                     </div>
                 </div>
 
-                {/* Priority Chart (Full Width) */}
-                <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-50 lg:col-span-12">
-                    <div className="flex justify-between items-center mb-8">
-                        <div>
-                            <h3 className="text-xl font-bold text-[#4449AA] flex items-center gap-2">
-                                <Target className="w-6 h-6 text-[#FFA500]" />
-                                Priorización Estratégica
-                            </h3>
-                            <p className="text-sm text-gray-400 font-medium">Haz clic en una categoría para gestionar los leads</p>
-                        </div>
+                {/* Priority Chart */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-50 lg:col-span-12">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-bold text-[#4449AA] flex items-center gap-2">
+                            <Target className="w-5 h-5 text-[#FFA500]" />
+                            Priorización Estratégica
+                        </h3>
                     </div>
-                    <div className="h-72">
+                    <div className="h-56">
                         {priorityData.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={priorityData}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F5F7FA" />
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fontWeight: 700, fill: '#94a3b8' }} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
                                     <Tooltip
                                         cursor={{ fill: '#F5F7FA' }}
-                                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                     />
                                     <Bar
                                         dataKey="value"
-                                        radius={[8, 8, 8, 8]}
-                                        barSize={45}
+                                        radius={[6, 6, 6, 6]}
+                                        barSize={32}
                                     >
                                         {priorityData.map((entry, index) => (
                                             <Cell
@@ -542,45 +539,45 @@ export default function Dashboard() {
                                 </BarChart>
                             </ResponsiveContainer>
                         ) : (
-                            <div className="h-full flex items-center justify-center text-gray-300 font-bold uppercase tracking-widest">Esperando actividad de leads</div>
+                            <div className="h-full flex items-center justify-center text-gray-300 font-bold text-[9px] uppercase tracking-widest">Sin actividad</div>
                         )}
                     </div>
                 </div>
 
-                {/* Top Opportunities Table (Full Width) */}
-                <div className="bg-white rounded-3xl shadow-sm border border-gray-50 overflow-hidden lg:col-span-12">
-                    <div className="p-8 border-b border-gray-50">
-                        <h3 className="text-xl font-bold text-[#4449AA]">{t('dashboard.crm.topOppTitle')}</h3>
+                {/* Top Opportunities Table */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-50 overflow-hidden lg:col-span-12">
+                    <div className="p-6 border-b border-gray-50">
+                        <h3 className="text-lg font-bold text-[#4449AA]">{t('dashboard.crm.topOppTitle')}</h3>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="min-w-full">
                             <thead className="bg-[#F5F7FA]">
                                 <tr>
-                                    <th className="px-8 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">{t('dashboard.crm.columnName')}</th>
-                                    <th className="px-8 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Fecha</th>
-                                    <th className="px-8 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">{t('dashboard.crm.columnValue')}</th>
-                                    <th className="px-8 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wider">{t('dashboard.crm.columnStatus')}</th>
+                                    <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t('dashboard.crm.columnName')}</th>
+                                    <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Fecha</th>
+                                    <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t('dashboard.crm.columnValue')}</th>
+                                    <th className="px-6 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t('dashboard.crm.columnStatus')}</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50">
                                 {topOpportunities.length > 0 ? topOpportunities.map((lead) => (
                                     <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-8 py-6">
-                                            <div className="text-sm font-bold text-[#4449AA]">{lead.name}</div>
-                                            {lead.company_name && <div className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{lead.company_name}</div>}
+                                        <td className="px-6 py-3.5">
+                                            <div className="text-xs font-bold text-[#4449AA]">{lead.name}</div>
+                                            {lead.company_name && <div className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">{lead.company_name}</div>}
                                         </td>
-                                        <td className="px-8 py-6 text-xs text-[#94a3b8] font-bold">{lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '-'}</td>
-                                        <td className="px-8 py-6 text-lg font-extrabold text-[#3DCC91] font-mono">${(lead.value || 0).toLocaleString()}</td>
-                                        <td className="px-8 py-6 text-right">
-                                            <span className="px-4 py-1.5 text-[10px] font-extrabold uppercase rounded-full bg-blue-50 text-[#007BFF]">
+                                        <td className="px-6 py-3.5 text-[10px] text-[#94a3b8] font-bold">{lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '-'}</td>
+                                        <td className="px-6 py-3.5 text-base font-extrabold text-[#3DCC91] font-mono">${(lead.value || 0).toLocaleString()}</td>
+                                        <td className="px-6 py-3.5 text-right">
+                                            <span className="px-3 py-1 text-[9px] font-extrabold uppercase rounded-full bg-blue-50 text-[#007BFF]">
                                                 {STATUS_CONFIG[lead.status as keyof typeof STATUS_CONFIG]?.label || lead.status}
                                             </span>
                                         </td>
                                     </tr>
                                 )) : (
                                     <tr>
-                                        <td colSpan={4} className="px-8 py-16 text-center text-gray-400 font-bold uppercase tracking-widest">
-                                            Sin oportunidades activas
+                                        <td colSpan={4} className="px-6 py-10 text-center text-gray-400 font-bold text-[10px] uppercase tracking-widest">
+                                            Sin oportunidades
                                         </td>
                                     </tr>
                                 )}
