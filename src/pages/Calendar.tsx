@@ -177,7 +177,7 @@ export default function Calendar() {
                                     {dayLeads.slice(0, 4).map(lead => (
                                         <button
                                             key={lead.id}
-                                            onClick={() => navigate('/leads', { state: { priority: lead.priority } })}
+                                            onClick={() => navigate('/leads', { state: { leadId: lead.id } })}
                                             className="w-full text-left text-[10px] p-1.5 rounded bg-gray-50 hover:bg-white hover:shadow-md hover:text-blue-700 hover:border-blue-200 transition-all border border-gray-100 border-l-2 border-l-blue-500 overflow-hidden group"
                                         >
                                             <span className="font-bold block truncate">{lead.name}</span>
@@ -217,8 +217,8 @@ export default function Calendar() {
                                     key={day.toISOString()}
                                     onClick={() => setSelectedDate(day)}
                                     className={`flex flex-col items-center min-w-[3rem] p-2 rounded-2xl transition-all ${isSelected
-                                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 transform scale-105'
-                                            : 'hover:bg-gray-50'
+                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 transform scale-105'
+                                        : 'hover:bg-gray-50'
                                         }`}
                                 >
                                     <span className={`text-[10px] font-bold uppercase mb-1 ${isSelected ? 'text-blue-200' : 'text-gray-400'}`}>
@@ -256,7 +256,7 @@ export default function Calendar() {
 
                                     {/* Card */}
                                     <div
-                                        onClick={() => navigate('/leads', { state: { priority: lead.priority } })}
+                                        onClick={() => navigate('/leads', { state: { leadId: lead.id } })}
                                         className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 active:scale-[0.98] transition-transform"
                                     >
                                         <div className="flex justify-between items-start mb-2">

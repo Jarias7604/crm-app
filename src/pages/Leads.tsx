@@ -56,12 +56,25 @@ export default function Leads() {
     const [isUploading, setIsUploading] = useState(false);
     const location = useLocation();
 
-    // Handle incoming state from Dashboard
+    // Handle incoming state from Dashboard or Calendar
     useEffect(() => {
-        if (location.state && (location.state as any).priority) {
-            setPriorityFilter((location.state as any).priority);
+        if (location.state) {
+            const state = location.state as any;
+            if (state.priority) {
+                setPriorityFilter(state.priority);
+            }
+            // If a specific lead ID is passed, we wait for leads to load then open it
+            if (state.leadId && leads.length > 0) {
+                const targetLead = leads.find(l => l.id === state.leadId);
+                if (targetLead) {
+                    setSelectedLead(targetLead);
+                    setIsDetailOpen(true);
+                    // Clear state to prevent reopening on reload (optional but good practice)
+                    window.history.replaceState({}, document.title);
+                }
+            }
         }
-    }, [location]);
+    }, [location, leads]); // Added leads dependence to run when leads are loaded
 
     // Force grid view on mobile initially, but allow changes
     useEffect(() => {
