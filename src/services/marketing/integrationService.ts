@@ -3,8 +3,8 @@ import { supabase } from '../supabase';
 export interface MarketingIntegration {
     id: string;
     company_id: string;
-    type: 'email' | 'whatsapp' | 'chat' | 'sms';
-    provider: 'gmail' | 'outlook' | 'resend' | 'twilio' | 'meta' | 'openai' | 'custom_webhook';
+    type: 'email' | 'whatsapp' | 'chat' | 'sms' | 'telegram';
+    provider: 'gmail' | 'outlook' | 'resend' | 'twilio' | 'meta' | 'openai' | 'custom_webhook' | 'telegram';
     name: string;
     settings: {
         email?: string;

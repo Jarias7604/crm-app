@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, ArrowLeft, CheckCircle, Server, Shield, Cloud, MessageSquare, Bot, Globe, Smartphone } from 'lucide-react';
+import { Mail, ArrowLeft, CheckCircle, Server, Shield, Cloud, MessageSquare, Bot, Globe, Smartphone, Send } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { integrationService, type MarketingIntegration } from '../../services/marketing/integrationService';
 import toast from 'react-hot-toast';
 
-type TabType = 'email' | 'whatsapp' | 'chat';
+type TabType = 'email' | 'whatsapp' | 'chat' | 'telegram';
 
 export default function MarketingSettings() {
     const { profile } = useAuth();
@@ -44,6 +44,7 @@ export default function MarketingSettings() {
             const typeMap: Record<string, any> = {
                 'gmail': 'email', 'resend': 'email', 'outlook': 'email',
                 'twilio': 'whatsapp', 'meta': 'whatsapp',
+                'telegram': 'telegram',
                 'openai': 'chat'
             };
 
@@ -100,6 +101,12 @@ export default function MarketingSettings() {
                         <MessageSquare className="w-4 h-4" /> WhatsApp
                     </button>
                     <button
+                        onClick={() => { setActiveTab('telegram'); setSelectedProvider(null); }}
+                        className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'telegram' ? 'bg-white text-sky-500 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                    >
+                        <Send className="w-4 h-4" /> Telegram
+                    </button>
+                    <button
                         onClick={() => { setActiveTab('chat'); setSelectedProvider(null); }}
                         className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'chat' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
@@ -140,6 +147,7 @@ export default function MarketingSettings() {
                             <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
                                 {activeTab === 'email' && <Mail className="w-10 h-10 text-gray-300" />}
                                 {activeTab === 'whatsapp' && <MessageSquare className="w-10 h-10 text-gray-300" />}
+                                {activeTab === 'telegram' && <Send className="w-10 h-10 text-gray-300" />}
                                 {activeTab === 'chat' && <Bot className="w-10 h-10 text-gray-300" />}
                             </div>
                             <h3 className="text-2xl font-black text-gray-900 mb-2">Canal no configurado</h3>
@@ -179,6 +187,15 @@ export default function MarketingSettings() {
                                     icon={Globe} color="text-blue-600 bg-blue-50"
                                     title="Meta Cloud API" desc="Integración oficial directa."
                                     onClick={() => setSelectedProvider('meta')}
+                                />
+                            </>
+                        )}
+                        {activeTab === 'telegram' && (
+                            <>
+                                <ProviderButton
+                                    icon={Send} color="text-sky-500 bg-sky-50"
+                                    title="Telegram Bot API" desc="Mensajería rápida y gratuita."
+                                    onClick={() => setSelectedProvider('telegram')}
                                 />
                             </>
                         )}
@@ -233,6 +250,10 @@ export default function MarketingSettings() {
                                 </>
                             )}
 
+                            {selectedProvider === 'telegram' && (
+                                <InputBlock label="Bot Token" type="password" value={formData.token} onChange={(v: string) => setFormData({ ...formData, token: v })} placeholder="123456789:ABCDEF..." hint="Obtenlo hablando con @BotFather en Telegram." />
+                            )}
+
                             {selectedProvider === 'openai' && (
                                 <InputBlock label="OpenAI API Key" type="password" value={formData.apiKey} onChange={(v: string) => setFormData({ ...formData, apiKey: v })} placeholder="sk-..." />
                             )}
@@ -266,6 +287,13 @@ export default function MarketingSettings() {
                                     <li>Ve a <b>developers.facebook.com</b>.</li>
                                     <li>Configura la app de WhatsApp.</li>
                                     <li>Genera un <b>Permanent Token</b> en los ajustes.</li>
+                                </ul>
+                            ) : selectedProvider === 'telegram' ? (
+                                <ul className="space-y-4 list-disc list-inside">
+                                    <li>Busca a <b>@BotFather</b> en Telegram.</li>
+                                    <li>Envía el comando <code>/newbot</code>.</li>
+                                    <li>Sigue los pasos y copia el <b>API Token</b>.</li>
+                                    <li>Asegúrate de que el bot no esté en modo privado si quieres recibir mensajes.</li>
                                 </ul>
                             ) : selectedProvider === 'openai' ? (
                                 <ul className="space-y-4 list-disc list-inside">
