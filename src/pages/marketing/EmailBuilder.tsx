@@ -4,15 +4,21 @@ import { Save, Send, ArrowLeft, Users, FileText } from 'lucide-react';
 import { campaignService } from '../../services/marketing/campaignService';
 import toast from 'react-hot-toast';
 
+import { useAuth } from '../../auth/AuthProvider';
+
 export default function EmailBuilder() {
+    const { profile } = useAuth();
     const navigate = useNavigate();
     const [step, setStep] = useState(1);
     const [formData, setFormData] = useState({
         name: '',
         subject: '',
         content: '',
-        recipient_filter: 'all' // Mock filter
+        audience_filter: 'all'
     });
+
+
+
 
     const handleSave = async (isDraft: boolean) => {
         try {
@@ -22,11 +28,15 @@ export default function EmailBuilder() {
             }
 
             const newCampaign = {
-                ...formData,
-                type: 'email' as const,
-                status: 'draft' as const,
-                total_recipients: Math.floor(Math.random() * 500) + 50, // Mock count
-                stats: { sent: 0, opened: 0, clicked: 0 }
+                name: formData.name,
+                subject: formData.subject,
+                content: formData.content,
+                type: 'email',
+                status: 'draft',
+                audience_filters: { type: formData.audience_filter },
+                total_recipients: Math.floor(Math.random() * 500) + 50,
+                company_id: profile?.company_id || null, // Handle company context
+                stats: { sent: 0, delivered: 0, opened: 0, clicked: 0, replied: 0, bounced: 0 }
             };
 
             const data = await campaignService.createCampaign(newCampaign);
@@ -107,19 +117,46 @@ export default function EmailBuilder() {
                             Audiencia
                         </h2>
 
-                        <div className="space-y-2">
-                            <label className="flex items-center gap-3 p-3 border border-blue-200 bg-blue-50 rounded-xl cursor-pointer">
-                                <input type="radio" name="audience" defaultChecked className="text-blue-600" />
+                        <div className="space-y-3">
+                            <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${formData.audience_filter === 'all' ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-gray-200 hover:bg-gray-50'}`}>
+                                <input
+                                    type="radio"
+                                    name="audience"
+                                    checked={formData.audience_filter === 'all'}
+                                    onChange={() => setFormData({ ...formData, audience_filter: 'all' })}
+                                    className="text-blue-600"
+                                />
                                 <div>
-                                    <p className="font-bold text-sm text-blue-900">Todos los Leads</p>
-                                    <p className="text-xs text-blue-700">Aprox. 1,240 recibidores</p>
+                                    <p className="font-bold text-sm text-gray-900">Todos los Leads</p>
+                                    <p className="text-xs text-gray-500">Envío masivo general</p>
                                 </div>
                             </label>
-                            <label className="flex items-center gap-3 p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50">
-                                <input type="radio" name="audience" className="text-gray-400" />
+
+                            <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${formData.audience_filter === 'new' ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-gray-200 hover:bg-gray-50'}`}>
+                                <input
+                                    type="radio"
+                                    name="audience"
+                                    checked={formData.audience_filter === 'new'}
+                                    onChange={() => setFormData({ ...formData, audience_filter: 'new' })}
+                                    className="text-blue-600"
+                                />
                                 <div>
-                                    <p className="font-bold text-sm text-gray-700">Solo Clientes Nuevos</p>
-                                    <p className="text-xs text-gray-500">Últimos 30 días</p>
+                                    <p className="font-bold text-sm text-gray-900">Solo Clientes Nuevos</p>
+                                    <p className="text-xs text-gray-500">Registrados últimos 30 días</p>
+                                </div>
+                            </label>
+
+                            <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${formData.audience_filter === 'vip' ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-gray-200 hover:bg-gray-50'}`}>
+                                <input
+                                    type="radio"
+                                    name="audience"
+                                    checked={formData.audience_filter === 'vip'}
+                                    onChange={() => setFormData({ ...formData, audience_filter: 'vip' })}
+                                    className="text-blue-600"
+                                />
+                                <div>
+                                    <p className="font-bold text-sm text-gray-900">Lista VIP / Calientes</p>
+                                    <p className="text-xs text-gray-500">Leads con alta probabilidad</p>
                                 </div>
                             </label>
                         </div>
