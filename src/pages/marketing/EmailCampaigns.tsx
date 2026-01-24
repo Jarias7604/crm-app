@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Mail, Clock, CheckCircle, BarChart2, MoreHorizontal, Play, Edit } from 'lucide-react';
+import { Plus, Mail, Clock, CheckCircle, BarChart2, Play, Edit } from 'lucide-react';
 import { campaignService, type Campaign } from '../../services/marketing/campaignService';
 import toast from 'react-hot-toast';
 
@@ -75,8 +75,8 @@ export default function EmailCampaigns() {
                             <div key={campaign.id} className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all flex items-center justify-between group">
                                 <div className="flex items-center gap-4">
                                     <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${campaign.status === 'completed' ? 'bg-green-100 text-green-600' :
-                                            campaign.status === 'sending' ? 'bg-blue-100 text-blue-600' :
-                                                'bg-gray-100 text-gray-500'
+                                        campaign.status === 'sending' ? 'bg-blue-100 text-blue-600' :
+                                            'bg-gray-100 text-gray-500'
                                         }`}>
                                         <Mail className="w-6 h-6" />
                                     </div>
@@ -84,8 +84,8 @@ export default function EmailCampaigns() {
                                         <h3 className="font-bold text-gray-900">{campaign.name}</h3>
                                         <div className="flex items-center gap-3 text-sm text-gray-500 mt-1">
                                             <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${campaign.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                                    campaign.status === 'draft' ? 'bg-gray-100 text-gray-600' :
-                                                        'bg-blue-100 text-blue-700'
+                                                campaign.status === 'draft' ? 'bg-gray-100 text-gray-600' :
+                                                    'bg-blue-100 text-blue-700'
                                                 }`}>
                                                 {campaign.status}
                                             </span>

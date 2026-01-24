@@ -9,7 +9,8 @@ import { useAuth } from '../../auth/AuthProvider';
 export default function EmailBuilder() {
     const { profile } = useAuth();
     const navigate = useNavigate();
-    const [step, setStep] = useState(1);
+
+
     const [formData, setFormData] = useState({
         name: '',
         subject: '',
@@ -142,9 +143,11 @@ export default function EmailBuilder() {
                             </div>
                             <button
                                 onClick={handlePreviewAudience}
-                                className="text-sm text-blue-600 font-bold hover:underline flex items-center gap-1"
+                                disabled={loadingPreview}
+                                className="text-sm text-blue-600 font-bold hover:underline flex items-center gap-1 disabled:opacity-50"
                             >
-                                <Eye className="w-4 h-4" /> Ver Lista
+                                <Eye className="w-4 h-4" />
+                                {loadingPreview ? 'Cargando...' : 'Ver Lista'}
                             </button>
                         </h2>
 

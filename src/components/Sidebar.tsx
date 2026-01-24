@@ -6,12 +6,12 @@ import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileTe
 import { cn } from '../lib/utils';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { brandingService } from '../services/branding';
-import { usePermissions } from '../hooks/usePermissions';
+
 import type { Company } from '../types';
 
 export default function Sidebar() {
     const { profile, signOut } = useAuth();
-    const { hasPermission } = usePermissions();
+    // const { hasPermission } = usePermissions(); // Removed: hasPermission is not used in the current code
     const location = useLocation();
     const { t } = useTranslation();
     const [configOpen, setConfigOpen] = useState(location.pathname.startsWith('/config'));

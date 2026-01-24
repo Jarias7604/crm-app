@@ -1,11 +1,20 @@
+
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Bot, Save, MessageSquare, Power, Settings2, Sparkles, Send, ArrowLeft } from 'lucide-react';
+import { Bot, Save, Settings2, Sparkles, ArrowLeft, Send } from 'lucide-react';
 import { aiAgentService, type AiAgent } from '../../services/marketing/aiAgentService';
 import toast from 'react-hot-toast';
 
 export default function AiAgentsConfig() {
-    const [agents, setAgents] = useState<AiAgent[]>([]);
+    // const [agents, setAgents] = useState<AiAgent[]>([]); // agents currently unused in render except for setup logic which uses local vars or state setter
+    // Actually agents is used in loadAgents to setAgents. 
+    // And selectedAgent is used.
+    // The lint error says 'agents' is unused.
+    // Looking at the code: setAgents(data) is called. But 'agents' variable is likely never read.
+    // I should remove the agents state variable if I don't read it, or read it/log it.
+    // Wait, if I remove 'agents' from destructuring, I can't use setAgents.
+    // const [, setAgents] = useState...
+    const [, setAgents] = useState<AiAgent[]>([]);
     const [selectedAgent, setSelectedAgent] = useState<AiAgent | null>(null);
     const [testMessage, setTestMessage] = useState('');
     const [botReply, setBotReply] = useState('');
@@ -97,14 +106,14 @@ export default function AiAgentsConfig() {
                                     Personalidad del Bot
                                 </h2>
                                 <div className="flex items-center gap-2">
-                                    <span className={`text-sm font-bold ${selectedAgent?.is_active ? 'text-green-600' : 'text-gray-400'}`}>
+                                    <span className={`text - sm font - bold ${selectedAgent?.is_active ? 'text-green-600' : 'text-gray-400'} `}>
                                         {selectedAgent?.is_active ? 'ACTIVO' : 'INACTIVO'}
                                     </span>
                                     <button
                                         onClick={() => setSelectedAgent(prev => prev ? { ...prev, is_active: !prev.is_active } : null)}
-                                        className={`w-12 h-6 rounded-full transition-colors relative ${selectedAgent?.is_active ? 'bg-green-500' : 'bg-gray-200'}`}
+                                        className={`w - 12 h - 6 rounded - full transition - colors relative ${selectedAgent?.is_active ? 'bg-green-500' : 'bg-gray-200'} `}
                                     >
-                                        <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform ${selectedAgent?.is_active ? 'left-7' : 'left-1'}`} />
+                                        <div className={`w - 4 h - 4 bg - white rounded - full absolute top - 1 transition - transform ${selectedAgent?.is_active ? 'left-7' : 'left-1'} `} />
                                     </button>
                                 </div>
                             </div>
@@ -137,10 +146,10 @@ export default function AiAgentsConfig() {
                                         <button
                                             key={tone}
                                             onClick={() => setSelectedAgent(prev => prev ? { ...prev, tone: tone as any } : null)}
-                                            className={`p-3 rounded-xl border font-medium capitalize transition-all ${selectedAgent?.tone === tone
-                                                    ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500'
-                                                    : 'border-gray-200 hover:border-blue-300'
-                                                }`}
+                                            className={`p - 3 rounded - xl border font - medium capitalize transition - all ${selectedAgent?.tone === tone
+                                                ? 'border-blue-500 bg-blue-50 text-blue-700 ring-1 ring-blue-500'
+                                                : 'border-gray-200 hover:border-blue-300'
+                                                } `}
                                         >
                                             {tone === 'aggressive' ? 'Persuasivo' : tone === 'friendly' ? 'Amigable' : 'Profesional'}
                                         </button>

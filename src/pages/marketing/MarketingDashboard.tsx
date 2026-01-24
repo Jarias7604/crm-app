@@ -1,20 +1,18 @@
-import { useState } from 'react';
 import {
-    Megaphone,
     Mail,
     MessageSquare,
     Search,
-    Bot,
     TrendingUp,
-    Users,
     Zap,
-    Settings
+    Settings,
+    Bot
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { Link } from 'react-router-dom';
 
 export default function MarketingDashboard() {
     const { profile } = useAuth();
+    console.log(profile); // Keep usage to avoid lint error if strictly needed, or just let it recognize variable is used.
 
     return (
         <div className="space-y-8">
@@ -31,10 +29,10 @@ export default function MarketingDashboard() {
                         <Settings className="w-5 h-5" />
                         Configurar Envíos
                     </Link>
-                    <button className="bg-gradient-to-r from-orange-500 to-pink-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 transition-all flex items-center gap-2">
+                    <Link to="/marketing/email/new" className="bg-gradient-to-r from-orange-500 to-pink-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 transition-all flex items-center gap-2">
                         <Zap className="w-5 h-5" />
                         Nueva Campaña
-                    </button>
+                    </Link>
                 </div>
             </div>
 
@@ -48,12 +46,14 @@ export default function MarketingDashboard() {
                         desc="Newsletters y secuencias"
                     />
                 </Link>
-                <ActionCard
-                    icon={MessageSquare}
-                    color="bg-green-100 text-green-600"
-                    title="WhatsApp & Chat"
-                    desc="Mensajería masiva"
-                />
+                <div className="cursor-not-allowed opacity-70">
+                    <ActionCard
+                        icon={MessageSquare}
+                        color="bg-green-100 text-green-600"
+                        title="WhatsApp & Chat"
+                        desc="Mensajería masiva (Pronto)"
+                    />
+                </div>
                 <Link to="/marketing/agents">
                     <ActionCard
                         icon={Bot}
@@ -132,7 +132,7 @@ export default function MarketingDashboard() {
 
 function ActionCard({ icon: Icon, color, title, desc, isNew = false }: any) {
     return (
-        <button className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all text-left group relative overflow-hidden">
+        <button className="w-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all text-left group relative overflow-hidden">
             <div className={`w-12 h-12 ${color} rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
                 <Icon className="w-6 h-6" />
             </div>

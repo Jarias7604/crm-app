@@ -1,6 +1,7 @@
+
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Mail, ArrowLeft, CheckCircle, Server, Shield, Cloud, CreditCard, ChevronRight } from 'lucide-react';
+import { Mail, ArrowLeft, CheckCircle, Server, Shield, Cloud, CreditCard } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { integrationService, type EmailIntegration } from '../../services/marketing/integrationService';
 import toast from 'react-hot-toast';
@@ -8,15 +9,12 @@ import toast from 'react-hot-toast';
 export default function MarketingSettings() {
     const { profile } = useAuth();
     const [integrations, setIntegrations] = useState<EmailIntegration[]>([]);
-    const [loading, setLoading] = useState(true);
     const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
     const [formData, setFormData] = useState<any>({});
 
     useEffect(() => {
         if (profile?.company_id) {
             loadIntegrations();
-        } else {
-            setLoading(false);
         }
     }, [profile?.company_id]);
 
@@ -28,8 +26,6 @@ export default function MarketingSettings() {
         } catch (error) {
             console.error(error);
             toast.error('Error cargando configuraciones');
-        } finally {
-            setLoading(false);
         }
     };
 
