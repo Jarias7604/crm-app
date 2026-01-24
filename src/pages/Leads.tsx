@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import { leadsService } from '../services/leads';
 import type { Lead, LeadStatus, LeadPriority, FollowUp } from '../types';
 import { PRIORITY_CONFIG, STATUS_CONFIG, ACTION_TYPES, SOURCE_CONFIG } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2, Layout } from 'lucide-react';
+import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2, Layout, MessageSquare, Send as TelegramIcon, Smartphone } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { csvHelper } from '../utils/csvHelper';
@@ -798,6 +798,32 @@ export default function Leads() {
                                     <StatusBadge status={selectedLead.status} />
                                     <p className="text-xs text-gray-500 mt-1">Estado</p>
                                 </div>
+                            </div>
+
+                            {/* Canales de Chat Unificados */}
+                            <div className="bg-white rounded-xl p-4 border border-blue-100 shadow-sm space-y-3">
+                                <h4 className="text-xs font-black text-blue-800 uppercase tracking-widest flex items-center gap-2">
+                                    <MessageSquare className="w-4 h-4" /> Centro de Mensajería
+                                </h4>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <Link
+                                        to="/marketing/chat"
+                                        state={{ lead: selectedLead, channel: 'telegram' }}
+                                        className="flex items-center justify-center gap-2 py-3 bg-sky-50 text-sky-600 rounded-xl font-bold text-xs hover:bg-sky-100 transition-all border border-sky-100"
+                                    >
+                                        <TelegramIcon className="w-4 h-4" /> Telegram Bot
+                                    </Link>
+                                    <Link
+                                        to="/marketing/chat"
+                                        state={{ lead: selectedLead, channel: 'whatsapp' }}
+                                        className="flex items-center justify-center gap-2 py-3 bg-green-50 text-green-600 rounded-xl font-bold text-xs hover:bg-green-100 transition-all border border-green-100"
+                                    >
+                                        <Smartphone className="w-4 h-4" /> WhatsApp
+                                    </Link>
+                                </div>
+                                <p className="text-[10px] text-gray-400 font-medium text-center italic">
+                                    Activa la comunicación omnicanal con este lead.
+                                </p>
                             </div>
 
                             {/* Edit Status & Priority */}

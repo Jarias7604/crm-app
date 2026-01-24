@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthProvider';
-import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Tag, Layers, Building2, Megaphone } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Tag, Layers, Building2, Megaphone, MessageSquare } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { brandingService } from '../services/branding';
@@ -56,7 +56,13 @@ export default function Sidebar() {
             name: 'Marketing Hub',
             href: '/marketing',
             icon: Megaphone,
-            current: location.pathname.startsWith('/marketing')
+            current: location.pathname.startsWith('/marketing') && !location.pathname.startsWith('/marketing/chat')
+        });
+        navigation.push({
+            name: 'Mensajes',
+            href: '/marketing/chat',
+            icon: MessageSquare,
+            current: location.pathname.startsWith('/marketing/chat')
         });
     }
 

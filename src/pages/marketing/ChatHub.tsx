@@ -20,6 +20,7 @@ import {
     Smartphone,
     Bot
 } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 interface Message {
@@ -51,6 +52,35 @@ export default function ChatHub() {
     const [newMessage, setNewMessage] = useState('');
     const [filter, setFilter] = useState<'all' | 'whatsapp' | 'telegram' | 'web'>('all');
     const scrollRef = useRef<HTMLDivElement>(null);
+    const location = useLocation();
+
+    // Handle deep linking from Leads page
+    useEffect(() => {
+        if (location.state?.lead) {
+            const incomingLead = location.state.lead;
+            const channel = location.state.channel || 'telegram';
+
+            // Set filter to the specific channel
+            setFilter(channel);
+
+            // Create a temporary conversation object for the lead
+            const tempConv: Conversation = {
+                id: `new-${incomingLead.id}`,
+                channel: channel,
+                status: 'open',
+                last_message: 'Iniciando conversación desde CRM...',
+                last_message_at: new Date().toISOString(),
+                unread_count: 0,
+                lead: {
+                    name: incomingLead.name,
+                    email: incomingLead.email || 'sin-email@email.com',
+                    company: incomingLead.company_name || 'Particular',
+                }
+            };
+            setSelectedConv(tempConv);
+            toast.success(`Abrir chat de ${channel} para ${incomingLead.name}`);
+        }
+    }, [location.state]);
 
     // Mock Conversations - Ideally fetch from Supabase
     const conversations: Conversation[] = [

@@ -132,7 +132,7 @@ export default function MarketingDashboard() {
 
 function ActionCard({ icon: Icon, color, title, desc, isNew = false }: any) {
     return (
-        <button className="w-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all text-left group relative overflow-hidden">
+        <div className="w-full bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-all text-left group relative overflow-hidden">
             <div className={`w-12 h-12 ${color} rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
                 <Icon className="w-6 h-6" />
             </div>
@@ -143,7 +143,7 @@ function ActionCard({ icon: Icon, color, title, desc, isNew = false }: any) {
                     New
                 </span>
             )}
-        </button>
+        </div>
     );
 }
 
