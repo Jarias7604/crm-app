@@ -22,6 +22,7 @@ import GestionItems from './pages/GestionItems';
 import CotizadorPro from './pages/CotizadorPro';
 import CotizacionDetalle from './pages/CotizacionDetalle';
 import Branding from './pages/company/Branding';
+import MarketingDashboard from './pages/marketing/MarketingDashboard';
 
 function App() {
   return (
@@ -51,6 +52,7 @@ function App() {
               <Route path="/company/team" element={<Team />} />
               <Route path="/company/permissions" element={<Permissions />} />
               <Route path="/config/branding" element={<Branding />} />
+              <Route path="/marketing" element={<MarketingDashboard />} />
             </Route>
           </Route>
 

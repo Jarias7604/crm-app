@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthProvider';
-import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Tag, Layers, Building2 } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Tag, Layers, Building2, Megaphone } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { brandingService } from '../services/branding';
@@ -49,6 +49,16 @@ export default function Sidebar() {
         { name: 'Cotizaciones', href: '/cotizaciones', icon: FileText, current: location.pathname === '/cotizaciones' },
         { name: t('sidebar.calendar'), href: '/calendar', icon: Calendar, current: location.pathname.startsWith('/calendar') },
     ];
+
+    // Marketing Platform (Super Admin Only for now)
+    if (profile?.role === 'super_admin') {
+        navigation.push({
+            name: 'Marketing Hub',
+            href: '/marketing',
+            icon: Megaphone,
+            current: location.pathname.startsWith('/marketing')
+        });
+    }
 
     const configSubItemsRaw = [
         {
