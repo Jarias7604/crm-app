@@ -12,6 +12,7 @@ export interface ChatConversation {
         name: string;
         email: string | null;
         company_name: string | null;
+        phone: string | null;
     } | null;
 }
 
@@ -20,17 +21,40 @@ export interface ChatMessage {
     conversation_id: string;
     content: string;
     direction: 'inbound' | 'outbound';
+    type: 'text' | 'image' | 'file';
     status: string;
+    metadata: any;
     sent_at: string;
 }
 
 export const chatService = {
+    async createConversation(leadId: string, channel: string, externalId: string = 'internal') {
+        const { data: profile } = await supabase.from('profiles').select('company_id').single();
+        if (!profile?.company_id) throw new Error('No company found');
+
+        const { data, error } = await supabase
+            .from('marketing_conversations')
+            .insert({
+                company_id: profile.company_id,
+                lead_id: leadId,
+                channel,
+                external_id: externalId,
+                last_message: 'Nueva conversación...',
+                unread_count: 0
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data as ChatConversation;
+    },
+
     async getConversations() {
         const { data, error } = await supabase
             .from('marketing_conversations')
             .select(`
                 *,
-                lead:leads(id, name, email, company_name)
+                lead:leads(id, name, email, company_name, phone)
             `)
             .order('last_message_at', { ascending: false });
 
@@ -49,12 +73,16 @@ export const chatService = {
         return data as ChatMessage[];
     },
 
-    async sendMessage(conversationId: string, content: string) {
-        const { data, error } = await supabase
+    async sendMessage(conversationId: string, content: string, type: 'text' | 'image' | 'file' = 'text', metadata: any = {}) {
+        // 1. Insert into local database
+        // We include 'origin' in metadata so the DB Trigger knows where the link should point.
+        const { data: msg, error } = await supabase
             .from('marketing_messages')
             .insert({
                 conversation_id: conversationId,
                 content,
+                type,
+                metadata: { ...metadata, origin: window.location.origin },
                 direction: 'outbound',
                 status: 'sent'
             })
@@ -63,7 +91,7 @@ export const chatService = {
 
         if (error) throw error;
 
-        // Update last message in conversation
+        // 2. Update last message in conversation for the UI
         await supabase
             .from('marketing_conversations')
             .update({
@@ -72,7 +100,7 @@ export const chatService = {
             })
             .eq('id', conversationId);
 
-        return data as ChatMessage;
+        return msg as ChatMessage;
     },
 
     async markAsRead(conversationId: string) {

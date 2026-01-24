@@ -21,6 +21,36 @@ export const storageService = {
     },
 
     /**
+     * Upload a file related to a chat message
+     */
+    async uploadMessageFile(companyId: string, conversationId: string, file: File) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `chats/${companyId}/${conversationId}/${fileName}`;
+
+        const { data, error } = await supabase.storage
+            .from('lead-documents')
+            .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: true
+            });
+
+        if (error) throw error;
+        return data.path;
+    },
+
+    /**
+     * Get public URL for a file
+     */
+    async getPublicUrl(path: string) {
+        const { data } = supabase.storage
+            .from('lead-documents')
+            .getPublicUrl(path);
+
+        return data.publicUrl;
+    },
+
+    /**
      * Get a temporary download URL for a file
      */
     async getDownloadUrl(path: string) {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, FileText, DollarSign, Search, X } from 'lucide-react';
 import { cotizadorService, type CotizadorPaquete, type CotizadorItem } from '../services/cotizador';
 import { leadsService } from '../services/leads';
@@ -8,6 +8,7 @@ import { Input } from '../components/ui/Input';
 import { cotizacionesService } from '../services/cotizaciones';
 import { useAuth } from '../auth/AuthProvider';
 import { usePermissions } from '../hooks/usePermissions';
+import { pdfService } from '../services/pdfService';
 import toast from 'react-hot-toast';
 
 export default function CotizadorPro() {
@@ -67,15 +68,32 @@ export default function CotizadorPro() {
     const [overrides, setOverrides] = useState<Record<string, number>>({});
     const [implementationOverride, setImplementationOverride] = useState<number | null>(null);
 
+    const location = useLocation();
+
     useEffect(() => {
         const init = async () => {
             await Promise.all([loadData(), loadLeads()]);
+
+            // Si venimos del chat con un lead específico
+            if (location.state?.lead) {
+                const l = location.state.lead;
+                setFormData(prev => ({
+                    ...prev,
+                    usar_lead: true,
+                    lead_id: l.id,
+                    cliente_nombre: l.name || '',
+                    cliente_empresa: l.company_name || '',
+                    cliente_email: l.email || '',
+                    cliente_telefono: l.phone || ''
+                }));
+            }
+
             if (id) {
                 await loadExistingCotizacion(id);
             }
         };
         init();
-    }, [id]);
+    }, [id, location.state]);
 
     const loadExistingCotizacion = async (cotId: string) => {
         try {
@@ -386,13 +404,53 @@ export default function CotizadorPro() {
             };
 
             if (id) {
-                await cotizacionesService.updateCotizacion(id, cotizacionData);
+                const updated = await cotizacionesService.updateCotizacion(id, cotizacionData);
                 toast.success('✅ Cotización actualizada exitosamente');
+
+                if (location.state?.fromChat) {
+                    navigate('/marketing/chat', {
+                        state: {
+                            newQuote: updated,
+                            conversation_id: location.state.conversation_id
+                        },
+                        replace: true
+                    });
+                } else {
+                    navigate('/cotizaciones');
+                }
             } else {
-                await cotizacionesService.createCotizacion(cotizacionData);
+                const created = await cotizacionesService.createCotizacion(cotizacionData);
                 toast.success('✅ Cotización creada exitosamente');
+
+                if (location.state?.fromChat) {
+                    // GENERATE PDF AUTOMATICALLY FOR CHAT
+                    try {
+                        toast.loading('Generando PDF oficial...', { id: 'pdf-gen' });
+                        const pdfUrl = await pdfService.generateAndUploadQuotePDF(created);
+                        toast.success('PDF generado y listo', { id: 'pdf-gen' });
+
+                        navigate('/marketing/chat', {
+                            state: {
+                                newQuote: { ...created, pdfUrl },
+                                conversation_id: location.state.conversation_id
+                            },
+                            replace: true
+                        });
+                    } catch (pdfErr) {
+                        console.error('PDF Error:', pdfErr);
+                        toast.error('Cotización guardada, pero hubo un error generando el PDF');
+                        navigate('/marketing/chat', {
+                            state: {
+                                newQuote: created,
+                                conversation_id: location.state.conversation_id
+                            },
+                            replace: true
+                        });
+                    }
+                } else {
+                    navigate('/cotizaciones');
+                }
             }
-            navigate('/cotizaciones');
         } catch (error: any) {
             console.error('Error procesando cotización:', error);
             const errorMessage = error?.message || error?.toString() || 'Error al procesar cotización';

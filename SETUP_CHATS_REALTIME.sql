@@ -44,8 +44,8 @@ CREATE TABLE IF NOT EXISTS marketing_messages (
 );
 
 -- Indices
-CREATE INDEX idx_messages_conv ON marketing_messages(conversation_id);
-CREATE INDEX idx_conversations_lead ON marketing_conversations(lead_id);
+CREATE INDEX IF NOT EXISTS idx_messages_conv ON marketing_messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_lead ON marketing_conversations(lead_id);
 
 -- RLS
 ALTER TABLE marketing_conversations ENABLE ROW LEVEL SECURITY;
