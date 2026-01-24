@@ -6,7 +6,7 @@ import type { Lead, LeadStatus, LeadPriority, FollowUp } from '../types';
 import { PRIORITY_CONFIG, STATUS_CONFIG, ACTION_TYPES, SOURCE_CONFIG } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2 } from 'lucide-react';
+import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2, Layout } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { csvHelper } from '../utils/csvHelper';
@@ -15,6 +15,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { useMemo } from 'react';
 import { CreateLeadFullscreen } from '../components/CreateLeadFullscreen';
 import { MobileQuickActions } from '../components/MobileQuickActions';
+import { LeadKanban } from '../components/LeadKanban';
 
 export default function Leads() {
     const { profile } = useAuth();
@@ -32,7 +33,7 @@ export default function Leads() {
         company_name: '' as string | undefined,
         email: '' as string | null,
         phone: '' as string | null,
-        status: 'Nuevo lead' as LeadStatus,
+        status: 'Prospecto' as LeadStatus,
         priority: 'medium' as LeadPriority,
         value: 0,
         closing_amount: 0,
@@ -51,7 +52,7 @@ export default function Leads() {
         notes: ''
     });
     const [isSavingFollowUp, setIsSavingFollowUp] = useState(false);
-    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'kanban'>('kanban');
     const [isImporting, setIsImporting] = useState(false);
     const [priorityFilter, setPriorityFilter] = useState<string>('all');
     const [filteredLeadId, setFilteredLeadId] = useState<string | null>(null);
@@ -270,8 +271,8 @@ export default function Leads() {
                 loadLeads(); // Refresh list
             }
         } catch (error: any) {
-            console.error('Import failed:', error);
-            toast.error(`Error al importar: ${error.message}`);
+            console.error('Lead import failed:', error);
+            toast.error(`Fallo en la importación: ${error.message || 'Verifica el formato del archivo CSV'}`);
         } finally {
             setIsImporting(false);
             // Reset input
@@ -364,7 +365,7 @@ export default function Leads() {
     const resetForm = () => {
         setFormData({
             name: '', company_name: '', email: '', phone: '',
-            status: 'Nuevo lead', priority: 'medium', value: 0, closing_amount: 0, source: '',
+            status: 'Prospecto', priority: 'medium', value: 0, closing_amount: 0, source: '',
             next_followup_date: '', next_followup_assignee: '', next_action_notes: '',
             assigned_to: ''
         });
@@ -380,7 +381,7 @@ export default function Leads() {
     };
 
     const StatusBadge = ({ status }: { status: LeadStatus }) => {
-        const config = STATUS_CONFIG[status] || STATUS_CONFIG['Nuevo lead'];
+        const config = STATUS_CONFIG[status] || STATUS_CONFIG['Prospecto'];
         return (
             <span className={`inline-block w-[140px] text-center px-2 py-0.5 text-xs font-medium rounded-full ${config.bgColor} ${config.color}`}>
                 {config.label}
@@ -433,6 +434,13 @@ export default function Leads() {
                             title="Vista Lista"
                         >
                             <List className="w-4 h-4" />
+                        </button>
+                        <button
+                            onClick={() => setViewMode('kanban')}
+                            className={`p-2 rounded-md transition-all ${viewMode === 'kanban' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                            title="Tablero Kanban"
+                        >
+                            <Layout className="w-4 h-4" />
                         </button>
                     </div>
 
@@ -529,13 +537,21 @@ export default function Leads() {
                                             })()}
                                         </div>
                                     )}
-                                    {lead.assigned_to && (
-                                        <div className="flex items-center text-xs text-blue-700 col-span-2 font-semibold">
-                                            <User className="w-3.5 h-3.5 mr-1" />
-                                            Asignado: {teamMembers.find(m => m.id === lead.assigned_to)?.full_name ||
-                                                teamMembers.find(m => m.id === lead.assigned_to)?.email.split('@')[0]}
-                                        </div>
-                                    )}
+                                    {lead.assigned_to && (() => {
+                                        const assignee = teamMembers.find(m => m.id === lead.assigned_to);
+                                        return (
+                                            <div className="flex items-center text-xs text-blue-700 col-span-2 font-semibold mt-1">
+                                                {assignee?.avatar_url ? (
+                                                    <img src={assignee.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover mr-2 border border-blue-200 shadow-sm" />
+                                                ) : (
+                                                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-2 border border-blue-200">
+                                                        <User className="w-4 h-4 text-blue-400" />
+                                                    </div>
+                                                )}
+                                                <span>Asignado: {assignee?.full_name || assignee?.email.split('@')[0]}</span>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
 
                                 <div className="mt-3 pt-3 border-t border-gray-100 flex gap-3 text-xs text-gray-400">
@@ -546,7 +562,7 @@ export default function Leads() {
                         </div>
                     ))}
                 </div>
-            ) : (
+            ) : viewMode === 'list' ? (
                 /* List View */
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                     <div className="overflow-x-auto">
@@ -597,13 +613,23 @@ export default function Leads() {
                                             {(lead.closing_amount || 0) > 0 && <div className="text-xs text-green-600 font-medium">Cierre: ${lead.closing_amount.toLocaleString()}</div>}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {lead.assigned_to ? (
-                                                <div className="flex items-center gap-1.5 text-blue-600 font-medium">
-                                                    <User className="w-3.5 h-3.5" />
-                                                    {teamMembers.find(m => m.id === lead.assigned_to)?.full_name ||
-                                                        teamMembers.find(m => m.id === lead.assigned_to)?.email.split('@')[0]}
-                                                </div>
-                                            ) : <span className="text-gray-400">-</span>}
+                                            {lead.assigned_to ? (() => {
+                                                const assignee = teamMembers.find(m => m.id === lead.assigned_to);
+                                                return (
+                                                    <div className="flex items-center gap-2">
+                                                        {assignee?.avatar_url ? (
+                                                            <img src={assignee.avatar_url} alt="" className="w-12 h-12 rounded-full object-cover border border-blue-100 shadow-sm" />
+                                                        ) : (
+                                                            <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center border border-blue-100">
+                                                                <User className="w-6 h-6 text-blue-400" />
+                                                            </div>
+                                                        )}
+                                                        <span className="text-sm font-medium text-gray-900">
+                                                            {assignee?.full_name || assignee?.email.split('@')[0]}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })() : <span className="text-gray-400">-</span>}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             {lead.created_at ? (() => {
@@ -641,6 +667,29 @@ export default function Leads() {
                         </table>
                     </div>
                 </div>
+            ) : (
+                /* Kanban View */
+                <LeadKanban
+                    leads={filteredLeads}
+                    teamMembers={teamMembers}
+                    onUpdateStatus={async (leadId, newStatus) => {
+                        const lead = leads.find(l => l.id === leadId);
+                        if (!lead) return;
+
+                        try {
+                            // Optimistic update
+                            setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: newStatus } : l));
+
+                            await leadsService.updateLead(leadId, { status: newStatus });
+                            toast.success(`Estado actualizado a ${newStatus}`);
+                        } catch (error) {
+                            // Rollback
+                            setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: lead.status } : l));
+                            toast.error('Error al actualizar estado');
+                        }
+                    }}
+                    onOpenDetail={openLeadDetail}
+                />
             )}
 
             {leads.length === 0 && !loading && (
@@ -756,11 +805,16 @@ export default function Leads() {
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 mb-1">Cambiar Estado</label>
                                     <select value={selectedLead.status} onChange={(e) => handleUpdateLead({ status: e.target.value as LeadStatus })} className="block w-full rounded-md border-gray-300 shadow-sm text-sm">
-                                        <option value="Nuevo lead">Nuevo lead</option>
-                                        <option value="Potencial – En seguimiento">En seguimiento</option>
-                                        <option value="Cliente 2025">Cliente 2025</option>
-                                        <option value="Cliente 2026">Cliente 2026</option>
-                                        <option value="Lead perdido">Perdido</option>
+                                        <option value="Prospecto">🎯 Prospecto</option>
+                                        <option value="Lead calificado">⭐ Lead calificado</option>
+                                        <option value="Sin respuesta">📵 Sin respuesta</option>
+                                        <option value="Lead frío">❄️ Lead frío</option>
+                                        <option value="Contactado">📞 Contactado</option>
+                                        <option value="Cotización enviada">📄 Cotización enviada</option>
+                                        <option value="Seguimiento / Negociación">💼 Seguimiento / Negociación</option>
+                                        <option value="Cerrado">🔒 Cerrado</option>
+                                        <option value="Cliente">✅ Cliente</option>
+                                        <option value="Perdido">❌ Perdido</option>
                                     </select>
                                 </div>
                                 <div>
@@ -772,20 +826,34 @@ export default function Leads() {
                                         <option value="low">⚪ Baja</option>
                                     </select>
                                 </div>
-                                <div className="col-span-2 bg-blue-50 p-2 rounded border border-blue-100">
-                                    <label className="block text-xs font-bold text-blue-700 mb-1">👤 Responsable Principal</label>
-                                    <select
-                                        value={selectedLead.assigned_to || ''}
-                                        onChange={(e) => handleUpdateLead({ assigned_to: e.target.value || null })}
-                                        className="block w-full rounded-md border-blue-200 shadow-sm text-sm bg-white"
-                                    >
-                                        <option value="">Sin asignar</option>
-                                        {teamMembers.map(m => (
-                                            <option key={m.id} value={m.id}>
-                                                {m.full_name ? `${m.full_name} (${m.email.split('@')[0]})` : m.email}
-                                            </option>
-                                        ))}
-                                    </select>
+                                <div className="col-span-2 bg-blue-50 p-3 rounded-lg border border-blue-100 flex items-center gap-3">
+                                    <div className="flex-shrink-0">
+                                        {(() => {
+                                            const assignee = teamMembers.find(m => m.id === selectedLead.assigned_to);
+                                            return assignee?.avatar_url ? (
+                                                <img src={assignee.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm" />
+                                            ) : (
+                                                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center border-2 border-white shadow-sm">
+                                                    <User className="w-5 h-5 text-blue-400" />
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="block text-xs font-bold text-blue-700 mb-1">👤 Responsable Principal</label>
+                                        <select
+                                            value={selectedLead.assigned_to || ''}
+                                            onChange={(e) => handleUpdateLead({ assigned_to: e.target.value || null })}
+                                            className="block w-full rounded-md border-blue-200 shadow-sm text-sm bg-white focus:ring-blue-500 focus:border-blue-500"
+                                        >
+                                            <option value="">Sin asignar</option>
+                                            {teamMembers.map(m => (
+                                                <option key={m.id} value={m.id}>
+                                                    {m.full_name ? `${m.full_name} (${m.email.split('@')[0]})` : m.email}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
 
@@ -969,9 +1037,12 @@ export default function Leads() {
                                                             } catch (e) {
                                                                 return 'Error fecha';
                                                             }
-                                                        })()} · {fu.profiles?.email?.split('@')[0] || 'Usuario'}
+                                                        })()} · <span className="font-bold text-gray-700">{fu.profiles?.full_name || fu.profiles?.email?.split('@')[0] || 'Usuario'}</span>
                                                     </p>
                                                 </div>
+                                                {fu.profiles?.avatar_url && (
+                                                    <img src={fu.profiles.avatar_url} alt="" className="w-8 h-8 rounded-full border border-gray-200" />
+                                                )}
                                             </div>
                                         ))}
                                     </div>

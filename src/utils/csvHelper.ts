@@ -4,6 +4,7 @@ export const CSV_COLUMNS = [
     { key: 'company_name', label: 'Empresa (opcional)' },
     { key: 'email', label: 'Email' },
     { key: 'phone', label: 'Teléfono' },
+    { key: 'address', label: 'Dirección' },
     { key: 'source', label: 'Fuente' },
     { key: 'priority', label: 'Prioridad' },
     { key: 'status', label: 'Estado' },
@@ -22,9 +23,10 @@ export const csvHelper = {
             'Empresa A.C.',  // company_name (opcional)
             'juan@ejemplo.com',  // email
             '123456789',  // phone
+            'Calle Falsa 123, Ciudad', // address
             'Redes Sociales',  // source
             'Media',  // priority
-            'Nuevo lead',  // status
+            'Prospecto',  // status
             '1000',  // value
             'Contacto inicial por Facebook',  // notes
             '15-01-2026'  // created_at (formato DD-MM-YYYY)
@@ -74,7 +76,15 @@ export const csvHelper = {
 
                     const data = lines.slice(1)
                         .map(row => {
-                            const values = row.split(delimiter).map(v => v.trim().replace(/^"(.*)"$/, '$1'));
+                            // Robust CSV split that respects quotes - handles both , and ;
+                            const regex = new RegExp(`(${delimiter}|\\r?\\n|^)(?:"([^"]*(?:""[^"]*)*)"|([^"${delimiter}\\r\\n]*))`, 'gi');
+                            const values: string[] = [];
+                            let match;
+                            while (match = regex.exec(row)) {
+                                let val = match[2] !== undefined ? match[2].replace(/""/g, '"') : match[3];
+                                values.push((val || '').trim());
+                            }
+
                             const lead: any = {};
                             let hasName = false;
 
@@ -95,11 +105,21 @@ export const csvHelper = {
                                     // Map Spanish status names for robust import
                                     if (col.key === 'status' && val) {
                                         const statusMap: Record<string, string> = {
-                                            'nuevo': 'Nuevo lead', 'nuevo lead': 'Nuevo lead',
-                                            'en seguimiento': 'Potencial – En seguimiento', 'seguimiento': 'Potencial – En seguimiento', 'potencial': 'Potencial – En seguimiento',
-                                            'cliente 2025': 'Cliente 2025', 'cliente 2026': 'Cliente 2026',
-                                            'perdido': 'Lead perdido', 'lead perdido': 'Lead perdido',
-                                            'erroneo': 'Lead erróneo', 'erróneo': 'Lead erróneo', 'error': 'Lead erróneo'
+                                            'prospecto': 'Prospecto',
+                                            'calificado': 'Lead calificado', 'lead calificado': 'Lead calificado',
+                                            'sin respuesta': 'Sin respuesta',
+                                            'frio': 'Lead frío', 'frío': 'Lead frío', 'lead frío': 'Lead frío',
+                                            'contactado': 'Contactado',
+                                            'cotizacion': 'Cotización enviada', 'cotización': 'Cotización enviada',
+                                            'negociacion': 'Seguimiento / Negociación', 'negociación': 'Seguimiento / Negociación', 'seguimiento': 'Seguimiento / Negociación',
+                                            'cerrado': 'Cerrado',
+                                            'cliente': 'Cliente',
+                                            'perdido': 'Perdido',
+                                            // Mapping from old statuses
+                                            'nuevo lead': 'Prospecto', 'nuevo': 'Prospecto',
+                                            'potencial – en seguimiento': 'Seguimiento / Negociación',
+                                            'cliente 2025': 'Cliente', 'cliente 2026': 'Cliente',
+                                            'lead perdido': 'Perdido', 'lead erroneo': 'Perdido', 'lead erróneo': 'Perdido'
                                         };
                                         const normalizedVal = val.toLowerCase().trim();
                                         val = statusMap[normalizedVal] || val;

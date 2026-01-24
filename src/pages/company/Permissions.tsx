@@ -27,10 +27,6 @@ export default function Permissions() {
             ]);
             setDefinitions(defs);
             setRolePermissions(perms);
-
-            // Expand all categories by default
-            const categories = [...new Set(defs.map(d => d.category))];
-            setExpandedCategories(new Set(categories));
         } catch (error) {
             console.error('Error loading permissions:', error);
         } finally {

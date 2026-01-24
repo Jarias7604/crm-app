@@ -34,13 +34,13 @@ export const leadsService = {
         if (error) throw error;
 
         const totalLeads = leads?.length || 0;
-        const wonDeals = leads?.filter(l => l.status?.includes('Cliente')).length || 0;
+        const wonDeals = leads?.filter(l => l.status === 'Cerrado' || l.status === 'Cliente').length || 0;
 
         return {
             totalLeads,
             totalPipeline: leads?.reduce((sum, l) => sum + (l.value || 0), 0) || 0,
             wonDeals,
-            lostDeals: leads?.filter(l => l.status === 'Lead perdido').length || 0,
+            lostDeals: leads?.filter(l => l.status === 'Perdido' || l.status === 'Sin respuesta' || l.status === 'Lead frío').length || 0,
             conversionRate: totalLeads > 0 ? Math.round((wonDeals / totalLeads) * 100) : 0,
         };
     },
@@ -60,7 +60,7 @@ export const leadsService = {
 
         const counts: Record<string, number> = {};
         data?.forEach(lead => {
-            const status = lead.status || 'Nuevo lead';
+            const status = lead.status || 'Prospecto';
             counts[status] = (counts[status] || 0) + 1;
         });
 
@@ -211,7 +211,7 @@ export const leadsService = {
                 'name', 'company_name', 'email', 'phone', 'source',
                 'status', 'priority', 'value', 'closing_amount',
                 'next_followup_date', 'next_followup_assignee', 'next_action_notes',
-                'company_id', 'assigned_to', 'created_at'
+                'company_id', 'assigned_to', 'created_at', 'address'
             ];
 
             const leadsToInsert = leads.map(lead => {
@@ -219,7 +219,7 @@ export const leadsService = {
                     company_id: profile.company_id,
                     assigned_to: lead.assigned_to || user.id, // Auto-assign to importer if not specified
                     priority: lead.priority || 'medium',
-                    status: lead.status || 'Nuevo lead',
+                    status: lead.status || 'Prospecto',
                     value: lead.value || 0
                 };
 
@@ -280,7 +280,7 @@ export const leadsService = {
     async getFollowUps(leadId: string) {
         const { data, error } = await supabase
             .from('follow_ups')
-            .select('*, profiles(email)')
+            .select('*, profiles(email, full_name, avatar_url)')
             .eq('lead_id', leadId)
             .order('date', { ascending: false });
 
@@ -318,7 +318,7 @@ export const leadsService = {
 
         const { data, error } = await supabase
             .from('profiles')
-            .select('id, email, role, full_name')
+            .select('id, email, role, full_name, avatar_url')
             .eq('company_id', profile.company_id);
 
         if (error) throw error;

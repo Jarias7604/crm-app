@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, AreaChart, Area
@@ -35,66 +35,95 @@ const THEME = {
 const PIE_COLORS = [THEME.primary, THEME.success, THEME.accent, '#8b5cf6', '#64748b', '#E2E8F0'];
 
 const FunnelInfographic = ({ data }: { data: any[] }) => {
-    // Process data to get specific funnel layers
-    const getLayerValue = (key: string) => data.find(d => d.key === key)?.value || 0;
+    // 10-STAGE COMPLETE EXCLUSIVE FUNNEL
+    // Logic: Exact status match per layer, strictly following user requested order.
 
-    // In this simplified dashboard, we'll map status names to 3 main layers
+    // Helper calculate EXACT count
+    const count = (status: string) => {
+        const item = data.find(d => d.key === status);
+        return item ? item.value : 0;
+    };
+
+    // Data Extraction based on Order
+    const prospectos = count('Prospecto');
+    const calificados = count('Lead calificado');
+    const sinRespuesta = count('Sin respuesta');
+    const frios = count('Lead frío');
+    const contactados = count('Contactado');
+    const cotizaciones = count('Cotización enviada');
+    const negociaciones = count('Seguimiento / Negociación');
+    const cerrados = count('Cerrado');
+    const clientes = count('Cliente');
+    const perdidos = count('Perdido');
+
+    // Total active for percentage/context (excluding lost)
+    const totalLeads = data.reduce((sum, d) => sum + d.value, 0);
+
     const layers = [
-        { label: 'Leads Totales', value: data.reduce((sum, d) => sum + d.value, 0), color: '#007BFF' },
-        { label: 'En Seguimiento', value: getLayerValue('Nuevo lead') + getLayerValue('Potencial – En seguimiento'), color: '#3b82f6' },
-        { label: 'Ventas Ganadas', value: getLayerValue('Cliente 2025') + getLayerValue('Cliente 2026'), color: '#3DCC91' },
-        { label: 'Leads Perdidos', value: getLayerValue('Lead perdido') + getLayerValue('Lead erróneo'), color: '#94a3b8' }
-    ].filter(l => l.value > 0 || l.label === 'Ventas Ganadas');
+        { label: 'Prospecto', value: prospectos, color: '#3b82f6' },                     // Blue 500
+        { label: 'Lead Calificado', value: calificados, color: '#6366f1' },              // Indigo 500
+        { label: 'Sin Respuesta', value: sinRespuesta, color: '#94a3b8' },               // Slate 400
+        { label: 'Lead Frío', value: frios, color: '#64748b' },                          // Slate 500
+        { label: 'Contactado', value: contactados, color: '#8b5cf6' },                   // Violet 500
+        { label: 'Cotización Enviada', value: cotizaciones, color: '#eab308' },          // Yellow 500
+        { label: 'Negociación', value: negociaciones, color: '#f97316' },                // Orange 500
+        { label: 'Cerrado', value: cerrados, color: '#10b981' },                         // Emerald 500
+        { label: 'Cliente', value: clientes, color: '#059669' },                         // Emerald 600
+        { label: 'Perdido', value: perdidos, color: '#ef4444' }                          // Red 500
+    ];
 
-    if (layers.length === 0) return <div className="text-gray-400 text-center py-10">No hay datos suficientes</div>;
+    console.log('🔍 Funnel 10-Layers:', layers);
 
+    if (data.length === 0) return <div className="text-gray-400 text-center py-10">No hay datos suficientes</div>;
 
     return (
         <div className="flex flex-col items-center justify-center w-full py-4">
-            <div className="relative w-full max-w-md space-y-2">
-                {layers.map((layer, index) => {
-                    const maxWidthPercent = 100 - (index * 15);
+            <div className="relative w-full max-w-md space-y-1.5">
+                {layers.filter(l => l.value > 0).map((layer, index, filteredLayers) => {
+                    // Tapering logic: Adjust based on filtered count
+                    const maxWidthPercent = 100 - (index * (40 / Math.max(filteredLayers.length, 1)));
 
                     return (
                         <div key={layer.label} className="relative group flex flex-col items-center">
-                            {/* Shape */}
+                            {/* Shape with custom clipPath */}
                             <div
-                                className="h-12 flex items-center justify-center text-white font-bold text-base shadow-md relative transition-all duration-300 group-hover:scale-[1.02]"
+                                className="h-9 flex items-center justify-center text-white font-bold text-xs shadow-sm relative transition-all duration-300 group-hover:scale-[1.02]"
                                 style={{
                                     width: `${maxWidthPercent}%`,
                                     backgroundColor: layer.color,
-                                    clipPath: `polygon(0 0, 100% 0, ${100 - 5}% 100%, 5% 100%)`,
-                                    zIndex: layers.length - index
+                                    // Gentle trapezoid
+                                    clipPath: `polygon(2% 0, 98% 0, 95% 100%, 5% 100%)`,
+                                    zIndex: 20 - index
                                 }}
                             >
-                                <div className="flex flex-col items-center">
-                                    <span className="text-[10px] opacity-80 uppercase tracking-wider">{layer.label}</span>
-                                    <span className="text-lg">{layer.value.toLocaleString()}</span>
+                                <div className="flex flex-row items-center gap-2 px-2 truncate w-full justify-center">
+                                    <span className="text-[10px] opacity-90 uppercase tracking-widest truncate">{layer.label}</span>
+                                    <span className="text-sm bg-black/10 px-1.5 rounded">{layer.value}</span>
                                 </div>
                             </div>
-
-                            {/* Conversion Arrow */}
-                            {index < layers.length - 1 && (
-                                <div className="flex items-center gap-1 text-[10px] text-gray-400 font-bold -my-1 z-0">
-                                    <TrendingUp className="w-3 h-3 text-blue-400" />
-                                    <span>{Math.round((layers[index + 1].value / layer.value) * 100) || 0}% CONVERSIÓN</span>
-                                </div>
-                            )}
                         </div>
                     );
                 })}
+                <div className="text-center mt-4">
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Total: {totalLeads}</span>
+                </div>
             </div>
         </div>
     );
 };
 
+
+
+
 export default function Dashboard() {
     const { t } = useTranslation();
     const { profile } = useAuth();
+    const location = useLocation();
 
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const filterRef = useRef<HTMLDivElement>(null);
     const [selectedDateRange, setSelectedDateRange] = useState<DateRange>('this_month');
+    const [refreshKey, setRefreshKey] = useState(Date.now());
 
     // Real data states
     const [stats, setStats] = useState({
@@ -122,13 +151,19 @@ export default function Dashboard() {
     const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
     const [isUpdatingCompany, setIsUpdatingCompany] = useState(false);
 
+    // Refresh data when navigating to Dashboard or when filters change
+    useEffect(() => {
+        // Update refresh key to force data reload
+        setRefreshKey(Date.now());
+    }, [location.pathname]);
+
     useEffect(() => {
         if (profile?.role === 'super_admin') {
             loadSuperAdminData();
-        } else {
+        } else if (profile) {
             loadCRMData();
         }
-    }, [profile, selectedDateRange]);
+    }, [profile, selectedDateRange, refreshKey]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -237,11 +272,19 @@ export default function Dashboard() {
                 conversionRate: realStats.conversionRate,
             });
 
-            setFunnelData(statusData.map((item: any) => ({
-                key: item.name,
-                name: STATUS_CONFIG[item.name as keyof typeof STATUS_CONFIG]?.label || item.name,
-                value: item.value
-            })));
+            const mappedFunnelData = statusData.map((item: any) => {
+                const config = STATUS_CONFIG[item.name as keyof typeof STATUS_CONFIG];
+                return {
+                    key: item.name,
+                    name: config?.label || item.name,
+                    value: item.value
+                };
+            });
+
+            console.log('📊 Dashboard: Raw status data from DB:', statusData);
+            console.log('📊 Dashboard: Mapped funnel data:', mappedFunnelData);
+
+            setFunnelData(mappedFunnelData);
 
             const total = sources.reduce((sum, s) => sum + s.value, 0);
             setSourceData(sources.map(s => ({

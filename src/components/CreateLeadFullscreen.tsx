@@ -1,6 +1,7 @@
-import { X, Plus, User, Phone, Mail, DollarSign, TrendingUp, Clock, Shield } from 'lucide-react';
-import { SOURCE_OPTIONS } from '../types';
+import { X, Plus, User, Mail, DollarSign, Shield, Building2, MapPin } from 'lucide-react';
 import type { Lead, LeadStatus, LeadPriority, Profile } from '../types';
+import { Input } from './ui/Input';
+import { Button } from './ui/Button';
 
 interface CreateLeadFullscreenProps {
     isOpen: boolean;
@@ -15,244 +16,202 @@ export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, t
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 bg-white">
-            {/* Header - Compacto */}
-            <div className="h-14 bg-gradient-to-r from-blue-600 to-indigo-600 flex items-center justify-between px-6 shadow-md">
-                <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                        <Plus className="w-5 h-5 text-white" />
+        <div className="fixed inset-0 z-50 bg-[#F8FAFC] flex flex-col">
+            {/* Header - Modern & Elevated */}
+            <div className="h-20 bg-white border-b border-gray-100 flex items-center justify-between px-8 shadow-sm relative z-10">
+                <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                        <Plus className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                        <h1 className="text-xl font-bold text-white">Nuevo Lead</h1>
-                        <p className="text-xs text-blue-100">Registra una nueva oportunidad de negocio</p>
+                        <h1 className="text-2xl font-black text-gray-900 tracking-tight">Nuevo Lead</h1>
+                        <p className="text-sm text-gray-500 font-medium font-serif">Registra una nueva oportunidad estratégica</p>
                     </div>
                 </div>
                 <button
                     onClick={onClose}
                     type="button"
-                    className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                    className="w-10 h-10 rounded-xl bg-gray-50 hover:bg-gray-100 flex items-center justify-center transition-all group border border-gray-100"
                 >
-                    <X className="w-5 h-5 text-white" />
+                    <X className="w-5 h-5 text-gray-400 group-hover:text-gray-900 transition-colors" />
                 </button>
             </div>
 
-            <form onSubmit={onSubmit} className="h-[calc(100vh-56px)] flex flex-col">
+            <form onSubmit={onSubmit} className="flex-1 flex overflow-hidden">
                 {/* Content Area */}
                 <div className="flex-1 flex overflow-hidden">
-                    {/* Left Side - Form */}
-                    <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
-                        <div className="max-w-4xl mx-auto space-y-4">
-                            {/* Contact Information Card */}
-                            <div className="bg-white rounded-lg p-5 shadow-sm border border-gray-200">
-                                <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2 pb-2 border-b border-gray-100">
-                                    <User className="w-4 h-4 text-blue-600" />
-                                    Información de Contacto
-                                </h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="col-span-2">
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                                            Nombre Contacto *
-                                        </label>
+                    {/* Left Side - Form Container */}
+                    <div className="flex-1 overflow-y-auto p-10">
+                        <div className="max-w-4xl mx-auto space-y-10">
+                            {/* Contact Information Group */}
+                            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl shadow-gray-200/40 space-y-8">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+                                        <User className="w-5 h-5 text-blue-600" />
+                                    </div>
+                                    <h3 className="text-sm font-black text-gray-800 uppercase tracking-widest">Información de Contacto</h3>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="md:col-span-2">
+                                        <label className="block text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-2 px-1">Nombre Completo del Contacto *</label>
                                         <div className="relative">
-                                            <User className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                            <input
+                                            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                            <Input
                                                 required
                                                 value={formData.name || ''}
                                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                                className="w-full pl-9 pr-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all"
+                                                className="pl-12 h-12 rounded-2xl border-gray-200 focus:ring-blue-500 focus:border-blue-500 font-bold bg-gray-50/30"
                                                 placeholder="Ej: Juan Pérez"
                                             />
                                         </div>
                                     </div>
+
                                     <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                                            Empresa
-                                        </label>
-                                        <input
-                                            value={formData.company_name || ''}
-                                            onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
-                                            className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all"
-                                            placeholder="Nombre de la empresa"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                                            Teléfono
-                                        </label>
+                                        <label className="block text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-2 px-1">Empresa</label>
                                         <div className="relative">
-                                            <Phone className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                            <input
-                                                value={formData.phone || ''}
-                                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                                className="w-full pl-9 pr-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all"
-                                                placeholder="+503 ..."
+                                            <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                            <Input
+                                                value={formData.company_name || ''}
+                                                onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
+                                                className="pl-12 h-12 rounded-2xl border-gray-200 focus:ring-blue-500 focus:border-blue-500 font-bold bg-gray-50/30"
+                                                placeholder="Nombre de la institución"
                                             />
                                         </div>
                                     </div>
-                                    <div className="col-span-2">
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                                            Email
-                                        </label>
+
+                                    <div>
+                                        <label className="block text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-2 px-1">Teléfono</label>
                                         <div className="relative">
-                                            <Mail className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                            <input
+                                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">📞</div>
+                                            <Input
+                                                value={formData.phone || ''}
+                                                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                                className="pl-12 h-12 rounded-2xl border-gray-200 focus:ring-blue-500 focus:border-blue-500 font-bold bg-gray-50/30"
+                                                placeholder="+503 7000-0000"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-2 px-1">Email Corporativo</label>
+                                        <div className="relative">
+                                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                                            <Input
                                                 type="email"
                                                 value={formData.email || ''}
                                                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                                className="w-full pl-9 pr-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all"
+                                                className="pl-12 h-12 rounded-2xl border-gray-200 focus:ring-blue-500 focus:border-blue-500 font-bold bg-gray-50/30"
                                                 placeholder="contacto@empresa.com"
                                             />
                                         </div>
                                     </div>
+
+                                    <div>
+                                        <label className="block text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-2 px-1">Dirección Física</label>
+                                        <div className="relative">
+                                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">📍</div>
+                                            <Input
+                                                value={formData.address || ''}
+                                                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                                className="pl-12 h-12 rounded-2xl border-gray-200 focus:ring-blue-500 focus:border-blue-500 font-bold bg-gray-50/30"
+                                                placeholder="Ciudad, Colonia, Calle..."
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Lead Details Card */}
-                            <div className="bg-white rounded-lg p-5 shadow-sm border border-gray-200">
-                                <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2 pb-2 border-b border-gray-100">
-                                    <TrendingUp className="w-4 h-4 text-green-600" />
-                                    Detalles del Lead
-                                </h3>
-                                <div className="grid grid-cols-3 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                                            Fuente
-                                        </label>
-                                        <select
-                                            value={formData.source || ''}
-                                            onChange={(e) => setFormData({ ...formData, source: e.target.value })}
-                                            className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all"
-                                        >
-                                            <option value="">Seleccionar...</option>
-                                            {SOURCE_OPTIONS.map(opt => (
-                                                <option key={opt.value} value={opt.value}>{opt.icon} {opt.label}</option>
-                                            ))}
-                                        </select>
+                            {/* Market Value & Priority Card */}
+                            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl shadow-gray-200/40 space-y-8">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+                                        <DollarSign className="w-5 h-5 text-emerald-600" />
                                     </div>
+                                    <h3 className="text-sm font-black text-gray-800 uppercase tracking-widest">Valor de Negocio y Clasificación</h3>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                                            Prioridad
-                                        </label>
+                                        <label className="block text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-2 px-1">Valor Potencial ($)</label>
+                                        <div className="relative">
+                                            <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-500" />
+                                            <Input
+                                                type="number"
+                                                value={formData.value || ''}
+                                                onChange={(e) => setFormData({ ...formData, value: Number(e.target.value) })}
+                                                className="pl-10 h-12 rounded-2xl border-gray-200 focus:ring-blue-500 font-bold bg-gray-50/30"
+                                                placeholder="0.00"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-2 px-1">Prioridad Estratégica</label>
                                         <select
                                             value={formData.priority || 'medium'}
                                             onChange={(e) => setFormData({ ...formData, priority: e.target.value as LeadPriority })}
-                                            className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all"
+                                            className="w-full h-12 rounded-2xl border-gray-200 focus:ring-blue-500 font-bold bg-gray-50/30 px-4 transition-all outline-none"
                                         >
-                                            <option value="very_high">🔴 Altísima</option>
-                                            <option value="high">🟠 Alta</option>
-                                            <option value="medium">🟡 Media</option>
-                                            <option value="low">⚪ Baja</option>
+                                            <option value="very_high">🔥 CRÍTICA (Altísima)</option>
+                                            <option value="high">⚡ ALTA</option>
+                                            <option value="medium">💎 MEDIA</option>
+                                            <option value="low">🌊 BAJA</option>
                                         </select>
                                     </div>
+
                                     <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                                            Estado
-                                        </label>
+                                        <label className="block text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-2 px-1">Estado del Lead</label>
                                         <select
-                                            value={formData.status || 'Nuevo lead'}
+                                            value={formData.status || 'Prospecto'}
                                             onChange={(e) => setFormData({ ...formData, status: e.target.value as LeadStatus })}
-                                            className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all"
+                                            className="w-full h-12 rounded-2xl border-gray-200 focus:ring-blue-500 font-bold bg-gray-50/30 px-4 transition-all outline-none"
                                         >
-                                            <option value="Nuevo lead">Nuevo lead</option>
-                                            <option value="Potencial – En seguimiento">En seguimiento</option>
-                                            <option value="Cliente 2025">Cliente 2025</option>
-                                            <option value="Cliente 2026">Cliente 2026</option>
-                                            <option value="Lead perdido">Perdido</option>
+                                            <option value="Prospecto">🎯 Prospecto</option>
+                                            <option value="Lead calificado">⭐ Lead calificado</option>
+                                            <option value="Sin respuesta">📵 Sin respuesta</option>
+                                            <option value="Lead frío">❄️ Lead frío</option>
+                                            <option value="Contactado">📞 Contactado</option>
                                         </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1.5 flex items-center gap-1">
-                                            <DollarSign className="w-3.5 h-3.5 text-green-600" />
-                                            Valor Potencial ($)
-                                        </label>
-                                        <input
-                                            type="number"
-                                            value={formData.value || ''}
-                                            onChange={(e) => setFormData({ ...formData, value: Number(e.target.value) })}
-                                            className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all"
-                                            placeholder="0"
-                                        />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1.5 flex items-center gap-1">
-                                            <TrendingUp className="w-3.5 h-3.5 text-green-600" />
-                                            Monto de Cierre ($)
-                                        </label>
-                                        <input
-                                            type="number"
-                                            value={formData.closing_amount || ''}
-                                            onChange={(e) => setFormData({ ...formData, closing_amount: Number(e.target.value) })}
-                                            className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all"
-                                            placeholder="0 si aún no cerró"
-                                        />
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Assignment & Follow-up Card */}
-                            <div className="bg-white rounded-lg p-5 shadow-sm border border-gray-200">
-                                <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2 pb-2 border-b border-gray-100">
-                                    <Clock className="w-4 h-4 text-purple-600" />
-                                    Asignación y Seguimiento
-                                </h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="col-span-2 bg-blue-50 p-3.5 rounded-lg border border-blue-200">
-                                        <label className="block text-xs font-bold text-blue-700 mb-1.5 flex items-center gap-1">
-                                            <Shield className="w-4 h-4" />
-                                            Responsable Principal *
-                                        </label>
+                            {/* Assignment & Notes */}
+                            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl shadow-gray-200/40 space-y-8">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center">
+                                        <Shield className="w-5 h-5 text-purple-600" />
+                                    </div>
+                                    <h3 className="text-sm font-black text-gray-800 uppercase tracking-widest">Asignación de Cuenta</h3>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="md:col-span-2 bg-blue-50/50 p-6 rounded-[2rem] border border-blue-100 space-y-4">
+                                        <label className="block text-[10px] font-black text-blue-700 uppercase tracking-[0.2em] mb-2 px-1">Responsable del Registro (Account Manager) *</label>
                                         <select
                                             required
                                             value={formData.assigned_to || ''}
                                             onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
-                                            className="w-full px-3 py-2 rounded-md border border-blue-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white transition-all"
+                                            className="w-full h-12 rounded-2xl border-blue-200 focus:ring-blue-500 font-bold bg-white px-4 transition-all shadow-sm outline-none"
                                         >
                                             <option value="">Seleccionar responsable...</option>
                                             {teamMembers.map(m => (
                                                 <option key={m.id} value={m.id}>
-                                                    {m.full_name ? `${m.full_name} (${m.email.split('@')[0]})` : m.email}
+                                                    {m.full_name || m.email}
                                                 </option>
                                             ))}
                                         </select>
                                     </div>
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                                            Próximo Seguimiento
-                                        </label>
-                                        <input
-                                            type="date"
-                                            value={formData.next_followup_date || ''}
-                                            onChange={(e) => setFormData({ ...formData, next_followup_date: e.target.value })}
-                                            className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                                            Seguimiento por
-                                        </label>
-                                        <select
-                                            value={formData.next_followup_assignee || ''}
-                                            onChange={(e) => setFormData({ ...formData, next_followup_assignee: e.target.value })}
-                                            className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all"
-                                        >
-                                            <option value="">Igual al responsable</option>
-                                            {teamMembers.map(m => (
-                                                <option key={m.id} value={m.id}>
-                                                    {m.full_name ? `${m.full_name} (${m.email.split('@')[0]})` : m.email}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="col-span-2">
-                                        <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                                            Notas próxima acción
-                                        </label>
+
+                                    <div className="md:col-span-2">
+                                        <label className="block text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-2 px-1">Notas de la Próxima Estrategia</label>
                                         <textarea
                                             value={formData.next_action_notes || ''}
                                             onChange={(e) => setFormData({ ...formData, next_action_notes: e.target.value })}
-                                            rows={2}
-                                            className="w-full px-3 py-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm resize-none transition-all"
-                                            placeholder="¿Qué se debe hacer en el próximo contacto?"
+                                            rows={3}
+                                            className="w-full p-4 rounded-[2rem] border border-gray-200 focus:ring-blue-500 font-medium bg-gray-50/30 text-sm resize-none"
+                                            placeholder="Detalla los siguientes pasos de valor para este lead..."
                                         />
                                     </div>
                                 </div>
@@ -260,62 +219,105 @@ export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, t
                         </div>
                     </div>
 
-                    {/* Right Side - Summary */}
-                    <div className="w-72 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-5 text-white shadow-xl">
-                        <h3 className="text-base font-bold mb-4 pb-3 border-b border-white/20">Resumen del Lead</h3>
-                        <div className="space-y-3">
-                            <div className="bg-white/15 rounded-lg p-3 backdrop-blur-md border border-white/20">
-                                <p className="text-blue-100 text-[10px] uppercase tracking-wider mb-1.5 font-semibold">Contacto</p>
-                                <p className="font-bold text-lg">{formData.name || 'Sin nombre'}</p>
-                                {formData.company_name && <p className="text-blue-100 mt-1 text-xs">{formData.company_name}</p>}
+                    {/* Right Side - Premium Summary Sidebar */}
+                    <div className="w-[380px] bg-white border-l border-gray-100 flex flex-col p-8 overflow-y-auto">
+                        <div className="flex-1 space-y-6">
+                            <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest px-1 mb-4 flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></div>
+                                Vista Previa del Perfil
+                            </h3>
+
+                            {/* Persona Card */}
+                            <div className="bg-gradient-to-br from-[#4449AA] to-[#2A2E6A] p-6 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden group">
+                                <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/5 rounded-full blur-2xl"></div>
+                                <div className="space-y-6 relative z-10">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-16 h-16 bg-white/10 backdrop-blur-xl rounded-[1.5rem] flex items-center justify-center border border-white/20 shadow-inner">
+                                            <User className="w-8 h-8 text-white select-none opacity-80" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xl font-black leading-tight tracking-tight truncate">{formData.name || 'Empresa ABC'}</p>
+                                            <div className="flex flex-col text-[9px] text-blue-100 font-black uppercase tracking-widest mt-1 opacity-70">
+                                                {formData.company_name && <span className="truncate">{formData.company_name}</span>}
+                                                <span className="flex items-center gap-1.5 mt-0.5">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
+                                                    Potencial Pipeline
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-sm border border-white/10">
+                                            <p className="text-[8px] font-black text-blue-100 uppercase opacity-60">Valor Potencial</p>
+                                            <p className="text-sm font-black mt-0.5">${(formData.value || 0).toLocaleString()}</p>
+                                        </div>
+                                        <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-sm border border-white/10">
+                                            <p className="text-[8px] font-black text-blue-100 uppercase opacity-60">Prioridad</p>
+                                            <p className="text-sm font-black mt-0.5 capitalize">
+                                                {formData.priority === 'very_high' ? 'Crítica' :
+                                                    formData.priority === 'high' ? 'Alta' :
+                                                        formData.priority === 'medium' ? 'Media' : 'Baja'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {formData.address && (
+                                        <div className="bg-white/5 p-3 rounded-2xl border border-white/5 flex items-start gap-2.5">
+                                            <MapPin className="w-4 h-4 text-blue-300 mt-0.5" />
+                                            <div>
+                                                <p className="text-[8px] text-blue-100 font-black uppercase opacity-60">Ubicación</p>
+                                                <p className="text-[10px] font-bold leading-relaxed">{formData.address}</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="pt-5 border-t border-white/10 flex items-center justify-between">
+                                        <div className="space-y-1">
+                                            <p className="text-[8px] text-blue-100 font-black uppercase opacity-50">Email de Contacto</p>
+                                            <p className="text-[9px] text-blue-100 font-bold truncate w-32">{formData.email || 'Sin correo asociado'}</p>
+                                        </div>
+                                        <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/10">
+                                            <Mail className="w-4 h-4 text-blue-300" />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="bg-white/15 rounded-lg p-3 backdrop-blur-md border border-white/20">
-                                <p className="text-blue-100 text-[10px] uppercase tracking-wider mb-1.5 font-semibold">Valor</p>
-                                <p className="font-bold text-2xl">${(formData.value || 0).toLocaleString()}</p>
-                            </div>
-
-                            <div className="bg-white/15 rounded-lg p-3 backdrop-blur-md border border-white/20">
-                                <p className="text-blue-100 text-[10px] uppercase tracking-wider mb-1.5 font-semibold">Prioridad</p>
-                                <p className="font-semibold text-sm">
-                                    {formData.priority === 'very_high' ? '🔴 Altísima' :
-                                        formData.priority === 'high' ? '🟠 Alta' :
-                                            formData.priority === 'medium' ? '🟡 Media' : '⚪ Baja'}
-                                </p>
-                            </div>
-
-                            <div className="bg-white/15 rounded-lg p-3 backdrop-blur-md border border-white/20">
-                                <p className="text-blue-100 text-[10px] uppercase tracking-wider mb-1.5 font-semibold">Responsable</p>
-                                <p className="font-semibold text-xs">
-                                    {formData.assigned_to ?
-                                        teamMembers.find(m => m.id === formData.assigned_to)?.full_name ||
-                                        teamMembers.find(m => m.id === formData.assigned_to)?.email.split('@')[0] ||
-                                        'Seleccionado'
-                                        : 'No asignado'}
+                            {/* Tip/Info Card */}
+                            <div className="bg-blue-50/50 p-6 rounded-[2rem] border border-blue-100 space-y-3">
+                                <div className="flex items-center gap-2">
+                                    <Shield className="w-4 h-4 text-blue-600" />
+                                    <p className="text-xs font-black text-blue-900 uppercase tracking-wider">Seguridad y Privacidad</p>
+                                </div>
+                                <p className="text-[11px] text-blue-700 leading-relaxed font-medium">
+                                    Al registrar este lead, se creará una trazabilidad automática. Solo usuarios con los permisos necesarios podrán modificar estos datos sensibles.
                                 </p>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                {/* Footer Action Buttons */}
-                <div className="h-16 bg-white border-t border-gray-200 px-6 flex items-center justify-between shadow-sm">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="px-6 py-2 rounded-lg border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 transition-all text-sm"
-                    >
-                        Cancelar
-                    </button>
-                    <button
-                        type="submit"
-                        className="px-6 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-500/30 transition-all flex items-center gap-2 text-sm"
-                    >
-                        <Plus className="w-4 h-4" />
-                        Crear Lead
-                    </button>
+                        {/* Sidebar Footer - Buttons */}
+                        <div className="mt-auto space-y-3 pt-6 border-t border-gray-100">
+                            <Button
+                                type="submit"
+                                className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-black shadow-xl shadow-blue-500/30 transition-all active:scale-95 flex items-center justify-center gap-2"
+                            >
+                                <Plus className="w-5 h-5" />
+                                Crear Estrategia Lead
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={onClose}
+                                className="w-full h-14 rounded-2xl border-gray-200 hover:bg-gray-50 font-black text-gray-500 transition-all"
+                            >
+                                Cancelar
+                            </Button>
+                        </div>
+                    </div>
                 </div>
             </form>
         </div>
     );
 }
+

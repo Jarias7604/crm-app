@@ -26,7 +26,7 @@ export const teamService = {
     async getTeamMembers(companyId: string) {
         const { data, error } = await supabase
             .from('profiles')
-            .select('id, email, role, created_at, company_id, full_name, phone, is_active')
+            .select('id, email, role, created_at, company_id, full_name, phone, is_active, avatar_url, website')
             .eq('company_id', companyId)
             .order('created_at', { ascending: false });
 
@@ -73,7 +73,7 @@ export const teamService = {
     },
 
     // Update member details
-    async updateMember(userId: string, updates: { full_name?: string; phone?: string; role?: Role }) {
+    async updateMember(userId: string, updates: { full_name?: string | null; phone?: string | null; role?: Role; avatar_url?: string | null; website?: string | null }) {
         const { error } = await supabase
             .from('profiles')
             .update(updates)
