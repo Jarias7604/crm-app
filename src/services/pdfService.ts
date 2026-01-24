@@ -1,67 +1,70 @@
-import { jsPDF } from 'jspdf';
+import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { supabase } from './supabase';
 
 export const pdfService = {
     async generateAndUploadQuotePDF(cotizacion: any): Promise<string> {
         try {
-            console.log('Iniciando PDF para:', cotizacion.id);
-            // Create PDF
-            const doc = new jsPDF();
+            console.log('Iniciando PDF:', cotizacion.id);
+
+            // Usar constructor seguro
+            const DocConstructor = (jsPDF as any).jsPDF || jsPDF;
+            const doc = new DocConstructor();
+
             const pageWidth = doc.internal.pageSize.getWidth();
 
-            // Colors
-            const primaryColor = [68, 73, 170];
-            const secondaryColor = [15, 23, 42];
-
-            // Header
+            // Header Negro Profesional
             doc.setFillColor(15, 23, 42);
             doc.rect(0, 0, pageWidth, 40, 'F');
-
             doc.setTextColor(255, 255, 255);
             doc.setFontSize(22);
             doc.text('PROPUESTA COMERCIAL', 20, 25);
 
-            // Body
+            // Datos Cliente
             doc.setTextColor(15, 23, 42);
-            doc.setFontSize(14);
-            doc.text('CLIENTE:', 20, 55);
-            doc.setFontSize(11);
-            doc.text(String(cotizacion.nombre_cliente || 'Cliente'), 20, 65);
-            doc.text(String(cotizacion.empresa_cliente || ''), 20, 72);
+            doc.setFontSize(12);
+            doc.text(`CLIENTE: ${cotizacion.nombre_cliente || 'Valorado Cliente'}`, 20, 55);
+            if (cotizacion.empresa_cliente) doc.text(cotizacion.empresa_cliente, 20, 62);
 
-            // Items Table
+            // Tabla Simple (Convertir todo a String para evitar fallos)
             const rows = [];
             rows.push([
-                'Suscripción ' + String(cotizacion.plan_nombre || 'Base'),
-                '$' + (cotizacion.costo_plan_anual?.toLocaleString() || '0')
+                'Suscripcion ' + String(cotizacion.plan_nombre || 'Base'),
+                '$' + String(cotizacion.costo_plan_anual || '0')
             ]);
 
             if (cotizacion.modulos_adicionales && Array.isArray(cotizacion.modulos_adicionales)) {
                 cotizacion.modulos_adicionales.forEach((m: any) => {
-                    rows.push([m.nombre, '$' + (m.costo_anual?.toLocaleString() || '0')]);
+                    rows.push([String(m.nombre), '$' + String(m.costo_anual || '0')]);
                 });
             }
 
-            (doc as any).autoTable({
-                startY: 85,
-                head: [['Servicio', 'Precio Anual']],
-                body: rows,
-                headStyles: { fillColor: primaryColor }
-            });
+            // Plugin AutoTable
+            if ((doc as any).autoTable) {
+                (doc as any).autoTable({
+                    startY: 75,
+                    head: [['Descripcion', 'Precio Anual']],
+                    body: rows,
+                    headStyles: { fillColor: [68, 73, 170] }
+                });
+            } else {
+                // Fallback si el plugin no carga
+                doc.text('Detalle de inversion:', 20, 80);
+                rows.forEach((r, i) => doc.text(`${r[0]}: ${r[1]}`, 25, 90 + (i * 7)));
+            }
 
-            const finalY = (doc as any).lastAutoTable.finalY + 20;
+            const finalY = (doc as any).lastAutoTable?.finalY || 150;
             doc.setFontSize(16);
-            doc.text(`TOTAL: $${cotizacion.total_anual?.toLocaleString() || '0'}`, pageWidth - 20, finalY, { align: 'right' });
+            doc.text(`TOTAL ANUAL: $${String(cotizacion.total_anual || '0')}`, pageWidth - 20, finalY + 20, { align: 'right' });
 
-            // To Blob
-            const blob = doc.output('blob');
-            const fileName = `propuesta_${Date.now()}.pdf`;
+            // Generar Blob
+            const pdfData = doc.output('blob');
+            const fileName = `prop_ready_${Date.now()}.pdf`;
 
-            console.log('Subiendo a storage...');
+            console.log('Subiendo...');
             const { error: uploadError } = await supabase.storage
                 .from('quotations')
-                .upload(fileName, blob, {
+                .upload(fileName, pdfData, {
                     contentType: 'application/pdf',
                     upsert: true
                 });
@@ -72,11 +75,10 @@ export const pdfService = {
                 .from('quotations')
                 .getPublicUrl(fileName);
 
-            console.log('PDF OK:', data.publicUrl);
             return data.publicUrl;
         } catch (err: any) {
-            console.error('ERROR PDF SERVICE:', err);
-            throw new Error(`Error en PDF: ${err.message || 'Falla desconocida'}`);
+            console.error('PDF ERROR:', err);
+            throw err;
         }
     }
 };

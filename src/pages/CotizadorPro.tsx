@@ -425,9 +425,9 @@ export default function CotizadorPro() {
                         },
                         replace: true
                     });
-                } catch (pdfErr) {
+                } catch (pdfErr: any) {
                     console.error('PDF Error:', pdfErr);
-                    toast.error('Cotización guardada, pero hubo un error generando el PDF', { id: 'pdf-gen' });
+                    toast.error(`Falla al crear PDF: ${pdfErr.message || 'Error Desconocido'}`, { id: 'pdf-gen' });
                     navigate('/marketing/chat', {
                         state: {
                             newQuote: result,
