@@ -83,7 +83,7 @@ export const campaignService = {
         let query = supabase
             .from('leads')
             .select('id, name, company_name, email, created_at, status')
-            .eq('company_id', companyId)
+            // .eq('company_id', companyId) // Removed to allow Super Admin to see all leads (RLS handles security)
             .not('email', 'is', null);
 
         if (filters.dateRange === 'new') {
