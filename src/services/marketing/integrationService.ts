@@ -1,16 +1,21 @@
 import { supabase } from '../supabase';
 
-export interface EmailIntegration {
+export interface MarketingIntegration {
     id: string;
     company_id: string;
-    provider: 'gmail' | 'outlook' | 'resend' | 'sendgrid' | 'smtp';
+    type: 'email' | 'whatsapp' | 'chat' | 'sms';
+    provider: 'gmail' | 'outlook' | 'resend' | 'twilio' | 'meta' | 'openai' | 'custom_webhook';
     name: string;
     settings: {
         email?: string;
         apiKey?: string;
+        token?: string;
+        accountSid?: string;
+        phoneNumberId?: string;
         host?: string;
         port?: number;
         user?: string;
+        baseUrl?: string;
     };
     is_active: boolean;
 }
@@ -24,10 +29,10 @@ export const integrationService = {
             .eq('company_id', companyId);
 
         if (error) throw error;
-        return data as EmailIntegration[];
+        return data as MarketingIntegration[];
     },
 
-    async saveIntegration(integration: Partial<EmailIntegration>) {
+    async saveIntegration(integration: Partial<MarketingIntegration>) {
         const { data, error } = await supabase
             .from('marketing_integrations')
             .upsert(integration, { onConflict: 'company_id, provider' })

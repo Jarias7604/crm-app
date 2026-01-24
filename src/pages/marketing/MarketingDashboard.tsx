@@ -46,14 +46,14 @@ export default function MarketingDashboard() {
                         desc="Newsletters y secuencias"
                     />
                 </Link>
-                <div className="cursor-not-allowed opacity-70">
+                <Link to="/marketing/settings">
                     <ActionCard
                         icon={MessageSquare}
                         color="bg-green-100 text-green-600"
                         title="WhatsApp & Chat"
-                        desc="Mensajería masiva (Pronto)"
+                        desc="Configura tus tokens y APIs"
                     />
-                </div>
+                </Link>
                 <Link to="/marketing/agents">
                     <ActionCard
                         icon={Bot}
