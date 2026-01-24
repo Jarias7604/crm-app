@@ -125,17 +125,6 @@ export default function Branding() {
                     <h1 className="text-4xl font-black text-[#0f172a] tracking-tight">Marca Corporativa</h1>
                     <p className="text-gray-500 font-medium">Gestiona tu identidad visual para cotizaciones y comunicaciones oficiales.</p>
                 </div>
-                <div className="hidden md:flex gap-3">
-                    <div className="flex -space-x-2">
-                        {[1, 2, 3].map(i => (
-                            <div key={i} className="w-10 h-10 rounded-full border-2 border-white bg-gray-100 flex items-center justify-center overflow-hidden">
-                                <img src={`https://i.pravatar.cc/150?u=${i + 10}`} alt="team" className="w-full h-full object-cover opacity-50" />
-                            </div>
-                        ))}
-                    </div>
-                    <div className="h-10 w-px bg-gray-100 mx-2"></div>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest self-center">Equipo de Diseño</p>
-                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">

@@ -195,24 +195,39 @@ class CotizadorService {
         items: CotizadorItem[],
         cantidad_dtes: number,
         descuento_porcentaje: number = 0,
-        iva_porcentaje: number = 13
+        iva_porcentaje: number = 13,
+        incluir_implementacion: boolean = true
     ): CotizacionCalculada {
         let subtotal_anual = 0;
         let subtotal_mensual = 0;
         const desglose: any[] = [];
 
-        // 1. PAQUETE BASE
-        subtotal_anual += paquete.costo_paquete_anual + paquete.costo_implementacion;
-        subtotal_mensual += (paquete.costo_paquete_mensual * 12) + paquete.costo_implementacion;
+        // 1. PAQUETE BASE (Solo licencia)
+        subtotal_anual += paquete.costo_paquete_anual;
+        subtotal_mensual += (paquete.costo_paquete_mensual * 12);
 
         desglose.push({
             tipo: 'Paquete',
             nombre: `${paquete.paquete} (${paquete.cantidad_dtes} DTEs)`,
             precio_anual: paquete.costo_paquete_anual,
             precio_mensual: paquete.costo_paquete_mensual,
-            implementacion: paquete.costo_implementacion,
-            descripcion: `Paquete base + implementación`
+            descripcion: 'Licencia anual de facturación electrónica'
         });
+
+        // 2. IMPLEMENTACIÓN (Línea separada)
+        if (incluir_implementacion) {
+            const costo_imp = paquete.costo_implementacion;
+            subtotal_anual += costo_imp;
+            subtotal_mensual += costo_imp;
+
+            desglose.push({
+                tipo: 'Implementación',
+                nombre: 'Servicios de Implementación',
+                precio_anual: costo_imp,
+                precio_mensual: 0,
+                descripcion: 'Configuración inicial, carga de datos y capacitación (Pago único)'
+            });
+        }
 
         // 2. ITEMS SELECCIONADOS
         items.forEach(item => {
@@ -256,13 +271,15 @@ class CotizadorService {
         // 4. CALCULAR IVA
         const iva_monto = (subtotal_con_descuento * iva_porcentaje) / 100;
         const total_anual = subtotal_con_descuento + iva_monto;
-        const total_mensual = (subtotal_mensual - descuento_monto) + (iva_monto);
+
+        // El total mensual es simplemente el total anual dividido en 12 cuotas
+        const total_mensual = total_anual / 12;
 
         return {
             paquete,
             items_seleccionados: items,
             subtotal_anual: Number(subtotal_anual.toFixed(2)),
-            subtotal_mensual: Number(subtotal_mensual.toFixed(2)),
+            subtotal_mensual: Number((subtotal_anual / 12).toFixed(2)),
             descuento_porcentaje,
             descuento_monto: Number(descuento_monto.toFixed(2)),
             iva_porcentaje,

@@ -282,7 +282,10 @@ export default function CotizacionDetalle() {
                                                         <Settings className="w-6 h-6" />
                                                     </div>
                                                     <div>
-                                                        <p className="font-black text-gray-900 text-lg">Implementación y Configuración</p>
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="font-black text-gray-900 text-lg">Implementación y Configuración</p>
+                                                            <span className="bg-orange-100 text-orange-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter">Pago Único</span>
+                                                        </div>
                                                         <p className="text-sm text-gray-500 font-medium mt-0.5">Puesta en marcha, capacitación y configuración inicial.</p>
                                                     </div>
                                                 </div>
@@ -301,9 +304,14 @@ export default function CotizacionDetalle() {
                                                         <FileText className="w-6 h-6" />
                                                     </div>
                                                     <div>
-                                                        <p className="font-black text-gray-900 text-lg">
-                                                            {mod.tipo === 'servicio' ? 'Servicio' : 'Módulo'}: {mod.nombre}
-                                                        </p>
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="font-black text-gray-900 text-lg">
+                                                                {mod.tipo === 'servicio' ? 'Servicio' : 'Módulo'}: {mod.nombre}
+                                                            </p>
+                                                            {mod.costo_mensual === 0 && (
+                                                                <span className="bg-purple-100 text-purple-700 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter">Pago Único</span>
+                                                            )}
+                                                        </div>
                                                         <p className="text-sm text-gray-500 font-medium mt-0.5">
                                                             {mod.descripcion || 'Integración nativa con su flujo de trabajo actual.'}
                                                         </p>
@@ -343,7 +351,10 @@ export default function CotizacionDetalle() {
                                                         <Target className="w-6 h-6" />
                                                     </div>
                                                     <div>
-                                                        <p className="font-black text-gray-900 text-lg">Personalización de Marca (White-label)</p>
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="font-black text-gray-900 text-lg">Personalización de Marca (White-label)</p>
+                                                            <span className="bg-amber-100 text-amber-900 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter">Pago Único</span>
+                                                        </div>
                                                         <p className="text-sm text-gray-500 font-medium mt-0.5">Adaptación total a su identidad corporativa.</p>
                                                     </div>
                                                 </div>

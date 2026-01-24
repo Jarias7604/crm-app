@@ -7,11 +7,13 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { cotizacionesService } from '../services/cotizaciones';
 import { useAuth } from '../auth/AuthProvider';
+import { usePermissions } from '../hooks/usePermissions';
 import toast from 'react-hot-toast';
 
 export default function CotizadorPro() {
     const navigate = useNavigate();
     const { profile } = useAuth();
+    const { hasPermission } = usePermissions();
     const [loading, setLoading] = useState(true);
     const [pasoActual, setPasoActual] = useState(1);
 
@@ -60,6 +62,10 @@ export default function CotizadorPro() {
         desglose: [] as any[]
     });
 
+    // Estado para overrides de precios
+    const [overrides, setOverrides] = useState<Record<string, number>>({});
+    const [implementationOverride, setImplementationOverride] = useState<number | null>(null);
+
     useEffect(() => {
         loadData();
         loadLeads();
@@ -87,7 +93,7 @@ export default function CotizadorPro() {
 
     useEffect(() => {
         calcularTotales();
-    }, [formData.paquete_id, formData.modulos_ids, formData.servicios_ids, formData.descuento_porcentaje, formData.volumen_dtes]);
+    }, [formData.paquete_id, formData.modulos_ids, formData.servicios_ids, formData.descuento_porcentaje, formData.volumen_dtes, formData.incluir_implementacion, overrides, implementationOverride]);
 
     const loadData = async () => {
         try {
@@ -162,14 +168,30 @@ export default function CotizadorPro() {
         const itemsSeleccionados = [
             ...modulos.filter(m => formData.modulos_ids.includes(m.id)),
             ...servicios.filter(s => formData.servicios_ids.includes(s.id))
-        ];
+        ].map(item => {
+            // Aplicar override si existe
+            if (overrides[item.id] !== undefined) {
+                return {
+                    ...item,
+                    precio_anual: overrides[item.id],
+                    precio_por_dte: 0, // Si se sobreescribe el precio anual, asumimos que no es por DTE
+                    pago_unico: 0
+                };
+            }
+            return item;
+        });
+
+        const packageWithOverride = implementationOverride !== null
+            ? { ...paqueteSeleccionado, costo_implementacion: implementationOverride }
+            : paqueteSeleccionado;
 
         const cotizacion = cotizadorService.calcularCotizacion(
-            paqueteSeleccionado,
+            packageWithOverride,
             itemsSeleccionados,
             formData.volumen_dtes,
             formData.descuento_porcentaje,
-            formData.iva_porcentaje
+            formData.iva_porcentaje,
+            formData.incluir_implementacion
         );
 
         setTotales(cotizacion);
@@ -270,15 +292,20 @@ export default function CotizadorPro() {
                     !s.nombre.toLowerCase().includes('whatsapp') &&
                     !s.nombre.toLowerCase().includes('personaliz')
                 )
-            ].map(item => ({
-                nombre: item.nombre,
-                tipo: item.tipo,
-                descripcion: item.descripcion || '',
-                costo_anual: item.precio_por_dte > 0
-                    ? formData.volumen_dtes * item.precio_por_dte
-                    : (item.pago_unico || item.precio_anual),
-                costo_mensual: item.precio_mensual || 0
-            }));
+            ].map(item => {
+                const manualPrice = overrides[item.id];
+                return {
+                    nombre: item.nombre,
+                    tipo: item.tipo,
+                    descripcion: item.descripcion || '',
+                    costo_anual: manualPrice !== undefined
+                        ? manualPrice
+                        : (item.precio_por_dte > 0
+                            ? formData.volumen_dtes * item.precio_por_dte
+                            : (item.pago_unico || item.precio_anual)),
+                    costo_mensual: item.precio_mensual || 0
+                };
+            });
 
             // Preparar datos para guardar (formato correcto)
             const cotizacionData = {
@@ -293,17 +320,21 @@ export default function CotizadorPro() {
                 plan_nombre: paqueteSeleccionado.paquete,
                 costo_plan_anual: paqueteSeleccionado.costo_paquete_anual,
                 costo_plan_mensual: paqueteSeleccionado.costo_paquete_mensual,
-                costo_implementacion: paqueteSeleccionado.costo_implementacion,
+                costo_implementacion: formData.incluir_implementacion ? paqueteSeleccionado.costo_implementacion : 0,
                 modulos_adicionales: todosLosItems,
                 servicio_whatsapp: whatsappSeleccionado,
                 costo_whatsapp: whatsappServicio
-                    ? (whatsappServicio.precio_por_dte > 0
-                        ? formData.volumen_dtes * whatsappServicio.precio_por_dte
-                        : whatsappServicio.precio_anual)
+                    ? (overrides[whatsappServicio.id] !== undefined
+                        ? overrides[whatsappServicio.id]
+                        : (whatsappServicio.precio_por_dte > 0
+                            ? formData.volumen_dtes * whatsappServicio.precio_por_dte
+                            : whatsappServicio.precio_anual))
                     : 0,
                 servicio_personalizacion: personalizacionSeleccionada,
                 costo_personalizacion: personalizacionServicio
-                    ? (personalizacionServicio.pago_unico || personalizacionServicio.precio_anual)
+                    ? (overrides[personalizacionServicio.id] !== undefined
+                        ? overrides[personalizacionServicio.id]
+                        : (personalizacionServicio.pago_unico || personalizacionServicio.precio_anual))
                     : 0,
                 subtotal_anual: totales.subtotal_anual,
                 subtotal_mensual: totales.subtotal_mensual,
@@ -623,13 +654,34 @@ export default function CotizadorPro() {
                                                 )}
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="font-bold text-green-600">
-                                                ${modulo.precio_anual.toFixed(2)}/año
-                                            </p>
-                                            <p className="text-xs text-gray-500">
-                                                ${modulo.precio_mensual.toFixed(2)}/mes
-                                            </p>
+                                        <div className="flex items-center gap-4">
+                                            <div className="text-right">
+                                                <div className="text-right flex flex-col items-end">
+                                                    {formData.modulos_ids.includes(modulo.id) && hasPermission('cotizaciones.edit_prices') ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-xs text-gray-400 font-bold">$</span>
+                                                            <input
+                                                                type="number"
+                                                                className="w-24 text-right font-bold text-green-600 border border-blue-200 rounded px-2 py-1 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                                                value={overrides[modulo.id] ?? modulo.precio_anual}
+                                                                onChange={(e) => {
+                                                                    setOverrides({ ...overrides, [modulo.id]: Number(e.target.value) });
+                                                                }}
+                                                            />
+                                                            <span className="text-[10px] text-gray-400 font-bold uppercase">/año</span>
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <p className="font-bold text-green-600">
+                                                                ${(overrides[modulo.id] ?? modulo.precio_anual).toFixed(2)}/año
+                                                            </p>
+                                                            <p className="text-xs text-gray-500">
+                                                                ${modulo.precio_mensual.toFixed(2)}/mes
+                                                            </p>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
                                     </label>
                                 ))}
@@ -658,27 +710,54 @@ export default function CotizadorPro() {
                                                 )}
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            {servicio.precio_por_dte > 0 ? (
-                                                <>
-                                                    <p className="font-bold text-green-600">
-                                                        ${(formData.volumen_dtes * servicio.precio_por_dte).toFixed(2)}
-                                                    </p>
-                                                    <p className="text-xs text-gray-500">
-                                                        {formData.volumen_dtes.toLocaleString()} × ${servicio.precio_por_dte}
-                                                    </p>
-                                                </>
-                                            ) : servicio.pago_unico > 0 ? (
-                                                <>
-                                                    <p className="font-bold text-green-600">
-                                                        ${servicio.pago_unico.toFixed(2)}
-                                                    </p>
-                                                    <p className="text-xs text-gray-500">Pago único</p>
-                                                </>
+                                        <div className="text-right flex flex-col items-end">
+                                            {formData.servicios_ids.includes(servicio.id) && hasPermission('cotizaciones.edit_prices') ? (
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs text-gray-400 font-bold">$</span>
+                                                    <input
+                                                        type="number"
+                                                        className="w-24 text-right font-bold text-green-600 border border-blue-200 rounded px-2 py-1 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                                        value={overrides[servicio.id] ?? (
+                                                            servicio.precio_por_dte > 0
+                                                                ? (formData.volumen_dtes * servicio.precio_por_dte)
+                                                                : (servicio.pago_unico > 0 ? servicio.pago_unico : servicio.precio_anual)
+                                                        )}
+                                                        onChange={(e) => {
+                                                            setOverrides({ ...overrides, [servicio.id]: Number(e.target.value) });
+                                                        }}
+                                                    />
+                                                    <span className="text-[10px] text-gray-400 font-bold uppercase">
+                                                        {servicio.pago_unico > 0 ? 'Único' : '/año'}
+                                                    </span>
+                                                </div>
                                             ) : (
-                                                <p className="font-bold text-green-600">
-                                                    ${servicio.precio_anual.toFixed(2)}/año
-                                                </p>
+                                                <>
+                                                    {(() => {
+                                                        const currentPrice = overrides[servicio.id] ?? (
+                                                            servicio.precio_por_dte > 0
+                                                                ? (formData.volumen_dtes * servicio.precio_por_dte)
+                                                                : (servicio.pago_unico > 0 ? servicio.pago_unico : servicio.precio_anual)
+                                                        );
+                                                        return (
+                                                            <>
+                                                                <p className="font-bold text-green-600">
+                                                                    ${currentPrice.toFixed(2)}
+                                                                </p>
+                                                                {servicio.precio_por_dte > 0 && !overrides[servicio.id] && (
+                                                                    <p className="text-xs text-gray-500">
+                                                                        {formData.volumen_dtes.toLocaleString()} × ${servicio.precio_por_dte}
+                                                                    </p>
+                                                                )}
+                                                                {servicio.pago_unico > 0 && (
+                                                                    <p className="text-xs text-gray-500">Pago único</p>
+                                                                )}
+                                                                {servicio.precio_anual > 0 && !servicio.pago_unico && !servicio.precio_por_dte && (
+                                                                    <p className="text-xs text-gray-500">/año</p>
+                                                                )}
+                                                            </>
+                                                        );
+                                                    })()}
+                                                </>
                                             )}
                                         </div>
                                     </label>
@@ -702,21 +781,47 @@ export default function CotizadorPro() {
                             </div>
                         </div>
 
-                        {/* Desglose */}
-                        <div className="space-y-2">
+                        {/* Desglose Premium */}
+                        <div className="space-y-3">
                             {totales.desglose.map((item, idx) => (
-                                <div key={idx} className="flex justify-between p-2 bg-gray-50 rounded">
-                                    <div>
-                                        <p className="font-semibold text-gray-800">
-                                            {item.tipo}: {item.nombre}
-                                        </p>
-                                        {item.descripcion && (
-                                            <p className="text-xs text-gray-500">{item.descripcion}</p>
-                                        )}
+                                <div key={idx} className="group relative bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
+                                    <div className="flex justify-between items-start gap-4">
+                                        <div className="flex gap-4">
+                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${item.tipo === 'Paquete' ? 'bg-blue-50 text-blue-600' :
+                                                item.tipo === 'Implementación' ? 'bg-orange-50 text-orange-600' :
+                                                    'bg-purple-50 text-purple-600'
+                                                }`}>
+                                                <FileText className="w-5 h-5" />
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="font-bold text-gray-900">{item.nombre}</p>
+                                                    {item.precio_mensual === 0 && (
+                                                        <span className="bg-gray-100 text-gray-600 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter">Pago Único</span>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-gray-500 mt-0.5">{item.descripcion}</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="text-right flex flex-col items-end gap-1">
+                                            {item.tipo === 'Implementación' && hasPermission('cotizaciones.edit_implementation') ? (
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs text-gray-400 font-bold">$</span>
+                                                    <input
+                                                        type="number"
+                                                        className="w-24 text-right font-bold text-orange-600 border border-orange-100 rounded px-2 py-1 bg-orange-50/30 focus:ring-2 focus:ring-orange-500 outline-none"
+                                                        value={implementationOverride ?? item.precio_anual}
+                                                        onChange={(e) => setImplementationOverride(Number(e.target.value))}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <p className="font-black text-gray-800 text-lg">
+                                                    ${(item.precio_anual).toLocaleString()}
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
-                                    <p className="font-bold text-gray700">
-                                        ${item.precio_anual.toFixed(2)}
-                                    </p>
                                 </div>
                             ))}
                         </div>
@@ -799,7 +904,7 @@ export default function CotizadorPro() {
                                     </div>
                                     <div className="flex justify-between text-sm text-gray-600 mt-1 italic border-t border-blue-100 pt-1">
                                         <span>Equivalente mensual aproximado:</span>
-                                        <span className="font-bold text-gray-800">${(totales.total_anual / 12).toFixed(2)}/mes</span>
+                                        <span className="font-bold text-gray-800">${totales.total_mensual.toLocaleString()}/mes</span>
                                     </div>
                                 </div>
                             </div>
@@ -864,6 +969,25 @@ export default function CotizadorPro() {
                         Precio en Tiempo Real
                     </h4>
                     <div className="space-y-1 text-sm">
+                        {hasPermission('cotizaciones.manage_implementation') && (
+                            <div className="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-100 mb-2">
+                                <span className="text-[10px] font-black uppercase text-gray-400 tracking-tighter">Implementación:</span>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <span className={`text-[11px] font-bold ${formData.incluir_implementacion ? 'text-green-600' : 'text-gray-400'}`}>
+                                        {formData.incluir_implementacion ? 'SÍ' : 'NO'}
+                                    </span>
+                                    <div className={`w-8 h-4 rounded-full p-0.5 transition-colors ${formData.incluir_implementacion ? 'bg-green-500' : 'bg-gray-300'}`}>
+                                        <div className={`w-3 h-3 bg-white rounded-full transition-transform ${formData.incluir_implementacion ? 'translate-x-4' : 'translate-x-0'}`} />
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        className="hidden"
+                                        checked={formData.incluir_implementacion}
+                                        onChange={(e) => setFormData({ ...formData, incluir_implementacion: e.target.checked })}
+                                    />
+                                </label>
+                            </div>
+                        )}
                         <div className="flex justify-between">
                             <span className="text-gray-600">Subtotal:</span>
                             <span className="font-semibold">${totales.subtotal_anual.toLocaleString()}</span>
@@ -891,11 +1015,11 @@ export default function CotizadorPro() {
                         </div>
                         <div className="border-t pt-2 mt-2">
                             <div className="flex justify-between text-lg font-bold text-green-600">
-                                <span>Total:</span>
+                                <span>Total Anual:</span>
                                 <span>${totales.total_anual.toLocaleString()}</span>
                             </div>
                             <p className="text-xs text-gray-500 text-right">
-                                ${(totales.total_anual / 12).toFixed(2)}/mes
+                                ${totales.total_mensual.toLocaleString()}/mes
                             </p>
                         </div>
                     </div>
