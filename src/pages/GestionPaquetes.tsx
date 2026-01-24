@@ -64,22 +64,26 @@ export default function GestionPaquetes() {
                 return;
             }
 
+            // Sanitizar datos: eliminar campos de sistema que no deben enviarse en el update
+            const { id, created_at, updated_at, ...updateData } = formData as any;
+
             if (editingId) {
-                await cotizadorService.updatePaquete(editingId, formData);
+                await cotizadorService.updatePaquete(editingId, updateData);
                 toast.success('✅ Paquete actualizado');
             } else {
                 // Si es Company Admin, asignar company_id
                 if (profile?.role === 'company_admin') {
-                    formData.company_id = profile.company_id;
+                    updateData.company_id = profile.company_id;
                 }
-                await cotizadorService.createPaquete(formData);
+                await cotizadorService.createPaquete(updateData);
                 toast.success('✅ Paquete creado');
             }
             resetForm();
             loadPaquetes();
         } catch (error: any) {
-            toast.error('Error al guardar');
-            console.error(error);
+            console.error('Error saving package:', error);
+            const errorMsg = error.message || 'Error desconocido';
+            toast.error(`❌ Error al guardar: ${errorMsg}`);
         }
     };
 

@@ -66,21 +66,25 @@ export default function GestionItems() {
                 return;
             }
 
+            // Sanitizar datos: eliminar campos de sistema
+            const { id, created_at, updated_at, ...updateData } = formData as any;
+
             if (editingId) {
-                await cotizadorService.updateItem(editingId, formData);
+                await cotizadorService.updateItem(editingId, updateData);
                 toast.success('✅ Item actualizado');
             } else {
                 if (profile?.role === 'company_admin') {
-                    formData.company_id = profile.company_id;
+                    updateData.company_id = profile.company_id;
                 }
-                await cotizadorService.createItem(formData);
+                await cotizadorService.createItem(updateData);
                 toast.success('✅ Item creado');
             }
             resetForm();
             loadItems();
         } catch (error: any) {
-            toast.error('Error al guardar');
-            console.error(error);
+            console.error('Error saving item:', error);
+            const errorMsg = error.message || 'Error desconocido';
+            toast.error(`❌ Error al guardar: ${errorMsg}`);
         }
     };
 
