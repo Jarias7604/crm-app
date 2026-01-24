@@ -50,12 +50,42 @@ export default function Sidebar() {
         { name: t('sidebar.calendar'), href: '/calendar', icon: Calendar, current: location.pathname.startsWith('/calendar') },
     ];
 
-    const configSubItems = [
-        { name: 'Marca de Empresa', href: '/config/branding', icon: Building, current: location.pathname === '/config/branding' },
-        { name: 'Gestión Precios', href: '/config/pricing', icon: Tag, current: location.pathname === '/config/pricing' },
-        { name: 'Gestión Paquete', href: '/config/paquetes', icon: Package, current: location.pathname === '/config/paquetes' },
-        { name: 'Gestión Item', href: '/config/items', icon: Layers, current: location.pathname === '/config/items' },
+    const configSubItemsRaw = [
+        {
+            name: 'Marca de Empresa',
+            href: '/config/branding',
+            icon: Building,
+            current: location.pathname === '/config/branding',
+            allowedRoles: ['super_admin', 'company_admin']
+        },
+        {
+            name: 'Gestión Precios',
+            href: '/config/pricing',
+            icon: Tag,
+            current: location.pathname === '/config/pricing',
+            allowedRoles: ['super_admin'] // Solo Super Admin define precios base
+        },
+        {
+            name: 'Gestión Paquete',
+            href: '/config/paquetes',
+            icon: Package,
+            current: location.pathname === '/config/paquetes',
+            allowedRoles: ['super_admin', 'company_admin']
+        },
+        {
+            name: 'Gestión Item',
+            href: '/config/items',
+            icon: Layers,
+            current: location.pathname === '/config/items',
+            allowedRoles: ['super_admin', 'company_admin']
+        },
     ];
+
+    // Filtrar subitems según permiso
+    const configSubItems = configSubItemsRaw.filter(item => {
+        if (!profile?.role) return false;
+        return item.allowedRoles.includes(profile.role);
+    });
 
     if (profile?.role === 'super_admin') {
         navigation.push({ name: t('sidebar.companies'), href: '/admin/companies', icon: Building, current: location.pathname.startsWith('/admin/companies') });
@@ -117,7 +147,7 @@ export default function Sidebar() {
                     ))}
 
                     {/* ACORDEON DE CONFIGURACIÓN */}
-                    {(profile?.role === 'super_admin' || profile?.role === 'company_admin' || hasPermission('cotizaciones.edit_prices')) && (
+                    {configSubItems.length > 0 && (
                         <div className="space-y-1">
                             <button
                                 onClick={() => setConfigOpen(!configOpen)}
@@ -136,7 +166,7 @@ export default function Sidebar() {
                                 {configOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                             </button>
 
-                            {configOpen && (
+                            {configOpen && configSubItems.length > 0 && (
                                 <div className="space-y-1 ml-4 pt-1">
                                     {configSubItems.map((subItem) => (
                                         <Link
