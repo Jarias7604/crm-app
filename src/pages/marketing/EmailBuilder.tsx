@@ -53,11 +53,11 @@ export default function EmailBuilder() {
                 name: formData.name,
                 subject: formData.subject,
                 content: formData.content,
-                type: 'email',
-                status: 'draft',
+                type: 'email' as 'email',
+                status: 'draft' as 'draft',
 
                 total_recipients: Math.floor(Math.random() * 500) + 50,
-                company_id: profile?.company_id || null, // Handle company context
+                company_id: profile?.company_id || undefined, // Handle company context
                 audience_filters: formData.audience_filter,
                 stats: { sent: 0, delivered: 0, opened: 0, clicked: 0, replied: 0, bounced: 0 }
             };
