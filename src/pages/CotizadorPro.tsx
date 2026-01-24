@@ -378,32 +378,40 @@ export default function CotizadorPro() {
                 <p className="text-sm text-gray-500 mt-1">Sistema dinámico de cotización basado en paquetes</p>
             </div>
 
-            {/* Indicador de Pasos */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-                <div className="flex items-center justify-between">
+            {/* Indicador de Pasos Rediseñado y Uniforme */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                <div className="flex items-center justify-between w-full max-w-4xl mx-auto">
                     {[1, 2, 3, 4].map((paso) => (
-                        <div key={paso} className="flex items-center flex-1">
-                            <div
-                                className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${paso <= pasoActual
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-200 text-gray-500'
-                                    }`}
-                            >
-                                {paso}
+                        <div key={paso} className={`flex items-center ${paso < 4 ? 'flex-1' : ''}`}>
+                            {/* Círculo del Número */}
+                            <div className="flex flex-col items-center gap-2">
+                                <div className="flex items-center gap-3">
+                                    <div
+                                        className={`w-10 h-10 rounded-full flex items-center justify-center font-black shadow-sm transition-all duration-300 ${paso <= pasoActual
+                                            ? 'bg-blue-600 text-white ring-4 ring-blue-50'
+                                            : 'bg-gray-100 text-gray-400 border border-gray-200'
+                                            }`}
+                                        style={{ fontSize: '15px' }}
+                                    >
+                                        {paso}
+                                    </div>
+                                    <span className={`text-sm font-bold whitespace-nowrap ${paso <= pasoActual ? 'text-blue-600' : 'text-gray-400'}`}>
+                                        {paso === 1 && 'Cliente'}
+                                        {paso === 2 && 'Paquete'}
+                                        {paso === 3 && 'Módulos/Servicios'}
+                                        {paso === 4 && 'Resumen'}
+                                    </span>
+                                </div>
                             </div>
-                            <div className="flex-1 ml-3">
-                                <p className={`text-sm font-bold ${paso <= pasoActual ? 'text-blue-600' : 'text-gray-400'}`}>
-                                    {paso === 1 && 'Cliente'}
-                                    {paso === 2 && 'Paquete'}
-                                    {paso === 3 && 'Módulos/Servicios'}
-                                    {paso === 4 && 'Resumen'}
-                                </p>
-                            </div>
+
+                            {/* Línea de Conexión */}
                             {paso < 4 && (
-                                <div
-                                    className={`h-0.5 w-full ${paso < pasoActual ? 'bg-blue-600' : 'bg-gray-200'
-                                        }`}
-                                />
+                                <div className="flex-1 mx-4 h-0.5 bg-gray-100 relative overflow-hidden rounded-full">
+                                    <div
+                                        className="absolute inset-y-0 left-0 bg-blue-600 transition-all duration-500 ease-out"
+                                        style={{ width: paso < pasoActual ? '100%' : '0%' }}
+                                    />
+                                </div>
                             )}
                         </div>
                     ))}
