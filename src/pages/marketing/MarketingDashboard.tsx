@@ -35,12 +35,14 @@ export default function MarketingDashboard() {
 
             {/* Quick Actions Grid */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <ActionCard
-                    icon={Mail}
-                    color="bg-purple-100 text-purple-600"
-                    title="Email Marketing"
-                    desc="Newsletters y secuencias"
-                />
+                <Link to="/marketing/email">
+                    <ActionCard
+                        icon={Mail}
+                        color="bg-purple-100 text-purple-600"
+                        title="Email Marketing"
+                        desc="Newsletters y secuencias"
+                    />
+                </Link>
                 <ActionCard
                     icon={MessageSquare}
                     color="bg-green-100 text-green-600"

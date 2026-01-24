@@ -24,6 +24,8 @@ import CotizacionDetalle from './pages/CotizacionDetalle';
 import Branding from './pages/company/Branding';
 import MarketingDashboard from './pages/marketing/MarketingDashboard';
 import LeadHunter from './pages/marketing/LeadHunter';
+import EmailCampaigns from './pages/marketing/EmailCampaigns';
+import EmailBuilder from './pages/marketing/EmailBuilder';
 
 function App() {
   return (
@@ -55,6 +57,8 @@ function App() {
               <Route path="/config/branding" element={<Branding />} />
               <Route path="/marketing" element={<MarketingDashboard />} />
               <Route path="/marketing/lead-hunter" element={<LeadHunter />} />
+              <Route path="/marketing/email" element={<EmailCampaigns />} />
+              <Route path="/marketing/email/new" element={<EmailBuilder />} />
             </Route>
           </Route>
 

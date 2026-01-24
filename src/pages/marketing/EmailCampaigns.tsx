@@ -1,0 +1,132 @@
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { Plus, Mail, Clock, CheckCircle, BarChart2, MoreHorizontal, Play, Edit } from 'lucide-react';
+import { campaignService, type Campaign } from '../../services/marketing/campaignService';
+import toast from 'react-hot-toast';
+
+export default function EmailCampaigns() {
+    const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        loadCampaigns();
+    }, []);
+
+    const loadCampaigns = async () => {
+        try {
+            const data = await campaignService.getCampaigns();
+            setCampaigns(data);
+        } catch (error) {
+            console.error(error);
+            toast.error('Error al cargar campañas');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleQuickSend = async (id: string) => {
+        if (!confirm('¿Estás seguro de enviar esta campaña ahora? (Simulación)')) return;
+
+        try {
+            toast.loading('Enviando campaña...', { id: 'sending' });
+            await campaignService.sendCampaign(id);
+            toast.success('¡Campaña enviada con éxito!', { id: 'sending' });
+            loadCampaigns();
+        } catch (error) {
+            toast.error('Error al enviar', { id: 'sending' });
+        }
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                <div>
+                    <div className="flex items-center gap-2 mb-1">
+                        <Link to="/marketing" className="text-gray-400 hover:text-blue-600 font-medium text-sm transition-colors">
+                            ← Volver al Dashboard
+                        </Link>
+                    </div>
+                    <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Email Marketing</h1>
+                    <p className="text-gray-500 mt-1">
+                        Crea, gestiona y analiza tus campañas de correo masivo.
+                    </p>
+                </div>
+                <Link to="/marketing/email/new" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2">
+                    <Plus className="w-5 h-5" />
+                    Crear Campaña
+                </Link>
+            </div>
+
+            {loading ? (
+                <div className="text-center py-20 text-gray-400">Cargando campañas...</div>
+            ) : (
+                <div className="grid gap-4">
+                    {campaigns.length === 0 ? (
+                        <div className="text-center py-20 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
+                            <Mail className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                            <h3 className="text-lg font-bold text-gray-900">No hay campañas aún</h3>
+                            <p className="text-gray-500 mb-6">Comienza creando tu primera campaña de email.</p>
+                            <Link to="/marketing/email/new" className="text-blue-600 font-bold hover:underline">
+                                Crear ahora
+                            </Link>
+                        </div>
+                    ) : (
+                        campaigns.map((campaign) => (
+                            <div key={campaign.id} className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all flex items-center justify-between group">
+                                <div className="flex items-center gap-4">
+                                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${campaign.status === 'completed' ? 'bg-green-100 text-green-600' :
+                                            campaign.status === 'sending' ? 'bg-blue-100 text-blue-600' :
+                                                'bg-gray-100 text-gray-500'
+                                        }`}>
+                                        <Mail className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-gray-900">{campaign.name}</h3>
+                                        <div className="flex items-center gap-3 text-sm text-gray-500 mt-1">
+                                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${campaign.status === 'completed' ? 'bg-green-100 text-green-700' :
+                                                    campaign.status === 'draft' ? 'bg-gray-100 text-gray-600' :
+                                                        'bg-blue-100 text-blue-700'
+                                                }`}>
+                                                {campaign.status}
+                                            </span>
+                                            {campaign.status === 'completed' && (
+                                                <span className="flex items-center gap-1">
+                                                    <CheckCircle className="w-3 h-3" /> Enviado: {campaign.stats.sent}
+                                                </span>
+                                            )}
+                                            {campaign.scheduled_at && (
+                                                <span className="flex items-center gap-1">
+                                                    <Clock className="w-3 h-3" /> Programado
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    {campaign.status === 'draft' && (
+                                        <>
+                                            <button className="p-2 text-gray-400 hover:text-blue-600 transition-colors" title="Editar">
+                                                <Edit className="w-5 h-5" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleQuickSend(campaign.id)}
+                                                className="p-2 text-gray-400 hover:text-green-600 transition-colors"
+                                                title="Enviar Ahora"
+                                            >
+                                                <Play className="w-5 h-5" />
+                                            </button>
+                                        </>
+                                    )}
+                                    <button className="p-2 text-gray-400 hover:text-purple-600 transition-colors" title="Ver Reporte">
+                                        <BarChart2 className="w-5 h-5" />
+                                    </button>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
