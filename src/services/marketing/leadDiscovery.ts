@@ -1,4 +1,4 @@
-import { supabase } from '../../supabase';
+import { supabase } from '../supabase';
 import type { Lead } from '../../types';
 
 export interface DiscoveredLead {
