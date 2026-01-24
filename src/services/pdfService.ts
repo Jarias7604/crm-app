@@ -1,99 +1,82 @@
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { supabase } from './supabase';
 
 export const pdfService = {
     async generateAndUploadQuotePDF(cotizacion: any): Promise<string> {
         try {
-            console.log('Iniciando generación de PDF para cotización:', cotizacion.id);
-            const doc = new jsPDF() as any;
+            console.log('Iniciando PDF para:', cotizacion.id);
+            // Create PDF
+            const doc = new jsPDF();
             const pageWidth = doc.internal.pageSize.getWidth();
 
             // Colors
-            const primaryColor = [68, 73, 170]; // #4449AA
-            const secondaryColor = [15, 23, 42]; // Slate 900
+            const primaryColor = [68, 73, 170];
+            const secondaryColor = [15, 23, 42];
 
             // Header
-            doc.setFillColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+            doc.setFillColor(15, 23, 42);
             doc.rect(0, 0, pageWidth, 40, 'F');
 
             doc.setTextColor(255, 255, 255);
             doc.setFontSize(22);
-            doc.setFont('helvetica', 'bold');
             doc.text('PROPUESTA COMERCIAL', 20, 25);
 
-            doc.setFontSize(10);
-            doc.text(`ID: ${cotizacion.id.substring(0, 8).toUpperCase()}`, pageWidth - 20, 15, { align: 'right' });
-            doc.text(`Fecha: ${new Date().toLocaleDateString()}`, pageWidth - 20, 25, { align: 'right' });
-
-            // Client Info
-            doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+            // Body
+            doc.setTextColor(15, 23, 42);
             doc.setFontSize(14);
-            doc.text('INFORMACIÓN DEL CLIENTE', 20, 55);
+            doc.text('CLIENTE:', 20, 55);
+            doc.setFontSize(11);
+            doc.text(String(cotizacion.nombre_cliente || 'Cliente'), 20, 65);
+            doc.text(String(cotizacion.empresa_cliente || ''), 20, 72);
 
-            doc.setFontSize(10);
-            doc.setFont('helvetica', 'normal');
-            doc.text(`Cliente: ${cotizacion.nombre_cliente}`, 20, 65);
-            doc.text(`Empresa: ${cotizacion.empresa_cliente || 'N/A'}`, 20, 72);
-            doc.text(`Email: ${cotizacion.email_cliente || 'N/A'}`, 20, 79);
-            doc.text(`Teléfono: ${cotizacion.telefono_cliente || 'N/A'}`, 20, 86);
-
-            // Table of items
-            const tableRows = [];
-            tableRows.push([
-                'Suscripción Anual - Plan ' + cotizacion.plan_nombre,
-                '1',
-                `$${cotizacion.costo_plan_anual?.toLocaleString() || '0'}`,
-                `$${cotizacion.costo_plan_anual?.toLocaleString() || '0'}`
+            // Items Table
+            const rows = [];
+            rows.push([
+                'Suscripción ' + String(cotizacion.plan_nombre || 'Base'),
+                '$' + (cotizacion.costo_plan_anual?.toLocaleString() || '0')
             ]);
 
             if (cotizacion.modulos_adicionales && Array.isArray(cotizacion.modulos_adicionales)) {
                 cotizacion.modulos_adicionales.forEach((m: any) => {
-                    tableRows.push([m.nombre, '1', `$${m.costo_anual?.toLocaleString() || '0'}`, `$${m.costo_anual?.toLocaleString() || '0'}`]);
+                    rows.push([m.nombre, '$' + (m.costo_anual?.toLocaleString() || '0')]);
                 });
             }
 
             (doc as any).autoTable({
-                startY: 100,
-                head: [['Concepto', 'Cant.', 'Precio Unit.', 'Subtotal']],
-                body: tableRows,
-                headStyles: { fillColor: primaryColor, textColor: [255, 255, 255] },
+                startY: 85,
+                head: [['Servicio', 'Precio Anual']],
+                body: rows,
+                headStyles: { fillColor: primaryColor }
             });
 
-            const finalY = (doc as any).lastAutoTable.finalY + 15;
-            doc.setFont('helvetica', 'bold');
-            doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-            doc.text(`TOTAL INVERSIÓN: $${cotizacion.total_anual?.toLocaleString() || '0'}`, pageWidth - 20, finalY, { align: 'right' });
+            const finalY = (doc as any).lastAutoTable.finalY + 20;
+            doc.setFontSize(16);
+            doc.text(`TOTAL: $${cotizacion.total_anual?.toLocaleString() || '0'}`, pageWidth - 20, finalY, { align: 'right' });
 
-            // Generate Blob - More robust way
-            const pdfOutput = doc.output('arraybuffer');
-            const pdfBlob = new Blob([pdfOutput], { type: 'application/pdf' });
+            // To Blob
+            const blob = doc.output('blob');
+            const fileName = `propuesta_${Date.now()}.pdf`;
 
-            const fileName = `propuesta_${cotizacion.id}.pdf`;
-            const filePath = `${fileName}`;
-
-            console.log('Subiendo PDF a Supabase Storage...');
-            const { error } = await supabase.storage
+            console.log('Subiendo a storage...');
+            const { error: uploadError } = await supabase.storage
                 .from('quotations')
-                .upload(filePath, pdfBlob, {
+                .upload(fileName, blob, {
                     contentType: 'application/pdf',
                     upsert: true
                 });
 
-            if (error) {
-                console.error('Error de Storage:', error);
-                throw error;
-            }
+            if (uploadError) throw uploadError;
 
-            const { data: { publicUrl } } = supabase.storage
+            const { data } = supabase.storage
                 .from('quotations')
-                .getPublicUrl(filePath);
+                .getPublicUrl(fileName);
 
-            console.log('PDF generado exitosamente:', publicUrl);
-            return publicUrl;
-        } catch (err) {
-            console.error('Falla crítica en pdfService:', err);
-            throw err;
+            console.log('PDF OK:', data.publicUrl);
+            return data.publicUrl;
+        } catch (err: any) {
+            console.error('ERROR PDF SERVICE:', err);
+            throw new Error(`Error en PDF: ${err.message || 'Falla desconocida'}`);
         }
     }
 };
