@@ -10,6 +10,7 @@ import {
     Zap
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
+import { Link } from 'react-router-dom';
 
 export default function MarketingDashboard() {
     const { profile } = useAuth();
@@ -52,13 +53,15 @@ export default function MarketingDashboard() {
                     title="Agentes AI"
                     desc="Configurar bots de venta"
                 />
-                <ActionCard
-                    icon={Search}
-                    color="bg-amber-100 text-amber-600"
-                    title="Lead Hunter"
-                    desc="Descubrir clientes nuevos"
-                    isNew={true}
-                />
+                <Link to="/marketing/lead-hunter">
+                    <ActionCard
+                        icon={Search}
+                        color="bg-amber-100 text-amber-600"
+                        title="Lead Hunter"
+                        desc="Descubrir clientes nuevos"
+                        isNew={true}
+                    />
+                </Link>
             </div>
 
             {/* Stats Overview */}
@@ -105,10 +108,10 @@ export default function MarketingDashboard() {
                         <div className="relative z-10">
                             <h3 className="text-lg font-bold mb-1">Lead Hunter AI</h3>
                             <p className="text-gray-400 text-sm mb-4">Descubre 500+ prospectos nuevos esta semana.</p>
-                            <button className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2 rounded-lg text-sm font-semibold w-full transition-colors flex items-center justify-center gap-2">
+                            <Link to="/marketing/lead-hunter" className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2 rounded-lg text-sm font-semibold w-full transition-colors flex items-center justify-center gap-2">
                                 <Search className="w-4 h-4" />
                                 Iniciar Búsqueda
-                            </button>
+                            </Link>
                         </div>
                         <Search className="absolute -bottom-4 -right-4 w-32 h-32 text-white/5 rotate-12" />
                     </div>
