@@ -58,7 +58,7 @@ export default function EmailBuilder() {
 
                 total_recipients: Math.floor(Math.random() * 500) + 50,
                 company_id: profile?.company_id || null, // Handle company context
-                filters: formData.audience_filter,
+                audience_filters: formData.audience_filter,
                 stats: { sent: 0, delivered: 0, opened: 0, clicked: 0, replied: 0, bounced: 0 }
             };
 
