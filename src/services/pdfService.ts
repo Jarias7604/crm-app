@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { supabase } from './supabase';
 import { format } from 'date-fns';
 
@@ -45,7 +45,6 @@ export const pdfService = {
     async generateAndUploadQuotePDF(cotizacion: CotizacionData): Promise<string> {
         try {
             console.log('Generando PDF Premium...', cotizacion.id);
-            // @ts-ignore - Evita errores de tipo en tiempo de compilación si jsPDF no se reconoce correctamente
             const doc = new jsPDF();
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
@@ -132,7 +131,7 @@ export const pdfService = {
             doc.text(`DTEs: ${(cotizacion.volumen_dtes || 0).toLocaleString()}/año`, pageWidth - 52.5, 82, { align: 'center' });
 
             // 3. TABLE
-            const tableRows = [];
+            const tableRows: any[][] = [];
             tableRows.push([
                 `LICENCIA ANUAL ${cotizacion.plan_nombre || 'BASE'}\nIncluye suite DTE y soporte técnico base.`,
                 `$${(cotizacion.costo_plan_anual || 0).toLocaleString()}`
@@ -148,19 +147,20 @@ export const pdfService = {
                 });
             }
 
-            // @ts-ignore
-            doc.autoTable({
+            // Use autoTable function directly for production compatibility
+            autoTable(doc, {
                 startY: 100,
                 head: [['DESCRIPCIÓN', 'INVERSIÓN (USD)']],
                 body: tableRows,
-                headStyles: { fillColor: [249, 250, 251], textColor: [100, 116, 139] },
+                headStyles: { fillColor: [249, 250, 251], textColor: [100, 116, 139], fontStyle: 'bold', fontSize: 8 },
+                bodyStyles: { textColor: [15, 23, 42], fontSize: 10, cellPadding: 6 },
                 columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
-                theme: 'grid'
+                theme: 'grid',
+                styles: { lineColor: [241, 245, 249] }
             });
 
             // 4. TOTALS
-            // @ts-ignore
-            const finalY = doc.lastAutoTable.finalY + 15;
+            const finalY = (doc as any).lastAutoTable.finalY + 15;
             doc.setFillColor(accentBg[0], accentBg[1], accentBg[2]);
             doc.roundedRect(pageWidth - 90, finalY, 70, 40, 5, 5, 'F');
 
