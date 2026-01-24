@@ -3,7 +3,6 @@ import {
     Search,
     Send,
     MoreVertical,
-    Phone,
     Video,
     Image as ImageIcon,
     Paperclip,
@@ -11,17 +10,14 @@ import {
     User,
     Mail,
     Phone as PhoneIcon,
-    Building2,
     CheckCheck,
     Clock,
     MessageSquare,
-    MessageCircle,
     Send as TelegramIcon,
     Smartphone,
     Bot
 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
-import toast from 'react-hot-toast';
 
 interface Message {
     id: string;
@@ -59,11 +55,8 @@ export default function ChatHub() {
         if (location.state?.lead) {
             const incomingLead = location.state.lead;
             const channel = location.state.channel || 'telegram';
-
-            // Set filter to the specific channel
             setFilter(channel);
 
-            // Create a temporary conversation object for the lead
             const tempConv: Conversation = {
                 id: `new-${incomingLead.id}`,
                 channel: channel,
@@ -78,11 +71,10 @@ export default function ChatHub() {
                 }
             };
             setSelectedConv(tempConv);
-            toast.success(`Abrir chat de ${channel} para ${incomingLead.name}`);
         }
     }, [location.state]);
 
-    // Mock Conversations - Ideally fetch from Supabase
+    // Mock Data
     const conversations: Conversation[] = [
         {
             id: '1',
@@ -91,11 +83,7 @@ export default function ChatHub() {
             last_message: 'Hola, me gustaría saber los precios del paquete Pro',
             last_message_at: new Date().toISOString(),
             unread_count: 2,
-            lead: {
-                name: 'Nestor Rodriguez',
-                email: 'nestor@email.com',
-                company: 'Estudios Eléctricos',
-            }
+            lead: { name: 'Nestor Rodriguez', email: 'nestor@email.com', company: 'Estudios Eléctricos' }
         },
         {
             id: '2',
@@ -104,11 +92,7 @@ export default function ChatHub() {
             last_message: 'Confirmado el pago de la suscripción mensual',
             last_message_at: new Date(Date.now() - 3600000).toISOString(),
             unread_count: 0,
-            lead: {
-                name: 'Anelda Garcia',
-                email: 'anelda@garcia.com',
-                company: 'Independientes S.A',
-            }
+            lead: { name: 'Anelda Garcia', email: 'anelda@garcia.com', company: 'Independientes S.A' }
         },
         {
             id: '3',
@@ -117,17 +101,12 @@ export default function ChatHub() {
             last_message: '¿Tienen soporte técnico los domingos?',
             last_message_at: new Date(Date.now() - 86400000).toISOString(),
             unread_count: 0,
-            lead: {
-                name: 'Miguel Carlo',
-                email: 'miguel@carlo.com',
-                company: 'Arroz Fuentes',
-            }
+            lead: { name: 'Miguel Carlo', email: 'miguel@carlo.com', company: 'Arroz Fuentes' }
         }
     ];
 
     useEffect(() => {
         if (selectedConv) {
-            // Mock messages loading
             setMessages([
                 { id: '1', content: '¡Hola! ¿En qué puedo ayudarte hoy?', direction: 'outbound', sent_at: new Date(Date.now() - 7200000).toISOString(), status: 'read' },
                 { id: '2', content: selectedConv.last_message, direction: 'inbound', sent_at: selectedConv.last_message_at }
@@ -144,156 +123,138 @@ export default function ChatHub() {
     const handleSendMessage = (e: React.FormEvent) => {
         e.preventDefault();
         if (!newMessage.trim() || !selectedConv) return;
-
-        const msg: Message = {
-            id: Date.now().toString(),
-            content: newMessage,
-            direction: 'outbound',
-            sent_at: new Date().toISOString(),
-            status: 'sent'
-        };
-
+        const msg: Message = { id: Date.now().toString(), content: newMessage, direction: 'outbound', sent_at: new Date().toISOString(), status: 'sent' };
         setMessages([...messages, msg]);
         setNewMessage('');
-
-        // Simular respuesta después de 2 segundos
-        setTimeout(() => {
-            toast.success('Respuesta del bot simulada');
-        }, 1000);
-    };
-
-    const formatTime = (isoString: string) => {
-        const date = new Date(isoString);
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    };
-
-    const isToday = (isoString: string) => {
-        const date = new Date(isoString);
-        const today = new Date();
-        return date.toDateString() === today.toDateString();
     };
 
     return (
-        <div className="flex h-[calc(100vh-120px)] bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-            {/* Conversations Sidebar */}
-            <div className="w-[380px] border-r border-gray-100 flex flex-col bg-gray-50/30">
-                <div className="p-6 bg-white border-b border-gray-100">
-                    <div className="flex items-center justify-between mb-6">
-                        <h2 className="text-2xl font-black text-[#0f172a] tracking-tight">Centro de Chats</h2>
-                        <button className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-400">
+        <div className="flex h-[calc(100vh-100px)] bg-white rounded-3xl border border-gray-100 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-500">
+            {/* 1. Sidebar: Lista de Chats */}
+            <div className="w-[360px] border-r border-gray-100 flex flex-col bg-[#fcfdfe]">
+                {/* Header suave */}
+                <div className="p-6 space-y-5">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-black text-slate-800 tracking-tight">Mensajes</h2>
+                        <button className="p-2 hover:bg-slate-100 rounded-xl transition-all text-slate-400">
                             <MoreVertical className="w-5 h-5" />
                         </button>
                     </div>
 
-                    <div className="relative mb-4">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    {/* Buscador Moderno */}
+                    <div className="relative group">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                         <input
                             type="text"
-                            placeholder="Buscar conversación..."
-                            className="w-full pl-11 pr-4 py-3 bg-gray-100 border-transparent rounded-2xl focus:bg-white focus:ring-2 focus:ring-blue-500/20 text-sm focus:border-blue-500 transition-all outline-none"
+                            placeholder="Buscar chats..."
+                            className="w-full pl-11 pr-4 py-2.5 bg-slate-100/50 border-none rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/10 text-sm font-medium transition-all outline-none placeholder:text-slate-400"
                         />
                     </div>
 
+                    {/* Filtros minimalistas */}
                     <div className="flex gap-2">
-                        <FilterChip label="Todos" active={filter === 'all'} onClick={() => setFilter('all')} />
-                        <FilterChip label="WhatsApp" active={filter === 'whatsapp'} onClick={() => setFilter('whatsapp')} />
-                        <FilterChip label="Telegram" active={filter === 'telegram'} onClick={() => setFilter('telegram')} />
+                        {['all', 'whatsapp', 'telegram'].map((f) => (
+                            <button
+                                key={f}
+                                onClick={() => setFilter(f as any)}
+                                className={`px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider transition-all ${filter === f
+                                    ? 'bg-slate-800 text-white shadow-lg'
+                                    : 'bg-white text-slate-400 border border-slate-100 hover:border-slate-300'}`}
+                            >
+                                {f === 'all' ? 'Todos' : f}
+                            </button>
+                        ))}
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar">
-                    {conversations.map(conv => (
+                {/* Lista de conversaciones */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar px-3 space-y-1">
+                    {conversations.filter(c => filter === 'all' || c.channel === filter).map(conv => (
                         <button
                             key={conv.id}
                             onClick={() => setSelectedConv(conv)}
-                            className={`w-full p-6 flex gap-4 text-left border-b border-gray-100/50 transition-all relative group ${selectedConv?.id === conv.id ? 'bg-white shadow-[0_10px_30px_rgba(0,0,0,0.04)] z-10' : 'hover:bg-white/50'}`}
+                            className={`w-full p-4 flex gap-4 text-left rounded-2xl transition-all group relative ${selectedConv?.id === conv.id
+                                ? 'bg-blue-50/50 ring-1 ring-blue-100'
+                                : 'hover:bg-slate-50'
+                                }`}
                         >
-                            {selectedConv?.id === conv.id && <div className="absolute left-0 top-6 bottom-6 w-1 bg-blue-600 rounded-r-full" />}
-
-                            <div className="relative">
-                                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center text-gray-600 font-bold text-lg select-none">
-                                    {conv.lead.name.split(' ').map(n => n[0]).join('')}
+                            <div className="relative shrink-0">
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold shadow-sm ${conv.channel === 'telegram' ? 'bg-sky-500' : conv.channel === 'whatsapp' ? 'bg-emerald-500' : 'bg-slate-800'
+                                    }`}>
+                                    {conv.lead.name[0]}
                                 </div>
-                                <div className={`absolute -bottom-1 -right-1 w-6 h-6 rounded-lg flex items-center justify-center border-2 border-white shadow-sm ${conv.channel === 'whatsapp' ? 'bg-green-500' : conv.channel === 'telegram' ? 'bg-sky-500' : 'bg-gray-800'
-                                    } text-white`}>
-                                    {conv.channel === 'whatsapp' && <Smartphone className="w-3 h-3" />}
-                                    {conv.channel === 'telegram' && <TelegramIcon className="w-3 h-3" />}
-                                    {conv.channel === 'web' && <MessageCircle className="w-3 h-3" />}
+                                <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-white rounded-lg flex items-center justify-center border-2 border-white shadow-sm overflow-hidden">
+                                    {conv.channel === 'telegram' ? <TelegramIcon className="w-2.5 h-2.5 text-sky-500" /> : <Smartphone className="w-2.5 h-2.5 text-emerald-500" />}
                                 </div>
                             </div>
 
                             <div className="flex-1 min-w-0">
-                                <div className="flex justify-between items-start mb-1">
-                                    <h3 className={`font-bold truncate ${selectedConv?.id === conv.id ? 'text-blue-600' : 'text-gray-900'}`}>{conv.lead.name}</h3>
-                                    <span className="text-[10px] font-bold text-gray-400 whitespace-nowrap ml-2">
-                                        {isToday(conv.last_message_at) ? formatTime(conv.last_message_at) : 'Ayer'}
-                                    </span>
+                                <div className="flex justify-between items-baseline mb-0.5">
+                                    <h3 className={`text-sm font-bold truncate ${selectedConv?.id === conv.id ? 'text-blue-600' : 'text-slate-700'}`}>
+                                        {conv.lead.name}
+                                    </h3>
+                                    <span className="text-[10px] font-medium text-slate-400">14:05</span>
                                 </div>
-                                <p className="text-xs text-gray-500 font-medium line-clamp-1">{conv.last_message}</p>
-
-                                {conv.unread_count > 0 && (
-                                    <div className="mt-2 flex items-center justify-between">
-                                        <span className="bg-blue-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full">{conv.unread_count} nuevos</span>
-                                    </div>
-                                )}
+                                <p className="text-xs text-slate-400 font-medium truncate leading-tight">{conv.last_message}</p>
                             </div>
+
+                            {conv.unread_count > 0 && (
+                                <div className="absolute top-1/2 -translate-y-1/2 right-4 w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-[9px] font-black shadow-md border-2 border-white">
+                                    {conv.unread_count}
+                                </div>
+                            )}
                         </button>
                     ))}
                 </div>
             </div>
 
-            {/* Chat Area */}
+            {/* 2. Chat Principal */}
             {selectedConv ? (
                 <div className="flex-1 flex flex-col bg-white">
-                    {/* Chat Header */}
-                    <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-white/80 backdrop-blur-md sticky top-0 z-20">
+                    {/* Header Limpio */}
+                    <div className="px-8 py-5 border-b border-slate-50 flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center text-gray-600 font-bold">
-                                {selectedConv.lead.name.split(' ').map(n => n[0]).join('')}
+                            <div className="relative cursor-pointer">
+                                <div className="w-11 h-11 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-600 font-black border border-slate-200 shadow-sm">
+                                    {selectedConv.lead.name[0]}
+                                </div>
+                                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white" />
                             </div>
                             <div>
-                                <h3 className="font-bold text-gray-900">{selectedConv.lead.name}</h3>
-                                <div className="flex items-center gap-1.5">
-                                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">En línea</span>
-                                </div>
+                                <h3 className="text-base font-black text-slate-800 tracking-tight">{selectedConv.lead.name}</h3>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{selectedConv.channel} • Conectado</p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <HeaderAction icon={Phone} />
-                            <HeaderAction icon={Video} />
-                            <div className="w-px h-6 bg-gray-100 mx-2" />
-                            <HeaderAction icon={Search} />
-                            <HeaderAction icon={MoreVertical} />
+
+                        {/* Acciones de Cabecera */}
+                        <div className="flex items-center gap-1">
+                            <button className="p-3 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-all">
+                                <Search className="w-4.5 h-4.5" />
+                            </button>
+                            <button className="p-3 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-all">
+                                <Video className="w-4.5 h-4.5" />
+                            </button>
+                            <button className="p-3 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-all">
+                                <MoreVertical className="w-4.5 h-4.5" />
+                            </button>
                         </div>
                     </div>
 
-                    {/* Messages Area */}
-                    <div
-                        ref={scrollRef}
-                        className="flex-1 overflow-y-auto p-8 space-y-6 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-fixed"
-                    >
-                        <div className="flex justify-center mb-8">
-                            <span className="bg-gray-100/80 backdrop-blur-sm text-gray-500 text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-widest">Hoy</span>
-                        </div>
-
-                        {messages.map((msg, i) => (
-                            <div
-                                key={msg.id}
-                                className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}
-                                style={{ animationDelay: `${i * 50}ms` }}
-                            >
-                                <div className={`max-w-[70%] relative ${msg.direction === 'outbound' ? 'order-1' : 'order-2'}`}>
-                                    <div className={`p-4 rounded-2xl shadow-sm text-sm font-medium leading-relaxed ${msg.direction === 'outbound'
-                                        ? 'bg-[#0f172a] text-white rounded-tr-none'
-                                        : 'bg-white border border-gray-100 text-gray-700 rounded-tl-none'
+                    {/* Area de Mensajes */}
+                    <div ref={scrollRef} className="flex-1 overflow-y-auto px-10 py-8 space-y-6 bg-slate-50/10">
+                        {messages.map((msg) => (
+                            <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[75%] space-y-1 ${msg.direction === 'outbound' ? 'items-end' : 'items-start'} flex flex-col`}>
+                                    <div className={`px-5 py-3.5 rounded-3xl text-sm font-semibold leading-relaxed shadow-sm transition-all hover:shadow-md ${msg.direction === 'outbound'
+                                        ? 'bg-slate-900 text-white rounded-tr-none'
+                                        : 'bg-white border border-slate-100 text-slate-700 rounded-tl-none'
                                         }`}>
                                         {msg.content}
                                     </div>
-                                    <div className={`mt-2 flex items-center gap-1.5 ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
-                                        <span className="text-[10px] font-bold text-gray-400">{formatTime(msg.sent_at)}</span>
+                                    <div className="flex items-center gap-1.5 px-2">
+                                        <span className="text-[9px] font-bold text-slate-400 uppercase">16:05</span>
                                         {msg.direction === 'outbound' && (
-                                            <CheckCheck className={`w-3.5 h-3.5 ${msg.status === 'read' ? 'text-blue-500' : 'text-gray-300'}`} />
+                                            <CheckCheck className={`w-3 h-3 ${msg.status === 'read' ? 'text-blue-500' : 'text-slate-300'}`} />
                                         )}
                                     </div>
                                 </div>
@@ -301,29 +262,26 @@ export default function ChatHub() {
                         ))}
                     </div>
 
-                    {/* Input Area */}
-                    <div className="p-6 bg-white border-t border-gray-100">
-                        <form
-                            onSubmit={handleSendMessage}
-                            className="bg-gray-50 rounded-2xl p-2 flex items-center gap-2 border border-transparent focus-within:border-blue-500/20 focus-within:bg-white focus-within:ring-4 focus-within:ring-blue-500/5 transition-all"
-                        >
-                            <button type="button" className="p-3 text-gray-400 hover:text-blue-600 transition-colors">
-                                <Paperclip className="w-5 h-5" />
+                    {/* Input Area Profesional */}
+                    <div className="p-8">
+                        <form onSubmit={handleSendMessage} className="bg-slate-100/60 rounded-[32px] p-2 flex items-center gap-2 group focus-within:bg-white focus-within:ring-4 focus-within:ring-blue-500/5 focus-within:shadow-xl transition-all border border-transparent focus-within:border-slate-200">
+                            <button type="button" className="p-4 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all">
+                                <Smile className="w-5 h-5" />
                             </button>
                             <input
                                 type="text"
                                 value={newMessage}
                                 onChange={e => setNewMessage(e.target.value)}
                                 placeholder="Escribe un mensaje..."
-                                className="flex-1 bg-transparent py-3 px-2 outline-none text-sm font-medium text-gray-700"
+                                className="flex-1 bg-transparent py-3 px-2 outline-none text-sm font-bold text-slate-700 placeholder:text-slate-400"
                             />
-                            <button type="button" className="p-3 text-gray-400 hover:text-blue-600 transition-colors">
-                                <Smile className="w-5 h-5" />
+                            <button type="button" className="p-4 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all mr-1">
+                                <Paperclip className="w-5 h-5" />
                             </button>
                             <button
                                 type="submit"
                                 disabled={!newMessage.trim()}
-                                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white p-3 rounded-xl shadow-lg shadow-blue-500/20 transition-all active:scale-95"
+                                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-30 text-white p-4 rounded-full shadow-lg shadow-blue-500/30 transition-all hover:scale-105 active:scale-95"
                             >
                                 <Send className="w-5 h-5" />
                             </button>
@@ -331,71 +289,56 @@ export default function ChatHub() {
                     </div>
                 </div>
             ) : (
-                <div className="flex-1 flex flex-col items-center justify-center bg-white p-12 text-center">
-                    <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center mb-8 animate-bounce transition-all duration-1000">
-                        <MessageSquare className="w-10 h-10 text-blue-600" />
+                <div className="flex-1 flex flex-col items-center justify-center bg-[#fcfdfe] p-12 text-center">
+                    <div className="w-20 h-20 bg-blue-50 rounded-[2rem] flex items-center justify-center mb-8 animate-pulse">
+                        <MessageSquare className="w-8 h-8 text-blue-600" />
                     </div>
-                    <h2 className="text-3xl font-black text-[#0f172a] mb-4 tracking-tight">Tu Central Omnicanal</h2>
-                    <p className="text-gray-500 max-w-md leading-relaxed font-medium">
-                        Selecciona una conversación a la izquierda para empezar a chatear.
-                        Tus mensajes de WhatsApp, Telegram y Web aparecerán aquí unificados.
+                    <h2 className="text-2xl font-black text-slate-800 mb-3 tracking-tight">Central de Comunicación</h2>
+                    <p className="text-sm text-slate-400 max-w-sm leading-relaxed font-bold uppercase tracking-widest text-[11px]">
+                        Selecciona un chat para continuar la prospección
                     </p>
-
-                    <div className="grid grid-cols-3 gap-8 mt-16 opacity-30">
-                        <div className="flex flex-col items-center gap-2">
-                            <Smartphone className="w-8 h-8 text-green-500" />
-                            <span className="text-xs font-bold uppercase tracking-widest">WhatsApp</span>
-                        </div>
-                        <div className="flex flex-col items-center gap-2">
-                            <TelegramIcon className="w-8 h-8 text-sky-500" />
-                            <span className="text-xs font-bold uppercase tracking-widest">Telegram</span>
-                        </div>
-                        <div className="flex flex-col items-center gap-2">
-                            <Bot className="w-8 h-8 text-indigo-500" />
-                            <span className="text-xs font-bold uppercase tracking-widest">Leads AI</span>
-                        </div>
-                    </div>
                 </div>
             )}
 
-            {/* Right Lead Details Panel */}
+            {/* 3. Panel de Detalles (Derecho) */}
             {selectedConv && (
-                <div className="w-[340px] border-l border-gray-100 bg-white flex flex-col animate-in slide-in-from-right-4 duration-500">
-                    <div className="p-8 text-center border-b border-gray-100">
-                        <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-3xl mx-auto mb-6 shadow-xl shadow-blue-500/20">
-                            {selectedConv.lead.name.split(' ').map(n => n[0]).join('')}
+                <div className="w-[320px] bg-white border-l border-slate-50 flex flex-col animate-in slide-in-from-right duration-700 shadow-[-20px_0_40px_rgba(0,0,0,0.01)]">
+                    <div className="p-8 text-center space-y-6">
+                        <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-black text-4xl mx-auto shadow-2xl shadow-blue-600/20 rotate-3 hover:rotate-0 transition-transform cursor-pointer">
+                            {selectedConv.lead.name[0]}
                         </div>
-                        <h3 className="text-xl font-black text-gray-900 mb-1">{selectedConv.lead.name}</h3>
-                        <p className="text-gray-400 text-sm font-bold uppercase tracking-widest">{selectedConv.lead.company}</p>
+                        <div>
+                            <h3 className="text-xl font-black text-slate-800 tracking-tight">{selectedConv.lead.name}</h3>
+                            <p className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full w-fit mx-auto mt-2 uppercase tracking-tighter">
+                                {selectedConv.lead.company}
+                            </p>
+                        </div>
                     </div>
 
-                    <div className="p-8 space-y-8 overflow-y-auto custom-scrollbar flex-1">
-                        <div>
-                            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Información de Contacto</h4>
-                            <div className="space-y-4">
-                                <LeadDetail icon={Mail} label="Email" value={selectedConv.lead.email} />
-                                <LeadDetail icon={PhoneIcon} label="WhatsApp" value="+503 7654-3210" />
-                                <LeadDetail icon={Building2} label="Empresa" value={selectedConv.lead.company} />
-                                <LeadDetail icon={Clock} label="Zona Horaria" value="GMT -6 (El Salvador)" />
-                            </div>
+                    <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-8">
+                        {/* Info rápida */}
+                        <div className="space-y-5">
+                            <DetailRow icon={Mail} label="Email" value={selectedConv.lead.email} />
+                            <DetailRow icon={PhoneIcon} label="WhatsApp" value="+503 7654 3210" />
+                            <DetailRow icon={Clock} label="Zona" value="GMT -6 (SV)" />
                         </div>
 
-                        <div>
-                            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Acciones CRM</h4>
-                            <div className="grid grid-cols-1 gap-3">
-                                <button className="w-full py-3 bg-blue-50 text-blue-600 font-bold rounded-xl text-xs hover:bg-blue-100 transition-colors flex items-center justify-center gap-2">
-                                    <User className="w-4 h-4" /> Ver Perfil de Lead
-                                </button>
-                                <button className="w-full py-3 bg-indigo-50 text-indigo-600 font-bold rounded-xl text-xs hover:bg-indigo-100 transition-colors flex items-center justify-center gap-2">
-                                    <ImageIcon className="w-4 h-4" /> Crear Cotización
-                                </button>
-                            </div>
+                        {/* CRM Actions Minimal */}
+                        <div className="space-y-3 pt-6 border-t border-slate-50">
+                            <h4 className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">CRM Sales Hub</h4>
+                            <button className="w-full flex items-center justify-center gap-3 py-3.5 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/10">
+                                <User className="w-4 h-4" /> Perfil Lead
+                            </button>
+                            <button className="w-full flex items-center justify-center gap-3 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all">
+                                <ImageIcon className="w-4 h-4" /> Cotizar
+                            </button>
                         </div>
 
-                        <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-                            <p className="text-[10px] font-bold text-gray-400 mb-2 uppercase">Nota del Agente AI</p>
-                            <p className="text-xs text-gray-600 leading-relaxed italic">
-                                "El cliente está interesado en el paquete corporativo pero tiene dudas sobre la implementación en la nube."
+                        {/* IA Insight */}
+                        <div className="p-5 bg-indigo-50/50 rounded-3xl border border-indigo-100 flex gap-4">
+                            <Bot className="w-5 h-5 text-indigo-500 shrink-0" />
+                            <p className="text-[11px] text-indigo-900/80 font-bold leading-relaxed italic">
+                                "Cliente potencial con alta intención de cierre. Priorizar soporte."
                             </p>
                         </div>
                     </div>
@@ -405,37 +348,15 @@ export default function ChatHub() {
     );
 }
 
-function FilterChip({ label, active, onClick }: any) {
+function DetailRow({ icon: Icon, label, value }: any) {
     return (
-        <button
-            onClick={onClick}
-            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${active
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
-                : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-100'
-                }`}
-        >
-            {label}
-        </button>
-    );
-}
-
-function HeaderAction({ icon: Icon }: any) {
-    return (
-        <button className="p-2.5 hover:bg-gray-50 rounded-xl transition-colors text-gray-500 hover:text-blue-600">
-            <Icon className="w-5 h-5" />
-        </button>
-    );
-}
-
-function LeadDetail({ icon: Icon, label, value }: any) {
-    return (
-        <div className="flex items-start gap-4">
-            <div className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 shrink-0">
+        <div className="flex items-start gap-4 group">
+            <div className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 transition-colors group-hover:bg-blue-50 group-hover:text-blue-500">
                 <Icon className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-                <p className="text-[10px] font-bold text-gray-400 uppercase">{label}</p>
-                <p className="text-sm font-bold text-gray-900 truncate">{value}</p>
+                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{label}</p>
+                <p className="text-xs font-bold text-slate-700 truncate">{value}</p>
             </div>
         </div>
     );
