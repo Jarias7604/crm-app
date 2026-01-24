@@ -168,7 +168,6 @@ class CotizacionesService {
         return stats;
     }
 
-    // Calcular totales de una cotización
     calcularTotales(params: {
         volumen_dtes: number;
         plan_nombre: string;
@@ -193,39 +192,43 @@ class CotizacionesService {
             iva_porcentaje = 13
         } = params;
 
-        // Calcular costos de módulos
+        // 1. CALCULOS ANUALES (Pago Único Frontal)
         const modulos_anual = modulos_adicionales.reduce((sum, m) => sum + m.costo_anual, 0);
-        const modulos_mensual = modulos_adicionales.reduce((sum, m) => sum + m.costo_mensual, 0);
-
-        // Calcular WhatsApp (por DTE)
-        const costo_whatsapp = servicio_whatsapp ? volumen_dtes * 0.025 : 0;
-
-        // Personalización (costo único)
+        const costo_whatsapp_anual = servicio_whatsapp ? volumen_dtes * 0.025 : 0;
         const costo_personalizacion = servicio_personalizacion ? 150 : 0;
 
-        // Subtotales
-        const subtotal_anual = costo_plan_anual + costo_implementacion + modulos_anual + costo_whatsapp + costo_personalizacion;
-        const subtotal_mensual = (costo_plan_mensual * 12) + costo_implementacion + (modulos_mensual * 12) + costo_whatsapp + costo_personalizacion;
+        // Subtotal Anual incluye TODO (Plan + Implementación + Módulos + Servicios extra)
+        const subtotal_anual = costo_plan_anual + costo_implementacion + modulos_anual + costo_whatsapp_anual + costo_personalizacion;
 
-        // Descuento
-        const descuento_monto = (subtotal_anual * descuento_porcentaje) / 100;
-        const subtotal_con_descuento = subtotal_anual - descuento_monto;
+        // Descuento sobre el subtotal anual
+        const descuento_monto_anual = (subtotal_anual * descuento_porcentaje) / 100;
+        const base_para_iva_anual = subtotal_anual - descuento_monto_anual;
 
-        // IVA
-        const iva_monto = (subtotal_con_descuento * iva_porcentaje) / 100;
+        const iva_monto_anual = (base_para_iva_anual * iva_porcentaje) / 100;
+        const total_anual = base_para_iva_anual + iva_monto_anual;
 
-        // Totales finales
-        const total_anual = subtotal_con_descuento + iva_monto;
-        const total_mensual = (subtotal_mensual - (subtotal_mensual * (descuento_porcentaje / 100))) + iva_monto;
+        // 2. CALCULOS MENSUALES (Recurrencia Mensual)
+        const modulos_mensual = modulos_adicionales.reduce((sum, m) => sum + m.costo_mensual, 0);
+        const costo_whatsapp_mensual = (servicio_whatsapp ? (volumen_dtes * 0.025) : 0) / 12;
+
+        // La cuota mensual recurrente NO incluye la implementación ni personalización (que son pagos únicos)
+        const subtotal_mensual_recurrente = costo_plan_mensual + modulos_mensual + costo_whatsapp_mensual;
+
+        // Descuento sobre la cuota mensual
+        const descuento_mensual = (subtotal_mensual_recurrente * descuento_porcentaje) / 100;
+        const base_para_iva_mensual = subtotal_mensual_recurrente - descuento_mensual;
+
+        const iva_mensual = (base_para_iva_mensual * iva_porcentaje) / 100;
+        const cuota_mensual = base_para_iva_mensual + iva_mensual;
 
         return {
             subtotal_anual: Number(subtotal_anual.toFixed(2)),
-            subtotal_mensual: Number(subtotal_mensual.toFixed(2)),
-            descuento_monto: Number(descuento_monto.toFixed(2)),
-            iva_monto: Number(iva_monto.toFixed(2)),
+            subtotal_mensual: Number(subtotal_mensual_recurrente.toFixed(2)),
+            descuento_monto: Number(descuento_monto_anual.toFixed(2)),
+            iva_monto: Number(iva_monto_anual.toFixed(2)),
             total_anual: Number(total_anual.toFixed(2)),
-            total_mensual: Number(total_mensual.toFixed(2)),
-            costo_whatsapp: Number(costo_whatsapp.toFixed(2)),
+            total_mensual: Number(cuota_mensual.toFixed(2)), // AHORA: Valor de una sola cuota mensual recurrente
+            costo_whatsapp: Number(costo_whatsapp_anual.toFixed(2)),
             costo_personalizacion,
             iva_porcentaje
         };

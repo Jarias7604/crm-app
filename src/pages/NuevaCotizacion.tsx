@@ -539,12 +539,12 @@ export default function NuevaCotizacion() {
 
                     <div className="border-t-2 border-blue-200 pt-3">
                         <div className="flex justify-between items-center">
-                            <span className="text-lg font-bold text-[#4449AA]">Total Anual</span>
+                            <span className="text-lg font-bold text-[#4449AA]">Inversión Anual Total</span>
                             <span className="text-3xl font-extrabold text-[#3DCC91]">${totales.total_anual.toLocaleString()}</span>
                         </div>
                         <div className="flex justify-between items-center mt-2">
-                            <span className="text-sm text-gray-600">Total Mensual (12 cuotas)</span>
-                            <span className="text-xl font-bold text-gray-700">${totales.total_mensual.toLocaleString()}</span>
+                            <span className="text-sm text-gray-600">O cuota mensual recurrente</span>
+                            <span className="text-xl font-bold text-gray-700">${totales.total_mensual.toLocaleString()} / mes</span>
                         </div>
                     </div>
                 </div>

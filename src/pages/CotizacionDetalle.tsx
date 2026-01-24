@@ -386,7 +386,7 @@ export default function CotizacionDetalle() {
                                                 </p>
                                             </div>
                                             <div className="text-right">
-                                                <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-1 text-green-300">Anual</p>
+                                                <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-1 text-green-300">Mensual</p>
                                                 <p className="text-xs font-medium opacity-80">
                                                     ${cotizacion.total_mensual.toLocaleString()}/mes
                                                 </p>
