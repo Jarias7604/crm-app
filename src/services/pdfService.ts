@@ -139,7 +139,7 @@ export const pdfService = {
         // Convert to Blob
         const pdfBlob = doc.output('blob');
         const fileName = `propuesta_${cotizacion.id}.pdf`;
-        const filePath = `${cotizacion.company_id}/quotations/${fileName}`;
+        const filePath = `${fileName}`; // Usamos un path plano para evitar errores de carpetas
 
         // Upload to Supabase Storage (Using the PUBLIC 'quotations' bucket)
         const { error } = await supabase.storage
@@ -149,7 +149,10 @@ export const pdfService = {
                 upsert: true
             });
 
-        if (error) throw error;
+        if (error) {
+            console.error('Error subiendo PDF a Storage:', error);
+            throw error;
+        }
 
         // Get public URL
         const { data: { publicUrl } } = supabase.storage
