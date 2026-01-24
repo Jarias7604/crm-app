@@ -274,8 +274,8 @@ export default function Branding() {
                                 <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl -mr-16 -mt-16"></div>
 
                                 <div className="space-y-6 relative z-10">
-                                    <div className="flex flex-col items-start gap-4">
-                                        <div className="w-48 h-14 bg-white/5 rounded-xl flex items-center justify-start overflow-hidden group/logo">
+                                    <div className="flex flex-col items-start gap-5">
+                                        <div className="w-64 h-20 flex items-center justify-start overflow-hidden group/logo">
                                             {formData.logo_url ? (
                                                 <img src={formData.logo_url} alt="Logo" className="max-h-full max-w-full object-contain" />
                                             ) : (

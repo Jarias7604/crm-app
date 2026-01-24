@@ -125,7 +125,7 @@ export default function CotizacionDetalle() {
 
                     <div className="flex flex-col md:flex-row justify-between items-center md:items-end gap-4 relative z-10">
                         {/* Left/Center: Vertical Branding */}
-                        <div className="flex flex-col items-center md:items-start -space-y-2">
+                        <div className="flex flex-col items-center md:items-start gap-3">
                             <div className="w-64 h-20 flex items-center justify-center md:justify-start">
                                 {cotizacion.company?.logo_url ? (
                                     <img src={cotizacion.company.logo_url} alt="" className="max-w-full max-h-full object-contain" />
