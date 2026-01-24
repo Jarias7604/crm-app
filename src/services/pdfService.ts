@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable'; // Side-effect import for the plugin
+import autoTable from 'jspdf-autotable';
 import { supabase } from './supabase';
 import { format } from 'date-fns';
 
@@ -10,7 +10,7 @@ export const pdfService = {
             console.log(`Generando PDF Premium 1:1 [v${Date.now()}]...`, cotizacion.id);
 
             // Instancia segura
-            const doc = new jsPDF() as any; // Cast to any for the plugin
+            const doc = new jsPDF() as any;
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
 
@@ -135,27 +135,58 @@ export const pdfService = {
                 ]);
             }
 
-            // USO DE PLUGIN (doc.autoTable)
-            doc.autoTable({
-                startY: 130,
-                head: [['DESCRIPCIÓN DEL SERVICIO', 'INVERSIÓN (USD)']],
-                body: tableRows,
-                headStyles: { fillColor: [249, 250, 251], textColor: [100, 116, 139], fontSize: 8, fontStyle: 'bold' },
-                bodyStyles: { textColor: slate900, fontSize: 10, cellPadding: 8 },
-                columnStyles: {
-                    0: { cellWidth: 130 },
-                    1: { halign: 'right', fontStyle: 'bold', fontSize: 11 }
-                },
-                alternateRowStyles: { fillColor: [255, 255, 255] },
-                margin: { left: 20, right: 20 },
-                theme: 'grid',
-                styles: { lineColor: [241, 245, 249] }
-            });
+            // USO EXPLÍCITO DE AUTOTABLE (ESTANDAR V5)
+            // Se garantiza que autoTable se llame como función (Safest for modular environments)
+            try {
+                if (typeof autoTable === 'function') {
+                    autoTable(doc, {
+                        startY: 130,
+                        head: [['DESCRIPCIÓN DEL SERVICIO', 'INVERSIÓN (USD)']],
+                        body: tableRows,
+                        headStyles: { fillColor: [249, 250, 251], textColor: [100, 116, 139], fontSize: 8, fontStyle: 'bold' },
+                        bodyStyles: { textColor: slate900, fontSize: 10, cellPadding: 8 },
+                        columnStyles: {
+                            0: { cellWidth: 130 },
+                            1: { halign: 'right', fontStyle: 'bold', fontSize: 11 }
+                        },
+                        alternateRowStyles: { fillColor: [255, 255, 255] },
+                        margin: { left: 20, right: 20 },
+                        theme: 'grid',
+                        styles: { lineColor: [241, 245, 249] }
+                    });
+                } else {
+                    // Fallback por si la librería se comporta como plugin
+                    (doc as any).autoTable({
+                        startY: 130,
+                        head: [['DESCRIPCIÓN DEL SERVICIO', 'INVERSIÓN (USD)']],
+                        body: tableRows,
+                        headStyles: { fillColor: [249, 250, 251], textColor: [100, 116, 139], fontSize: 8, fontStyle: 'bold' },
+                        bodyStyles: { textColor: slate900, fontSize: 10, cellPadding: 8 },
+                        columnStyles: {
+                            0: { cellWidth: 130 },
+                            1: { halign: 'right', fontStyle: 'bold', fontSize: 11 }
+                        },
+                        alternateRowStyles: { fillColor: [255, 255, 255] },
+                        margin: { left: 20, right: 20 },
+                        theme: 'grid',
+                        styles: { lineColor: [241, 245, 249] }
+                    });
+                }
+            } catch (e) {
+                console.warn('Fallback table generation triggered', e);
+                // Ultimo recurso: texto plano si falla la tabla
+                let y = 130;
+                tableRows.forEach(row => {
+                    doc.text(`${row[0]} - ${row[1]}`, 20, y);
+                    y += 10;
+                });
+            }
+
 
             // ---------------------------------------------------------
             // 4. TOTALS
             // ---------------------------------------------------------
-            const finalY = doc.lastAutoTable.finalY + 20;
+            const finalY = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 20 : 150;
 
             const boxHeight = 60;
             const drawY = finalY + boxHeight > pageHeight ? 20 : finalY;
