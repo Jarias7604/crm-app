@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 export const pdfService = {
     async generateAndUploadQuotePDF(cotizacion: any): Promise<string> {
         try {
-            console.log('Generando PDF Premium 1:1 ...', cotizacion.id);
+            console.log(`Generando PDF Premium 1:1 [v${Date.now()}]...`, cotizacion.id);
 
             // Instancia segura
             const doc = new jsPDF() as any; // Cast to any for the plugin
