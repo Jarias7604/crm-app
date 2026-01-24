@@ -174,6 +174,7 @@ class CotizacionesService {
         costo_plan_anual: number;
         costo_plan_mensual: number;
         costo_implementacion: number;
+        incluir_implementacion: boolean;
         modulos_adicionales: ModuloAdicional[];
         servicio_whatsapp: boolean;
         servicio_personalizacion: boolean;
@@ -185,6 +186,7 @@ class CotizacionesService {
             costo_plan_anual,
             costo_plan_mensual,
             costo_implementacion,
+            incluir_implementacion,
             modulos_adicionales,
             servicio_whatsapp,
             servicio_personalizacion,
@@ -197,8 +199,11 @@ class CotizacionesService {
         const costo_whatsapp_anual = servicio_whatsapp ? volumen_dtes * 0.025 : 0;
         const costo_personalizacion = servicio_personalizacion ? 150 : 0;
 
+        // Implementación condicional
+        const implementacion_final = incluir_implementacion ? costo_implementacion : 0;
+
         // Subtotal Anual incluye TODO (Plan + Implementación + Módulos + Servicios extra)
-        const subtotal_anual = costo_plan_anual + costo_implementacion + modulos_anual + costo_whatsapp_anual + costo_personalizacion;
+        const subtotal_anual = costo_plan_anual + implementacion_final + modulos_anual + costo_whatsapp_anual + costo_personalizacion;
 
         // Descuento sobre el subtotal anual
         const descuento_monto_anual = (subtotal_anual * descuento_porcentaje) / 100;

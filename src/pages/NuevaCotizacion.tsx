@@ -9,6 +9,8 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import toast from 'react-hot-toast';
 
+import { usePermissions } from '../hooks/usePermissions';
+
 const PASOS = [
     { id: 1, nombre: 'Cliente', icon: User },
     { id: 2, nombre: 'Plan', icon: FileText },
@@ -18,6 +20,7 @@ const PASOS = [
 
 export default function NuevaCotizacion() {
     const { profile } = useAuth();
+    const { hasPermission } = usePermissions();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const leadIdParam = searchParams.get('leadId');
@@ -38,6 +41,7 @@ export default function NuevaCotizacion() {
         costo_plan_anual: 0,
         costo_plan_mensual: 0,
         costo_implementacion: 0,
+        incluir_implementacion: true,
         modulos_adicionales: [] as ModuloAdicional[],
         servicio_whatsapp: false,
         servicio_personalizacion: false,
@@ -123,6 +127,7 @@ export default function NuevaCotizacion() {
             costo_plan_anual: formData.costo_plan_anual,
             costo_plan_mensual: formData.costo_plan_mensual,
             costo_implementacion: formData.costo_implementacion,
+            incluir_implementacion: formData.incluir_implementacion,
             modulos_adicionales: formData.modulos_adicionales,
             servicio_whatsapp: formData.servicio_whatsapp,
             servicio_personalizacion: formData.servicio_personalizacion,
@@ -367,6 +372,38 @@ export default function NuevaCotizacion() {
                     );
                 })}
             </div>
+
+            {formData.plan_nombre && hasPermission('cotizaciones.edit_prices') && (
+                <div className="bg-blue-50/50 p-6 rounded-2xl border border-blue-100 animate-in fade-in slide-in-from-top-4">
+                    <div className="flex items-center gap-2 mb-4">
+                        <DollarSign className="w-5 h-5 text-blue-600" />
+                        <h3 className="text-sm font-bold text-blue-800 uppercase tracking-wider">Ajuste de Precios de Venta (Negociación)</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-xs font-black text-gray-500 uppercase px-1">Costo Plan Anual</label>
+                            <Input
+                                type="number"
+                                value={formData.costo_plan_anual}
+                                onChange={(e) => setFormData({ ...formData, costo_plan_anual: Number(e.target.value) })}
+                                className="h-12 rounded-xl border-gray-200 focus:ring-4 focus:ring-blue-500/10 font-bold"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-xs font-black text-gray-500 uppercase px-1">Costo Plan Mensual</label>
+                            <Input
+                                type="number"
+                                value={formData.costo_plan_mensual}
+                                onChange={(e) => setFormData({ ...formData, costo_plan_mensual: Number(e.target.value) })}
+                                className="h-12 rounded-xl border-gray-200 focus:ring-4 focus:ring-blue-500/10 font-bold"
+                            />
+                        </div>
+                    </div>
+                    <p className="text-[10px] text-blue-600 font-bold mt-3 px-1 italic">
+                        * Los cambios manuales anularán los precios base del plan seleccionado.
+                    </p>
+                </div>
+            )}
         </div>
     );
 
@@ -440,6 +477,44 @@ export default function NuevaCotizacion() {
                 </div>
             </div>
 
+            {hasPermission('cotizaciones.manage_implementation') && (
+                <div className="bg-amber-50/50 p-6 rounded-2xl border border-amber-100 animate-in fade-in slide-in-from-top-4">
+                    <div className="flex items-center gap-2 mb-4">
+                        <Check className="w-5 h-5 text-amber-600" />
+                        <h3 className="text-sm font-bold text-amber-800 uppercase tracking-wider">Gestión de Implementación</h3>
+                    </div>
+                    <div className="flex flex-col gap-6">
+                        <label className="flex items-center gap-3 cursor-pointer group">
+                            <div className={`w-12 h-6 rounded-full p-1 transition-colors duration-200 ${formData.incluir_implementacion ? 'bg-amber-500' : 'bg-gray-300'}`}>
+                                <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-200 ${formData.incluir_implementacion ? 'translate-x-6' : 'translate-x-0'}`} />
+                            </div>
+                            <input
+                                type="checkbox"
+                                className="hidden"
+                                checked={formData.incluir_implementacion}
+                                onChange={(e) => setFormData({ ...formData, incluir_implementacion: e.target.checked })}
+                            />
+                            <span className="text-sm font-bold text-amber-900">Cobrar costo de implementación</span>
+                        </label>
+
+                        {formData.incluir_implementacion && (
+                            <div className="space-y-2 max-w-xs transition-all duration-300">
+                                <label className="text-xs font-black text-amber-700 uppercase px-1">Monto de Implementación (Negociable)</label>
+                                <div className="relative">
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-amber-600 font-bold">$</span>
+                                    <Input
+                                        type="number"
+                                        value={formData.costo_implementacion}
+                                        onChange={(e) => setFormData({ ...formData, costo_implementacion: Number(e.target.value) })}
+                                        className="h-12 pl-8 rounded-xl border-amber-200 focus:ring-4 focus:ring-amber-500/10 font-bold text-amber-900"
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
             <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">
                     💰 Descuento (%)
@@ -481,7 +556,11 @@ export default function NuevaCotizacion() {
                     </div>
                     <div className="text-right">
                         <p className="text-xl font-bold text-[#3DCC91]">${formData.costo_plan_anual.toLocaleString()}</p>
-                        <p className="text-sm text-gray-500">Implementación: ${formData.costo_implementacion}</p>
+                        {formData.incluir_implementacion ? (
+                            <p className="text-sm text-gray-500">Implementación: ${formData.costo_implementacion.toLocaleString()}</p>
+                        ) : (
+                            <p className="text-[10px] text-amber-600 font-bold uppercase tracking-tighter">⚠️ Implementación Omitida</p>
+                        )}
                     </div>
                 </div>
             </div>

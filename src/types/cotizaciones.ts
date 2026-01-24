@@ -16,6 +16,7 @@ export interface Cotizacion {
     costo_plan_anual: number;
     costo_plan_mensual: number;
     costo_implementacion: number;
+    incluir_implementacion: boolean;
 
     // Módulos y Servicios
     modulos_adicionales: ModuloAdicional[];

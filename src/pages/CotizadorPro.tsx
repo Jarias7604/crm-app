@@ -45,6 +45,7 @@ export default function CotizadorPro() {
         // Paso 4: Descuento e IVA
         descuento_porcentaje: 0,
         iva_porcentaje: 13,
+        incluir_implementacion: true,
         notas: ''
     });
 
@@ -313,6 +314,7 @@ export default function CotizadorPro() {
                 total_anual: totales.total_anual,
                 total_mensual: totales.total_mensual,
                 notas: formData.notas,
+                incluir_implementacion: formData.incluir_implementacion,
                 estado: 'borrador' as const
             };
 

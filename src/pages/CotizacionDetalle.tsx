@@ -11,7 +11,8 @@ import {
     FileText,
     Target,
     Package,
-    Globe
+    Globe,
+    Settings
 } from 'lucide-react';
 import { cotizacionesService } from '../services/cotizaciones';
 import { Button } from '../components/ui/Button';
@@ -264,14 +265,33 @@ export default function CotizacionDetalle() {
                                                 </div>
                                                 <div>
                                                     <p className="font-black text-gray-900 text-lg">Licencia Anual {cotizacion.plan_nombre}</p>
-                                                    <p className="text-sm text-gray-500 font-medium mt-0.5">Incluye suite DTE, implementación y soporte técnico base.</p>
+                                                    <p className="text-sm text-gray-500 font-medium mt-0.5">Incluye suite DTE y soporte técnico base.</p>
                                                 </div>
                                             </div>
                                         </td>
                                         <td className="px-8 py-7 text-right font-black text-gray-900 text-xl">
-                                            ${(cotizacion.costo_plan_anual + cotizacion.costo_implementacion).toLocaleString()}
+                                            ${cotizacion.costo_plan_anual.toLocaleString()}
                                         </td>
                                     </tr>
+
+                                    {cotizacion.incluir_implementacion && (
+                                        <tr className="hover:bg-gray-50/30 transition-colors">
+                                            <td className="px-8 py-7">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-12 h-12 bg-orange-50 rounded-2xl flex items-center justify-center text-orange-600 shadow-sm">
+                                                        <Settings className="w-6 h-6" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-black text-gray-900 text-lg">Implementación y Configuración</p>
+                                                        <p className="text-sm text-gray-500 font-medium mt-0.5">Puesta en marcha, capacitación y configuración inicial.</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-8 py-7 text-right font-black text-gray-900 text-xl">
+                                                ${cotizacion.costo_implementacion.toLocaleString()}
+                                            </td>
+                                        </tr>
+                                    )}
 
                                     {cotizacion.modulos_adicionales?.map((mod: any, idx: number) => (
                                         <tr key={idx} className="hover:bg-gray-50/30 transition-colors">
