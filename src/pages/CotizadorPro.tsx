@@ -403,53 +403,41 @@ export default function CotizadorPro() {
                 estado: 'borrador' as const
             };
 
+            let result;
             if (id) {
-                const updated = await cotizacionesService.updateCotizacion(id, cotizacionData);
+                result = await cotizacionesService.updateCotizacion(id, cotizacionData);
                 toast.success('✅ Cotización actualizada exitosamente');
+            } else {
+                result = await cotizacionesService.createCotizacion(cotizacionData);
+                toast.success('✅ Cotización creada exitosamente');
+            }
 
-                if (location.state?.fromChat) {
+            if (location.state?.fromChat) {
+                try {
+                    toast.loading('Generando PDF oficial...', { id: 'pdf-gen' });
+                    const pdfUrl = await pdfService.generateAndUploadQuotePDF(result);
+                    toast.success('PDF generado y listo', { id: 'pdf-gen' });
+
                     navigate('/marketing/chat', {
                         state: {
-                            newQuote: updated,
+                            newQuote: { ...result, pdfUrl },
                             conversation_id: location.state.conversation_id
                         },
                         replace: true
                     });
-                } else {
-                    navigate('/cotizaciones');
+                } catch (pdfErr) {
+                    console.error('PDF Error:', pdfErr);
+                    toast.error('Cotización guardada, pero hubo un error generando el PDF', { id: 'pdf-gen' });
+                    navigate('/marketing/chat', {
+                        state: {
+                            newQuote: result,
+                            conversation_id: location.state.conversation_id
+                        },
+                        replace: true
+                    });
                 }
             } else {
-                const created = await cotizacionesService.createCotizacion(cotizacionData);
-                toast.success('✅ Cotización creada exitosamente');
-
-                if (location.state?.fromChat) {
-                    // GENERATE PDF AUTOMATICALLY FOR CHAT
-                    try {
-                        toast.loading('Generando PDF oficial...', { id: 'pdf-gen' });
-                        const pdfUrl = await pdfService.generateAndUploadQuotePDF(created);
-                        toast.success('PDF generado y listo', { id: 'pdf-gen' });
-
-                        navigate('/marketing/chat', {
-                            state: {
-                                newQuote: { ...created, pdfUrl },
-                                conversation_id: location.state.conversation_id
-                            },
-                            replace: true
-                        });
-                    } catch (pdfErr) {
-                        console.error('PDF Error:', pdfErr);
-                        toast.error('Cotización guardada, pero hubo un error generando el PDF');
-                        navigate('/marketing/chat', {
-                            state: {
-                                newQuote: created,
-                                conversation_id: location.state.conversation_id
-                            },
-                            replace: true
-                        });
-                    }
-                } else {
-                    navigate('/cotizaciones');
-                }
+                navigate('/cotizaciones');
             }
         } catch (error: any) {
             console.error('Error procesando cotización:', error);
