@@ -5,6 +5,8 @@ import { campaignService } from '../../services/marketing/campaignService';
 import toast from 'react-hot-toast';
 
 import { useAuth } from '../../auth/AuthProvider';
+import { STATUS_CONFIG, type LeadStatus } from '../../types';
+import { Building2 } from 'lucide-react';
 
 export default function EmailBuilder() {
     const { profile } = useAuth();
@@ -218,57 +220,91 @@ export default function EmailBuilder() {
             {/* Preview Modal */}
             {
                 showPreview && (
-                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200">
-                            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-3xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200 border border-gray-100">
+                            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 rounded-t-3xl">
                                 <div>
-                                    <h3 className="text-xl font-bold text-gray-900">Vista Previa de Destinatarios</h3>
-                                    <p className="text-sm text-gray-500">Mostrando primeros 50 resultados.</p>
+                                    <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
+                                        <Users className="w-5 h-5 text-blue-600" />
+                                        Vista Previa de Destinatarios
+                                    </h3>
+                                    <p className="text-sm text-gray-500 mt-1">
+                                        Se enviará a <span className="font-bold text-gray-900">{previewLeads.length}</span> contactos seleccionados.
+                                    </p>
                                 </div>
-                                <button onClick={() => setShowPreview(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                                    <X className="w-5 h-5 text-gray-500" />
+                                <button
+                                    onClick={() => setShowPreview(false)}
+                                    className="p-2 hover:bg-gray-100 rounded-full transition-colors group"
+                                >
+                                    <X className="w-6 h-6 text-gray-400 group-hover:text-gray-900" />
                                 </button>
                             </div>
 
-                            <div className="p-0 overflow-y-auto flex-1">
+                            <div className="p-0 overflow-y-auto flex-1 bg-white">
                                 {previewLeads.length > 0 ? (
-                                    <table className="w-full text-left text-sm">
-                                        <thead className="bg-gray-50 text-gray-500 font-semibold sticky top-0">
-                                            <tr>
-                                                <th className="p-4">Nombre</th>
-                                                <th className="p-4">Email</th>
-                                                <th className="p-4">Registrado</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-100">
-                                            {previewLeads.map((lead: any) => (
-                                                <tr key={lead.id} className="hover:bg-gray-50">
-                                                    <td className="p-4 font-medium text-gray-900">
-                                                        {lead.first_name} {lead.last_name}
-                                                        {!lead.first_name && !lead.last_name && <span className="text-gray-400 italic">Sin nombre</span>}
-                                                    </td>
-                                                    <td className="p-4 text-gray-600">{lead.email}</td>
-                                                    <td className="p-4 text-gray-400 text-xs text-right">
-                                                        {new Date(lead.created_at).toLocaleDateString()}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                    <div className="divide-y divide-gray-100">
+                                        {previewLeads.map((lead: any) => {
+                                            const statusConfig = STATUS_CONFIG[lead.status as LeadStatus] || STATUS_CONFIG['Prospecto'];
+                                            return (
+                                                <div key={lead.id} className="p-4 hover:bg-gray-50 transition-colors flex items-center gap-4 group">
+                                                    {/* Avatar / Initial */}
+                                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center text-blue-700 font-bold text-sm border-2 border-white shadow-sm ring-1 ring-gray-100">
+                                                        {lead.name?.charAt(0).toUpperCase() || '?'}
+                                                    </div>
+
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 mb-0.5">
+                                                            <h4 className="font-bold text-gray-900 truncate">{lead.name || 'Sin nombre'}</h4>
+                                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${statusConfig.bgColor} ${statusConfig.color} border-transparent bg-opacity-50`}>
+                                                                {statusConfig.label}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-3 text-xs text-gray-500">
+                                                            <div className="flex items-center gap-1">
+                                                                <span className="text-gray-400">@</span>
+                                                                {lead.email}
+                                                            </div>
+                                                            {lead.company_name && (
+                                                                <div className="flex items-center gap-1 px-2 py-0.5 bg-gray-100 rounded text-gray-600">
+                                                                    <Building2 className="w-3 h-3" />
+                                                                    {lead.company_name}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="text-right text-xs text-gray-400">
+                                                        <p>Creado</p>
+                                                        <p className="font-medium text-gray-600">
+                                                            {new Date(lead.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 ) : (
-                                    <div className="p-10 text-center text-gray-500">
-                                        <Users className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                                        <p>No se encontraron destinatarios con email válido para este filtro.</p>
+                                    <div className="flex flex-col items-center justify-center h-[300px] text-center p-8">
+                                        <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-4">
+                                            <Users className="w-8 h-8 text-gray-300" />
+                                        </div>
+                                        <h4 className="text-lg font-bold text-gray-900 mb-1">No se encontraron destinatarios</h4>
+                                        <p className="text-gray-500 max-w-xs mx-auto">
+                                            Intenta ajustar los filtros de estado o fecha para encontrar contactos con correo válido.
+                                        </p>
                                     </div>
                                 )}
                             </div>
 
-                            <div className="p-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl text-right">
+                            <div className="p-4 border-t border-gray-100 bg-gray-50/50 rounded-b-3xl flex justify-between items-center">
+                                <span className="text-xs font-medium text-gray-500">
+                                    * Solo se muestran los primeros 50 resultados para vista previa.
+                                </span>
                                 <button
                                     onClick={() => setShowPreview(false)}
-                                    className="px-6 py-2 bg-white border border-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-100 transition-colors"
+                                    className="px-6 py-2.5 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl hover:bg-gray-50 hover:shadow-sm transition-all text-sm"
                                 >
-                                    Cerrar
+                                    Cerrar Vista Previa
                                 </button>
                             </div>
                         </div>

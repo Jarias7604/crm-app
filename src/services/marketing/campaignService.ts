@@ -82,7 +82,7 @@ export const campaignService = {
 
         let query = supabase
             .from('leads')
-            .select('id, first_name, last_name, email, created_at, status')
+            .select('id, name, company_name, email, created_at, status')
             .eq('company_id', companyId)
             .not('email', 'is', null);
 
