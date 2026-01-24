@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Save, X, Search, Settings } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, Search, Settings, Copy } from 'lucide-react';
 import { cotizadorService, type CotizadorPaquete } from '../services/cotizador';
 import { useAuth } from '../auth/AuthProvider';
 import { usePermissions } from '../hooks/usePermissions';
@@ -84,6 +84,28 @@ export default function GestionPaquetes() {
             console.error('Error saving package:', error);
             const errorMsg = error.message || 'Error desconocido';
             toast.error(`❌ Error al guardar: ${errorMsg}`);
+        }
+    };
+
+    const handleClone = async (paquete: CotizadorPaquete) => {
+        try {
+            if (!canEdit) {
+                toast.error('No tienes permisos para realizar esta acción');
+                return;
+            }
+
+            const { id, created_at, updated_at, company_id, ...cloneData } = paquete as any;
+
+            // Forzar el company_id del usuario actual
+            cloneData.company_id = profile?.company_id;
+            cloneData.paquete = `${cloneData.paquete} (Copia)`;
+
+            await cotizadorService.createPaquete(cloneData);
+            toast.success('✅ Paquete clonado exitosamente. Ahora puedes editar tu copia.');
+            loadPaquetes();
+        } catch (error: any) {
+            console.error('Error cloning package:', error);
+            toast.error('Error al clonar el paquete. Es posible que ya exista una copia con la misma cantidad de DTEs.');
         }
     };
 
@@ -436,13 +458,22 @@ export default function GestionPaquetes() {
                                                             <Edit className="w-4 h-4" />
                                                         </button>
                                                     ) : (
-                                                        <button
-                                                            disabled
-                                                            className="p-2 text-gray-300 cursor-not-allowed"
-                                                            title="No puedes editar paquetes globales del sistema"
-                                                        >
-                                                            <Edit className="w-4 h-4" />
-                                                        </button>
+                                                        <div className="flex items-center gap-1">
+                                                            <button
+                                                                disabled
+                                                                className="p-2 text-gray-300 cursor-not-allowed"
+                                                                title="No puedes editar paquetes globales"
+                                                            >
+                                                                <Edit className="w-4 h-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleClone(paquete)}
+                                                                className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                                                title="Clonar para mi empresa"
+                                                            >
+                                                                <Copy className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
                                                     )}
 
                                                     {(profile?.role === 'super_admin' || paquete.company_id !== null) && (

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Save, X, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, Search, Copy } from 'lucide-react';
 import { cotizadorService, type CotizadorItem } from '../services/cotizador';
 import { useAuth } from '../auth/AuthProvider';
 import { usePermissions } from '../hooks/usePermissions';
@@ -85,6 +85,28 @@ export default function GestionItems() {
             console.error('Error saving item:', error);
             const errorMsg = error.message || 'Error desconocido';
             toast.error(`❌ Error al guardar: ${errorMsg}`);
+        }
+    };
+
+    const handleClone = async (item: CotizadorItem) => {
+        try {
+            if (!canEdit) {
+                toast.error('No tienes permisos para realizar esta acción');
+                return;
+            }
+
+            const { id, created_at, updated_at, company_id, ...cloneData } = item as any;
+
+            // Forzar el company_id del usuario actual
+            cloneData.company_id = profile?.company_id;
+            cloneData.nombre = `${cloneData.nombre} (Copia)`;
+
+            await cotizadorService.createItem(cloneData);
+            toast.success('✅ Item clonado exitosamente. Ahora puedes editar tu copia.');
+            loadItems();
+        } catch (error: any) {
+            console.error('Error cloning item:', error);
+            toast.error('Error al clonar el item.');
         }
     };
 
@@ -451,13 +473,22 @@ export default function GestionItems() {
                                                             <Edit className="w-4 h-4" />
                                                         </button>
                                                     ) : (
-                                                        <button
-                                                            disabled
-                                                            className="p-2 text-gray-300 cursor-not-allowed"
-                                                            title="No tienes permisos para editar items globales"
-                                                        >
-                                                            <Edit className="w-4 h-4" />
-                                                        </button>
+                                                        <div className="flex items-center gap-1">
+                                                            <button
+                                                                disabled
+                                                                className="p-2 text-gray-300 cursor-not-allowed"
+                                                                title="No tienes permisos para editar items globales"
+                                                            >
+                                                                <Edit className="w-4 h-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleClone(item)}
+                                                                className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                                                title="Clonar para mi empresa"
+                                                            >
+                                                                <Copy className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
                                                     )}
 
                                                     {(profile?.role === 'super_admin' || item.company_id !== null) && (
