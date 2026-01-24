@@ -49,12 +49,14 @@ export default function MarketingDashboard() {
                     title="WhatsApp & Chat"
                     desc="Mensajería masiva"
                 />
-                <ActionCard
-                    icon={Bot}
-                    color="bg-blue-100 text-blue-600"
-                    title="Agentes AI"
-                    desc="Configurar bots de venta"
-                />
+                <Link to="/marketing/agents">
+                    <ActionCard
+                        icon={Bot}
+                        color="bg-blue-100 text-blue-600"
+                        title="Agentes AI"
+                        desc="Configurar bots de venta"
+                    />
+                </Link>
                 <Link to="/marketing/lead-hunter">
                     <ActionCard
                         icon={Search}
