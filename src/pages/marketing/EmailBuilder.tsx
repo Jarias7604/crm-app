@@ -84,134 +84,168 @@ export default function EmailBuilder() {
     };
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6">
-            <div className="flex items-center gap-4 mb-6">
-                <Link to="/marketing/email" className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500">
-                    <ArrowLeft className="w-5 h-5" />
+        <div className="max-w-6xl mx-auto space-y-8">
+            <div className="flex items-center gap-4 mb-8">
+                <Link to="/marketing/email" className="p-3 hover:bg-gray-100 rounded-full transition-colors text-gray-500 hover:text-blue-600">
+                    <ArrowLeft className="w-6 h-6" />
                 </Link>
-                <h1 className="text-2xl font-bold text-gray-900">Nueva Campaña de Email</h1>
+                <div>
+                    <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Nueva Campaña de Email</h1>
+                    <p className="text-gray-500 mt-1">Configura y diseña tu correo para maximizar conversiones.</p>
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {/* Configuration Panel */}
-                <div className="md:col-span-2 space-y-6">
-                    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
-                        <h2 className="text-lg font-bold flex items-center gap-2">
-                            <FileText className="w-5 h-5 text-blue-500" />
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                {/* Configuration Panel - Takes up 8 cols (2/3) */}
+                <div className="lg:col-span-8 space-y-6">
+                    <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+                        <h2 className="text-xl font-bold flex items-center gap-2 text-gray-900 border-b border-gray-100 pb-4">
+                            <FileText className="w-6 h-6 text-blue-500" />
                             Detalles del Envío
                         </h2>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de Campaña (Interno)</label>
-                            <input
-                                type="text"
-                                className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                                placeholder="Ej: Promo Verano 2026"
-                                value={formData.name}
-                                onChange={e => setFormData({ ...formData, name: e.target.value })}
-                            />
-                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">Nombre de Campaña (Interno)</label>
+                                <input
+                                    type="text"
+                                    className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-medium"
+                                    placeholder="Ej: Promo Verano 2026"
+                                    value={formData.name}
+                                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                />
+                            </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Asunto del Correo</label>
-                            <input
-                                type="text"
-                                className="w-full p-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                                placeholder="¡No te pierdas esta oferta!"
-                                value={formData.subject}
-                                onChange={e => setFormData({ ...formData, subject: e.target.value })}
-                            />
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">Asunto del Correo</label>
+                                <input
+                                    type="text"
+                                    className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-medium"
+                                    placeholder="¡No te pierdas esta oferta!"
+                                    value={formData.subject}
+                                    onChange={e => setFormData({ ...formData, subject: e.target.value })}
+                                />
+                            </div>
                         </div>
                     </div>
 
-                    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm grow flex flex-col">
-                        <h2 className="text-lg font-bold mb-4">Contenido del Correo</h2>
+                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm grow flex flex-col min-h-[500px]">
+                        <h2 className="text-xl font-bold mb-4 text-gray-900">Diseño del Contenido</h2>
                         <textarea
-                            className="w-full h-64 p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none bg-gray-50 font-mono text-sm"
+                            className="w-full flex-1 p-6 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none resize-none bg-gray-50 font-mono text-sm leading-relaxed"
                             placeholder="Escribe tu mensaje aquí... (Soporta HTML básico)"
                             value={formData.content}
                             onChange={e => setFormData({ ...formData, content: e.target.value })}
                         ></textarea>
+                        <p className="text-xs text-gray-400 mt-2 text-right">Consejo: Usa etiquetas HTML para dar formato enriquecido.</p>
                     </div>
                 </div>
 
-                {/* Sidebar Settings */}
-                <div className="space-y-6">
-                    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                        <h2 className="text-lg font-bold flex items-center justify-between mb-4">
+                {/* Sidebar Settings - Takes up 4 cols (1/3) */}
+                <div className="lg:col-span-4 space-y-6 sticky top-6">
+                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-xl shadow-gray-100/50">
+                        <h2 className="text-lg font-black flex items-center justify-between mb-6 text-gray-900">
                             <div className="flex items-center gap-2">
-                                <Users className="w-5 h-5 text-green-500" />
-                                Audiencia
+                                <Users className="w-5 h-5 text-indigo-600" />
+                                Audiencia Objetivo
                             </div>
-                            <button
-                                onClick={handlePreviewAudience}
-                                disabled={loadingPreview}
-                                className="text-sm text-blue-600 font-bold hover:underline flex items-center gap-1 disabled:opacity-50"
-                            >
-                                <Eye className="w-4 h-4" />
-                                {loadingPreview ? 'Cargando...' : 'Ver Lista'}
-                            </button>
+                            <span className="bg-blue-50 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-lg">
+                                {formData.audience_filter.status.length > 0 ? `${formData.audience_filter.status.length} filtros` : 'Todos'}
+                            </span>
                         </h2>
 
-                        <div className="space-y-3">
-                            <div className="p-4 border border-gray-200 rounded-xl space-y-3">
-                                <p className="font-bold text-sm text-gray-900">Filtrar por Estados (Selección Multiple)</p>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {possibleStatuses.map(status => (
-                                        <label key={status} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded-lg">
-                                            <input
-                                                type="checkbox"
-                                                checked={formData.audience_filter.status.includes(status)}
-                                                onChange={(e) => {
+                        <div className="space-y-6">
+                            {/* Status Filter - Chips Design */}
+                            <div>
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
+                                    Filtrar por Estado
+                                </label>
+                                <div className="flex flex-wrap gap-2">
+                                    {possibleStatuses.map(status => {
+                                        const isSelected = formData.audience_filter.status.includes(status);
+                                        const config = STATUS_CONFIG[status as LeadStatus] || STATUS_CONFIG['Prospecto'];
+
+                                        return (
+                                            <button
+                                                key={status}
+                                                onClick={() => {
                                                     const current = formData.audience_filter.status;
-                                                    const newStatus = e.target.checked
-                                                        ? [...current, status]
-                                                        : current.filter(s => s !== status);
+                                                    const newStatus = isSelected
+                                                        ? current.filter(s => s !== status)
+                                                        : [...current, status];
                                                     setFormData({
                                                         ...formData,
                                                         audience_filter: { ...formData.audience_filter, status: newStatus }
                                                     });
                                                 }}
-                                                className="rounded text-blue-600 focus:ring-blue-500"
-                                            />
-                                            <span className="text-sm text-gray-700">{status}</span>
-                                        </label>
-                                    ))}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${isSelected
+                                                        ? `${config.bgColor} ${config.color} border-transparent ring-2 ring-offset-1 ring-${config.color.split('-')[1]}-400`
+                                                        : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'
+                                                    }`}
+                                            >
+                                                {isSelected && <span className="mr-1">✓</span>}
+                                                {status}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                             </div>
 
-                            <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${formData.audience_filter.dateRange === 'new' ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-gray-200 hover:bg-gray-50'}`}>
-                                <input
-                                    type="checkbox"
-                                    checked={formData.audience_filter.dateRange === 'new'}
-                                    onChange={(e) => setFormData({
-                                        ...formData,
-                                        audience_filter: { ...formData.audience_filter, dateRange: e.target.checked ? 'new' : 'all' }
-                                    })}
-                                    className="text-blue-600 rounded"
-                                />
-                                <div>
-                                    <p className="font-bold text-sm text-gray-900">Solo Clientes Nuevos</p>
-                                    <p className="text-xs text-gray-500">Registrados últimos 30 días</p>
+                            {/* Date Filter - Modern Toggle Card */}
+                            <div
+                                onClick={() => setFormData({
+                                    ...formData,
+                                    audience_filter: { ...formData.audience_filter, dateRange: formData.audience_filter.dateRange === 'new' ? 'all' : 'new' }
+                                })}
+                                className={`group p-4 rounded-2xl border-2 cursor-pointer transition-all relative overflow-hidden ${formData.audience_filter.dateRange === 'new'
+                                        ? 'border-blue-500 bg-blue-50'
+                                        : 'border-gray-100 bg-white hover:border-blue-200'
+                                    }`}
+                            >
+                                <div className="flex justify-between items-center relative z-10">
+                                    <div>
+                                        <p className={`font-bold text-sm ${formData.audience_filter.dateRange === 'new' ? 'text-blue-900' : 'text-gray-900'}`}>Solo Clientes Recientes</p>
+                                        <p className={`text-xs mt-0.5 ${formData.audience_filter.dateRange === 'new' ? 'text-blue-600' : 'text-gray-500'}`}>Registrados en los últimos 30 días</p>
+                                    </div>
+                                    <div className={`w-10 h-6 rounded-full p-1 transition-colors ${formData.audience_filter.dateRange === 'new' ? 'bg-blue-600' : 'bg-gray-200'}`}>
+                                        <div className={`w-4 h-4 bg-white rounded-full transition-transform ${formData.audience_filter.dateRange === 'new' ? 'translate-x-4' : ''}`} />
+                                    </div>
                                 </div>
-                            </label>
+                            </div>
+
+                            {/* Preview Button */}
+                            <button
+                                onClick={handlePreviewAudience}
+                                disabled={loadingPreview}
+                                className="w-full py-3 bg-gray-900 hover:bg-black text-white rounded-xl font-bold text-sm transition-all hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
+                            >
+                                {loadingPreview ? (
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                    <>
+                                        <Eye className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                                        Ver Vista Previa de Audiencia
+                                    </>
+                                )}
+                            </button>
                         </div>
                     </div>
 
+                    {/* Actions */}
                     <div className="grid gap-3">
                         <button
                             onClick={() => handleSave(true)}
-                            className="w-full py-4 text-gray-700 font-bold bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors flex justify-center items-center gap-2"
+                            className="w-full py-4 text-gray-700 font-bold bg-white border border-gray-200 rounded-2xl hover:bg-gray-50 transition-colors flex justify-center items-center gap-2"
                         >
                             <Save className="w-5 h-5" />
                             Guardar Borrador
                         </button>
                         <button
                             onClick={() => handleSave(false)}
-                            className="w-full py-4 text-white font-bold bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl hover:shadow-lg transition-all flex justify-center items-center gap-2"
+                            className="w-full py-4 text-white font-bold bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl hover:shadow-xl hover:shadow-blue-500/20 transition-all flex justify-center items-center gap-2 transform active:scale-[0.98]"
                         >
                             <Send className="w-5 h-5" />
-                            Enviar Campaña
+                            Enviar Campaña Ahora
                         </button>
                     </div>
                 </div>
