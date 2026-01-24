@@ -427,20 +427,33 @@ export default function GestionPaquetes() {
                                         {canEdit && (
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center justify-end gap-2">
-                                                    <button
-                                                        onClick={() => handleEdit(paquete)}
-                                                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                        title="Editar"
-                                                    >
-                                                        <Edit className="w-4 h-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDelete(paquete.id)}
-                                                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                        title="Desactivar"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
+                                                    {profile?.role === 'super_admin' || paquete.company_id !== null ? (
+                                                        <button
+                                                            onClick={() => handleEdit(paquete)}
+                                                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                            title="Editar"
+                                                        >
+                                                            <Edit className="w-4 h-4" />
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            disabled
+                                                            className="p-2 text-gray-300 cursor-not-allowed"
+                                                            title="No puedes editar paquetes globales del sistema"
+                                                        >
+                                                            <Edit className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+
+                                                    {(profile?.role === 'super_admin' || paquete.company_id !== null) && (
+                                                        <button
+                                                            onClick={() => handleDelete(paquete.id)}
+                                                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                            title="Desactivar"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         )}

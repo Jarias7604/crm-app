@@ -106,9 +106,10 @@ class CotizadorService {
             .from('cotizador_paquetes')
             .insert(paquete)
             .select()
-            .single();
+            .maybeSingle();
 
         if (error) throw error;
+        if (!data) throw new Error('No se pudo crear el paquete. Verifique sus permisos.');
         return data;
     }
 
@@ -118,9 +119,10 @@ class CotizadorService {
             .update(updates)
             .eq('id', id)
             .select()
-            .single();
+            .maybeSingle();
 
         if (error) throw error;
+        if (!data) throw new Error('No se pudo actualizar el paquete. Es posible que no tenga permisos para editar este registro global.');
         return data;
     }
 
@@ -165,9 +167,10 @@ class CotizadorService {
             .from('cotizador_items')
             .insert(item)
             .select()
-            .single();
+            .maybeSingle();
 
         if (error) throw error;
+        if (!data) throw new Error('No se pudo crear el item. Verifique sus permisos.');
         return data;
     }
 
@@ -177,9 +180,10 @@ class CotizadorService {
             .update(updates)
             .eq('id', id)
             .select()
-            .single();
+            .maybeSingle();
 
         if (error) throw error;
+        if (!data) throw new Error('No se pudo actualizar el item. Es posible que no tenga permisos para editar este registro global.');
         return data;
     }
 

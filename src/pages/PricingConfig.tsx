@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Save, X, DollarSign, Package, Settings } from 'lucide-react';
 import { pricingService } from '../services/pricing';
 import type { PricingItem } from '../types/pricing';
+import { useAuth } from '../auth/AuthProvider';
 import { usePermissions } from '../hooks/usePermissions';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import toast from 'react-hot-toast';
 
 export default function PricingConfig() {
+    const { profile } = useAuth();
     const { hasPermission } = usePermissions();
     const [items, setItems] = useState<PricingItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -59,17 +61,23 @@ export default function PricingConfig() {
                 toast.error('No tienes permisos para realizar esta acción');
                 return;
             }
+
+            // Sanitizar datos: eliminar campos de sistema
+            const { id, created_at, updated_at, ...updateData } = formData as any;
+
             if (editingId) {
-                await pricingService.updatePricingItem(editingId, formData);
+                await pricingService.updatePricingItem(editingId, updateData);
                 toast.success('✅ Ítem actualizado');
             } else {
-                await pricingService.createPricingItem(formData as any);
+                await pricingService.createPricingItem(updateData as any);
                 toast.success('✅ Ítem creado');
             }
             resetForm();
             loadItems();
-        } catch (error) {
-            toast.error('Error al guardar');
+        } catch (error: any) {
+            console.error('Error saving pricing item:', error);
+            const errorMsg = error.message || 'Error desconocido';
+            toast.error(`❌ Error al guardar: ${errorMsg}`);
         }
     };
 
@@ -325,18 +333,32 @@ export default function PricingConfig() {
                                         <td className="px-6 py-4">
                                             {canEdit && (
                                                 <div className="flex items-center justify-end gap-2">
-                                                    <button
-                                                        onClick={() => handleEdit(item)}
-                                                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                    >
-                                                        <Edit className="w-4 h-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleDelete(item.id)}
-                                                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
+                                                    {profile?.role === 'super_admin' ? (
+                                                        <>
+                                                            <button
+                                                                onClick={() => handleEdit(item)}
+                                                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                                title="Editar"
+                                                            >
+                                                                <Edit className="w-4 h-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDelete(item.id)}
+                                                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                                title="Desactivar"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <button
+                                                            disabled
+                                                            className="p-2 text-gray-300 cursor-not-allowed"
+                                                            title="Solo el administrador del sistema puede editar estos precios base"
+                                                        >
+                                                            <Edit className="w-4 h-4" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             )}
                                         </td>
