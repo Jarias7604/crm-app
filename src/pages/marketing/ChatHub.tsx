@@ -18,101 +18,100 @@ import {
     Bot
 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
-
-interface Message {
-    id: string;
-    content: string;
-    direction: 'inbound' | 'outbound';
-    sent_at: string;
-    status?: 'sent' | 'delivered' | 'read';
-}
-
-interface Conversation {
-    id: string;
-    channel: 'whatsapp' | 'telegram' | 'web';
-    status: string;
-    last_message: string;
-    last_message_at: string;
-    unread_count: number;
-    lead: {
-        name: string;
-        email: string;
-        company: string;
-        avatar?: string;
-    };
-}
+import { chatService, type ChatConversation, type ChatMessage } from '../../services/marketing/chatService';
+import toast from 'react-hot-toast';
 
 export default function ChatHub() {
-    const [selectedConv, setSelectedConv] = useState<Conversation | null>(null);
-    const [messages, setMessages] = useState<Message[]>([]);
+    const [conversations, setConversations] = useState<ChatConversation[]>([]);
+    const [selectedConv, setSelectedConv] = useState<ChatConversation | null>(null);
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
     const [filter, setFilter] = useState<'all' | 'whatsapp' | 'telegram' | 'web'>('all');
+    const [loading, setLoading] = useState(true);
     const scrollRef = useRef<HTMLDivElement>(null);
     const location = useLocation();
 
-    // Handle deep linking from Leads page
+    // 1. Initial Load of Conversations
     useEffect(() => {
-        if (location.state?.lead) {
-            const incomingLead = location.state.lead;
-            const channel = location.state.channel || 'telegram';
-            setFilter(channel);
+        loadConversations();
 
-            const tempConv: Conversation = {
-                id: `new-${incomingLead.id}`,
-                channel: channel,
-                status: 'open',
-                last_message: 'Iniciando conversación desde CRM...',
-                last_message_at: new Date().toISOString(),
-                unread_count: 0,
-                lead: {
-                    name: incomingLead.name,
-                    email: incomingLead.email || 'sin-email@email.com',
-                    company: incomingLead.company_name || 'Particular',
+        // Subscribe to conversation updates (new chats, unread counts)
+        const sub = chatService.subscribeToConversations(() => {
+            loadConversations();
+        });
+
+        return () => {
+            sub.unsubscribe();
+        };
+    }, []);
+
+    const loadConversations = async () => {
+        try {
+            const data = await chatService.getConversations();
+            setConversations(data);
+
+            // Handle deep linking after loading
+            if (location.state?.lead && !selectedConv) {
+                const leadId = location.state.lead.id;
+                const existing = data.find(c => c.lead?.id === leadId);
+                if (existing) {
+                    setSelectedConv(existing);
+                } else {
+                    // Create a placeholder for new conversation
+                    const placeholder: ChatConversation = {
+                        id: 'new',
+                        channel: location.state.channel || 'telegram',
+                        status: 'open',
+                        last_message: 'Iniciando conversación...',
+                        last_message_at: new Date().toISOString(),
+                        unread_count: 0,
+                        lead: {
+                            id: leadId,
+                            name: location.state.lead.name,
+                            email: location.state.lead.email,
+                            company_name: location.state.lead.company_name
+                        }
+                    };
+                    setSelectedConv(placeholder);
                 }
-            };
-            setSelectedConv(tempConv);
+            }
+        } catch (error) {
+            console.error('Error loading conversations:', error);
+        } finally {
+            setLoading(false);
         }
-    }, [location.state]);
+    };
 
-    // Mock Data
-    const conversations: Conversation[] = [
-        {
-            id: '1',
-            channel: 'telegram',
-            status: 'open',
-            last_message: 'Hola, me gustaría saber los precios del paquete Pro',
-            last_message_at: new Date().toISOString(),
-            unread_count: 2,
-            lead: { name: 'Nestor Rodriguez', email: 'nestor@email.com', company: 'Estudios Eléctricos' }
-        },
-        {
-            id: '2',
-            channel: 'whatsapp',
-            status: 'open',
-            last_message: 'Confirmado el pago de la suscripción mensual',
-            last_message_at: new Date(Date.now() - 3600000).toISOString(),
-            unread_count: 0,
-            lead: { name: 'Anelda Garcia', email: 'anelda@garcia.com', company: 'Independientes S.A' }
-        },
-        {
-            id: '3',
-            channel: 'web',
-            status: 'open',
-            last_message: '¿Tienen soporte técnico los domingos?',
-            last_message_at: new Date(Date.now() - 86400000).toISOString(),
-            unread_count: 0,
-            lead: { name: 'Miguel Carlo', email: 'miguel@carlo.com', company: 'Arroz Fuentes' }
-        }
-    ];
-
+    // 2. Load Messages when selection changes
     useEffect(() => {
-        if (selectedConv) {
-            setMessages([
-                { id: '1', content: '¡Hola! ¿En qué puedo ayudarte hoy?', direction: 'outbound', sent_at: new Date(Date.now() - 7200000).toISOString(), status: 'read' },
-                { id: '2', content: selectedConv.last_message, direction: 'inbound', sent_at: selectedConv.last_message_at }
-            ]);
+        if (selectedConv && selectedConv.id !== 'new') {
+            loadMessages(selectedConv.id);
+            chatService.markAsRead(selectedConv.id);
+
+            // Subscribe to new messages for this chat
+            const sub = chatService.subscribeToMessages(selectedConv.id, (msg) => {
+                setMessages(prev => {
+                    if (prev.find(m => m.id === msg.id)) return prev;
+                    return [...prev, msg];
+                });
+            });
+
+            return () => {
+                sub.unsubscribe();
+            };
+        } else {
+            setMessages([]);
         }
-    }, [selectedConv]);
+    }, [selectedConv?.id]);
+
+    const loadMessages = async (id: string) => {
+        try {
+            const data = await chatService.getMessages(id);
+            setMessages(data);
+        } catch (error) {
+            console.error('Error loading messages:', error);
+        }
+    };
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -120,19 +119,37 @@ export default function ChatHub() {
         }
     }, [messages]);
 
-    const handleSendMessage = (e: React.FormEvent) => {
+    const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newMessage.trim() || !selectedConv) return;
-        const msg: Message = { id: Date.now().toString(), content: newMessage, direction: 'outbound', sent_at: new Date().toISOString(), status: 'sent' };
-        setMessages([...messages, msg]);
+
+        const content = newMessage;
         setNewMessage('');
+
+        try {
+            if (selectedConv.id === 'new') {
+                toast.error('La integración real requiere configurar el Webhook para este canal.');
+                return;
+            }
+
+            await chatService.sendMessage(selectedConv.id, content);
+            // The message will be added to state via subscription
+        } catch (error: any) {
+            toast.error('Error al enviar: ' + error.message);
+        }
     };
+
+    const formatTime = (isoString: string) => {
+        const date = new Date(isoString);
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
+
+    if (loading) return <div className="flex h-full items-center justify-center font-bold text-slate-400">Cargando central de mensajes...</div>;
 
     return (
         <div className="flex h-[calc(100vh-100px)] bg-white rounded-3xl border border-gray-100 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-500">
             {/* 1. Sidebar: Lista de Chats */}
             <div className="w-[360px] border-r border-gray-100 flex flex-col bg-[#fcfdfe]">
-                {/* Header suave */}
                 <div className="p-6 space-y-5">
                     <div className="flex items-center justify-between">
                         <h2 className="text-xl font-black text-slate-800 tracking-tight">Mensajes</h2>
@@ -141,7 +158,6 @@ export default function ChatHub() {
                         </button>
                     </div>
 
-                    {/* Buscador Moderno */}
                     <div className="relative group">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                         <input
@@ -151,7 +167,6 @@ export default function ChatHub() {
                         />
                     </div>
 
-                    {/* Filtros minimalistas */}
                     <div className="flex gap-2">
                         {['all', 'whatsapp', 'telegram'].map((f) => (
                             <button
@@ -167,7 +182,6 @@ export default function ChatHub() {
                     </div>
                 </div>
 
-                {/* Lista de conversaciones */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar px-3 space-y-1">
                     {conversations.filter(c => filter === 'all' || c.channel === filter).map(conv => (
                         <button
@@ -181,7 +195,7 @@ export default function ChatHub() {
                             <div className="relative shrink-0">
                                 <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold shadow-sm ${conv.channel === 'telegram' ? 'bg-sky-500' : conv.channel === 'whatsapp' ? 'bg-emerald-500' : 'bg-slate-800'
                                     }`}>
-                                    {conv.lead.name[0]}
+                                    {conv.lead?.name?.[0] || '?'}
                                 </div>
                                 <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-white rounded-lg flex items-center justify-center border-2 border-white shadow-sm overflow-hidden">
                                     {conv.channel === 'telegram' ? <TelegramIcon className="w-2.5 h-2.5 text-sky-500" /> : <Smartphone className="w-2.5 h-2.5 text-emerald-500" />}
@@ -191,9 +205,9 @@ export default function ChatHub() {
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-baseline mb-0.5">
                                     <h3 className={`text-sm font-bold truncate ${selectedConv?.id === conv.id ? 'text-blue-600' : 'text-slate-700'}`}>
-                                        {conv.lead.name}
+                                        {conv.lead?.name || 'Cliente Desconocido'}
                                     </h3>
-                                    <span className="text-[10px] font-medium text-slate-400">14:05</span>
+                                    <span className="text-[10px] font-medium text-slate-400">{formatTime(conv.last_message_at)}</span>
                                 </div>
                                 <p className="text-xs text-slate-400 font-medium truncate leading-tight">{conv.last_message}</p>
                             </div>
@@ -205,28 +219,32 @@ export default function ChatHub() {
                             )}
                         </button>
                     ))}
+
+                    {conversations.length === 0 && (
+                        <div className="p-8 text-center text-slate-300 text-xs font-bold uppercase tracking-widest">
+                            No hay conversaciones todavía
+                        </div>
+                    )}
                 </div>
             </div>
 
             {/* 2. Chat Principal */}
             {selectedConv ? (
                 <div className="flex-1 flex flex-col bg-white">
-                    {/* Header Limpio */}
                     <div className="px-8 py-5 border-b border-slate-50 flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <div className="relative cursor-pointer">
+                            <div className="relative">
                                 <div className="w-11 h-11 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-600 font-black border border-slate-200 shadow-sm">
-                                    {selectedConv.lead.name[0]}
+                                    {selectedConv.lead?.name?.[0] || '?'}
                                 </div>
                                 <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white" />
                             </div>
                             <div>
-                                <h3 className="text-base font-black text-slate-800 tracking-tight">{selectedConv.lead.name}</h3>
+                                <h3 className="text-base font-black text-slate-800 tracking-tight">{selectedConv.lead?.name || 'Cargando...'}</h3>
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{selectedConv.channel} • Conectado</p>
                             </div>
                         </div>
 
-                        {/* Acciones de Cabecera */}
                         <div className="flex items-center gap-1">
                             <button className="p-3 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-all">
                                 <Search className="w-4.5 h-4.5" />
@@ -240,7 +258,6 @@ export default function ChatHub() {
                         </div>
                     </div>
 
-                    {/* Area de Mensajes */}
                     <div ref={scrollRef} className="flex-1 overflow-y-auto px-10 py-8 space-y-6 bg-slate-50/10">
                         {messages.map((msg) => (
                             <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
@@ -252,7 +269,7 @@ export default function ChatHub() {
                                         {msg.content}
                                     </div>
                                     <div className="flex items-center gap-1.5 px-2">
-                                        <span className="text-[9px] font-bold text-slate-400 uppercase">16:05</span>
+                                        <span className="text-[9px] font-bold text-slate-400 uppercase">{formatTime(msg.sent_at)}</span>
                                         {msg.direction === 'outbound' && (
                                             <CheckCheck className={`w-3 h-3 ${msg.status === 'read' ? 'text-blue-500' : 'text-slate-300'}`} />
                                         )}
@@ -260,9 +277,21 @@ export default function ChatHub() {
                                 </div>
                             </div>
                         ))}
+                        {messages.length === 0 && selectedConv.id !== 'new' && (
+                            <div className="flex h-full items-center justify-center text-slate-300 font-bold uppercase text-[10px] tracking-[0.3em]">
+                                Cargando historial...
+                            </div>
+                        )}
+                        {selectedConv.id === 'new' && (
+                            <div className="flex flex-col items-center justify-center h-full space-y-4 text-center">
+                                <Bot className="w-12 h-12 text-blue-200" />
+                                <p className="text-slate-400 text-xs font-bold max-w-xs leading-relaxed">
+                                    Esta es una conversación nueva. Envía el primer mensaje para activarla.
+                                </p>
+                            </div>
+                        )}
                     </div>
 
-                    {/* Input Area Profesional */}
                     <div className="p-8">
                         <form onSubmit={handleSendMessage} className="bg-slate-100/60 rounded-[32px] p-2 flex items-center gap-2 group focus-within:bg-white focus-within:ring-4 focus-within:ring-blue-500/5 focus-within:shadow-xl transition-all border border-transparent focus-within:border-slate-200">
                             <button type="button" className="p-4 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all">
@@ -305,25 +334,23 @@ export default function ChatHub() {
                 <div className="w-[320px] bg-white border-l border-slate-50 flex flex-col animate-in slide-in-from-right duration-700 shadow-[-20px_0_40px_rgba(0,0,0,0.01)]">
                     <div className="p-8 text-center space-y-6">
                         <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white font-black text-4xl mx-auto shadow-2xl shadow-blue-600/20 rotate-3 hover:rotate-0 transition-transform cursor-pointer">
-                            {selectedConv.lead.name[0]}
+                            {selectedConv.lead?.name?.[0] || '?'}
                         </div>
                         <div>
-                            <h3 className="text-xl font-black text-slate-800 tracking-tight">{selectedConv.lead.name}</h3>
+                            <h3 className="text-xl font-black text-slate-800 tracking-tight">{selectedConv.lead?.name || 'Visitante'}</h3>
                             <p className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full w-fit mx-auto mt-2 uppercase tracking-tighter">
-                                {selectedConv.lead.company}
+                                {selectedConv.lead?.company_name || 'Sin empresa'}
                             </p>
                         </div>
                     </div>
 
                     <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-8">
-                        {/* Info rápida */}
                         <div className="space-y-5">
-                            <DetailRow icon={Mail} label="Email" value={selectedConv.lead.email} />
-                            <DetailRow icon={PhoneIcon} label="WhatsApp" value="+503 7654 3210" />
+                            <DetailRow icon={Mail} label="Email" value={selectedConv.lead?.email || 'No disponible'} />
+                            <DetailRow icon={PhoneIcon} label="Identificador" value={selectedConv.id === 'new' ? 'Pendiente' : 'Activo'} />
                             <DetailRow icon={Clock} label="Zona" value="GMT -6 (SV)" />
                         </div>
 
-                        {/* CRM Actions Minimal */}
                         <div className="space-y-3 pt-6 border-t border-slate-50">
                             <h4 className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">CRM Sales Hub</h4>
                             <button className="w-full flex items-center justify-center gap-3 py-3.5 bg-slate-900 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/10">
@@ -334,11 +361,10 @@ export default function ChatHub() {
                             </button>
                         </div>
 
-                        {/* IA Insight */}
                         <div className="p-5 bg-indigo-50/50 rounded-3xl border border-indigo-100 flex gap-4">
                             <Bot className="w-5 h-5 text-indigo-500 shrink-0" />
                             <p className="text-[11px] text-indigo-900/80 font-bold leading-relaxed italic">
-                                "Cliente potencial con alta intención de cierre. Priorizar soporte."
+                                "El sistema monitoriza este canal en tiempo real buscando señales de compra."
                             </p>
                         </div>
                     </div>
