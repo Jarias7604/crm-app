@@ -1,5 +1,6 @@
 import { X, Plus, User, Mail, DollarSign, Shield, Building2, MapPin } from 'lucide-react';
 import type { Lead, LeadStatus, LeadPriority, Profile } from '../types';
+import { STATUS_CONFIG } from '../types';
 import { Input } from './ui/Input';
 import { Button } from './ui/Button';
 
@@ -167,11 +168,11 @@ export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, t
                                             onChange={(e) => setFormData({ ...formData, status: e.target.value as LeadStatus })}
                                             className="w-full h-12 rounded-2xl border-gray-200 focus:ring-blue-500 font-bold bg-gray-50/30 px-4 transition-all outline-none"
                                         >
-                                            <option value="Prospecto">🎯 Prospecto</option>
-                                            <option value="Lead calificado">⭐ Lead calificado</option>
-                                            <option value="Sin respuesta">📵 Sin respuesta</option>
-                                            <option value="Lead frío">❄️ Lead frío</option>
-                                            <option value="Contactado">📞 Contactado</option>
+                                            {Object.entries(STATUS_CONFIG).map(([key, config]) => (
+                                                <option key={key} value={key}>
+                                                    {config.icon} {config.label}
+                                                </option>
+                                            ))}
                                         </select>
                                     </div>
                                 </div>
@@ -320,4 +321,3 @@ export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, t
         </div>
     );
 }
-

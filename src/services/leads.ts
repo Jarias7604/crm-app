@@ -40,7 +40,6 @@ export const leadsService = {
             totalLeads,
             totalPipeline: leads?.reduce((sum, l) => sum + (l.value || 0), 0) || 0,
             wonDeals,
-            lostDeals: leads?.filter(l => l.status === 'Perdido' || l.status === 'Sin respuesta' || l.status === 'Lead frío').length || 0,
             conversionRate: totalLeads > 0 ? Math.round((wonDeals / totalLeads) * 100) : 0,
         };
     },
@@ -116,7 +115,6 @@ export const leadsService = {
         let query = supabase
             .from('leads')
             .select('id, name, company_name, status, value, created_at')
-            .not('status', 'in', '("Lead perdido","Lead erróneo")')
             .order('value', { ascending: false })
             .limit(limit);
 

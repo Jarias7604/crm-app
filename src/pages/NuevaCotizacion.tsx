@@ -192,10 +192,10 @@ export default function NuevaCotizacion() {
                 valida_hasta: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
             });
 
-            // Si hay lead asociado, actualizar su estado
+            // Si hay lead asociado, actualizar su estado a Negociación
             if (formData.lead_id) {
                 await leadsService.updateLead(formData.lead_id, {
-                    status: 'Cotización enviada'
+                    status: 'Negociación'
                 });
             }
 

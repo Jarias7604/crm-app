@@ -6,10 +6,12 @@ import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileTe
 import { cn } from '../lib/utils';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { brandingService } from '../services/branding';
+import { usePermissions } from '../hooks/usePermissions';
 import type { Company } from '../types';
 
 export default function Sidebar() {
     const { profile, signOut } = useAuth();
+    const { hasPermission } = usePermissions();
     const location = useLocation();
     const { t } = useTranslation();
     const [configOpen, setConfigOpen] = useState(location.pathname.startsWith('/config'));
@@ -115,7 +117,7 @@ export default function Sidebar() {
                     ))}
 
                     {/* ACORDEON DE CONFIGURACIÓN */}
-                    {(profile?.role === 'super_admin' || profile?.role === 'company_admin') && (
+                    {(profile?.role === 'super_admin' || profile?.role === 'company_admin' || hasPermission('cotizaciones.edit_prices')) && (
                         <div className="space-y-1">
                             <button
                                 onClick={() => setConfigOpen(!configOpen)}

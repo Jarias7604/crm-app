@@ -23,12 +23,10 @@ interface LeadKanbanProps {
 const COLUMNS: LeadStatus[] = [
     'Prospecto',
     'Lead calificado',
-    'Contactado',
-    'Cotización enviada',
-    'Seguimiento / Negociación',
+    'En seguimiento',
+    'Negociación',
     'Cerrado',
-    'Cliente',
-    'Perdido'
+    'Cliente'
 ];
 
 export function LeadKanban({ leads, teamMembers, onUpdateStatus, onOpenDetail }: LeadKanbanProps) {

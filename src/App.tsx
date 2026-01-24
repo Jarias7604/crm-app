@@ -42,6 +42,7 @@ function App() {
               <Route path="/cotizaciones/nueva" element={<NuevaCotizacion />} />
               <Route path="/cotizaciones/nueva-pro" element={<CotizadorPro />} />
               <Route path="/cotizaciones/:id" element={<CotizacionDetalle />} />
+              <Route path="/cotizaciones/:id/editar" element={<CotizadorPro />} />
               <Route path="/config/pricing" element={<PricingConfig />} />
               <Route path="/config/paquetes" element={<GestionPaquetes />} />
               <Route path="/config/items" element={<GestionItems />} />

@@ -107,19 +107,20 @@ export const csvHelper = {
                                         const statusMap: Record<string, string> = {
                                             'prospecto': 'Prospecto',
                                             'calificado': 'Lead calificado', 'lead calificado': 'Lead calificado',
-                                            'sin respuesta': 'Sin respuesta',
-                                            'frio': 'Lead frío', 'frío': 'Lead frío', 'lead frío': 'Lead frío',
-                                            'contactado': 'Contactado',
-                                            'cotizacion': 'Cotización enviada', 'cotización': 'Cotización enviada',
-                                            'negociacion': 'Seguimiento / Negociación', 'negociación': 'Seguimiento / Negociación', 'seguimiento': 'Seguimiento / Negociación',
+                                            'sin respuesta': 'Prospecto',
+                                            'frio': 'Prospecto', 'frío': 'Prospecto', 'lead frío': 'Prospecto',
+                                            'contactado': 'En seguimiento',
+                                            'cotizacion': 'Negociación', 'cotización': 'Negociación', 'cotización enviada': 'Negociación',
+                                            'negociacion': 'Negociación', 'negociación': 'Negociación', 'seguimiento': 'En seguimiento', 'seguimiento / negociación': 'Negociación',
                                             'cerrado': 'Cerrado',
                                             'cliente': 'Cliente',
-                                            'perdido': 'Perdido',
+                                            'perdido': 'Prospecto',
+                                            'en seguimiento': 'En seguimiento',
                                             // Mapping from old statuses
                                             'nuevo lead': 'Prospecto', 'nuevo': 'Prospecto',
-                                            'potencial – en seguimiento': 'Seguimiento / Negociación',
+                                            'potencial – en seguimiento': 'En seguimiento',
                                             'cliente 2025': 'Cliente', 'cliente 2026': 'Cliente',
-                                            'lead perdido': 'Perdido', 'lead erroneo': 'Perdido', 'lead erróneo': 'Perdido'
+                                            'lead perdido': 'Prospecto', 'lead erroneo': 'Prospecto', 'lead erróneo': 'Prospecto'
                                         };
                                         const normalizedVal = val.toLowerCase().trim();
                                         val = statusMap[normalizedVal] || val;

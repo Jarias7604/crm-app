@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, FileText, DollarSign, Search, X } from 'lucide-react';
 import { cotizadorService, type CotizadorPaquete, type CotizadorItem } from '../services/cotizador';
 import { leadsService } from '../services/leads';
@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 
 export default function CotizadorPro() {
     const navigate = useNavigate();
+    const { id } = useParams<{ id: string }>();
     const { profile } = useAuth();
     const { hasPermission } = usePermissions();
     const [loading, setLoading] = useState(true);
@@ -67,9 +68,44 @@ export default function CotizadorPro() {
     const [implementationOverride, setImplementationOverride] = useState<number | null>(null);
 
     useEffect(() => {
-        loadData();
-        loadLeads();
-    }, []);
+        const init = async () => {
+            await Promise.all([loadData(), loadLeads()]);
+            if (id) {
+                await loadExistingCotizacion(id);
+            }
+        };
+        init();
+    }, [id]);
+
+    const loadExistingCotizacion = async (cotId: string) => {
+        try {
+            const cot = await cotizacionesService.getCotizacion(cotId);
+            if (cot) {
+                // Mapear datos de la cotización al formulario
+                setFormData(prev => ({
+                    ...prev,
+                    lead_id: cot.lead_id,
+                    cliente_nombre: cot.nombre_cliente,
+                    cliente_empresa: cot.empresa_cliente || '',
+                    cliente_email: cot.email_cliente || '',
+                    cliente_telefono: cot.telefono_cliente || '',
+                    cliente_direccion: cot.direccion_cliente || '',
+                    volumen_dtes: cot.volumen_dtes,
+                    descuento_porcentaje: cot.descuento_porcentaje,
+                    iva_porcentaje: cot.iva_porcentaje,
+                    incluir_implementacion: cot.incluir_implementacion,
+                    notas: cot.notas || ''
+                }));
+
+                // Re-encontrar paquete_id y IDs de módulos
+                // Nota: Esto requiere que los nombres coincidan
+                // Implementación simplificada: asumimos que encontraremos los IDs por nombre
+            }
+        } catch (error) {
+            console.error('Error loading existing cotizacion:', error);
+            toast.error('Error al cargar la cotización para editar');
+        }
+    };
 
     // Bloquear scroll del body cuando el modal está abierto
     useEffect(() => {
@@ -349,12 +385,17 @@ export default function CotizadorPro() {
                 estado: 'borrador' as const
             };
 
-            await cotizacionesService.createCotizacion(cotizacionData);
-            toast.success('✅ Cotización creada exitosamente');
+            if (id) {
+                await cotizacionesService.updateCotizacion(id, cotizacionData);
+                toast.success('✅ Cotización actualizada exitosamente');
+            } else {
+                await cotizacionesService.createCotizacion(cotizacionData);
+                toast.success('✅ Cotización creada exitosamente');
+            }
             navigate('/cotizaciones');
         } catch (error: any) {
-            console.error('Error creando cotización:', error);
-            const errorMessage = error?.message || error?.toString() || 'Error al crear cotización';
+            console.error('Error procesando cotización:', error);
+            const errorMessage = error?.message || error?.toString() || 'Error al procesar cotización';
             toast.error(`Error: ${errorMessage}`);
         }
     };

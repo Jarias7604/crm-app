@@ -4,14 +4,10 @@ export type LicenseStatus = 'active' | 'trial' | 'suspended' | 'expired' | 'manu
 export type LeadStatus =
     | 'Prospecto'
     | 'Lead calificado'
-    | 'Sin respuesta'
-    | 'Lead frío'
-    | 'Contactado'
-    | 'Cotización enviada'
-    | 'Seguimiento / Negociación'
+    | 'En seguimiento'
+    | 'Negociación'
     | 'Cerrado'
-    | 'Cliente'
-    | 'Perdido';
+    | 'Cliente';
 export type LeadPriority = 'very_high' | 'high' | 'medium' | 'low';
 export type FollowUpActionType = 'call' | 'email' | 'meeting' | 'whatsapp' | 'other';
 export type DateRange = 'today' | 'this_week' | 'this_month' | 'last_3_months' | 'last_6_months' | 'this_year' | 'all';
@@ -88,14 +84,10 @@ export const PRIORITY_CONFIG = {
 export const STATUS_CONFIG: Record<LeadStatus, { label: string; color: string; bgColor: string; icon: string }> = {
     'Prospecto': { label: 'Prospecto', color: 'text-blue-700', bgColor: 'bg-blue-100', icon: '🎯' },
     'Lead calificado': { label: 'Lead calificado', color: 'text-indigo-700', bgColor: 'bg-indigo-100', icon: '⭐' },
-    'Sin respuesta': { label: 'Sin respuesta', color: 'text-gray-600', bgColor: 'bg-gray-100', icon: '📵' },
-    'Lead frío': { label: 'Lead frío', color: 'text-blue-400', bgColor: 'bg-blue-50', icon: '❄️' },
-    'Contactado': { label: 'Contactado', color: 'text-teal-700', bgColor: 'bg-teal-100', icon: '📞' },
-    'Cotización enviada': { label: 'Cotización enviada', color: 'text-orange-700', bgColor: 'bg-orange-100', icon: '📄' },
-    'Seguimiento / Negociación': { label: 'Seguimiento / Negociación', color: 'text-yellow-700', bgColor: 'bg-yellow-100', icon: '💼' },
+    'En seguimiento': { label: 'En seguimiento', color: 'text-teal-700', bgColor: 'bg-teal-100', icon: '📞' },
+    'Negociación': { label: 'Negociación', color: 'text-yellow-700', bgColor: 'bg-yellow-100', icon: '💼' },
     'Cerrado': { label: 'Cerrado', color: 'text-purple-700', bgColor: 'bg-purple-100', icon: '🔒' },
     'Cliente': { label: 'Cliente', color: 'text-green-700', bgColor: 'bg-green-100', icon: '✅' },
-    'Perdido': { label: 'Perdido', color: 'text-red-700', bgColor: 'bg-red-100', icon: '❌' },
 };
 
 export const ACTION_TYPES = [

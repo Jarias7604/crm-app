@@ -804,17 +804,16 @@ export default function Leads() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-medium text-gray-500 mb-1">Cambiar Estado</label>
-                                    <select value={selectedLead.status} onChange={(e) => handleUpdateLead({ status: e.target.value as LeadStatus })} className="block w-full rounded-md border-gray-300 shadow-sm text-sm">
-                                        <option value="Prospecto">🎯 Prospecto</option>
-                                        <option value="Lead calificado">⭐ Lead calificado</option>
-                                        <option value="Sin respuesta">📵 Sin respuesta</option>
-                                        <option value="Lead frío">❄️ Lead frío</option>
-                                        <option value="Contactado">📞 Contactado</option>
-                                        <option value="Cotización enviada">📄 Cotización enviada</option>
-                                        <option value="Seguimiento / Negociación">💼 Seguimiento / Negociación</option>
-                                        <option value="Cerrado">🔒 Cerrado</option>
-                                        <option value="Cliente">✅ Cliente</option>
-                                        <option value="Perdido">❌ Perdido</option>
+                                    <select
+                                        value={selectedLead.status}
+                                        onChange={(e) => handleUpdateLead({ status: e.target.value as LeadStatus })}
+                                        className="block w-full rounded-md border-gray-300 shadow-sm text-sm"
+                                    >
+                                        {Object.entries(STATUS_CONFIG).map(([key, config]) => (
+                                            <option key={key} value={key}>
+                                                {config.icon} {config.label}
+                                            </option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div>

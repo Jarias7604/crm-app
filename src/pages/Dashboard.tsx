@@ -35,10 +35,7 @@ const THEME = {
 const PIE_COLORS = [THEME.primary, THEME.success, THEME.accent, '#8b5cf6', '#64748b', '#E2E8F0'];
 
 const FunnelInfographic = ({ data }: { data: any[] }) => {
-    // 10-STAGE COMPLETE EXCLUSIVE FUNNEL
     // Logic: Exact status match per layer, strictly following user requested order.
-
-    // Helper calculate EXACT count
     const count = (status: string) => {
         const item = data.find(d => d.key === status);
         return item ? item.value : 0;
@@ -47,32 +44,24 @@ const FunnelInfographic = ({ data }: { data: any[] }) => {
     // Data Extraction based on Order
     const prospectos = count('Prospecto');
     const calificados = count('Lead calificado');
-    const sinRespuesta = count('Sin respuesta');
-    const frios = count('Lead frío');
-    const contactados = count('Contactado');
-    const cotizaciones = count('Cotización enviada');
-    const negociaciones = count('Seguimiento / Negociación');
+    const seguimiento = count('En seguimiento');
+    const negociaciones = count('Negociación');
     const cerrados = count('Cerrado');
     const clientes = count('Cliente');
-    const perdidos = count('Perdido');
 
-    // Total active for percentage/context (excluding lost)
+    // Total active for percentage/context
     const totalLeads = data.reduce((sum, d) => sum + d.value, 0);
 
     const layers = [
         { label: 'Prospecto', value: prospectos, color: '#3b82f6' },                     // Blue 500
         { label: 'Lead Calificado', value: calificados, color: '#6366f1' },              // Indigo 500
-        { label: 'Sin Respuesta', value: sinRespuesta, color: '#94a3b8' },               // Slate 400
-        { label: 'Lead Frío', value: frios, color: '#64748b' },                          // Slate 500
-        { label: 'Contactado', value: contactados, color: '#8b5cf6' },                   // Violet 500
-        { label: 'Cotización Enviada', value: cotizaciones, color: '#eab308' },          // Yellow 500
+        { label: 'En Seguimiento', value: seguimiento, color: '#8b5cf6' },               // Violet 500
         { label: 'Negociación', value: negociaciones, color: '#f97316' },                // Orange 500
         { label: 'Cerrado', value: cerrados, color: '#10b981' },                         // Emerald 500
-        { label: 'Cliente', value: clientes, color: '#059669' },                         // Emerald 600
-        { label: 'Perdido', value: perdidos, color: '#ef4444' }                          // Red 500
+        { label: 'Cliente', value: clientes, color: '#059669' }                          // Emerald 600
     ];
 
-    console.log('🔍 Funnel 10-Layers:', layers);
+    console.log('🔍 Funnel 6-Layers:', layers);
 
     if (data.length === 0) return <div className="text-gray-400 text-center py-10">No hay datos suficientes</div>;
 

@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Save, X, Search } from 'lucide-react';
 import { cotizadorService, type CotizadorItem } from '../services/cotizador';
 import { useAuth } from '../auth/AuthProvider';
+import { usePermissions } from '../hooks/usePermissions';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import toast from 'react-hot-toast';
 
 export default function GestionItems() {
     const { profile } = useAuth();
+    const { hasPermission } = usePermissions();
     const [items, setItems] = useState<CotizadorItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -30,7 +32,7 @@ export default function GestionItems() {
         metadata: {}
     });
 
-    const canEdit = profile?.role === 'super_admin' || profile?.role === 'company_admin';
+    const canEdit = hasPermission('cotizaciones.edit_prices');
 
     useEffect(() => {
         loadItems();
@@ -53,6 +55,8 @@ export default function GestionItems() {
         setEditingId(item.id);
         setFormData(item);
         setShowNewForm(false);
+        // Desplazar al formulario para que el usuario lo vea
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const handleSave = async () => {

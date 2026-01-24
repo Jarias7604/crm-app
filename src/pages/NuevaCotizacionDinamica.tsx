@@ -334,10 +334,10 @@ export default function NuevaCotizacionDinamica() {
 
             await cotizacionesService.createCotizacion(cotizacionData);
 
-            // Actualizar lead si existe
+            // Actualizar lead si existe a estado Negociación
             if (formData.lead_id) {
                 await leadsService.updateLead(formData.lead_id, {
-                    status: 'Cotización enviada'
+                    status: 'Negociación'
                 });
             }
 
