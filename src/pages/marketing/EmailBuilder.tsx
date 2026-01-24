@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Save, Send, ArrowLeft, Users, FileText } from 'lucide-react';
+import { Save, Send, ArrowLeft, Users, FileText, Eye, X } from 'lucide-react';
 import { campaignService } from '../../services/marketing/campaignService';
 import toast from 'react-hot-toast';
 
@@ -14,11 +14,31 @@ export default function EmailBuilder() {
         name: '',
         subject: '',
         content: '',
-        audience_filter: 'all'
+        audience_filter: 'all' as 'all' | 'new' | 'vip'
     });
 
+    const [previewLeads, setPreviewLeads] = useState<any[]>([]);
+    const [showPreview, setShowPreview] = useState(false);
+    const [loadingPreview, setLoadingPreview] = useState(false);
 
+    const handlePreviewAudience = async () => {
+        if (!profile?.company_id) {
+            toast.error('No se encontró información de la empresa');
+            return;
+        }
 
+        setLoadingPreview(true);
+        try {
+            const leads = await campaignService.getAudiencePreview(formData.audience_filter, profile.company_id);
+            setPreviewLeads(leads);
+            setShowPreview(true);
+            if (leads.length === 0) toast('No se encontraron leads para este filtro.');
+        } catch (error) {
+            toast.error('Error al cargar audiencia');
+        } finally {
+            setLoadingPreview(false);
+        }
+    };
 
     const handleSave = async (isDraft: boolean) => {
         try {
@@ -112,9 +132,17 @@ export default function EmailBuilder() {
                 {/* Sidebar Settings */}
                 <div className="space-y-6">
                     <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                        <h2 className="text-lg font-bold flex items-center gap-2 mb-4">
-                            <Users className="w-5 h-5 text-green-500" />
-                            Audiencia
+                        <h2 className="text-lg font-bold flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2">
+                                <Users className="w-5 h-5 text-green-500" />
+                                Audiencia
+                            </div>
+                            <button
+                                onClick={handlePreviewAudience}
+                                className="text-sm text-blue-600 font-bold hover:underline flex items-center gap-1"
+                            >
+                                <Eye className="w-4 h-4" /> Ver Lista
+                            </button>
                         </h2>
 
                         <div className="space-y-3">
@@ -144,42 +172,106 @@ export default function EmailBuilder() {
                                     <p className="font-bold text-sm text-gray-900">Solo Clientes Nuevos</p>
                                     <p className="text-xs text-gray-500">Registrados últimos 30 días</p>
                                 </div>
-                            </label>
 
-                            <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${formData.audience_filter === 'vip' ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-gray-200 hover:bg-gray-50'}`}>
-                                <input
-                                    type="radio"
-                                    name="audience"
-                                    checked={formData.audience_filter === 'vip'}
-                                    onChange={() => setFormData({ ...formData, audience_filter: 'vip' })}
-                                    className="text-blue-600"
-                                />
-                                <div>
-                                    <p className="font-bold text-sm text-gray-900">Lista VIP / Calientes</p>
-                                    <p className="text-xs text-gray-500">Leads con alta probabilidad</p>
-                                </div>
-                            </label>
+
                         </div>
+                    </label>
+
+                    <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${formData.audience_filter === 'vip' ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-gray-200 hover:bg-gray-50'}`}>
+                        <input
+                            type="radio"
+                            name="audience"
+                            checked={formData.audience_filter === 'vip'}
+                            onChange={() => setFormData({ ...formData, audience_filter: 'vip' })}
+                            className="text-blue-600"
+                        />
+                        <div>
+                            <p className="font-bold text-sm text-gray-900">Lista VIP / Calientes</p>
+                            <p className="text-xs text-gray-500">Leads con alta probabilidad</p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div className="grid gap-3">
+                <button
+                    onClick={() => handleSave(true)}
+                    className="w-full py-4 text-gray-700 font-bold bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors flex justify-center items-center gap-2"
+                >
+                    <Save className="w-5 h-5" />
+                    Guardar Borrador
+                </button>
+                <button
+                    onClick={() => handleSave(false)}
+                    className="w-full py-4 text-white font-bold bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl hover:shadow-lg transition-all flex justify-center items-center gap-2"
+                >
+                    <Send className="w-5 h-5" />
+                    Enviar Campaña
+                </button>
+            </div>
+        </div>
+            </div >
+
+        {/* Preview Modal */ }
+    {
+        showPreview && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl animate-in fade-in zoom-in duration-200">
+                    <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                        <div>
+                            <h3 className="text-xl font-bold text-gray-900">Vista Previa de Destinatarios</h3>
+                            <p className="text-sm text-gray-500">Mostrando primeros 50 resultados para filtro: <strong>{formData.audience_filter.toUpperCase()}</strong></p>
+                        </div>
+                        <button onClick={() => setShowPreview(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                            <X className="w-5 h-5 text-gray-500" />
+                        </button>
                     </div>
 
-                    <div className="grid gap-3">
+                    <div className="p-0 overflow-y-auto flex-1">
+                        {previewLeads.length > 0 ? (
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-gray-50 text-gray-500 font-semibold sticky top-0">
+                                    <tr>
+                                        <th className="p-4">Nombre</th>
+                                        <th className="p-4">Email</th>
+                                        <th className="p-4">Registrado</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {previewLeads.map((lead: any) => (
+                                        <tr key={lead.id} className="hover:bg-gray-50">
+                                            <td className="p-4 font-medium text-gray-900">
+                                                {lead.first_name} {lead.last_name}
+                                                {!lead.first_name && !lead.last_name && <span className="text-gray-400 italic">Sin nombre</span>}
+                                            </td>
+                                            <td className="p-4 text-gray-600">{lead.email}</td>
+                                            <td className="p-4 text-gray-400 text-xs text-right">
+                                                {new Date(lead.created_at).toLocaleDateString()}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        ) : (
+                            <div className="p-10 text-center text-gray-500">
+                                <Users className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                                <p>No se encontraron destinatarios con email válido para este filtro.</p>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="p-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl text-right">
                         <button
-                            onClick={() => handleSave(true)}
-                            className="w-full py-4 text-gray-700 font-bold bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors flex justify-center items-center gap-2"
+                            onClick={() => setShowPreview(false)}
+                            className="px-6 py-2 bg-white border border-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-100 transition-colors"
                         >
-                            <Save className="w-5 h-5" />
-                            Guardar Borrador
-                        </button>
-                        <button
-                            onClick={() => handleSave(false)}
-                            className="w-full py-4 text-white font-bold bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl hover:shadow-lg transition-all flex justify-center items-center gap-2"
-                        >
-                            <Send className="w-5 h-5" />
-                            Enviar Campaña
+                            Cerrar
                         </button>
                     </div>
                 </div>
             </div>
-        </div>
+        )
+    }
+        </div >
     );
 }

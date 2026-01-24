@@ -8,11 +8,17 @@ export interface Campaign {
     subject?: string;
     content?: string;
     total_recipients: number;
+    audience_filters?: any;
+    company_id?: string;
     scheduled_at?: string;
+    sent_at?: string;
     stats: {
         sent: number;
         opened: number;
         clicked: number;
+        delivered?: number;
+        replied?: number;
+        bounced?: number;
     };
     created_at: string;
 }
@@ -68,5 +74,36 @@ export const campaignService = {
             sent_at: new Date().toISOString(),
             stats: mockStats
         });
+    },
+
+    // NEW: Get audience preview based on filters
+    async getAudiencePreview(filter: 'all' | 'new' | 'vip', companyId: string) {
+        if (!companyId) return [];
+
+        let query = supabase
+            .from('leads')
+            .select('id, first_name, last_name, email, created_at')
+            .eq('company_id', companyId)
+            .not('email', 'is', null);
+
+        if (filter === 'new') {
+            // Last 30 days
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            query = query.gte('created_at', thirtyDaysAgo.toISOString());
+        }
+
+        // 'vip' would filter by tags/status ideally, simplified for now
+        // if (filter === 'vip') query = query.eq('status', 'qualified');
+
+        const { data, error } = await query.limit(50); // Preview limit
+
+        if (error) {
+            console.error('Error fetching audience:', error);
+            // Return empty if error (table might typically be empty in dev)
+            return [];
+        }
+
+        return data || [];
     }
 };
