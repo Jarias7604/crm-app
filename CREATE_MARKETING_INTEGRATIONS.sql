@@ -6,8 +6,9 @@ CREATE TABLE IF NOT EXISTS marketing_integrations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id UUID REFERENCES companies(id),
     
-    provider VARCHAR(50) NOT NULL, -- 'gmail', 'outlook', 'resend', 'sendgrid', 'smtp'
-    name VARCHAR(100) DEFAULT 'Email Provider',
+    provider VARCHAR(50) NOT NULL,
+    type VARCHAR(50) NOT NULL DEFAULT 'email', -- 'email', 'whatsapp', 'telegram', 'chat'
+    name VARCHAR(100) DEFAULT 'Provider',
     
     -- Encrypted/Secured settings
     -- En producción real, "credentials" debería estar encriptado o en Vault.

@@ -28,6 +28,7 @@ import EmailCampaigns from './pages/marketing/EmailCampaigns';
 import EmailBuilder from './pages/marketing/EmailBuilder';
 import AiAgentsConfig from './pages/marketing/AiAgentsConfig';
 import MarketingSettings from './pages/marketing/MarketingSettings';
+import ChatHub from './pages/marketing/ChatHub';
 
 function App() {
   return (
@@ -61,6 +62,7 @@ function App() {
               <Route path="/marketing/lead-hunter" element={<LeadHunter />} />
               <Route path="/marketing/email" element={<EmailCampaigns />} />
               <Route path="/marketing/email/new" element={<EmailBuilder />} />
+              <Route path="/marketing/chat" element={<ChatHub />} />
               <Route path="/marketing/agents" element={<AiAgentsConfig />} />
               <Route path="/marketing/settings" element={<MarketingSettings />} />
             </Route>
