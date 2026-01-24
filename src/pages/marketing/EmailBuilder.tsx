@@ -14,8 +14,10 @@ export default function EmailBuilder() {
         name: '',
         subject: '',
         content: '',
-        audience_filter: 'all' as 'all' | 'new' | 'vip'
+        audience_filter: { status: [] as string[], dateRange: 'all' as 'all' | 'new' }
     });
+
+    const possibleStatuses = ["Prospecto", "Cerrado", "En seguimiento", "Cliente", "Negociación", "Lead calificado"];
 
     const [previewLeads, setPreviewLeads] = useState<any[]>([]);
     const [showPreview, setShowPreview] = useState(false);
@@ -53,9 +55,10 @@ export default function EmailBuilder() {
                 content: formData.content,
                 type: 'email',
                 status: 'draft',
-                audience_filters: { type: formData.audience_filter },
+
                 total_recipients: Math.floor(Math.random() * 500) + 50,
                 company_id: profile?.company_id || null, // Handle company context
+                filters: formData.audience_filter,
                 stats: { sent: 0, delivered: 0, opened: 0, clicked: 0, replied: 0, bounced: 0 }
             };
 
@@ -146,48 +149,45 @@ export default function EmailBuilder() {
                         </h2>
 
                         <div className="space-y-3">
-                            <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${formData.audience_filter === 'all' ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-gray-200 hover:bg-gray-50'}`}>
-                                <input
-                                    type="radio"
-                                    name="audience"
-                                    checked={formData.audience_filter === 'all'}
-                                    onChange={() => setFormData({ ...formData, audience_filter: 'all' })}
-                                    className="text-blue-600"
-                                />
-                                <div>
-                                    <p className="font-bold text-sm text-gray-900">Todos los Leads</p>
-                                    <p className="text-xs text-gray-500">Envío masivo general</p>
+                            <div className="p-4 border border-gray-200 rounded-xl space-y-3">
+                                <p className="font-bold text-sm text-gray-900">Filtrar por Estados (Selección Multiple)</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {possibleStatuses.map(status => (
+                                        <label key={status} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded-lg">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.audience_filter.status.includes(status)}
+                                                onChange={(e) => {
+                                                    const current = formData.audience_filter.status;
+                                                    const newStatus = e.target.checked
+                                                        ? [...current, status]
+                                                        : current.filter(s => s !== status);
+                                                    setFormData({
+                                                        ...formData,
+                                                        audience_filter: { ...formData.audience_filter, status: newStatus }
+                                                    });
+                                                }}
+                                                className="rounded text-blue-600 focus:ring-blue-500"
+                                            />
+                                            <span className="text-sm text-gray-700">{status}</span>
+                                        </label>
+                                    ))}
                                 </div>
-                            </label>
+                            </div>
 
-                            <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${formData.audience_filter === 'new' ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-gray-200 hover:bg-gray-50'}`}>
+                            <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${formData.audience_filter.dateRange === 'new' ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-gray-200 hover:bg-gray-50'}`}>
                                 <input
-                                    type="radio"
-                                    name="audience"
-                                    checked={formData.audience_filter === 'new'}
-                                    onChange={() => setFormData({ ...formData, audience_filter: 'new' })}
-                                    className="text-blue-600"
+                                    type="checkbox"
+                                    checked={formData.audience_filter.dateRange === 'new'}
+                                    onChange={(e) => setFormData({
+                                        ...formData,
+                                        audience_filter: { ...formData.audience_filter, dateRange: e.target.checked ? 'new' : 'all' }
+                                    })}
+                                    className="text-blue-600 rounded"
                                 />
                                 <div>
                                     <p className="font-bold text-sm text-gray-900">Solo Clientes Nuevos</p>
                                     <p className="text-xs text-gray-500">Registrados últimos 30 días</p>
-                                </div>
-
-
-
-                            </label>
-
-                            <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${formData.audience_filter === 'vip' ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-gray-200 hover:bg-gray-50'}`}>
-                                <input
-                                    type="radio"
-                                    name="audience"
-                                    checked={formData.audience_filter === 'vip'}
-                                    onChange={() => setFormData({ ...formData, audience_filter: 'vip' })}
-                                    className="text-blue-600"
-                                />
-                                <div>
-                                    <p className="font-bold text-sm text-gray-900">Lista VIP / Calientes</p>
-                                    <p className="text-xs text-gray-500">Leads con alta probabilidad</p>
                                 </div>
                             </label>
                         </div>
@@ -220,7 +220,7 @@ export default function EmailBuilder() {
                             <div className="p-6 border-b border-gray-100 flex justify-between items-center">
                                 <div>
                                     <h3 className="text-xl font-bold text-gray-900">Vista Previa de Destinatarios</h3>
-                                    <p className="text-sm text-gray-500">Mostrando primeros 50 resultados para filtro: <strong>{formData.audience_filter.toUpperCase()}</strong></p>
+                                    <p className="text-sm text-gray-500">Mostrando primeros 50 resultados.</p>
                                 </div>
                                 <button onClick={() => setShowPreview(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                                     <X className="w-5 h-5 text-gray-500" />

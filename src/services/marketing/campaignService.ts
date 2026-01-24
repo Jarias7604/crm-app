@@ -77,24 +77,25 @@ export const campaignService = {
     },
 
     // NEW: Get audience preview based on filters
-    async getAudiencePreview(filter: 'all' | 'new' | 'vip', companyId: string) {
+    async getAudiencePreview(filters: { status?: string[], dateRange?: 'all' | 'new' }, companyId: string) {
         if (!companyId) return [];
 
         let query = supabase
             .from('leads')
-            .select('id, first_name, last_name, email, created_at')
+            .select('id, first_name, last_name, email, created_at, status')
             .eq('company_id', companyId)
             .not('email', 'is', null);
 
-        if (filter === 'new') {
+        if (filters.dateRange === 'new') {
             // Last 30 days
             const thirtyDaysAgo = new Date();
             thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
             query = query.gte('created_at', thirtyDaysAgo.toISOString());
         }
 
-        // 'vip' would filter by tags/status ideally, simplified for now
-        // if (filter === 'vip') query = query.eq('status', 'qualified');
+        if (filters.status && filters.status.length > 0) {
+            query = query.in('status', filters.status);
+        }
 
         const { data, error } = await query.limit(50); // Preview limit
 
