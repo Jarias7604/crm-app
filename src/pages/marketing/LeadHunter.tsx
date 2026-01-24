@@ -90,7 +90,7 @@ export default function LeadHunter() {
                         <input
                             type="text"
                             placeholder="¿Qué buscas? (ej. Dentistas, Abogados, Restaurantes)"
-                            className="w-full pl-12 pr-4 py-4 rounded-xl text-gray-900 placeholder-gray-400 focus:ring-4 focus:ring-blue-500/30 focus:outline-none"
+                            className="w-full pl-12 pr-4 py-4 rounded-xl bg-white/10 text-white placeholder-gray-300 focus:bg-white/20 focus:ring-4 focus:ring-blue-500/30 focus:outline-none transition-all"
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
                         />
@@ -100,7 +100,7 @@ export default function LeadHunter() {
                         <input
                             type="text"
                             placeholder="¿Dónde? (ej. Miami, FL o Ciudad de México)"
-                            className="w-full pl-12 pr-4 py-4 rounded-xl text-gray-900 placeholder-gray-400 focus:ring-4 focus:ring-blue-500/30 focus:outline-none"
+                            className="w-full pl-12 pr-4 py-4 rounded-xl bg-white/10 text-white placeholder-gray-300 focus:bg-white/20 focus:ring-4 focus:ring-blue-500/30 focus:outline-none transition-all"
                             value={location}
                             onChange={(e) => setLocation(e.target.value)}
                         />
@@ -166,8 +166,8 @@ export default function LeadHunter() {
                             onClick={() => handleImport(lead)}
                             disabled={lead.is_imported}
                             className={`w-full py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${lead.is_imported
-                                    ? 'bg-green-100 text-green-700 cursor-default'
-                                    : 'bg-[#0f172a] text-white hover:bg-[#1e293b] shadow-lg shadow-blue-900/10'
+                                ? 'bg-green-100 text-green-700 cursor-default'
+                                : 'bg-[#0f172a] text-white hover:bg-[#1e293b] shadow-lg shadow-blue-900/10'
                                 }`}
                         >
                             {lead.is_imported ? (
