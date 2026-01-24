@@ -1,16 +1,16 @@
 // @ts-nocheck
 import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import 'jspdf-autotable'; // Side-effect import for the plugin
 import { supabase } from './supabase';
 import { format } from 'date-fns';
 
 export const pdfService = {
     async generateAndUploadQuotePDF(cotizacion: any): Promise<string> {
         try {
-            console.log('Generando PDF Final (V5)...', cotizacion.id);
+            console.log('Generando PDF Premium 1:1 ...', cotizacion.id);
 
-            // 1. Instancia segura
-            const doc = new jsPDF();
+            // Instancia segura
+            const doc = new jsPDF() as any; // Cast to any for the plugin
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
 
@@ -20,25 +20,25 @@ export const pdfService = {
             const textMuted = [100, 116, 139];
 
             // ---------------------------------------------------------
-            // HEADER & BRANDING
+            // 1. HEADER
             // ---------------------------------------------------------
             doc.setFillColor(slate900[0], slate900[1], slate900[2]);
             doc.rect(0, 0, pageWidth, 55, 'F');
 
-            // Logo Text
+            // Logo / Nombre
             doc.setTextColor(255, 255, 255);
             doc.setFontSize(18);
             doc.setFont('helvetica', 'bold');
             doc.text((cotizacion.company?.name || 'ARIAS DEFENSE COMPONENTS').toUpperCase(), 20, 22);
 
-            // Contact
+            // Contacto
             doc.setFontSize(8);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(148, 163, 184);
             doc.text(`${cotizacion.company?.address || 'COL. LA MASCOTA, SAN SALVADOR, EL SALVADOR'}`, 20, 28);
             doc.text(`${cotizacion.company?.phone || '+503 7971 8911'}  |  ${cotizacion.company?.website || 'WWW.ARIASDEFENSE.COM'}`, 20, 32);
 
-            // Metadata Right
+            // Metadata Der.
             doc.setTextColor(indigoColor[0], indigoColor[1], indigoColor[2]);
             doc.setFontSize(8);
             doc.setFont('helvetica', 'bold');
@@ -49,11 +49,9 @@ export const pdfService = {
             doc.setFont('helvetica', 'normal');
             doc.text(String(cotizacion.id).slice(0, 8).toUpperCase(), pageWidth - 20, 32, { align: 'right' });
 
-            // Line
             doc.setDrawColor(30, 41, 59);
             doc.line(pageWidth - 80, 38, pageWidth - 20, 38);
 
-            // Ref Details
             doc.setFontSize(7);
             doc.setTextColor(148, 163, 184);
             doc.text('FECHA EMISIÓN', pageWidth - 80, 43);
@@ -66,7 +64,7 @@ export const pdfService = {
             doc.text(String(cotizacion.id).slice(0, 6).toUpperCase(), pageWidth - 45, 48);
 
             // ---------------------------------------------------------
-            // CLIENT & SUMMARY
+            // 2. CLIENTE
             // ---------------------------------------------------------
             let currentY = 75;
             doc.setTextColor(indigoColor[0], indigoColor[1], indigoColor[2]);
@@ -105,7 +103,7 @@ export const pdfService = {
             doc.text(`${(cotizacion.volumen_dtes || 0).toLocaleString()} DTEs/año`, pageWidth - 52.5, 95, { align: 'center' });
 
             // ---------------------------------------------------------
-            // DATA TABLE
+            // 3. TABLE
             // ---------------------------------------------------------
             const tableRows = [];
             tableRows.push([
@@ -118,7 +116,7 @@ export const pdfService = {
             }
 
             if (cotizacion.modulos_adicionales && Array.isArray(cotizacion.modulos_adicionales)) {
-                cotizacion.modulos_adicionales.forEach(m => {
+                cotizacion.modulos_adicionales.forEach((m: any) => {
                     tableRows.push([
                         `${m.nombre}\nServicio complementario activado.`,
                         `$${(m.costo_anual || 0).toLocaleString()}`
@@ -137,9 +135,8 @@ export const pdfService = {
                 ]);
             }
 
-            // USO EXPLÍCITO DE AUTOTABLE (ESTANDAR V5)
-            // Se asume que autoTable es la función importada por default
-            autoTable(doc, {
+            // USO DE PLUGIN (doc.autoTable)
+            doc.autoTable({
                 startY: 130,
                 head: [['DESCRIPCIÓN DEL SERVICIO', 'INVERSIÓN (USD)']],
                 body: tableRows,
@@ -156,12 +153,10 @@ export const pdfService = {
             });
 
             // ---------------------------------------------------------
-            // TOTALS BOX
+            // 4. TOTALS
             // ---------------------------------------------------------
-            // @ts-ignore
             const finalY = doc.lastAutoTable.finalY + 20;
 
-            // Check page break
             const boxHeight = 60;
             const drawY = finalY + boxHeight > pageHeight ? 20 : finalY;
             if (drawY === 20) doc.addPage();
@@ -187,7 +182,7 @@ export const pdfService = {
             doc.text(`IVA (${cotizacion.iva_porcentaje || 13}%)`, pageWidth - 90, totalCursor);
             doc.text(`$${(cotizacion.iva_monto || 0).toLocaleString()}`, pageWidth - 30, totalCursor, { align: 'right' });
 
-            // Separator
+            // Linea
             totalCursor += 6;
             doc.setDrawColor(255, 255, 255, 0.2);
             doc.line(pageWidth - 90, totalCursor, pageWidth - 30, totalCursor);
@@ -201,7 +196,7 @@ export const pdfService = {
             doc.text(`$${(cotizacion.total_anual || 0).toLocaleString()}`, pageWidth - 30, totalCursor + 4, { align: 'right' });
 
             // ---------------------------------------------------------
-            // FOOTER & UPLOAD
+            // 5. FOOTER
             // ---------------------------------------------------------
             doc.setFillColor(249, 250, 251);
             doc.rect(0, pageHeight - 35, pageWidth, 35, 'F');
@@ -219,11 +214,10 @@ export const pdfService = {
 
             doc.text('DOCUMENTO OFICIAL', pageWidth - 20, footerY + 5, { align: 'right' });
 
-            // Generate
+            // Generar
             const pdfBlob = doc.output('blob');
             const fileName = `propuesta_${Date.now()}.pdf`;
 
-            // Upload
             const { error: uploadError } = await supabase.storage
                 .from('quotations')
                 .upload(fileName, pdfBlob, {
