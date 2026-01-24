@@ -13,7 +13,17 @@ export default function Sidebar() {
     const location = useLocation();
     const { t } = useTranslation();
     const [configOpen, setConfigOpen] = useState(location.pathname.startsWith('/config'));
-    const [company, setCompany] = useState<Company | null>(null);
+    const [company, setCompany] = useState<Company | null>(() => {
+        const saved = localStorage.getItem('company_branding');
+        if (saved) {
+            try {
+                return JSON.parse(saved);
+            } catch (e) {
+                return null;
+            }
+        }
+        return null;
+    });
 
     useEffect(() => {
         if (profile?.company_id) {
@@ -25,6 +35,7 @@ export default function Sidebar() {
         try {
             const data = await brandingService.getMyCompany();
             setCompany(data);
+            localStorage.setItem('company_branding', JSON.stringify(data));
         } catch (error) {
             console.error('Error loading company branding for sidebar:', error);
         }
@@ -66,12 +77,17 @@ export default function Sidebar() {
                 <div className="w-full flex items-center justify-center h-12 mb-1">
                     {company?.logo_url ? (
                         <img src={company.logo_url} alt={company.name} className="max-h-full max-w-full object-contain" />
-                    ) : (
+                    ) : company?.name ? (
                         <div className="flex items-center gap-2 text-white">
                             <Building2 className="w-5 h-5 text-blue-500" />
                             <span className="text-sm font-black tracking-tight uppercase truncate">
-                                {company?.name || 'CRM Enterprise'}
+                                {company.name}
                             </span>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2 text-white/20 animate-pulse">
+                            <Building2 className="w-5 h-5" />
+                            <div className="h-4 w-24 bg-white/10 rounded" />
                         </div>
                     )}
                 </div>
