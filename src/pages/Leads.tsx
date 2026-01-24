@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { useLocation, Link } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { leadsService } from '../services/leads';
 import type { Lead, LeadStatus, LeadPriority, FollowUp } from '../types';
 import { PRIORITY_CONFIG, STATUS_CONFIG, ACTION_TYPES, SOURCE_CONFIG } from '../types';
@@ -59,6 +59,7 @@ export default function Leads() {
 
     const [isUploading, setIsUploading] = useState(false);
     const location = useLocation();
+    const navigate = useNavigate();
 
     // Handle incoming state from Dashboard or Calendar
     useEffect(() => {
@@ -806,20 +807,24 @@ export default function Leads() {
                                     <MessageSquare className="w-4 h-4" /> Centro de Mensajería
                                 </h4>
                                 <div className="grid grid-cols-2 gap-3">
-                                    <Link
-                                        to="/marketing/chat"
-                                        state={{ lead: selectedLead, channel: 'telegram' }}
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigate('/marketing/chat', { state: { lead: selectedLead, channel: 'telegram' } });
+                                        }}
                                         className="flex items-center justify-center gap-2 py-3 bg-sky-50 text-sky-600 rounded-xl font-bold text-xs hover:bg-sky-100 transition-all border border-sky-100"
                                     >
                                         <TelegramIcon className="w-4 h-4" /> Telegram Bot
-                                    </Link>
-                                    <Link
-                                        to="/marketing/chat"
-                                        state={{ lead: selectedLead, channel: 'whatsapp' }}
+                                    </button>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigate('/marketing/chat', { state: { lead: selectedLead, channel: 'whatsapp' } });
+                                        }}
                                         className="flex items-center justify-center gap-2 py-3 bg-green-50 text-green-600 rounded-xl font-bold text-xs hover:bg-green-100 transition-all border border-green-100"
                                     >
                                         <Smartphone className="w-4 h-4" /> WhatsApp
-                                    </Link>
+                                    </button>
                                 </div>
                                 <p className="text-[10px] text-gray-400 font-medium text-center italic">
                                     Activa la comunicación omnicanal con este lead.

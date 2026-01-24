@@ -58,11 +58,11 @@ function App() {
               <Route path="/company/team" element={<Team />} />
               <Route path="/company/permissions" element={<Permissions />} />
               <Route path="/config/branding" element={<Branding />} />
+              <Route path="/marketing/chat" element={<ChatHub />} />
               <Route path="/marketing" element={<MarketingDashboard />} />
               <Route path="/marketing/lead-hunter" element={<LeadHunter />} />
               <Route path="/marketing/email" element={<EmailCampaigns />} />
               <Route path="/marketing/email/new" element={<EmailBuilder />} />
-              <Route path="/marketing/chat" element={<ChatHub />} />
               <Route path="/marketing/agents" element={<AiAgentsConfig />} />
               <Route path="/marketing/settings" element={<MarketingSettings />} />
             </Route>
