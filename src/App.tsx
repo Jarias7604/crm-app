@@ -27,6 +27,7 @@ import LeadHunter from './pages/marketing/LeadHunter';
 import EmailCampaigns from './pages/marketing/EmailCampaigns';
 import EmailBuilder from './pages/marketing/EmailBuilder';
 import AiAgentsConfig from './pages/marketing/AiAgentsConfig';
+import MarketingSettings from './pages/marketing/MarketingSettings';
 
 function App() {
   return (
@@ -61,6 +62,7 @@ function App() {
               <Route path="/marketing/email" element={<EmailCampaigns />} />
               <Route path="/marketing/email/new" element={<EmailBuilder />} />
               <Route path="/marketing/agents" element={<AiAgentsConfig />} />
+              <Route path="/marketing/settings" element={<MarketingSettings />} />
             </Route>
           </Route>
 

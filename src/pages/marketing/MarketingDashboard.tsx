@@ -7,7 +7,8 @@ import {
     Bot,
     TrendingUp,
     Users,
-    Zap
+    Zap,
+    Settings
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { Link } from 'react-router-dom';
@@ -26,6 +27,10 @@ export default function MarketingDashboard() {
                     </p>
                 </div>
                 <div className="flex gap-3">
+                    <Link to="/marketing/settings" className="bg-white text-gray-700 border border-gray-200 px-4 py-3 rounded-xl font-bold hover:bg-gray-50 transition-all flex items-center gap-2">
+                        <Settings className="w-5 h-5" />
+                        Configurar Envíos
+                    </Link>
                     <button className="bg-gradient-to-r from-orange-500 to-pink-600 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 transition-all flex items-center gap-2">
                         <Zap className="w-5 h-5" />
                         Nueva Campaña
