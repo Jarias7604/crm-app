@@ -44,9 +44,7 @@ export default function CotizacionDetalle() {
         }
     };
 
-    const handlePrint = () => {
-        window.print();
-    };
+
 
     const updateEstado = async (nuevoEstado: string) => {
         try {
@@ -80,7 +78,6 @@ export default function CotizacionDetalle() {
 
     return (
         <div className="max-w-5xl mx-auto space-y-6 pb-20 px-4 md:px-0">
-            {/* Header / Actions - Hidden on print */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden">
                 <Button onClick={() => navigate('/cotizaciones')} variant="outline" className="border-gray-300">
                     <ArrowLeft className="w-4 h-4 mr-2" />
@@ -88,9 +85,67 @@ export default function CotizacionDetalle() {
                 </Button>
 
                 <div className="flex flex-wrap gap-2 w-full md:w-auto">
-                    <Button onClick={handlePrint} className="bg-gray-900 hover:bg-black text-white shadow-lg transition-all active:scale-95">
+                    {/* NEW: Send to Chat Button */}
+                    <Button
+                        onClick={async () => {
+                            if (!cotizacion.lead_id) {
+                                toast.error('Esta cotización no está vinculada a un Lead');
+                                return;
+                            }
+                            try {
+                                toast.loading('Preparando envío...', { id: 'send-chat' });
+
+                                // 1. Generate PDF
+                                const { pdfService } = await import('../services/pdfService');
+                                const url = await pdfService.generateAndUploadQuotePDF(cotizacion);
+
+                                // 2. Find/Create Conversation
+                                const { chatService } = await import('../services/marketing/chatService');
+                                const convs = await chatService.getConversations();
+                                let conversation = convs.find((c: any) => c.lead?.id === cotizacion.lead_id);
+
+                                if (!conversation) {
+                                    // Default to Telegram if creating new
+                                    conversation = await chatService.createConversation(cotizacion.lead_id, 'telegram');
+                                }
+
+                                // 3. Send Message
+                                const message = `Hola ${cotizacion.nombre_cliente}, adjunto la cotización oficial ${cotizacion.id.slice(0, 8)}.`;
+                                await chatService.sendMessage(conversation.id, message, 'file', {
+                                    url: url,
+                                    fileName: `Cotizacion_${cotizacion.nombre_cliente}.pdf`
+                                });
+
+                                toast.success('Enviado al chat exitosamente', { id: 'send-chat' });
+                                navigate('/marketing/chat', { state: { lead: conversation.lead } });
+                            } catch (error) {
+                                console.error(error);
+                                toast.error('Error al enviar', { id: 'send-chat' });
+                            }
+                        }}
+                        className="bg-[#2AABEE] hover:bg-[#229ED9] text-white shadow-md"
+                    >
+                        <MessageSquare className="w-4 h-4 mr-2" />
+                        Enviar por Telegram
+                    </Button>
+
+                    {/* UPDATED: Download PDF (Standardized) */}
+                    <Button
+                        onClick={async () => {
+                            try {
+                                toast.loading('Generando PDF Oficial...', { id: 'download-pdf' });
+                                const { pdfService } = await import('../services/pdfService');
+                                const url = await pdfService.generateAndUploadQuotePDF(cotizacion);
+                                window.open(url, '_blank');
+                                toast.success('PDF Generado', { id: 'download-pdf' });
+                            } catch (e) {
+                                toast.error('Error al generar PDF', { id: 'download-pdf' });
+                            }
+                        }}
+                        className="bg-gray-900 hover:bg-black text-white shadow-lg transition-all active:scale-95"
+                    >
                         <Printer className="w-4 h-4 mr-2" />
-                        Imprimir / Guardar PDF
+                        Descargar PDF Oficial
                     </Button>
 
                     <div className="h-8 w-[1px] bg-gray-200 mx-2 hidden md:block"></div>
