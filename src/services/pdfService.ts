@@ -26,6 +26,7 @@ export const pdfService = {
             const C_BLUE_500 = [59, 130, 246];
             const C_SLATE_400 = [148, 163, 184];
             const C_GRAY_50 = [249, 250, 251];
+            const C_GRAY_100 = [241, 245, 249]; // Fix: Added missing definition
 
 
             // Helper: Load Image
