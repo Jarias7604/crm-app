@@ -1,43 +1,29 @@
+
 import { useState, useEffect, useRef } from 'react';
-import {
-    Search,
-    Send,
-    MoreVertical,
-    Paperclip,
-    Smile,
-    User,
-    Mail,
-    Phone as PhoneIcon,
-    CheckCheck,
-    MessageSquare,
-    Send as TelegramIcon,
-    Smartphone,
-    Bot,
-    Users,
-    FileText,
-    TrendingUp,
-    Zap,
-    X,
-    Filter
-} from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import {
+    MoreVertical, Send, FileText, Smartphone, Layers,
+    Paperclip, TrendingUp, Eye, Zap, Smile, Mail, Phone as PhoneIcon,
+    Send as TelegramIcon, MessageSquare
+} from 'lucide-react';
 import { chatService, type ChatConversation, type ChatMessage } from '../../services/marketing/chatService';
-import { leadsService } from '../../services/leads';
+import { aiAgentService } from '../../services/marketing/aiAgentService';
 import { storageService } from '../../services/storage';
 import { useAuth } from '../../auth/AuthProvider';
-import toast from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 
 export default function ChatHub() {
     const [conversations, setConversations] = useState<ChatConversation[]>([]);
-    const [leads, setLeads] = useState<any[]>([]);
     const [selectedConv, setSelectedConv] = useState<ChatConversation | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [newMessage, setNewMessage] = useState('');
-    const [sidebarView, setSidebarView] = useState<'chats' | 'leads'>('chats');
+    const [filter, setFilter] = useState<'all' | 'whatsapp' | 'telegram'>('all');
     const [showDetails, setShowDetails] = useState(true);
     const [loading, setLoading] = useState(true);
     const [pendingQuote, setPendingQuote] = useState<any>(null);
-    const [isUploading, setIsUploading] = useState(false);
+    const [isAiProcessing, setIsAiProcessing] = useState(false);
+    const [agentStatus, setAgentStatus] = useState<boolean>(false);
+    const lastProcessedMsgId = useRef<string | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const location = useLocation();
@@ -60,12 +46,17 @@ export default function ChatHub() {
 
     const loadData = async () => {
         try {
-            const [conversationsData, leadsData] = await Promise.all([
-                chatService.getConversations(),
-                leadsService.getLeads(1, 20)
+            const [conversationsData] = await Promise.all([
+                chatService.getConversations()
             ]);
+
+            if (profile?.company_id) {
+                const agents = await aiAgentService.getAgents(profile.company_id);
+                const mainAgent = agents.find(a => a.is_active) || agents[0];
+                setAgentStatus(mainAgent?.is_active || false);
+            }
+
             setConversations(conversationsData);
-            setLeads(leadsData.data || []);
             setLoading(false);
 
             if (location.state?.lead && !selectedConv) {
@@ -122,6 +113,19 @@ export default function ChatHub() {
         if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
+
+        // AUTO-TRIGGER AI BOT
+        if (agentStatus && !isAiProcessing && selectedConv && selectedConv.id !== 'new') {
+            const lastMsg = messages[messages.length - 1];
+            if (lastMsg && !lastMsg.metadata?.isAiGenerated && lastMsg.id !== lastProcessedMsgId.current) {
+                // Only respond to recent messages
+                const sentTime = new Date(lastMsg.sent_at).getTime();
+                if (Date.now() - sentTime < 5000) {
+                    lastProcessedMsgId.current = lastMsg.id || null;
+                    handleAiProcess(selectedConv.id, lastMsg.content);
+                }
+            }
+        }
     }, [messages]);
 
     const handleSendMessage = async (e: React.FormEvent) => {
@@ -140,13 +144,30 @@ export default function ChatHub() {
                 );
                 setSelectedConv(newConv);
                 convId = newConv.id;
-                // Add the new conversation to the list so it doesn't look empty
                 setConversations(prev => [newConv, ...prev]);
             }
 
-            await chatService.sendMessage(convId, content);
+            await chatService.sendMessage(convId, content, 'text', 'outbound');
         } catch (error: any) {
             toast.error('Error al enviar: ' + error.message);
+        }
+    };
+
+    const handleAiProcess = async (targetConvId?: string, providedMessage?: string) => {
+        const cid = targetConvId || selectedConv?.id;
+        if (!cid || !profile?.company_id) return;
+
+        try {
+            setIsAiProcessing(true);
+            const response = await aiAgentService.processMessage(cid, providedMessage || '', profile.company_id);
+
+            if (response) {
+                await chatService.sendMessage(cid, response, 'text', 'outbound', { isAiGenerated: true });
+            }
+        } catch (error: any) {
+            console.error('AI Error:', error);
+        } finally {
+            setIsAiProcessing(false);
         }
     };
 
@@ -155,10 +176,7 @@ export default function ChatHub() {
         if (!file || !selectedConv?.id || !profile?.company_id) return;
 
         try {
-            setIsUploading(true);
             const path = await storageService.uploadMessageFile(profile.company_id, selectedConv.id, file);
-
-            // Use signed URL for better security and accessibility if bucket is private
             const url = await storageService.getDownloadUrl(path);
 
             const isImage = file.type.startsWith('image/');
@@ -166,6 +184,7 @@ export default function ChatHub() {
                 selectedConv.id,
                 `📁 Archivo: ${file.name}`,
                 isImage ? 'image' : 'file',
+                'outbound',
                 { url, fileName: file.name, fileSize: file.size }
             );
 
@@ -174,7 +193,6 @@ export default function ChatHub() {
             console.error('Upload error:', error);
             toast.error('Error al subir el archivo');
         } finally {
-            setIsUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
@@ -182,9 +200,6 @@ export default function ChatHub() {
     const handleSendPendingQuote = async () => {
         if (!pendingQuote || !selectedConv) return;
         try {
-            // We follow the user's request: mention the lead name, a greeting and attach the professional PDF
-            // We follow the user's request: mention the lead name, a greeting and attach the professional PDF
-            // ALWAYS ensure we have a PDF URL. If not provided, generate it.
             let finalPdfUrl = pendingQuote.pdfUrl;
 
             if (!finalPdfUrl) {
@@ -202,6 +217,7 @@ export default function ChatHub() {
                 selectedConv.id,
                 professionalMessage,
                 'file',
+                'outbound',
                 {
                     url: finalPdfUrl,
                     fileName: `Propuesta_${pendingQuote.nombre_cliente?.replace(/\s+/g, '_') || 'Comercial'}.pdf`,
@@ -228,33 +244,27 @@ export default function ChatHub() {
         });
     };
 
+    const handlePreviewQuote = async () => {
+        if (!pendingQuote) return;
+        let pdfUrl = pendingQuote.pdfUrl;
+        if (!pdfUrl) {
+            toast.loading('Generando vista previa...', { id: 'preview-pdf' });
+            try {
+                const { pdfService } = await import('../../services/pdfService');
+                pdfUrl = await pdfService.generateAndUploadQuotePDF(pendingQuote);
+                setPendingQuote({ ...pendingQuote, pdfUrl });
+            } catch (e) {
+                toast.error("Error generando vista previa", { id: 'preview-pdf' });
+                return;
+            }
+        }
+        toast.dismiss('preview-pdf');
+        window.open(pdfUrl, '_blank');
+    };
+
     const formatTime = (isoString: string) => {
         const date = new Date(isoString);
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    };
-
-    const handleSelectLead = (lead: any) => {
-        const existing = conversations.find(c => c.lead?.id === lead.id);
-        if (existing) {
-            setSelectedConv(existing);
-        } else {
-            const placeholder: ChatConversation = {
-                id: 'new',
-                channel: 'telegram',
-                status: 'open',
-                last_message: 'Nueva conversación...',
-                last_message_at: new Date().toISOString(),
-                unread_count: 0,
-                lead: {
-                    id: lead.id,
-                    name: lead.name,
-                    email: lead.email,
-                    company_name: lead.company_name,
-                    phone: lead.phone
-                }
-            };
-            setSelectedConv(placeholder);
-        }
     };
 
     if (loading) return (
@@ -266,9 +276,13 @@ export default function ChatHub() {
         </div>
     );
 
+    const filteredConversations = conversations.filter(c => {
+        if (filter === 'all') return true;
+        return c.channel === filter;
+    });
+
     return (
-        <div className="flex h-[calc(100vh-100px)] w-full gap-6 p-6 animate-in fade-in duration-700">
-            {/* Hidden File Input */}
+        <div className="flex h-[100vh] bg-[#F0F4F8] p-4 md:p-8 gap-6 overflow-hidden font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900 -m-4 md:-m-8 w-[calc(100%+2rem)] md:w-[calc(100%+4rem)]">
             <input
                 type="file"
                 ref={fileInputRef}
@@ -277,251 +291,203 @@ export default function ChatHub() {
                 accept="application/pdf,image/*"
             />
 
-            {/* List Sidebar */}
-            <div className="w-[380px] flex flex-col bg-white rounded-[32px] border border-slate-100 shadow-sm overflow-hidden shrink-0">
-                <div className="p-8 pb-4 space-y-6">
+            <div className="w-[360px] flex flex-col bg-white rounded-[32px] shadow-xl border border-white/50 shrink-0 relative overflow-hidden h-full">
+                <div className="p-6 pb-2 space-y-4 relative z-10">
                     <div className="flex items-center justify-between">
-                        <h2 className="text-2xl font-black text-slate-800 tracking-tighter">Mensajes</h2>
-                        <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100">
-                            <button
-                                onClick={() => setSidebarView('chats')}
-                                className={`p-2.5 rounded-lg transition-all ${sidebarView === 'chats' ? 'bg-white text-blue-600 shadow-sm border border-slate-100' : 'text-slate-400'}`}
-                            >
-                                <MessageSquare className="w-5 h-5" />
-                            </button>
-                            <button
-                                onClick={() => setSidebarView('leads')}
-                                className={`p-2.5 rounded-lg transition-all ${sidebarView === 'leads' ? 'bg-white text-blue-600 shadow-sm border border-slate-100' : 'text-slate-400'}`}
-                            >
-                                <Users className="w-5 h-5" />
-                            </button>
+                        <h2 className="text-2xl font-black text-slate-900 tracking-tighter">Inbox</h2>
+                        <div className="flex gap-1.5 bg-slate-100 p-1.5 rounded-xl w-[180px]">
+                            <FilterButton icon={Layers} active={filter === 'all'} onClick={() => setFilter('all')} />
+                            <FilterButton icon={Smartphone} active={filter === 'whatsapp'} onClick={() => setFilter('whatsapp')} activeColor="bg-emerald-500 text-white shadow-emerald-500/30" />
+                            <FilterButton icon={TelegramIcon} active={filter === 'telegram'} onClick={() => setFilter('telegram')} activeColor="bg-blue-500 text-white shadow-blue-500/30" />
                         </div>
                     </div>
-                    <div className="relative">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-300" />
+
+                    <div className="relative group">
                         <input
                             type="text"
-                            placeholder={sidebarView === 'chats' ? "Buscar conversación..." : "Buscar lead..."}
-                            className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:bg-white focus:ring-4 focus:ring-blue-500/5 transition-all outline-none font-bold text-sm text-slate-700 placeholder:text-slate-300"
+                            placeholder="Buscar cliente..."
+                            className="w-full pl-5 pr-5 py-3.5 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-700 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20 transition-all shadow-inner"
                         />
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pb-8 space-y-2">
-                    {sidebarView === 'chats' ? (
-                        conversations.map(conv => (
-                            <button
-                                key={conv.id}
-                                onClick={() => setSelectedConv(conv)}
-                                className={`w-full p-4 flex gap-4 text-left rounded-2xl transition-all relative ${selectedConv?.id === conv.id ? 'bg-blue-50/50 border border-blue-100/50' : 'hover:bg-slate-50'}`}
-                            >
+                <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-2 custom-scrollbar">
+                    {filteredConversations.map(conv => (
+                        <div
+                            key={conv.id}
+                            onClick={() => setSelectedConv(conv)}
+                            className={`p-4 rounded-[20px] cursor-pointer transition-all duration-300 border relative group overflow-hidden ${selectedConv?.id === conv.id
+                                ? 'bg-blue-600 border-blue-500 shadow-xl shadow-blue-900/20 translate-x-2'
+                                : 'bg-white border-transparent hover:bg-white hover:border-slate-100 hover:shadow-lg hover:shadow-slate-200/50 hover:translate-x-1'
+                                }`}
+                        >
+                            <div className="flex gap-4 relative z-10">
                                 <div className="relative shrink-0">
-                                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl shadow-sm ${selectedConv?.id === conv.id ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                                    <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center font-black text-lg transition-transform group-hover:scale-105 ${selectedConv?.id === conv.id ? 'bg-white text-blue-600 shadow-lg' : 'bg-slate-100 text-slate-500'
+                                        }`}>
                                         {conv.lead?.name?.[0] || '?'}
                                     </div>
-                                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-white rounded-xl shadow-sm flex items-center justify-center border-2 border-white">
-                                        {conv.channel === 'telegram' ? <TelegramIcon className="w-3 h-3 text-blue-500" /> : <Smartphone className="w-3 h-3 text-emerald-500" />}
+                                    <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center ring-2 ring-white shadow-sm ${conv.channel === 'telegram' ? 'bg-sky-500' : 'bg-emerald-500'
+                                        }`}>
+                                        {conv.channel === 'telegram' ? <TelegramIcon className="w-2.5 h-2.5 text-white" /> : <Smartphone className="w-2.5 h-2.5 text-white" />}
                                     </div>
                                 </div>
-                                <div className="flex-1 min-w-0 pt-1">
+                                <div className="flex-1 min-w-0 flex flex-col justify-center">
                                     <div className="flex justify-between items-baseline mb-1">
-                                        <h3 className={`text-[13px] font-black truncate tracking-tight ${selectedConv?.id === conv.id ? 'text-blue-700' : 'text-slate-700'}`}>
+                                        <h3 className={`text-sm font-black truncate tracking-tight ${selectedConv?.id === conv.id ? 'text-white' : 'text-slate-800'}`}>
                                             {conv.lead?.name || 'Prospecto'}
                                         </h3>
-                                        <span className="text-[9px] font-black text-slate-300">{formatTime(conv.last_message_at)}</span>
+                                        <span className={`text-[9px] font-bold ${selectedConv?.id === conv.id ? 'text-blue-200' : 'text-slate-400'}`}>
+                                            {formatTime(conv.last_message_at)}
+                                        </span>
                                     </div>
-                                    <p className={`text-[12px] truncate font-bold leading-tight ${selectedConv?.id === conv.id ? 'text-blue-600/60' : 'text-slate-400'}`}>
+                                    <p className={`text-[11px] truncate font-medium leading-relaxed ${selectedConv?.id === conv.id ? 'text-blue-100' : 'text-slate-400'}`}>
                                         {conv.last_message}
                                     </p>
                                 </div>
-                                {conv.unread_count > 0 && <div className="w-2 h-2 bg-blue-600 rounded-full mt-3 shadow-lg shadow-blue-500/20" />}
-                            </button>
-                        ))
-                    ) : (
-                        leads.length > 0 ? leads.map(lead => (
-                            <button
-                                key={lead.id}
-                                onClick={() => handleSelectLead(lead)}
-                                className="w-full p-4 flex gap-4 text-left rounded-2xl hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100"
-                            >
-                                <div className="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center text-white font-black text-lg">
-                                    {lead.name?.[0]}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="text-[13px] font-black text-slate-800 tracking-tight truncate">{lead.name}</h3>
-                                    <p className="text-[11px] font-bold text-slate-400 truncate">{lead.company_name || 'Individual'}</p>
-                                </div>
-                                <Filter className="w-4 h-4 text-slate-200 self-center" />
-                            </button>
-                        )) : (
-                            <div className="p-10 text-center space-y-4">
-                                <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto"><Bot className="w-8 h-8 text-slate-200" /></div>
-                                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">No hay leads</p>
                             </div>
-                        )
-                    )}
+                        </div>
+                    ))}
                 </div>
             </div>
 
-            {/* Main Chat Area */}
-            <div className="flex-1 flex flex-col bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden relative">
+            <div className="flex-1 flex flex-col bg-white/80 backdrop-blur-xl rounded-[32px] shadow-2xl border border-white/50 overflow-hidden relative isolate min-h-0">
+                <div className="absolute inset-0 z-[-1] opacity-40" style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
+                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-100/30 rounded-full blur-[100px] -z-10 translate-x-1/3 -translate-y-1/3"></div>
+
                 {selectedConv ? (
                     <>
-                        <header className="px-10 py-6 border-b border-slate-50 flex items-center justify-between bg-white z-10">
+                        <header className="px-8 py-5 flex items-center justify-between border-b border-white/50 bg-white/60 backdrop-blur-md sticky top-0 z-30">
                             <div className="flex items-center gap-5">
-                                <div className="w-14 h-14 rounded-2xl bg-slate-900 flex items-center justify-center text-white font-black text-2xl shadow-xl">
-                                    {selectedConv.lead?.name?.[0] || '?'}
+                                <div className="relative">
+                                    <div className="w-14 h-14 rounded-[20px] bg-slate-900 flex items-center justify-center text-white text-xl font-black shadow-2xl shadow-slate-900/20 overflow-hidden">
+                                        {selectedConv.lead?.name?.[0]}
+                                        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/20" />
+                                    </div>
+                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-[3px] border-white rounded-full animate-pulse shadow-sm" />
                                 </div>
                                 <div>
-                                    <h2 className="text-xl font-black text-slate-900 tracking-tighter leading-none mb-2">{selectedConv.lead?.name}</h2>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Activo en {selectedConv.channel}</span>
+                                    <div className="flex items-center gap-3">
+                                        <h2 className="text-xl font-black text-slate-900 tracking-tight">{selectedConv.lead?.name}</h2>
+                                        <span className="px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-[9px] font-black uppercase text-slate-500 tracking-widest">{selectedConv.channel}</span>
                                     </div>
+                                    <p className="text-xs font-medium text-slate-500 flex items-center gap-1.5 mt-0.5">
+                                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full inline-block" /> En línea
+                                    </p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex gap-3 items-center">
                                 <button
                                     onClick={() => navigate('/cotizaciones/nueva-pro', { state: { lead: selectedConv.lead, conversation_id: selectedConv.id, fromChat: true } })}
-                                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl shadow-blue-600/20"
+                                    className="h-11 px-6 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 hover:shadow-lg hover:shadow-blue-600/30 transition-all flex items-center gap-2 group"
                                 >
-                                    Nueva Cotización
+                                    <TrendingUp className="w-4 h-4 text-blue-400 group-hover:text-white transition-colors" />
+                                    Cotizar
                                 </button>
                                 <button
                                     onClick={() => setShowDetails(!showDetails)}
-                                    className={`p-3.5 rounded-2xl transition-all ${showDetails ? 'bg-slate-100 text-blue-600' : 'bg-white text-slate-300 border border-slate-100'}`}
+                                    className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all ${showDetails ? 'bg-slate-200 text-slate-900' : 'bg-white border border-slate-200 text-slate-400 hover:text-slate-900'}`}
                                 >
-                                    <Zap className="w-5 h-5" />
+                                    <MoreVertical className="w-5 h-5" />
                                 </button>
-                                <button className="p-3.5 text-slate-300 hover:bg-slate-50 rounded-2xl transition-all"><MoreVertical className="w-5 h-5" /></button>
                             </div>
                         </header>
 
-                        {/* REVIEW QUOTE BAR */}
-                        {pendingQuote && (
-                            <div className="absolute top-[88px] left-0 right-0 bg-blue-600 text-white px-10 py-4 flex items-center justify-between animate-in slide-in-from-top duration-500 z-20 shadow-lg">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center"><FileText className="w-6 h-6" /></div>
-                                    <div>
-                                        <p className="text-[11px] font-black uppercase tracking-widest leading-none mb-1">Cotización Lista</p>
-                                        <p className="text-sm font-bold">Resumen: ${pendingQuote.total_anual?.toLocaleString()} - {pendingQuote.nombre_cliente}</p>
-                                    </div>
-                                </div>
-                                <div className="flex gap-3">
-                                    <button onClick={handleEditPendingQuote} className="px-5 py-2.5 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black uppercase transition-all">Seguir Editando</button>
-                                    <button onClick={handleSendPendingQuote} className="px-5 py-2.5 bg-white text-blue-600 hover:bg-blue-50 rounded-xl text-[10px] font-black uppercase transition-all shadow-sm">Enviar al Chat</button>
-                                    <button onClick={() => setPendingQuote(null)} className="p-2.5 hover:bg-white/10 rounded-xl transition-all"><X className="w-5 h-5" /></button>
-                                </div>
-                            </div>
-                        )}
-
-                        <div ref={scrollRef} className="flex-1 overflow-y-auto px-12 py-10 space-y-12 bg-slate-50/20 custom-scrollbar">
-                            {messages.map((msg) => (
-                                <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-500`}>
-                                    <div className={`max-w-[70%] space-y-2.5 ${msg.direction === 'outbound' ? 'items-end' : 'items-start'} flex flex-col`}>
-                                        <div className={`px-7 py-4 rounded-[2.5rem] text-[15px] font-bold leading-relaxed shadow-sm relative ${msg.direction === 'outbound'
-                                            ? 'bg-slate-900 text-white rounded-br-none'
-                                            : 'bg-white text-slate-700 rounded-bl-none border border-slate-100 shadow-slate-200/50'
+                        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-8 space-y-6 custom-scrollbar scroll-smooth">
+                            {messages.map((msg, idx) => (
+                                <div key={msg.id || idx} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'} group w-full`}>
+                                    <div className={`flex flex-col gap-1.5 ${msg.direction === 'outbound' ? 'items-end' : 'items-start'} w-full`}>
+                                        <div className={`px-6 py-4 rounded-[24px] text-[15px] leading-relaxed relative shadow-sm transition-all hover:shadow-md w-fit max-w-[90%] break-words ${msg.direction === 'outbound'
+                                            ? 'bg-slate-900 text-white rounded-br-none shadow-slate-900/10'
+                                            : 'bg-white text-slate-700 border border-slate-100 rounded-bl-none shadow-slate-200/40'
                                             }`}>
                                             {msg.content.startsWith('__QUOTE__') ? (
-                                                <div className="space-y-4 py-2 min-w-[200px]">
-                                                    <div className="flex items-center gap-3 text-blue-400">
-                                                        <FileText className="w-8 h-8" />
-                                                        <div className="font-black text-white">Propuesta Comercial</div>
-                                                    </div>
-                                                    <div className="h-px bg-white/10" />
-                                                    <div className="flex justify-between items-center py-2">
-                                                        <span className="text-[12px] font-bold opacity-60">Inversión:</span>
-                                                        <span className="text-emerald-400 text-lg font-black">
-                                                            ${(() => {
-                                                                try {
-                                                                    const data = JSON.parse(msg.content.substring(9).trim());
-                                                                    return data.total?.toLocaleString() || '0';
-                                                                } catch (e) { return '0'; }
-                                                            })()}
-                                                        </span>
+                                                <div className="w-fit max-w-[80%] min-w-[200px]">
+                                                    <div className="flex items-center gap-4 mb-3 pb-3 border-b border-white/10">
+                                                        <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-blue-400">
+                                                            <FileText className="w-5 h-5" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-[9px] font-black uppercase text-white/60 tracking-widest">Documento</p>
+                                                            <p className="text-sm font-bold text-white truncate">Propuesta Comercial</p>
+                                                        </div>
                                                     </div>
                                                     <button
-                                                        onClick={() => {
-                                                            try {
-                                                                const quoteData = JSON.parse(msg.content.substring(9).trim());
-                                                                navigate(`/cotizaciones/${quoteData.id}`);
-                                                            } catch (e) {
-                                                                toast.error('Error al abrir la cotización');
-                                                            }
-                                                        }}
-                                                        className="w-full py-3 bg-white/10 hover:bg-white text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                                                        onClick={() => { try { const d = JSON.parse(msg.content.substring(9).trim()); navigate(`/cotizaciones/${d.id}`); } catch (e) { } }}
+                                                        className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-900/20"
                                                     >
-                                                        Ver Detalle / Exportar PDF
+                                                        Ver PDF
                                                     </button>
                                                 </div>
-                                            ) : msg.type === 'file' || msg.type === 'image' ? (
-                                                <div className="space-y-3">
-                                                    {msg.type === 'image' && msg.metadata?.url && (
-                                                        <img
-                                                            src={msg.metadata.url}
-                                                            alt="Preview"
-                                                            className="max-w-full rounded-xl border border-white/10 cursor-pointer hover:opacity-90 transition-all"
-                                                            onClick={() => window.open(msg.metadata.url, '_blank')}
-                                                        />
-                                                    )}
-                                                    <div className="flex items-center gap-3 text-blue-400">
-                                                        <FileText className="w-6 h-6" />
-                                                        <div className="font-bold truncate max-w-[150px]">{msg.metadata?.fileName || 'Archivo'}</div>
-                                                    </div>
-                                                    <a
-                                                        href={msg.metadata?.url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="block w-full text-center py-2 bg-white/10 hover:bg-white/20 rounded-lg text-[10px] font-black uppercase transition-all"
-                                                    >
-                                                        Ver / Descargar
-                                                    </a>
-                                                </div>
-                                            ) : msg.content}
+                                            ) : msg.type === 'image' && msg.metadata?.url ? (
+                                                <img src={msg.metadata.url} className="rounded-xl max-w-full cursor-pointer hover:opacity-95 shadow-sm border border-black/5" onClick={() => window.open(msg.metadata.url)} />
+                                            ) : msg.type === 'file' ? (
+                                                <a href={msg.metadata?.url} target="_blank" className="flex items-center gap-3 p-2 group-hover/link:underline w-full">
+                                                    <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-white shrink-0"><Paperclip className="w-5 h-5" /></div>
+                                                    <span className="font-bold underline-offset-4 truncate">{msg.metadata?.fileName || 'Adjunto'}</span>
+                                                </a>
+                                            ) : (
+                                                msg.content
+                                            )}
                                         </div>
-                                        <div className="flex items-center gap-2 px-3 opacity-30">
-                                            <span className="text-[9px] font-black uppercase tracking-widest">{formatTime(msg.sent_at)}</span>
-                                            {msg.direction === 'outbound' && <CheckCheck className="w-3.5 h-3.5" />}
-                                        </div>
+                                        <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest px-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            {formatTime(msg.sent_at)} • {msg.direction === 'outbound' ? 'Entregado' : 'Recibido'}
+                                        </span>
                                     </div>
                                 </div>
                             ))}
                         </div>
 
-                        {/* Input Area */}
-                        <div className="px-10 pb-10 pt-4 bg-white border-t border-slate-50">
-                            {isUploading && (
-                                <div className="mb-4 flex items-center gap-3 text-blue-600 animate-pulse">
-                                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                    <span className="text-[10px] font-black uppercase tracking-widest">Subiendo archivo...</span>
+                        {pendingQuote && (
+                            <div className="absolute bottom-24 left-1/2 -translate-x-1/2 w-[90%] max-w-xl animate-in slide-in-from-bottom-5 duration-500 z-20">
+                                <div className="bg-white rounded-2xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] border border-blue-50 overflow-hidden">
+                                    <div className="h-1 w-full bg-slate-100 flex">
+                                        <div className="h-full bg-blue-500 w-2/3 shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
+                                    </div>
+
+                                    <div className="p-5">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div>
+                                                <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide">Proceso de Cotización</h4>
+                                                <p className="text-[11px] text-slate-400 font-medium mt-0.5">Editando propuesta para {pendingQuote.nombre_cliente}</p>
+                                            </div>
+                                            <div className="bg-blue-50 text-blue-600 px-2 py-1 rounded text-[9px] font-black uppercase tracking-wider border border-blue-100">
+                                                Paso 2 de 3
+                                            </div>
+                                        </div>
+
+                                        <div className="flex gap-3 mt-4">
+                                            <button onClick={handleEditPendingQuote} className="px-4 py-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors">
+                                                ← Editar
+                                            </button>
+                                            <button onClick={handlePreviewQuote} className="flex-1 py-3 bg-white border-2 border-slate-100 hover:border-blue-200 text-slate-700 hover:text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 group">
+                                                <Eye className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
+                                                Previsualizar PDF
+                                            </button>
+                                            <button onClick={handleSendPendingQuote} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">
+                                                Enviar PDF <Send className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                            )}
-                            <form onSubmit={handleSendMessage} className="bg-slate-50 rounded-[32px] p-2 flex items-center gap-3 border border-slate-100 focus-within:bg-white focus-within:ring-4 focus-within:ring-blue-500/5 transition-all">
-                                <button type="button" className="p-4 text-slate-300 hover:text-blue-600 transition-all"><Smile className="w-7 h-7" /></button>
+                            </div>
+                        )}
+
+                        <div className="px-8 pb-8 pt-2 bg-gradient-to-t from-white via-white to-transparent">
+                            <form onSubmit={handleSendMessage} className="bg-white rounded-[24px] p-2 flex items-center gap-2 border border-slate-200 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.05)] focus-within:ring-4 focus-within:ring-blue-100 focus-within:border-blue-300 transition-all">
+                                <button type="button" className="p-3 text-slate-400 hover:text-blue-500 transition-colors"><Smile className="w-5 h-5" /></button>
                                 <textarea
                                     value={newMessage}
                                     onChange={e => setNewMessage(e.target.value)}
                                     onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(e as any); } }}
                                     placeholder="Escribe un mensaje..."
-                                    className="flex-1 bg-transparent py-4 font-bold text-sm text-slate-700 outline-none resize-none max-h-32 custom-scrollbar"
+                                    className="flex-1 bg-transparent py-3 text-sm font-medium text-slate-700 outline-none resize-none max-h-24 custom-scrollbar placeholder:text-slate-300"
+                                    rows={1}
                                 />
-                                <div className="flex items-center gap-1.5 pr-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => fileInputRef.current?.click()}
-                                        className="p-4 text-slate-300 hover:text-blue-600 transition-all"
-                                    >
-                                        <Paperclip className="w-6 h-6" />
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={!newMessage.trim() || isUploading}
-                                        className="bg-blue-600 hover:bg-blue-700 disabled:opacity-30 text-white p-5 rounded-[22px] shadow-xl shadow-blue-600/30 transition-all"
-                                    >
-                                        <Send className="w-6 h-6" />
-                                    </button>
-                                </div>
+                                <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 text-slate-400 hover:text-blue-500 transition-colors"><Paperclip className="w-5 h-5" /></button>
+                                <button type="submit" disabled={!newMessage.trim()} className="p-3 bg-slate-900 text-white rounded-xl hover:bg-blue-600 disabled:opacity-50 disabled:hover:bg-slate-900 transition-all shadow-md">
+                                    <Send className="w-4 h-4" />
+                                </button>
                             </form>
                         </div>
                     </>
@@ -536,65 +502,65 @@ export default function ChatHub() {
                 )}
             </div>
 
-            {/* Right Information Sidebar */}
-            {
-                selectedConv && showDetails && (
-                    <div className="w-[360px] bg-white rounded-[32px] border border-slate-100 shadow-sm flex flex-col overflow-y-auto custom-scrollbar shrink-0">
-                        <div className="p-10 text-center space-y-8 bg-gradient-to-b from-slate-50/50 to-white">
-                            <div className="w-36 h-36 rounded-[48px] bg-gradient-to-br from-indigo-600 to-blue-700 flex items-center justify-center text-white font-black text-6xl mx-auto shadow-2xl shadow-blue-600/30 rotate-3">
+            {selectedConv && showDetails && (
+                <div className="w-[260px] bg-white rounded-[32px] border border-slate-100 shadow-sm flex flex-col overflow-y-auto shrink-0 p-5 space-y-6">
+                    <div className="text-center space-y-3">
+                        <div className="relative inline-block">
+                            <div className="w-20 h-20 rounded-[24px] bg-slate-50 mx-auto flex items-center justify-center text-4xl font-black text-slate-900 shadow-inner border border-white">
                                 {selectedConv.lead?.name?.[0] || '?'}
                             </div>
-                            <div>
-                                <h3 className="text-2xl font-black text-slate-900 tracking-tighter mb-2">{selectedConv.lead?.name || 'Visitante'}</h3>
-                                <span className="px-4 py-1.5 bg-blue-50 text-blue-600 text-[10px] font-black rounded-xl border border-blue-100 uppercase tracking-widest">{selectedConv.lead?.company_name || 'Individual'}</span>
+                            <div className="absolute -bottom-2 inset-x-0 flex justify-center">
+                                <div className="bg-white/90 backdrop-blur-sm border border-slate-100 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                                    <Zap className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                                    <span className="text-[8px] font-black uppercase tracking-wider text-slate-600">High Value</span>
+                                </div>
                             </div>
                         </div>
-                        <div className="px-8 pb-12 space-y-12">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="p-5 bg-slate-50 rounded-[24px] border border-slate-100 text-center">
-                                    <TrendingUp className="w-5 h-5 text-blue-600 mx-auto mb-2" />
-                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Score IA</p>
-                                    <p className="text-xl font-black text-slate-800 tracking-tighter">98/100</p>
-                                </div>
-                                <div className="p-5 bg-slate-50 rounded-[24px] border border-slate-100 text-center">
-                                    <Zap className="w-5 h-5 text-amber-500 mx-auto mb-2" />
-                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Interés</p>
-                                    <p className="text-xl font-black text-slate-800 tracking-tighter">Alto</p>
-                                </div>
-                            </div>
-                            <div className="space-y-6">
-                                <h4 className="text-[11px] font-black text-slate-300 uppercase tracking-widest">Información de Contacto</h4>
-                                <div className="space-y-4">
-                                    <InfoItem icon={Mail} label="Email" value={selectedConv.lead?.email || 'No identificado'} />
-                                    <InfoItem icon={PhoneIcon} label="Teléfono" value={selectedConv.lead?.phone || 'Sin número'} />
-                                </div>
-                            </div>
-                            <div className="space-y-3 pt-6">
-                                <button
-                                    onClick={() => navigate('/leads', { state: { leadId: selectedConv.lead?.id } })}
-                                    className="w-full py-5 bg-slate-900 text-white rounded-[24px] text-[11px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center justify-center gap-3 shadow-xl shadow-slate-900/10"
-                                >
-                                    <User className="w-4.5 h-4.5" /> Perfil Completo
-                                </button>
-                            </div>
+                        <div className="pt-2">
+                            <h3 className="text-lg font-black text-slate-900 leading-tight truncate px-2">{selectedConv.lead?.name || 'Visitante'}</h3>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{selectedConv.lead?.company_name || 'Individual'}</p>
                         </div>
                     </div>
-                )
-            }
-        </div >
+
+                    <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-[20px] border border-blue-100 text-center relative overflow-hidden group">
+                        <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1 relative z-10">IA Score</p>
+                        <div className="text-3xl font-black text-blue-600 tracking-tighter relative z-10 group-hover:scale-110 transition-transform">98</div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="space-y-3">
+                            <InfoItem icon={Mail} label="EMAIL" value={selectedConv.lead?.email || 'No identificado'} />
+                            <InfoItem icon={PhoneIcon} label="TELÉFONO" value={selectedConv.lead?.phone || 'Sin número'} />
+                        </div>
+                        <button onClick={() => navigate('/leads', { state: { leadId: selectedConv.lead?.id } })} className="w-full py-3 rounded-xl border-2 border-slate-100 font-black text-[9px] uppercase tracking-widest text-slate-500 hover:border-slate-300 hover:text-slate-900 transition-all">Ver Perfil</button>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }
 
 function InfoItem({ icon: Icon, label, value }: { icon: any, label: string, value: string }) {
     return (
-        <div className="flex items-center gap-5 group">
-            <div className="w-10 h-10 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-200 group-hover:bg-blue-50 group-hover:text-blue-500 transition-all">
-                <Icon className="w-5 h-5" />
+        <div className="flex items-center gap-3 overflow-hidden">
+            <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 shrink-0">
+                <Icon className="w-3.5 h-3.5" />
             </div>
-            <div className="flex-1 min-w-0 border-b border-slate-50 pb-2">
-                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">{label}</p>
-                <p className="text-[13px] font-bold text-slate-800 truncate tracking-tight">{value}</p>
+            <div className="min-w-0">
+                <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest mb-0.5">{label}</p>
+                <p className="text-[11px] font-bold text-slate-700 truncate">{value}</p>
             </div>
         </div>
+    );
+}
+
+function FilterButton({ icon: Icon, active, onClick, activeColor = "bg-slate-900 text-white shadow-lg" }: { icon: any, active: boolean, onClick: () => void, activeColor?: string }) {
+    return (
+        <button
+            onClick={onClick}
+            className={`flex-1 h-9 rounded-lg flex items-center justify-center transition-all ${active ? activeColor : 'hover:bg-white hover:shadow-sm text-slate-400'}`}
+        >
+            <Icon className="w-4 h-4" />
+        </button>
     );
 }

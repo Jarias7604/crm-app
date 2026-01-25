@@ -43,21 +43,50 @@ export default function Sidebar() {
         }
     };
 
+    // --- PERMISSION LOGIC ---
+    const canAccess = (feature: 'leads' | 'quotes' | 'calendar' | 'marketing' | 'chat') => {
+        if (!profile || !company) return false;
+        if (profile.role === 'super_admin' || profile.role === 'company_admin') return true;
+
+        // Core Modules (Default True unless explicitly disabled)
+        if (['leads', 'quotes', 'calendar'].includes(feature)) {
+            return profile.permissions?.[feature as 'leads' | 'quotes' | 'calendar'] !== false;
+        }
+
+        // Premium Modules (Default False, Check Company Feature)
+        const companyEnabled = company.features?.[feature as 'marketing' | 'chat'];
+        if (!companyEnabled) return false;
+
+        return profile.permissions?.[feature as 'marketing' | 'chat'] === true;
+    };
+
     const navigation = [
-        { name: t('sidebar.dashboard'), href: '/', icon: LayoutDashboard, current: location.pathname === '/' },
-        { name: t('sidebar.leads'), href: '/leads', icon: Users, current: location.pathname.startsWith('/leads') },
-        { name: 'Cotizaciones', href: '/cotizaciones', icon: FileText, current: location.pathname === '/cotizaciones' },
-        { name: t('sidebar.calendar'), href: '/calendar', icon: Calendar, current: location.pathname.startsWith('/calendar') },
+        { name: t('sidebar.dashboard'), href: '/', icon: LayoutDashboard, current: location.pathname === '/' }
     ];
 
-    // Marketing Platform (Super Admin Only for now)
-    if (profile?.role === 'super_admin') {
+    if (canAccess('leads')) {
+        navigation.push({ name: t('sidebar.leads'), href: '/leads', icon: Users, current: location.pathname.startsWith('/leads') });
+    }
+
+    if (canAccess('quotes')) {
+        navigation.push({ name: 'Cotizaciones', href: '/cotizaciones', icon: FileText, current: location.pathname === '/cotizaciones' });
+    }
+
+    if (canAccess('calendar')) {
+        navigation.push({ name: t('sidebar.calendar'), href: '/calendar', icon: Calendar, current: location.pathname.startsWith('/calendar') });
+    }
+
+    // Marketing & Chat
+    if (canAccess('marketing')) {
         navigation.push({
             name: 'Marketing Hub',
             href: '/marketing',
             icon: Megaphone,
             current: location.pathname.startsWith('/marketing') && !location.pathname.startsWith('/marketing/chat')
         });
+    }
+
+    if (canAccess('chat')) {
         navigation.push({
             name: 'Mensajes',
             href: '/marketing/chat',

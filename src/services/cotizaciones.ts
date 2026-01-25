@@ -27,6 +27,14 @@ class CotizacionesService {
             data.modulos_adicionales = typeof data.modulos_adicionales === 'string'
                 ? JSON.parse(data.modulos_adicionales)
                 : data.modulos_adicionales;
+
+            // AUTOMATION: Update Lead Value with Quote Total
+            if (data.lead_id && data.total_anual !== undefined) {
+                await supabase
+                    .from('leads')
+                    .update({ value: data.total_anual })
+                    .eq('id', data.lead_id);
+            }
         }
 
         return data;
@@ -122,6 +130,14 @@ class CotizacionesService {
             data.modulos_adicionales = typeof data.modulos_adicionales === 'string'
                 ? JSON.parse(data.modulos_adicionales)
                 : data.modulos_adicionales;
+
+            // AUTOMATION: Update Lead Value with Quote Total
+            if (data.lead_id && data.total_anual !== undefined) {
+                await supabase
+                    .from('leads')
+                    .update({ value: data.total_anual })
+                    .eq('id', data.lead_id);
+            }
         }
 
         return data;

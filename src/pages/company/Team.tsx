@@ -4,7 +4,7 @@ import { teamService, type Invitation } from '../../services/team';
 import type { Profile, Role } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Plus, Trash2, Mail, User, Shield, Phone, Lock, Edit2, Globe, Camera, Loader2, X } from 'lucide-react';
+import { Plus, Trash2, Mail, User, Shield, Phone, Lock, Edit2, Globe, Camera, Loader2, X, Megaphone, MessageSquare, FileText, Calendar } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { storageService } from '../../services/storage';
 import { useAuth } from '../../auth/AuthProvider';
@@ -191,7 +191,8 @@ export default function Team() {
                 phone: editingMember.phone || null,
                 avatar_url: editingMember.avatar_url || null,
                 website: editingMember.website || null,
-                role: editingMember.role
+                role: editingMember.role,
+                permissions: editingMember.permissions
             });
 
             toast.success('Perfil actualizado correctamente');
@@ -220,6 +221,57 @@ export default function Team() {
             <span className={`px-2.5 py-1 rounded-full text-[10px] uppercase font-black tracking-wider ${styles[role as keyof typeof styles] || 'bg-gray-100'}`}>
                 {labels[role as keyof typeof labels] || role}
             </span>
+        );
+    };
+
+    const PermissionCard = ({ title, icon: Icon, mainKey, desc, subFeatures = [], permissions = {}, onChange, isPremium = false }: any) => {
+        const isCore = ['leads', 'quotes', 'calendar'].includes(mainKey);
+        // If undefined: Core defaults to TRUE. Premium defaults to FALSE.
+        const currentVal = permissions[mainKey];
+        const isChecked = currentVal === undefined ? isCore : currentVal === true;
+
+        return (
+            <div className={`border rounded-xl p-5 transition-all ${isChecked ? 'border-blue-200 bg-blue-50/30' : 'border-gray-100 bg-white hover:border-gray-200'}`}>
+                {/* Header */}
+                <div className="flex justify-between items-start mb-4">
+                    <div className="flex gap-3">
+                        <div className={`p-2 rounded-lg transition-colors ${isChecked ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'}`}>
+                            <Icon className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h4 className={`font-bold text-sm ${isChecked ? 'text-gray-900' : 'text-gray-500'}`}>{title}</h4>
+                            <p className="text-xs text-gray-400">{desc}</p>
+                        </div>
+                    </div>
+                    <Switch
+                        checked={isChecked}
+                        onChange={() => {
+                            const newVal = !isChecked;
+                            onChange({ ...permissions, [mainKey]: newVal });
+                        }}
+                        size="sm"
+                    />
+                </div>
+
+                {/* Sub Features */}
+                {subFeatures.length > 0 && (
+                    <div className={`space-y-3 pl-11 pt-2 border-t border-dashed ${isChecked ? 'border-blue-200/50' : 'border-gray-100 opacity-50 pointer-events-none'}`}>
+                        {subFeatures.map((sub: any) => (
+                            <label key={sub.key} className="flex items-center gap-3 cursor-pointer group">
+                                <div className="relative flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={permissions[sub.key] === true}
+                                        onChange={(e) => onChange({ ...permissions, [sub.key]: e.target.checked })}
+                                        className="peer h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 transition-all"
+                                    />
+                                </div>
+                                <span className="text-xs font-medium text-gray-500 group-hover:text-blue-600 transition-colors select-none">{sub.label}</span>
+                            </label>
+                        ))}
+                    </div>
+                )}
+            </div>
         );
     };
 
@@ -334,150 +386,193 @@ export default function Team() {
             {/* Edit Member Modal - Ultimate Professional Wide Version with Portal */}
             {editingMember && createPortal(
                 <div className="fixed inset-0 min-h-screen w-screen bg-black/70 backdrop-blur-[12px] flex items-center justify-center z-[9999] p-4 md:p-12 animate-in fade-in duration-500">
-                    <div className="bg-white rounded-[2.5rem] shadow-[0_40px_100px_-20px_rgba(0,0,0,0.4)] max-w-2xl w-full max-h-[94vh] flex flex-col border border-white/20 animate-in zoom-in-95 duration-300 overflow-hidden">
+                    <div className="bg-white rounded-[2rem] shadow-2xl max-w-6xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
 
-                        {/* Header - Refined & Wide Spacing */}
-                        <div className="px-10 py-9 flex justify-between items-center shrink-0 bg-white border-b border-gray-50">
-                            <div>
-                                <h2 className="text-3xl font-black text-gray-900 tracking-tighter leading-none">Editar Perfil</h2>
-                                <div className="mt-3 flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
-                                    <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">{editingMember.email}</span>
+                        {/* Header - Wide & Clean */}
+                        <div className="px-8 py-6 flex justify-between items-center bg-white border-b border-gray-100 shrink-0">
+                            <div className="flex items-center gap-4">
+                                <div className="h-10 w-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600">
+                                    <Shield className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-gray-900">Configuración de Usuario</h2>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
+                                        <p className="text-xs text-gray-500 uppercase tracking-wider">{editingMember.email}</p>
+                                    </div>
                                 </div>
                             </div>
-                            <button
-                                onClick={handleCancelEdit}
-                                type="button"
-                                className="p-3 hover:bg-gray-50 rounded-[1.5rem] transition-all text-gray-400 hover:text-gray-900 group border border-transparent hover:border-gray-100"
-                            >
-                                <X className="w-6 h-6 group-hover:rotate-90 transition-transform duration-500" />
+                            <button onClick={handleCancelEdit} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-gray-600">
+                                <X className="w-6 h-6" />
                             </button>
                         </div>
 
-                        {/* Scrollable Body - Balanced & Spacious */}
-                        <div className="flex-1 overflow-y-auto px-10 pb-10 pt-6 custom-scrollbar scroll-smooth">
-                            <form id="edit-profile-form" onSubmit={handleSaveEdit} className="space-y-10">
-                                {/* Avatar Section - Premium Centered */}
-                                <div className="flex flex-col items-center py-6">
-                                    <div className="relative group">
-                                        <div className="w-44 h-44 rounded-[3.5rem] border-[8px] border-white overflow-hidden shadow-2xl bg-gray-50 flex items-center justify-center relative ring-1 ring-gray-100/50">
-                                            {isUploading ? (
-                                                <div className="absolute inset-0 bg-white/95 backdrop-blur-sm flex items-center justify-center z-20">
-                                                    <Loader2 className="w-10 h-10 text-[#4449AA] animate-spin" />
-                                                </div>
-                                            ) : null}
+                        {/* Scrollable Body - Grid Layout */}
+                        <div className="flex-1 overflow-y-auto bg-gray-50/50 custom-scrollbar">
+                            <form id="edit-profile-form" onSubmit={handleSaveEdit} className="p-8">
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-                                            {editingMember.avatar_url ? (
-                                                <img
-                                                    src={editingMember.avatar_url}
-                                                    alt=""
-                                                    className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110"
-                                                />
-                                            ) : (
-                                                <div className="w-full h-full bg-gradient-to-br from-gray-50 to-gray-200 flex items-center justify-center">
-                                                    <User className="w-20 h-20 text-gray-200" />
+                                    {/* Left Column: Profile Identity (4 Cols) */}
+                                    <div className="lg:col-span-4 space-y-6">
+                                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                                            {/* Avatar Box */}
+                                            <div className="flex flex-col items-center mb-6">
+                                                <div className="relative group cursor-pointer">
+                                                    <div className="w-32 h-32 rounded-full border-4 border-white shadow-lg overflow-hidden relative bg-gray-100">
+                                                        {editingMember.avatar_url ? (
+                                                            <img src={editingMember.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                                                <User className="w-12 h-12" />
+                                                            </div>
+                                                        )}
+                                                        {isUploading && (
+                                                            <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                                                                <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                                                            </div>
+                                                        )}
+                                                        <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white cursor-pointer">
+                                                            <Camera className="w-8 h-8" />
+                                                            <input type="file" className="hidden" accept="image/*" onChange={handleAvatarUpload} disabled={isUploading} />
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                <h3 className="mt-4 text-lg font-bold text-gray-900 text-center">{editingMember.full_name || 'Sin Nombre'}</h3>
+                                                <p className="text-sm text-gray-500 text-center">{editingMember.role === 'company_admin' ? 'Administrador' : 'Agente Ventas'}</p>
+                                            </div>
+
+                                            {/* Core Fields */}
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Nombre Completo</label>
+                                                    <Input value={editingMember.full_name || ''} onChange={e => setEditingMember({ ...editingMember, full_name: e.target.value })} className="bg-gray-50" />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Teléfono</label>
+                                                    <div className="relative">
+                                                        <Phone className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+                                                        <Input value={editingMember.phone || ''} onChange={e => setEditingMember({ ...editingMember, phone: e.target.value })} className="pl-9 bg-gray-50" placeholder="+503..." />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Sitio Web / Link</label>
+                                                    <div className="relative">
+                                                        <Globe className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+                                                        <Input value={editingMember.website || ''} onChange={e => setEditingMember({ ...editingMember, website: e.target.value })} className="pl-9 bg-gray-50" placeholder="https://..." />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Rol</label>
+                                                    <select
+                                                        className="w-full rounded-lg border-gray-200 bg-gray-50 text-sm focus:ring-blue-500 focus:border-blue-500 p-2.5"
+                                                        value={editingMember.role}
+                                                        onChange={e => setEditingMember({ ...editingMember, role: e.target.value as Role })}
+                                                        disabled={editingMember.id === myProfile?.id}
+                                                    >
+                                                        <option value="sales_agent">Agente de Ventas</option>
+                                                        <option value="company_admin">Admin de Empresa</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Right Column: Permission Matrix (8 Cols) */}
+                                    <div className="lg:col-span-8 space-y-6">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <h3 className="text-lg font-bold text-gray-900">Matriz de Acceso</h3>
+                                                <p className="text-sm text-gray-500">Define qué módulos y acciones específicas puede realizar este usuario.</p>
+                                            </div>
+                                            {editingMember.role === 'company_admin' && (
+                                                <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2">
+                                                    <Shield className="w-4 h-4" />
+                                                    Acceso Total (Admin)
                                                 </div>
                                             )}
+                                        </div>
 
-                                            <label className="absolute inset-0 bg-[#4449AA]/85 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-all duration-500 cursor-pointer backdrop-blur-[6px] z-10">
-                                                <div className="bg-white/20 p-4 rounded-2xl mb-2 backdrop-blur-md hover:scale-110 transition-transform shadow-xl">
-                                                    <Camera className="w-8 h-8" />
-                                                </div>
-                                                <span className="text-[10px] font-black uppercase tracking-[0.3em] font-sans">Cambiar Imagen</span>
-                                                <input
-                                                    type="file"
-                                                    className="hidden"
-                                                    accept="image/*"
-                                                    onChange={handleAvatarUpload}
-                                                    disabled={isUploading}
+                                        {(editingMember.role === 'company_admin' || editingMember.role === 'super_admin') ? (
+                                            <div className="bg-blue-50 border border-blue-100 rounded-xl p-8 text-center">
+                                                <Shield className="w-12 h-12 text-blue-400 mx-auto mb-3" />
+                                                <h4 className="text-blue-900 font-bold text-lg">Modo Administrador Activo</h4>
+                                                <p className="text-blue-700 mt-2 max-w-md mx-auto">Este usuario tiene control total sobre todos los módulos activos de la empresa. Para limitar su acceso, cambia su rol a "Agente de Ventas".</p>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                                {/* Leads Module */}
+                                                <PermissionCard
+                                                    title="CRM & Leads"
+                                                    icon={User}
+                                                    mainKey="leads"
+                                                    desc="Gestión de contactos y pipeline"
+                                                    subFeatures={[
+                                                        { key: 'leads_delete', label: 'Eliminar Leads' },
+                                                        { key: 'leads_export', label: 'Exportar Data' }
+                                                    ]}
+                                                    permissions={editingMember.permissions}
+                                                    onChange={(newPerms) => setEditingMember({ ...editingMember, permissions: newPerms })}
                                                 />
-                                            </label>
-                                        </div>
-                                        <div className="absolute -bottom-1 -right-1 bg-green-500 w-12 h-12 rounded-[1.5rem] border-[6px] border-white shadow-2xl flex items-center justify-center z-20">
-                                            <div className="w-3 h-3 bg-white rounded-full animate-pulse shadow-[0_0_15px_rgba(255,255,255,1)]"></div>
-                                        </div>
-                                    </div>
-                                    <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.5em] mt-10">Profile Specification</p>
-                                </div>
 
-                                <div className="space-y-8">
-                                    {/* Name Input */}
-                                    <div className="space-y-3">
-                                        <label className="text-[11px] font-black text-gray-400 uppercase tracking-[0.4em] ml-4">Identidad</label>
-                                        <div className="relative group/field px-1">
-                                            <div className="absolute inset-y-0 left-8 flex items-center pointer-events-none">
-                                                <User className="w-5 h-5 text-gray-300 group-focus-within/field:text-[#4449AA] transition-colors" />
-                                            </div>
-                                            <Input
-                                                required
-                                                value={editingMember.full_name || ''}
-                                                onChange={e => setEditingMember({ ...editingMember, full_name: e.target.value })}
-                                                placeholder="Nombre Completo"
-                                                className="h-16 pl-16 bg-gray-50/50 border-gray-100 focus:bg-white rounded-[1.5rem] border-2 focus:border-[#4449AA] focus:ring-8 focus:ring-[#4449AA]/5 transition-all text-base font-bold tracking-tight shadow-sm"
-                                            />
-                                        </div>
-                                    </div>
+                                                {/* Quotes Module */}
+                                                <PermissionCard
+                                                    title="Cotizaciones"
+                                                    icon={FileText}
+                                                    mainKey="quotes"
+                                                    desc="Creación y envío de presupuestos"
+                                                    subFeatures={[
+                                                        { key: 'quotes_approve', label: 'Aprobar Descuentos' },
+                                                        { key: 'quotes_delete', label: 'Eliminar Cotizaciones' }
+                                                    ]}
+                                                    permissions={editingMember.permissions}
+                                                    onChange={(newPerms) => setEditingMember({ ...editingMember, permissions: newPerms })}
+                                                />
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 px-1">
-                                        {/* Contact */}
-                                        <div className="space-y-3">
-                                            <label className="text-[11px] font-black text-gray-400 uppercase tracking-[0.4em] ml-4">Contacto</label>
-                                            <div className="relative group/field">
-                                                <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none">
-                                                    <Phone className="w-5 h-5 text-gray-300 group-focus-within/field:text-[#4449AA] transition-colors" />
-                                                </div>
-                                                <Input
-                                                    value={editingMember.phone || ''}
-                                                    onChange={e => setEditingMember({ ...editingMember, phone: e.target.value })}
-                                                    placeholder="Teléfono"
-                                                    className="h-16 pl-16 bg-gray-50/50 border-gray-100 focus:bg-white rounded-[1.5rem] border-2 focus:border-[#4449AA] focus:ring-8 focus:ring-[#4449AA]/5 transition-all text-base font-bold tracking-tight shadow-sm"
+                                                {/* Calendar Module */}
+                                                <PermissionCard
+                                                    title="Agenda & Citas"
+                                                    icon={Calendar}
+                                                    mainKey="calendar"
+                                                    desc="Calendario de actividades"
+                                                    subFeatures={[]} // No sub-features yet
+                                                    permissions={editingMember.permissions}
+                                                    onChange={(newPerms) => setEditingMember({ ...editingMember, permissions: newPerms })}
+                                                />
+
+                                                {/* Marketing Module */}
+                                                <PermissionCard
+                                                    title="Marketing Hub"
+                                                    icon={Megaphone}
+                                                    mainKey="marketing"
+                                                    desc="Campañas y Automatización"
+                                                    isPremium
+                                                    subFeatures={[
+                                                        { key: 'marketing_publish', label: 'Publicar Campañas' }
+                                                    ]}
+                                                    permissions={editingMember.permissions}
+                                                    onChange={(newPerms) => setEditingMember({ ...editingMember, permissions: newPerms })}
+                                                />
+
+                                                {/* Chat Module */}
+                                                <PermissionCard
+                                                    title="Mensajería"
+                                                    icon={MessageSquare}
+                                                    mainKey="chat"
+                                                    desc="Chat unificado y WhatsApp"
+                                                    isPremium
+                                                    subFeatures={[
+                                                        { key: 'chat_history', label: 'Ver Historial Completo' }
+                                                    ]}
+                                                    permissions={editingMember.permissions}
+                                                    onChange={(newPerms) => setEditingMember({ ...editingMember, permissions: newPerms })}
                                                 />
                                             </div>
-                                        </div>
-
-                                        {/* Digital */}
-                                        <div className="space-y-3">
-                                            <label className="text-[11px] font-black text-gray-400 uppercase tracking-[0.4em] ml-4">Digital</label>
-                                            <div className="relative group/field">
-                                                <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none">
-                                                    <Globe className="w-5 h-5 text-gray-300 group-focus-within/field:text-[#4449AA] transition-colors" />
-                                                </div>
-                                                <Input
-                                                    value={editingMember.website || ''}
-                                                    onChange={e => setEditingMember({ ...editingMember, website: e.target.value })}
-                                                    placeholder="Sitio Web"
-                                                    className="h-16 pl-16 bg-gray-50/50 border-gray-100 focus:bg-white rounded-[1.5rem] border-2 focus:border-[#4449AA] focus:ring-8 focus:ring-[#4449AA]/5 transition-all text-sm font-bold tracking-tight shadow-sm"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Permissions */}
-                                    <div className="space-y-3 px-1">
-                                        <label className="text-[11px] font-black text-gray-400 uppercase tracking-[0.4em] ml-4">Rol & Autoridad</label>
-                                        <div className="relative group/field">
-                                            <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none z-10">
-                                                <Shield className="w-5 h-5 text-gray-300 group-focus-within/field:text-[#4449AA] transition-colors" />
-                                            </div>
-                                            <select
-                                                className={`w-full rounded-[1.5rem] border-2 border-gray-100 bg-gray-50/50 h-16 pl-16 pr-12 text-sm font-bold focus:border-[#4449AA] focus:ring-8 focus:ring-[#4449AA]/5 focus:bg-white transition-all outline-none appearance-none shadow-sm ${editingMember.id === myProfile?.id ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}
-                                                value={editingMember.role}
-                                                onChange={e => setEditingMember({ ...editingMember, role: e.target.value as Role })}
-                                                disabled={editingMember.id === myProfile?.id}
-                                            >
-                                                <option value="sales_agent">Agente de Ventas CRM</option>
-                                                <option value="company_admin">Administrador de Empresa</option>
-                                            </select>
-                                            <div className="absolute inset-y-0 right-7 flex items-center pointer-events-none text-gray-300">
-                                                <div className="w-2.5 h-2.5 border-b-2 border-r-2 border-gray-300 rotate-45 mb-1.5"></div>
-                                            </div>
-                                        </div>
+                                        )}
                                     </div>
                                 </div>
                             </form>
                         </div>
 
-                        {/* Footer - Wide & Solid */}
                         <div className="px-10 py-10 bg-gray-50 border-t border-gray-100 shrink-0">
                             <div className="flex gap-6">
                                 <button
@@ -542,9 +637,21 @@ export default function Team() {
                                         <div className="ml-4">
                                             <div className="text-sm font-medium text-gray-900">{member.full_name || 'Sin nombre'}</div>
                                             <div className="text-xs text-gray-500">{member.email}</div>
-                                            <div className="flex gap-3 mt-0.5">
-                                                {member.phone && <span className="text-xs text-blue-600 flex items-center"><Phone className="w-3 h-3 mr-1" /> {member.phone}</span>}
-                                                {member.website && <span className="text-xs text-purple-600 flex items-center"><Globe className="w-3 h-3 mr-1" /> {member.website.replace(/^https?:\/\//, '')}</span>}
+                                            <div className="flex gap-3 mt-1 flex-wrap">
+                                                {member.phone && <span className="text-xs text-blue-600 flex items-center bg-blue-50 px-1.5 py-0.5 rounded"><Phone className="w-3 h-3 mr-1" /> {member.phone}</span>}
+                                                {member.website && <span className="text-xs text-purple-600 flex items-center bg-purple-50 px-1.5 py-0.5 rounded"><Globe className="w-3 h-3 mr-1" /> Web</span>}
+
+                                                {/* Permission Indicators */}
+                                                {(member.role === 'company_admin' || member.role === 'super_admin' || member.permissions?.marketing) && (
+                                                    <span className="text-xs text-indigo-600 flex items-center bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100" title="Acceso a Marketing">
+                                                        <Megaphone className="w-3 h-3 mr-1" /> Marketing
+                                                    </span>
+                                                )}
+                                                {(member.role === 'company_admin' || member.role === 'super_admin' || member.permissions?.chat) && (
+                                                    <span className="text-xs text-emerald-600 flex items-center bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100" title="Acceso a Chat">
+                                                        <MessageSquare className="w-3 h-3 mr-1" /> Chat
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

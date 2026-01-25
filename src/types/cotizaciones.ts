@@ -40,6 +40,12 @@ export interface Cotizacion {
     valida_hasta?: string;
     notas?: string;
 
+    // Términos de Pago (Nuevo)
+    tipo_pago?: 'contado' | 'credito';
+    plazo_meses?: number;
+    monto_anticipo?: number;
+    descripcion_pago?: string;
+
     created_by?: string;
     created_at: string;
     updated_at: string;

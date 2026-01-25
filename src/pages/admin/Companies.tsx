@@ -67,6 +67,27 @@ export default function Companies() {
         }
     };
 
+    const handleToggleFeature = async (id: string, feature: 'marketing' | 'chat', value: boolean, currentFeatures: any) => {
+        try {
+            const newFeatures = {
+                ...(currentFeatures || { marketing: false, chat: false }),
+                [feature]: value
+            };
+
+            // Optimistic update
+            setCompanies(companies.map(c =>
+                c.id === id ? { ...c, features: newFeatures } : c
+            ));
+
+            await adminService.updateCompany(id, { features: newFeatures });
+            // No need to reload if optimistic update was successful, but good for sync
+        } catch (error) {
+            console.error('Failed to update feature', error);
+            // Revert on error would be ideal, but for now just reload
+            loadCompanies();
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -88,6 +109,7 @@ export default function Companies() {
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuarios / Límite</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creado</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Módulos</th>
                             <th className="relative px-6 py-3"><span className="sr-only">Acciones</span></th>
                         </tr>
                     </thead>
@@ -137,6 +159,28 @@ export default function Companies() {
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                     {format(new Date(company.created_at), 'dd MMM yyyy')}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    <div className="flex gap-3">
+                                        <label className="flex items-center space-x-2 text-xs cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={company.features?.marketing || false}
+                                                onChange={(e) => handleToggleFeature(company.id, 'marketing', e.target.checked, company.features)}
+                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                                            />
+                                            <span>Mkt</span>
+                                        </label>
+                                        <label className="flex items-center space-x-2 text-xs cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={company.features?.chat || false}
+                                                onChange={(e) => handleToggleFeature(company.id, 'chat', e.target.checked, company.features)}
+                                                className="rounded border-gray-300 text-green-600 focus:ring-green-500 h-4 w-4"
+                                            />
+                                            <span>Chat</span>
+                                        </label>
+                                    </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <button className="text-gray-400 hover:text-gray-600 p-2">

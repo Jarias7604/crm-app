@@ -73,7 +73,7 @@ export const chatService = {
         return data as ChatMessage[];
     },
 
-    async sendMessage(conversationId: string, content: string, type: 'text' | 'image' | 'file' = 'text', metadata: any = {}) {
+    async sendMessage(conversationId: string, content: string, type: 'text' | 'image' | 'file' = 'text', direction: 'inbound' | 'outbound' = 'outbound', metadata: any = {}) {
         // 1. Insert into local database
         const { data: msg, error } = await supabase
             .from('marketing_messages')
@@ -81,9 +81,9 @@ export const chatService = {
                 conversation_id: conversationId,
                 content,
                 type,
-                metadata: { ...metadata, origin: window.location.origin },
-                direction: 'outbound',
-                status: 'pending' // Mark as pending initially
+                metadata: { ...metadata, origin: typeof window !== 'undefined' ? window.location.origin : 'server' },
+                direction,
+                status: direction === 'outbound' ? 'pending' : 'delivered'
             })
             .select()
             .single();
@@ -99,14 +99,14 @@ export const chatService = {
             })
             .eq('id', conversationId);
 
-        // 3. TRIGGER SENDING (Call Edge Function)
-        // We do this optimistically. If it fails, the status stays 'pending' or 'failed'.
-        // In a real prod app, use a queue or DB webhook. For simplicity/reliability here, call direct.
-        supabase.functions.invoke('send-telegram-message', {
-            body: { record: msg }
-        }).then(({ data, error }) => {
-            if (error) console.error('Edge Function Error:', error);
-        });
+        // 3. TRIGGER SENDING (Only for Outbound)
+        if (direction === 'outbound') {
+            supabase.functions.invoke('send-telegram-message', {
+                body: { record: msg }
+            }).then(({ data, error }) => {
+                if (error) console.error('Edge Function Error:', error);
+            });
+        }
 
         return msg as ChatMessage;
     },

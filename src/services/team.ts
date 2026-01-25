@@ -26,7 +26,7 @@ export const teamService = {
     async getTeamMembers(companyId: string) {
         const { data, error } = await supabase
             .from('profiles')
-            .select('id, email, role, created_at, company_id, full_name, phone, is_active, avatar_url, website')
+            .select('id, email, role, created_at, company_id, full_name, phone, is_active, avatar_url, website, permissions')
             .eq('company_id', companyId)
             .order('created_at', { ascending: false });
 
@@ -48,7 +48,7 @@ export const teamService = {
     },
 
     // Create a new member directly (Admin only)
-    async createMember(data: { email: string; password: string; role: Role; fullName: string; phone?: string; companyId: string }) {
+    async createMember(data: { email: string; password: string; role: Role; fullName: string; phone?: string; companyId: string; permissions?: any }) {
         const { data: stringId, error } = await supabase.rpc('admin_create_user', {
             new_email: data.email,
             new_password: data.password,
@@ -59,6 +59,12 @@ export const teamService = {
         });
 
         if (error) throw error;
+
+        // Apply permissions if provided
+        if (data.permissions && stringId) {
+            await supabase.from('profiles').update({ permissions: data.permissions }).eq('id', stringId);
+        }
+
         return stringId;
     },
 
@@ -73,7 +79,7 @@ export const teamService = {
     },
 
     // Update member details
-    async updateMember(userId: string, updates: { full_name?: string | null; phone?: string | null; role?: Role; avatar_url?: string | null; website?: string | null }) {
+    async updateMember(userId: string, updates: { full_name?: string | null; phone?: string | null; role?: Role; avatar_url?: string | null; website?: string | null; permissions?: any }) {
         const { error } = await supabase
             .from('profiles')
             .update(updates)

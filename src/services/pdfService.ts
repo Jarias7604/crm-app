@@ -4,30 +4,28 @@ import { supabase } from './supabase';
 import { format } from 'date-fns';
 
 /**
- * 💎 PDF SERVICE - PREMIUM CLONE v5.1 (Deployment Retry)
+ * 💎 PDF SERVICE - FINAL RESTORED VERSION
  * -----------------------------------------
- * - Includes QR Code generation (matching React UI)
- * - Includes Agent Avatar rendering
- * - Includes Company Logo rendering
- * - Exact layout match for Header, Body, Table, and Footer
+ * Matches "10:16 AM" layout exactly.
+ * Gap: 12, HeaderH: 60, Padding: 8
  */
 export const pdfService = {
     async generateAndUploadQuotePDF(cotizacion: any): Promise<string> {
         try {
+            console.log('Generating PDF vMax.4...'); // Debug marker
             const doc = new jsPDF();
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
 
-            // --- PREMIUM PALETTE (Exact match to Web UI) ---
-            const C_BG_DARK = [15, 23, 42];      // #0f172a (Header BG)
-            const C_TEXT_DARK = [15, 23, 42];    // #0f172a (Main Text)
-            const C_BLUE_ACCENT = [42, 171, 238]; // #2AABEE (Buttons/Accents)
-            const C_PURPLE_MAIN = [68, 73, 170];  // #4449AA (Brand Color)
-            const C_GRAY_TEXT = [100, 116, 139];  // #64748b (Slate 500)
-            const C_GRAY_LIGHT = [248, 250, 252]; // #f8fafc (Slate 50)
-            const C_BORDER = [226, 232, 240];     // #e2e8f0 (Slate 200)
+            // --- PREMIUM PALETTE ---
+            const C_BG_DARK = [15, 23, 42];      // #0f172a
+            const C_TEXT_DARK = [15, 23, 42];    // #0f172a
+            const C_BLUE_ACCENT = [42, 171, 238]; // #2AABEE
+            const C_PURPLE_MAIN = [68, 73, 170];  // #4449AA
+            const C_GRAY_TEXT = [100, 116, 139];  // #64748b
+            const C_GRAY_LIGHT = [248, 250, 252]; // #f8fafc
+            const C_BORDER = [226, 232, 240];     // #e2e8f0
 
-            // Helper: Load Image safely
             const loadImage = async (url: string) => {
                 if (!url) return null;
                 try {
@@ -42,310 +40,438 @@ export const pdfService = {
                             ctx?.drawImage(img, 0, 0);
                             resolve(canvas.toDataURL('image/png'));
                         };
-                        img.onerror = () => resolve(null as any); // Fallback safely
+                        img.onerror = () => resolve(null as any);
                         img.src = url;
                     });
                 } catch (e) { return null; }
             };
 
             // ==========================================
-            // 1. HEADER (Dark #0f172a)
+            // 1. HEADER (FULL WIDTH & RECTANGULAR)
             // ==========================================
-            const headerHeight = 70;
+            const headerH = 60;
+            const contentMargin = 15; // Internal padding for text
+
+            // DRAW HEADER BACKGROUND (Full Width, No Rounding)
             doc.setFillColor(C_BG_DARK[0], C_BG_DARK[1], C_BG_DARK[2]);
-            doc.rect(0, 0, pageWidth, headerHeight, 'F');
+            doc.rect(0, 0, pageWidth, headerH, 'F');
 
-            // Logo Branding (Left)
+            // --- LEFT SIDE ---
+            const leftPad = contentMargin;
             const logoData = await loadImage(cotizacion.company?.logo_url);
+            let contentStartY = 36; // Relative to top 0
+            const boxY = 0; // Keeping for reference if needed below, but effectively 0
+
             if (logoData) {
-                // Keep aspect ratio but constrain height
-                const props = doc.getImageProperties(logoData);
-                const maxHeight = 18; // Max height in mm
-                const w = (props.width * maxHeight) / props.height;
-                doc.addImage(logoData, 'PNG', 15, 12, w, maxHeight);
+                const logoSize = 22; // Increased size
+                doc.addImage(logoData, 'PNG', leftPad, boxY + 8, logoSize, logoSize);
             } else {
-                // Fallback Text Logo
-                doc.setTextColor(42, 171, 238); // Blue
-                doc.setFontSize(22);
-                doc.setFont('helvetica', 'bold');
-                doc.text((cotizacion.company?.name || 'BRAND').slice(0, 10).toUpperCase(), 15, 25);
+                doc.setFillColor(255, 255, 255);
+                doc.circle(leftPad + 8, boxY + 16, 8, 'F');
+                doc.setTextColor(C_BG_DARK[0], C_BG_DARK[1], C_BG_DARK[2]);
+                doc.setFontSize(10);
+                doc.text('LOGO', leftPad + 8, boxY + 18, { align: 'center' });
             }
 
-            // Company Name & Info (Below Logo)
+            // Company Name
             doc.setTextColor(255, 255, 255);
-            doc.setFontSize(10);
+            doc.setFontSize(11);
             doc.setFont('helvetica', 'bold');
-            doc.text((cotizacion.company?.name || 'SU EMPRESA').toUpperCase(), 15, 40); // Moved up slightly
+            doc.text((cotizacion.company?.name || 'EMPRESA DEMO').toUpperCase(), leftPad, contentStartY);
 
-            doc.setFontSize(7);
-            doc.setFont('helvetica', 'normal');
+            // Address
+            const headerAddrY = contentStartY + 5;
             doc.setTextColor(148, 163, 184); // Slate 400
+            doc.setFontSize(6.5);
+            doc.setFont('helvetica', 'normal');
+            let addrLine = cotizacion.company?.address || 'Dirección de la empresa';
+            if (cotizacion.company?.phone) addrLine += `  •  ${cotizacion.company?.phone}`;
+            doc.text(addrLine.toUpperCase(), leftPad, headerAddrY);
 
-            let contactY = 47;
-            if (cotizacion.company?.address) {
-                doc.text(cotizacion.company.address, 15, contactY);
-                contactY += 4;
-            }
-            // Website (Blue)
+            // Website
+            const webY = headerAddrY + 5;
             doc.setTextColor(C_BLUE_ACCENT[0], C_BLUE_ACCENT[1], C_BLUE_ACCENT[2]);
             doc.setFont('helvetica', 'bold');
-            doc.text((cotizacion.company?.website || 'www.suwebsite.com').replace(/^https?:\/\//, '').toUpperCase(), 15, contactY);
+            doc.text((cotizacion.company?.website || 'WWW.SITIOWEB.COM').replace(/^https?:\/\//, '').toUpperCase(), leftPad, webY);
 
 
-            // Right Side Header Info
+            const footerH = 40;
+            const footerStart = pageHeight - footerH;
+
+            // --- RIGHT SIDE ---
+            const rightPad = pageWidth - contentMargin;
+
+            // Label
             doc.setTextColor(C_BLUE_ACCENT[0], C_BLUE_ACCENT[1], C_BLUE_ACCENT[2]);
             doc.setFontSize(7);
             doc.setFont('helvetica', 'bold');
-            doc.text('COTIZACIÓN OFICIAL', pageWidth - 15, 20, { align: 'right' });
+            doc.text('COTIZACIÓN OFICIAL', rightPad, boxY + 12, { align: 'right' });
 
+            // ID
             doc.setTextColor(255, 255, 255);
-            doc.setFontSize(32);
-            doc.setFont('helvetica', 'normal'); // Thin/Light look
-            doc.text(cotizacion.id.slice(0, 8).toUpperCase(), pageWidth - 15, 33, { align: 'right' });
+            doc.setFontSize(26);
+            doc.setFont('helvetica', 'normal');
+            doc.text(cotizacion.id.slice(0, 8).toUpperCase(), rightPad, boxY + 24, { align: 'right' });
 
-            // Stats separator
+            // Line
+            const lineY = boxY + 32;
             doc.setDrawColor(51, 65, 85); // Slate 700
-            doc.line(pageWidth - 90, 42, pageWidth - 15, 42);
+            doc.line(rightPad - 70, lineY, rightPad, lineY);
 
-            // Date & Ref
-            const gridY = 48;
+            // Columns
+            const labelY = lineY + 6;
+            const valY = labelY + 5;
+
+            // Ref ID
             doc.setFontSize(6);
             doc.setTextColor(148, 163, 184); // Slate 400
-            doc.text('FECHA EMISIÓN', pageWidth - 80, gridY);
-            doc.text('REFERENCIA ID', pageWidth - 35, gridY);
-
-            doc.setTextColor(226, 232, 240); // Slate 200
-            doc.setFontSize(9);
             doc.setFont('helvetica', 'bold');
-            doc.text(format(new Date(cotizacion.created_at || new Date()), 'dd/MM/yyyy'), pageWidth - 80, gridY + 5);
-            doc.text(cotizacion.id.slice(0, 6).toUpperCase(), pageWidth - 35, gridY + 5);
+            doc.text('REFERENCIA ID', rightPad, labelY, { align: 'right' });
+
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(8);
+            doc.text(cotizacion.id.slice(0, 6).toUpperCase(), rightPad, valY, { align: 'right' });
+
+            // Date
+            const col2X = rightPad - 35;
+            doc.setTextColor(148, 163, 184);
+            doc.setFontSize(6);
+            doc.text('FECHA EMISIÓN', col2X, labelY, { align: 'right' });
+
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(8);
+            doc.text(format(new Date(cotizacion.created_at || new Date()), 'dd/MM/yyyy'), col2X, valY, { align: 'right' });
 
 
             // ==========================================
-            // 2. CLIENT INFO & SUMMARY (2 Columns)
+            // 2. CLIENT INFO (Restored Layout)
             // ==========================================
-            let cursorY = 90;
+            let cursorY = boxY + headerH + 20;
+            // Ensure no overlap if header was somehow taller, but strict value is usually best for consistency
+            cursorY = Math.max(cursorY, 90);
 
-            // --- LEFT COLUMN: CLIENT ---
             doc.setTextColor(C_BLUE_ACCENT[0], C_BLUE_ACCENT[1], C_BLUE_ACCENT[2]);
             doc.setFontSize(7);
             doc.setFont('helvetica', 'bold');
-            doc.text('CLIENTE RECEPTOR', 15, cursorY - 10);
+            doc.text('CLIENTE RECEPTOR', 15, cursorY - 12);
 
             doc.setTextColor(C_TEXT_DARK[0], C_TEXT_DARK[1], C_TEXT_DARK[2]);
-            doc.setFontSize(22);
+            doc.setFontSize(24);
             doc.setFont('helvetica', 'bold');
             doc.text(cotizacion.nombre_cliente, 15, cursorY);
 
-            // Company tag
+            let detailsY = cursorY + 10;
             if (cotizacion.empresa_cliente) {
-                cursorY += 8;
                 doc.setFillColor(C_BLUE_ACCENT[0], C_BLUE_ACCENT[1], C_BLUE_ACCENT[2]);
-                doc.circle(17, cursorY - 1, 1.5, 'F');
-                doc.setFontSize(9);
+                doc.circle(17, detailsY - 2.5, 2, 'F');
+                doc.setFontSize(10);
                 doc.setTextColor(C_BLUE_ACCENT[0], C_BLUE_ACCENT[1], C_BLUE_ACCENT[2]);
-                doc.text(cotizacion.empresa_cliente.toUpperCase(), 21, cursorY);
+                doc.setFont('helvetica', 'bold');
+                doc.text(cotizacion.empresa_cliente.toUpperCase(), 22, detailsY);
+                detailsY += 8;
+            } else if (cotizacion.email_cliente) {
+                doc.setFontSize(9);
+                doc.setTextColor(C_GRAY_TEXT[0], C_GRAY_TEXT[1], C_GRAY_TEXT[2]);
+                doc.setFont('helvetica', 'normal');
+                doc.text(cotizacion.email_cliente, 15, detailsY);
             }
 
-            // Contact details
-            cursorY += 10;
-            const contactBoxColor = [248, 250, 252]; // Slate 50
-            doc.setFontSize(8);
-            doc.setTextColor(C_GRAY_TEXT[0], C_GRAY_TEXT[1], C_GRAY_TEXT[2]);
-
-            // Email & Phone
-            if (cotizacion.email_cliente) {
-                doc.text(`Email: ${cotizacion.email_cliente}`, 15, cursorY);
-                cursorY += 5;
-            }
-            if (cotizacion.telefono_cliente) {
-                doc.text(`Tel: ${cotizacion.telefono_cliente}`, 15, cursorY);
-                cursorY += 5;
-            }
-
-
-            // --- RIGHT COLUMN: SUMMARY BOX ---
+            // Summary Box
             const summaryX = pageWidth - 85;
-            const summaryY = 85;
+            doc.setTextColor(C_BLUE_ACCENT[0], C_BLUE_ACCENT[1], C_BLUE_ACCENT[2]);
+            doc.setFontSize(7);
+            doc.setFont('helvetica', 'bold');
+            doc.text('RESUMEN EJECUTIVO', summaryX + 70, cursorY - 10, { align: 'right' });
 
-            // Box
             doc.setFillColor(C_GRAY_LIGHT[0], C_GRAY_LIGHT[1], C_GRAY_LIGHT[2]);
             doc.setDrawColor(C_BORDER[0], C_BORDER[1], C_BORDER[2]);
-            doc.roundedRect(summaryX, summaryY, 70, 35, 3, 3, 'FD');
+            doc.roundedRect(summaryX, cursorY - 5, 70, 25, 3, 3, 'FD');
 
             doc.setTextColor(C_GRAY_TEXT[0], C_GRAY_TEXT[1], C_GRAY_TEXT[2]);
             doc.setFontSize(7);
-            doc.text('PLAN SELECCIONADO', summaryX + 35, summaryY + 8, { align: 'center' });
+            doc.setFont('helvetica', 'bold');
+            doc.text('PLAN SELECCIONADO', summaryX + 35, cursorY + 2, { align: 'center' });
 
             doc.setTextColor(C_PURPLE_MAIN[0], C_PURPLE_MAIN[1], C_PURPLE_MAIN[2]);
             doc.setFontSize(14);
             doc.setFont('helvetica', 'bold');
-            doc.text((cotizacion.plan_nombre || 'N/A').toUpperCase(), summaryX + 35, summaryY + 16, { align: 'center' });
+            doc.text((cotizacion.plan_nombre || 'N/A').toUpperCase(), summaryX + 35, cursorY + 12, { align: 'center' });
 
-            doc.setTextColor(C_TEXT_DARK[0], C_TEXT_DARK[1], C_TEXT_DARK[2]);
-            doc.setFontSize(9);
+            const volY = cursorY + 28;
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'normal');
+            const volPrefixWidth = doc.getTextWidth('Volumen Transaccional: ');
             doc.setFont('helvetica', 'bold');
-            doc.text(`Volumen: ${(cotizacion.volumen_dtes || 0).toLocaleString()} DTEs`, summaryX + 35, summaryY + 24, { align: 'center' });
+            const volValueWidth = doc.getTextWidth(`${(cotizacion.volumen_dtes || 0).toLocaleString()} DTEs/año`);
+            const startX = (summaryX + 35) - ((volPrefixWidth + volValueWidth) / 2);
 
+            doc.setTextColor(C_GRAY_TEXT[0], C_GRAY_TEXT[1], C_GRAY_TEXT[2]);
+            doc.setFont('helvetica', 'normal');
+            doc.text('Volumen Transaccional: ', startX, volY);
 
-            // ==========================================
-            // 3. TABLE OF ITEMS
-            // ==========================================
-            let tableY = 140;
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(C_TEXT_DARK[0], C_TEXT_DARK[1], C_TEXT_DARK[2]);
+            doc.text(`${(cotizacion.volumen_dtes || 0).toLocaleString()} DTEs/año`, startX + volPrefixWidth, volY);
 
-            // Table Header
-            doc.setFillColor(241, 245, 249); // Slate 100
-            doc.rect(15, tableY, pageWidth - 30, 10, 'F');
-
-            doc.setTextColor(148, 163, 184); // Slate 400
+            const statusY = volY + 8;
+            const statusText = `• ${(cotizacion.estado || 'BORRADOR').toUpperCase()}`;
             doc.setFontSize(7);
             doc.setFont('helvetica', 'bold');
-            doc.text('DESCRIPCIÓN DEL SERVICIO', 25, tableY + 6);
-            doc.text('INVERSIÓN (USD)', pageWidth - 25, tableY + 6, { align: 'right' });
+            const statusWidth = doc.getTextWidth(statusText) + 12;
+            doc.setFillColor(241, 245, 249);
+            doc.roundedRect((summaryX + 35) - (statusWidth / 2), statusY - 4, statusWidth, 6, 3, 3, 'F');
+            doc.setTextColor(100, 116, 139);
+            doc.text(statusText, summaryX + 35, statusY, { align: 'center' });
 
+
+            // ==========================================
+            // 3. TABLE
+            // ==========================================
+            let tableY = 140;
+            const drawTableHeader = (y: number) => {
+                doc.setFillColor(241, 245, 249);
+                doc.rect(15, y, pageWidth - 30, 10, 'F');
+                doc.setTextColor(148, 163, 184);
+                doc.setFontSize(7);
+                doc.setFont('helvetica', 'bold');
+                doc.text('DESCRIPCIÓN DEL SERVICIO', 25, y + 6);
+                doc.text('INVERSIÓN (USD)', pageWidth - 25, y + 6, { align: 'right' });
+            };
+
+            drawTableHeader(tableY);
             tableY += 15;
 
-            // Row Renderer
-            const drawRow = (iconType: string, title: string, subtitle: string, price: number) => {
-                // Icon Placeholder (Colored Square)
-                let iconColor = C_BLUE_ACCENT;
-                if (iconType === 'setup') iconColor = [249, 115, 22]; // Orange
-                if (iconType === 'module') iconColor = [168, 85, 247]; // Purple
-                if (iconType === 'chat') iconColor = [34, 197, 94];   // Green
+            const drawRow = (iconType: string, title: string, subtitle: string, price: number, isOneTime: boolean = false) => {
+                if (tableY + 30 > footerStart) {
+                    doc.addPage();
+                    tableY = 40;
+                    drawTableHeader(tableY);
+                    tableY += 15;
+                }
+                let baseColor = C_BLUE_ACCENT;
+                let bgMix = [239, 246, 255];
+                if (iconType === 'setup') { baseColor = [249, 115, 22]; bgMix = [255, 247, 237]; }
+                if (iconType === 'module') { baseColor = [168, 85, 247]; bgMix = [250, 245, 255]; }
+                if (iconType === 'chat') { baseColor = [34, 197, 94]; bgMix = [240, 253, 244]; }
+                if (iconType === 'target') { baseColor = [245, 158, 11]; bgMix = [255, 251, 235]; }
 
-                doc.setFillColor(iconColor[0], iconColor[1], iconColor[2]);
-                doc.roundedRect(15, tableY, 8, 8, 2, 2, 'F'); // Icon box
+                doc.setFillColor(bgMix[0], bgMix[1], bgMix[2]);
+                doc.roundedRect(15, tableY, 12, 12, 4, 4, 'F');
 
-                // Icon (Simulated with text char or empty)
-                doc.setTextColor(255, 255, 255);
-                doc.setFontSize(6);
-                doc.text('•', 19, tableY + 5.5, { align: 'center' }); // Dot icon
+                doc.setFillColor(baseColor[0], baseColor[1], baseColor[2]);
+                if (iconType === 'setup') {
+                    doc.circle(21, tableY + 6, 2.5, 'F');
+                    doc.setFillColor(bgMix[0], bgMix[1], bgMix[2]);
+                    doc.circle(21, tableY + 6, 1, 'F');
+                } else if (iconType === 'module') {
+                    doc.rect(19.5, tableY + 3.5, 3, 5, 'F');
+                } else if (iconType === 'chat') {
+                    doc.roundedRect(18.5, tableY + 4, 5, 4, 1, 1, 'F');
+                } else if (iconType === 'target') {
+                    doc.circle(21, tableY + 6, 2.5, 'F');
+                    doc.setFillColor(bgMix[0], bgMix[1], bgMix[2]);
+                    doc.circle(21, tableY + 6, 1.5, 'F');
+                    doc.setFillColor(baseColor[0], baseColor[1], baseColor[2]);
+                    doc.circle(21, tableY + 6, 0.8, 'F');
+                } else {
+                    doc.circle(21, tableY + 6, 2, 'F');
+                }
 
-                // Title
                 doc.setTextColor(C_TEXT_DARK[0], C_TEXT_DARK[1], C_TEXT_DARK[2]);
                 doc.setFontSize(10);
                 doc.setFont('helvetica', 'bold');
-                doc.text(title, 28, tableY + 4);
+                doc.text(title, 32, tableY + 5);
 
-                // Subtitle
+                const titleWidth = doc.getTextWidth(title);
+                if (isOneTime) {
+                    const badgeX = 32 + titleWidth + 3;
+                    doc.setFillColor(255, 237, 213);
+                    doc.roundedRect(badgeX, tableY + 2, 16, 4, 1, 1, 'F');
+                    doc.setTextColor(154, 52, 18);
+                    doc.setFontSize(5);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('PAGO ÚNICO', badgeX + 8, tableY + 4.5, { align: 'center' });
+                }
+
                 doc.setTextColor(C_GRAY_TEXT[0], C_GRAY_TEXT[1], C_GRAY_TEXT[2]);
                 doc.setFontSize(8);
                 doc.setFont('helvetica', 'normal');
-                doc.text(subtitle, 28, tableY + 9);
+                doc.text(subtitle, 32, tableY + 10);
 
-                // Price
                 doc.setTextColor(C_TEXT_DARK[0], C_TEXT_DARK[1], C_TEXT_DARK[2]);
                 doc.setFontSize(11);
                 doc.setFont('helvetica', 'bold');
-                doc.text(`$${price.toLocaleString()}`, pageWidth - 25, tableY + 6, { align: 'right' });
+                const priceStr = Number.isInteger(price) ? `$${price}` : `$${price.toLocaleString()}`;
+                doc.text(priceStr, pageWidth - 25, tableY + 8, { align: 'right' });
 
-                // Divider
-                doc.setDrawColor(241, 245, 249); // Slate 100
-                doc.line(15, tableY + 14, pageWidth - 15, tableY + 14);
-
-                tableY += 20;
+                doc.setDrawColor(241, 245, 249);
+                doc.setLineDashPattern([], 0);
+                doc.line(15, tableY + 16, pageWidth - 15, tableY + 16);
+                tableY += 22;
             };
 
-            // Dynamic Rows
-            drawRow('plan', `Licencia Anual ${cotizacion.plan_nombre}`, 'Suite DTE y soporte cloud.', cotizacion.costo_plan_anual || 0);
-
+            drawRow('plan', `Licencia Anual ${cotizacion.plan_nombre}`, 'Suite DTE y soporte cloud.', cotizacion.costo_plan_anual || 0, false);
             if (cotizacion.incluir_implementacion) {
-                drawRow('setup', 'Implementación y Configuración', 'Pago único inicial.', cotizacion.costo_implementacion || 0);
+                drawRow('setup', 'Implementación y Configuración', 'Puesta en marcha, capacitación y configuración inicial.', cotizacion.costo_implementacion || 0, true);
             }
-
             cotizacion.modulos_adicionales?.forEach((m: any) => {
-                drawRow('module', `${m.tipo === 'servicio' ? 'Servicio' : 'Módulo'}: ${m.nombre}`, m.descripcion || 'Adicional', m.costo_anual || 0);
+                const isOneTime = m.costo_mensual === 0;
+                drawRow('module', `${m.tipo === 'servicio' ? 'Servicio' : 'Módulo'}: ${m.nombre}`, m.descripcion || 'Integración nativa con su flujo de trabajo actual.', m.costo_anual || 0, isOneTime);
             });
-
-            if (cotizacion.servicio_whatsapp) {
-                drawRow('chat', 'Smart-WhatsApp', 'Notificaciones automáticas.', cotizacion.costo_whatsapp || 0);
-            }
-
-            if (cotizacion.servicio_personalizacion) {
-                drawRow('setup', 'Personalización Marca', 'White-label branding.', cotizacion.costo_personalizacion || 0);
-            }
+            if (cotizacion.servicio_whatsapp) drawRow('chat', 'Smart-WhatsApp', 'Notificaciones automáticas.', cotizacion.costo_whatsapp || 0, false);
+            if (cotizacion.servicio_personalizacion) drawRow('target', 'Personalización Marca (White-label)', 'Adaptación total a su identidad corporativa.', cotizacion.costo_personalizacion || 0, true);
 
 
             // ==========================================
-            // 4. TOTALS (Purple Box)
+            // 4. TOTALS
             // ==========================================
-            // Check if we have enough space for the totals box (50mm) + spacing before the footer starts
-            // Page Height is ~297mm. Footer starts at (Height - 40). We need to finish before that.
-            const footerStart = pageHeight - 40;
-            const totalsBoxHeight = 50;
-            const buffer = 10; // Extra breathing room
-
-            if (tableY + totalsBoxHeight + buffer > footerStart) {
+            const sectionHeight = 60;
+            const buffer = 10;
+            if (tableY + sectionHeight + buffer > footerStart) {
                 doc.addPage();
-                tableY = 40; // Reset Y position for the new page (below header if we drew one, or just top margin)
-
-                // Optional: Draw header again on new page? Or just keep it clean.
-                // Let's keep it clean, maybe just a small top margin.
+                tableY = 40;
             }
+            const sectionY = tableY + 10;
 
-            const totalBoxX = pageWidth - 95;
-            const totalBoxY = tableY + 10;
+            // Notes
+            const notesBoxWidth = 80;
+            const notesBoxHeight = 45;
+            doc.setFillColor(248, 250, 252);
+            doc.setDrawColor(226, 232, 240);
+            doc.roundedRect(15, sectionY, notesBoxWidth, notesBoxHeight, 3, 3, 'FD');
 
-            // Purple Card BG
+            doc.setFillColor(219, 234, 254);
+            doc.circle(23, sectionY + 8, 4, 'F');
+            doc.setTextColor(37, 99, 235);
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'bold');
+            doc.text('!', 23, sectionY + 9, { align: 'center' });
+
+            doc.setTextColor(C_BLUE_ACCENT[0], C_BLUE_ACCENT[1], C_BLUE_ACCENT[2]);
+            doc.setFontSize(6);
+            doc.text('NOTAS Y CONDICIONES', 30, sectionY + 7);
+
+            doc.setTextColor(100, 116, 139);
+            doc.setFontSize(7);
+            doc.setFont('helvetica', 'italic');
+            const notesText = doc.splitTextToSize(
+                cotizacion.notes || 'Esta propuesta tiene una validez de 30 días calendario. Los precios no incluyen impuestos locales adicionales. SLA garantizado del 99.9%.',
+                notesBoxWidth - 15
+            );
+            doc.text(notesText, 20, sectionY + 15);
+
+            // Totals Box
+            const totalBoxWidth = 80;
+            const totalBoxX = pageWidth - 15 - totalBoxWidth;
+
+            // Calculate discount first to decide box height
+            const discountAmount = cotizacion.descuento_monto || ((cotizacion.subtotal_anual || 0) * ((cotizacion.descuento_porcentaje || 0) / 100));
+            const hasDiscount = discountAmount > 0;
+            const boxHeight = hasDiscount ? 65 : 55;
+
             doc.setFillColor(C_PURPLE_MAIN[0], C_PURPLE_MAIN[1], C_PURPLE_MAIN[2]);
-            doc.roundedRect(totalBoxX, totalBoxY, 80, 50, 4, 4, 'F');
+            doc.roundedRect(totalBoxX, sectionY, totalBoxWidth, boxHeight, 6, 6, 'F');
 
-            // (Removed decorative circle)
-
-            let ty = totalBoxY + 12;
+            let ty = sectionY + 12;
             doc.setTextColor(255, 255, 255);
 
-            // Subtotal
             doc.setFontSize(7);
             doc.text('SUBTOTAL NETO', totalBoxX + 10, ty);
             doc.setFontSize(9);
             doc.setFont('helvetica', 'bold');
-            doc.text(`$${(cotizacion.subtotal_anual || 0).toLocaleString()}`, pageWidth - 20, ty, { align: 'right' });
+            doc.text(`$${(cotizacion.subtotal_anual || 0).toLocaleString()}`, totalBoxX + totalBoxWidth - 10, ty, { align: 'right' });
 
-            // Taxes
+            if (hasDiscount) {
+                ty += 8;
+                doc.setTextColor(134, 239, 172);
+                doc.setFontSize(7);
+                doc.setFont('helvetica', 'bold');
+                const percentLabel = cotizacion.descuento_porcentaje ? `(${cotizacion.descuento_porcentaje}%)` : '';
+                doc.text(`DESCUENTO ${percentLabel}`, totalBoxX + 10, ty);
+                doc.text(`-$${discountAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })}`, totalBoxX + totalBoxWidth - 10, ty, { align: 'right' });
+                doc.setTextColor(255, 255, 255);
+            }
+
             ty += 8;
             doc.setFontSize(7);
             doc.setFont('helvetica', 'normal');
-            doc.text(`IVA (${cotizacion.iva_porcentaje}%)`, totalBoxX + 10, ty);
-            doc.text(`$${(cotizacion.iva_monto || 0).toLocaleString()}`, pageWidth - 20, ty, { align: 'right' });
+            doc.text(`IVA (${cotizacion.iva_porcentaje || 13}%)`, totalBoxX + 10, ty);
+            doc.text(`$${(cotizacion.iva_monto || 0).toLocaleString()}`, totalBoxX + totalBoxWidth - 10, ty, { align: 'right' });
 
-            // Divider
             doc.setDrawColor(255, 255, 255, 0.2);
-            doc.line(totalBoxX + 10, ty + 5, pageWidth - 20, ty + 5);
+            doc.line(totalBoxX + 10, ty + 5, totalBoxX + totalBoxWidth - 10, ty + 5);
 
-            // Grand Total
-            ty += 15;
-            doc.setFontSize(8);
-            doc.text('TOTAL A INVERTIR', totalBoxX + 10, ty);
-            doc.setFontSize(20);
+            const isCredit = cotizacion.tipo_pago === 'credito' && cotizacion.plazo_meses > 0;
+            if (isCredit) {
+                ty += 12;
+                doc.setFontSize(7);
+                doc.text('INVERSIÓN TOTAL', totalBoxX + 10, ty);
+                doc.text(`$${(cotizacion.total_anual || 0).toLocaleString()}`, totalBoxX + totalBoxWidth - 10, ty, { align: 'right' });
+
+                ty += 6;
+                doc.setTextColor(134, 239, 172);
+                doc.setFontSize(7);
+                doc.setFont('helvetica', 'bold');
+                doc.text('PAGO INICIAL / ANTICIPO', totalBoxX + 10, ty);
+                doc.text(`$${(cotizacion.monto_anticipo || 0).toLocaleString()}`, totalBoxX + totalBoxWidth - 10, ty, { align: 'right' });
+
+                ty += 12;
+                const saldo = (cotizacion.total_anual || 0) - (cotizacion.monto_anticipo || 0);
+                const cuota = saldo / cotizacion.plazo_meses;
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(7);
+                doc.setFont('helvetica', 'normal');
+                doc.text(`Saldo a ${cotizacion.plazo_meses} cuotas de:`, totalBoxX + 10, ty - 3);
+                doc.setFontSize(16);
+                doc.setFont('helvetica', 'bold');
+                doc.text(`$${cuota.toLocaleString(undefined, { maximumFractionDigits: 2 })}/mes`, totalBoxX + totalBoxWidth - 10, ty + 2, { align: 'right' });
+            } else {
+                ty += 18;
+                doc.setFontSize(8);
+                doc.text('TOTAL A INVERTIR', totalBoxX + 10, ty);
+                doc.setFontSize(22);
+                doc.setFont('helvetica', 'bold');
+                doc.text(`$${(cotizacion.total_anual || 0).toLocaleString()}`, totalBoxX + totalBoxWidth - 10, ty + 2, { align: 'right' });
+
+                ty += 10;
+                const monthlyVal = cotizacion.total_mensual || (cotizacion.total_anual / 12);
+                doc.setTextColor(134, 239, 172);
+                doc.setFontSize(7);
+                doc.setFont('helvetica', 'bold');
+                doc.text(`MENSUAL: $${monthlyVal.toLocaleString(undefined, { maximumFractionDigits: 1 })}/mes`, totalBoxX + totalBoxWidth - 10, ty, { align: 'right' });
+            }
+
+            doc.setTextColor(148, 163, 184);
+            doc.setFontSize(6);
             doc.setFont('helvetica', 'bold');
-            doc.text(`$${(cotizacion.total_anual || 0).toLocaleString()}`, pageWidth - 20, ty + 2, { align: 'right' });
+            doc.text('TODOS LOS VALORES EXPRESADOS EN USD', totalBoxX + (totalBoxWidth / 2), sectionY + 62, { align: 'center' });
 
 
             // ==========================================
-            // 5. FOOTER (Gray Box) - REFINED
+            // 5. FOOTER
             // ==========================================
-            const footerH = 40;
-            const footerY = pageHeight - footerH;
-
-            doc.setFillColor(248, 250, 252); // Gray 50
+            const footerY = footerStart;
+            doc.setFillColor(248, 250, 252);
             doc.rect(0, footerY, pageWidth, footerH, 'F');
             doc.setDrawColor(226, 232, 240);
             doc.line(0, footerY, pageWidth, footerY);
 
-            // --- LEFT: AGENT PROFILE ---
             const avatarUrl = cotizacion.creator?.avatar_url;
             const avatarData = await loadImage(avatarUrl);
+            const avatarSize = 14;
+            const avatarX = 15;
+            const avatarY = footerY + 8;
 
             if (avatarData) {
-                // Circular clip for avatar (advanced, but square with rounded simulation is safer)
-                doc.addImage(avatarData, 'PNG', 15, footerY + 8, 14, 14);
+                doc.addImage(avatarData, 'PNG', avatarX, avatarY, avatarSize, avatarSize);
+                doc.setDrawColor(226, 232, 240);
+                doc.rect(avatarX, avatarY, avatarSize, avatarSize);
             } else {
                 doc.setFillColor(C_PURPLE_MAIN[0], C_PURPLE_MAIN[1], C_PURPLE_MAIN[2]);
-                doc.circle(22, footerY + 15, 7, 'F');
+                doc.roundedRect(avatarX, avatarY, avatarSize, avatarSize, 3, 3, 'F');
                 doc.setTextColor(255, 255, 255);
                 doc.setFontSize(9);
-                doc.text('A', 22, footerY + 18, { align: 'center' });
+                doc.text('A', avatarX + (avatarSize / 2), avatarY + (avatarSize / 2) + 1, { align: 'center' });
             }
 
             const agentTextX = 35;
@@ -358,20 +484,14 @@ export const pdfService = {
             doc.setFontSize(10);
             doc.text((cotizacion.creator?.full_name || 'AGENTE COMERCIAL').toUpperCase(), agentTextX, footerY + 15);
 
-            // Agent Contact Details (Email)
-            doc.setTextColor(100, 116, 139); // Slate 500
+            doc.setTextColor(100, 116, 139);
             doc.setFontSize(7);
             doc.setFont('helvetica', 'normal');
             doc.text(cotizacion.creator?.email || '', agentTextX, footerY + 19);
 
-
-            // --- CENTER/RIGHT: QR CODE & COMPANY INFO ---
-
-            // Separator Line
-            doc.setDrawColor(226, 232, 240); // Slate 200
+            doc.setDrawColor(226, 232, 240);
             doc.line(pageWidth - 85, footerY + 8, pageWidth - 85, footerY + 32);
 
-            // QR Code (Center-Right)
             const qrTarget = cotizacion.company?.website || cotizacion.creator?.website || 'https://ariesdefense.com';
             const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(qrTarget)}`;
             const qrData = await loadImage(qrUrl);
@@ -383,13 +503,12 @@ export const pdfService = {
                 doc.text('VISITA NUESTRA WEB', pageWidth - 105, footerY + 28);
             }
 
-            // Right: Company Address & Branding
             doc.setFontSize(7);
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(C_PURPLE_MAIN[0], C_PURPLE_MAIN[1], C_PURPLE_MAIN[2]);
             doc.text(`${cotizacion.company?.name || 'SaaS PRO'} - ${new Date().getFullYear()}`, pageWidth - 15, footerY + 12, { align: 'right' });
 
-            doc.setTextColor(100, 116, 139); // Slate 500
+            doc.setTextColor(100, 116, 139);
             doc.setFontSize(6);
             doc.setFont('helvetica', 'normal');
 
@@ -404,11 +523,11 @@ export const pdfService = {
             }
 
             doc.setFontSize(6);
-            doc.setTextColor(148, 163, 184); // Slate 400
+            doc.setTextColor(148, 163, 184);
             doc.text('DOCUMENTO OFICIAL', pageWidth - 15, footerY + 28, { align: 'right' });
 
 
-            // OUTPUT
+            // SAVE
             const pdfBlob = doc.output('blob');
             const fileName = `Propuesta_${(cotizacion.nombre_cliente || 'Cliente').replace(/\s+/g, '_')}_${Date.now()}.pdf`;
 
@@ -418,7 +537,7 @@ export const pdfService = {
             return supabase.storage.from('quotations').getPublicUrl(fileName).data.publicUrl;
 
         } catch (err: any) {
-            console.error('PDF Error:', err);
+            console.error('PDF Generation Error:', err);
             throw err;
         }
     }

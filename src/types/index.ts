@@ -24,6 +24,14 @@ export interface Profile {
     avatar_url?: string | null;
     website?: string | null;
     created_at: string;
+    permissions?: {
+        leads?: boolean;
+        quotes?: boolean;
+        calendar?: boolean;
+        marketing?: boolean;
+        chat?: boolean;
+        [key: string]: boolean | undefined;
+    };
 }
 
 export interface Company {
@@ -39,6 +47,10 @@ export interface Company {
     phone?: string | null;
     license_status: LicenseStatus;
     created_at: string;
+    features?: {
+        marketing: boolean;
+        chat: boolean;
+    };
 }
 
 export interface Lead {
