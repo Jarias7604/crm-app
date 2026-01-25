@@ -269,7 +269,19 @@ export const pdfService = {
             // ==========================================
             // 4. TOTALS (Purple Box)
             // ==========================================
-            if (tableY + 50 > pageHeight) doc.addPage();
+            // Check if we have enough space for the totals box (50mm) + spacing before the footer starts
+            // Page Height is ~297mm. Footer starts at (Height - 40). We need to finish before that.
+            const footerStart = pageHeight - 40;
+            const totalsBoxHeight = 50;
+            const buffer = 10; // Extra breathing room
+
+            if (tableY + totalsBoxHeight + buffer > footerStart) {
+                doc.addPage();
+                tableY = 40; // Reset Y position for the new page (below header if we drew one, or just top margin)
+
+                // Optional: Draw header again on new page? Or just keep it clean.
+                // Let's keep it clean, maybe just a small top margin.
+            }
 
             const totalBoxX = pageWidth - 95;
             const totalBoxY = tableY + 10;
