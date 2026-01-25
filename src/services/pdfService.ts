@@ -39,23 +39,54 @@ export const pdfService = {
             doc.rect(pageWidth / 2, 0, pageWidth / 2, headerH, 'F');
 
             // Left: Company Profile
-            doc.setTextColor(255, 255, 255);
-            doc.setFontSize(22);
-            doc.setFont('helvetica', 'bold');
-            const companyName = (cotizacion.company?.name || 'ARIAS DEFENSE').toUpperCase();
-            doc.text(companyName, 20, 25);
+            if (cotizacion.company?.logo_url) {
+                try {
+                    // Creating a promise to load the image
+                    const imgData = await new Promise<string>((resolve, reject) => {
+                        const img = new Image();
+                        img.crossOrigin = "Anonymous"; // Try to handle CORS
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            const ctx = canvas.getContext('2d');
+                            ctx?.drawImage(img, 0, 0);
+                            resolve(canvas.toDataURL('image/png'));
+                        };
+                        img.onerror = reject;
+                        // Cache buster if needed, or just src
+                        img.src = cotizacion.company.logo_url;
+                    });
+
+                    // Add image to PDF (Aspect ratio optional, but we force fit 50x20 box)
+                    doc.addImage(imgData, 'PNG', 20, 15, 50, 20, undefined, 'FAST');
+                } catch (e) {
+                    // Fallback to text if image fails
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFontSize(22);
+                    doc.setFont('helvetica', 'bold');
+                    const companyName = (cotizacion.company?.name || 'ARIAS DEFENSE').toUpperCase();
+                    doc.text(companyName, 20, 25);
+                }
+            } else {
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(22);
+                doc.setFont('helvetica', 'bold');
+                const companyName = (cotizacion.company?.name || 'ARIAS DEFENSE').toUpperCase();
+                doc.text(companyName, 20, 25);
+            }
 
             doc.setFontSize(8);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(C_SLATE_400[0], C_SLATE_400[1], C_SLATE_400[2]);
             const address = cotizacion.company?.address || 'COL. LA MASCOTA, EDIF. ARIAS DEFENSE';
             const phone = cotizacion.company?.phone || '7123-4567';
-            doc.text(`${address} • ${phone}`, 20, 32);
+            doc.text(`${address} • ${phone}`, 20, 40); // Adjusted Y for image space
 
             doc.setTextColor(C_BLUE_500[0], C_BLUE_500[1], C_BLUE_500[2]);
             doc.setFont('helvetica', 'bold');
             const web = (cotizacion.company?.website || 'WWW.ARIASDEFENSE.COM').replace(/^https?:\/\//, '').toUpperCase();
-            doc.text(web, 20, 37);
+            doc.text(web, 20, 45);
 
             // Right: Quote Identification
             doc.setTextColor(C_BLUE_500[0], C_BLUE_500[1], C_BLUE_500[2]);
