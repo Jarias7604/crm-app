@@ -387,7 +387,7 @@ export default function ChatHub() {
                             </div>
                             <div className="flex items-center gap-3">
                                 <button
-                                    onClick={() => navigate('/cotizaciones/nueva', { state: { lead: selectedConv.lead, conversation_id: selectedConv.id, fromChat: true } })}
+                                    onClick={() => navigate('/cotizaciones/nueva-pro', { state: { lead: selectedConv.lead, conversation_id: selectedConv.id, fromChat: true } })}
                                     className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl shadow-blue-600/20"
                                 >
                                     Nueva Cotización
