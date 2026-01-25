@@ -4,256 +4,288 @@ import { supabase } from './supabase';
 import { format } from 'date-fns';
 
 /**
- * 🛡️ PDF SERVICE - PREMIUM UI NATIVE MODE
+ * 💎 PDF SERVICE - PREMIUM CLONE v4.0
  * -----------------------------------------
- * This implementation REPLICATES the exact React UI (CotizacionDetalle.tsx)
- * using pure coordinates to ensure 100% compatibility with Vercel and Production.
- * NO external table dependencies are used to avoid "is not a function" errors.
+ * Replicas the visual hierarchy, colors, and iconography of CotizacionDetalle.tsx
+ * using native code to ensure Vercel/Production safety.
  */
 
 export const pdfService = {
     async generateAndUploadQuotePDF(cotizacion: any): Promise<string> {
         try {
-            console.log(`🚀 Generando PDF Premium 1:1 [vFINAL] para: ${cotizacion.id}`);
+            console.log(`✨ Generating Pixel-Perfect PDF for: ${cotizacion.nombre_cliente}`);
 
-            // Standard A4
             const doc = new jsPDF();
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
 
-            // Palette (Exact Match from CotizacionDetalle.tsx)
-            const C_SLATE_900 = [15, 23, 42];  // #0f172a (Header)
-            const C_INDIGO_MAIN = [68, 73, 170]; // #4449AA (Brand/Total)
-            const C_BLUE_500 = [59, 130, 246]; // Blue accents
+            // Colors 
+            const C_SLATE_900 = [15, 23, 42];
+            const C_INDIGO_MAIN = [68, 73, 170];
+            const C_BLUE_500 = [59, 130, 246];
             const C_SLATE_400 = [148, 163, 184];
-            const C_SLATE_700 = [51, 65, 85];
             const C_GRAY_50 = [249, 250, 251];
             const C_GRAY_100 = [243, 244, 246];
 
             // ==========================================
             // 1. HEADER (SLATE DARK SECTION)
             // ==========================================
-            const headerH = 55;
+            const headerH = 60;
             doc.setFillColor(C_SLATE_900[0], C_SLATE_900[1], C_SLATE_900[2]);
             doc.rect(0, 0, pageWidth, headerH, 'F');
 
-            // Left: Company Branding
-            doc.setTextColor(255, 255, 255);
-            doc.setFontSize(18);
-            doc.setFont('helvetica', 'bold');
-            const companyName = (cotizacion.company?.name || 'ARIAS DEFENSE COMPONENTS').toUpperCase();
-            doc.text(companyName, 20, 22);
+            // Accent Gradient Simulation (Lighter blue on the right)
+            doc.setFillColor(30, 41, 59);
+            doc.rect(pageWidth / 2, 0, pageWidth / 2, headerH, 'F');
 
-            // Company Info (Small)
+            // Left: Company Profile
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(22);
+            doc.setFont('helvetica', 'bold');
+            const companyName = (cotizacion.company?.name || 'ARIAS DEFENSE').toUpperCase();
+            doc.text(companyName, 20, 25);
+
             doc.setFontSize(8);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(C_SLATE_400[0], C_SLATE_400[1], C_SLATE_400[2]);
-            const address = cotizacion.company?.address || 'COL. LA MASCOTA, SAN SALVADOR, EL SALVADOR';
+            const address = cotizacion.company?.address || 'COL. LA MASCOTA, EDIF. ARIAS DEFENSE';
+            const phone = cotizacion.company?.phone || '7123-4567';
+            doc.text(`${address} • ${phone}`, 20, 32);
+
+            doc.setTextColor(C_BLUE_500[0], C_BLUE_500[1], C_BLUE_500[2]);
+            doc.setFont('helvetica', 'bold');
             const web = (cotizacion.company?.website || 'WWW.ARIASDEFENSE.COM').replace(/^https?:\/\//, '').toUpperCase();
-            doc.text(address, 20, 28);
+            doc.text(web, 20, 37);
 
+            // Right: Quote Identification
             doc.setTextColor(C_BLUE_500[0], C_BLUE_500[1], C_BLUE_500[2]);
+            doc.setFontSize(7);
             doc.setFont('helvetica', 'bold');
-            doc.text(web, 20, 32);
-
-            // Right: Metadata
-            doc.setTextColor(C_BLUE_500[0], C_BLUE_500[1], C_BLUE_500[2]);
-            doc.setFontSize(8);
-            doc.text('COTIZACIÓN OFICIAL', pageWidth - 20, 18, { align: 'right' });
+            doc.text('COTIZACIÓN OFICIAL', pageWidth - 20, 20, { align: 'right' });
 
             doc.setTextColor(255, 255, 255);
-            doc.setFontSize(28);
+            doc.setFontSize(32);
             doc.setFont('helvetica', 'normal');
-            doc.text(String(cotizacion.id).slice(0, 8).toUpperCase(), pageWidth - 20, 32, { align: 'right' });
+            doc.text(String(cotizacion.id).slice(0, 8).toUpperCase(), pageWidth - 20, 35, { align: 'right' });
 
-            // Divider & Row
-            doc.setDrawColor(C_SLATE_700[0], C_SLATE_700[1], C_SLATE_700[2]);
-            doc.line(pageWidth - 80, 38, pageWidth - 20, 38);
+            // Stat row
+            doc.setDrawColor(71, 85, 105);
+            doc.line(pageWidth - 85, 42, pageWidth - 20, 42);
 
-            doc.setFontSize(7);
+            const statsY = 48;
+            doc.setFontSize(6);
             doc.setTextColor(C_SLATE_400[0], C_SLATE_400[1], C_SLATE_400[2]);
-            doc.text('FECHA EMISIÓN', pageWidth - 80, 43);
-            doc.text('REFERENCIA ID', pageWidth - 45, 43);
+            doc.text('FECHA EMISIÓN', pageWidth - 80, statsY);
+            doc.text('REFERENCIA ID', pageWidth - 45, statsY);
 
-            doc.setTextColor(241, 245, 249);
-            doc.setFontSize(9);
-            doc.setFont('helvetica', 'bold');
-            doc.text(format(new Date(cotizacion.created_at || Date.now()), 'dd/MM/yyyy'), pageWidth - 80, 48);
-            doc.text(String(cotizacion.id).slice(0, 6).toUpperCase(), pageWidth - 45, 48);
-
-            // ==========================================
-            // 2. CLIENT & SUMMARY
-            // ==========================================
-            let cursorY = 75;
-            doc.setTextColor(C_BLUE_500[0], C_BLUE_500[1], C_BLUE_500[2]);
+            doc.setTextColor(255, 255, 255);
             doc.setFontSize(10);
             doc.setFont('helvetica', 'bold');
-            doc.text('CLIENTE RECEPTOR', 20, cursorY);
+            doc.text(format(new Date(cotizacion.created_at || Date.now()), 'dd/MM/yyyy'), pageWidth - 80, statsY + 5);
+            doc.text(String(cotizacion.id).slice(0, 6).toUpperCase(), pageWidth - 45, statsY + 5);
 
-            cursorY += 12;
+
+            // ==========================================
+            // 2. CLIENT & EXECUTIVE SUMMARY
+            // ==========================================
+            let cursorY = 85;
+
+            // Client Label
+            doc.setTextColor(C_BLUE_500[0], C_BLUE_500[1], C_BLUE_500[2]);
+            doc.setFontSize(8);
+            doc.text('CLIENTE RECEPTOR', 20, cursorY - 10);
+
             doc.setTextColor(C_SLATE_900[0], C_SLATE_900[1], C_SLATE_900[2]);
-            doc.setFontSize(24);
+            doc.setFontSize(26);
+            doc.setFont('helvetica', 'bold');
             doc.text(String(cotizacion.nombre_cliente).toUpperCase(), 20, cursorY);
 
             if (cotizacion.empresa_cliente) {
                 cursorY += 8;
                 doc.setFontSize(11);
                 doc.setTextColor(C_INDIGO_MAIN[0], C_INDIGO_MAIN[1], C_INDIGO_MAIN[2]);
-                doc.text(String(cotizacion.empresa_cliente).toUpperCase(), 20, cursorY);
+                doc.text(cotizacion.empresa_cliente.toUpperCase(), 20, cursorY);
             }
 
-            // Summary Box (Right)
+            // Summary Card (Right)
             doc.setFillColor(C_GRAY_50[0], C_GRAY_50[1], C_GRAY_50[2]);
             doc.setDrawColor(C_GRAY_100[0], C_GRAY_100[1], C_GRAY_100[2]);
-            doc.roundedRect(pageWidth - 85, 70, 65, 35, 4, 4, 'FD');
+            doc.roundedRect(pageWidth - 85, 80, 65, 30, 4, 4, 'FD');
 
             doc.setTextColor(C_INDIGO_MAIN[0], C_INDIGO_MAIN[1], C_INDIGO_MAIN[2]);
-            doc.setFontSize(8);
-            doc.text('RESUMEN EJECUTIVO', pageWidth - 52.5, 78, { align: 'center' });
+            doc.setFontSize(6);
+            doc.text('RESUMEN EJECUTIVO', pageWidth - 52.5, 87, { align: 'center' });
 
             doc.setTextColor(C_SLATE_900[0], C_SLATE_900[1], C_SLATE_900[2]);
-            doc.setFontSize(12);
-            doc.text(`${cotizacion.plan_nombre}`, pageWidth - 52.5, 88, { align: 'center' });
-            doc.setFontSize(8);
-            doc.setTextColor(100, 116, 139);
-            doc.text(`${(cotizacion.volumen_dtes || 0).toLocaleString()} DTEs/año`, pageWidth - 52.5, 95, { align: 'center' });
-
-            // ==========================================
-            // 3. TABLE (MANUAL RENDER)
-            // ==========================================
-            let tableY = 120;
-            doc.setFontSize(10);
-            doc.setTextColor(C_BLUE_500[0], C_BLUE_500[1], C_BLUE_500[2]);
+            doc.setFontSize(14);
             doc.setFont('helvetica', 'bold');
-            doc.text('DESGLOSE DE INVERSIÓN', 20, tableY);
+            doc.text(cotizacion.plan_nombre || 'PLAN PERSONALIZADO', pageWidth - 52.5, 96, { align: 'center' });
 
-            tableY += 8;
+            doc.setFontSize(8);
+            doc.setTextColor(148, 163, 184);
+            doc.text(`${(cotizacion.volumen_dtes || 0).toLocaleString()} DTEs / año`, pageWidth - 52.5, 103, { align: 'center' });
+
+
+            // ==========================================
+            // 3. TABLE BODY
+            // ==========================================
+            let tableY = 135;
+            doc.setTextColor(C_BLUE_500[0], C_BLUE_500[1], C_BLUE_500[2]);
+            doc.setFontSize(8);
+            doc.text('DESGLOSE DE INVERSIÓN', 20, tableY - 10);
+
+            // Header row
             doc.setFillColor(C_GRAY_50[0], C_GRAY_50[1], C_GRAY_50[2]);
             doc.rect(20, tableY, pageWidth - 40, 10, 'F');
+            doc.setDrawColor(C_GRAY_100[0], C_GRAY_100[1], C_GRAY_100[2]);
+            doc.line(20, tableY + 10, pageWidth - 20, tableY + 10);
 
-            doc.setTextColor(100, 116, 139);
-            doc.setFontSize(8);
+            doc.setTextColor(C_SLATE_400[0], C_SLATE_400[1], C_SLATE_400[2]);
+            doc.setFontSize(7);
             doc.text('DESCRIPCIÓN DEL SERVICIO', 25, tableY + 6.5);
             doc.text('INVERSIÓN (USD)', pageWidth - 25, tableY + 6.5, { align: 'right' });
 
-            tableY += 10;
+            tableY += 15;
 
-            const drawRow = (title: string, subtitle: string, price: number, color: number[]) => {
-                // Icon Box
-                doc.setFillColor(color[0], color[1], color[2], 0.1);
-                doc.roundedRect(20, tableY + 2, 10, 10, 2, 2, 'F');
+            const drawItemRow = (type: string, title: string, subtitle: string, price: number) => {
+                let iconColor = C_BLUE_500;
+                if (type === 'setup') iconColor = [234, 88, 12];
+                if (type === 'module') iconColor = [147, 51, 234];
+                if (type === 'chat') iconColor = [22, 163, 74];
 
-                doc.setTextColor(C_SLATE_900[0], C_SLATE_900[1], C_SLATE_900[2]);
-                doc.setFontSize(10);
-                doc.setFont('helvetica', 'bold');
-                doc.text(title, 35, tableY + 6.5);
+                // Draw Icon Box
+                doc.setFillColor(iconColor[0], iconColor[1], iconColor[2], 0.1);
+                doc.roundedRect(20, tableY, 12, 12, 3, 3, 'F');
 
-                doc.setTextColor(100, 116, 139);
-                doc.setFontSize(8);
-                doc.setFont('helvetica', 'normal');
-                doc.text(subtitle, 35, tableY + 11);
+                // Draw Icon Symbol (Primitive lines)
+                doc.setDrawColor(iconColor[0], iconColor[1], iconColor[2]);
+                doc.setLineWidth(0.3);
+                if (type === 'plan') { // Box
+                    doc.rect(23, tableY + 3, 6, 6);
+                } else if (type === 'setup') { // Gear
+                    doc.circle(26, tableY + 6, 3);
+                    doc.line(26, tableY + 2, 26, tableY + 10);
+                    doc.line(22, tableY + 6, 30, tableY + 6);
+                } else { // Circle/Dot
+                    doc.circle(26, tableY + 6, 2, 'F');
+                }
 
                 doc.setTextColor(C_SLATE_900[0], C_SLATE_900[1], C_SLATE_900[2]);
                 doc.setFontSize(11);
                 doc.setFont('helvetica', 'bold');
-                doc.text(`$${price.toLocaleString()}`, pageWidth - 25, tableY + 8, { align: 'right' });
+                doc.text(title, 36, tableY + 5);
 
-                tableY += 18;
+                doc.setFontSize(9);
+                doc.setTextColor(148, 163, 184);
+                doc.setFont('helvetica', 'normal');
+                doc.text(subtitle, 36, tableY + 10);
+
+                doc.setTextColor(C_SLATE_900[0], C_SLATE_900[1], C_SLATE_900[2]);
+                doc.setFontSize(13);
+                doc.setFont('helvetica', 'bold');
+                doc.text(`$${price.toLocaleString()}`, pageWidth - 25, tableY + 7, { align: 'right' });
+
+                tableY += 21;
                 doc.setDrawColor(C_GRAY_100[0], C_GRAY_100[1], C_GRAY_100[2]);
-                doc.line(20, tableY, pageWidth - 20, tableY);
+                doc.setLineWidth(0.1);
+                doc.line(20, tableY - 4, pageWidth - 20, tableY - 4);
             };
 
-            // Items
-            drawRow(`Licencia Anual ${cotizacion.plan_nombre}`, 'Incluye suite DTE y soporte técnico base.', cotizacion.costo_plan_anual || 0, [59, 130, 246]);
+            // Rows
+            drawItemRow('plan', `Licencia Anual ${cotizacion.plan_nombre}`, 'Suite completa DTE y soporte técnico.', cotizacion.costo_plan_anual || 0);
 
             if (cotizacion.incluir_implementacion) {
-                drawRow('Implementación y Configuración', 'Puesta en marcha, capacitación y configuración inicial.', cotizacion.costo_implementacion || 0, [234, 88, 12]);
+                drawItemRow('setup', 'Implementación y Configuración', 'Pago único. Puesta en marcha corporativa.', cotizacion.costo_implementacion || 0);
             }
 
             if (cotizacion.modulos_adicionales) {
                 cotizacion.modulos_adicionales.forEach((m: any) => {
-                    drawRow(m.nombre, 'Módulo adicional especializado.', m.costo_anual || 0, [147, 51, 234]);
+                    drawItemRow('module', m.nombre, 'Módulo adicional integrado.', m.costo_anual || 0);
                 });
             }
 
             if (cotizacion.servicio_whatsapp) {
-                drawRow('Notificaciones Smart-WhatsApp', 'Automatización de envíos y confirmación.', cotizacion.costo_whatsapp || 0, [22, 163, 74]);
+                drawItemRow('chat', 'Servicio Smart-WhatsApp', 'Notificaciones y seguimiento automático.', cotizacion.costo_whatsapp || 0);
             }
 
-            if (cotizacion.servicio_personalizacion) {
-                drawRow('Personalización White-Label', 'Adaptación total a su marca corporativa.', cotizacion.costo_personalizacion || 0, [245, 158, 11]);
-            }
 
             // ==========================================
-            // 4. TOTALS (INDIGO CARD)
+            // 4. TOTALS (FLOATING INDIGO BOX)
             // ==========================================
-            if (tableY + 60 > pageHeight) doc.addPage();
-            const totalY = tableY + 15;
+            if (tableY + 70 > pageHeight) doc.addPage();
+            const totalX = pageWidth - 90;
+            const totalY = tableY + 10;
 
             doc.setFillColor(C_INDIGO_MAIN[0], C_INDIGO_MAIN[1], C_INDIGO_MAIN[2]);
-            doc.roundedRect(pageWidth - 100, totalY, 80, 50, 6, 6, 'F');
+            doc.roundedRect(totalX, totalY, 70, 50, 8, 8, 'F');
 
-            let tY = totalY + 12;
+            let ty = totalY + 12;
             doc.setTextColor(255, 255, 255);
             doc.setFontSize(8);
             doc.setFont('helvetica', 'normal');
-            doc.text('SUBTOTAL NETO', pageWidth - 90, tY);
+            doc.text('SUBTOTAL NETO', totalX + 8, ty);
             doc.setFontSize(11);
             doc.setFont('helvetica', 'bold');
-            doc.text(`$${(cotizacion.subtotal_anual || 0).toLocaleString()}`, pageWidth - 30, tY, { align: 'right' });
+            doc.text(`$${(cotizacion.subtotal_anual || 0).toLocaleString()}`, pageWidth - 28, ty, { align: 'right' });
 
-            tY += 10;
+            ty += 10;
             doc.setFontSize(8);
             doc.setFont('helvetica', 'normal');
-            doc.text(`IVA (${cotizacion.iva_porcentaje || 13}%)`, pageWidth - 90, tY);
-            doc.text(`$${(cotizacion.iva_monto || 0).toLocaleString()}`, pageWidth - 30, tY, { align: 'right' });
+            doc.text(`IVA (${cotizacion.iva_porcentaje || 13}%)`, totalX + 8, ty);
+            doc.text(`$${(cotizacion.iva_monto || 0).toLocaleString()}`, pageWidth - 28, ty, { align: 'right' });
 
-            doc.setDrawColor(255, 255, 255, 0.2);
-            doc.line(pageWidth - 90, tY + 4, pageWidth - 30, tY + 4);
+            doc.setDrawColor(255, 255, 255, 0.3);
+            doc.setLineWidth(0.2);
+            doc.line(totalX + 8, ty + 4, pageWidth - 28, ty + 4);
 
-            tY += 15;
-            doc.setFontSize(10);
-            doc.text('TOTAL A INVERTIR', pageWidth - 90, tY);
-            doc.setFontSize(24);
+            ty += 15;
+            doc.setFontSize(9);
+            doc.text('TOTAL A INVERTIR', totalX + 8, ty);
+            doc.setFontSize(22);
             doc.setFont('helvetica', 'bold');
-            doc.text(`$${(cotizacion.total_anual || 0).toLocaleString()}`, pageWidth - 30, tY + 2, { align: 'right' });
+            doc.text(`$${(cotizacion.total_anual || 0).toLocaleString()}`, pageWidth - 28, ty + 2, { align: 'right' });
+
 
             // ==========================================
-            // 5. FOOTER
+            // 5. PROFESSIONAL FOOTER
             // ==========================================
-            const footerY = pageHeight - 35;
+            const footY = pageHeight - 35;
             doc.setFillColor(C_GRAY_50[0], C_GRAY_50[1], C_GRAY_50[2]);
-            doc.rect(0, footerY, pageWidth, 35, 'F');
+            doc.rect(0, footY, pageWidth, 35, 'F');
 
             doc.setTextColor(C_SLATE_900[0], C_SLATE_900[1], C_SLATE_900[2]);
-            doc.setFontSize(12);
+            doc.setFontSize(13);
             doc.setFont('helvetica', 'bold');
-            doc.text((cotizacion.creator?.full_name || 'AGENTE COMERCIAL').toUpperCase(), 20, footerY + 15);
+            doc.text((cotizacion.creator?.full_name || 'AGENTE DE VENTAS').toUpperCase(), 20, footY + 15);
 
             doc.setFontSize(8);
+            doc.setTextColor(C_SLATE_400[0], C_SLATE_400[1], C_SLATE_400[2]);
             doc.setFont('helvetica', 'normal');
-            doc.setTextColor(100, 116, 139);
-            doc.text((cotizacion.creator?.email || 'ventas@ariasdefense.com').toUpperCase(), 20, footerY + 22);
+            doc.text((cotizacion.creator?.email || 'ARIASDEFENSE.COM').toUpperCase(), 20, footY + 21);
 
             doc.setTextColor(C_INDIGO_MAIN[0], C_INDIGO_MAIN[1], C_INDIGO_MAIN[2]);
             doc.setFont('helvetica', 'bold');
-            doc.text('DOCUMENTO OFICIAL', pageWidth - 20, footerY + 15, { align: 'right' });
+            doc.text('DOCUMENTO OFICIAL', pageWidth - 20, footY + 15, { align: 'right' });
+            doc.setFontSize(7);
+            doc.setTextColor(C_SLATE_400[0], C_SLATE_400[1], C_SLATE_400[2]);
+            doc.text('GENERADO ELECTRÓNICAMENTE - VALIDEZ 30 DÍAS', pageWidth - 20, footY + 21, { align: 'right' });
 
-            // GENERATE & UPLOAD
+
+            // EXPORT & UPLOAD
             const pdfBlob = doc.output('blob');
-            const fileName = `propuesta_${cotizacion.id.slice(0, 8)}_${Date.now()}.pdf`;
+            const quoteFileName = `Propuesta_${cotizacion.nombre_cliente.replace(/\s+/g, '_')}_${Date.now()}.pdf`;
 
             const { error: uploadError } = await supabase.storage
                 .from('quotations')
-                .upload(fileName, pdfBlob, { contentType: 'application/pdf', upsert: true });
+                .upload(quoteFileName, pdfBlob, { contentType: 'application/pdf', upsert: true });
 
             if (uploadError) throw uploadError;
 
-            const { data } = supabase.storage.from('quotations').getPublicUrl(fileName);
+            const { data } = supabase.storage.from('quotations').getPublicUrl(quoteFileName);
             return data.publicUrl;
 
         } catch (err: any) {
-            console.error('❌ ERROR PDF NATIVE:', err);
+            console.error('❌ PDF Generation Error:', err);
             throw err;
         }
     }
