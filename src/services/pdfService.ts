@@ -58,11 +58,11 @@ export const pdfService = {
             // Logo Branding (Left)
             const logoData = await loadImage(cotizacion.company?.logo_url);
             if (logoData) {
-                // Keep aspect ratio
+                // Keep aspect ratio but constrain height
                 const props = doc.getImageProperties(logoData);
-                const w = 45;
-                const h = (props.height * w) / props.width;
-                doc.addImage(logoData, 'PNG', 15, 10, w, h);
+                const maxHeight = 18; // Max height in mm
+                const w = (props.width * maxHeight) / props.height;
+                doc.addImage(logoData, 'PNG', 15, 12, w, maxHeight);
             } else {
                 // Fallback Text Logo
                 doc.setTextColor(42, 171, 238); // Blue
@@ -75,7 +75,7 @@ export const pdfService = {
             doc.setTextColor(255, 255, 255);
             doc.setFontSize(10);
             doc.setFont('helvetica', 'bold');
-            doc.text((cotizacion.company?.name || 'SU EMPRESA').toUpperCase(), 15, 42);
+            doc.text((cotizacion.company?.name || 'SU EMPRESA').toUpperCase(), 15, 40); // Moved up slightly
 
             doc.setFontSize(7);
             doc.setFont('helvetica', 'normal');
