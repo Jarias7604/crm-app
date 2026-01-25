@@ -25,8 +25,8 @@ export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, t
                         <Plus className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-black text-gray-900 tracking-tight">Nuevo Lead</h1>
-                        <p className="text-sm text-gray-500 font-medium font-serif">Registra una nueva oportunidad estratégica</p>
+                        <h1 className="text-2xl font-extrabold text-[#4449AA] tracking-tight">Nuevo Prospecto</h1>
+                        <p className="text-[13px] text-gray-400 font-medium">Registra una nueva oportunidad estratégica en el pipeline</p>
                     </div>
                 </div>
                 <button

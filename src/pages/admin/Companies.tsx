@@ -4,7 +4,7 @@ import type { Company, LicenseStatus } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
-import { Plus, Building, MoreHorizontal } from 'lucide-react';
+import { Plus, Building, MoreHorizontal, Shield } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function Companies() {
@@ -15,10 +15,24 @@ export default function Companies() {
         name: '',
         license_status: 'active' as LicenseStatus,
     });
+    const [permissionDefinitions, setPermissionDefinitions] = useState<any[]>([]);
+    const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false);
+    const [selectedCompany, setSelectedCompany] = useState<any>(null);
+    const [tempPermissions, setTempPermissions] = useState<string[]>([]);
 
     useEffect(() => {
         loadCompanies();
+        loadDefinitions();
     }, []);
+
+    const loadDefinitions = async () => {
+        try {
+            const defs = await adminService.getPermissionDefinitions();
+            setPermissionDefinitions(defs);
+        } catch (error) {
+            console.error('Failed to load permission definitions', error);
+        }
+    };
 
     const loadCompanies = async () => {
         try {
@@ -67,24 +81,21 @@ export default function Companies() {
         }
     };
 
-    const handleToggleFeature = async (id: string, feature: 'marketing' | 'chat', value: boolean, currentFeatures: any) => {
+
+    const handleOpenLicense = (company: any) => {
+        setSelectedCompany(company);
+        setTempPermissions(company.allowed_permissions || []);
+        setIsLicenseModalOpen(true);
+    };
+
+    const handleSaveLicense = async () => {
+        if (!selectedCompany) return;
         try {
-            const newFeatures = {
-                ...(currentFeatures || { marketing: false, chat: false }),
-                [feature]: value
-            };
-
-            // Optimistic update
-            setCompanies(companies.map(c =>
-                c.id === id ? { ...c, features: newFeatures } : c
-            ));
-
-            await adminService.updateCompany(id, { features: newFeatures });
-            // No need to reload if optimistic update was successful, but good for sync
-        } catch (error) {
-            console.error('Failed to update feature', error);
-            // Revert on error would be ideal, but for now just reload
+            await adminService.updateCompany(selectedCompany.id, { allowed_permissions: tempPermissions });
+            setIsLicenseModalOpen(false);
             loadCompanies();
+        } catch (error) {
+            console.error('Failed to update licenses', error);
         }
     };
 
@@ -109,7 +120,7 @@ export default function Companies() {
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuarios / Límite</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creado</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Módulos</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creado</th>
                             <th className="relative px-6 py-3"><span className="sr-only">Acciones</span></th>
                         </tr>
                     </thead>
@@ -160,29 +171,17 @@ export default function Companies() {
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                     {format(new Date(company.created_at), 'dd MMM yyyy')}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    <div className="flex gap-3">
-                                        <label className="flex items-center space-x-2 text-xs cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={company.features?.marketing || false}
-                                                onChange={(e) => handleToggleFeature(company.id, 'marketing', e.target.checked, company.features)}
-                                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
-                                            />
-                                            <span>Mkt</span>
-                                        </label>
-                                        <label className="flex items-center space-x-2 text-xs cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={company.features?.chat || false}
-                                                onChange={(e) => handleToggleFeature(company.id, 'chat', e.target.checked, company.features)}
-                                                className="rounded border-gray-300 text-green-600 focus:ring-green-500 h-4 w-4"
-                                            />
-                                            <span>Chat</span>
-                                        </label>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => handleOpenLicense(company)}
+                                        title="Gestionar Licencia"
+                                        className="text-indigo-600 hover:text-indigo-900"
+                                    >
+                                        <Shield className="h-4 h-4 mr-1" />
+                                        Licencia
+                                    </Button>
                                     <button className="text-gray-400 hover:text-gray-600 p-2">
                                         <MoreHorizontal className="h-5 w-5" />
                                     </button>
@@ -232,6 +231,69 @@ export default function Companies() {
                         <Button type="submit">Create Company</Button>
                     </div>
                 </form>
+            </Modal>
+
+            <Modal
+                isOpen={isLicenseModalOpen}
+                onClose={() => setIsLicenseModalOpen(false)}
+                title={`Configurar Licencia: ${selectedCompany?.name}`}
+            >
+                <div className="space-y-6">
+                    <p className="text-sm text-gray-500">
+                        Selecciona qué permisos y módulos específicos están habilitados para esta empresa.
+                        Los cambios afectan a todos los usuarios de la organización.
+                    </p>
+
+                    <div className="max-h-[60vh] overflow-y-auto px-1">
+                        {Object.entries(
+                            permissionDefinitions.reduce((acc, def) => {
+                                if (!acc[def.category]) acc[def.category] = [];
+                                acc[def.category].push(def);
+                                return acc;
+                            }, {} as Record<string, any[]>)
+                        ).map(([category, defs]) => (
+                            <div key={category} className="mb-6">
+                                <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center">
+                                    <div className="w-1 h-4 bg-blue-500 rounded mr-2"></div>
+                                    {category}
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {(defs as any[]).map((def) => (
+                                        <label
+                                            key={def.id}
+                                            className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${tempPermissions.includes(def.permission_key)
+                                                ? 'bg-blue-50 border-blue-200 ring-1 ring-blue-100'
+                                                : 'bg-white border-gray-100 hover:bg-gray-50'
+                                                }`}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={tempPermissions.includes(def.permission_key)}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        setTempPermissions([...tempPermissions, def.permission_key]);
+                                                    } else {
+                                                        setTempPermissions(tempPermissions.filter(pk => pk !== def.permission_key));
+                                                    }
+                                                }}
+                                                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                            />
+                                            <div className="ml-3">
+                                                <div className="text-sm font-medium text-gray-900">{def.label}</div>
+                                                <div className="text-xs text-gray-500 font-mono">{def.permission_key}</div>
+                                            </div>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="flex justify-end pt-4 border-t gap-3">
+                        <Button variant="ghost" onClick={() => setIsLicenseModalOpen(false)}>Cancelar</Button>
+                        <Button onClick={handleSaveLicense}>Guardar Cambios de Licencia</Button>
+                    </div>
+                </div>
             </Modal>
         </div>
     );

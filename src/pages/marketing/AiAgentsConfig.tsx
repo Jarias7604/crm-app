@@ -149,9 +149,12 @@ export default function AiAgentsConfig() {
     );
 
     return (
-        <div className="h-[calc(100vh-140px)] flex flex-col space-y-4 overflow-hidden bg-[#F0F4F8] p-4 md:p-6 rounded-[24px]">
+        <div className="flex h-[calc(100vh-128px)] flex-col bg-white rounded-[3.5rem] shadow-[0_48px_96px_-24px_rgba(0,0,0,0.15)] border border-white/60 overflow-hidden font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900 relative p-6 md:p-8 space-y-6 animate-in fade-in duration-700">
+            {/* Capa decorativa premium */}
+            <div className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#4449AA 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
+
             {/* Header Section - Fixed height */}
-            <div className="flex items-center gap-4 shrink-0 px-2 pt-2">
+            <div className="flex items-center gap-4 shrink-0 px-2 pt-2 relative z-10">
                 <Link to="/marketing" className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500">
                     <ArrowLeft className="w-5 h-5" />
                 </Link>
@@ -167,13 +170,10 @@ export default function AiAgentsConfig() {
             </div>
 
             {/* Main Content Area - Expands to fill remaining height */}
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0">
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 min-h-0 relative z-10">
 
                 {/* 1. PERSONALITY COLUMN */}
-                <div
-                    className="lg:col-span-2 flex flex-col bg-white p-6 rounded-[24px] border border-gray-100 shadow-xl shadow-slate-200/50 min-h-0 overflow-hidden"
-                    style={{ borderBottomRightRadius: '26px' }}
-                >
+                <div className="lg:col-span-2 flex flex-col bg-white p-6 rounded-[24px] border border-gray-100 shadow-xl shadow-slate-200/50 min-h-0 overflow-hidden">
                     <div className="flex justify-between items-center mb-4 shrink-0">
                         <h2 className="text-lg font-black text-gray-900 flex items-center gap-2">
                             <Settings2 className="w-5 h-5 text-blue-500" />
@@ -262,37 +262,22 @@ export default function AiAgentsConfig() {
                 </div>
 
                 {/* 2. SIMULATOR COLUMN */}
-                <div
-                    className="flex flex-col bg-white p-6 rounded-[24px] border border-gray-100 shadow-xl shadow-slate-200/50 min-h-0 overflow-hidden"
-                    style={{ borderBottomRightRadius: '26px' }}
-                >
+                <div className="flex flex-col bg-white p-6 rounded-[24px] border border-gray-100 shadow-xl shadow-slate-200/50 min-h-0 overflow-hidden">
                     <div className="flex items-center justify-between mb-4 shrink-0">
                         <h2 className="text-lg font-black text-gray-900 flex items-center gap-2">
                             <Sparkles className="w-5 h-5 text-amber-500" />
                             Simulator
                         </h2>
                         <div className="flex gap-2">
-                            <button
-                                onClick={handleSimulateClient}
-                                className="p-2 bg-orange-50 hover:bg-orange-100 text-orange-600 rounded-lg transition-all border border-orange-100"
-                            >
-                                <UserPlus className="w-4 h-4" />
-                            </button>
-                            <button
-                                onClick={() => setTestHistory([])}
-                                className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-400 rounded-lg transition-all border border-slate-100"
-                            >
-                                <RefreshCw className="w-4 h-4" />
-                            </button>
+                            <button onClick={handleSimulateClient} className="p-2 bg-orange-50 hover:bg-orange-100 text-orange-600 rounded-lg transition-all border border-orange-100"><UserPlus className="w-4 h-4" /></button>
+                            <button onClick={() => setTestHistory([])} className="p-2 bg-slate-50 hover:bg-slate-100 text-slate-400 rounded-lg transition-all border border-slate-100"><RefreshCw className="w-4 h-4" /></button>
                         </div>
                     </div>
 
                     {/* Chat Area - Flexible height with scroll */}
                     <div className="flex-1 bg-slate-50/50 rounded-[24px] p-4 overflow-y-auto space-y-4 shadow-inner border border-slate-100/50 custom-scrollbar mb-4">
                         <div className="flex gap-3">
-                            <div className="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center shrink-0 shadow-sm">
-                                <Bot className="w-5 h-5 text-blue-600" />
-                            </div>
+                            <div className="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center shrink-0 shadow-sm"><Bot className="w-5 h-5 text-blue-600" /></div>
                             <div className="bg-white p-3 rounded-2xl rounded-tl-none border border-slate-100 text-xs font-medium text-slate-700 shadow-sm max-w-[85%] leading-relaxed">
                                 <p className="font-black text-[9px] text-blue-600 uppercase tracking-widest mb-1">{selectedAgent?.name}</p>
                                 Hola, soy {selectedAgent?.name || 'tu asistente virtual'}. ¿En qué puedo ayudarte hoy?
@@ -302,16 +287,9 @@ export default function AiAgentsConfig() {
                         {testHistory.map((msg, i) => (
                             <div key={i} className={`flex gap-3 animate-in slide-in-from-bottom-2 duration-300 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
                                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm ${msg.role === 'user' ? 'bg-indigo-100' : 'bg-blue-100'}`}>
-                                    {msg.role === 'user' ? (
-                                        <span className="text-[9px] font-black text-indigo-600 uppercase">Tú</span>
-                                    ) : (
-                                        <Bot className="w-5 h-5 text-blue-600" />
-                                    )}
+                                    {msg.role === 'user' ? <span className="text-[9px] font-black text-indigo-600 uppercase">Tú</span> : <Bot className="w-5 h-5 text-blue-600" />}
                                 </div>
-                                <div className={`p-3 rounded-2xl text-[12px] font-medium leading-relaxed shadow-sm max-w-[85%] ${msg.role === 'user'
-                                    ? 'bg-slate-900 text-white rounded-tr-none shadow-slate-900/10'
-                                    : 'bg-white text-slate-700 border border-slate-100 rounded-tl-none'
-                                    }`}>
+                                <div className={`p-3 rounded-2xl text-[12px] font-medium leading-relaxed shadow-sm max-w-[85%] ${msg.role === 'user' ? 'bg-slate-900 text-white rounded-tr-none shadow-slate-900/10' : 'bg-white text-slate-700 border border-slate-100 rounded-tl-none'}`}>
                                     {msg.role === 'bot' && <p className="font-black text-[9px] text-blue-600 uppercase tracking-widest mb-1">{selectedAgent?.name}</p>}
                                     {msg.content}
                                 </div>
@@ -329,21 +307,8 @@ export default function AiAgentsConfig() {
                             onChange={e => setTestMessage(e.target.value)}
                         />
                         <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
-                            <button
-                                type="button"
-                                onClick={handleAiResponse}
-                                disabled={isTesting}
-                                className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
-                            >
-                                <Sparkles className={`w-4 h-4 ${isTesting ? 'animate-spin' : ''}`} />
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={isTesting || !testMessage}
-                                className="p-2 bg-slate-900 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-all shadow-md"
-                            >
-                                <Send className="w-4 h-4" />
-                            </button>
+                            <button type="button" onClick={handleAiResponse} disabled={isTesting} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all"><Sparkles className={`w-4 h-4 ${isTesting ? 'animate-spin' : ''}`} /></button>
+                            <button type="submit" disabled={isTesting || !testMessage} className="p-2 bg-slate-900 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-all shadow-md"><Send className="w-4 h-4" /></button>
                         </div>
                     </form>
                 </div>

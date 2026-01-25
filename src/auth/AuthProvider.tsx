@@ -58,14 +58,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
             const { data, error } = await supabase
                 .from('profiles')
-                .select('id, email, role, company_id, full_name, status, created_at')
+                .select('id, email, role, company_id, full_name, status, created_at, custom_role_id, permissions')
                 .eq('id', userId)
                 .single();
 
             if (error) {
                 console.error('Error fetching profile:', error);
             } else {
-                setProfile(data as Profile);
+                // Fetch merged permissions
+                const { data: mergedPerms } = await supabase.rpc('get_user_permissions', { user_id: userId });
+                setProfile({ ...data, permissions: mergedPerms } as Profile);
             }
         } catch (err) {
             console.error('Unexpected error fetching profile:', err);

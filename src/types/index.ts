@@ -1,4 +1,14 @@
 export type Role = 'super_admin' | 'company_admin' | 'sales_agent';
+
+export interface CustomRole {
+    id: string;
+    company_id: string | null;
+    name: string;
+    description: string | null;
+    base_role: Role;
+    is_system: boolean;
+    created_at: string;
+}
 export type CompanyStatus = 'active' | 'trial' | 'suspended';
 export type LicenseStatus = 'active' | 'trial' | 'suspended' | 'expired' | 'manual_hold';
 export type LeadStatus =
@@ -23,6 +33,8 @@ export interface Profile {
     is_active?: boolean;
     avatar_url?: string | null;
     website?: string | null;
+    birth_date?: string | null;
+    address?: string | null;
     created_at: string;
     permissions?: {
         leads?: boolean;
@@ -32,6 +44,7 @@ export interface Profile {
         chat?: boolean;
         [key: string]: boolean | undefined;
     };
+    custom_role_id?: string;
 }
 
 export interface Company {
@@ -51,6 +64,14 @@ export interface Company {
         marketing: boolean;
         chat: boolean;
     };
+    allowed_permissions?: string[];
+}
+
+export interface PermissionDefinition {
+    id: string;
+    category: string;
+    permission_key: string;
+    label: string;
 }
 
 export interface Lead {

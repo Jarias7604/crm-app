@@ -1,62 +1,45 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { teamService, type Invitation } from '../../services/team';
-import type { Profile, Role } from '../../types';
+import type { Profile, CustomRole } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Plus, Trash2, Mail, User, Shield, Phone, Lock, Edit2, Globe, Camera, Loader2, X, Megaphone, MessageSquare, FileText, Calendar } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, LayoutGrid, Lock } from 'lucide-react';
 import { createPortal } from 'react-dom';
-import { storageService } from '../../services/storage';
 import { useAuth } from '../../auth/AuthProvider';
+import { storageService } from '../../services/storage';
 import Switch from '../../components/ui/Switch';
+
+type TabType = 'general' | 'security';
 
 export default function Team() {
     const { profile: myProfile } = useAuth();
-    const isAdmin = myProfile?.role === 'super_admin' || myProfile?.role === 'company_admin';
     const [members, setMembers] = useState<Profile[]>([]);
     const [invitations, setInvitations] = useState<Invitation[]>([]);
+    const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
     const [maxUsers, setMaxUsers] = useState(5);
     const [loading, setLoading] = useState(true);
-    const [isCreating, setIsCreating] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
 
-    // Edit state
+    // Modal States
     const [editingMember, setEditingMember] = useState<Profile | null>(null);
+    const [activeTab, setActiveTab] = useState<TabType>('general');
+
+    // Status States
+    const [isCreating, setIsCreating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file || !editingMember) return;
-
-        // Size validation (max 2MB)
-        if (file.size > 2 * 1024 * 1024) {
-            toast.error('La imagen debe pesar menos de 2MB');
-            return;
-        }
-
-        setIsUploading(true);
-        try {
-            console.log('Starting avatar upload for user:', editingMember.id);
-            const publicUrl = await storageService.uploadAvatar(editingMember.id, file);
-            console.log('Upload successful, URL received:', publicUrl);
-
-            setEditingMember({ ...editingMember, avatar_url: publicUrl });
-            toast.success('Foto cargada correctamente');
-        } catch (error: any) {
-            console.error('Upload failed with detail:', error);
-            toast.error(`Error al subir imagen: ${error.message || 'Error de conexión'}`);
-        } finally {
-            setIsUploading(false);
-        }
-    };
-
-    // Form state
+    // Form state for new members (Inline)
     const [formData, setFormData] = useState({
         email: '',
         password: '',
         fullName: '',
         phone: '',
-        role: 'sales_agent' as Role
+        customRoleId: '',
+        birthDate: '',
+        address: ''
     });
 
     useEffect(() => {
@@ -68,14 +51,21 @@ export default function Team() {
     const loadData = async () => {
         if (!myProfile?.company_id) return;
         try {
-            const [membersData, invitationsData, limit] = await Promise.all([
+            const [membersData, invitationsData, limit, roles] = await Promise.all([
                 teamService.getTeamMembers(myProfile.company_id),
                 teamService.getInvitations(myProfile.company_id),
-                teamService.getCompanyLimit(myProfile.company_id)
+                teamService.getCompanyLimit(myProfile.company_id),
+                teamService.getRoles(myProfile.company_id)
             ]);
             setMembers(membersData || []);
             setInvitations(invitationsData || []);
             setMaxUsers(limit);
+            setCustomRoles(roles);
+
+            if (!formData.customRoleId && roles.length > 0) {
+                const defaultRole = roles.find(r => r.base_role === 'sales_agent') || roles[0];
+                setFormData(prev => ({ ...prev, customRoleId: defaultRole.id }));
+            }
         } catch (error) {
             console.error('Failed to load team data', error);
         } finally {
@@ -85,17 +75,22 @@ export default function Team() {
 
     const isLimitReached = (members.length + invitations.length) >= maxUsers;
 
+    const filteredMembers = members.filter(m =>
+        m.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.email.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
     const handleCreateMember = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!myProfile?.company_id) return;
-
         if (isLimitReached) {
-            toast.error('Has alcanzado el límite de usuarios permitidos por tu licencia.');
+            toast.error('Límite de usuarios alcanzado');
             return;
         }
 
-        if (formData.password.length < 6) {
-            toast.error('La contraseña debe tener al menos 6 caracteres.');
+        const selectedRole = customRoles.find(r => r.id === formData.customRoleId);
+        if (!selectedRole) {
+            toast.error('Seleccione un rol válido');
             return;
         }
 
@@ -106,602 +101,374 @@ export default function Team() {
                 password: formData.password,
                 fullName: formData.fullName,
                 phone: formData.phone,
-                role: formData.role,
-                companyId: myProfile.company_id
+                role: selectedRole.base_role,
+                companyId: myProfile.company_id,
+                customRoleId: selectedRole.id,
+                birthDate: formData.birthDate,
+                address: formData.address
             });
 
-            setFormData({
-                email: '',
-                password: '',
-                fullName: '',
-                phone: '',
-                role: 'sales_agent'
-            });
-
-            toast.success('Usuario creado correctamente');
+            setFormData(prev => ({
+                ...prev,
+                email: '', password: '', fullName: '', phone: '',
+                birthDate: '', address: ''
+            }));
+            toast.success('Miembro creado correctamente');
             loadData();
         } catch (error: any) {
-            console.error(error);
-            toast.error(`Error al crear usuario: ${error.message}`);
+            toast.error(`Error: ${error.message}`);
         } finally {
             setIsCreating(false);
         }
     };
 
-    const handleToggleStatus = async (id: string, currentStatus: boolean | undefined) => {
-        // Default to true if undefined
-        const newStatus = !(currentStatus ?? true);
-        try {
-            // Optimistic update
-            setMembers(members.map(m => m.id === id ? { ...m, is_active: newStatus } : m));
-            await teamService.toggleMemberStatus(id, newStatus);
-            toast.success(newStatus ? 'Usuario activado' : 'Usuario desactivado');
-        } catch (error: any) {
-            console.error('Toggle failed:', error);
-            toast.error(`Error: ${error.message}`);
-            loadData(); // Revert on error
-        }
-    };
+    const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !editingMember) return;
 
-    const handleRevoke = async (id: string) => {
-        if (!confirm('¿Estás seguro de cancelar esta invitación?')) return;
-        try {
-            await teamService.revokeInvitation(id);
-            toast.success('Invitación cancelada');
-            loadData();
-        } catch (error: any) {
-            toast.error(`Error: ${error.message}`);
-        }
-    };
-
-    const handleMemberDelete = async (id: string, email: string) => {
-        if (id === myProfile?.id) {
-            toast.error('No puedes eliminarte a ti mismo.');
+        if (file.size > 2 * 1024 * 1024) {
+            toast.error('Máximo 2MB');
             return;
         }
-        if (!confirm(`¿Estás seguro de eliminar a ${email} del equipo? Perderá el acceso de inmediato.`)) return;
+
+        setIsUploading(true);
         try {
-            await teamService.deleteMember(id);
-            toast.success('Miembro eliminado');
-            loadData();
+            const publicUrl = await storageService.uploadAvatar(editingMember.id, file);
+            setEditingMember({ ...editingMember, avatar_url: publicUrl });
+            toast.success('Foto actualizada');
         } catch (error: any) {
-            console.error('Delete failed:', error);
-            toast.error(`Error al eliminar: ${error.message}`);
+            toast.error('Error al subir');
+        } finally {
+            setTimeout(() => setIsUploading(false), 1000);
         }
-    };
-
-    const handleEditMember = (member: Profile) => {
-        setEditingMember(member);
-    };
-
-    const handleCancelEdit = () => {
-        setEditingMember(null);
     };
 
     const handleSaveEdit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!editingMember) return;
 
-        setIsSaving(true);
-        console.log('Attempting to save member:', editingMember);
+        const selectedRole = customRoles.find(r => r.id === editingMember.custom_role_id);
 
+        setIsSaving(true);
         try {
             await teamService.updateMember(editingMember.id, {
-                full_name: editingMember.full_name || null,
-                phone: editingMember.phone || null,
-                avatar_url: editingMember.avatar_url || null,
-                website: editingMember.website || null,
-                role: editingMember.role,
-                permissions: editingMember.permissions
+                full_name: editingMember.full_name,
+                phone: editingMember.phone,
+                role: selectedRole?.base_role || editingMember.role,
+                custom_role_id: editingMember.custom_role_id,
+                permissions: editingMember.permissions,
+                birth_date: editingMember.birth_date,
+                address: editingMember.address,
+                avatar_url: editingMember.avatar_url
             });
 
-            toast.success('Perfil actualizado correctamente');
+            toast.success('Cambios guardados');
             setEditingMember(null);
             loadData();
         } catch (error: any) {
-            console.error('Core Profile Update failed:', error);
-            toast.error(`Error al guardar: ${error.message || 'Error desconocido'}`);
+            toast.error('Error al guardar');
         } finally {
             setIsSaving(false);
         }
     };
 
-    const RoleBadge = ({ role }: { role: string }) => {
-        const styles = {
-            super_admin: 'bg-purple-100 text-purple-800',
-            company_admin: 'bg-blue-100 text-blue-800',
-            sales_agent: 'bg-green-100 text-green-800'
-        };
-        const labels = {
-            super_admin: 'Super Admin',
-            company_admin: 'Admin Empresa',
-            sales_agent: 'Agente Ventas'
-        };
+    const RoleBadge = ({ member }: { member: Profile }) => {
+        const customRole = customRoles.find(r => r.id === member.custom_role_id);
+        const name = customRole ? customRole.name : (member.role === 'super_admin' ? 'SUPER ADMIN' : (member.role === 'company_admin' ? 'ADMIN EMPRESA' : 'COLABORADOR'));
+
+        const style = member.role === 'super_admin' ? 'bg-purple-50 text-purple-600 border-purple-100' :
+            (member.role === 'company_admin' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-green-50 text-green-600 border-green-100');
+
         return (
-            <span className={`px-2.5 py-1 rounded-full text-[10px] uppercase font-black tracking-wider ${styles[role as keyof typeof styles] || 'bg-gray-100'}`}>
-                {labels[role as keyof typeof labels] || role}
+            <span className={`px-2.5 py-1 rounded-full text-[9px] uppercase font-black tracking-widest border ${style}`}>
+                {name}
             </span>
         );
     };
 
-    const PermissionCard = ({ title, icon: Icon, mainKey, desc, subFeatures = [], permissions = {}, onChange, isPremium = false }: any) => {
-        const isCore = ['leads', 'quotes', 'calendar'].includes(mainKey);
-        // If undefined: Core defaults to TRUE. Premium defaults to FALSE.
-        const currentVal = permissions[mainKey];
-        const isChecked = currentVal === undefined ? isCore : currentVal === true;
-
-        return (
-            <div className={`border rounded-xl p-5 transition-all ${isChecked ? 'border-blue-200 bg-blue-50/30' : 'border-gray-100 bg-white hover:border-gray-200'}`}>
-                {/* Header */}
-                <div className="flex justify-between items-start mb-4">
-                    <div className="flex gap-3">
-                        <div className={`p-2 rounded-lg transition-colors ${isChecked ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'}`}>
-                            <Icon className="w-5 h-5" />
-                        </div>
-                        <div>
-                            <h4 className={`font-bold text-sm ${isChecked ? 'text-gray-900' : 'text-gray-500'}`}>{title}</h4>
-                            <p className="text-xs text-gray-400">{desc}</p>
-                        </div>
-                    </div>
-                    <Switch
-                        checked={isChecked}
-                        onChange={() => {
-                            const newVal = !isChecked;
-                            onChange({ ...permissions, [mainKey]: newVal });
-                        }}
-                        size="sm"
-                    />
-                </div>
-
-                {/* Sub Features */}
-                {subFeatures.length > 0 && (
-                    <div className={`space-y-3 pl-11 pt-2 border-t border-dashed ${isChecked ? 'border-blue-200/50' : 'border-gray-100 opacity-50 pointer-events-none'}`}>
-                        {subFeatures.map((sub: any) => (
-                            <label key={sub.key} className="flex items-center gap-3 cursor-pointer group">
-                                <div className="relative flex items-center">
-                                    <input
-                                        type="checkbox"
-                                        checked={permissions[sub.key] === true}
-                                        onChange={(e) => onChange({ ...permissions, [sub.key]: e.target.checked })}
-                                        className="peer h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 transition-all"
-                                    />
-                                </div>
-                                <span className="text-xs font-medium text-gray-500 group-hover:text-blue-600 transition-colors select-none">{sub.label}</span>
-                            </label>
-                        ))}
-                    </div>
-                )}
-            </div>
-        );
-    };
-
-    if (loading) return <div className="p-8 text-center text-gray-500">Cargando equipo...</div>;
+    if (loading) return (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+            <Loader2 className="w-10 h-10 text-[#4449AA] animate-spin" />
+            <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px]">Cargando...</p>
+        </div>
+    );
 
     return (
-        <div className="space-y-8 max-w-5xl mx-auto">
-            <div>
-                <h1 className="text-2xl font-bold text-gray-900">Gestión de Equipo</h1>
-                <p className="text-gray-500">Administra los accesos y colaboradores de tu empresa.</p>
-            </div>
+        <div className="w-full max-w-[1500px] mx-auto pb-6 space-y-8 animate-in fade-in duration-500">
 
-            {/* Create User Form */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <Plus className="w-5 h-5 text-blue-600" />
-                    Crear Nuevo Usuario
-                </h2>
+            {/* Simple Header - Compact */}
+            <header className="space-y-0.5">
+                <h1 className="text-2xl font-extrabold text-[#4449AA] tracking-tight">Gestión de Equipo</h1>
+                <p className="text-[13px] text-gray-400 font-medium font-inter">Administra los accesos y colaboradores de tu empresa.</p>
+            </header>
+
+            {/* Restored Quick Add Form - Scaled to 90% */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
+                <div className="flex items-center gap-2">
+                    <Plus className="w-4 h-4 text-indigo-600" />
+                    <h2 className="text-base font-black text-gray-900 tracking-tight uppercase">Crear Nuevo Usuario</h2>
+                </div>
                 <form onSubmit={handleCreateMember} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo *</label>
-                            <Input
-                                required
-                                placeholder="Ej: Juan Pérez"
-                                value={formData.fullName}
-                                onChange={e => setFormData({ ...formData, fullName: e.target.value })}
-                            />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                        <div className="space-y-1.5">
+                            <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest pl-1">Nombre Completo *</label>
+                            <Input required value={formData.fullName} onChange={e => setFormData({ ...formData, fullName: e.target.value })} className="h-11 rounded-lg bg-gray-50/50 border-gray-100 focus:bg-white font-bold text-[13px]" placeholder="Ej: Juan Pérez" />
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Email (Usuario) *</label>
-                            <Input
-                                type="email"
-                                required
-                                placeholder="juan@empresa.com"
-                                value={formData.email}
-                                onChange={e => setFormData({ ...formData, email: e.target.value })}
-                            />
+                        <div className="space-y-1.5">
+                            <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest pl-1">Email (Usuario) *</label>
+                            <Input type="email" required value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="h-11 rounded-lg bg-gray-50/50 border-gray-100 focus:bg-white font-bold text-[13px]" placeholder="juan@empresa.com" />
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña *</label>
+                        <div className="space-y-1.5">
+                            <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest pl-1">Contraseña *</label>
                             <div className="relative">
-                                <Input
-                                    type="text" // Visible by default for admin convenience on creation
-                                    required
-                                    placeholder="Contraseña inicial"
-                                    value={formData.password}
-                                    onChange={e => setFormData({ ...formData, password: e.target.value })}
-                                />
-                                <Lock className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                                <Input type="password" required value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} className="h-11 rounded-lg bg-gray-50/50 border-gray-100 focus:bg-white font-bold text-[13px]" placeholder="Contraseña inicial" />
+                                <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" />
                             </div>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono (Opcional)</label>
-                            <Input
-                                placeholder="+503 ..."
-                                value={formData.phone}
-                                onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                            />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-end">
+                        <div className="space-y-1.5">
+                            <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest pl-1">Teléfono (Opcional)</label>
+                            <Input value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} className="h-11 rounded-lg bg-gray-50/50 border-gray-100 focus:bg-white font-bold text-[13px]" placeholder="+503 ..." />
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Rol Asignado</label>
+                        <div className="space-y-1.5">
+                            <label className="text-[9px] font-black uppercase text-gray-400 tracking-widest pl-1">Rol Asignado</label>
                             <select
-                                className="w-full rounded-md border border-gray-300 p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
-                                value={formData.role}
-                                onChange={e => setFormData({ ...formData, role: e.target.value as Role })}
+                                className="w-full h-11 rounded-lg border border-gray-100 bg-gray-50/50 px-3.5 font-bold text-[13px] text-gray-700 outline-none focus:bg-white focus:border-indigo-100 transition-all appearance-none cursor-pointer"
+                                value={formData.customRoleId}
+                                onChange={e => setFormData({ ...formData, customRoleId: e.target.value })}
                             >
-                                <option value="sales_agent">Agente de Ventas (Solo ve sus leads)</option>
-                                <option value="company_admin">Admin de Empresa (Ve todo)</option>
+                                {customRoles.map(role => (
+                                    <option key={role.id} value={role.id}>{role.name}</option>
+                                ))}
                             </select>
                         </div>
-                        <div className="flex items-end">
-                            <Button type="submit" disabled={isCreating} className="w-full">
-                                {isCreating ? 'Creando...' : 'Crear Usuario'}
-                            </Button>
+                        <div className="flex justify-center md:justify-end">
+                            <button
+                                type="submit"
+                                disabled={isCreating || isLimitReached}
+                                className="h-11 px-8 rounded-lg bg-[#4449AA] text-white font-black text-[10px] uppercase tracking-widest shadow-md hover:translate-y-[-1px] active:scale-95 transition-all"
+                            >
+                                {isCreating ? 'Guardando...' : 'Crear Usuario'}
+                            </button>
                         </div>
                     </div>
                 </form>
             </div>
 
-            {/* Pending Invitations */}
-            {invitations.length > 0 && (
-                <div className="bg-yellow-50 p-6 rounded-xl border border-yellow-100">
-                    <h3 className="text-sm font-semibold text-yellow-800 mb-3 uppercase tracking-wider">Invitaciones Pendientes</h3>
-                    <div className="bg-white rounded-lg overflow-hidden border border-yellow-200">
-                        {invitations.map(inv => (
-                            <div key={inv.id} className="flex justify-between items-center p-4 border-b last:border-0">
-                                <div className="flex items-center gap-3">
-                                    <div className="bg-yellow-100 p-2 rounded-full">
-                                        <Mail className="w-4 h-4 text-yellow-600" />
-                                    </div>
-                                    <div>
-                                        <p className="font-medium text-gray-900">{inv.email}</p>
-                                        <p className="text-xs text-gray-500">Invitado el {new Date(inv.created_at).toLocaleDateString()}</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    <RoleBadge role={inv.role} />
-                                    <button
-                                        onClick={() => handleRevoke(inv.id)}
-                                        className="text-red-500 hover:text-red-700 text-sm font-medium flex items-center gap-1"
-                                    >
-                                        <Trash2 className="w-4 h-4" /> Cancelar
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
+            {/* Member List Section - Compact */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div className="flex items-center gap-3">
+                        <h3 className="text-[13px] font-black text-gray-900 uppercase tracking-widest">Miembros Activos</h3>
+                        <span className="bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full text-[9px] font-black border border-blue-100">
+                            {members.length + invitations.length} / {maxUsers} Licencias
+                        </span>
+                    </div>
+                    <div className="relative w-full md:w-72 group">
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" />
+                        <input
+                            type="text"
+                            placeholder="Buscar Integrante..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full h-9 pl-10 pr-4 rounded-lg bg-gray-50/50 border border-transparent focus:bg-white focus:border-gray-100 outline-none transition-all font-bold text-[12px] placeholder:text-gray-300"
+                        />
                     </div>
                 </div>
-            )}
 
-            {/* Edit Member Modal - Ultimate Professional Wide Version with Portal */}
-            {editingMember && createPortal(
-                <div className="fixed inset-0 min-h-screen w-screen bg-black/70 backdrop-blur-[12px] flex items-center justify-center z-[9999] p-4 md:p-12 animate-in fade-in duration-500">
-                    <div className="bg-white rounded-[2rem] shadow-2xl max-w-6xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-
-                        {/* Header - Wide & Clean */}
-                        <div className="px-8 py-6 flex justify-between items-center bg-white border-b border-gray-100 shrink-0">
-                            <div className="flex items-center gap-4">
-                                <div className="h-10 w-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600">
-                                    <Shield className="w-5 h-5" />
-                                </div>
-                                <div>
-                                    <h2 className="text-xl font-bold text-gray-900">Configuración de Usuario</h2>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
-                                        <p className="text-xs text-gray-500 uppercase tracking-wider">{editingMember.email}</p>
+                <div className="divide-y divide-gray-50">
+                    {filteredMembers.map(member => (
+                        <div key={member.id} className="px-6 py-4 hover:bg-gray-50/30 transition-all group flex items-center justify-between">
+                            <div className="flex items-center gap-5">
+                                <div className="relative shrink-0">
+                                    <div className="w-11 h-11 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400 overflow-hidden border border-white shadow-sm">
+                                        {member.avatar_url ? <img src={member.avatar_url} className="w-full h-full object-cover" /> : <User className="w-5 h-5 opacity-30" />}
                                     </div>
+                                    {member.is_active !== false && <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 border-2 border-white rounded-full"></div>}
                                 </div>
-                            </div>
-                            <button onClick={handleCancelEdit} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-gray-600">
-                                <X className="w-6 h-6" />
-                            </button>
-                        </div>
-
-                        {/* Scrollable Body - Grid Layout */}
-                        <div className="flex-1 overflow-y-auto bg-gray-50/50 custom-scrollbar">
-                            <form id="edit-profile-form" onSubmit={handleSaveEdit} className="p-8">
-                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-
-                                    {/* Left Column: Profile Identity (4 Cols) */}
-                                    <div className="lg:col-span-4 space-y-6">
-                                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                                            {/* Avatar Box */}
-                                            <div className="flex flex-col items-center mb-6">
-                                                <div className="relative group cursor-pointer">
-                                                    <div className="w-32 h-32 rounded-full border-4 border-white shadow-lg overflow-hidden relative bg-gray-100">
-                                                        {editingMember.avatar_url ? (
-                                                            <img src={editingMember.avatar_url} alt="" className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                                                <User className="w-12 h-12" />
-                                                            </div>
-                                                        )}
-                                                        {isUploading && (
-                                                            <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
-                                                                <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-                                                            </div>
-                                                        )}
-                                                        <label className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white cursor-pointer">
-                                                            <Camera className="w-8 h-8" />
-                                                            <input type="file" className="hidden" accept="image/*" onChange={handleAvatarUpload} disabled={isUploading} />
-                                                        </label>
-                                                    </div>
-                                                </div>
-                                                <h3 className="mt-4 text-lg font-bold text-gray-900 text-center">{editingMember.full_name || 'Sin Nombre'}</h3>
-                                                <p className="text-sm text-gray-500 text-center">{editingMember.role === 'company_admin' ? 'Administrador' : 'Agente Ventas'}</p>
-                                            </div>
-
-                                            {/* Core Fields */}
-                                            <div className="space-y-4">
-                                                <div>
-                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Nombre Completo</label>
-                                                    <Input value={editingMember.full_name || ''} onChange={e => setEditingMember({ ...editingMember, full_name: e.target.value })} className="bg-gray-50" />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Teléfono</label>
-                                                    <div className="relative">
-                                                        <Phone className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
-                                                        <Input value={editingMember.phone || ''} onChange={e => setEditingMember({ ...editingMember, phone: e.target.value })} className="pl-9 bg-gray-50" placeholder="+503..." />
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Sitio Web / Link</label>
-                                                    <div className="relative">
-                                                        <Globe className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
-                                                        <Input value={editingMember.website || ''} onChange={e => setEditingMember({ ...editingMember, website: e.target.value })} className="pl-9 bg-gray-50" placeholder="https://..." />
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Rol</label>
-                                                    <select
-                                                        className="w-full rounded-lg border-gray-200 bg-gray-50 text-sm focus:ring-blue-500 focus:border-blue-500 p-2.5"
-                                                        value={editingMember.role}
-                                                        onChange={e => setEditingMember({ ...editingMember, role: e.target.value as Role })}
-                                                        disabled={editingMember.id === myProfile?.id}
-                                                    >
-                                                        <option value="sales_agent">Agente de Ventas</option>
-                                                        <option value="company_admin">Admin de Empresa</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Right Column: Permission Matrix (8 Cols) */}
-                                    <div className="lg:col-span-8 space-y-6">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <h3 className="text-lg font-bold text-gray-900">Matriz de Acceso</h3>
-                                                <p className="text-sm text-gray-500">Define qué módulos y acciones específicas puede realizar este usuario.</p>
-                                            </div>
-                                            {editingMember.role === 'company_admin' && (
-                                                <div className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2">
-                                                    <Shield className="w-4 h-4" />
-                                                    Acceso Total (Admin)
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {(editingMember.role === 'company_admin' || editingMember.role === 'super_admin') ? (
-                                            <div className="bg-blue-50 border border-blue-100 rounded-xl p-8 text-center">
-                                                <Shield className="w-12 h-12 text-blue-400 mx-auto mb-3" />
-                                                <h4 className="text-blue-900 font-bold text-lg">Modo Administrador Activo</h4>
-                                                <p className="text-blue-700 mt-2 max-w-md mx-auto">Este usuario tiene control total sobre todos los módulos activos de la empresa. Para limitar su acceso, cambia su rol a "Agente de Ventas".</p>
-                                            </div>
-                                        ) : (
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                                {/* Leads Module */}
-                                                <PermissionCard
-                                                    title="CRM & Leads"
-                                                    icon={User}
-                                                    mainKey="leads"
-                                                    desc="Gestión de contactos y pipeline"
-                                                    subFeatures={[
-                                                        { key: 'leads_delete', label: 'Eliminar Leads' },
-                                                        { key: 'leads_export', label: 'Exportar Data' }
-                                                    ]}
-                                                    permissions={editingMember.permissions}
-                                                    onChange={(newPerms) => setEditingMember({ ...editingMember, permissions: newPerms })}
-                                                />
-
-                                                {/* Quotes Module */}
-                                                <PermissionCard
-                                                    title="Cotizaciones"
-                                                    icon={FileText}
-                                                    mainKey="quotes"
-                                                    desc="Creación y envío de presupuestos"
-                                                    subFeatures={[
-                                                        { key: 'quotes_approve', label: 'Aprobar Descuentos' },
-                                                        { key: 'quotes_delete', label: 'Eliminar Cotizaciones' }
-                                                    ]}
-                                                    permissions={editingMember.permissions}
-                                                    onChange={(newPerms) => setEditingMember({ ...editingMember, permissions: newPerms })}
-                                                />
-
-                                                {/* Calendar Module */}
-                                                <PermissionCard
-                                                    title="Agenda & Citas"
-                                                    icon={Calendar}
-                                                    mainKey="calendar"
-                                                    desc="Calendario de actividades"
-                                                    subFeatures={[]} // No sub-features yet
-                                                    permissions={editingMember.permissions}
-                                                    onChange={(newPerms) => setEditingMember({ ...editingMember, permissions: newPerms })}
-                                                />
-
-                                                {/* Marketing Module */}
-                                                <PermissionCard
-                                                    title="Marketing Hub"
-                                                    icon={Megaphone}
-                                                    mainKey="marketing"
-                                                    desc="Campañas y Automatización"
-                                                    isPremium
-                                                    subFeatures={[
-                                                        { key: 'marketing_publish', label: 'Publicar Campañas' }
-                                                    ]}
-                                                    permissions={editingMember.permissions}
-                                                    onChange={(newPerms) => setEditingMember({ ...editingMember, permissions: newPerms })}
-                                                />
-
-                                                {/* Chat Module */}
-                                                <PermissionCard
-                                                    title="Mensajería"
-                                                    icon={MessageSquare}
-                                                    mainKey="chat"
-                                                    desc="Chat unificado y WhatsApp"
-                                                    isPremium
-                                                    subFeatures={[
-                                                        { key: 'chat_history', label: 'Ver Historial Completo' }
-                                                    ]}
-                                                    permissions={editingMember.permissions}
-                                                    onChange={(newPerms) => setEditingMember({ ...editingMember, permissions: newPerms })}
-                                                />
+                                <div className="space-y-0.5">
+                                    <p className="font-bold text-gray-900 text-sm leading-tight uppercase tracking-tight">{member.full_name || 'Sin Nombre'}</p>
+                                    <div className="flex flex-col">
+                                        <p className="text-[11px] text-gray-400 font-medium">{member.email}</p>
+                                        {member.website && (
+                                            <div className="flex items-center gap-1 text-indigo-500 font-bold text-[9px] uppercase tracking-wider">
+                                                <LayoutGrid className="w-2.5 h-2.5" />
+                                                {member.website}
                                             </div>
                                         )}
                                     </div>
                                 </div>
+                            </div>
+
+                            <div className="flex items-center gap-8">
+                                <RoleBadge member={member} />
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => { setEditingMember(member); setActiveTab('general'); }}
+                                        className="p-2 rounded-lg text-gray-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
+                                    >
+                                        <Edit2 className="w-4 h-4" />
+                                    </button>
+                                    {member.id !== myProfile?.id ? (
+                                        <>
+                                            <button
+                                                onClick={() => { if (confirm('¿Eliminar usuario?')) teamService.deleteMember(member.id).then(loadData) }}
+                                                className="p-2 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                            <div className="pl-2">
+                                                <Switch checked={member.is_active !== false} onChange={() => { }} size="sm" colorVariant="green" label="" />
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest px-4 py-1.5 bg-indigo-50/50 rounded-lg">TÚ</span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Premium Tabbed Edit Modal - Master Design */}
+            {editingMember && createPortal(
+                <div className="fixed inset-0 min-h-screen w-screen bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+                    <div className="bg-white rounded-[3rem] shadow-2xl max-w-2xl w-full flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+
+                        <div className="px-12 py-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                            <div className="flex items-center gap-6">
+                                <div className="relative">
+                                    <div className="w-20 h-20 rounded-2xl bg-white shadow-md overflow-hidden border-4 border-white">
+                                        {editingMember.avatar_url ? <img src={editingMember.avatar_url} className="w-full h-full object-cover" /> : <User className="w-8 h-8 m-auto mt-6 text-gray-200" />}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#4449AA] text-white rounded-lg flex items-center justify-center shadow-lg border-2 border-white hover:scale-110 transition-transform"
+                                    >
+                                        <Camera className="w-3 h-3" />
+                                    </button>
+                                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleAvatarUpload} />
+                                </div>
+                                <div className="space-y-1">
+                                    <h2 className="text-xl font-black text-[#4449AA] leading-tight uppercase tracking-tight">{editingMember.full_name || 'Editar Perfil'}</h2>
+                                    <p className="text-[11px] text-gray-400 font-bold uppercase tracking-[0.2em]">{editingMember.email}</p>
+                                </div>
+                            </div>
+                            <div className="flex gap-4">
+                                <div className="flex bg-white p-1 rounded-2xl border border-gray-100 shadow-sm">
+                                    <button
+                                        onClick={() => setActiveTab('general')}
+                                        className={`px-5 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'general' ? 'bg-[#4449AA] text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+                                    >General</button>
+                                    <button
+                                        onClick={() => setActiveTab('security')}
+                                        className={`px-5 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${activeTab === 'security' ? 'bg-[#4449AA] text-white shadow-md' : 'text-gray-400 hover:text-gray-600'}`}
+                                    >Accesos</button>
+                                </div>
+                                <button onClick={() => setEditingMember(null)} className="p-2.5 hover:bg-gray-100 rounded-xl transition-colors"><X className="w-5 h-5 text-gray-300" /></button>
+                            </div>
+                        </div>
+
+                        <div className="p-12 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                            <form id="edit-form-master" onSubmit={handleSaveEdit}>
+                                {activeTab === 'general' ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 animate-in fade-in duration-300">
+                                        <div className="space-y-6">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] pl-1">Nombre Completo</label>
+                                                <Input value={editingMember.full_name || ''} onChange={e => setEditingMember({ ...editingMember, full_name: e.target.value })} className="h-14 rounded-xl shadow-inner bg-gray-50/50 font-bold" />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] pl-1">Número de Contacto</label>
+                                                <Input value={editingMember.phone || ''} onChange={e => setEditingMember({ ...editingMember, phone: e.target.value })} className="h-14 rounded-xl shadow-inner bg-gray-50/50 font-bold" />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-6">
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] pl-1">Fecha de Nacimiento</label>
+                                                <Input type="date" value={editingMember.birth_date || ''} onChange={e => setEditingMember({ ...editingMember, birth_date: e.target.value })} className="h-14 rounded-xl shadow-inner bg-gray-50/50" />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] pl-1">Dirección Física</label>
+                                                <textarea
+                                                    value={editingMember.address || ''}
+                                                    onChange={e => setEditingMember({ ...editingMember, address: e.target.value })}
+                                                    className="w-full p-4 rounded-xl bg-gray-50/50 border border-gray-100 focus:bg-white focus:border-indigo-100 outline-none min-h-[100px] font-bold text-sm transition-all shadow-inner"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-8 animate-in fade-in duration-300">
+                                        <div className="bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-100/50">
+                                            <div className="flex items-center gap-3 mb-4">
+                                                <Shield className="w-5 h-5 text-indigo-600" />
+                                                <label className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em]">Configuración de Nivel de Acceso</label>
+                                            </div>
+                                            <select
+                                                className="w-full h-14 rounded-2xl border-white bg-white px-5 font-bold text-sm text-gray-900 shadow-sm outline-none"
+                                                value={editingMember.custom_role_id || ''}
+                                                onChange={e => setEditingMember({ ...editingMember, custom_role_id: e.target.value })}
+                                                disabled={editingMember.id === myProfile?.id}
+                                            >
+                                                {customRoles.map(role => (
+                                                    <option key={role.id} value={role.id}>{role.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <PermissionRow title="Gestión de Leads" icon={User} mainKey="leads" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
+                                            <PermissionRow title="Marketing Digital" icon={Megaphone} mainKey="marketing" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
+                                            <PermissionRow title="Comunicación (Chat)" icon={MessageSquare} mainKey="chat" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
+                                            <PermissionRow title="Agenda Global" icon={Calendar} mainKey="calendar" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
+                                        </div>
+                                    </div>
+                                )}
                             </form>
                         </div>
 
-                        <div className="px-10 py-10 bg-gray-50 border-t border-gray-100 shrink-0">
-                            <div className="flex gap-6">
-                                <button
-                                    type="button"
-                                    onClick={handleCancelEdit}
-                                    className="flex-1 h-16 rounded-[1.5rem] font-black text-[11px] uppercase tracking-[0.4em] text-gray-400 hover:text-gray-900 border-2 border-gray-200 hover:border-gray-300 transition-all bg-white hover:shadow-xl active:scale-95"
-                                >
-                                    Descartar
-                                </button>
-                                <Button
-                                    form="edit-profile-form"
-                                    type="submit"
-                                    disabled={isSaving}
-                                    className="flex-[2] h-16 rounded-[1.5rem] bg-[#4449AA] hover:bg-[#383d8f] text-white shadow-[0_15px_30px_-10px_rgba(68,73,170,0.6)] transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-4 border-0"
-                                >
-                                    {isSaving ? (
-                                        <>
-                                            <Loader2 className="w-6 h-6 animate-spin" />
-                                            <span className="font-black text-xs uppercase tracking-[0.2em]">Guardando Cambios...</span>
-                                        </>
-                                    ) : (
-                                        <span className="font-black text-xs uppercase tracking-[0.2em]">Confirmar Actualización</span>
-                                    )}
-                                </Button>
-                            </div>
+                        <div className="px-12 py-8 bg-gray-50 border-t border-gray-100 flex gap-6">
+                            <button
+                                onClick={() => setEditingMember(null)}
+                                className="flex-1 h-14 rounded-2xl font-black text-[11px] text-gray-400 hover:text-gray-900 transition-all uppercase tracking-widest"
+                            >Cancelar</button>
+                            <Button
+                                form="edit-form-master"
+                                type="submit"
+                                disabled={isSaving}
+                                className="flex-[2] h-14 rounded-2xl bg-[#4449AA] text-white font-black text-[11px] uppercase tracking-widest shadow-2xl border-0 hover:translate-y-[-2px] transition-all"
+                            >
+                                {isSaving ? 'Actualizando...' : 'Guardar Cambios permanentemente'}
+                            </Button>
                         </div>
                     </div>
                 </div>,
                 document.body
             )}
-            {/* Active Members */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mt-8">
-                <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                    <div className="flex items-center gap-4">
-                        <h2 className="font-semibold text-gray-800">Miembros Activos</h2>
-                        <span className={`text-xs px-2 py-1 rounded-full font-bold ${isLimitReached ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`}>
-                            {members.length + invitations.length} / {maxUsers} Licencias
-                        </span>
-                    </div>
+        </div>
+    );
+}
+
+function PermissionRow({ title, icon: Icon, mainKey, permissions = {}, onChange }: any) {
+    const isCore = ['leads', 'quotes', 'calendar'].includes(mainKey);
+    const currentVal = permissions[mainKey];
+    const isChecked = currentVal === undefined ? isCore : currentVal === true;
+
+    return (
+        <div className={`p-4 rounded-xl border transition-all flex items-center justify-between ${isChecked ? 'bg-white border-blue-100 shadow-sm' : 'bg-gray-50/50 border-gray-100'}`}>
+            <div className="flex items-center gap-3.5">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${isChecked ? 'bg-[#4449AA] text-white' : 'bg-white text-gray-300 border border-gray-100'}`}>
+                    <Icon className="w-5 h-5" />
                 </div>
-                {isLimitReached && (
-                    <div className="px-6 py-3 bg-red-50 border-b border-red-100 flex items-center gap-2 text-red-700 text-sm">
-                        <Shield className="w-4 h-4" />
-                        Has alcanzado el límite de usuarios. Contacta al soporte para ampliar tu licencia.
-                    </div>
-                )}
-                <table className="min-w-full divide-y divide-gray-200">
-                    <tbody className="divide-y divide-gray-200">
-                        {members.map(member => (
-                            <tr key={member.id} className="hover:bg-gray-50 transition-colors">
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center">
-                                        <div className="flex-shrink-0 h-10 w-10">
-                                            {member.avatar_url ? (
-                                                <img src={member.avatar_url} alt="" className="h-10 w-10 rounded-full object-cover border border-gray-100 shadow-sm" />
-                                            ) : (
-                                                <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500">
-                                                    <User className="w-6 h-6" />
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="ml-4">
-                                            <div className="text-sm font-medium text-gray-900">{member.full_name || 'Sin nombre'}</div>
-                                            <div className="text-xs text-gray-500">{member.email}</div>
-                                            <div className="flex gap-3 mt-1 flex-wrap">
-                                                {member.phone && <span className="text-xs text-blue-600 flex items-center bg-blue-50 px-1.5 py-0.5 rounded"><Phone className="w-3 h-3 mr-1" /> {member.phone}</span>}
-                                                {member.website && <span className="text-xs text-purple-600 flex items-center bg-purple-50 px-1.5 py-0.5 rounded"><Globe className="w-3 h-3 mr-1" /> Web</span>}
-
-                                                {/* Permission Indicators */}
-                                                {(member.role === 'company_admin' || member.role === 'super_admin' || member.permissions?.marketing) && (
-                                                    <span className="text-xs text-indigo-600 flex items-center bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100" title="Acceso a Marketing">
-                                                        <Megaphone className="w-3 h-3 mr-1" /> Marketing
-                                                    </span>
-                                                )}
-                                                {(member.role === 'company_admin' || member.role === 'super_admin' || member.permissions?.chat) && (
-                                                    <span className="text-xs text-emerald-600 flex items-center bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100" title="Acceso a Chat">
-                                                        <MessageSquare className="w-3 h-3 mr-1" /> Chat
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <RoleBadge role={member.role} />
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <div className="flex justify-end gap-2 items-center">
-                                        {(isAdmin || member.id === myProfile?.id) && (
-                                            <button
-                                                onClick={() => handleEditMember(member)}
-                                                className="text-gray-400 hover:text-blue-600 transition-colors p-1"
-                                                title="Editar Miembros"
-                                            >
-                                                <Edit2 className="w-4 h-4" />
-                                            </button>
-                                        )}
-
-                                        {isAdmin && member.id !== myProfile?.id && (
-                                            <button
-                                                onClick={() => handleMemberDelete(member.id, member.email)}
-                                                className="text-gray-400 hover:text-red-600 transition-colors p-1"
-                                                title="Eliminar Miembro"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        )}
-
-                                        {member.id === myProfile?.id && (
-                                            <span className="text-blue-600 text-[10px] font-black px-2 py-1 bg-blue-50 rounded uppercase tracking-wider">Tú</span>
-                                        )}
-
-                                        {isAdmin && member.id !== myProfile?.id && (
-                                            <div className="ml-2" title={member.is_active !== false ? "Desactivar usuario" : "Activar usuario"}>
-                                                <Switch
-                                                    checked={member.is_active !== false}
-                                                    onChange={() => handleToggleStatus(member.id, member.is_active)}
-                                                    size="sm"
-                                                    colorVariant="green"
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                <div className="space-y-0">
+                    <p className={`font-black text-[13px] uppercase tracking-tight ${isChecked ? 'text-gray-900' : 'text-gray-400'}`}>{title}</p>
+                    <p className="text-[9px] text-gray-400 font-medium">Módulo {isChecked ? 'Activo' : 'Restringido'}</p>
+                </div>
             </div>
+            <Switch checked={isChecked} onChange={() => onChange({ ...permissions, [mainKey]: !isChecked })} size="sm" colorVariant="blue" />
         </div>
     );
 }

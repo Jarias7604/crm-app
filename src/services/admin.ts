@@ -41,5 +41,15 @@ export const adminService = {
 
         if (error) throw error;
         return data as Company;
+    },
+
+    async getPermissionDefinitions() {
+        const { data, error } = await supabase
+            .from('permission_definitions')
+            .select('*')
+            .order('category', { ascending: true });
+
+        if (error) throw error;
+        return data as any[];
     }
 };

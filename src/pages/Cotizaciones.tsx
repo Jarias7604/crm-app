@@ -93,16 +93,16 @@ export default function Cotizaciones() {
     }
 
     return (
-        <div className="space-y-6">
-            {/* Header */}
-            <div className="flex justify-between items-center">
+        <div className="w-full max-w-[1500px] mx-auto pb-6 space-y-8 animate-in fade-in duration-500">
+            {/* Header - Global Standard */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-extrabold text-[#4449AA]">💰 Cotizaciones</h1>
-                    <p className="text-sm text-gray-500 mt-1">Gestión de cotizaciones de facturación electrónica</p>
+                    <h1 className="text-2xl font-extrabold text-[#4449AA] tracking-tight">💰 Cotizaciones</h1>
+                    <p className="text-[13px] text-gray-400 font-medium">Gestión de cotizaciones de facturación electrónica</p>
                 </div>
                 <Button
                     onClick={() => navigate('/cotizaciones/nueva-pro')}
-                    className="bg-[#007BFF] hover:bg-blue-600 text-white"
+                    className="h-10 px-6 bg-[#4449AA] hover:bg-[#383d8f] text-white text-[10px] font-black uppercase tracking-widest border-0 shadow-lg"
                 >
                     <Plus className="w-4 h-4 mr-2" />
                     Nueva Cotización

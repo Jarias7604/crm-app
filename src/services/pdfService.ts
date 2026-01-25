@@ -47,108 +47,118 @@ export const pdfService = {
             };
 
             // ==========================================
-            // 1. HEADER (FULL WIDTH & RECTANGULAR)
+            // 1. HEADER (FULL WIDTH & SQUARE)
             // ==========================================
-            const headerH = 60;
-            const contentMargin = 15; // Internal padding for text
+            const headerH = 58; // Calibrated to 58px as requested
+            const contentMargin = 15;
 
-            // DRAW HEADER BACKGROUND (Full Width, No Rounding)
-            doc.setFillColor(C_BG_DARK[0], C_BG_DARK[1], C_BG_DARK[2]);
+            // DRAW HEADER BACKGROUND (Slate 950 deep feel)
+            doc.setFillColor(15, 23, 42);
             doc.rect(0, 0, pageWidth, headerH, 'F');
 
-            // --- LEFT SIDE ---
+            // --- LEFT SIDE (VERTICAL STACK: LOGO -> NAME -> INFO) ---
             const leftPad = contentMargin;
+            const logoSize = 18;
+            let currentY = 12; // Starting top margin
+
             const logoData = await loadImage(cotizacion.company?.logo_url);
-            let contentStartY = 36; // Relative to top 0
-            const boxY = 0; // Keeping for reference if needed below, but effectively 0
 
             if (logoData) {
-                const logoSize = 22; // Increased size
-                doc.addImage(logoData, 'PNG', leftPad, boxY + 8, logoSize, logoSize);
+                doc.addImage(logoData, 'PNG', leftPad, currentY, logoSize, logoSize);
+                currentY += logoSize + 8; // Space after logo
             } else {
                 doc.setFillColor(255, 255, 255);
-                doc.circle(leftPad + 8, boxY + 16, 8, 'F');
-                doc.setTextColor(C_BG_DARK[0], C_BG_DARK[1], C_BG_DARK[2]);
-                doc.setFontSize(10);
-                doc.text('LOGO', leftPad + 8, boxY + 18, { align: 'center' });
+                doc.circle(leftPad + 9, currentY + 9, 9, 'F');
+                doc.setTextColor(15, 23, 42);
+                doc.setFontSize(8);
+                doc.text('LOGO', leftPad + 9, currentY + 10.5, { align: 'center' });
+                currentY += logoSize + 8;
             }
 
-            // Company Name
+            // Company Name (Below Logo)
             doc.setTextColor(255, 255, 255);
-            doc.setFontSize(11);
+            doc.setFontSize(12);
             doc.setFont('helvetica', 'bold');
-            doc.text((cotizacion.company?.name || 'EMPRESA DEMO').toUpperCase(), leftPad, contentStartY);
+            doc.text((cotizacion.company?.name || 'EMPRESA DEMO').toUpperCase(), leftPad, currentY);
 
-            // Address
-            const headerAddrY = contentStartY + 5;
-            doc.setTextColor(148, 163, 184); // Slate 400
+            // Sub Info (Address & Phone)
+            currentY += 5.5;
+            doc.setTextColor(100, 116, 139); // Slate 400
             doc.setFontSize(6.5);
             doc.setFont('helvetica', 'normal');
             let addrLine = cotizacion.company?.address || 'Dirección de la empresa';
             if (cotizacion.company?.phone) addrLine += `  •  ${cotizacion.company?.phone}`;
-            doc.text(addrLine.toUpperCase(), leftPad, headerAddrY);
 
-            // Website
-            const webY = headerAddrY + 5;
+            const maxAddrWidth = 100;
+            const splitAddr = doc.splitTextToSize(addrLine.toUpperCase(), maxAddrWidth);
+            doc.text(splitAddr, leftPad, currentY);
+
+            // Website (Below Address)
+            currentY += (Array.isArray(splitAddr) ? (splitAddr.length * 3.5) : 4.5);
             doc.setTextColor(C_BLUE_ACCENT[0], C_BLUE_ACCENT[1], C_BLUE_ACCENT[2]);
+            doc.setFontSize(7.5);
             doc.setFont('helvetica', 'bold');
-            doc.text((cotizacion.company?.website || 'WWW.SITIOWEB.COM').replace(/^https?:\/\//, '').toUpperCase(), leftPad, webY);
+            doc.text((cotizacion.company?.website || 'WWW.SITIOWEB.COM').replace(/^https?:\/\//, '').toUpperCase(), leftPad, currentY);
 
-
-            const footerH = 40;
-            const footerStart = pageHeight - footerH;
-
-            // --- RIGHT SIDE ---
+            // --- RIGHT SIDE (IDS & DATES) remains aligned ---
             const rightPad = pageWidth - contentMargin;
+            const rightBaseY = 14;
 
-            // Label
+            // "COTIZACIÓN OFICIAL"
             doc.setTextColor(C_BLUE_ACCENT[0], C_BLUE_ACCENT[1], C_BLUE_ACCENT[2]);
             doc.setFontSize(7);
             doc.setFont('helvetica', 'bold');
-            doc.text('COTIZACIÓN OFICIAL', rightPad, boxY + 12, { align: 'right' });
+            doc.text('COTIZACIÓN OFICIAL', rightPad, rightBaseY, { align: 'right' });
 
-            // ID
+            // Main ID (Large White)
             doc.setTextColor(255, 255, 255);
-            doc.setFontSize(26);
+            doc.setFontSize(32); // Prominent as in screenshot
             doc.setFont('helvetica', 'normal');
-            doc.text(cotizacion.id.slice(0, 8).toUpperCase(), rightPad, boxY + 24, { align: 'right' });
+            doc.text(cotizacion.id.slice(0, 8).toUpperCase(), rightPad, rightBaseY + 11, { align: 'right' });
 
-            // Line
-            const lineY = boxY + 32;
+            // Horizontal Line
+            const lineY = rightBaseY + 16;
             doc.setDrawColor(51, 65, 85); // Slate 700
+            doc.setLineWidth(0.2);
             doc.line(rightPad - 70, lineY, rightPad, lineY);
 
-            // Columns
-            const labelY = lineY + 6;
-            const valY = labelY + 5;
+            // Info Columns below line
+            const infoLabelY = lineY + 5.5;
+            const infoValueY = infoLabelY + 5;
 
-            // Ref ID
-            doc.setFontSize(6);
+            // Date Column
+            const colDateX = rightPad - 36;
             doc.setTextColor(148, 163, 184); // Slate 400
+            doc.setFontSize(6);
             doc.setFont('helvetica', 'bold');
-            doc.text('REFERENCIA ID', rightPad, labelY, { align: 'right' });
+            doc.text('FECHA EMISIÓN', colDateX, infoLabelY, { align: 'right' });
 
             doc.setTextColor(255, 255, 255);
             doc.setFontSize(8);
-            doc.text(cotizacion.id.slice(0, 6).toUpperCase(), rightPad, valY, { align: 'right' });
+            doc.text(format(new Date(cotizacion.created_at || new Date()), 'dd/MM/yyyy'), colDateX, infoValueY, { align: 'right' });
 
-            // Date
-            const col2X = rightPad - 35;
+            // Ref ID Column
             doc.setTextColor(148, 163, 184);
             doc.setFontSize(6);
-            doc.text('FECHA EMISIÓN', col2X, labelY, { align: 'right' });
+            doc.setFont('helvetica', 'bold');
+            doc.text('REFERENCIA ID', rightPad, infoLabelY, { align: 'right' });
 
             doc.setTextColor(255, 255, 255);
             doc.setFontSize(8);
-            doc.text(format(new Date(cotizacion.created_at || new Date()), 'dd/MM/yyyy'), col2X, valY, { align: 'right' });
+            doc.text(cotizacion.id.slice(0, 6).toUpperCase(), rightPad, infoValueY, { align: 'right' });
+
+
+            // --- PAGE BALANCE CONSTANTS ---
+            const footerH = 40;
+            const footerStart = pageHeight - footerH;
 
 
             // ==========================================
             // 2. CLIENT INFO (Restored Layout)
             // ==========================================
-            let cursorY = boxY + headerH + 20;
-            // Ensure no overlap if header was somehow taller, but strict value is usually best for consistency
-            cursorY = Math.max(cursorY, 90);
+            let cursorY = headerH + 20;
+            // Ensure no overlap
+            cursorY = Math.max(cursorY, 95);
 
             doc.setTextColor(C_BLUE_ACCENT[0], C_BLUE_ACCENT[1], C_BLUE_ACCENT[2]);
             doc.setFontSize(7);
@@ -156,7 +166,7 @@ export const pdfService = {
             doc.text('CLIENTE RECEPTOR', 15, cursorY - 12);
 
             doc.setTextColor(C_TEXT_DARK[0], C_TEXT_DARK[1], C_TEXT_DARK[2]);
-            doc.setFontSize(24);
+            doc.setFontSize(24); // Restored to 24 as originally requested
             doc.setFont('helvetica', 'bold');
             doc.text(cotizacion.nombre_cliente, 15, cursorY);
 
@@ -227,15 +237,15 @@ export const pdfService = {
             // ==========================================
             // 3. TABLE
             // ==========================================
-            let tableY = 140;
+            let tableY = 155; // Lowered from 140 to avoid clashing with Summary Box and Status Badge
             const drawTableHeader = (y: number) => {
                 doc.setFillColor(241, 245, 249);
                 doc.rect(15, y, pageWidth - 30, 10, 'F');
                 doc.setTextColor(148, 163, 184);
                 doc.setFontSize(7);
                 doc.setFont('helvetica', 'bold');
-                doc.text('DESCRIPCIÓN DEL SERVICIO', 25, y + 6);
-                doc.text('INVERSIÓN (USD)', pageWidth - 25, y + 6, { align: 'right' });
+                doc.text('DESCRIPCIÓN DEL SERVICIO', 20, y + 6);
+                doc.text('INVERSIÓN (USD)', pageWidth - 15, y + 6, { align: 'right' });
             };
 
             drawTableHeader(tableY);
@@ -302,7 +312,7 @@ export const pdfService = {
                 doc.setFontSize(11);
                 doc.setFont('helvetica', 'bold');
                 const priceStr = Number.isInteger(price) ? `$${price}` : `$${price.toLocaleString()}`;
-                doc.text(priceStr, pageWidth - 25, tableY + 8, { align: 'right' });
+                doc.text(priceStr, pageWidth - 15, tableY + 8, { align: 'right' });
 
                 doc.setDrawColor(241, 245, 249);
                 doc.setLineDashPattern([], 0);
@@ -364,8 +374,12 @@ export const pdfService = {
             const totalBoxWidth = 80;
             const totalBoxX = pageWidth - 15 - totalBoxWidth;
 
-            // Calculate discount first to decide box height
-            const discountAmount = cotizacion.descuento_monto || ((cotizacion.subtotal_anual || 0) * ((cotizacion.descuento_porcentaje || 0) / 100));
+            // Calculate discount robustly
+            const dPct = parseFloat(cotizacion.descuento_porcentaje || 0);
+            const dMnt = parseFloat(cotizacion.descuento_monto || 0);
+            const subtotal = parseFloat(cotizacion.subtotal_anual || 0);
+
+            const discountAmount = dMnt > 0 ? dMnt : (subtotal * (dPct / 100));
             const hasDiscount = discountAmount > 0;
             const boxHeight = hasDiscount ? 65 : 55;
 

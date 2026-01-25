@@ -46,18 +46,27 @@ export default function Sidebar() {
     // --- PERMISSION LOGIC ---
     const canAccess = (feature: 'leads' | 'quotes' | 'calendar' | 'marketing' | 'chat') => {
         if (!profile || !company) return false;
+
+        // Representante de cada modulo para verificar licencia de empresa
+        const licenseKeys: Record<string, string> = {
+            leads: 'leads_view',
+            quotes: 'cotizaciones.manage_implementation',
+            calendar: 'calendar_view_own',
+            marketing: 'mkt_view_dashboard',
+            chat: 'chat_view_all'
+        };
+
+        const licenseKey = licenseKeys[feature];
+
+        // 1. Verificar si la empresa tiene el modulo habilitado (Licencia)
+        const isLicensed = company.allowed_permissions?.includes(licenseKey);
+        if (!isLicensed) return false;
+
+        // 2. Verificar el rol y permiso individual
         if (profile.role === 'super_admin' || profile.role === 'company_admin') return true;
 
-        // Core Modules (Default True unless explicitly disabled)
-        if (['leads', 'quotes', 'calendar'].includes(feature)) {
-            return profile.permissions?.[feature as 'leads' | 'quotes' | 'calendar'] !== false;
-        }
-
-        // Premium Modules (Default False, Check Company Feature)
-        const companyEnabled = company.features?.[feature as 'marketing' | 'chat'];
-        if (!companyEnabled) return false;
-
-        return profile.permissions?.[feature as 'marketing' | 'chat'] === true;
+        // Agentes deben tener el permiso habilitado en su objeto permissions
+        return profile.permissions?.[feature] !== false;
     };
 
     const navigation = [

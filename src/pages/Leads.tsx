@@ -391,14 +391,14 @@ export default function Leads() {
     };
 
     return (
-        <div className="space-y-6">
-            {/* Header */}
+        <div className="w-full max-w-[1500px] mx-auto pb-6 space-y-8 animate-in fade-in duration-500">
+            {/* Header - Global Standard */}
             <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Gestión de Leads</h1>
+                    <h1 className="text-2xl font-extrabold text-[#4449AA] tracking-tight">Gestión de Leads</h1>
                     <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-1">
-                        <p className="text-sm text-gray-500">
-                            {leads.length} leads {!isAdmin && '(Mis asignaciones)'} · ${leads.reduce((sum, l) => sum + (l.value || 0), 0).toLocaleString()} en pipeline
+                        <p className="text-[13px] text-gray-400 font-medium">
+                            {leads.length} prospectos {!isAdmin && '(Asignados)'} · <span className="text-[#4449AA] font-black">${leads.reduce((sum, l) => sum + (l.value || 0), 0).toLocaleString()}</span> en pipeline
                         </p>
                         <div className="hidden sm:block w-px h-4 bg-gray-300"></div>
                         <div className="flex items-center gap-2">
@@ -421,24 +421,24 @@ export default function Leads() {
                 </div>
 
                 <div className="flex flex-wrap gap-2 w-full xl:w-auto">
-                    <div className="flex bg-gray-100 rounded-lg p-1 border border-gray-200">
+                    <div className="flex bg-gray-50 rounded-xl p-1 border border-gray-100">
                         <button
                             onClick={() => setViewMode('grid')}
-                            className={`p-2 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                            className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white shadow-md text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
                             title="Vista Cuadrícula"
                         >
                             <LayoutGrid className="w-4 h-4" />
                         </button>
                         <button
                             onClick={() => setViewMode('list')}
-                            className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                            className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white shadow-md text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
                             title="Vista Lista"
                         >
                             <List className="w-4 h-4" />
                         </button>
                         <button
                             onClick={() => setViewMode('kanban')}
-                            className={`p-2 rounded-md transition-all ${viewMode === 'kanban' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                            className={`p-2 rounded-lg transition-all ${viewMode === 'kanban' ? 'bg-white shadow-md text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
                             title="Tablero Kanban"
                         >
                             <Layout className="w-4 h-4" />
@@ -448,11 +448,10 @@ export default function Leads() {
                     <div className="flex items-center gap-2 flex-1 sm:flex-none">
                         <Button
                             variant="outline"
-                            className="hidden sm:flex items-center gap-2 h-9"
+                            className="hidden sm:flex items-center gap-2 h-10 px-4 text-[10px] font-black uppercase tracking-widest border-gray-100"
                             onClick={handleDownloadTemplate}
-                            title="Descargar Plantilla CSV"
                         >
-                            <Download className="w-4 h-4" />
+                            <Download className="w-3.5 h-3.5" />
                             <span className="hidden lg:inline">Plantilla</span>
                         </Button>
 
@@ -466,18 +465,21 @@ export default function Leads() {
                             />
                             <Button
                                 variant="outline"
-                                className="flex items-center gap-2 h-9 w-full sm:w-auto justify-center"
+                                className="flex items-center gap-2 h-10 w-full sm:w-auto justify-center px-4 text-[10px] font-black uppercase tracking-widest border-gray-100"
                                 disabled={isImporting}
                             >
-                                {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                                {isImporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
                                 <span className="inline">Importar</span>
                             </Button>
                         </div>
                     </div>
 
-                    <Button onClick={() => setIsModalOpen(true)} className="flex-1 sm:flex-none justify-center">
+                    <Button
+                        onClick={() => setIsModalOpen(true)}
+                        className="flex-1 sm:flex-none justify-center h-10 bg-[#4449AA] hover:bg-[#383d8f] px-6 text-[10px] font-black uppercase tracking-widest"
+                    >
                         <Plus className="w-4 h-4 mr-2" />
-                        Nuevo
+                        Nuevo Prospecto
                     </Button>
                 </div>
             </div>

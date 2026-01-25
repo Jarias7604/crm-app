@@ -282,7 +282,9 @@ export default function ChatHub() {
     });
 
     return (
-        <div className="flex h-[calc(100vh-140px)] bg-[#F0F4F8] p-4 md:p-6 gap-6 overflow-hidden font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900 rounded-[24px]">
+        <div className="flex h-[calc(100vh-128px)] bg-white rounded-[3.5rem] shadow-[0_48px_96px_-24px_rgba(0,0,0,0.15)] border border-white/60 overflow-hidden font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900 relative animate-in fade-in duration-700">
+            {/* Capa decorativa premium */}
+            <div className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#4449AA 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
             <input
                 type="file"
                 ref={fileInputRef}

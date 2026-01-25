@@ -422,34 +422,40 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                <Modal isOpen={isCompanyModalOpen} onClose={() => setIsCompanyModalOpen(false)} title="Configuración de Empresa">
+                <Modal isOpen={isCompanyModalOpen} onClose={() => setIsCompanyModalOpen(false)} title="Configuración de Empresa" className="max-w-xl rounded-[3rem] p-0 overflow-hidden shadow-3xl">
                     {editingCompany && (
-                        <form onSubmit={handleUpdateCompany} className="p-2 space-y-6">
-                            <div>
-                                <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Nombre Jurídico</label>
-                                <Input required value={editingCompany.name} onChange={e => setEditingCompany({ ...editingCompany, name: e.target.value })} className="rounded-xl border-gray-100 focus:border-[#007BFF]" />
-                            </div>
-                            <div className="grid grid-cols-2 gap-6">
-                                <div>
-                                    <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Licencia</label>
-                                    <select className="w-full bg-[#F5F7FA] border-none rounded-xl p-3 text-sm font-semibold text-[#4449AA]" value={editingCompany.license_status} onChange={e => setEditingCompany({ ...editingCompany, license_status: e.target.value })}>
-                                        <option value="trial">PRUEBA</option>
-                                        <option value="active">ACTIVA</option>
-                                        <option value="suspended">SUSPENDIDA</option>
-                                    </select>
+                        <div className="bg-white p-12 space-y-10">
+                            <form onSubmit={handleUpdateCompany} className="space-y-10">
+                                <div className="space-y-4">
+                                    <label className="text-[11px] font-black text-gray-400 uppercase tracking-[0.3em] mb-2 block pl-1">Nombre Jurídico de la Empresa</label>
+                                    <Input required value={editingCompany.name} onChange={e => setEditingCompany({ ...editingCompany, name: e.target.value })} className="h-16 rounded-2xl border-gray-100 bg-gray-50/50 shadow-inner text-lg font-bold placeholder:text-gray-300 focus:bg-white focus:border-indigo-600 transition-all" />
                                 </div>
-                                <div>
-                                    <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Usuarios Máx.</label>
-                                    <Input type="number" value={editingCompany.max_users || 5} onChange={e => setEditingCompany({ ...editingCompany, max_users: Number(e.target.value) })} className="rounded-xl border-gray-100" />
+                                <div className="grid grid-cols-2 gap-8">
+                                    <div className="space-y-4">
+                                        <label className="text-[11px] font-black text-gray-400 uppercase tracking-[0.3em] mb-2 block pl-1">Estatus de Licencia</label>
+                                        <select
+                                            className="w-full h-16 bg-gray-50/50 border border-gray-100 rounded-2xl px-5 text-sm font-black text-[#4449AA] uppercase tracking-widest outline-none transition-all focus:bg-white focus:border-indigo-600 shadow-inner"
+                                            value={editingCompany.license_status}
+                                            onChange={e => setEditingCompany({ ...editingCompany, license_status: e.target.value })}
+                                        >
+                                            <option value="trial">MODO PRUEBA</option>
+                                            <option value="active">LICENCIA ACTIVA</option>
+                                            <option value="suspended">SUSPENDIDA</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <label className="text-[11px] font-black text-gray-400 uppercase tracking-[0.3em] mb-2 block pl-1">Límite de Colaboradores</label>
+                                        <Input type="number" value={editingCompany.max_users || 5} onChange={e => setEditingCompany({ ...editingCompany, max_users: Number(e.target.value) })} className="h-16 rounded-2xl border-gray-100 bg-gray-50/50 shadow-inner text-lg font-bold text-center" />
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="flex justify-end gap-3 pt-4">
-                                <Button type="button" variant="ghost" onClick={() => setIsCompanyModalOpen(false)}>Descartar</Button>
-                                <Button type="submit" disabled={isUpdatingCompany} className="bg-[#007BFF] text-white rounded-xl px-8">
-                                    {isUpdatingCompany ? 'Aplicando...' : 'Confirmar Cambios'}
-                                </Button>
-                            </div>
-                        </form>
+                                <div className="flex justify-end gap-5 pt-6">
+                                    <button type="button" onClick={() => setIsCompanyModalOpen(false)} className="h-16 px-8 rounded-2xl font-black text-[11px] uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-all active:scale-95">Descartar</button>
+                                    <Button type="submit" disabled={isUpdatingCompany} className="h-16 bg-[#4449AA] text-white rounded-2xl px-12 font-black text-[11px] uppercase tracking-[0.1em] shadow-2xl border-0 hover:translate-y-[-2px] transition-all">
+                                        {isUpdatingCompany ? 'Actualizando...' : 'Confirmar Cambios'}
+                                    </Button>
+                                </div>
+                            </form>
+                        </div>
                     )}
                 </Modal>
             </div>
@@ -458,29 +464,29 @@ export default function Dashboard() {
 
     // CRM DASHBOARD VIEW
     return (
-        <div className="space-y-5 pb-6">
+        <div className="w-full max-w-[1500px] mx-auto pb-6 space-y-8 animate-in fade-in duration-500">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h2 className="text-2xl font-extrabold text-[#4449AA] leading-tight">{t('dashboard.crm.title')}</h2>
-                    <p className="text-xs text-gray-400 font-medium italic">Ventas y prospección en tiempo real</p>
+                    <h2 className="text-2xl font-extrabold text-[#4449AA] leading-tight tracking-tight">{t('dashboard.crm.title')}</h2>
+                    <p className="text-[13px] text-gray-400 font-medium font-inter transition-all">Análisis de rendimiento y prospección en tiempo real</p>
                 </div>
                 <FilterDropdown />
             </div>
 
-            {/* KPI Cards */}
+            {/* KPI Cards - Global Standard */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {[
-                    { name: t('dashboard.crm.totalPipeline'), value: `$${stats.totalPipeline.toLocaleString()}`, icon: BadgeDollarSign, color: 'text-[#007BFF]', bg: 'bg-blue-50' },
-                    { name: t('dashboard.crm.totalLeads'), value: stats.totalLeads, icon: Users, color: 'text-[#4449AA]', bg: 'bg-slate-100' },
-                    { name: t('dashboard.crm.wonDeals'), value: stats.wonDeals, icon: Target, color: 'text-[#3DCC91]', bg: 'bg-green-50' },
-                    { name: t('dashboard.crm.conversionRate'), value: `${stats.conversionRate}%`, icon: TrendingUp, color: 'text-[#FFA500]', bg: 'bg-orange-50' },
+                    { name: t('dashboard.crm.totalPipeline'), value: `$${stats.totalPipeline.toLocaleString()}`, icon: BadgeDollarSign, color: 'text-indigo-600', bg: 'bg-indigo-50/50' },
+                    { name: t('dashboard.crm.totalLeads'), value: stats.totalLeads, icon: Users, color: 'text-[#4449AA]', bg: 'bg-slate-100/50' },
+                    { name: t('dashboard.crm.wonDeals'), value: stats.wonDeals, icon: Target, color: 'text-emerald-600', bg: 'bg-emerald-50/50' },
+                    { name: t('dashboard.crm.conversionRate'), value: `${stats.conversionRate}%`, icon: TrendingUp, color: 'text-amber-600', bg: 'bg-amber-50/50' },
                 ].map((item) => (
-                    <div key={item.name} className="group relative overflow-hidden rounded-2xl bg-white p-5 shadow-sm border border-gray-50 hover:shadow-md transition-all duration-300">
-                        <div className={`p-3 rounded-xl ${item.bg} w-fit mb-3 transition-transform group-hover:scale-110`}>
-                            <item.icon className={`h-6 w-6 ${item.color}`} />
+                    <div key={item.name} className="group relative overflow-hidden rounded-2xl bg-white p-5 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300">
+                        <div className={`p-2.5 rounded-xl ${item.bg} w-fit mb-3 transition-transform group-hover:scale-110`}>
+                            <item.icon className={`h-5 w-5 ${item.color}`} />
                         </div>
-                        <dt className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{item.name}</dt>
-                        <dd className="mt-1 text-2xl font-extrabold text-[#4449AA]">{item.value}</dd>
+                        <dt className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{item.name}</dt>
+                        <dd className="mt-1 text-2xl font-black text-[#4449AA] tracking-tighter">{item.value}</dd>
                     </div>
                 ))}
             </div>
