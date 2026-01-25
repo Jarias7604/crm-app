@@ -75,7 +75,6 @@ export const chatService = {
 
     async sendMessage(conversationId: string, content: string, type: 'text' | 'image' | 'file' = 'text', metadata: any = {}) {
         // 1. Insert into local database
-        // We include 'origin' in metadata so the DB Trigger knows where the link should point.
         const { data: msg, error } = await supabase
             .from('marketing_messages')
             .insert({
@@ -84,14 +83,14 @@ export const chatService = {
                 type,
                 metadata: { ...metadata, origin: window.location.origin },
                 direction: 'outbound',
-                status: 'sent'
+                status: 'pending' // Mark as pending initially
             })
             .select()
             .single();
 
         if (error) throw error;
 
-        // 2. Update last message in conversation for the UI
+        // 2. Update conversation preview
         await supabase
             .from('marketing_conversations')
             .update({
@@ -99,6 +98,15 @@ export const chatService = {
                 last_message_at: new Date().toISOString()
             })
             .eq('id', conversationId);
+
+        // 3. TRIGGER SENDING (Call Edge Function)
+        // We do this optimistically. If it fails, the status stays 'pending' or 'failed'.
+        // In a real prod app, use a queue or DB webhook. For simplicity/reliability here, call direct.
+        supabase.functions.invoke('send-telegram-message', {
+            body: { record: msg }
+        }).then(({ data, error }) => {
+            if (error) console.error('Edge Function Error:', error);
+        });
 
         return msg as ChatMessage;
     },
