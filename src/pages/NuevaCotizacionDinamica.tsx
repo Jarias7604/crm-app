@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, User, FileText, Package, DollarSign, Loader } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import { cotizacionesService } from '../services/cotizaciones';
@@ -21,6 +21,7 @@ const PASOS = [
 export default function NuevaCotizacionDinamica() {
     const { profile } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [searchParams] = useSearchParams();
     const leadIdParam = searchParams.get('leadId');
 
@@ -91,8 +92,24 @@ export default function NuevaCotizacionDinamica() {
         }
     };
 
-    // AUTO-CARGAR DATOS DEL LEAD
+    // AUTO-CARGAR DATOS DEL LEAD (Desde URL o Desde Estado de Navegación del Chat)
     useEffect(() => {
+        // Opción 1: Viene desde el Chat (State)
+        const stateLead = location.state?.lead;
+        if (stateLead) {
+            setFormData(prev => ({
+                ...prev,
+                lead_id: stateLead.id,
+                nombre_cliente: stateLead.name || 'Cliente',
+                empresa_cliente: stateLead.company_name || '',
+                email_cliente: stateLead.email || '',
+                telefono_cliente: stateLead.phone || '',
+                direccion_cliente: stateLead.address || stateLead.address_line1 || ''
+            }));
+            return; // Ya cargamos, no verificamos params
+        }
+
+        // Opción 2: Viene por parámetro URL y ya cargaron los leads
         if (leadIdParam && leads.length > 0) {
             const lead = leads.find(l => l.id === leadIdParam);
             if (lead) {
@@ -107,7 +124,7 @@ export default function NuevaCotizacionDinamica() {
                 }));
             }
         }
-    }, [leadIdParam, leads]);
+    }, [leadIdParam, leads, location.state]);
 
     // SUGERENCIA AUTOMÁTICA DE PLAN SEGÚN DTEs
     useEffect(() => {

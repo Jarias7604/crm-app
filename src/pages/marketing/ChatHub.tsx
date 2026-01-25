@@ -387,7 +387,7 @@ export default function ChatHub() {
                             </div>
                             <div className="flex items-center gap-3">
                                 <button
-                                    onClick={() => navigate('/cotizaciones/nueva-pro', { state: { lead: selectedConv.lead, conversation_id: selectedConv.id, fromChat: true } })}
+                                    onClick={() => navigate('/cotizaciones/nueva', { state: { lead: selectedConv.lead, conversation_id: selectedConv.id, fromChat: true } })}
                                     className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl shadow-blue-600/20"
                                 >
                                     Nueva Cotización
@@ -542,49 +542,51 @@ export default function ChatHub() {
             </div>
 
             {/* Right Information Sidebar */}
-            {selectedConv && showDetails && (
-                <div className="w-[360px] bg-white rounded-[32px] border border-slate-100 shadow-sm flex flex-col overflow-y-auto custom-scrollbar shrink-0">
-                    <div className="p-10 text-center space-y-8 bg-gradient-to-b from-slate-50/50 to-white">
-                        <div className="w-36 h-36 rounded-[48px] bg-gradient-to-br from-indigo-600 to-blue-700 flex items-center justify-center text-white font-black text-6xl mx-auto shadow-2xl shadow-blue-600/30 rotate-3">
-                            {selectedConv.lead?.name?.[0] || '?'}
+            {
+                selectedConv && showDetails && (
+                    <div className="w-[360px] bg-white rounded-[32px] border border-slate-100 shadow-sm flex flex-col overflow-y-auto custom-scrollbar shrink-0">
+                        <div className="p-10 text-center space-y-8 bg-gradient-to-b from-slate-50/50 to-white">
+                            <div className="w-36 h-36 rounded-[48px] bg-gradient-to-br from-indigo-600 to-blue-700 flex items-center justify-center text-white font-black text-6xl mx-auto shadow-2xl shadow-blue-600/30 rotate-3">
+                                {selectedConv.lead?.name?.[0] || '?'}
+                            </div>
+                            <div>
+                                <h3 className="text-2xl font-black text-slate-900 tracking-tighter mb-2">{selectedConv.lead?.name || 'Visitante'}</h3>
+                                <span className="px-4 py-1.5 bg-blue-50 text-blue-600 text-[10px] font-black rounded-xl border border-blue-100 uppercase tracking-widest">{selectedConv.lead?.company_name || 'Individual'}</span>
+                            </div>
                         </div>
-                        <div>
-                            <h3 className="text-2xl font-black text-slate-900 tracking-tighter mb-2">{selectedConv.lead?.name || 'Visitante'}</h3>
-                            <span className="px-4 py-1.5 bg-blue-50 text-blue-600 text-[10px] font-black rounded-xl border border-blue-100 uppercase tracking-widest">{selectedConv.lead?.company_name || 'Individual'}</span>
+                        <div className="px-8 pb-12 space-y-12">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="p-5 bg-slate-50 rounded-[24px] border border-slate-100 text-center">
+                                    <TrendingUp className="w-5 h-5 text-blue-600 mx-auto mb-2" />
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Score IA</p>
+                                    <p className="text-xl font-black text-slate-800 tracking-tighter">98/100</p>
+                                </div>
+                                <div className="p-5 bg-slate-50 rounded-[24px] border border-slate-100 text-center">
+                                    <Zap className="w-5 h-5 text-amber-500 mx-auto mb-2" />
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Interés</p>
+                                    <p className="text-xl font-black text-slate-800 tracking-tighter">Alto</p>
+                                </div>
+                            </div>
+                            <div className="space-y-6">
+                                <h4 className="text-[11px] font-black text-slate-300 uppercase tracking-widest">Información de Contacto</h4>
+                                <div className="space-y-4">
+                                    <InfoItem icon={Mail} label="Email" value={selectedConv.lead?.email || 'No identificado'} />
+                                    <InfoItem icon={PhoneIcon} label="Teléfono" value={selectedConv.lead?.phone || 'Sin número'} />
+                                </div>
+                            </div>
+                            <div className="space-y-3 pt-6">
+                                <button
+                                    onClick={() => navigate('/leads', { state: { leadId: selectedConv.lead?.id } })}
+                                    className="w-full py-5 bg-slate-900 text-white rounded-[24px] text-[11px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center justify-center gap-3 shadow-xl shadow-slate-900/10"
+                                >
+                                    <User className="w-4.5 h-4.5" /> Perfil Completo
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    <div className="px-8 pb-12 space-y-12">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="p-5 bg-slate-50 rounded-[24px] border border-slate-100 text-center">
-                                <TrendingUp className="w-5 h-5 text-blue-600 mx-auto mb-2" />
-                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Score IA</p>
-                                <p className="text-xl font-black text-slate-800 tracking-tighter">98/100</p>
-                            </div>
-                            <div className="p-5 bg-slate-50 rounded-[24px] border border-slate-100 text-center">
-                                <Zap className="w-5 h-5 text-amber-500 mx-auto mb-2" />
-                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Interés</p>
-                                <p className="text-xl font-black text-slate-800 tracking-tighter">Alto</p>
-                            </div>
-                        </div>
-                        <div className="space-y-6">
-                            <h4 className="text-[11px] font-black text-slate-300 uppercase tracking-widest">Información de Contacto</h4>
-                            <div className="space-y-4">
-                                <InfoItem icon={Mail} label="Email" value={selectedConv.lead?.email || 'No identificado'} />
-                                <InfoItem icon={PhoneIcon} label="Teléfono" value={selectedConv.lead?.phone || 'Sin número'} />
-                            </div>
-                        </div>
-                        <div className="space-y-3 pt-6">
-                            <button
-                                onClick={() => navigate('/leads', { state: { leadId: selectedConv.lead?.id } })}
-                                className="w-full py-5 bg-slate-900 text-white rounded-[24px] text-[11px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center justify-center gap-3 shadow-xl shadow-slate-900/10"
-                            >
-                                <User className="w-4.5 h-4.5" /> Perfil Completo
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }
 
