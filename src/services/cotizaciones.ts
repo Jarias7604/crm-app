@@ -13,7 +13,11 @@ class CotizacionesService {
                 created_by: user?.id,
                 modulos_adicionales: JSON.stringify(cotizacion.modulos_adicionales)
             })
-            .select()
+            .select(`
+                *,
+                company:companies(id, name, logo_url, website, address, phone),
+                creator:profiles!created_by(full_name, email, avatar_url)
+            `)
             .single();
 
         if (error) throw error;
