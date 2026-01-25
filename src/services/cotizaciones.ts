@@ -109,7 +109,11 @@ class CotizacionesService {
             .from('cotizaciones')
             .update(updateData)
             .eq('id', id)
-            .select()
+            .select(`
+                *,
+                company:companies(id, name, logo_url, website, address, phone),
+                creator:profiles!created_by(full_name, email, avatar_url)
+            `)
             .single();
 
         if (error) throw error;

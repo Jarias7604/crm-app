@@ -109,7 +109,7 @@ export const pdfService = {
             doc.setTextColor(255, 255, 255);
             doc.setFontSize(9);
             doc.setFont('helvetica', 'bold');
-            doc.text(format(new Date(cotizacion.created_at), 'dd/MM/yyyy'), pageWidth - 85, gridY + 5);
+            doc.text(format(new Date(cotizacion.created_at || new Date()), 'dd/MM/yyyy'), pageWidth - 85, gridY + 5);
             doc.text(cotizacion.id.slice(0, 6).toUpperCase(), pageWidth - 45, gridY + 5);
 
 
