@@ -278,9 +278,7 @@ export const pdfService = {
             doc.setFillColor(C_PURPLE_MAIN[0], C_PURPLE_MAIN[1], C_PURPLE_MAIN[2]);
             doc.roundedRect(totalBoxX, totalBoxY, 80, 50, 4, 4, 'F');
 
-            // Circle decoration
-            doc.setFillColor(255, 255, 255, 0.1);
-            doc.circle(totalBoxX + 90, totalBoxY - 10, 30, 'F');
+            // (Removed decorative circle)
 
             let ty = totalBoxY + 12;
             doc.setTextColor(255, 255, 255);
@@ -313,9 +311,9 @@ export const pdfService = {
 
 
             // ==========================================
-            // 5. FOOTER (Gray Box)
+            // 5. FOOTER (Gray Box) - REFINED
             // ==========================================
-            const footerH = 35;
+            const footerH = 40;
             const footerY = pageHeight - footerH;
 
             doc.setFillColor(248, 250, 252); // Gray 50
@@ -323,35 +321,79 @@ export const pdfService = {
             doc.setDrawColor(226, 232, 240);
             doc.line(0, footerY, pageWidth, footerY);
 
-            // Agent Info
+            // --- LEFT: AGENT PROFILE ---
             const avatarUrl = cotizacion.creator?.avatar_url;
             const avatarData = await loadImage(avatarUrl);
 
             if (avatarData) {
-                doc.addImage(avatarData, 'PNG', 15, footerY + 8, 12, 12);
+                // Circular clip for avatar (advanced, but square with rounded simulation is safer)
+                doc.addImage(avatarData, 'PNG', 15, footerY + 8, 14, 14);
             } else {
-                // Avatar Placeholder
                 doc.setFillColor(C_PURPLE_MAIN[0], C_PURPLE_MAIN[1], C_PURPLE_MAIN[2]);
-                doc.circle(21, footerY + 14, 6, 'F');
+                doc.circle(22, footerY + 15, 7, 'F');
                 doc.setTextColor(255, 255, 255);
-                doc.setFontSize(8);
-                doc.text('A', 21, footerY + 16, { align: 'center' });
+                doc.setFontSize(9);
+                doc.text('A', 22, footerY + 18, { align: 'center' });
             }
 
+            const agentTextX = 35;
             doc.setTextColor(C_BLUE_ACCENT[0], C_BLUE_ACCENT[1], C_BLUE_ACCENT[2]);
             doc.setFontSize(6);
             doc.setFont('helvetica', 'bold');
-            doc.text('PROPUESTA ELABORADA POR', 32, footerY + 12);
+            doc.text('PROPUESTA ELABORADA POR', agentTextX, footerY + 10);
 
             doc.setTextColor(C_TEXT_DARK[0], C_TEXT_DARK[1], C_TEXT_DARK[2]);
             doc.setFontSize(10);
-            doc.text((cotizacion.creator?.full_name || 'AGENTE COMERCIAL').toUpperCase(), 32, footerY + 17);
+            doc.text((cotizacion.creator?.full_name || 'AGENTE COMERCIAL').toUpperCase(), agentTextX, footerY + 15);
 
-            // Notes
-            doc.setTextColor(148, 163, 184); // Slate 400
+            // Agent Contact Details (Email)
+            doc.setTextColor(100, 116, 139); // Slate 500
+            doc.setFontSize(7);
+            doc.setFont('helvetica', 'normal');
+            doc.text(cotizacion.creator?.email || '', agentTextX, footerY + 19);
+
+
+            // --- CENTER/RIGHT: QR CODE & COMPANY INFO ---
+
+            // Separator Line
+            doc.setDrawColor(226, 232, 240); // Slate 200
+            doc.line(pageWidth - 85, footerY + 8, pageWidth - 85, footerY + 32);
+
+            // QR Code (Center-Right)
+            const qrTarget = cotizacion.company?.website || cotizacion.creator?.website || 'https://ariesdefense.com';
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(qrTarget)}`;
+            const qrData = await loadImage(qrUrl);
+
+            if (qrData) {
+                doc.addImage(qrData, 'PNG', pageWidth - 105, footerY + 8, 16, 16);
+                doc.setFontSize(6);
+                doc.setTextColor(148, 163, 184);
+                doc.text('VISITA NUESTRA WEB', pageWidth - 105, footerY + 28);
+            }
+
+            // Right: Company Address & Branding
+            doc.setFontSize(7);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(C_PURPLE_MAIN[0], C_PURPLE_MAIN[1], C_PURPLE_MAIN[2]);
+            doc.text(`${cotizacion.company?.name || 'SaaS PRO'} - ${new Date().getFullYear()}`, pageWidth - 15, footerY + 12, { align: 'right' });
+
+            doc.setTextColor(100, 116, 139); // Slate 500
             doc.setFontSize(6);
             doc.setFont('helvetica', 'normal');
-            doc.text('Validez: 30 días. Sujeto a términos y condiciones.', pageWidth - 15, footerY + 28, { align: 'right' });
+
+            let addrY = footerY + 17;
+            if (cotizacion.company?.address) {
+                doc.text(cotizacion.company.address, pageWidth - 15, addrY, { align: 'right' });
+                addrY += 3;
+            }
+            if (cotizacion.company?.phone) {
+                doc.text(cotizacion.company.phone, pageWidth - 15, addrY, { align: 'right' });
+                addrY += 3;
+            }
+
+            doc.setFontSize(6);
+            doc.setTextColor(148, 163, 184); // Slate 400
+            doc.text('DOCUMENTO OFICIAL', pageWidth - 15, footerY + 28, { align: 'right' });
 
 
             // OUTPUT
