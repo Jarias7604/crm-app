@@ -4,7 +4,7 @@ import { supabase } from './supabase';
 import { format } from 'date-fns';
 
 /**
- * 💎 PDF SERVICE - PREMIUM CLONE v5.0 (Local Standard)
+ * 💎 PDF SERVICE - PREMIUM CLONE v5.1 (Deployment Retry)
  * -----------------------------------------
  * - Includes QR Code generation (matching React UI)
  * - Includes Agent Avatar rendering
