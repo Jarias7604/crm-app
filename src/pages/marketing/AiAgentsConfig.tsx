@@ -149,7 +149,7 @@ export default function AiAgentsConfig() {
     );
 
     return (
-        <div className="h-[100vh] flex flex-col space-y-4 overflow-hidden bg-[#F0F4F8] p-4 md:p-8 -m-4 md:-m-8 w-[calc(100%+2rem)] md:w-[calc(100%+4rem)]">
+        <div className="h-[calc(100vh-140px)] flex flex-col space-y-4 overflow-hidden bg-[#F0F4F8] p-4 md:p-6 rounded-[24px]">
             {/* Header Section - Fixed height */}
             <div className="flex items-center gap-4 shrink-0 px-2 pt-2">
                 <Link to="/marketing" className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-500">

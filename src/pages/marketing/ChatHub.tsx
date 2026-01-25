@@ -282,7 +282,7 @@ export default function ChatHub() {
     });
 
     return (
-        <div className="flex h-[100vh] bg-[#F0F4F8] p-4 md:p-8 gap-6 overflow-hidden font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900 -m-4 md:-m-8 w-[calc(100%+2rem)] md:w-[calc(100%+4rem)]">
+        <div className="flex h-[calc(100vh-140px)] bg-[#F0F4F8] p-4 md:p-6 gap-6 overflow-hidden font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900 rounded-[24px]">
             <input
                 type="file"
                 ref={fileInputRef}
