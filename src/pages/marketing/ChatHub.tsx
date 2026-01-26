@@ -35,6 +35,7 @@ export default function ChatHub() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const location = useLocation();
     const navigate = useNavigate();
+    const hasAutoSelected = useRef<string | null>(null);
     const { profile } = useAuth();
     const { isAdmin } = usePermissions();
 
@@ -76,10 +77,16 @@ export default function ChatHub() {
     useEffect(() => {
         if (loading || conversations.length === 0) return;
 
+        // If we already handled the auto-selection for this specific navigation, stop.
+        if (hasAutoSelected.current === location.key) return;
+
         const stateConvId = location.state?.conversation_id;
         const stateLead = location.state?.lead;
 
-        if (!stateConvId && !stateLead) return;
+        if (!stateConvId && !stateLead) {
+            hasAutoSelected.current = location.key;
+            return;
+        }
 
         // Find best candidate
         let candidate = null;
@@ -91,27 +98,24 @@ export default function ChatHub() {
         }
 
         if (candidate) {
-            if (selectedConv?.id !== candidate.id) {
-                console.log('Hub: Auto-selecting candidate:', candidate.id);
-                setSelectedConv(candidate);
-            }
+            console.log('Hub: Auto-selecting candidate:', candidate.id);
+            setSelectedConv(candidate);
+            hasAutoSelected.current = location.key; // Mark as done
         } else if (stateLead) {
             // If lead provided but no conversation found in list, use a placeholder
-            // Check if we already have the correct placeholder selected
-            if (!selectedConv || selectedConv.id !== 'new' || selectedConv.lead?.id !== stateLead.id) {
-                console.log('Hub: Setting placeholder for lead:', stateLead.id);
-                setSelectedConv({
-                    id: 'new',
-                    channel: location.state.channel || 'telegram',
-                    status: 'open',
-                    last_message: 'Iniciando conversación...',
-                    last_message_at: new Date().toISOString(),
-                    unread_count: 0,
-                    lead: stateLead
-                });
-            }
+            console.log('Hub: Setting placeholder for lead:', stateLead.id);
+            setSelectedConv({
+                id: 'new',
+                channel: location.state.channel || 'telegram',
+                status: 'open',
+                last_message: 'Iniciando conversación...',
+                last_message_at: new Date().toISOString(),
+                unread_count: 0,
+                lead: stateLead
+            });
+            hasAutoSelected.current = location.key; // Mark as done
         }
-    }, [location.state, conversations, loading, selectedConv?.id]);
+    }, [location.key, conversations, loading]);
 
     // 3. Handle incoming quote for review from location state
     useEffect(() => {
