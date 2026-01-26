@@ -61,17 +61,13 @@ export const chatService = {
     },
 
     async getConversations() {
-        // 1. Get current user company
-        const { data: profile } = await supabase.from('profiles').select('company_id').single();
-        if (!profile?.company_id) return [];
-
+        // RLS handles company filtering automatically
         const { data, error } = await supabase
             .from('marketing_conversations')
             .select(`
                 *,
                 lead:leads(id, name, email, company_name, phone)
             `)
-            .eq('company_id', profile.company_id)
             .order('last_message_at', { ascending: false });
 
         if (error) throw error;

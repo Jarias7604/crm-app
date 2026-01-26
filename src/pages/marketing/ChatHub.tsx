@@ -22,6 +22,7 @@ export default function ChatHub() {
     const [showDetails, setShowDetails] = useState(true);
     const [loading, setLoading] = useState(true);
     const [pendingQuote, setPendingQuote] = useState<any>(null);
+    const [searchQuery, setSearchQuery] = useState('');
     const [isAiProcessing, setIsAiProcessing] = useState(false);
     const [agentStatus, setAgentStatus] = useState<boolean>(false);
     const lastProcessedMsgId = useRef<string | null>(null);
@@ -309,8 +310,17 @@ export default function ChatHub() {
     );
 
     const filteredConversations = conversations.filter(c => {
-        if (filter === 'all') return true;
-        return c.channel === filter;
+        if (filter !== 'all' && c.channel !== filter) return false;
+
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            const name = c.lead?.name?.toLowerCase() || '';
+            const phone = c.lead?.phone?.toLowerCase() || '';
+            const email = c.lead?.email?.toLowerCase() || '';
+            return name.includes(q) || phone.includes(q) || email.includes(q);
+        }
+
+        return true;
     });
 
     return (
@@ -347,7 +357,8 @@ export default function ChatHub() {
 
                     <div className="relative group">
                         <input
-                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Buscar cliente..."
                             className="w-full pl-5 pr-5 py-3.5 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-700 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20 transition-all shadow-inner"
                         />
