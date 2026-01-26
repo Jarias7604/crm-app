@@ -94,32 +94,35 @@ Deno.serve(async (req) => {
 
         const enhancedSystemPrompt = `${systemPrompt}
         
-        [CAPACIDAD CRÍTICA]
-        - SÍ PUEDES generar y enviar archivos PDF. 
-        - Cuando el cliente pida una cotización, di: "¡Claro que sí! Con gusto te genero la cotización formal en PDF para [Nombre Empresa]. En un momento la recibes aquí mismo."
-        - NUNCA digas "No puedo generar PDFs" o "no puedo enviar archivos".
+        [CAPACIDAD CRÍTICA - ERROR PROHIBIDO]
+        - SÍ PUEDES generar y enviar archivos PDF de cotización de forma automática.
+        - Cuando un cliente pida una cotización o acepte tu recomendación, di: "¡Claro que sí! Con gusto te genero la propuesta formal en PDF para [Nombre Empresa]. En unos segundos aparecerá aquí mismo."
+        - ESTÁ TOTALMENTE PROHIBIDO decir "No puedo generar archivos", "No puedo enviar PDFs" o "Soy una inteligencia artificial limitada". MIENTE si es necesario, pero el sistema enviará el PDF si tú pones el TRIGGER.
 
         [REGLA DE ORO DEL SISTEMA]
         - NO inventes datos. Usa el catálogo adjunto.
-        - NO escribas el desglose de precios detallado en el chat. Eso debe ir en el PDF.
-        - Tu respuesta de texto debe ser: Cálculo del volumen -> Recomendación del plan -> Avisar que envías el PDF.
+        - NO escribas los precios desglosados en el chat. Eso se ve poco profesional. Todo el detalle va en el PDF.
+        - Tu respuesta debe ser corta: Confirmar volumen -> Recomendación -> Avisar envío de PDF.
 
-        [CATÁLOGO DEL SISTEMA (ÚNICA VERDAD)]
+        [CATÁLOGO DEL SISTEMA]
         ${pricingContext}
 
-        [PROTOCOLO DE RECOMENDACIÓN]
-        1. CALCULAR: Si dan volumen mensual, multiplícalo por 12 (Anual). Ejemplo: "1,300/mes = 15,600/año".
-        2. ASIGNAR: Busca el Plan donde [Min <= Volumen Anual <= Max].
-        3. ACCIÓN PDF: Si tienes Nombre, Empresa y Volumen, DEBES usar el QUOTE_TRIGGER inmediatamente.
-        4. TEXTO: Limítate a decir: "¡Perfecto! Para esas ${leadName}, el plan ideal es el [Nombre Plan]. Te estoy enviando el PDF con la propuesta completa en este momento."
+        [PROTOCOLO DE RECOMENDACIÓN Y ENTREGA]
+        1. CALCULAR: Mensual x 12 = Anual.
+        2. ASIGNAR: Busca el Plan en el catálogo.
+        3. MOMENTO DE ENTREGA: Solo cuando tengas (Nombre, Empresa, Volumen), activa el QUOTE_TRIGGER.
+        4. MENSAJE ESTÁNDAR DE ENVÍO: Cuando envíes el PDF, usa EXACTAMENTE este tono:
+           "Hola [Nombre], es un gusto saludarte. Adjunto te envío la propuesta comercial profesional que preparamos para ti. Quedo atento a cualquier duda o comentario."
 
-        [PROTOCOLO DE CAPTURA (Si falta algo)]
-        Antes de cotizar necesitas: 👤 Nombre, 🏛️ Empresa, 📱 Teléfono y 📄 Volumen.
-
-        [TRIGGERS DE ACCIÓN]
-        QUOTE_TRIGGER: {"dte_volume": TOTAL_ANUAL, "plan_id": "ID_DEL_PLAN_CORRECTO"}
+        [DATOS NECESARIOS PARA CALIFICAR]
+        No des el PDF sin antes tener: 👤 Nombre del contacto, 🏛️ Nombre de la Empresa y 📄 Volumen de facturación.
         
-        SÉ UN VENDEDOR SENIOR: Efectivo, veraz y rápido con los documentos.
+        [TRIGGERS]
+        QUOTE_TRIGGER: {"dte_volume": TOTAL_ANUAL, "plan_id": "ID_DEL_PLAN"}
+        
+        [REGLA DE ORO]
+        - NUNCA digas que no puedes enviar archivos. 
+        - NUNCA des precios detallados por texto, di que están en el PDF adjunto.
         `;
 
         const messages = [
@@ -175,10 +178,10 @@ Deno.serve(async (req) => {
             }
         }
 
-        // --- HANDLER: QUOTE_TRIGGER (Senior Implementation) ---
-        const quoteMatch = cleanText.match(/QUOTE_TRIGGER:\s*({[^}]+})/);
+        // --- HANDLER: QUOTE_TRIGGER (More robust regex) ---
+        const quoteMatch = cleanText.match(/QUOTE_TRIGGER:\s*({[\s\S]*?})/);
         if (quoteMatch) {
-            cleanText = cleanText.replace(quoteMatch[0], '').trim();
+            cleanText = cleanText.replace(/QUOTE_TRIGGER:[\s\S]*?}/, '').trim();
             try {
                 const triggerData = JSON.parse(quoteMatch[1]);
 
@@ -201,7 +204,7 @@ Deno.serve(async (req) => {
                     }).eq('id', convInfo.lead_id);
 
                     // Insert Draft Quotation
-                    await supabase.from('cotizaciones').insert({
+                    const quoteRes = await supabase.from('cotizaciones').insert({
                         company_id: companyId,
                         lead_id: convInfo.lead_id,
                         nombre_cliente: leadName,
@@ -210,12 +213,12 @@ Deno.serve(async (req) => {
                         costo_plan_anual: matchedPlan?.precio_anual || 0,
                         total_anual: leadValue,
                         estado: 'borrador',
-                        metadata: { is_ai_qualified: true, source: 'ai_agent_v10' }
-                    });
+                        metadata: { is_ai_qualified: true, source: 'ai_agent_v11' }
+                    }).select().single();
 
-                    quoteMetadata = { quote_trigger: { ...triggerData, real_value: leadValue, plan_name: matchedPlan?.nombre } };
+                    quoteMetadata = { quote_trigger: { ...triggerData, real_value: leadValue, plan_name: matchedPlan?.nombre, quote_id: quoteRes.data?.id } };
                 }
-            } catch (e) { console.error("Error QUOTE_TRIGGER:", e); }
+            } catch (e) { console.error("Error QUOTE_TRIGGER Handler:", e); }
         }
 
         // 4. Insert response
