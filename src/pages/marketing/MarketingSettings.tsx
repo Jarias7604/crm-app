@@ -81,15 +81,15 @@ export default function MarketingSettings() {
     const currentActive = getActiveIntegrationForTab(activeTab);
 
     return (
-        <div className="max-w-6xl mx-auto space-y-8">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-8 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden">
-                <div className="flex items-center gap-4 relative z-10">
-                    <Link to="/marketing" className="p-3 hover:bg-gray-100 rounded-full transition-colors text-gray-500 hover:text-blue-600">
-                        <ArrowLeft className="w-6 h-6" />
+        <div className="max-w-6xl mx-auto space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm relative overflow-hidden">
+                <div className="flex items-center gap-3 relative z-10">
+                    <Link to="/marketing" className="p-2.5 hover:bg-gray-100 rounded-full transition-colors text-gray-500 hover:text-blue-600">
+                        <ArrowLeft className="w-5 h-5" />
                     </Link>
                     <div>
-                        <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Configuración Hub</h1>
-                        <p className="text-gray-500">Configura tus canales de comunicación y tokens de API.</p>
+                        <h1 className="text-2xl font-black text-[#0f172a] tracking-tight">Configuración Hub</h1>
+                        <p className="text-sm text-gray-500">Configura tus canales de comunicación y tokens de API.</p>
                     </div>
                 </div>
 
@@ -97,27 +97,27 @@ export default function MarketingSettings() {
                 <div className="flex p-1 bg-gray-100 rounded-2xl relative z-10">
                     <button
                         onClick={() => { setActiveTab('email'); setSelectedProvider(null); }}
-                        className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'email' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        className={`px-5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeTab === 'email' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
-                        <Mail className="w-4 h-4" /> Email
+                        <Mail className="w-3.5 h-3.5" /> Email
                     </button>
                     <button
                         onClick={() => { setActiveTab('whatsapp'); setSelectedProvider(null); }}
-                        className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'whatsapp' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        className={`px-5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeTab === 'whatsapp' ? 'bg-white text-green-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
-                        <MessageSquare className="w-4 h-4" /> WhatsApp
+                        <MessageSquare className="w-3.5 h-3.5" /> WhatsApp
                     </button>
                     <button
                         onClick={() => { setActiveTab('telegram'); setSelectedProvider(null); }}
-                        className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'telegram' ? 'bg-white text-sky-500 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        className={`px-5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeTab === 'telegram' ? 'bg-white text-sky-500 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
-                        <Send className="w-4 h-4" /> Telegram
+                        <Send className="w-3.5 h-3.5" /> Telegram
                     </button>
                     <button
                         onClick={() => { setActiveTab('chat'); setSelectedProvider(null); }}
-                        className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'chat' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                        className={`px-5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeTab === 'chat' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                     >
-                        <Bot className="w-4 h-4" /> AI Chat
+                        <Bot className="w-3.5 h-3.5" /> AI Chat
                     </button>
                 </div>
             </div>
@@ -126,16 +126,16 @@ export default function MarketingSettings() {
             {!selectedProvider && (
                 <>
                     {currentActive ? (
-                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-3xl p-8 flex flex-col md:flex-row items-center gap-6 animate-in slide-in-from-top-4 duration-500">
-                            <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center text-blue-600 border border-blue-100">
-                                <CheckCircle className="w-8 h-8" />
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-3xl p-6 flex flex-col md:flex-row items-center gap-5 animate-in slide-in-from-top-4 duration-500">
+                            <div className="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center text-blue-600 border border-blue-100">
+                                <CheckCircle className="w-7 h-7" />
                             </div>
                             <div className="flex-1 text-center md:text-left">
-                                <div className="flex items-center justify-center md:justify-start gap-2 mb-1">
-                                    <h3 className="text-xl font-black text-blue-900 uppercase">{currentActive.provider}</h3>
-                                    <span className="px-2 py-0.5 bg-green-500 text-white text-[10px] font-black rounded-full uppercase tracking-tighter">Activo</span>
+                                <div className="flex items-center justify-center md:justify-start gap-2 mb-0.5">
+                                    <h3 className="text-lg font-black text-blue-900 uppercase">{currentActive.provider}</h3>
+                                    <span className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] font-black rounded-full uppercase tracking-tighter">Activo</span>
                                 </div>
-                                <p className="text-blue-700 font-medium">Este canal está correctamente configurado y listo para usar.</p>
+                                <p className="text-sm text-blue-700 font-medium">Este canal está correctamente configurado y listo para usar.</p>
                             </div>
                             <div className="flex gap-3">
                                 <button
@@ -143,27 +143,27 @@ export default function MarketingSettings() {
                                         setSelectedProvider(currentActive.provider);
                                         setFormData(currentActive.settings);
                                     }}
-                                    className="px-6 py-3 bg-white text-blue-600 font-bold rounded-xl hover:shadow-md transition-all border border-blue-200"
+                                    className="px-5 py-2.5 bg-white text-blue-600 text-sm font-bold rounded-xl hover:shadow-md transition-all border border-blue-200"
                                 >
                                     Editar Configuración
                                 </button>
                             </div>
                         </div>
                     ) : (
-                        <div className="bg-white border border-dashed border-gray-200 rounded-3xl p-12 text-center">
-                            <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                                {activeTab === 'email' && <Mail className="w-10 h-10 text-gray-300" />}
-                                {activeTab === 'whatsapp' && <MessageSquare className="w-10 h-10 text-gray-300" />}
-                                {activeTab === 'telegram' && <Send className="w-10 h-10 text-gray-300" />}
-                                {activeTab === 'chat' && <Bot className="w-10 h-10 text-gray-300" />}
+                        <div className="bg-white border border-dashed border-gray-200 rounded-3xl p-10 text-center">
+                            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                {activeTab === 'email' && <Mail className="w-8 h-8 text-gray-300" />}
+                                {activeTab === 'whatsapp' && <MessageSquare className="w-8 h-8 text-gray-300" />}
+                                {activeTab === 'telegram' && <Send className="w-8 h-8 text-gray-300" />}
+                                {activeTab === 'chat' && <Bot className="w-8 h-8 text-gray-300" />}
                             </div>
-                            <h3 className="text-2xl font-black text-gray-900 mb-2">Canal no configurado</h3>
-                            <p className="text-gray-500 max-w-sm mx-auto mb-8">Selecciona un proveedor abajo para comenzar a enviar mensajes por {activeTab}.</p>
+                            <h3 className="text-xl font-black text-gray-900 mb-1">Canal no configurado</h3>
+                            <p className="text-sm text-gray-500 max-w-sm mx-auto mb-6">Selecciona un proveedor abajo para comenzar a enviar mensajes por {activeTab}.</p>
                         </div>
                     )}
 
                     {/* Provider Selection Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {activeTab === 'email' && (
                             <>
                                 <ProviderButton
@@ -323,13 +323,13 @@ function ProviderButton({ icon: Icon, color, title, desc, onClick }: any) {
     return (
         <button
             onClick={onClick}
-            className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm hover:shadow-xl transition-all text-left group hover:scale-[1.02]"
+            className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm hover:shadow-xl transition-all text-left group hover:scale-[1.02]"
         >
-            <div className={`w-16 h-16 ${color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
-                <Icon className="w-8 h-8" />
+            <div className={`w-14 h-14 ${color} rounded-2xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform`}>
+                <Icon className="w-7 h-7" />
             </div>
-            <h3 className="text-xl font-black text-gray-900 group-hover:text-blue-600 transition-colors tracking-tight">{title}</h3>
-            <p className="text-gray-500 mt-2 text-sm leading-relaxed font-medium">
+            <h3 className="text-lg font-black text-gray-900 group-hover:text-blue-600 transition-colors tracking-tight">{title}</h3>
+            <p className="text-gray-500 mt-1 text-xs leading-relaxed font-medium">
                 {desc}
             </p>
         </button>
