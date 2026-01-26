@@ -39,6 +39,15 @@ Deno.serve(async (req) => {
 
         const pricingContext = JSON.stringify(pricingItems || []);
 
+        // --- NEW: Fetch Conversation & Lead Context ---
+        const { data: conversationData } = await supabase
+            .from('marketing_conversations')
+            .select('lead:leads(name)')
+            .eq('id', conversationId)
+            .single();
+
+        const leadName = conversationData?.lead?.name || 'Cliente';
+
         // --- NEW: Fetch Conversation History for Context ---
         const { data: historyData } = await supabase
             .from('marketing_messages')
@@ -57,6 +66,9 @@ Deno.serve(async (req) => {
         }
 
         const enhancedSystemPrompt = `${systemPrompt}
+        
+        [CONTEXTO DEL CLIENTE]
+        Estás hablando con: ${leadName}. Dirígete a él por su nombre cuando sea natural.
         
         [INFORMACIÓN DE PRECIOS ACTUALIZADA]
         Usa estos datos REALES para calcular la cotización interna, pero NO los escribas en el chat.

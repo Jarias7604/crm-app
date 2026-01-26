@@ -37,14 +37,25 @@ export const aiQuoteService = {
                 throw new Error(`No se encontró un plan adecuado para ${trigger.dte_volume} DTEs`);
             }
 
-            // 3. Map Modules
-            const selectedModulesItems = config.modulos.filter(m => trigger.modules?.includes(m.id || ''));
+            // 3. Map Modules (Advanced AI Matching)
+            // The AI might send IDs "MOD_CXC" or simple names "Compras". We try to match both.
+            const requestedModules = trigger.modules || [];
+            const selectedModulesItems = config.modulos.filter(m => {
+                const search = requestedModules.map(rm => rm.toLowerCase());
+                return search.some(s =>
+                    m.id?.toLowerCase() === s ||
+                    m.nombre.toLowerCase().includes(s) ||
+                    m.codigo?.toLowerCase() === s
+                );
+            });
+
             const modulosAdicionales: ModuloAdicional[] = selectedModulesItems.map(m => ({
                 nombre: m.nombre,
                 costo_anual: m.precio_anual,
                 costo_mensual: m.precio_mensual,
                 descripcion: m.descripcion
             }));
+
 
             // 4. Calculate Totals using core logic
             const totals = cotizacionesService.calcularTotales({
