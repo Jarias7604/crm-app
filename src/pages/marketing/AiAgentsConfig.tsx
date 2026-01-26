@@ -45,7 +45,7 @@ export default function AiAgentsConfig() {
                     language: 'es',
                     is_active: true,
                     active_channels: ['telegram', 'whatsapp', 'web'],
-                    system_prompt: 'Eres un consultor experto. Tu objetivo es calificar al lead. DEBES recopilar: 1. Nombre 2. Teléfono 3. Email 4. ¿Recibió notificación de Hacienda? 5. Volumen de facturas. Cuando tengas el volumen, ofrece el plan adecuado.'
+                    system_prompt: 'Eres un consultor experto. Tu objetivo es calificar al lead. DEBES recopilar: 1. Nombre 2. Teléfono 3. Email 4. ¿Recibió notificación de Hacienda? 5. Volumen de facturas. REGLA DE TELÉFONO: Si te dan un teléfono, verifica si ya existe. Si el número coincide con otro cliente, pregunta amablemente si es de la misma persona o de alguien más para evitar duplicados.'
                 });
                 setSelectedAgent(newAgent);
             }

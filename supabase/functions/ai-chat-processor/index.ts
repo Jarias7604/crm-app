@@ -65,11 +65,36 @@ Deno.serve(async (req) => {
             history.pop();
         }
 
+        // --- NEW: Detect Phone Conflict ---
+        let phoneConflict = "";
+        const phoneMatch = prompt.match(/\b\d{4}[-\s]?\d{4}\b|\b\d{8,12}\b/);
+        if (phoneMatch) {
+            const detectedPhone = phoneMatch[0].replace(/[-\s]/g, '');
+            const { data: existingLead } = await supabase
+                .from('leads')
+                .select('id, name')
+                .eq('company_id', companyId)
+                .eq('phone', detectedPhone)
+                .maybeSingle();
+
+            const { data: currentConv } = await supabase.from('marketing_conversations').select('lead_id').eq('id', conversationId).single();
+
+            if (existingLead && existingLead.id !== currentConv?.lead_id) {
+                phoneConflict = `
+                [CONFLICTO DE IDENTIDAD DETECTADO]
+                - El usuario ha proporcionado el teléfono: ${detectedPhone}
+                - Este número ya pertenece en tu CRM a: "${existingLead.name}".
+                - ACCIÓN: Antes de guardar, pregunta amablemente: "¿Ese número es tuyo o es de la persona [Nombre del anterior]?", o algo similar para confirmar si es la misma persona con un nombre diferente o alguien más.
+                `;
+            }
+        }
+
         const enhancedSystemPrompt = `${systemPrompt}
         
         [CONTEXTO DEL CLIENTE]
         Estás hablando con: ${leadName}. Dirígete a él por su nombre cuando sea natural.
-        
+        ${phoneConflict}
+
         [INFORMACIÓN DE PRECIOS ACTUALIZADA]
         Usa estos datos REALES para calcular la cotización interna, pero NO los escribas en el chat.
         ${pricingContext}
@@ -85,7 +110,7 @@ Deno.serve(async (req) => {
         [TRIGGERS DE ACCIÓN - IMPORTANTE]
         Si el usuario te da CUALQUIERA de estos datos, DEBES incluirlos al inicio de tu respuesta en formato JSON estricto.
         
-        Si detectas datos de contacto o estado de hacienda:
+        Si detectas datos de contacto o estado de hacienda (Y NO HAY CONFLICTO DE IDENTIDAD):
         LEAD_UPDATE: {"name": "...", "email": "...", "phone": "...", "hacienda_status": "Recibió Notificación/No recibió"}
         (Envía solo los campos que detectes nuevos o corregidos).
 
@@ -93,6 +118,7 @@ Deno.serve(async (req) => {
         QUOTE_TRIGGER: {"dte_volume": 100, "plan_id": "BASIC"}
 
         [INSTRUCCIÓN CRÍTICA DE FORMATO]
+        - Si hay un [CONFLICTO DE IDENTIDAD], PRIORIZA resolver la duda antes de lanzar un LEAD_UPDATE.
         - Primero pon los TRIGGERS (LEAD_UPDATE o QUOTE_TRIGGER) si aplican.
         - Luego tu respuesta conversacional amable.
         - Eres un vendedor experto: si falta un dato, pídelo con naturalidad, no como un robot.
