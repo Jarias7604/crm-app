@@ -1,5 +1,4 @@
 // @ts-nocheck
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 /**
@@ -11,10 +10,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-region',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
+    console.log(`[send-telegram-message] Request received: ${req.method} ${req.url}`);
+
     // 1. Handle CORS Preflight
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders });
@@ -22,11 +24,13 @@ serve(async (req) => {
 
     try {
         const payload = await req.json();
+        console.log('[send-telegram-message] Payload:', JSON.stringify(payload));
 
         // This is a Database Webhook payload or manual invoke
         const record = payload.record;
 
         if (!record || record.direction !== 'outbound' || record.status === 'delivered') {
+            console.log('[send-telegram-message] Skipping record:', record?.id);
             return new Response('Skipped', { status: 200, headers: corsHeaders });
         }
 
@@ -42,7 +46,7 @@ serve(async (req) => {
             .single();
 
         if (convError || !conversation || conversation.channel !== 'telegram') {
-            console.error('Conv Error or not Telegram:', convError);
+            console.error('[send-telegram-message] Conv Error:', convError || 'Not Telegram');
             return new Response('Not Telegram or Conv not found', { status: 200, headers: corsHeaders });
         }
 
@@ -59,10 +63,10 @@ serve(async (req) => {
             .single();
 
         if (intError || !integration?.settings?.token) {
-            console.error('Integration Token Error:', intError);
+            console.error('[send-telegram-message] Integration Error:', intError || 'Token missing');
             await supabase.from('marketing_messages').update({
                 status: 'failed',
-                metadata: { ...record.metadata, error: 'Telegram Integration not configured or token missing for this company' }
+                metadata: { ...record.metadata, error: 'Telegram Token missing or integration inactive' }
             }).eq('id', record.id);
             return new Response('Integration Missing', { status: 400, headers: corsHeaders });
         }
@@ -91,6 +95,7 @@ serve(async (req) => {
             }
         }
 
+        console.log('[send-telegram-message] Sending to Telegram:', telegramUrl);
         const res = await fetch(telegramUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -98,9 +103,10 @@ serve(async (req) => {
         });
 
         const telegramResult = await res.json();
+        console.log('[send-telegram-message] Telegram API Result:', JSON.stringify(telegramResult));
 
         if (!telegramResult.ok) {
-            console.error('Telegram API Error:', telegramResult);
+            console.error('[send-telegram-message] Telegram Error:', telegramResult);
             await supabase.from('marketing_messages').update({
                 status: 'failed',
                 metadata: { ...record.metadata, error: telegramResult }
@@ -114,12 +120,13 @@ serve(async (req) => {
             external_message_id: telegramResult.result.message_id
         }).eq('id', record.id);
 
+        console.log('[send-telegram-message] Successfully delivered.');
         return new Response(JSON.stringify(telegramResult), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
 
     } catch (err) {
-        console.error('Global Error in Edge Function:', err);
+        console.error('[send-telegram-message] Global Error:', err);
         return new Response(JSON.stringify({ error: err.message }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }

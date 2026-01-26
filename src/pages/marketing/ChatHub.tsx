@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
     MoreVertical, Send, FileText, Smartphone, Layers,
     Paperclip, TrendingUp, Eye, Zap, Smile, Mail, Phone as PhoneIcon,
-    Send as TelegramIcon, MessageSquare, Trash2, UserPlus, Search, X as CloseIcon, ChevronRight
+    Send as TelegramIcon, MessageSquare, Trash2, UserPlus, Search, X as CloseIcon, ChevronRight, Plus, Loader2
 } from 'lucide-react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { chatService, type ChatConversation, type ChatMessage } from '../../services/marketing/chatService';
@@ -29,6 +29,7 @@ export default function ChatHub() {
     const [leadStatusFilter, setLeadStatusFilter] = useState('all');
     const [availableLeads, setAvailableLeads] = useState<any[]>([]);
     const [isAiProcessing, setIsAiProcessing] = useState(false);
+    const [isSending, setIsSending] = useState(false);
     const [agentStatus, setAgentStatus] = useState<boolean>(false);
     const lastProcessedMsgId = useRef<string | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -214,9 +215,12 @@ export default function ChatHub() {
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newMessage.trim() || !selectedConv) return;
+        if (!newMessage.trim() || !selectedConv || isSending) return;
+
         const content = newMessage;
         setNewMessage('');
+        setIsSending(true);
+
         try {
             let convId = selectedConv.id;
 
@@ -234,6 +238,9 @@ export default function ChatHub() {
             await chatService.sendMessage(convId, content, 'text', 'outbound');
         } catch (error: any) {
             toast.error('Error al enviar: ' + error.message);
+            setNewMessage(content); // Restore message on failure
+        } finally {
+            setIsSending(false);
         }
     };
 
@@ -687,8 +694,12 @@ export default function ChatHub() {
                                     rows={1}
                                 />
                                 <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 text-slate-400 hover:text-blue-500 transition-colors"><Paperclip className="w-5 h-5" /></button>
-                                <button type="submit" disabled={!newMessage.trim()} className="p-3 bg-slate-900 text-white rounded-xl hover:bg-blue-600 disabled:opacity-50 disabled:hover:bg-slate-900 transition-all shadow-md">
-                                    <Send className="w-4 h-4" />
+                                <button
+                                    type="submit"
+                                    disabled={!newMessage.trim() || isSending}
+                                    className={`p-3 bg-slate-900 text-white rounded-xl transition-all shadow-md ${(!newMessage.trim() || isSending) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
+                                >
+                                    {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                                 </button>
                             </form>
                         </div>

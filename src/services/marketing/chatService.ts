@@ -111,8 +111,9 @@ export const chatService = {
             })
             .eq('id', conversationId);
 
-        // 3. TRIGGER SENDING (Handled by DB Trigger tr_on_outbound_message_delivery)
-        // No manual invoke here to avoid duplicates.
+        // 3. TRIGGER SENDING (Senior Architecture: Managed by DB Webhook Trigger)
+        // The database trigger 'tr_outbound_telegram_delivery' automatically 
+        // notifies the Edge Function for all outbound messages.
 
         return msg as ChatMessage;
     },
