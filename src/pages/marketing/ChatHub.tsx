@@ -4,8 +4,9 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
     MoreVertical, Send, FileText, Smartphone, Layers,
     Paperclip, TrendingUp, Eye, Zap, Smile, Mail, Phone as PhoneIcon,
-    Send as TelegramIcon, MessageSquare
+    Send as TelegramIcon, MessageSquare, Trash2
 } from 'lucide-react';
+import { usePermissions } from '../../hooks/usePermissions';
 import { chatService, type ChatConversation, type ChatMessage } from '../../services/marketing/chatService';
 import { aiAgentService } from '../../services/marketing/aiAgentService';
 import { storageService } from '../../services/storage';
@@ -29,6 +30,7 @@ export default function ChatHub() {
     const location = useLocation();
     const navigate = useNavigate();
     const { profile } = useAuth();
+    const { isAdmin } = usePermissions();
 
     // 1. Initial Load
     useEffect(() => {
@@ -106,6 +108,20 @@ export default function ChatHub() {
             setMessages(data);
         } catch (error) {
             console.error('Error loading messages:', error);
+        }
+    };
+
+    const handleDeleteMessage = async (msgId: string) => {
+        if (!isAdmin()) return;
+        if (!confirm('¿Eliminar este mensaje permanentemente?')) return;
+
+        try {
+            await chatService.deleteMessage(msgId);
+            setMessages(prev => prev.filter(m => m.id !== msgId));
+            toast.success('Mensaje eliminado');
+        } catch (error) {
+            console.error('Error deleting message:', error);
+            toast.error('Error al eliminar mensaje');
         }
     };
 
@@ -430,6 +446,17 @@ export default function ChatHub() {
                                                 </a>
                                             ) : (
                                                 msg.content
+                                            )}
+
+                                            {/* DELETE BUTTON FOR ADMINS */}
+                                            {isAdmin() && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg.id); }}
+                                                    className={`absolute -top-2 ${msg.direction === 'outbound' ? '-left-8' : '-right-8'} p-1.5 rounded-full bg-white text-slate-400 hover:text-red-500 hover:bg-slate-50 opacity-0 group-hover:opacity-100 transition-all shadow-sm border border-slate-100 z-10`}
+                                                    title="Eliminar mensaje"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
                                             )}
                                         </div>
                                         <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest px-2 opacity-0 group-hover:opacity-100 transition-opacity">

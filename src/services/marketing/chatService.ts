@@ -111,6 +111,16 @@ export const chatService = {
         return msg as ChatMessage;
     },
 
+    async deleteMessage(messageId: string) {
+        // Only delete from DB, real-time trigger will handle UI update if subscribed
+        const { error } = await supabase
+            .from('marketing_messages')
+            .delete()
+            .eq('id', messageId);
+
+        if (error) throw error;
+    },
+
     async markAsRead(conversationId: string) {
         const { error } = await supabase
             .from('marketing_conversations')
