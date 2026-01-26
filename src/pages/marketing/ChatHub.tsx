@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
     MoreVertical, Send, FileText, Smartphone, Layers,
     Paperclip, TrendingUp, Eye, Zap, Smile, Mail, Phone as PhoneIcon,
-    Send as TelegramIcon, MessageSquare, Trash2
+    Send as TelegramIcon, MessageSquare, Trash2, Settings
 } from 'lucide-react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { chatService, type ChatConversation, type ChatMessage } from '../../services/marketing/chatService';
@@ -328,7 +328,16 @@ export default function ChatHub() {
             <div className="w-[360px] flex flex-col bg-white rounded-[32px] shadow-xl border border-white/50 shrink-0 relative overflow-hidden h-full">
                 <div className="p-6 pb-2 space-y-4 relative z-10">
                     <div className="flex items-center justify-between">
-                        <h2 className="text-2xl font-black text-slate-900 tracking-tighter">Inbox</h2>
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-2xl font-black text-slate-900 tracking-tighter">Inbox</h2>
+                            <button
+                                onClick={() => navigate('/marketing/agents')}
+                                className={`p-2 rounded-full border transition-all ${agentStatus ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-700'}`}
+                                title="Configuración de Agentes y Canales"
+                            >
+                                <Settings className="w-4 h-4" />
+                            </button>
+                        </div>
                         <div className="flex gap-1.5 bg-slate-100 p-1.5 rounded-xl w-[180px]">
                             <FilterButton icon={Layers} active={filter === 'all'} onClick={() => setFilter('all')} />
                             <FilterButton icon={Smartphone} active={filter === 'whatsapp'} onClick={() => setFilter('whatsapp')} activeColor="bg-emerald-500 text-white shadow-emerald-500/30" />
