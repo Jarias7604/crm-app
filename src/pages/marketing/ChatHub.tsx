@@ -443,7 +443,7 @@ export default function ChatHub() {
                                                 )}
                                             </div>
                                         </div>
-                                    </div>
+                                    </div> {/* Closing the flex gap-3 container */}
                                 </header>
 
                                 <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-8 space-y-6 custom-scrollbar scroll-smooth">
@@ -589,7 +589,6 @@ export default function ChatHub() {
         </div>
     )
 }
-                        </div >
 
 {
     selectedConv && showDetails && (
@@ -626,10 +625,7 @@ export default function ChatHub() {
             </div>
         </div>
     )
-                        }
-                </div >
-            )
-            }
+}
         </div >
     );
 }
