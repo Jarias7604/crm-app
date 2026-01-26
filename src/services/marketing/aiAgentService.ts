@@ -65,9 +65,18 @@ export const aiAgentService = {
         } else if (userText.includes('whatsapp') || userText.includes('notificaciones')) {
             simulatedReply = "En cuanto a **WhatsApp**: Sí, podemos enviar automáticamente el PDF del DTE al número del cliente apenas emitas la factura. ¿Quieres que lo activemos en tu plan?";
         } else if (userText.includes('factura') || userText.includes('dte') || userText.includes('volumen') || userText.includes('emito') || /\d+/.test(userText)) {
-            const dtes = parseInt(userText.match(/\d+/)?.[0] || "500");
-            const planName = pricing.planes.find(p => dtes >= (p.min_dtes || 0) && dtes <= (p.max_dtes || 999999))?.nombre || "BASIC";
-            simulatedReply = `¡Excelente! Para un volumen de **${dtes.toLocaleString()} documentos**, el **Plan ${planName}** es el indicado. Acabo de preparar una propuesta PDF profesional con los detalles.`;
+            const isMonthly = userText.includes('mes') || userText.includes('mensual');
+            let dtes = parseInt(userText.match(/\d+/)?.[0] || "500");
+            const annualDtes = isMonthly ? dtes * 12 : dtes;
+
+            const matchedPlan = pricing.planes.find(p => annualDtes >= (p.min_dtes || 0) && annualDtes <= (p.max_dtes || 99999999));
+            const planName = matchedPlan?.nombre || "BASIC";
+
+            const volumeDesc = isMonthly
+                ? `**${dtes.toLocaleString()} documentos al mes** (${annualDtes.toLocaleString()} al año)`
+                : `**${dtes.toLocaleString()} documentos**`;
+
+            simulatedReply = `¡Excelente! Para un volumen de ${volumeDesc}, el **Plan ${planName}** es el indicado. Acabo de preparar una propuesta PDF profesional con los detalles.`;
         } else if (userText.includes('precio') || userText.includes('costo') || userText.includes('cuanto vale')) {
             simulatedReply = "Nuestros costos son flexibles según tu volumen. Para darte el precio exacto del plan, ¿podrías confirmarme cuántas facturas emites mensualmente aproximadamente?";
         } else {
