@@ -229,7 +229,7 @@ export const aiAgentService = {
 
         } catch (error) {
             console.error('AI Processing Error:', error);
-            return 'He recibido tu mensaje. Un consultor humano revisará tu caso para darte una respuesta comercial detallada pronto.';
+            return { text: 'He recibido tu mensaje. Un consultor humano revisará tu caso para darte una respuesta comercial detallada pronto.' };
         }
     },
 
@@ -244,20 +244,26 @@ export const aiAgentService = {
                 const { data: conv } = await supabase.from('marketing_conversations').select('lead_id').eq('id', conversationId).single();
 
                 if (conv?.lead_id) {
-                    await aiQuoteService.processAiQuote({
+                    const result = await aiQuoteService.processAiQuote({
                         ...triggerData,
                         lead_id: conv.lead_id,
                         conversation_id: conversationId,
                         company_id: companyId
                     });
+
+                    return {
+                        text: cleanText,
+                        quote: result.quote,
+                        pdfUrl: result.pdfUrl
+                    };
                 }
             } catch (e) {
                 console.error('Error parsing AI JSON trigger:', e);
             }
 
-            return cleanText;
+            return { text: cleanText };
         }
 
-        return aiResponse;
+        return { text: aiResponse };
     }
 };

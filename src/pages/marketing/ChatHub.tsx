@@ -210,10 +210,18 @@ export default function ChatHub() {
 
         try {
             setIsAiProcessing(true);
-            const response = await aiAgentService.processMessage(cid, providedMessage || '', profile.company_id);
+            const result = await aiAgentService.processMessage(cid, providedMessage || '', profile.company_id);
 
-            if (response) {
-                await chatService.sendMessage(cid, response, 'text', 'outbound', { isAiGenerated: true });
+            if (result && result.text) {
+                await chatService.sendMessage(cid, result.text, 'text', 'outbound', { isAiGenerated: true });
+            }
+
+            if (result && result.quote) {
+                // If AI generated a quote, set it as pending for human review
+                setPendingQuote({
+                    ...result.quote,
+                    pdfUrl: result.pdfUrl
+                });
             }
         } catch (error: any) {
             console.error('AI Error:', error);
