@@ -701,7 +701,7 @@ export default function ChatHub() {
             }
             {showNewChatModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300" style={{ width: '700px', maxWidth: '95vw' }}>
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300" style={{ width: '700px', height: '650px', maxWidth: '95vw', display: 'flex', flexDirection: 'column' }}>
                         <div className="p-8 border-b border-slate-50 flex items-center justify-between">
                             <div>
                                 <h3 className="text-2xl font-black text-slate-900 tracking-tighter">Nueva Conversación</h3>
@@ -709,7 +709,7 @@ export default function ChatHub() {
                             </div>
                             <button onClick={() => setShowNewChatModal(false)} className="p-2 rounded-full hover:bg-slate-100 transition-colors text-slate-400"><CloseIcon className="w-6 h-6" /></button>
                         </div>
-                        <div className="p-8 space-y-6">
+                        <div className="p-8 space-y-6 flex-1 flex flex-col min-h-0">
                             <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl">
                                 <button
                                     onClick={() => setLeadStatusFilter('all')}
@@ -743,7 +743,7 @@ export default function ChatHub() {
                                 />
                             </div>
 
-                            <div className="max-h-[350px] overflow-y-auto custom-scrollbar space-y-2 pr-2">
+                            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-2">
                                 {modalFilteredLeads.length > 0 ? (
                                     modalFilteredLeads.map(lead => (
                                         <button
