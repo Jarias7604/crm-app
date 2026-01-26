@@ -79,30 +79,28 @@ export default function ChatHub() {
         const stateConvId = location.state?.conversation_id;
         const stateLead = location.state?.lead;
 
-        // Case 1: Specific conversation ID provided
+        if (!stateConvId && !stateLead) return;
+
+        // Find best candidate
+        let candidate = null;
         if (stateConvId && stateConvId !== 'new') {
-            const existing = conversations.find(c => c.id === stateConvId);
-            if (existing && selectedConv?.id !== existing.id) {
-                console.log('Hub: Auto-selecting by conversation ID:', stateConvId);
-                setSelectedConv(existing);
-                return;
-            }
+            candidate = conversations.find(c => c.id === stateConvId);
+        }
+        if (!candidate && stateLead) {
+            candidate = conversations.find(c => c.lead?.id === stateLead.id);
         }
 
-        // Case 2: Lead provided (can be from Leads page or return from new chat quote)
-        if (stateLead) {
-            const leadId = stateLead.id;
-            const existing = conversations.find(c => c.lead?.id === leadId);
-
-            if (existing) {
-                if (selectedConv?.id !== existing.id) {
-                    console.log('Hub: Auto-selecting existing conversation for lead:', leadId);
-                    setSelectedConv(existing);
-                }
-            } else if (!selectedConv || (selectedConv.id === 'new' && selectedConv.lead?.id !== leadId) || (selectedConv.id !== 'new' && selectedConv.lead?.id !== leadId)) {
-                // If no real conversation exists yet or it's the wrong one, create placeholder
-                console.log('Hub: Creating/Updating placeholder for lead:', leadId);
-                const placeholder: ChatConversation = {
+        if (candidate) {
+            if (selectedConv?.id !== candidate.id) {
+                console.log('Hub: Auto-selecting candidate:', candidate.id);
+                setSelectedConv(candidate);
+            }
+        } else if (stateLead) {
+            // If lead provided but no conversation found in list, use a placeholder
+            // Check if we already have the correct placeholder selected
+            if (!selectedConv || selectedConv.id !== 'new' || selectedConv.lead?.id !== stateLead.id) {
+                console.log('Hub: Setting placeholder for lead:', stateLead.id);
+                setSelectedConv({
                     id: 'new',
                     channel: location.state.channel || 'telegram',
                     status: 'open',
@@ -110,8 +108,7 @@ export default function ChatHub() {
                     last_message_at: new Date().toISOString(),
                     unread_count: 0,
                     lead: stateLead
-                };
-                setSelectedConv(placeholder);
+                });
             }
         }
     }, [location.state, conversations, loading, selectedConv?.id]);
