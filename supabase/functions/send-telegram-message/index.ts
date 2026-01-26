@@ -15,22 +15,13 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req) => {
-    console.log(`[send-telegram-message] Request received: ${req.method} ${req.url}`);
-
-    // 1. Handle CORS Preflight
-    if (req.method === 'OPTIONS') {
-        return new Response('ok', { headers: corsHeaders });
-    }
+    if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
     try {
         const payload = await req.json();
-        console.log('[send-telegram-message] Payload:', JSON.stringify(payload));
-
-        // This is a Database Webhook payload or manual invoke
         const record = payload.record;
 
         if (!record || record.direction !== 'outbound' || record.status === 'delivered') {
-            console.log('[send-telegram-message] Skipping record:', record?.id);
             return new Response('Skipped', { status: 200, headers: corsHeaders });
         }
 
@@ -38,7 +29,7 @@ Deno.serve(async (req) => {
         const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
         const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-        // 1. Get Conversation to find Company and External ID
+        // 1. Get Conversation Context
         const { data: conversation, error: convError } = await supabase
             .from('marketing_conversations')
             .select('external_id, channel, company_id')
@@ -46,15 +37,14 @@ Deno.serve(async (req) => {
             .single();
 
         if (convError || !conversation || conversation.channel !== 'telegram') {
-            console.error('[send-telegram-message] Conv Error:', convError || 'Not Telegram');
-            return new Response('Not Telegram or Conv not found', { status: 200, headers: corsHeaders });
+            return new Response('Not Telegram or Conv missing', { status: 200, headers: corsHeaders });
         }
 
         const chatId = conversation.external_id;
         const companyId = conversation.company_id;
 
-        // 2. Fetch the Telegram Token for this specific company
-        const { data: integration, error: intError } = await supabase
+        // 2. Fetch Bot Token
+        const { data: integration } = await supabase
             .from('marketing_integrations')
             .select('settings')
             .eq('company_id', companyId)
@@ -62,74 +52,79 @@ Deno.serve(async (req) => {
             .eq('is_active', true)
             .single();
 
-        if (intError || !integration?.settings?.token) {
-            console.error('[send-telegram-message] Integration Error:', intError || 'Token missing');
-            await supabase.from('marketing_messages').update({
-                status: 'failed',
-                metadata: { ...record.metadata, error: 'Telegram Token missing or integration inactive' }
-            }).eq('id', record.id);
-            return new Response('Integration Missing', { status: 400, headers: corsHeaders });
+        if (!integration?.settings?.token) {
+            await supabase.from('marketing_messages').update({ status: 'failed', metadata: { ...record.metadata, error: 'Token missing' } }).eq('id', record.id);
+            return new Response('Token missing', { status: 400, headers: corsHeaders });
         }
 
         const botToken = integration.settings.token;
+        console.log(`[Send-Telegram] Using Token: ...${botToken.slice(-5)} for Chat: ${chatId}`);
 
-        // 3. SEND TO TELEGRAM
-        let telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
-        let body: any = {
-            chat_id: chatId,
-            text: record.content,
-            parse_mode: 'HTML'
-        };
+        const formData = new FormData();
+        formData.append('chat_id', String(chatId));
 
-        // Handle Files/Images
-        if (record.type === 'file' || record.type === 'image') {
-            const fileUrl = record.metadata?.url;
-            if (fileUrl) {
-                if (record.type === 'image') {
-                    telegramUrl = `https://api.telegram.org/bot${botToken}/sendPhoto`;
-                    body = { chat_id: chatId, photo: fileUrl, caption: record.content };
-                } else {
-                    telegramUrl = `https://api.telegram.org/bot${botToken}/sendDocument`;
-                    body = { chat_id: chatId, document: fileUrl, caption: record.content };
+        const isFile = record.type === 'file' || record.type === 'image';
+        const fileUrl = record.metadata?.url;
+
+        let res;
+        if (isFile && fileUrl) {
+            console.log(`[Send-Telegram] Downloading file: ${fileUrl}`);
+            try {
+                const fileResponse = await fetch(fileUrl);
+                if (fileResponse.ok) {
+                    const fileBlob = await fileResponse.blob();
+                    const fieldName = record.type === 'image' ? 'photo' : 'document';
+                    const fileName = record.metadata?.fileName || (record.type === 'image' ? 'photo.png' : 'document.pdf');
+
+                    const telegramUrl = `https://api.telegram.org/bot${botToken}/send${fieldName.charAt(0).toUpperCase() + fieldName.slice(1)}`;
+                    formData.append(fieldName, fileBlob, fileName);
+                    formData.append('caption', record.content || '');
+
+                    res = await fetch(telegramUrl, { method: 'POST', body: formData });
                 }
+            } catch (e) {
+                console.error(`[Send-Telegram] File fetch/upload error:`, e);
             }
         }
 
-        console.log('[send-telegram-message] Sending to Telegram:', telegramUrl);
-        const res = await fetch(telegramUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-        });
+        // Fallback or Text Message
+        if (!res || !(await res.clone().json()).ok) {
+            const errorResult = res ? await res.clone().json() : { error: 'Binary upload failed' };
+            console.warn(`[Send-Telegram] Binary upload failed or skipped. Falling back to text. Error:`, JSON.stringify(errorResult));
 
-        const telegramResult = await res.json();
-        console.log('[send-telegram-message] Telegram API Result:', JSON.stringify(telegramResult));
+            const textUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+            const textContent = isFile
+                ? `📄 *ARCHIVO ADJUNTO*:\n${record.content}\n\n🔗 Descarga aquí:\n${fileUrl}`
+                : record.content;
 
-        if (!telegramResult.ok) {
-            console.error('[send-telegram-message] Telegram Error:', telegramResult);
-            await supabase.from('marketing_messages').update({
-                status: 'failed',
-                metadata: { ...record.metadata, error: telegramResult }
-            }).eq('id', record.id);
+            res = await fetch(textUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: String(chatId),
+                    text: textContent
+                })
+            });
+        }
+
+        const result = await res.json();
+        console.log(`[Send-Telegram] Final API Response:`, JSON.stringify(result));
+
+        if (!result.ok) {
+            await supabase.from('marketing_messages').update({ status: 'failed', metadata: { ...record.metadata, telegram_error: result } }).eq('id', record.id);
             return new Response('Telegram Error', { status: 400, headers: corsHeaders });
         }
 
         // 4. Mark as delivered
         await supabase.from('marketing_messages').update({
             status: 'delivered',
-            external_message_id: telegramResult.result.message_id
+            external_message_id: result.result.message_id?.toString()
         }).eq('id', record.id);
 
-        console.log('[send-telegram-message] Successfully delivered.');
-        return new Response(JSON.stringify(telegramResult), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
+        return new Response(JSON.stringify(result), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     } catch (err) {
-        console.error('[send-telegram-message] Global Error:', err);
-        return new Response(JSON.stringify({ error: err.message }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
+        console.error('[Send-Telegram] Global Error:', err);
+        return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 });

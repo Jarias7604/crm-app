@@ -13,6 +13,7 @@ export interface ChatConversation {
         email: string | null;
         company_name: string | null;
         phone: string | null;
+        company_id: string | null;
     } | null;
 }
 
@@ -39,14 +40,33 @@ export const chatService = {
         if (error) throw error;
     },
 
-    async createConversation(leadId: string, channel: string, externalId: string = 'internal') {
-        const { data: profile } = await supabase.from('profiles').select('company_id').single();
-        if (!profile?.company_id) throw new Error('No company found');
+    async createConversation(leadId: string, channel: string, companyId?: string | null, externalId: string = 'internal') {
+        let finalCompanyId = companyId;
+
+        if (!finalCompanyId) {
+            // Try to get company_id from the lead itself
+            const { data: lead } = await supabase.from('leads').select('company_id').eq('id', leadId).single();
+            if (lead?.company_id) {
+                finalCompanyId = lead.company_id;
+            } else {
+                // Fallback to current user's profile
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single();
+                    finalCompanyId = profile?.company_id;
+                }
+            }
+        }
+
+        if (!finalCompanyId) {
+            console.error(`Failed to find company for lead ${leadId}. Lead record might be missing company_id.`);
+            throw new Error(`No se pudo encontrar la empresa asociada al prospecto ${leadId}. Por favor verifique la configuración.`);
+        }
 
         const { data, error } = await supabase
             .from('marketing_conversations')
             .insert({
-                company_id: profile.company_id,
+                company_id: finalCompanyId,
                 lead_id: leadId,
                 channel,
                 external_id: externalId,
@@ -66,7 +86,7 @@ export const chatService = {
             .from('marketing_conversations')
             .select(`
                 *,
-                lead:leads(id, name, email, company_name, phone)
+                lead:leads(id, name, email, company_name, phone, company_id)
             `)
             .order('last_message_at', { ascending: false });
 
@@ -111,9 +131,14 @@ export const chatService = {
             })
             .eq('id', conversationId);
 
-        // 3. TRIGGER SENDING (Senior Architecture: Managed by DB Webhook Trigger)
-        // The database trigger 'tr_outbound_telegram_delivery' automatically 
-        // notifies the Edge Function for all outbound messages.
+        // 3. PROACTIVE DISPATCH (Reliability Fix)
+        // Instead of waiting for database triggers which can be slow or blocked,
+        // we proactively notify the delivery service.
+        if (direction === 'outbound') {
+            supabase.functions.invoke('send-telegram-message', {
+                body: { record: msg }
+            }).catch(error => console.error('Error in proactive dispatch:', error));
+        }
 
         return msg as ChatMessage;
     },

@@ -117,12 +117,11 @@ Deno.serve(async (req) => {
         [DATOS NECESARIOS PARA CALIFICAR]
         No des el PDF sin antes tener: 👤 Nombre del contacto, 🏛️ Nombre de la Empresa y 📄 Volumen de facturación.
         
-        [TRIGGERS]
-        QUOTE_TRIGGER: {"dte_volume": TOTAL_ANUAL, "plan_id": "ID_DEL_PLAN"}
+        [TRIGGERS DE SISTEMA - OBLIGATORIO]
+        Si el cliente califica (Nombre, Empresa y Volumen), debes incluir este bloque AL FINAL de tu respuesta, separado por una línea:
+        [AUTO_QUOTE_TRIGGER]: {"dte_volume": TOTAL_ANUAL_CALCULADO, "plan_id": "ID_OPCIONAL"}
         
-        [REGLA DE ORO]
-        - NUNCA digas que no puedes enviar archivos. 
-        - NUNCA des precios detallados por texto, di que están en el PDF adjunto.
+        SÉ UN VENDEDOR SENIOR: Efectivo, veraz y rápido con los documentos.
         `;
 
         const messages = [
@@ -178,10 +177,11 @@ Deno.serve(async (req) => {
             }
         }
 
-        // --- HANDLER: QUOTE_TRIGGER (More robust regex) ---
-        const quoteMatch = cleanText.match(/QUOTE_TRIGGER:\s*({[\s\S]*?})/);
+        // --- HANDLER: AUTO_QUOTE_TRIGGER (Enhanced Detection) ---
+        const quoteMatch = cleanText.match(/\[AUTO_QUOTE_TRIGGER\]:\s*({[\s\S]*?})/i);
         if (quoteMatch) {
-            cleanText = cleanText.replace(/QUOTE_TRIGGER:[\s\S]*?}/, '').trim();
+            console.log("Trigger detected in AI response!");
+            cleanText = cleanText.replace(/\[AUTO_QUOTE_TRIGGER\]:[\s\S]*?}/i, '').trim();
             try {
                 const triggerData = JSON.parse(quoteMatch[1]);
 
@@ -222,7 +222,7 @@ Deno.serve(async (req) => {
         }
 
         // 4. Insert response
-        const { error: insertError } = await supabase
+        const { data: insertedMsg, error: insertError } = await supabase
             .from('marketing_messages')
             .insert({
                 conversation_id: conversationId,
@@ -230,10 +230,27 @@ Deno.serve(async (req) => {
                 direction: 'outbound',
                 type: 'text',
                 status: 'pending',
-                metadata: { ...quoteMetadata, isAiGenerated: true, processed_by: 'ai-processor-v7' }
-            });
+                metadata: { ...quoteMetadata, isAiGenerated: true, processed_by: 'ai-processor-v12' }
+            })
+            .select()
+            .single();
 
         if (insertError) throw insertError;
+
+        // 5. PROACTIVE DISPATCH: Trigger the delivery function immediately
+        // This replaces the unreliable database triggers
+        if (insertedMsg) {
+            console.log(`[AI-Processor] Proactively triggering dispatch for message: ${insertedMsg.id}`);
+            fetch(`${SUPABASE_URL}/functions/v1/send-telegram-message`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+                },
+                body: JSON.stringify({ record: insertedMsg })
+            }).catch(e => console.error("Dispatch Trigger Error:", e));
+        }
+
         return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     } catch (err) {

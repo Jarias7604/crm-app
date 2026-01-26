@@ -111,8 +111,8 @@ BEGIN
     END IF;
     
     -- 4. Store message
-    INSERT INTO marketing_messages (conversation_id, content, direction, status)
-    VALUES (v_conversation_id, p_content, 'inbound', 'delivered');
+    INSERT INTO marketing_messages (conversation_id, content, direction, status, metadata)
+    VALUES (v_conversation_id, p_content, 'inbound', 'delivered', p_metadata);
     
     RETURN v_conversation_id;
 END;

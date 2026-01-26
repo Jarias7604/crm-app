@@ -301,7 +301,8 @@ export default function ChatHub() {
                 if (!selectedConv.lead?.id) return;
                 const newConv = await chatService.createConversation(
                     selectedConv.lead.id,
-                    selectedConv.channel
+                    selectedConv.channel,
+                    selectedConv.lead.company_id
                 );
                 setSelectedConv(newConv);
                 convId = newConv.id;
@@ -430,7 +431,8 @@ export default function ChatHub() {
                 if (!selectedConv.lead?.id) throw new Error("Lead ID missing");
                 const newConv = await chatService.createConversation(
                     selectedConv.lead.id,
-                    selectedConv.channel
+                    selectedConv.channel,
+                    selectedConv.lead.company_id
                 );
                 convId = newConv.id;
                 setSelectedConv(newConv);
