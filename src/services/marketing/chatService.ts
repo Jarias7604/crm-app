@@ -137,6 +137,20 @@ export const chatService = {
         if (error) throw error;
     },
 
+    async updateMessageMetadata(messageId: string, metadata: any) {
+        // Fetch current metadata first to merge
+        const { data: msg } = await supabase.from('marketing_messages').select('metadata').eq('id', messageId).single();
+        const newMetadata = { ...(msg?.metadata || {}), ...metadata };
+
+        const { error } = await supabase
+            .from('marketing_messages')
+            .update({ metadata: newMetadata })
+            .eq('id', messageId);
+
+        if (error) throw error;
+    },
+
+
     // Real-time subscription helper
     subscribeToMessages(conversationId: string, onMessage: (msg: ChatMessage) => void) {
         return supabase

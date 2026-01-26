@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
         const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
         const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-        // 1. Get OpenAI Key for this company
+        // 1. Get OpenAI Key
         const { data: integration } = await supabase
             .from('marketing_integrations')
             .select('settings')
@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
         const aiData = await response.json();
         const aiResponse = aiData.choices[0].message.content;
 
-        // 3. Handle QUOTE_TRIGGER and Message Insertion
+        // 3. Handle QUOTE_TRIGGER and Lead Management
         let cleanText = aiResponse;
         let quoteMetadata = {};
 
@@ -53,17 +53,44 @@ Deno.serve(async (req) => {
             cleanText = parts[0].trim();
             try {
                 const triggerData = JSON.parse(parts[1].trim());
-                // In a full implementation, we would call the quotation service here.
-                // For speed and reliability in this fix, we mark it in metadata 
-                // so the UI or another trigger can handle the PDF generation.
                 quoteMetadata = { quote_trigger: triggerData };
+
+                console.log('[ai-chat-processor] Qualifying lead...');
+
+                const { data: convInfo } = await supabase
+                    .from('marketing_conversations')
+                    .select('lead_id')
+                    .eq('id', conversationId)
+                    .single();
+
+                if (convInfo?.lead_id) {
+                    // Update Lead Status to 'Lead calificado'
+                    await supabase
+                        .from('leads')
+                        .update({
+                            status: 'Lead calificado',
+                            priority: 'high',
+                            value: (triggerData.dte_volume || 0) * 0.05
+                        })
+                        .eq('id', convInfo.lead_id);
+
+                    // Register preliminary quote
+                    await supabase.from('cotizaciones').insert({
+                        company_id: companyId,
+                        lead_id: convInfo.lead_id,
+                        nombre_cliente: 'Lead Calificado (AI)',
+                        volumen_dtes: triggerData.dte_volume,
+                        plan_nombre: triggerData.plan_id || 'BASIC',
+                        estado: 'borrador',
+                        metadata: { is_ai_qualified: true }
+                    });
+                }
             } catch (e) {
-                console.error("Error parsing quote trigger:", e);
+                console.error("Error in lead management:", e);
             }
         }
 
-        // 4. Insert the response message into the DB
-        // This will automatically trigger 'tr_on_outbound_message_delivery' to send to Telegram
+        // 4. Insert response
         const { error: insertError } = await supabase
             .from('marketing_messages')
             .insert({
@@ -72,11 +99,7 @@ Deno.serve(async (req) => {
                 direction: 'outbound',
                 type: 'text',
                 status: 'pending',
-                metadata: {
-                    ...quoteMetadata,
-                    isAiGenerated: true,
-                    processed_by: 'ai-processor-v1'
-                }
+                metadata: { ...quoteMetadata, isAiGenerated: true, processed_by: 'ai-processor-v3' }
             });
 
         if (insertError) throw insertError;
