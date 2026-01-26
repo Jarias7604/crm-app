@@ -155,7 +155,7 @@ export default function ChatHub() {
                 });
 
                 // --- AUTO-QUOTE DELIVERY ENGINE (Triggered by Server-Side AI Detection) ---
-                if (msg.direction === 'outbound' && msg.metadata?.quote_trigger && agentStatus) {
+                if (msg.direction === 'outbound' && msg.metadata?.quote_trigger) {
                     // Check if already processed by this or another instance
                     if (processedTriggers.current.has(msg.id) || msg.metadata.pdf_dispatched) return;
 

@@ -71,23 +71,26 @@ serve(async (req) => {
             return new Response('OK', { status: 200 }); // Ignore stickers/voice for now
         }
 
-        // 4. Identify Company
-        // For simplicity in this mono-repo setup, we'll assign to the MAIN company.
-        // In a real multi-tenant SaaS, the Telegram Bot would be mapped to a specific company_id via a DB table.
-        // Here we query the first company found (or a specific fixed one if you have the ID).
-        // Let's find via the `integration` table if we had one.
-        // FALLBACK: Get the first company in the system.
-        const { data: company } = await supabase.from('companies').select('id').limit(1).single();
+        // 4. Identify Company (Senior Logic: Find company with active Telegram integration)
+        const { data: integration } = await supabase
+            .from('marketing_integrations')
+            .select('company_id')
+            .eq('provider', 'telegram')
+            .eq('is_active', true)
+            .limit(1)
+            .single();
 
-        if (!company) {
-            console.error('No company found to assign message');
+        const companyId = integration?.company_id;
+
+        if (!companyId) {
+            console.error('No company with active Telegram integration found');
             return new Response('OK', { status: 200 });
         }
 
         // 5. Process Message in Database (RPC)
         // This function handles "Find or Create Lead" + "Find or Create Conversation" + "Insert Message"
         const { data, error } = await supabase.rpc('process_incoming_marketing_message', {
-            p_company_id: company.id,
+            p_company_id: companyId,
             p_channel: 'telegram',
             p_external_id: chatId,
             p_sender_name: senderName || 'Usuario Telegram',

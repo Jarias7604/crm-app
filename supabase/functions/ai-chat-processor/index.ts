@@ -10,11 +10,14 @@ Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
     try {
-        const { conversationId, prompt, systemPrompt, companyId } = await req.json();
+        const payload = await req.json();
+        const { conversationId, prompt, systemPrompt, companyId } = payload;
 
         const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
         const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
         const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+        if (!companyId) throw new Error("Missing companyId in payload");
 
         // 1. Get OpenAI Key
         const { data: integration } = await supabase
@@ -22,10 +25,59 @@ Deno.serve(async (req) => {
             .select('settings')
             .eq('company_id', companyId)
             .eq('provider', 'openai')
-            .single();
+            .eq('is_active', true)
+            .maybeSingle();
 
         const apiKey = integration?.settings?.apiKey;
-        if (!apiKey) throw new Error("OpenAI API Key not found");
+        if (!apiKey) throw new Error(`OpenAI API Key not found for company ${companyId}`);
+
+        // --- NEW: Fetch Pricing for Context ---
+        const { data: pricingItems } = await supabase
+            .from('pricing_items')
+            .select('nombre, tipo, precio_anual, min_dtes, max_dtes, descripcion')
+            .eq('activo', true);
+
+        const pricingContext = JSON.stringify(pricingItems || []);
+
+        // --- NEW: Fetch Conversation History for Context ---
+        const { data: historyData } = await supabase
+            .from('marketing_messages')
+            .select('content, direction')
+            .eq('conversation_id', conversationId)
+            .order('created_at', { ascending: false })
+            .limit(10);
+
+        const history = (historyData || []).reverse().map(msg => ({
+            role: msg.direction === 'inbound' ? 'user' : 'assistant',
+            content: msg.content
+        }));
+
+        if (history.length > 0 && history[history.length - 1].role === 'user' && history[history.length - 1].content === prompt) {
+            history.pop();
+        }
+
+        const enhancedSystemPrompt = `${systemPrompt}
+        
+        [INFORMACIÓN DE PRECIOS ACTUALIZADA]
+        Usa estos datos REALES para calcular la cotización interna, pero NO los escribas en el chat.
+        ${pricingContext}
+
+        [INSTRUCCIÓN CRÍTICA DE FORMATO]
+        - SI EL CLIENTE DA DATOS DE VOLUMEN (DTEs):
+          1. Activa INMEDIATAMENTE el QUOTE_TRIGGER.
+          2. Tu respuesta escrita debe ser únicamente un mensaje corto indicando que has generado la propuesta oficial.
+          3. **PROHIBIDO** escribir precios, tablas o desgloses en el mensaje de texto.
+          4. Di algo como: "Entendido. He preparado tu propuesta formal para {volumen} facturas. Puedes ver todos los detalles y precios en el PDF adjunto 👇".
+        
+        - Si el cliente pregunta precios explícitamente sin dar volumen: 
+          Pregunta primero el volumen para poder generar el PDF oficial. Evita dar precios sueltos si es posible, dirige todo al PDF.
+        `;
+
+        const messages = [
+            { role: 'system', content: enhancedSystemPrompt },
+            ...history,
+            { role: 'user', content: prompt }
+        ];
 
         // 2. Call OpenAI
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -33,15 +85,14 @@ Deno.serve(async (req) => {
             headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 model: 'gpt-4o',
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: prompt }
-                ],
-                temperature: 0.7,
+                messages: messages,
+                temperature: 0.3,
             }),
         });
 
         const aiData = await response.json();
+        if (!aiData.choices || !aiData.choices[0]) throw new Error("OpenAI error: " + JSON.stringify(aiData));
+
         const aiResponse = aiData.choices[0].message.content;
 
         // 3. Handle QUOTE_TRIGGER and Lead Management
@@ -55,8 +106,6 @@ Deno.serve(async (req) => {
                 const triggerData = JSON.parse(parts[1].trim());
                 quoteMetadata = { quote_trigger: triggerData };
 
-                console.log('[ai-chat-processor] Qualifying lead...');
-
                 const { data: convInfo } = await supabase
                     .from('marketing_conversations')
                     .select('lead_id')
@@ -64,7 +113,6 @@ Deno.serve(async (req) => {
                     .single();
 
                 if (convInfo?.lead_id) {
-                    // Update Lead Status to 'Lead calificado'
                     await supabase
                         .from('leads')
                         .update({
@@ -74,7 +122,6 @@ Deno.serve(async (req) => {
                         })
                         .eq('id', convInfo.lead_id);
 
-                    // Register preliminary quote
                     await supabase.from('cotizaciones').insert({
                         company_id: companyId,
                         lead_id: convInfo.lead_id,
@@ -99,20 +146,14 @@ Deno.serve(async (req) => {
                 direction: 'outbound',
                 type: 'text',
                 status: 'pending',
-                metadata: { ...quoteMetadata, isAiGenerated: true, processed_by: 'ai-processor-v3' }
+                metadata: { ...quoteMetadata, isAiGenerated: true, processed_by: 'ai-processor-v7' }
             });
 
         if (insertError) throw insertError;
-
-        return new Response(JSON.stringify({ success: true }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     } catch (err) {
         console.error('AI-CHAT-PROCESSOR Error:', err);
-        return new Response(JSON.stringify({ error: err.message }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+        return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 });
