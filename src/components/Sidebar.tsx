@@ -117,7 +117,7 @@ export default function Sidebar() {
             href: '/config/pricing',
             icon: Tag,
             current: location.pathname === '/config/pricing',
-            allowedRoles: ['super_admin'] // Solo Super Admin define precios base
+            allowedRoles: ['super_admin', 'company_admin']
         },
         {
             name: 'Gestión Paquete',

@@ -10,14 +10,14 @@ import toast from 'react-hot-toast';
 
 export default function PricingConfig() {
     const { profile } = useAuth();
-    const { hasPermission } = usePermissions();
+    const { isAdmin } = usePermissions();
     const [items, setItems] = useState<PricingItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [showNewForm, setShowNewForm] = useState(false);
     const [filterTipo, setFilterTipo] = useState<string>('all');
 
-    const canEdit = hasPermission('cotizaciones.edit_prices');
+    const canEdit = isAdmin();
 
     const [formData, setFormData] = useState<Partial<PricingItem>>({
         tipo: 'modulo',
@@ -333,7 +333,7 @@ export default function PricingConfig() {
                                         <td className="px-6 py-4">
                                             {canEdit && (
                                                 <div className="flex items-center justify-end gap-2">
-                                                    {profile?.role === 'super_admin' ? (
+                                                    {profile?.role === 'super_admin' || profile?.role === 'company_admin' ? (
                                                         <>
                                                             <button
                                                                 onClick={() => handleEdit(item)}
