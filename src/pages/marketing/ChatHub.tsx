@@ -510,108 +510,107 @@ export default function ChatHub() {
                                 </div>
                             ))}
                         </div>
-                    </div>
 
-                {pendingQuote && (
-                    <div className="absolute bottom-24 left-1/2 -translate-x-1/2 w-[90%] max-w-xl animate-in slide-in-from-bottom-5 duration-500 z-20">
-                        <div className="bg-white rounded-2xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] border border-blue-50 overflow-hidden">
-                            <div className="h-1 w-full bg-slate-100 flex">
-                                <div className="h-full bg-blue-500 w-2/3 shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
-                            </div>
-
-                            <div className="p-5">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div>
-                                        <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide">Proceso de Cotización</h4>
-                                        <p className="text-[11px] text-slate-400 font-medium mt-0.5">Editando propuesta para {pendingQuote.nombre_cliente}</p>
+                        {pendingQuote && (
+                            <div className="absolute bottom-24 left-1/2 -translate-x-1/2 w-[90%] max-w-xl animate-in slide-in-from-bottom-5 duration-500 z-20">
+                                <div className="bg-white rounded-2xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] border border-blue-50 overflow-hidden">
+                                    <div className="h-1 w-full bg-slate-100 flex">
+                                        <div className="h-full bg-blue-500 w-2/3 shadow-[0_0_10px_rgba(59,130,246,0.5)]"></div>
                                     </div>
-                                    <div className="bg-blue-50 text-blue-600 px-2 py-1 rounded text-[9px] font-black uppercase tracking-wider border border-blue-100">
-                                        Paso 2 de 3
+
+                                    <div className="p-5">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div>
+                                                <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide">Proceso de Cotización</h4>
+                                                <p className="text-[11px] text-slate-400 font-medium mt-0.5">Editando propuesta para {pendingQuote.nombre_cliente}</p>
+                                            </div>
+                                            <div className="bg-blue-50 text-blue-600 px-2 py-1 rounded text-[9px] font-black uppercase tracking-wider border border-blue-100">
+                                                Paso 2 de 3
+                                            </div>
+                                        </div>
+
+                                        <div className="flex gap-3 mt-4">
+                                            <button onClick={handleEditPendingQuote} className="px-4 py-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors">
+                                                ← Editar
+                                            </button>
+                                            <button onClick={handlePreviewQuote} className="flex-1 py-3 bg-white border-2 border-slate-100 hover:border-blue-200 text-slate-700 hover:text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 group">
+                                                <Eye className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
+                                                Previsualizar PDF
+                                            </button>
+                                            <button onClick={handleSendPendingQuote} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">
+                                                Enviar PDF <Send className="w-3 h-3" />
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
-
-                                <div className="flex gap-3 mt-4">
-                                    <button onClick={handleEditPendingQuote} className="px-4 py-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors">
-                                        ← Editar
-                                    </button>
-                                    <button onClick={handlePreviewQuote} className="flex-1 py-3 bg-white border-2 border-slate-100 hover:border-blue-200 text-slate-700 hover:text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 group">
-                                        <Eye className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
-                                        Previsualizar PDF
-                                    </button>
-                                    <button onClick={handleSendPendingQuote} className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">
-                                        Enviar PDF <Send className="w-3 h-3" />
-                                    </button>
-                                </div>
                             </div>
+                        )}
+
+                        <div className="px-8 pb-8 pt-2 bg-gradient-to-t from-white via-white to-transparent">
+                            <form onSubmit={handleSendMessage} className="bg-white rounded-[24px] p-2 flex items-center gap-2 border border-slate-200 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.05)] focus-within:ring-4 focus-within:ring-blue-100 focus-within:border-blue-300 transition-all">
+                                <button type="button" className="p-3 text-slate-400 hover:text-blue-500 transition-colors"><Smile className="w-5 h-5" /></button>
+                                <textarea
+                                    value={newMessage}
+                                    onChange={e => setNewMessage(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(e as any); } }}
+                                    placeholder="Escribe un mensaje..."
+                                    className="flex-1 bg-transparent py-3 text-sm font-medium text-slate-700 outline-none resize-none max-h-24 custom-scrollbar placeholder:text-slate-300"
+                                    rows={1}
+                                />
+                                <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 text-slate-400 hover:text-blue-500 transition-colors"><Paperclip className="w-5 h-5" /></button>
+                                <button type="submit" disabled={!newMessage.trim()} className="p-3 bg-slate-900 text-white rounded-xl hover:bg-blue-600 disabled:opacity-50 disabled:hover:bg-slate-900 transition-all shadow-md">
+                                    <Send className="w-4 h-4" />
+                                </button>
+                            </form>
                         </div>
+                    </>
+                ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center p-20 text-center bg-slate-50/10">
+                        <div className="w-32 h-32 bg-slate-50 rounded-[40px] flex items-center justify-center mb-10 border border-slate-100">
+                            <MessageSquare className="w-14 h-14 text-slate-200" />
+                        </div>
+                        <h2 className="text-4xl font-black text-slate-900 mb-6 tracking-tighter">Inbox Centralizado</h2>
+                        <p className="text-[12px] text-slate-400 max-w-sm leading-loose font-black uppercase tracking-[0.25em]">Selecciona una conversación o lead para ver los detalles y mensajes.</p>
                     </div>
                 )}
-
-                <div className="px-8 pb-8 pt-2 bg-gradient-to-t from-white via-white to-transparent">
-                    <form onSubmit={handleSendMessage} className="bg-white rounded-[24px] p-2 flex items-center gap-2 border border-slate-200 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.05)] focus-within:ring-4 focus-within:ring-blue-100 focus-within:border-blue-300 transition-all">
-                        <button type="button" className="p-3 text-slate-400 hover:text-blue-500 transition-colors"><Smile className="w-5 h-5" /></button>
-                        <textarea
-                            value={newMessage}
-                            onChange={e => setNewMessage(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(e as any); } }}
-                            placeholder="Escribe un mensaje..."
-                            className="flex-1 bg-transparent py-3 text-sm font-medium text-slate-700 outline-none resize-none max-h-24 custom-scrollbar placeholder:text-slate-300"
-                            rows={1}
-                        />
-                        <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 text-slate-400 hover:text-blue-500 transition-colors"><Paperclip className="w-5 h-5" /></button>
-                        <button type="submit" disabled={!newMessage.trim()} className="p-3 bg-slate-900 text-white rounded-xl hover:bg-blue-600 disabled:opacity-50 disabled:hover:bg-slate-900 transition-all shadow-md">
-                            <Send className="w-4 h-4" />
-                        </button>
-                    </form>
-                </div>
-            </>
-            ) : (
-            <div className="flex-1 flex flex-col items-center justify-center p-20 text-center bg-slate-50/10">
-                <div className="w-32 h-32 bg-slate-50 rounded-[40px] flex items-center justify-center mb-10 border border-slate-100">
-                    <MessageSquare className="w-14 h-14 text-slate-200" />
-                </div>
-                <h2 className="text-4xl font-black text-slate-900 mb-6 tracking-tighter">Inbox Centralizado</h2>
-                <p className="text-[12px] text-slate-400 max-w-sm leading-loose font-black uppercase tracking-[0.25em]">Selecciona una conversación o lead para ver los detalles y mensajes.</p>
             </div>
-            )}
-        </div>
 
             {
-        selectedConv && showDetails && (
-            <div className="w-[260px] bg-white rounded-[32px] border border-slate-100 shadow-sm flex flex-col overflow-y-auto shrink-0 p-5 space-y-6">
-                <div className="text-center space-y-3">
-                    <div className="relative inline-block">
-                        <div className="w-20 h-20 rounded-[24px] bg-slate-50 mx-auto flex items-center justify-center text-4xl font-black text-slate-900 shadow-inner border border-white">
-                            {selectedConv.lead?.name?.[0] || '?'}
-                        </div>
-                        <div className="absolute -bottom-2 inset-x-0 flex justify-center">
-                            <div className="bg-white/90 backdrop-blur-sm border border-slate-100 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
-                                <Zap className="w-3 h-3 text-yellow-500 fill-yellow-500" />
-                                <span className="text-[8px] font-black uppercase tracking-wider text-slate-600">High Value</span>
+                selectedConv && showDetails && (
+                    <div className="w-[260px] bg-white rounded-[32px] border border-slate-100 shadow-sm flex flex-col overflow-y-auto shrink-0 p-5 space-y-6">
+                        <div className="text-center space-y-3">
+                            <div className="relative inline-block">
+                                <div className="w-20 h-20 rounded-[24px] bg-slate-50 mx-auto flex items-center justify-center text-4xl font-black text-slate-900 shadow-inner border border-white">
+                                    {selectedConv.lead?.name?.[0] || '?'}
+                                </div>
+                                <div className="absolute -bottom-2 inset-x-0 flex justify-center">
+                                    <div className="bg-white/90 backdrop-blur-sm border border-slate-100 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                                        <Zap className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                                        <span className="text-[8px] font-black uppercase tracking-wider text-slate-600">High Value</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="pt-2">
+                                <h3 className="text-lg font-black text-slate-900 leading-tight truncate px-2">{selectedConv.lead?.name || 'Visitante'}</h3>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{selectedConv.lead?.company_name || 'Individual'}</p>
                             </div>
                         </div>
-                    </div>
-                    <div className="pt-2">
-                        <h3 className="text-lg font-black text-slate-900 leading-tight truncate px-2">{selectedConv.lead?.name || 'Visitante'}</h3>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{selectedConv.lead?.company_name || 'Individual'}</p>
-                    </div>
-                </div>
 
-                <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-[20px] border border-blue-100 text-center relative overflow-hidden group">
-                    <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1 relative z-10">IA Score</p>
-                    <div className="text-3xl font-black text-blue-600 tracking-tighter relative z-10 group-hover:scale-110 transition-transform">98</div>
-                </div>
+                        <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-[20px] border border-blue-100 text-center relative overflow-hidden group">
+                            <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1 relative z-10">IA Score</p>
+                            <div className="text-3xl font-black text-blue-600 tracking-tighter relative z-10 group-hover:scale-110 transition-transform">98</div>
+                        </div>
 
-                <div className="space-y-4">
-                    <div className="space-y-3">
-                        <InfoItem icon={Mail} label="EMAIL" value={selectedConv.lead?.email || 'No identificado'} />
-                        <InfoItem icon={PhoneIcon} label="TELÉFONO" value={selectedConv.lead?.phone || 'Sin número'} />
+                        <div className="space-y-4">
+                            <div className="space-y-3">
+                                <InfoItem icon={Mail} label="EMAIL" value={selectedConv.lead?.email || 'No identificado'} />
+                                <InfoItem icon={PhoneIcon} label="TELÉFONO" value={selectedConv.lead?.phone || 'Sin número'} />
+                            </div>
+                            <button onClick={() => navigate('/leads', { state: { leadId: selectedConv.lead?.id } })} className="w-full py-3 rounded-xl border-2 border-slate-100 font-black text-[9px] uppercase tracking-widest text-slate-500 hover:border-slate-300 hover:text-slate-900 transition-all">Ver Perfil</button>
+                        </div>
                     </div>
-                    <button onClick={() => navigate('/leads', { state: { leadId: selectedConv.lead?.id } })} className="w-full py-3 rounded-xl border-2 border-slate-100 font-black text-[9px] uppercase tracking-widest text-slate-500 hover:border-slate-300 hover:text-slate-900 transition-all">Ver Perfil</button>
-                </div>
-            </div>
-        )
-    }
+                )
+            }
         </div >
     );
 }
