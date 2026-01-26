@@ -74,15 +74,29 @@ Deno.serve(async (req) => {
         Usa estos datos REALES para calcular la cotización interna, pero NO los escribas en el chat.
         ${pricingContext}
 
-        [INSTRUCCIÓN CRÍTICA DE FORMATO]
-        - SI EL CLIENTE DA DATOS DE VOLUMEN (DTEs):
-          1. Activa INMEDIATAMENTE el QUOTE_TRIGGER.
-          2. Tu respuesta escrita debe ser únicamente un mensaje corto indicando que has generado la propuesta oficial.
-          3. **PROHIBIDO** escribir precios, tablas o desgloses en el mensaje de texto.
-          4. Di algo como: "Entendido. He preparado tu propuesta formal para {volumen} facturas. Puedes ver todos los detalles y precios en el PDF adjunto 👇".
+        [PROTOCOLO DE CAPTURA DE DATOS (PRIORIDAD ALTA)]
+        Tu objetivo PRINCIPAL es calificar al lead recopilando esta información:
+        1. 👤 Nombre completo (si no lo tienes)
+        2. 📱 Teléfono (vital para ventas)
+        3. 📧 Email (para enviar cotización)
+        4. 🏛️ ¿Recibió notificación de Hacienda? (SI/NO - Crítico para urgencia)
+        5. 📄 Volumen de facturas (DTEs) mensuales.
+
+        [TRIGGERS DE ACCIÓN - IMPORTANTE]
+        Si el usuario te da CUALQUIERA de estos datos, DEBES incluirlos al inicio de tu respuesta en formato JSON estricto.
         
-        - Si el cliente pregunta precios explícitamente sin dar volumen: 
-          Pregunta primero el volumen para poder generar el PDF oficial. Evita dar precios sueltos si es posible, dirige todo al PDF.
+        Si detectas datos de contacto o estado de hacienda:
+        LEAD_UPDATE: {"name": "...", "email": "...", "phone": "...", "hacienda_status": "Recibió Notificación/No recibió"}
+        (Envía solo los campos que detectes nuevos o corregidos).
+
+        Si detectas intención de cotizar o volumen de facturas:
+        QUOTE_TRIGGER: {"dte_volume": 100, "plan_id": "BASIC"}
+
+        [INSTRUCCIÓN CRÍTICA DE FORMATO]
+        - Primero pon los TRIGGERS (LEAD_UPDATE o QUOTE_TRIGGER) si aplican.
+        - Luego tu respuesta conversacional amable.
+        - Eres un vendedor experto: si falta un dato, pídelo con naturalidad, no como un robot.
+        - EJEMPLO: "LEAD_UPDATE: {"phone": "8888-8888"}\n\n¡Gracias! He guardado tu número. Cuéntame, ¿cuántas facturas emites al mes?"
         `;
 
         const messages = [
@@ -107,45 +121,83 @@ Deno.serve(async (req) => {
 
         const aiResponse = aiData.choices[0].message.content;
 
-        // 3. Handle QUOTE_TRIGGER and Lead Management
+        // 3. Handle TRIGGERS and Lead Management
         let cleanText = aiResponse;
         let quoteMetadata = {};
 
-        if (aiResponse.includes('QUOTE_TRIGGER:')) {
-            const parts = aiResponse.split('QUOTE_TRIGGER:');
-            cleanText = parts[0].trim();
-            try {
-                const triggerData = JSON.parse(parts[1].trim());
-                quoteMetadata = { quote_trigger: triggerData };
+        // --- HANDLER: LEAD_UPDATE ---
+        if (cleanText.includes('LEAD_UPDATE:')) {
+            const parts = cleanText.split('LEAD_UPDATE:');
+            // Check order to find where the JSON part is. Usually it's expected at start or before text.
+            // We use regex to extract the JSON object safer
+            const match = cleanText.match(/LEAD_UPDATE:\s*({[^}]+})/);
+            if (match) {
+                try {
+                    const leadData = JSON.parse(match[1]);
+                    cleanText = cleanText.replace(match[0], '').trim();
 
-                const { data: convInfo } = await supabase
-                    .from('marketing_conversations')
-                    .select('lead_id')
-                    .eq('id', conversationId)
-                    .single();
+                    const updatePayload: any = {};
+                    if (leadData.name) updatePayload.name = leadData.name;
+                    if (leadData.email) updatePayload.email = leadData.email;
+                    if (leadData.phone) updatePayload.phone = leadData.phone;
+                    if (leadData.hacienda_status) {
+                        updatePayload.next_action_notes = `Estado Hacienda: ${leadData.hacienda_status}`;
+                        if (leadData.hacienda_status.toLowerCase().includes('si') || leadData.hacienda_status.toLowerCase().includes('recibió')) {
+                            updatePayload.priority = 'very_high'; // Urgencia Hacienda
+                        }
+                    }
 
-                if (convInfo?.lead_id) {
-                    await supabase
-                        .from('leads')
-                        .update({
-                            status: 'Lead calificado',
-                            priority: 'high',
-                            value: (triggerData.dte_volume || 0) * 0.05
-                        })
-                        .eq('id', convInfo.lead_id);
-
-                    await supabase.from('cotizaciones').insert({
-                        company_id: companyId,
-                        lead_id: convInfo.lead_id,
-                        nombre_cliente: 'Lead Calificado (AI)',
-                        volumen_dtes: triggerData.dte_volume,
-                        plan_nombre: triggerData.plan_id || 'BASIC',
-                        estado: 'borrador',
-                        metadata: { is_ai_qualified: true }
-                    });
+                    const { data: convInfo } = await supabase.from('marketing_conversations').select('lead_id').eq('id', conversationId).single();
+                    if (convInfo?.lead_id && Object.keys(updatePayload).length > 0) {
+                        await supabase.from('leads').update(updatePayload).eq('id', convInfo.lead_id);
+                    }
+                } catch (e) {
+                    console.error("Error parsing LEAD_UPDATE:", e);
                 }
-            } catch (e) {
-                console.error("Error in lead management:", e);
+            }
+        }
+
+        // --- HANDLER: QUOTE_TRIGGER ---
+        if (cleanText.includes('QUOTE_TRIGGER:')) {
+            const parts = cleanText.split('QUOTE_TRIGGER:');
+            // We assume trigger is separated from text clearly
+            const match = cleanText.match(/QUOTE_TRIGGER:\s*({[^}]+})/);
+            if (match) {
+                cleanText = cleanText.replace(match[0], '').trim();
+                try {
+                    const triggerData = JSON.parse(match[1]);
+                    quoteMetadata = { quote_trigger: triggerData };
+
+                    const { data: convInfo } = await supabase
+                        .from('marketing_conversations')
+                        .select('lead_id')
+                        .eq('id', conversationId)
+                        .single();
+
+                    if (convInfo?.lead_id) {
+                        await supabase
+                            .from('leads')
+                            .update({
+                                status: 'Lead calificado',
+                                priority: 'high',
+                                value: (triggerData.dte_volume || 0) * 0.05
+                            })
+                            .eq('id', convInfo.lead_id);
+
+                        // Upsert quotation draft
+                        await supabase.from('cotizaciones').insert({
+                            company_id: companyId,
+                            lead_id: convInfo.lead_id,
+                            nombre_cliente: leadName || 'Cliente Autogenerado',
+                            volumen_dtes: triggerData.dte_volume,
+                            plan_nombre: triggerData.plan_id || 'BASIC',
+                            estado: 'borrador',
+                            metadata: { is_ai_qualified: true, source: 'ai_agent' }
+                        });
+                    }
+                } catch (e) {
+                    console.error("Error in lead management:", e);
+                }
             }
         }
 

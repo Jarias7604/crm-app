@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Bot, Save, Settings2, Sparkles, ArrowLeft, Send, UserPlus, RefreshCw } from 'lucide-react';
+import { Bot, Save, Settings2, Sparkles, ArrowLeft, Send, UserPlus, RefreshCw, Maximize2, X } from 'lucide-react';
 import { aiAgentService, type AiAgent } from '../../services/marketing/aiAgentService';
 import { useAuth } from '../../auth/AuthProvider';
 import toast from 'react-hot-toast';
@@ -12,6 +12,7 @@ export default function AiAgentsConfig() {
     const [isTesting, setIsTesting] = useState(false);
     const [loading, setLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false);
     const { profile } = useAuth();
     const [testHistory, setTestHistory] = useState<{ role: 'user' | 'bot', content: string }[]>([]);
 
@@ -44,7 +45,7 @@ export default function AiAgentsConfig() {
                     language: 'es',
                     is_active: true,
                     active_channels: ['telegram', 'whatsapp', 'web'],
-                    system_prompt: 'Eres un consultor experto. Tu objetivo es ayudar al cliente a elegir el mejor plan de facturación electrónica.'
+                    system_prompt: 'Eres un consultor experto. Tu objetivo es calificar al lead. DEBES recopilar: 1. Nombre 2. Teléfono 3. Email 4. ¿Recibió notificación de Hacienda? 5. Volumen de facturas. Cuando tengas el volumen, ofrece el plan adecuado.'
                 });
                 setSelectedAgent(newAgent);
             }
@@ -233,16 +234,76 @@ export default function AiAgentsConfig() {
                         </div>
 
                         <div className="space-y-1.5 flex flex-col">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Instrucciones del Sistema</label>
-                            <textarea
-                                className="w-full h-32 p-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500/20 outline-none resize-none text-xs font-medium text-slate-600 focus:bg-white shadow-inner transition-all"
-                                placeholder="Escribe aquí el cerebro de tu bot..."
-                                value={selectedAgent?.system_prompt || ''}
-                                onChange={e => handleInputChange('system_prompt', e.target.value)}
-                            ></textarea>
+                            <div className="flex justify-between items-center pl-1">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Instrucciones del Sistema</label>
+                                <button
+                                    onClick={() => setIsExpanded(true)}
+                                    className="p-1.5 hover:bg-slate-100 text-blue-500 rounded-lg transition-colors flex items-center gap-1.5 group"
+                                    title="Modo pantalla completa"
+                                >
+                                    <span className="text-[9px] font-bold opacity-0 group-hover:opacity-100 transition-opacity">EXPANDIR</span>
+                                    <Maximize2 className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                            <div className="relative group">
+                                <textarea
+                                    className="w-full h-32 p-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-blue-500/20 outline-none resize-none text-xs font-medium text-slate-600 focus:bg-white shadow-inner transition-all"
+                                    placeholder="Escribe aquí el cerebro de tu bot..."
+                                    value={selectedAgent?.system_prompt || ''}
+                                    onChange={e => handleInputChange('system_prompt', e.target.value)}
+                                ></textarea>
+                                <div className="absolute bottom-2 right-2 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 px-2 py-1 rounded text-[9px] font-bold text-slate-400">
+                                    {(selectedAgent?.system_prompt || '').length} caracteres
+                                </div>
+                            </div>
                             <p className="text-[9px] text-slate-400 font-bold text-right pt-1 opacity-70 italic">Instrucciones fundamentales para la IA.</p>
                         </div>
                     </div>
+
+                    {/* Full Screen Editor Modal */}
+                    {isExpanded && (
+                        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+                            <div className="bg-white w-full max-w-4xl h-[85vh] rounded-[2rem] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-white/20">
+                                <div className="flex items-center justify-between p-6 border-b border-slate-100 bg-slate-50/50">
+                                    <div>
+                                        <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                                            <Bot className="w-6 h-6 text-blue-600" />
+                                            Editor de Instrucciones
+                                        </h3>
+                                        <p className="text-xs text-slate-500 font-medium mt-1">Define el comportamiento detallado de tu agente</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setIsExpanded(false)}
+                                        className="p-2 hover:bg-slate-200/50 text-slate-400 hover:text-red-500 rounded-xl transition-all"
+                                    >
+                                        <X className="w-6 h-6" />
+                                    </button>
+                                </div>
+
+                                <div className="flex-1 p-6 bg-slate-50/30">
+                                    <textarea
+                                        className="w-full h-full p-6 bg-white border-none rounded-2xl focus:ring-4 focus:ring-blue-500/10 outline-none resize-none text-sm font-medium text-slate-700 leading-relaxed shadow-sm custom-scrollbar"
+                                        placeholder="Escribe aquí las instrucciones detalladas..."
+                                        value={selectedAgent?.system_prompt || ''}
+                                        onChange={e => handleInputChange('system_prompt', e.target.value)}
+                                        autoFocus
+                                    ></textarea>
+                                </div>
+
+                                <div className="p-4 border-t border-slate-100 bg-white flex justify-between items-center">
+                                    <div className="text-xs font-bold text-slate-400 px-4">
+                                        {(selectedAgent?.system_prompt || '').length} caracteres
+                                    </div>
+                                    <button
+                                        onClick={() => setIsExpanded(false)}
+                                        className="px-8 py-3 bg-slate-900 hover:bg-slate-800 text-white font-black uppercase text-[10px] tracking-widest rounded-xl shadow-lg shadow-slate-900/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                    >
+                                        Listo, volver
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Fixed Save Button Section */}
                     <div className="pt-4 mt-auto border-t border-slate-50 shrink-0">
