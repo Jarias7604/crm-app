@@ -421,7 +421,8 @@ export default function CotizadorPro() {
                     navigate('/marketing/chat', {
                         state: {
                             newQuote: { ...result, pdfUrl },
-                            conversation_id: location.state.conversation_id
+                            conversation_id: location.state.conversation_id,
+                            lead: location.state.lead
                         },
                         replace: true
                     });
@@ -431,7 +432,8 @@ export default function CotizadorPro() {
                     navigate('/marketing/chat', {
                         state: {
                             newQuote: result,
-                            conversation_id: location.state.conversation_id
+                            conversation_id: location.state.conversation_id,
+                            lead: location.state.lead
                         },
                         replace: true
                     });

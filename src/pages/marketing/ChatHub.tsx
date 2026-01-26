@@ -66,32 +66,56 @@ export default function ChatHub() {
 
             setConversations(conversationsData);
             setLoading(false);
-
-            if (location.state?.lead && !selectedConv) {
-                const leadId = location.state.lead.id;
-                const existing = conversationsData.find(c => c.lead?.id === leadId);
-                if (existing) {
-                    setSelectedConv(existing);
-                } else {
-                    const placeholder: ChatConversation = {
-                        id: 'new',
-                        channel: location.state.channel || 'telegram',
-                        status: 'open',
-                        last_message: 'Iniciando conversación...',
-                        last_message_at: new Date().toISOString(),
-                        unread_count: 0,
-                        lead: location.state.lead
-                    };
-                    setSelectedConv(placeholder);
-                }
-            }
         } catch (error) {
             console.error('Error loading hub data:', error);
             setLoading(false);
         }
     };
 
-    // 3. Auto-load leads when modal opens
+    // 2. Auto-select logic when state or conversations change
+    useEffect(() => {
+        if (loading || conversations.length === 0) return;
+
+        // Case 1: Specific conversation ID provided
+        if (location.state?.conversation_id && location.state.conversation_id !== 'new') {
+            const existing = conversations.find(c => c.id === location.state.conversation_id);
+            if (existing && selectedConv?.id !== existing.id) {
+                setSelectedConv(existing);
+                return;
+            }
+        }
+
+        // Case 2: Lead provided (can be from Leads page or return from new chat quote)
+        if (location.state?.lead && (!selectedConv || selectedConv.lead?.id !== location.state.lead.id)) {
+            const leadId = location.state.lead.id;
+            const existing = conversations.find(c => c.lead?.id === leadId);
+
+            if (existing) {
+                setSelectedConv(existing);
+            } else {
+                // If no real conversation exists yet, create placeholder
+                const placeholder: ChatConversation = {
+                    id: 'new',
+                    channel: location.state.channel || 'telegram',
+                    status: 'open',
+                    last_message: 'Iniciando conversación...',
+                    last_message_at: new Date().toISOString(),
+                    unread_count: 0,
+                    lead: location.state.lead
+                };
+                setSelectedConv(placeholder);
+            }
+        }
+    }, [location.state, conversations, loading]);
+
+    // 3. Handle incoming quote for review from location state
+    useEffect(() => {
+        if (location.state?.newQuote) {
+            setPendingQuote(location.state.newQuote);
+        }
+    }, [location.state]);
+
+    // 4. Auto-load leads when modal opens
     useEffect(() => {
         if (showNewChatModal) {
             loadInitialLeads();
