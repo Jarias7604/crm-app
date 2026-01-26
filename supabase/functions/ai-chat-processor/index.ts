@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
         // --- NEW: Fetch Pricing for Context ---
         const { data: pricingItems } = await supabase
             .from('pricing_items')
-            .select('nombre, tipo, precio_anual, min_dtes, max_dtes, descripcion')
+            .select('id, nombre, tipo, precio_anual, min_dtes, max_dtes, descripcion')
             .eq('activo', true);
 
         const pricingContext = JSON.stringify(pricingItems || []);
@@ -92,30 +92,32 @@ Deno.serve(async (req) => {
         const enhancedSystemPrompt = `${systemPrompt}
         
         [CONTEXTO DEL CLIENTE]
-        Estás hablando con: ${leadName}. Dirígete a él por su nombre cuando sea natural.
+        Estás hablando con: ${leadName}.
         ${phoneConflict}
 
-        [INFORMACIÓN DE PRECIOS ACTUALIZADA]
-        Usa estos datos REALES para calcular la cotización interna, pero NO los escribas en el chat.
+        [INFORMACIÓN DE PRECIOS - CRÍTICO]
+        Nuestros planes se basan en volumen ANUAL de facturas (DTEs):
         ${pricingContext}
 
-        [PROTOCOLO DE CAPTURA DE DATOS (PRIORIDAD ALTA)]
-        Tu objetivo PRINCIPAL es calificar al lead recopilando esta información:
-        1. 👤 Nombre completo (si no lo tienes)
-        2. 📱 Teléfono (vital para ventas)
-        3. 📧 Email (para enviar cotización)
-        4. 🏛️ ¿Recibió notificación de Hacienda? (SI/NO - Crítico para urgencia)
-        5. 📄 Volumen de facturas (DTEs) mensuales.
+        [REGLA DE CONVERSIÓN]
+        - Si el cliente dice "800 mensual", tú calculas 800 * 12 = 9,600 anual.
+        - Usa SIEMPRE el volumen ANUAL para encontrar el Plan correcto en la lista de arriba.
+        - Por ejemplo: 9,600 anual NO cabe en "Starter" (max 3000), debería ser un plan mayor.
 
-        [TRIGGERS DE ACCIÓN - IMPORTANTE]
-        Si el usuario te da CUALQUIERA de estos datos, DEBES incluirlos al inicio de tu respuesta en formato JSON estricto.
-        
+        [PROTOCOLO DE CAPTURA DE DATOS (PRIORIDAD ALTA)]
+        Tu objetivo es calificar al lead recopilando:
+        1. 👤 Nombre 2. 📱 Teléfono 3. 📧 Email
+        4. 🏛️ Hacienda (SI/NO)
+        5. 📄 Volumen de facturas (DI SI ES MENSUAL O ANUAL).
+
+        [TRIGGERS DE ACCIÓN]
         Si detectas datos de contacto o estado de hacienda (Y NO HAY CONFLICTO DE IDENTIDAD):
         LEAD_UPDATE: {"name": "...", "email": "...", "phone": "...", "hacienda_status": "Recibió Notificación/No recibió"}
         (Envía solo los campos que detectes nuevos o corregidos).
 
-        Si detectas intención de cotizar o volumen de facturas:
-        QUOTE_TRIGGER: {"dte_volume": 100, "plan_id": "BASIC"}
+        Si detectas intención de cotizar o volumen, usa esto AL INICIO:
+        QUOTE_TRIGGER: {"dte_volume": 9600, "plan_id": "ID_DEL_PLAN_CORRECTO"}
+        (El dte_volume DEBE ser el equivalente ANUAL).
 
         [INSTRUCCIÓN CRÍTICA DE FORMATO]
         - Si hay un [CONFLICTO DE IDENTIDAD], PRIORIZA resolver la duda antes de lanzar un LEAD_UPDATE.
@@ -123,6 +125,8 @@ Deno.serve(async (req) => {
         - Luego tu respuesta conversacional amable.
         - Eres un vendedor experto: si falta un dato, pídelo con naturalidad, no como un robot.
         - EJEMPLO: "LEAD_UPDATE: {"phone": "8888-8888"}\n\n¡Gracias! He guardado tu número. Cuéntame, ¿cuántas facturas emites al mes?"
+        - Eres un vendedor senior. No seas robótico.
+        - Si el usuario te da un volumen, confirma: "Entendido, para esas {X} facturas al mes ({Total} al año), el plan ideal es..."
         `;
 
         const messages = [
@@ -152,79 +156,73 @@ Deno.serve(async (req) => {
         let quoteMetadata = {};
 
         // --- HANDLER: LEAD_UPDATE ---
-        if (cleanText.includes('LEAD_UPDATE:')) {
-            const parts = cleanText.split('LEAD_UPDATE:');
-            // Check order to find where the JSON part is. Usually it's expected at start or before text.
-            // We use regex to extract the JSON object safer
-            const match = cleanText.match(/LEAD_UPDATE:\s*({[^}]+})/);
-            if (match) {
-                try {
-                    const leadData = JSON.parse(match[1]);
-                    cleanText = cleanText.replace(match[0], '').trim();
+        const leadMatch = cleanText.match(/LEAD_UPDATE:\s*({[^}]+})/);
+        if (leadMatch) {
+            try {
+                const leadData = JSON.parse(leadMatch[1]);
+                cleanText = cleanText.replace(leadMatch[0], '').trim();
 
-                    const updatePayload: any = {};
-                    if (leadData.name) updatePayload.name = leadData.name;
-                    if (leadData.email) updatePayload.email = leadData.email;
-                    if (leadData.phone) updatePayload.phone = leadData.phone;
-                    if (leadData.hacienda_status) {
-                        updatePayload.next_action_notes = `Estado Hacienda: ${leadData.hacienda_status}`;
-                        if (leadData.hacienda_status.toLowerCase().includes('si') || leadData.hacienda_status.toLowerCase().includes('recibió')) {
-                            updatePayload.priority = 'very_high'; // Urgencia Hacienda
-                        }
+                const updatePayload: any = {};
+                if (leadData.name) updatePayload.name = leadData.name;
+                if (leadData.email) updatePayload.email = leadData.email;
+                if (leadData.phone) updatePayload.phone = leadData.phone;
+                if (leadData.hacienda_status) {
+                    updatePayload.next_action_notes = `Estado Hacienda: ${leadData.hacienda_status}`;
+                    if (leadData.hacienda_status.toLowerCase().includes('si') || leadData.hacienda_status.toLowerCase().includes('recibió')) {
+                        updatePayload.priority = 'very_high'; // Urgencia Hacienda
                     }
-
-                    const { data: convInfo } = await supabase.from('marketing_conversations').select('lead_id').eq('id', conversationId).single();
-                    if (convInfo?.lead_id && Object.keys(updatePayload).length > 0) {
-                        await supabase.from('leads').update(updatePayload).eq('id', convInfo.lead_id);
-                    }
-                } catch (e) {
-                    console.error("Error parsing LEAD_UPDATE:", e);
                 }
+
+                const { data: convInfo } = await supabase.from('marketing_conversations').select('lead_id').eq('id', conversationId).single();
+                if (convInfo?.lead_id && Object.keys(updatePayload).length > 0) {
+                    await supabase.from('leads').update(updatePayload).eq('id', convInfo.lead_id);
+                }
+            } catch (e) {
+                console.error("Error parsing LEAD_UPDATE:", e);
             }
         }
 
-        // --- HANDLER: QUOTE_TRIGGER ---
-        if (cleanText.includes('QUOTE_TRIGGER:')) {
-            const parts = cleanText.split('QUOTE_TRIGGER:');
-            // We assume trigger is separated from text clearly
-            const match = cleanText.match(/QUOTE_TRIGGER:\s*({[^}]+})/);
-            if (match) {
-                cleanText = cleanText.replace(match[0], '').trim();
-                try {
-                    const triggerData = JSON.parse(match[1]);
-                    quoteMetadata = { quote_trigger: triggerData };
+        // --- HANDLER: QUOTE_TRIGGER (Senior Implementation) ---
+        const quoteMatch = cleanText.match(/QUOTE_TRIGGER:\s*({[^}]+})/);
+        if (quoteMatch) {
+            cleanText = cleanText.replace(quoteMatch[0], '').trim();
+            try {
+                const triggerData = JSON.parse(quoteMatch[1]);
 
-                    const { data: convInfo } = await supabase
-                        .from('marketing_conversations')
-                        .select('lead_id')
-                        .eq('id', conversationId)
-                        .single();
+                // 1. Calculate REAL Value from pricingItems
+                const dteAnnual = triggerData.dte_volume;
+                const matchedPlan = pricingItems
+                    ?.filter(i => i.tipo === 'plan')
+                    .find(p => dteAnnual >= (p.min_dtes || 0) && dteAnnual <= (p.max_dtes || 99999999));
 
-                    if (convInfo?.lead_id) {
-                        await supabase
-                            .from('leads')
-                            .update({
-                                status: 'Lead calificado',
-                                priority: 'high',
-                                value: (triggerData.dte_volume || 0) * 0.05
-                            })
-                            .eq('id', convInfo.lead_id);
+                const leadValue = matchedPlan?.precio_anual || (dteAnnual * 0.05); // Fallback to 0.05 if no plan matched
 
-                        // Upsert quotation draft
-                        await supabase.from('cotizaciones').insert({
-                            company_id: companyId,
-                            lead_id: convInfo.lead_id,
-                            nombre_cliente: leadName || 'Cliente Autogenerado',
-                            volumen_dtes: triggerData.dte_volume,
-                            plan_nombre: triggerData.plan_id || 'BASIC',
-                            estado: 'borrador',
-                            metadata: { is_ai_qualified: true, source: 'ai_agent' }
-                        });
-                    }
-                } catch (e) {
-                    console.error("Error in lead management:", e);
+                const { data: convInfo } = await supabase.from('marketing_conversations').select('lead_id, company_id').eq('id', conversationId).single();
+
+                if (convInfo?.lead_id) {
+                    // Update Lead with REAL potential value
+                    await supabase.from('leads').update({
+                        status: 'Lead calificado',
+                        priority: leadValue > 1000 ? 'very_high' : 'high',
+                        value: leadValue
+                    }).eq('id', convInfo.lead_id);
+
+                    // Insert Draft Quotation
+                    await supabase.from('cotizaciones').insert({
+                        company_id: companyId,
+                        lead_id: convInfo.lead_id,
+                        nombre_cliente: leadName,
+                        volumen_dtes: dteAnnual,
+                        plan_nombre: matchedPlan?.nombre || 'PLAN PERSONALIZADO',
+                        costo_plan_anual: matchedPlan?.precio_anual || 0,
+                        total_anual: leadValue,
+                        estado: 'borrador',
+                        metadata: { is_ai_qualified: true, source: 'ai_agent_v10' }
+                    });
+
+                    quoteMetadata = { quote_trigger: { ...triggerData, real_value: leadValue, plan_name: matchedPlan?.nombre } };
                 }
-            }
+            } catch (e) { console.error("Error QUOTE_TRIGGER:", e); }
         }
 
         // 4. Insert response
