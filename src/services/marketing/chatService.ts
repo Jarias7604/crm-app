@@ -28,6 +28,17 @@ export interface ChatMessage {
 }
 
 export const chatService = {
+    async deleteConversation(conversationId: string) {
+        // Cascade delete should handle messages if configured, or we delete messages first
+        // Assuming cascade or simple delete for now. Code handled in DB or simply row deletion.
+        const { error } = await supabase
+            .from('marketing_conversations')
+            .delete()
+            .eq('id', conversationId);
+
+        if (error) throw error;
+    },
+
     async createConversation(leadId: string, channel: string, externalId: string = 'internal') {
         const { data: profile } = await supabase.from('profiles').select('company_id').single();
         if (!profile?.company_id) throw new Error('No company found');
