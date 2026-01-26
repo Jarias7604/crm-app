@@ -111,14 +111,8 @@ export const chatService = {
             })
             .eq('id', conversationId);
 
-        // 3. TRIGGER SENDING (Only for Outbound)
-        if (direction === 'outbound') {
-            supabase.functions.invoke('send-telegram-message', {
-                body: { record: msg }
-            }).then(({ data, error }) => {
-                if (error) console.error('Edge Function Error:', error);
-            });
-        }
+        // 3. TRIGGER SENDING (Handled by DB Trigger tr_on_outbound_message_delivery)
+        // No manual invoke here to avoid duplicates.
 
         return msg as ChatMessage;
     },
