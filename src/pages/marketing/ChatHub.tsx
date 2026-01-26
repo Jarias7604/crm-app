@@ -385,11 +385,24 @@ export default function ChatHub() {
                 toast.loading('Enviando propuesta PDF...', { id: 'send-pdf' });
             }
 
+            // --- FIX: Handle 'new' conversation placeholder ---
+            let convId = selectedConv.id;
+            if (convId === 'new') {
+                if (!selectedConv.lead?.id) throw new Error("Lead ID missing");
+                const newConv = await chatService.createConversation(
+                    selectedConv.lead.id,
+                    selectedConv.channel
+                );
+                convId = newConv.id;
+                setSelectedConv(newConv);
+                setConversations(prev => [newConv, ...prev]);
+            }
+
             const leadName = selectedConv.lead?.name || pendingQuote.nombre_cliente || 'Cliente';
             const professionalMessage = `Hola ${leadName}, es un gusto saludarte. Adjunto te envío la propuesta comercial profesional que preparamos para ti. Quedo atento a cualquier duda o comentario.`;
 
             await chatService.sendMessage(
-                selectedConv.id,
+                convId,
                 professionalMessage,
                 'file',
                 'outbound',
@@ -402,9 +415,9 @@ export default function ChatHub() {
             toast.success('¡Propuesta enviada exitosamente!', { id: 'send-pdf' });
 
             setPendingQuote(null);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error sending quote:', error);
-            toast.error('Error al enviar el archivo PDF', { id: 'send-pdf' });
+            toast.error(`Error al enviar el archivo PDF: ${error.message || 'Error desconocido'}`, { id: 'send-pdf' });
         }
     };
 

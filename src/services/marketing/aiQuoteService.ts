@@ -71,7 +71,7 @@ export const aiQuoteService = {
             });
 
             // 5. Create the Quote in DB with real lead name
-            const { data: leadData } = await supabase.from('marketing_leads').select('name').eq('id', trigger.lead_id).single();
+            const { data: leadData } = await supabase.from('leads').select('name').eq('id', trigger.lead_id).single();
 
             const newQuote = await cotizacionesService.createCotizacion({
                 company_id: trigger.company_id,

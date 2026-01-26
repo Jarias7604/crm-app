@@ -143,7 +143,7 @@ export const aiAgentService = {
                 .select(`
                     id, 
                     channel, 
-                    lead:marketing_leads(name, company_name, email, phone)
+                    lead:leads(name, company_name, email, phone)
                 `)
                 .eq('id', conversationId)
                 .single();
