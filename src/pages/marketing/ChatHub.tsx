@@ -4,10 +4,11 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
     MoreVertical, Send, FileText, Smartphone, Layers,
     Paperclip, TrendingUp, Eye, Zap, Smile, Mail, Phone as PhoneIcon,
-    Send as TelegramIcon, MessageSquare, Trash2, Settings
+    Send as TelegramIcon, MessageSquare, Trash2, UserPlus, Search, X as CloseIcon, ChevronRight
 } from 'lucide-react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { chatService, type ChatConversation, type ChatMessage } from '../../services/marketing/chatService';
+import { leadsService } from '../../services/leads';
 import { aiAgentService } from '../../services/marketing/aiAgentService';
 import { storageService } from '../../services/storage';
 import { useAuth } from '../../auth/AuthProvider';
@@ -23,6 +24,9 @@ export default function ChatHub() {
     const [loading, setLoading] = useState(true);
     const [pendingQuote, setPendingQuote] = useState<any>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [showNewChatModal, setShowNewChatModal] = useState(false);
+    const [leadSearch, setLeadSearch] = useState('');
+    const [availableLeads, setAvailableLeads] = useState<any[]>([]);
     const [isAiProcessing, setIsAiProcessing] = useState(false);
     const [agentStatus, setAgentStatus] = useState<boolean>(false);
     const lastProcessedMsgId = useRef<string | null>(null);
@@ -227,6 +231,52 @@ export default function ChatHub() {
         }
     };
 
+    const searchLeads = async (query: string) => {
+        setLeadSearch(query);
+        if (query.trim().length < 2) {
+            setAvailableLeads([]);
+            return;
+        }
+
+        try {
+            const { data } = await leadsService.getLeads(1, 10);
+            // Search client side for now
+            const filtered = data?.filter((l: any) =>
+                l.name?.toLowerCase().includes(query.toLowerCase()) ||
+                l.phone?.includes(query)
+            ) || [];
+            setAvailableLeads(filtered);
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const startChatWithLead = (lead: any) => {
+        if (!lead.phone) {
+            toast.error('Este prospecto no tiene número de teléfono configurado para recibir mensajes.');
+            return;
+        }
+
+        const existing = conversations.find(c => c.lead?.id === lead.id);
+        if (existing) {
+            setSelectedConv(existing);
+        } else {
+            const placeholder: ChatConversation = {
+                id: 'new',
+                channel: 'telegram',
+                status: 'open',
+                last_message: 'Iniciando conversación...',
+                last_message_at: new Date().toISOString(),
+                unread_count: 0,
+                lead: lead
+            };
+            setSelectedConv(placeholder);
+        }
+        setShowNewChatModal(false);
+        setLeadSearch('');
+        setAvailableLeads([]);
+    };
+
     const handleSendPendingQuote = async () => {
         if (!pendingQuote || !selectedConv) return;
         try {
@@ -338,11 +388,11 @@ export default function ChatHub() {
                         <div className="flex items-center gap-3">
                             <h2 className="text-2xl font-black text-slate-900 tracking-tighter">Inbox</h2>
                             <button
-                                onClick={() => navigate('/marketing/agents')}
-                                className={`p-2 rounded-full border transition-all ${agentStatus ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-700'}`}
-                                title="Configuración de Agentes y Canales"
+                                onClick={() => setShowNewChatModal(true)}
+                                className="p-2.5 rounded-full bg-blue-50 border border-blue-100 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                                title="Nueva conversación con Lead"
                             >
-                                <Settings className="w-4 h-4" />
+                                <UserPlus className="w-5 h-5" />
                             </button>
                         </div>
                         <div className="flex gap-1.5 bg-slate-100 p-1.5 rounded-xl w-[180px]">
@@ -636,6 +686,59 @@ export default function ChatHub() {
                     </div>
                 )
             }
+            {showNewChatModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="w-full max-w-lg bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+                        <div className="p-8 border-b border-slate-50 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-2xl font-black text-slate-900 tracking-tighter">Nueva Conversación</h3>
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Busca un lead para chatear</p>
+                            </div>
+                            <button onClick={() => setShowNewChatModal(false)} className="p-2 rounded-full hover:bg-slate-100 transition-colors text-slate-400"><CloseIcon className="w-6 h-6" /></button>
+                        </div>
+                        <div className="p-8 space-y-6">
+                            <div className="relative group">
+                                <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                                <input
+                                    autoFocus
+                                    type="text"
+                                    placeholder="Nombre del cliente o teléfono..."
+                                    value={leadSearch}
+                                    onChange={(e) => searchLeads(e.target.value)}
+                                    className="w-full pl-14 pr-6 py-4.5 bg-slate-50 border-2 border-transparent rounded-[20px] text-sm font-bold text-slate-700 placeholder:text-slate-400 focus:bg-white focus:border-blue-500/20 focus:ring-4 focus:ring-blue-500/5 transition-all"
+                                />
+                            </div>
+
+                            <div className="max-h-[300px] overflow-y-auto custom-scrollbar space-y-2">
+                                {availableLeads.length > 0 ? (
+                                    availableLeads.map(lead => (
+                                        <button
+                                            key={lead.id}
+                                            onClick={() => startChatWithLead(lead)}
+                                            className="w-full p-4 flex items-center justify-between rounded-2xl hover:bg-blue-50/50 border border-transparent hover:border-blue-100 transition-all group"
+                                        >
+                                            <div className="flex items-center gap-4 text-left">
+                                                <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-lg font-black text-slate-400 group-hover:bg-blue-500 group-hover:text-white transition-all">
+                                                    {lead.name?.[0]}
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-black text-slate-900">{lead.name}</p>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{lead.phone || 'Sin teléfono'}</p>
+                                                </div>
+                                            </div>
+                                            <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500 translate-x-0 group-hover:translate-x-1 transition-all" />
+                                        </button>
+                                    ))
+                                ) : leadSearch.trim().length >= 2 ? (
+                                    <p className="text-center py-10 text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">No se encontraron leads</p>
+                                ) : (
+                                    <p className="text-center py-10 text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">Escribe 2 letras para buscar</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div >
     );
 }
