@@ -149,7 +149,7 @@ export default function AiAgentsConfig() {
     );
 
     return (
-        <div className="flex h-[calc(100vh-128px)] flex-col bg-white rounded-[3.5rem] shadow-[0_48px_96px_-24px_rgba(0,0,0,0.15)] border border-white/60 overflow-hidden font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900 relative p-6 md:p-8 space-y-6 animate-in fade-in duration-700">
+        <div className="flex h-[calc(100vh-64px)] flex-col bg-white rounded-[3.5rem] shadow-[0_48px_96px_-24px_rgba(0,0,0,0.15)] border border-white/60 overflow-hidden font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900 relative p-6 md:p-8 space-y-6 animate-in fade-in duration-500">
             {/* Capa decorativa premium */}
             <div className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#4449AA 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
 
