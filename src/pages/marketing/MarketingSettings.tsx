@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Mail, ArrowLeft, CheckCircle, Server, Shield, Cloud, MessageSquare, Bot, Globe, Smartphone, Send } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { integrationService, type MarketingIntegration } from '../../services/marketing/integrationService';
@@ -9,11 +9,18 @@ type TabType = 'email' | 'whatsapp' | 'chat' | 'telegram';
 
 export default function MarketingSettings() {
     const { profile } = useAuth();
+    const location = useLocation();
     const [integrations, setIntegrations] = useState<MarketingIntegration[]>([]);
     const [activeTab, setActiveTab] = useState<TabType>('email');
     const [selectedProvider, setSelectedProvider] = useState<string | null>(null);
     const [formData, setFormData] = useState<any>({});
     const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        if (location.state?.tab) {
+            setActiveTab(location.state.tab);
+        }
+    }, [location.state]);
 
     useEffect(() => {
         if (profile?.company_id) {

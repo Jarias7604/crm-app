@@ -46,7 +46,7 @@ export default function MarketingDashboard() {
                         desc="Newsletters y secuencias"
                     />
                 </Link>
-                <Link to="/marketing/agents">
+                <Link to="/marketing/settings" state={{ tab: 'whatsapp' }}>
                     <ActionCard
                         icon={MessageSquare}
                         color="bg-green-100 text-green-600"
