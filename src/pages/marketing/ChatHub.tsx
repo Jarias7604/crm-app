@@ -76,24 +76,32 @@ export default function ChatHub() {
     useEffect(() => {
         if (loading || conversations.length === 0) return;
 
+        const stateConvId = location.state?.conversation_id;
+        const stateLead = location.state?.lead;
+
         // Case 1: Specific conversation ID provided
-        if (location.state?.conversation_id && location.state.conversation_id !== 'new') {
-            const existing = conversations.find(c => c.id === location.state.conversation_id);
+        if (stateConvId && stateConvId !== 'new') {
+            const existing = conversations.find(c => c.id === stateConvId);
             if (existing && selectedConv?.id !== existing.id) {
+                console.log('Hub: Auto-selecting by conversation ID:', stateConvId);
                 setSelectedConv(existing);
                 return;
             }
         }
 
         // Case 2: Lead provided (can be from Leads page or return from new chat quote)
-        if (location.state?.lead && (!selectedConv || selectedConv.lead?.id !== location.state.lead.id)) {
-            const leadId = location.state.lead.id;
+        if (stateLead) {
+            const leadId = stateLead.id;
             const existing = conversations.find(c => c.lead?.id === leadId);
 
             if (existing) {
-                setSelectedConv(existing);
-            } else {
-                // If no real conversation exists yet, create placeholder
+                if (selectedConv?.id !== existing.id) {
+                    console.log('Hub: Auto-selecting existing conversation for lead:', leadId);
+                    setSelectedConv(existing);
+                }
+            } else if (!selectedConv || (selectedConv.id === 'new' && selectedConv.lead?.id !== leadId) || (selectedConv.id !== 'new' && selectedConv.lead?.id !== leadId)) {
+                // If no real conversation exists yet or it's the wrong one, create placeholder
+                console.log('Hub: Creating/Updating placeholder for lead:', leadId);
                 const placeholder: ChatConversation = {
                     id: 'new',
                     channel: location.state.channel || 'telegram',
@@ -101,12 +109,12 @@ export default function ChatHub() {
                     last_message: 'Iniciando conversación...',
                     last_message_at: new Date().toISOString(),
                     unread_count: 0,
-                    lead: location.state.lead
+                    lead: stateLead
                 };
                 setSelectedConv(placeholder);
             }
         }
-    }, [location.state, conversations, loading]);
+    }, [location.state, conversations, loading, selectedConv?.id]);
 
     // 3. Handle incoming quote for review from location state
     useEffect(() => {
