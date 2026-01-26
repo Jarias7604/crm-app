@@ -31,13 +31,16 @@ Deno.serve(async (req) => {
         const apiKey = integration?.settings?.apiKey;
         if (!apiKey) throw new Error(`OpenAI API Key not found for company ${companyId}`);
 
-        // --- NEW: Fetch Pricing for Context ---
+        // --- NEW: Fetch FULL Pricing for Context ---
         const { data: pricingItems } = await supabase
             .from('pricing_items')
-            .select('id, nombre, tipo, precio_anual, min_dtes, max_dtes, descripcion')
-            .eq('activo', true);
+            .select('id, nombre, tipo, precio_anual, precio_mensual, costo_unico, min_dtes, max_dtes, descripcion')
+            .eq('activo', true)
+            .order('tipo', { ascending: true });
 
-        const pricingContext = JSON.stringify(pricingItems || []);
+        const pricingContext = (pricingItems || []).map(item => {
+            return `- [${item.tipo.toUpperCase()}] ${item.nombre}: $${item.precio_anual}/año ($${item.precio_mensual}/mes). Pago Único Setup: $${item.costo_unico || 0}. Rango DTEs: ${item.min_dtes}-${item.max_dtes}.`;
+        }).join('\n');
 
         // --- NEW: Fetch Conversation & Lead Context ---
         const { data: conversationData } = await supabase
@@ -91,18 +94,18 @@ Deno.serve(async (req) => {
 
         const enhancedSystemPrompt = `${systemPrompt}
         
-        [CONTEXTO DEL CLIENTE]
-        Estás hablando con: ${leadName}.
-        ${phoneConflict}
+        REGLA DE ORO DEL SISTEMA:
+        - NO inventes planes, precios, ni servicios que no estén en la lista de abajo.
+        - Usa EXCLUSIVAMENTE los datos del sistema proporcionados.
+        - Si el usuario te pregunta por algo que no está listado, dile amablemente que no posees esa información oficial pero un humano lo revisará.
 
-        [INFORMACIÓN DE PRECIOS - CRÍTICO]
-        Nuestros planes se basan en volumen ANUAL de facturas (DTEs):
+        [CATÁLOGO DEL SISTEMA (ÚNICA VERDAD)]
         ${pricingContext}
 
-        [REGLA DE CONVERSIÓN]
-        - Si el cliente dice "800 mensual", tú calculas 800 * 12 = 9,600 anual.
-        - Usa SIEMPRE el volumen ANUAL para encontrar el Plan correcto en la lista de arriba.
-        - Por ejemplo: 9,600 anual NO cabe en "Starter" (max 3000), debería ser un plan mayor.
+        [INSTRUCCIONES DE RECOMENDACIÓN]
+        1. CONVERSIÓN: Si el cliente da volumen mensual, multiplícalo por 12 para obtener el total ANUAL.
+        2. ASIGNACIÓN: Busca el Plan cuyo rango [min_dtes - max_dtes] coincida con el total ANUAL. 
+        3. TRANSPARENCIA: Menciona siempre que hay un costo de implementación (Setup) de pago único (costo_unico).
 
         [PROTOCOLO DE CAPTURA DE DATOS (PRIORIDAD ALTA)]
         Tu objetivo es calificar al lead recopilando:
@@ -111,22 +114,13 @@ Deno.serve(async (req) => {
         5. 📄 Volumen de facturas (DI SI ES MENSUAL O ANUAL).
 
         [TRIGGERS DE ACCIÓN]
-        Si detectas datos de contacto o estado de hacienda (Y NO HAY CONFLICTO DE IDENTIDAD):
-        LEAD_UPDATE: {"name": "...", "email": "...", "phone": "...", "hacienda_status": "Recibió Notificación/No recibió"}
-        (Envía solo los campos que detectes nuevos o corregidos).
+        Si detectas volumen o intención, incluye esto AL INICIO:
+        QUOTE_TRIGGER: {"dte_volume": TOTAL_ANUAL, "plan_id": "ID_DEL_PLAN_CORRECTO"}
 
-        Si detectas intención de cotizar o volumen, usa esto AL INICIO:
-        QUOTE_TRIGGER: {"dte_volume": 9600, "plan_id": "ID_DEL_PLAN_CORRECTO"}
-        (El dte_volume DEBE ser el equivalente ANUAL).
-
-        [INSTRUCCIÓN CRÍTICA DE FORMATO]
-        - Si hay un [CONFLICTO DE IDENTIDAD], PRIORIZA resolver la duda antes de lanzar un LEAD_UPDATE.
-        - Primero pon los TRIGGERS (LEAD_UPDATE o QUOTE_TRIGGER) si aplican.
-        - Luego tu respuesta conversacional amable.
-        - Eres un vendedor experto: si falta un dato, pídelo con naturalidad, no como un robot.
-        - EJEMPLO: "LEAD_UPDATE: {"phone": "8888-8888"}\n\n¡Gracias! He guardado tu número. Cuéntame, ¿cuántas facturas emites al mes?"
+        [CONSIDERACIONES DE AGENTE]
         - Eres un vendedor senior. No seas robótico.
         - Si el usuario te da un volumen, confirma: "Entendido, para esas {X} facturas al mes ({Total} al año), el plan ideal es..."
+        - Eres veraz: si no está en el sistema, no existe para ti.
         `;
 
         const messages = [
