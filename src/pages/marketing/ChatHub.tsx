@@ -26,6 +26,7 @@ export default function ChatHub() {
     const [searchQuery, setSearchQuery] = useState('');
     const [showNewChatModal, setShowNewChatModal] = useState(false);
     const [leadSearch, setLeadSearch] = useState('');
+    const [leadStatusFilter, setLeadStatusFilter] = useState('all');
     const [availableLeads, setAvailableLeads] = useState<any[]>([]);
     const [isAiProcessing, setIsAiProcessing] = useState(false);
     const [agentStatus, setAgentStatus] = useState<boolean>(false);
@@ -90,7 +91,23 @@ export default function ChatHub() {
         }
     };
 
-    // 3. Load Messages & Realtime Subscription
+    // 3. Auto-load leads when modal opens
+    useEffect(() => {
+        if (showNewChatModal) {
+            loadInitialLeads();
+        }
+    }, [showNewChatModal]);
+
+    const loadInitialLeads = async () => {
+        try {
+            const { data } = await leadsService.getLeads(1, 40);
+            setAvailableLeads(data || []);
+        } catch (e) {
+            console.error('Error loading initial leads:', e);
+        }
+    };
+
+    // 4. Load Messages & Realtime Subscription
     useEffect(() => {
         if (selectedConv && selectedConv.id !== 'new') {
             loadMessages(selectedConv.id);
@@ -231,25 +248,21 @@ export default function ChatHub() {
         }
     };
 
-    const searchLeads = async (query: string) => {
+    const searchLeads = (query: string) => {
         setLeadSearch(query);
-        if (query.trim().length < 2) {
-            setAvailableLeads([]);
-            return;
-        }
-
-        try {
-            const { data } = await leadsService.getLeads(1, 10);
-            // Search client side for now
-            const filtered = data?.filter((l: any) =>
-                l.name?.toLowerCase().includes(query.toLowerCase()) ||
-                l.phone?.includes(query)
-            ) || [];
-            setAvailableLeads(filtered);
-        } catch (e) {
-            console.error(e);
-        }
     };
+
+    const modalFilteredLeads = availableLeads.filter(l => {
+        const matchesSearch = !leadSearch.trim() ||
+            (l.name?.toLowerCase().includes(leadSearch.toLowerCase()) ||
+                l.phone?.includes(leadSearch));
+
+        const matchesStatus = leadStatusFilter === 'all' ||
+            (leadStatusFilter === 'prospect' && (l.status === 'Prospecto' || l.status === 'Nuevo')) ||
+            (leadStatusFilter === 'client' && (l.status === 'Cliente' || l.status === 'Cerrado'));
+
+        return matchesSearch && matchesStatus;
+    });
 
     const startChatWithLead = (lead: any) => {
         if (!lead.phone) {
@@ -697,6 +710,27 @@ export default function ChatHub() {
                             <button onClick={() => setShowNewChatModal(false)} className="p-2 rounded-full hover:bg-slate-100 transition-colors text-slate-400"><CloseIcon className="w-6 h-6" /></button>
                         </div>
                         <div className="p-8 space-y-6">
+                            <div className="flex gap-2 p-1 bg-slate-100 rounded-2xl">
+                                <button
+                                    onClick={() => setLeadStatusFilter('all')}
+                                    className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${leadStatusFilter === 'all' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    Todos
+                                </button>
+                                <button
+                                    onClick={() => setLeadStatusFilter('prospect')}
+                                    className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${leadStatusFilter === 'prospect' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    Prospectos
+                                </button>
+                                <button
+                                    onClick={() => setLeadStatusFilter('client')}
+                                    className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${leadStatusFilter === 'client' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    Clientes
+                                </button>
+                            </div>
+
                             <div className="relative group">
                                 <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                                 <input
@@ -709,30 +743,38 @@ export default function ChatHub() {
                                 />
                             </div>
 
-                            <div className="max-h-[300px] overflow-y-auto custom-scrollbar space-y-2">
-                                {availableLeads.length > 0 ? (
-                                    availableLeads.map(lead => (
+                            <div className="max-h-[350px] overflow-y-auto custom-scrollbar space-y-2 pr-2">
+                                {modalFilteredLeads.length > 0 ? (
+                                    modalFilteredLeads.map(lead => (
                                         <button
                                             key={lead.id}
                                             onClick={() => startChatWithLead(lead)}
-                                            className="w-full p-4 flex items-center justify-between rounded-2xl hover:bg-blue-50/50 border border-transparent hover:border-blue-100 transition-all group"
+                                            className="w-full p-4 flex items-center justify-between rounded-2xl hover:bg-blue-50/50 border border-transparent hover:border-blue-100 transition-all group animate-in fade-in slide-in-from-bottom-2 duration-300"
                                         >
                                             <div className="flex items-center gap-4 text-left">
-                                                <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center text-lg font-black text-slate-400 group-hover:bg-blue-500 group-hover:text-white transition-all">
+                                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-lg font-black transition-all ${lead.status === 'Cliente' ? 'bg-emerald-50 text-emerald-500' : 'bg-slate-100 text-slate-400'} group-hover:bg-blue-500 group-hover:text-white`}>
                                                     {lead.name?.[0]}
                                                 </div>
                                                 <div>
-                                                    <p className="text-sm font-black text-slate-900">{lead.name}</p>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{lead.phone || 'Sin teléfono'}</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-sm font-black text-slate-900">{lead.name}</p>
+                                                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${lead.status === 'Cliente' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+                                                            {lead.status || 'Nuevo'}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{lead.phone || 'Sin teléfono'}</p>
                                                 </div>
                                             </div>
                                             <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500 translate-x-0 group-hover:translate-x-1 transition-all" />
                                         </button>
                                     ))
-                                ) : leadSearch.trim().length >= 2 ? (
-                                    <p className="text-center py-10 text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">No se encontraron leads</p>
                                 ) : (
-                                    <p className="text-center py-10 text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">Escribe 2 letras para buscar</p>
+                                    <div className="py-20 text-center space-y-4">
+                                        <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto">
+                                            <Search className="w-8 h-8 text-slate-200" />
+                                        </div>
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">No se encontraron leads</p>
+                                    </div>
                                 )}
                             </div>
                         </div>
