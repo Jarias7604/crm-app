@@ -701,7 +701,7 @@ export default function ChatHub() {
             }
             {showNewChatModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="w-full max-w-2xl bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+                    <div className="w-full bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300" style={{ maxWidth: '700px' }}>
                         <div className="p-8 border-b border-slate-50 flex items-center justify-between">
                             <div>
                                 <h3 className="text-2xl font-black text-slate-900 tracking-tighter">Nueva Conversación</h3>
