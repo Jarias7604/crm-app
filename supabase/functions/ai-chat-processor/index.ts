@@ -1,10 +1,100 @@
 // @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { PDFDocument, StandardFonts, rgb } from 'https://esm.sh/pdf-lib@1.17.1';
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+/**
+ * 🎨 SERVER-SIDE PDF GENERATOR (Deno/Edge Compatible)
+ * Uses pdf-lib to generate a professional PDF without DOM/Canvas dependencies.
+ */
+async function generateQuotePDF(quote: any, supabase: any): Promise<string> {
+    try {
+        console.log(`[PDF-Gen] Generating PDF for quote: ${quote.id}`);
+        const pdfDoc = await PDFDocument.create();
+        const page = pdfDoc.addPage([595.28, 841.89]); // A4
+        const { width, height } = page.getSize();
+        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+        const fontSize = 10;
+        const colorBlue = rgb(0.1, 0.4, 0.7);
+        const colorGray = rgb(0.4, 0.4, 0.4);
+
+        // 1. HEADER
+        page.drawRectangle({ x: 0, y: height - 100, width: width, height: 100, color: rgb(0.06, 0.09, 0.16) }); // Dark Slate
+
+        page.drawText('COTIZACIÓN OFICIAL', { x: width - 200, y: height - 40, size: 14, font: fontBold, color: rgb(1, 1, 1) });
+        page.drawText(`#${quote.id.slice(0, 8).toUpperCase()}`, { x: width - 200, y: height - 60, size: 20, font: font, color: rgb(1, 1, 1) });
+
+        page.drawText('EMPRESA DEMO CRM', { x: 50, y: height - 50, size: 18, font: fontBold, color: rgb(1, 1, 1) });
+        page.drawText('Soluciones Tecnológicas Avanzadas', { x: 50, y: height - 65, size: 10, font: font, color: rgb(0.8, 0.8, 0.8) });
+
+        // 2. CLIENT INFO
+        let y = height - 150;
+        page.drawText('PREPARADO PARA:', { x: 50, y: y, size: 8, font: fontBold, color: colorBlue });
+        y -= 15;
+        page.drawText((quote.nombre_cliente || 'Cliente Estimado').toUpperCase(), { x: 50, y: y, size: 16, font: fontBold, color: rgb(0, 0, 0) });
+        y -= 15;
+        if (quote.empresa_cliente) {
+            page.drawText(quote.empresa_cliente, { x: 50, y: y, size: 12, font: font, color: colorGray });
+            y -= 20;
+        }
+
+        // 3. PLAN DETAILS
+        y -= 20;
+        page.drawLine({ start: { x: 50, y: y }, end: { x: width - 50, y: y }, thickness: 1, color: rgb(0.9, 0.9, 0.9) });
+        y -= 20;
+
+        page.drawText('DESCRIPCIÓN', { x: 50, y: y, size: 10, font: fontBold, color: colorGray });
+        page.drawText('MONTO', { x: width - 100, y: y, size: 10, font: fontBold, color: colorGray });
+        y -= 20;
+
+        // Row 1: Plan
+        page.drawRectangle({ x: 50, y: y - 5, width: width - 100, height: 30, color: rgb(0.97, 0.98, 0.99) });
+        page.drawText(`Plan Anual: ${quote.plan_nombre}`, { x: 60, y: y + 10, size: 12, font: fontBold, color: rgb(0, 0, 0) });
+        page.drawText(`Volumen: ${quote.volumen_dtes} DTEs/año`, { x: 60, y: y - 2, size: 10, font: font, color: colorGray });
+
+        const price = quote.costo_plan_anual || 0;
+        page.drawText(`$${price.toLocaleString()}`, { x: width - 100, y: y + 5, size: 12, font: fontBold, color: rgb(0, 0, 0) });
+        y -= 50;
+
+        // 4. TOTAL
+        const total = quote.total_anual || price;
+        page.drawRectangle({ x: width - 250, y: y - 40, width: 200, height: 60, color: colorBlue });
+
+        page.drawText('TOTAL A INVERTIR (USD)', { x: width - 230, y: y + 5, size: 10, font: fontBold, color: rgb(1, 1, 1) });
+        page.drawText(`$${total.toLocaleString()}`, { x: width - 230, y: y - 20, size: 24, font: fontBold, color: rgb(1, 1, 1) });
+
+        // 5. FOOTER
+        page.drawText('Documento generado automáticamente por IA Agent.', { x: 50, y: 30, size: 8, font: font, color: colorGray });
+        const now = new Date().toLocaleDateString();
+        page.drawText(`Fecha: ${now}`, { x: width - 150, y: 30, size: 8, font: font, color: colorGray });
+
+        const pdfBytes = await pdfDoc.save();
+
+        // Upload to Supabase
+        const fileName = `Propuesta_${(quote.nombre_cliente || 'Client').replace(/\s+/g, '_')}_${quote.id.slice(0, 6)}.pdf`;
+        const { error: uploadError } = await supabase.storage.from('quotations').upload(fileName, pdfBytes, {
+            contentType: 'application/pdf',
+            upsert: true
+        });
+
+        if (uploadError) {
+            console.error('Upload Error:', uploadError);
+            throw uploadError;
+        }
+
+        const { data: { publicUrl } } = supabase.storage.from('quotations').getPublicUrl(fileName);
+        return publicUrl;
+    } catch (e) {
+        console.error("PDF Generate Failed:", e);
+        return null; // Fallback
+    }
+}
 
 Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
