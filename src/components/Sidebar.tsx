@@ -14,7 +14,8 @@ export default function Sidebar() {
     // const { hasPermission } = usePermissions(); // Removed: hasPermission is not used in the current code
     const location = useLocation();
     const { t } = useTranslation();
-    const [configOpen, setConfigOpen] = useState(location.pathname.startsWith('/config'));
+    const configPaths = ['/company/branding', '/pricing', '/paquetes', '/items'];
+    const [configOpen, setConfigOpen] = useState(configPaths.some(path => location.pathname === path));
     const [company, setCompany] = useState<Company | null>(() => {
         const saved = localStorage.getItem('company_branding');
         if (saved) {
@@ -107,30 +108,30 @@ export default function Sidebar() {
     const configSubItemsRaw = [
         {
             name: 'Marca de Empresa',
-            href: '/config/branding',
+            href: '/company/branding',
             icon: Building,
-            current: location.pathname === '/config/branding',
+            current: location.pathname === '/company/branding',
             allowedRoles: ['super_admin', 'company_admin']
         },
         {
             name: 'Gestión Precios',
-            href: '/config/pricing',
+            href: '/pricing',
             icon: Tag,
-            current: location.pathname === '/config/pricing',
+            current: location.pathname === '/pricing',
             allowedRoles: ['super_admin', 'company_admin']
         },
         {
             name: 'Gestión Paquete',
-            href: '/config/paquetes',
+            href: '/paquetes',
             icon: Package,
-            current: location.pathname === '/config/paquetes',
+            current: location.pathname === '/paquetes',
             allowedRoles: ['super_admin', 'company_admin']
         },
         {
             name: 'Gestión Item',
-            href: '/config/items',
+            href: '/items',
             icon: Layers,
-            current: location.pathname === '/config/items',
+            current: location.pathname === '/items',
             allowedRoles: ['super_admin', 'company_admin']
         },
     ];
@@ -206,13 +207,13 @@ export default function Sidebar() {
                             <button
                                 onClick={() => setConfigOpen(!configOpen)}
                                 className={cn(
-                                    location.pathname.startsWith('/config') ? 'text-white' : 'text-gray-300 hover:bg-[#1e293b] hover:text-white',
+                                    configPaths.some(path => location.pathname === path) ? 'text-white' : 'text-gray-300 hover:bg-[#1e293b] hover:text-white',
                                     'group flex items-center justify-between w-full px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 outline-none'
                                 )}
                             >
                                 <div className="flex items-center">
                                     <Settings className={cn(
-                                        location.pathname.startsWith('/config') ? 'text-white' : 'text-gray-400 group-hover:text-white',
+                                        configPaths.some(path => location.pathname === path) ? 'text-white' : 'text-gray-400 group-hover:text-white',
                                         "mr-3 flex-shrink-0 h-5 w-5 transition-colors"
                                     )} />
                                     <span>Configuración</span>
