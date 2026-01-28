@@ -7,11 +7,11 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Validación de variables de entorno requeridas
 if (!supabaseUrl) {
-    throw new Error('VITE_SUPABASE_URL is required. Please check your .env.local file.');
+    console.error('❌ VITE_SUPABASE_URL is missing! Check Vercel Environment Variables.');
 }
 
 if (!supabaseAnonKey) {
-    throw new Error('VITE_SUPABASE_ANON_KEY is required. Please check your .env.local file.');
+    console.error('❌ VITE_SUPABASE_ANON_KEY is missing! Check Vercel Environment Variables.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
