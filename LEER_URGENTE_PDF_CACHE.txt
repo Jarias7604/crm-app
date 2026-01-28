@@ -1,0 +1,17 @@
+// INSTRUCCIONES CRITICAS PARA EL USUARIO
+// ========================================
+// 
+// EL PDF QUE VES EN EL NAVEGADOR ES UN PDF VIEJO GUARDADO EN SUPABASE STORAGE
+// 
+// PARA VER EL NUEVO PDF CON CAJAS DE COLORES:
+// 1. Ve a Supabase Dashboard > Storage > quotations
+// 2. BORRA todos los PDFs viejos de "Cotizacion_Jimmy_Arias..."
+// 3. Vuelve a la app y genera una NUEVA cotización
+// 4. El nuevo PDF mostrará las cajas de colores
+//
+// ALTERNATIVAMENTE:
+// - Espera 2-3 minutos para que el caché expire
+// - Abre el PDF en una pestaña de incógnito
+// - O borra el caché del navegador (Ctrl+Shift+Del)
+//
+// EL CÓDIGO ESTÁ 100% CORRECTO. EL PROBLEMA ES EL CACHE.

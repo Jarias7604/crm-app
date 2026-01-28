@@ -7,7 +7,7 @@ import {
 } from 'recharts';
 import { BadgeDollarSign, TrendingUp, Users, Target, Building, Calendar, CheckCircle, ChevronDown, Edit2 } from 'lucide-react';
 import { adminService } from '../services/admin';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import {
     startOfToday, endOfToday,
     startOfWeek, endOfWeek,
@@ -16,11 +16,12 @@ import {
     startOfYear, endOfYear
 } from 'date-fns';
 import { useAuth } from '../auth/AuthProvider';
-import { leadsService } from '../services/leads';
 import { STATUS_CONFIG, PRIORITY_CONFIG, DATE_RANGE_OPTIONS, type DateRange } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
+import { logger } from '../utils/logger';
+import { useDashboardStats } from '../hooks/useDashboard';
 
 const THEME = {
     primary: '#007BFF',   // Azul Eléctrico
@@ -61,7 +62,7 @@ const FunnelInfographic = ({ data }: { data: any[] }) => {
         { label: 'Cliente', value: clientes, color: '#059669' }                          // Emerald 600
     ];
 
-    console.log('🔍 Funnel 6-Layers:', layers);
+    logger.debug('Funnel 6-Layers', { layers });
 
     if (data.length === 0) return <div className="text-gray-400 text-center py-10">No hay datos suficientes</div>;
 
@@ -146,13 +147,92 @@ export default function Dashboard() {
         setRefreshKey(Date.now());
     }, [location.pathname]);
 
+    // Calculate date range based on selected filter
+    const dateRange = useMemo(() => {
+        const now = new Date();
+        let startDate: string | undefined;
+        let endDate: string | undefined;
+
+        switch (selectedDateRange) {
+            case 'today':
+                startDate = startOfToday().toISOString().split('.')[0] + 'Z';
+                endDate = endOfToday().toISOString().split('.')[0] + 'Z';
+                break;
+            case 'this_week':
+                startDate = startOfWeek(now, { weekStartsOn: 1 }).toISOString().split('.')[0] + 'Z';
+                endDate = endOfWeek(now, { weekStartsOn: 1 }).toISOString().split('.')[0] + 'Z';
+                break;
+            case 'this_month':
+                startDate = startOfMonth(now).toISOString().split('.')[0] + 'Z';
+                endDate = endOfMonth(now).toISOString().split('.')[0] + 'Z';
+                break;
+            case 'last_3_months':
+                startDate = startOfMonth(subMonths(now, 2)).toISOString().split('.')[0] + 'Z';
+                endDate = endOfMonth(now).toISOString().split('.')[0] + 'Z';
+                break;
+            case 'last_6_months':
+                startDate = startOfMonth(subMonths(now, 5)).toISOString().split('.')[0] + 'Z';
+                endDate = endOfMonth(now).toISOString().split('.')[0] + 'Z';
+                break;
+            case 'this_year':
+                startDate = startOfYear(now).toISOString().split('.')[0] + 'Z';
+                endDate = endOfYear(now).toISOString().split('.')[0] + 'Z';
+                break;
+        }
+
+        return { startDate, endDate };
+    }, [selectedDateRange]);
+
+    // Use optimized dashboard hook (replaces 5 queries with 1)
+    const { data: dashboardData, isLoading: isDashboardLoading, error: dashboardError } = useDashboardStats(
+        dateRange.startDate,
+        dateRange.endDate
+    );
+
+    // Process dashboard data when it arrives
+    useEffect(() => {
+        if (dashboardData) {
+            // Set stats
+            setStats(dashboardData.stats);
+
+            // Map funnel data with labels
+            const mappedFunnelData = dashboardData.byStatus.map((item: any) => {
+                const config = STATUS_CONFIG[item.name as keyof typeof STATUS_CONFIG];
+                return {
+                    key: item.name,
+                    name: config?.label || item.name,
+                    value: item.value
+                };
+            });
+            setFunnelData(mappedFunnelData);
+
+            // Calculate source percentages
+            const total = dashboardData.bySource.reduce((sum: number, s: any) => sum + s.value, 0);
+            setSourceData(dashboardData.bySource.map((s: any) => ({
+                name: s.name,
+                value: total > 0 ? Math.round((s.value / total) * 100) : 0
+            })));
+
+            // Set top opportunities
+            setTopOpportunities(dashboardData.topOpportunities || []);
+
+            // Map priority data with labels
+            setPriorityData(dashboardData.byPriority.map((p: any) => ({
+                name: (PRIORITY_CONFIG as any)[p.name]?.label || p.name,
+                value: p.value,
+                key: p.name
+            })).sort((a: any, b: any) => {
+                const order = ['very_high', 'high', 'medium', 'low'];
+                return order.indexOf(a.key) - order.indexOf(b.key);
+            }));
+        }
+    }, [dashboardData]);
+
     useEffect(() => {
         if (profile?.role === 'super_admin') {
             loadSuperAdminData();
-        } else if (profile) {
-            loadCRMData();
         }
-    }, [profile, selectedDateRange, refreshKey]);
+    }, [profile, refreshKey]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -183,7 +263,7 @@ export default function Dashboard() {
                 { name: 'Jun', value: totalCompanies },
             ]);
         } catch (error) {
-            console.error('Failed to load admin data', error);
+            logger.error('Failed to load admin data', error, { action: 'loadSuperAdminData' });
         }
     };
 
@@ -206,96 +286,14 @@ export default function Dashboard() {
             loadSuperAdminData();
             toast.success('Configuración de empresa actualizada');
         } catch (error: any) {
-            console.error('Update company failed', error);
+            logger.error('Update company failed', error, { action: 'handleUpdateCompany', companyId: editingCompany.id });
             toast.error(`Error: ${error.message}`);
         } finally {
             setIsUpdatingCompany(false);
         }
     };
 
-    const loadCRMData = async () => {
-        try {
-            const now = new Date();
-            let startDate: string | undefined;
-            let endDate: string | undefined;
 
-            switch (selectedDateRange) {
-                case 'today':
-                    startDate = startOfToday().toISOString().split('.')[0] + 'Z';
-                    endDate = endOfToday().toISOString().split('.')[0] + 'Z';
-                    break;
-                case 'this_week':
-                    startDate = startOfWeek(now, { weekStartsOn: 1 }).toISOString().split('.')[0] + 'Z';
-                    endDate = endOfWeek(now, { weekStartsOn: 1 }).toISOString().split('.')[0] + 'Z';
-                    break;
-                case 'this_month':
-                    startDate = startOfMonth(now).toISOString().split('.')[0] + 'Z';
-                    endDate = endOfMonth(now).toISOString().split('.')[0] + 'Z';
-                    break;
-                case 'last_3_months':
-                    startDate = startOfMonth(subMonths(now, 2)).toISOString().split('.')[0] + 'Z';
-                    endDate = endOfMonth(now).toISOString().split('.')[0] + 'Z';
-                    break;
-                case 'last_6_months':
-                    startDate = startOfMonth(subMonths(now, 5)).toISOString().split('.')[0] + 'Z';
-                    endDate = endOfMonth(now).toISOString().split('.')[0] + 'Z';
-                    break;
-                case 'this_year':
-                    startDate = startOfYear(now).toISOString().split('.')[0] + 'Z';
-                    endDate = endOfYear(now).toISOString().split('.')[0] + 'Z';
-                    break;
-            }
-
-            const [realStats, statusData, sources, topOpps, priorities] = await Promise.all([
-                leadsService.getLeadStats(startDate, endDate),
-                leadsService.getLeadsByStatus(startDate, endDate),
-                leadsService.getLeadsBySource(startDate, endDate),
-                leadsService.getTopOpportunities(4, startDate, endDate),
-                leadsService.getLeadsByPriority(startDate, endDate)
-            ]);
-
-            setStats({
-                totalLeads: realStats.totalLeads,
-                totalPipeline: realStats.totalPipeline,
-                wonDeals: realStats.wonDeals,
-                conversionRate: realStats.conversionRate,
-            });
-
-            const mappedFunnelData = statusData.map((item: any) => {
-                const config = STATUS_CONFIG[item.name as keyof typeof STATUS_CONFIG];
-                return {
-                    key: item.name,
-                    name: config?.label || item.name,
-                    value: item.value
-                };
-            });
-
-            console.log('📊 Dashboard: Raw status data from DB:', statusData);
-            console.log('📊 Dashboard: Mapped funnel data:', mappedFunnelData);
-
-            setFunnelData(mappedFunnelData);
-
-            const total = sources.reduce((sum, s) => sum + s.value, 0);
-            setSourceData(sources.map(s => ({
-                name: s.name,
-                value: total > 0 ? Math.round((s.value / total) * 100) : 0
-            })));
-
-            setTopOpportunities(topOpps || []);
-
-            setPriorityData(priorities.map(p => ({
-                name: (PRIORITY_CONFIG as any)[p.name]?.label || p.name,
-                value: p.value,
-                key: p.name
-            })).sort((a, b) => {
-                const order = ['very_high', 'high', 'medium', 'low'];
-                return order.indexOf(a.key) - order.indexOf(b.key);
-            }));
-
-        } catch (error) {
-            console.error('Failed to load CRM data', error);
-        }
-    };
 
     const FilterDropdown = () => (
         <div className="relative" ref={filterRef}>

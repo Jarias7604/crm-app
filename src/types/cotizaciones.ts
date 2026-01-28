@@ -41,9 +41,11 @@ export interface Cotizacion {
     notas?: string;
 
     // Términos de Pago (Nuevo)
-    tipo_pago?: 'contado' | 'credito';
+    tipo_pago?: 'contado' | 'credito' | 'anual' | 'mensual';
     plazo_meses?: number;
     monto_anticipo?: number;
+    subtotal_anticipo?: number;
+    iva_anticipo?: number;
     descripcion_pago?: string;
 
     created_by?: string;

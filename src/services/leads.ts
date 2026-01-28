@@ -1,23 +1,29 @@
 import { supabase } from './supabase';
 import type { Lead, FollowUp } from '../types';
+import { logger } from '../utils/logger';
 
 export const leadsService = {
     // Get all leads for the company - Optimized for performance
     async getLeads(page = 1, pageSize = 50) {
-        const from = (page - 1) * pageSize;
-        const to = from + pageSize - 1;
+        try {
+            const from = (page - 1) * pageSize;
+            const to = from + pageSize - 1;
 
-        const { data, error, count } = await supabase
-            .from('leads')
-            .select('*', { count: 'exact' })
-            .order('created_at', { ascending: false })
-            .range(from, to);
+            const { data, error, count } = await supabase
+                .from('leads')
+                .select('*', { count: 'exact' })
+                .order('created_at', { ascending: false })
+                .range(from, to);
 
-        if (error) {
-            console.error('Error loading leads:', error);
-            throw error;
+            if (error) {
+                logger.error('Error loading leads', error, { action: 'getLeads', page, pageSize });
+                throw error;
+            }
+            return { data, count };
+        } catch (err) {
+            logger.error('Unhandled error in getLeads', err, { page, pageSize });
+            throw err;
         }
-        return { data, count };
     },
 
     // Get lead statistics for Dashboard - Optimized selection
@@ -231,7 +237,7 @@ export const leadsService = {
                 return cleanedLead;
             });
 
-            console.log(`Attempting to import ${leadsToInsert.length} leads...`);
+            logger.debug('Attempting to import leads', { count: leadsToInsert.length });
 
             const { data, error } = await supabase
                 .from('leads')
@@ -239,14 +245,14 @@ export const leadsService = {
                 .select();
 
             if (error) {
-                console.error('Supabase insert error details:', error);
+                logger.error('Supabase insert error', error, { action: 'importLeads', count: leadsToInsert.length });
                 throw error;
             }
 
-            console.log('Successfully imported leads:', data?.length);
+            logger.debug('Successfully imported leads', { count: data?.length });
             return data as Lead[];
         } catch (error: any) {
-            console.error('Lead import service failed:', error);
+            logger.error('Lead import service failed', error, { action: 'importLeads' });
             throw error;
         }
     },

@@ -10,8 +10,7 @@ class CotizacionesService {
             .from('cotizaciones')
             .insert({
                 ...cotizacion,
-                created_by: user?.id,
-                modulos_adicionales: JSON.stringify(cotizacion.modulos_adicionales)
+                created_by: user?.id
             })
             .select(`
                 *,
@@ -110,7 +109,7 @@ class CotizacionesService {
         const updateData: any = { ...updates };
 
         if (updates.modulos_adicionales) {
-            updateData.modulos_adicionales = JSON.stringify(updates.modulos_adicionales);
+            updateData.modulos_adicionales = updates.modulos_adicionales;
         }
 
         const { data, error } = await supabase

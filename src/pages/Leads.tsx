@@ -16,6 +16,7 @@ import { useMemo } from 'react';
 import { CreateLeadFullscreen } from '../components/CreateLeadFullscreen';
 import { MobileQuickActions } from '../components/MobileQuickActions';
 import { LeadKanban } from '../components/LeadKanban';
+import { logger } from '../utils/logger';
 
 export default function Leads() {
     const { profile } = useAuth();
@@ -99,7 +100,7 @@ export default function Leads() {
                 try {
                     dateStr = selectedLead.next_followup_date.split('T')[0];
                 } catch (e) {
-                    console.error('Date parsing error', e);
+                    logger.error('Date parsing error', e, { action: 'parseFollowUpDate', leadId: selectedLead.id });
                     dateStr = '';
                 }
             }
@@ -155,7 +156,7 @@ export default function Leads() {
 
             toast.success('Próximo seguimiento actualizado y registrado');
         } catch (error: any) {
-            console.error('Save failed:', error);
+            logger.error('Save failed', error, { action: 'handleSaveNextFollowUp', leadId: selectedLead.id });
             toast.error(`Error al guardar: ${error.message}`);
         } finally {
             setIsSavingFollowUp(false);
@@ -183,7 +184,7 @@ export default function Leads() {
             if (selectedLead?.id === id) setIsDetailOpen(false);
             loadLeads();
         } catch (error: any) {
-            console.error('Delete failed:', error);
+            logger.error('Delete failed', error, { action: 'handleDeleteLead', leadId: id });
             toast.error(`Error al eliminar: ${error.message}`);
         }
     };
@@ -205,7 +206,7 @@ export default function Leads() {
             setLeads(leads.map(l => l.id === selectedLead.id ? { ...l, document_path: path } : l));
             toast.success('PDF cargado correctamente');
         } catch (error: any) {
-            console.error('Upload failed:', error);
+            logger.error('Upload failed', error, { action: 'handleFileUpload', leadId: selectedLead.id });
             toast.error('Error al subir el archivo: ' + error.message);
         } finally {
             setIsUploading(false);
@@ -243,7 +244,7 @@ export default function Leads() {
             const { data } = await leadsService.getLeads();
             setLeads(data || []);
         } catch (error) {
-            console.error('Failed to load leads', error);
+            logger.error('Failed to load leads', error, { action: 'loadLeads' });
         } finally {
             setLoading(false);
         }
@@ -272,7 +273,7 @@ export default function Leads() {
                 loadLeads(); // Refresh list
             }
         } catch (error: any) {
-            console.error('Lead import failed:', error);
+            logger.error('Lead import failed', error, { action: 'handleImportCSV' });
             toast.error(`Fallo en la importación: ${error.message || 'Verifica el formato del archivo CSV'}`);
         } finally {
             setIsImporting(false);
@@ -287,7 +288,7 @@ export default function Leads() {
             const data = await leadsService.getTeamMembers();
             setTeamMembers(data || []);
         } catch (error) {
-            console.error('Failed to load team', error);
+            logger.error('Failed to load team', error, { action: 'loadTeamMembers' });
         }
     };
 
@@ -296,7 +297,7 @@ export default function Leads() {
             const data = await leadsService.getFollowUps(leadId);
             setFollowUps(data || []);
         } catch (error) {
-            console.error('Failed to load follow-ups', error);
+            logger.error('Failed to load follow-ups', error, { action: 'loadFollowUps', leadId });
         }
     };
 
@@ -315,7 +316,7 @@ export default function Leads() {
             loadLeads();
             toast.success('Nuevo lead creado');
         } catch (error: any) {
-            console.error('Failed to create lead', error);
+            logger.error('Failed to create lead', error, { action: 'handleSubmit' });
             toast.error(`Error: ${error.message}`);
         }
     };
@@ -350,7 +351,7 @@ export default function Leads() {
                 toast.success('Cambio guardado');
             }
         } catch (error: any) {
-            console.error('Update failed:', error);
+            logger.error('Update failed', error, { action: 'handleUpdateLead', leadId: selectedLead.id });
             toast.error(`Error al guardar: ${error.message}`);
         }
     };

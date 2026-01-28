@@ -39,18 +39,47 @@ export interface CotizadorItem {
     updated_at: string;
 }
 
+export interface DetalleLinea {
+    tipo: string;
+    nombre: string;
+    precio_anual: number;
+    precio_mensual: number;
+    es_pago_unico: boolean;
+    descripcion: string;
+}
+
 export interface CotizacionCalculada {
-    paquete: CotizadorPaquete;
-    items_seleccionados: CotizadorItem[];
-    subtotal_anual: number;
-    subtotal_mensual: number;
+    // Pagos Únicos (implementación, servicios únicos, etc)
+    subtotal_pagos_unicos: number;
+    iva_pagos_unicos: number;
+    total_pagos_unicos: number;
+
+    // Pagos Recurrentes (licencias, módulos, servicios recurrentes)
+    subtotal_recurrente_base: number;      // Sin recargo
+    recargo_mensual_porcentaje: number;    // 20% por defecto, configurable
+    recargo_mensual_monto: number;         // Solo si forma_pago = 'mensual'
+
+    // Forma de pago y cálculos
+    forma_pago: 'anual' | 'mensual';
+    precio_anual_sin_recargo: number;      // Precio si paga anual completo
+    precio_anual_con_recargo: number;      // Precio si paga mensual (× 1.20)
+    cuota_mensual: number;                 // Solo si forma_pago = 'mensual'
+    ahorro_pago_anual: number;             // Incentivo visual
+
+    // Descuentos e impuestos
     descuento_porcentaje: number;
     descuento_monto: number;
     iva_porcentaje: number;
-    iva_monto: number;
-    total_anual: number;
-    total_mensual: number;
-    desglose: any[];
+    iva_monto_recurrente: number;
+
+    // Totales finales
+    total_recurrente: number;              // Según forma de pago elegida
+    total_general: number;                 // Únicos + Recurrente
+
+    // Información adicional
+    paquete: CotizadorPaquete;
+    items_seleccionados: CotizadorItem[];
+    desglose: DetalleLinea[];
 }
 
 // =====================================================
@@ -198,98 +227,151 @@ class CotizadorService {
         paquete: CotizadorPaquete,
         items: CotizadorItem[],
         cantidad_dtes: number,
+        forma_pago: 'anual' | 'mensual' = 'mensual',
         descuento_porcentaje: number = 0,
         iva_porcentaje: number = 13,
-        incluir_implementacion: boolean = true
+        incluir_implementacion: boolean = true,
+        recargo_mensual_porcentaje: number = 20
     ): CotizacionCalculada {
-        let subtotal_anual = 0;
-        let subtotal_mensual = 0;
-        const desglose: any[] = [];
 
-        // 1. PAQUETE BASE (Solo licencia)
-        subtotal_anual += paquete.costo_paquete_anual;
-        subtotal_mensual += (paquete.costo_paquete_mensual * 12);
+        let subtotal_pagos_unicos = 0;
+        let subtotal_recurrente_base = 0;
+        const desglose: DetalleLinea[] = [];
 
-        desglose.push({
-            tipo: 'Paquete',
-            nombre: `${paquete.paquete} (${paquete.cantidad_dtes} DTEs)`,
-            precio_anual: paquete.costo_paquete_anual,
-            precio_mensual: paquete.costo_paquete_mensual,
-            descripcion: 'Licencia anual de facturación electrónica'
-        });
-
-        // 2. IMPLEMENTACIÓN (Línea separada)
-        if (incluir_implementacion) {
-            const costo_imp = paquete.costo_implementacion;
-            subtotal_anual += costo_imp;
-            subtotal_mensual += costo_imp;
-
+        // 1. IMPLEMENTACIÓN (Pago Único)
+        if (incluir_implementacion && paquete.costo_implementacion > 0) {
+            subtotal_pagos_unicos += paquete.costo_implementacion;
             desglose.push({
-                tipo: 'Implementación',
-                nombre: 'Servicios de Implementación',
-                precio_anual: costo_imp,
+                es_pago_unico: true,
+                tipo: 'Pago Único',
+                nombre: 'Implementación y Configuración',
+                precio_anual: paquete.costo_implementacion,
                 precio_mensual: 0,
-                descripcion: 'Configuración inicial, carga de datos y capacitación (Pago único)'
+                descripcion: 'Configuración inicial, capacitación (Pago único)'
             });
         }
 
-        // 2. ITEMS SELECCIONADOS
-        items.forEach(item => {
-            let precio_item_anual = 0;
-            let precio_item_mensual = 0;
-            let descripcion = '';
-
-            if (item.precio_por_dte > 0) {
-                // Precio variable según DTEs
-                precio_item_anual = cantidad_dtes * item.precio_por_dte;
-                precio_item_mensual = cantidad_dtes * item.precio_por_dte;
-                descripcion = `${cantidad_dtes.toLocaleString()} DTEs × $${item.precio_por_dte}`;
-            } else if (item.pago_unico > 0) {
-                // Pago único
-                precio_item_anual = item.pago_unico;
-                precio_item_mensual = item.pago_unico;
-                descripcion = 'Pago único';
-            } else {
-                // Precio anual/mensual estándar
-                precio_item_anual = item.precio_anual;
-                precio_item_mensual = item.precio_mensual * 12;
-                descripcion = 'Precio anual';
-            }
-
-            subtotal_anual += precio_item_anual;
-            subtotal_mensual += precio_item_mensual;
-
-            desglose.push({
-                tipo: item.tipo === 'modulo' ? 'Módulo' : 'Servicio',
-                nombre: item.nombre,
-                precio_anual: precio_item_anual,
-                precio_mensual: item.precio_mensual || 0,
-                descripcion
-            });
+        // 2. PAQUETE (Recurrente)
+        subtotal_recurrente_base += paquete.costo_paquete_anual;
+        desglose.push({
+            es_pago_unico: false,
+            tipo: 'Licencia',
+            nombre: `${paquete.paquete} (${paquete.cantidad_dtes} DTEs)`,
+            precio_anual: paquete.costo_paquete_anual,
+            precio_mensual: paquete.costo_paquete_mensual,
+            descripcion: 'Licencia de facturación electrónica'
         });
 
-        // 3. APLICAR DESCUENTO
-        const descuento_monto = (subtotal_anual * descuento_porcentaje) / 100;
-        const subtotal_con_descuento = subtotal_anual - descuento_monto;
+        // 3. ITEMS (separar únicos de recurrentes)
+        items.forEach(item => {
+            if (item.pago_unico > 0) {
+                // ✅ Pago único - NO va a mensual
+                subtotal_pagos_unicos += item.pago_unico;
+                desglose.push({
+                    es_pago_unico: true,
+                    tipo: item.tipo === 'modulo' ? 'Módulo' : 'Servicio',
+                    nombre: item.nombre,
+                    precio_anual: item.pago_unico,
+                    precio_mensual: 0,
+                    descripcion: 'Pago único'
+                });
+            } else if (item.precio_por_dte > 0) {
+                // Precio por DTE (recurrente)
+                const precio = cantidad_dtes * item.precio_por_dte;
+                subtotal_recurrente_base += precio;
+                desglose.push({
+                    es_pago_unico: false,
+                    tipo: item.tipo === 'modulo' ? 'Módulo' : 'Servicio',
+                    nombre: item.nombre,
+                    precio_anual: precio,
+                    precio_mensual: precio / 12,
+                    descripcion: `${cantidad_dtes.toLocaleString()} DTEs × $${item.precio_por_dte}`
+                });
+            } else {
+                // Recurrente normal
+                const precio = item.precio_anual || (item.precio_mensual * 12);
+                subtotal_recurrente_base += precio;
+                desglose.push({
+                    es_pago_unico: false,
+                    tipo: item.tipo === 'modulo' ? 'Módulo' : 'Servicio',
+                    nombre: item.nombre,
+                    precio_anual: precio,
+                    precio_mensual: item.precio_mensual || precio / 12,
+                    descripcion: 'Recurrente'
+                });
+            }
+        });
 
-        // 4. CALCULAR IVA
-        const iva_monto = (subtotal_con_descuento * iva_porcentaje) / 100;
-        const total_anual = subtotal_con_descuento + iva_monto;
+        // 4. CALCULAR SEGÚN FORMA DE PAGO
+        let precio_recurrente_final = 0;
+        let recargo_monto = 0;
+        let cuota_mensual = 0;
+        let ahorro_pago_anual = 0;
 
-        // El total mensual es simplemente el total anual dividido en 12 cuotas
-        const total_mensual = total_anual / 12;
+        if (forma_pago === 'anual') {
+            // Pago anual: precio base sin recargo
+            precio_recurrente_final = subtotal_recurrente_base;
+            recargo_monto = 0;
+            cuota_mensual = 0;
+            // Calcular cuánto se ahorra vs pagar mensual
+            ahorro_pago_anual = subtotal_recurrente_base * (recargo_mensual_porcentaje / 100);
+        } else {
+            // Pago mensual: precio base + recargo 20%
+            recargo_monto = subtotal_recurrente_base * (recargo_mensual_porcentaje / 100);
+            precio_recurrente_final = subtotal_recurrente_base + recargo_monto;
+            cuota_mensual = precio_recurrente_final / 12;
+            ahorro_pago_anual = recargo_monto;
+        }
+
+        // 5. APLICAR DESCUENTO (solo a recurrentes)
+        const descuento_monto = (precio_recurrente_final * descuento_porcentaje) / 100;
+        const recurrente_con_descuento = precio_recurrente_final - descuento_monto;
+
+        // 6. CALCULAR IVA
+        const iva_pagos_unicos = (subtotal_pagos_unicos * iva_porcentaje) / 100;
+        const iva_recurrente = (recurrente_con_descuento * iva_porcentaje) / 100;
+
+        // 7. TOTALES
+        const total_pagos_unicos = subtotal_pagos_unicos + iva_pagos_unicos;
+        const total_recurrente = recurrente_con_descuento + iva_recurrente;
+        const total_general = total_pagos_unicos + total_recurrente;
+
+        // Recalcular cuota mensual si hay descuento
+        if (forma_pago === 'mensual') {
+            cuota_mensual = total_recurrente / 12;
+        }
 
         return {
-            paquete,
-            items_seleccionados: items,
-            subtotal_anual: Number(subtotal_anual.toFixed(2)),
-            subtotal_mensual: Number((subtotal_anual / 12).toFixed(2)),
+            // Pagos únicos
+            subtotal_pagos_unicos: Number(subtotal_pagos_unicos.toFixed(2)),
+            iva_pagos_unicos: Number(iva_pagos_unicos.toFixed(2)),
+            total_pagos_unicos: Number(total_pagos_unicos.toFixed(2)),
+
+            // Recurrentes
+            subtotal_recurrente_base: Number(subtotal_recurrente_base.toFixed(2)),
+            recargo_mensual_porcentaje,
+            recargo_mensual_monto: Number(recargo_monto.toFixed(2)),
+
+            // Forma de pago
+            forma_pago,
+            precio_anual_sin_recargo: Number(subtotal_recurrente_base.toFixed(2)),
+            precio_anual_con_recargo: Number((subtotal_recurrente_base + recargo_monto).toFixed(2)),
+            cuota_mensual: Number(cuota_mensual.toFixed(2)),
+            ahorro_pago_anual: Number(ahorro_pago_anual.toFixed(2)),
+
+            // Descuentos e impuestos
             descuento_porcentaje,
             descuento_monto: Number(descuento_monto.toFixed(2)),
             iva_porcentaje,
-            iva_monto: Number(iva_monto.toFixed(2)),
-            total_anual: Number(total_anual.toFixed(2)),
-            total_mensual: Number(total_mensual.toFixed(2)),
+            iva_monto_recurrente: Number(iva_recurrente.toFixed(2)),
+
+            // Totales
+            total_recurrente: Number(total_recurrente.toFixed(2)),
+            total_general: Number(total_general.toFixed(2)),
+
+            // Información adicional
+            paquete,
+            items_seleccionados: items,
             desglose
         };
     }

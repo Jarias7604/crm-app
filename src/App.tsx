@@ -1,77 +1,100 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './lib/queryClient';
 import { AuthProvider } from './auth/AuthProvider';
 import AuthLayout from './layouts/AuthLayout';
 import DashboardLayout from './layouts/DashboardLayout';
-import Login from './pages/Login';
-import SignUp from './pages/SignUp';
 import ProtectedRoute from './components/ProtectedRoute';
 import { Toaster } from 'react-hot-toast';
 
-// Placeholders (Will replace with actual components)
-import Dashboard from './pages/Dashboard';
-import Leads from './pages/Leads';
-import Calendar from './pages/Calendar';
-import Companies from './pages/admin/Companies';
-import Team from './pages/company/Team';
-import Permissions from './pages/company/Permissions';
-import Cotizaciones from './pages/Cotizaciones';
-import NuevaCotizacion from './pages/NuevaCotizacionDinamica';
-import PricingConfig from './pages/PricingConfig';
-import GestionPaquetes from './pages/GestionPaquetes';
-import GestionItems from './pages/GestionItems';
-import CotizadorPro from './pages/CotizadorPro';
-import CotizacionDetalle from './pages/CotizacionDetalle';
-import Branding from './pages/company/Branding';
-import MarketingDashboard from './pages/marketing/MarketingDashboard';
-import LeadHunter from './pages/marketing/LeadHunter';
-import EmailCampaigns from './pages/marketing/EmailCampaigns';
-import EmailBuilder from './pages/marketing/EmailBuilder';
-import AiAgentsConfig from './pages/marketing/AiAgentsConfig';
-import MarketingSettings from './pages/marketing/MarketingSettings';
-import ChatHub from './pages/marketing/ChatHub';
+// Auth pages (not lazy loaded - needed immediately)
+import Login from './pages/Login';
+import SignUp from './pages/SignUp';
+
+// Lazy loaded pages for better performance
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Leads = lazy(() => import('./pages/Leads'));
+const Calendar = lazy(() => import('./pages/Calendar'));
+const Companies = lazy(() => import('./pages/admin/Companies'));
+const Team = lazy(() => import('./pages/company/Team'));
+const Permissions = lazy(() => import('./pages/company/Permissions'));
+const Cotizaciones = lazy(() => import('./pages/Cotizaciones'));
+const NuevaCotizacion = lazy(() => import('./pages/NuevaCotizacionDinamica'));
+const PricingConfig = lazy(() => import('./pages/PricingConfig'));
+const GestionPaquetes = lazy(() => import('./pages/GestionPaquetes'));
+const GestionItems = lazy(() => import('./pages/GestionItems'));
+const CotizadorPro = lazy(() => import('./pages/CotizadorPro'));
+const CotizacionDetalle = lazy(() => import('./pages/CotizacionDetalle'));
+const Branding = lazy(() => import('./pages/company/Branding'));
+const MarketingDashboard = lazy(() => import('./pages/marketing/MarketingDashboard'));
+const LeadHunter = lazy(() => import('./pages/marketing/LeadHunter'));
+const EmailCampaigns = lazy(() => import('./pages/marketing/EmailCampaigns'));
+const EmailBuilder = lazy(() => import('./pages/marketing/EmailBuilder'));
+const AiAgentsConfig = lazy(() => import('./pages/marketing/AiAgentsConfig'));
+const MarketingSettings = lazy(() => import('./pages/marketing/MarketingSettings'));
+const ChatHub = lazy(() => import('./pages/marketing/ChatHub'));
+
+// Loading component
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+  </div>
+);
 
 function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Toaster position="top-right" reverseOrder={false} />
-        <Routes>
-          <Route element={<AuthLayout />}>
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<SignUp />} />
-          </Route>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>
+          <Toaster position="top-right" reverseOrder={false} />
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route element={<AuthLayout />}>
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<SignUp />} />
+              </Route>
 
-          <Route element={<ProtectedRoute />}>
-            <Route element={<DashboardLayout />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/leads" element={<Leads />} />
-              <Route path="/cotizaciones" element={<Cotizaciones />} />
-              <Route path="/cotizaciones/nueva" element={<NuevaCotizacion />} />
-              <Route path="/cotizaciones/nueva-pro" element={<CotizadorPro />} />
-              <Route path="/cotizaciones/:id" element={<CotizacionDetalle />} />
-              <Route path="/cotizaciones/:id/editar" element={<CotizadorPro />} />
-              <Route path="/config/pricing" element={<PricingConfig />} />
-              <Route path="/config/paquetes" element={<GestionPaquetes />} />
-              <Route path="/config/items" element={<GestionItems />} />
-              <Route path="/calendar" element={<Calendar />} />
-              <Route path="/admin/companies" element={<Companies />} />
-              <Route path="/company/team" element={<Team />} />
-              <Route path="/company/permissions" element={<Permissions />} />
-              <Route path="/config/branding" element={<Branding />} />
-              <Route path="/marketing/chat" element={<ChatHub />} />
-              <Route path="/marketing" element={<MarketingDashboard />} />
-              <Route path="/marketing/lead-hunter" element={<LeadHunter />} />
-              <Route path="/marketing/email" element={<EmailCampaigns />} />
-              <Route path="/marketing/email/new" element={<EmailBuilder />} />
-              <Route path="/marketing/agents" element={<AiAgentsConfig />} />
-              <Route path="/marketing/settings" element={<MarketingSettings />} />
-            </Route>
-          </Route>
+              <Route element={<ProtectedRoute />}>
+                <Route element={<DashboardLayout />}>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/leads" element={<Leads />} />
+                  <Route path="/cotizaciones" element={<Cotizaciones />} />
+                  <Route path="/cotizaciones/nueva" element={<NuevaCotizacion />} />
+                  <Route path="/cotizaciones/nueva-pro" element={<CotizadorPro />} />
+                  <Route path="/cotizaciones/:id/editar" element={<CotizadorPro />} />
+                  <Route path="/cotizaciones/:id" element={<CotizacionDetalle />} />
+                  <Route path="/calendar" element={<Calendar />} />
+                  <Route path="/pricing" element={<PricingConfig />} />
+                  <Route path="/paquetes" element={<GestionPaquetes />} />
+                  <Route path="/items" element={<GestionItems />} />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
+                  {/* Company Routes */}
+                  <Route path="/company/team" element={<Team />} />
+                  <Route path="/company/permissions" element={<Permissions />} />
+                  <Route path="/company/branding" element={<Branding />} />
+
+                  {/* Admin Routes */}
+                  <Route path="/admin/companies" element={<Companies />} />
+
+                  {/* Marketing Routes */}
+                  <Route path="/marketing" element={<MarketingDashboard />} />
+                  <Route path="/marketing/lead-hunter" element={<LeadHunter />} />
+                  <Route path="/marketing/campaigns" element={<EmailCampaigns />} />
+                  <Route path="/marketing/campaigns/new" element={<EmailBuilder />} />
+                  <Route path="/marketing/campaigns/:id/edit" element={<EmailBuilder />} />
+                  <Route path="/marketing/ai-agents" element={<AiAgentsConfig />} />
+                  <Route path="/marketing/settings" element={<MarketingSettings />} />
+                  <Route path="/marketing/chat" element={<ChatHub />} />
+                </Route>
+              </Route>
+
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
+        </AuthProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }
 

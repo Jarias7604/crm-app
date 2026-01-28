@@ -214,13 +214,29 @@ export const aiAgentService = {
                 simulatedReply = "Sobre el módulo **contable**: Generamos automáticamente el libro de ventas y diario a partir de tus facturas. Es ideal para ahorrar tiempo con el contador. ¿Quieres ver el precio de este módulo?";
             } else if (userText.includes('whatsapp') || userText.includes('notificaciones')) {
                 simulatedReply = "En cuanto a **WhatsApp**: Sí, podemos enviar automáticamente el PDF del DTE al número del cliente apenas emitas la factura. ¿Quieres que lo activemos en tu plan?";
-            } else if (userText.includes('factura') || userText.includes('dte') || userText.includes('volumen') || userText.includes('emito') || /\d+/.test(userText)) {
-                const dtes = parseInt(userText.match(/\d+/)?.[0] || "500");
-                const matchedPlan = pricing.planes.find(p => dtes >= (p.min_dtes || 0) && dtes <= (p.max_dtes || 999999));
-                const planName = matchedPlan?.nombre || "BASIC";
+            } else if (userText.includes('factura') || userText.includes('dte') || userText.includes('volumen') || userText.includes('emito') || /\d+/.test(userText) || userText.includes('módulo') || userText.includes('incluir') || userText.includes('agregar')) {
+                // Determine volume: try to find number, otherwise fallback to last or default
+                let dtes = parseInt(userText.match(/\d+/)?.[0] || "600");
+                if (history && !userText.match(/\d+/)) {
+                    const prevVolumeMsg = history.find(m => m.content.match(/\d+/));
+                    if (prevVolumeMsg) dtes = parseInt(prevVolumeMsg.content.match(/\d+/)?.[0] || "600");
+                }
 
-                simulatedReply = `¡Excelente, ${context.lead_name}! Para un volumen de **${dtes.toLocaleString()} documentos**, el **Plan ${planName}** es el indicado para ${context.lead_company}. Acabo de preparar una propuesta PDF profesional con los detalles. ¿Necesitas que agregue algún módulo como Inventario o POS?`;
-                triggerJson = `QUOTE_TRIGGER: { "dte_volume": ${dtes}, "plan_id": "${matchedPlan?.id || ''}", "include_imp": true }`;
+                const matchedPlan = pricing.planes.find(p => dtes >= (p.min_dtes || 0) && dtes <= (p.max_dtes || 999999));
+                const planName = matchedPlan?.nombre || "STARTER";
+
+                // Detect modules from text
+                const mods = [];
+                if (userText.includes('compras')) mods.push('f6ddee30-fb8a-4e35-8392-08dce67396e7');
+                if (userText.includes('cobrar') || userText.includes('cxc')) mods.push('8a761a07-104c-485f-9bf8-51b6043cdf84');
+                if (userText.includes('producción')) mods.push('4f7df220-755c-4309-93dc-5dbae4db9c60');
+                if (userText.includes('whatsapp')) mods.push('a5408c00-6d94-4d75-b918-79a8e122d80e');
+                if (userText.includes('json') || userText.includes('jason')) mods.push('2d2fbca5-f13f-4e6f-80e5-7311bbf44384');
+                if (userText.includes('pos')) mods.push('f7b3f9e0-6c02-475b-8216-489b0954d398');
+                if (userText.includes('inventario')) mods.push('defe59a9-58f1-44c1-97ed-1ab3704d3f92');
+
+                simulatedReply = `¡Perfecto, ${context.lead_name}! He actualizado la propuesta para ${context.lead_company} incluyendo los módulos solicitados y ajustada para un volumen de **${dtes.toLocaleString()} documentos/año**. Aquí tienes la cotización PDF oficial con el nuevo diseño premium.`;
+                triggerJson = `QUOTE_TRIGGER: { "dte_volume": ${dtes}, "plan_id": "${matchedPlan?.id || ''}", "modules": ${JSON.stringify(mods)}, "include_imp": true }`;
             } else if (userText.includes('precio') || userText.includes('costo') || userText.includes('cuanto vale')) {
                 simulatedReply = "Nuestros costos son flexibles según tu volumen. Para darte el precio exacto del plan, ¿podrías confirmarme cuántas facturas emites mensualmente aproximadamente?";
             } else if (userText.includes('demo') || userText.includes('probar')) {

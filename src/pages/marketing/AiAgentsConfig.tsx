@@ -52,8 +52,17 @@ export default function AiAgentsConfig() {
         } catch (error: any) {
             console.error('Error loading agents:', error);
             const errorMsg = error?.message || 'Error desconocido';
-            toast.error(`Error de base de datos: ${errorMsg}. Usando valores temporales.`);
 
+            // Mostrar error específico si la tabla no existe
+            if (errorMsg.includes('relation') || errorMsg.includes('does not exist') || errorMsg.includes('marketing_ai_agents')) {
+                toast.error('⚠️ La tabla de Agentes AI no está configurada en la base de datos. Contacta al administrador para crear la tabla "marketing_ai_agents".');
+            } else if (errorMsg.includes('permission') || errorMsg.includes('RLS') || errorMsg.includes('policy')) {
+                toast.error('⚠️ No tienes permisos para acceder a los Agentes AI. Verifica las políticas RLS en Supabase.');
+            } else {
+                toast.error(`Error de base de datos: ${errorMsg}. Usando valores temporales.`);
+            }
+
+            // Usar valores temporales para que la UI funcione
             setSelectedAgent({
                 id: 'temp',
                 company_id: profile!.company_id,
