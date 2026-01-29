@@ -3,7 +3,7 @@ import { brandingService } from '../../services/branding';
 import { storageService } from '../../services/storage';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Building2, Save, Upload, Globe, Image as ImageIcon, CheckCircle2, X, Maximize2, Square } from 'lucide-react';
+import { Building2, Save, Upload, Globe, Image as ImageIcon, CheckCircle2, X, Maximize2, Square, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Company } from '../../types';
 import Cropper from 'react-easy-crop';
@@ -15,12 +15,14 @@ export default function Branding() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [tcPreview, setTcPreview] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
         website: '',
         address: '',
         phone: '',
-        logo_url: ''
+        logo_url: '',
+        terminos_condiciones: ''
     });
 
     // Cropping state
@@ -44,7 +46,8 @@ export default function Branding() {
                 website: data.website || '',
                 address: data.address || '',
                 phone: data.phone || '',
-                logo_url: data.logo_url || ''
+                logo_url: data.logo_url || '',
+                terminos_condiciones: data.terminos_condiciones || ''
             });
         } catch (error) {
             console.error('Error loading branding:', error);
@@ -101,9 +104,10 @@ export default function Branding() {
                 website: formData.website,
                 address: formData.address,
                 phone: formData.phone,
-                logo_url: formData.logo_url
+                logo_url: formData.logo_url,
+                terminos_condiciones: formData.terminos_condiciones
             });
-            toast.success('Cambios de marca guardados con éxito');
+            toast.success('Configuración global actualizada');
         } catch (error: any) {
             console.error('Error saving branding:', error);
             toast.error(error.message || 'Error al guardar los cambios');
@@ -123,7 +127,7 @@ export default function Branding() {
             <div className="flex justify-between items-center bg-white p-8 rounded-[2rem] border border-gray-100 shadow-sm">
                 <div className="space-y-1">
                     <h1 className="text-4xl font-black text-[#0f172a] tracking-tight">Marca Corporativa</h1>
-                    <p className="text-gray-500 font-medium">Gestiona tu identidad visual para cotizaciones y comunicaciones oficiales.</p>
+                    <p className="text-gray-500 font-medium">Gestiona tu identidad visual y términos legales globales.</p>
                 </div>
             </div>
 
@@ -190,6 +194,67 @@ export default function Branding() {
                                 </div>
                             </div>
 
+                            <div className="space-y-6">
+                                <label className="block text-xs font-black text-blue-600 uppercase tracking-widest px-1">Términos y Condiciones Predeterminados</label>
+                                <div className="p-8 border-2 border-slate-100 rounded-[2.5rem] bg-slate-50/50 space-y-6">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-start gap-4">
+                                            <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                                                <FileText className="w-5 h-5" />
+                                            </div>
+                                            <p className="text-sm text-slate-500 leading-relaxed font-medium">
+                                                Define el marco legal. Usa <code className="bg-blue-100 px-1.5 py-0.5 rounded text-blue-700 font-black">**texto**</code> para resaltar en negrita.
+                                            </p>
+                                        </div>
+                                        <div className="flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
+                                            <button
+                                                type="button"
+                                                onClick={() => setTcPreview(false)}
+                                                className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all ${!tcPreview ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-600'}`}
+                                            >
+                                                Editar
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setTcPreview(true)}
+                                                className={`px-4 py-2 rounded-lg text-xs font-black uppercase transition-all ${tcPreview ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-600'}`}
+                                            >
+                                                Vista Previa
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {!tcPreview ? (
+                                        <textarea
+                                            value={formData.terminos_condiciones}
+                                            onChange={e => setFormData({ ...formData, terminos_condiciones: e.target.value })}
+                                            className="w-full min-h-[350px] p-8 rounded-[2rem] border-gray-200 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 font-medium text-slate-600 shadow-inner bg-white leading-relaxed resize-none transition-all"
+                                            placeholder="**Artículo 1: Objeto...**&#10;Este contrato establece los términos para el uso de...&#10;&#10;**Artículo 2: Pagos**..."
+                                        />
+                                    ) : (
+                                        <div className="w-full min-h-[350px] p-8 rounded-[2rem] bg-white border border-slate-200 shadow-inner overflow-y-auto space-y-6">
+                                            {(formData.terminos_condiciones || '').split('\n\n').filter(p => p.trim()).map((para, idx) => (
+                                                <div key={idx} className="flex gap-4 items-start">
+                                                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-black mt-0.5">
+                                                        {idx + 1}
+                                                    </span>
+                                                    <p className="text-sm text-slate-600 leading-relaxed font-medium flex-1">
+                                                        {para.trim().split(/(\*\*.*?\*\*)/).map((part, i) =>
+                                                            part.startsWith('**') && part.endsWith('**')
+                                                                ? <strong key={i} className="text-slate-900 font-black">{part.slice(2, -2)}</strong>
+                                                                : part
+                                                        )}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                            {!formData.terminos_condiciones && (
+                                                <p className="text-slate-400 italic text-center py-20">No hay contenido para mostrar.</p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
                             <div className="space-y-4">
                                 <label className="block text-xs font-black text-blue-600 uppercase tracking-widest px-1">Logotipo Corporativo</label>
                                 <div className="flex flex-col md:flex-row items-center gap-10 p-10 border-2 border-dashed border-gray-200 rounded-[2.5rem] bg-gray-50/50 group hover:border-blue-400 hover:bg-blue-50/30 transition-all duration-300">
@@ -237,7 +302,7 @@ export default function Branding() {
                                 ) : (
                                     <>
                                         <Save className="w-6 h-6" />
-                                        Guardar Perfil de Marca
+                                        Guardar Configuración
                                     </>
                                 )}
                             </Button>
@@ -293,7 +358,7 @@ export default function Branding() {
                                         </div>
                                         <div className="bg-white p-2 rounded-xl shadow-2xl group-hover:scale-110 transition-transform duration-500">
                                             <img
-                                                src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(formData.website || 'https://ariassdefense.com')}`}
+                                                src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(formData.website || 'https://-')}`}
                                                 alt="QR"
                                                 className="w-10 h-10"
                                             />

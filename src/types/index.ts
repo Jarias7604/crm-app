@@ -58,6 +58,7 @@ export interface Company {
     website?: string | null;
     address?: string | null;
     phone?: string | null;
+    terminos_condiciones?: string | null;
     license_status: LicenseStatus;
     created_at: string;
     features?: {

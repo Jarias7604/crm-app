@@ -51,7 +51,6 @@ export default function CotizadorPro() {
         descuento_porcentaje: 0,
         iva_porcentaje: 13,
         incluir_implementacion: true,
-        notas: '',
 
         // Forma de pago
         forma_pago: 'mensual' as 'anual' | 'mensual',
@@ -118,8 +117,7 @@ export default function CotizadorPro() {
                     volumen_dtes: cot.volumen_dtes,
                     descuento_porcentaje: cot.descuento_porcentaje,
                     iva_porcentaje: cot.iva_porcentaje,
-                    incluir_implementacion: cot.incluir_implementacion,
-                    notas: cot.notas || ''
+                    incluir_implementacion: cot.incluir_implementacion
                 }));
 
                 // Re-encontrar paquete_id y IDs de módulos
@@ -246,7 +244,8 @@ export default function CotizadorPro() {
             formData.descuento_porcentaje,
             formData.iva_porcentaje,
             formData.incluir_implementacion,
-            formData.recargo_mensual_porcentaje
+            formData.recargo_mensual_porcentaje,
+            formData.meses_pago
         );
 
         setTotales(cotizacion);
@@ -403,7 +402,7 @@ export default function CotizadorPro() {
                 iva_porcentaje: formData.iva_porcentaje,
                 iva_monto: totales.iva_pagos_unicos + totales.iva_monto_recurrente,
                 total_anual: totales.total_general,
-                total_mensual: totales.cuota_mensual,
+                total_mensual: (formData.forma_pago === 'mensual' ? totales.cuota_mensual : totales.total_recurrente),
                 monto_anticipo: totales.total_pagos_unicos,
                 subtotal_anticipo: totales.subtotal_pagos_unicos,
                 iva_anticipo: totales.iva_pagos_unicos,
@@ -411,7 +410,7 @@ export default function CotizadorPro() {
                 // subtotal_recurrente: totales.subtotal_recurrente_base,
                 // iva_recurrente: totales.iva_monto_recurrente,
                 tipo_pago: formData.forma_pago,
-                notas: formData.notas,
+                plazo_meses: formData.forma_pago === 'mensual' ? formData.meses_pago : 12,
                 incluir_implementacion: formData.incluir_implementacion,
                 estado: 'borrador' as const
             };
@@ -1373,18 +1372,7 @@ export default function CotizadorPro() {
                             </div>
                         </div>
 
-                        {/* Notas */}
-                        <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-2">
-                                Notas adicionales
-                            </label>
-                            <textarea
-                                value={formData.notas}
-                                onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
-                                className="w-full border border-gray-300 rounded-xl px-4 py-2.5"
-                                rows={3}
-                            />
-                        </div>
+                        {/* Notas removed */}
                     </div>
                 )}
 

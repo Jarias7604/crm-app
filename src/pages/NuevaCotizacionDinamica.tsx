@@ -49,8 +49,7 @@ export default function NuevaCotizacionDinamica() {
         modulos_ids: [] as string[],
         servicios_ids: [] as string[],
         descuento_porcentaje: 0,
-        incluir_implementacion: true,
-        notas: ''
+        incluir_implementacion: true
     });
 
     const [totales, setTotales] = useState({
@@ -345,8 +344,7 @@ export default function NuevaCotizacionDinamica() {
                 iva_monto: Number((totales.total_anual - (totales.total_anual / 1.13)).toFixed(2)),
                 estado: 'borrador' as const,
                 valida_hasta: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                incluir_implementacion: formData.incluir_implementacion,
-                notas: formData.notas
+                incluir_implementacion: formData.incluir_implementacion
             };
 
             await cotizacionesService.createCotizacion(cotizacionData);
@@ -734,19 +732,7 @@ export default function NuevaCotizacionDinamica() {
                 </div>
             </div>
 
-            {/* Notas */}
-            <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">
-                    📝 Notas Internas (Opcional)
-                </label>
-                <textarea
-                    value={formData.notas}
-                    onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
-                    className="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    rows={3}
-                    placeholder="Observaciones, condiciones especiales, etc."
-                />
-            </div>
+            {/* Notas removed */}
         </div>
     );
 

@@ -61,9 +61,10 @@ export interface CotizacionCalculada {
 
     // Forma de pago y cálculos
     forma_pago: 'anual' | 'mensual';
+    meses_pago: number;                    // 1, 3, 6, 9, 12
     precio_anual_sin_recargo: number;      // Precio si paga anual completo
-    precio_anual_con_recargo: number;      // Precio si paga mensual (× 1.20)
-    cuota_mensual: number;                 // Solo si forma_pago = 'mensual'
+    precio_anual_con_recargo: number;      // Precio si paga mensual (con recargo)
+    cuota_mensual: number;                 // Valor de la cuotas por periodo
     ahorro_pago_anual: number;             // Incentivo visual
 
     // Descuentos e impuestos
@@ -231,7 +232,8 @@ class CotizadorService {
         descuento_porcentaje: number = 0,
         iva_porcentaje: number = 13,
         incluir_implementacion: boolean = true,
-        recargo_mensual_porcentaje: number = 20
+        recargo_mensual_porcentaje: number = 20,
+        meses_pago: number = 1
     ): CotizacionCalculada {
 
         let subtotal_pagos_unicos = 0;
@@ -313,14 +315,23 @@ class CotizadorService {
             precio_recurrente_final = subtotal_recurrente_base;
             recargo_monto = 0;
             cuota_mensual = 0;
-            // Calcular cuánto se ahorra vs pagar mensual
             ahorro_pago_anual = subtotal_recurrente_base * (recargo_mensual_porcentaje / 100);
+            meses_pago = 12;
         } else {
-            // Pago mensual: precio base + recargo 20%
-            recargo_monto = subtotal_recurrente_base * (recargo_mensual_porcentaje / 100);
+            // Pago mensual: recargo dinámico según el plazo
+            let surchargePct = recargo_mensual_porcentaje;
+            if (meses_pago === 3) surchargePct = recargo_mensual_porcentaje * 0.75;
+            else if (meses_pago === 6) surchargePct = recargo_mensual_porcentaje * 0.5;
+            else if (meses_pago === 9) surchargePct = recargo_mensual_porcentaje * 0.25;
+            else if (meses_pago === 12) surchargePct = 0;
+
+            recargo_monto = subtotal_recurrente_base * (surchargePct / 100);
             precio_recurrente_final = subtotal_recurrente_base + recargo_monto;
-            cuota_mensual = precio_recurrente_final / 12;
-            ahorro_pago_anual = recargo_monto;
+
+            // La cuota mensual es (SubtotalBase + Recargo) / 12
+            // PERO si el usuario quiere ver el "Monto del periodo", sería (Total / 12) * meses_pago
+            cuota_mensual = (precio_recurrente_final / 12) * meses_pago;
+            ahorro_pago_anual = (subtotal_recurrente_base * (recargo_mensual_porcentaje / 100));
         }
 
         // 5. APLICAR DESCUENTO (solo a recurrentes)
@@ -354,6 +365,7 @@ class CotizadorService {
 
             // Forma de pago
             forma_pago,
+            meses_pago,
             precio_anual_sin_recargo: Number(subtotal_recurrente_base.toFixed(2)),
             precio_anual_con_recargo: Number((subtotal_recurrente_base + recargo_monto).toFixed(2)),
             cuota_mensual: Number(cuota_mensual.toFixed(2)),

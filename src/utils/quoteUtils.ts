@@ -29,6 +29,7 @@ export interface CotizacionData {
     total_anual: number;
     monto_anticipo: number;
     tipo_pago: 'mensual' | 'anual';
+    plazo_meses?: number;
     estado: string;
     subtotal_anticipo: number;
     iva_anticipo: number;
@@ -41,6 +42,7 @@ export interface CotizacionData {
         website?: string;
         address?: string;
         phone?: string;
+        terminos_condiciones?: string;
     };
     creator?: {
         full_name: string;
@@ -50,45 +52,58 @@ export interface CotizacionData {
 }
 
 export const calculateQuoteFinancials = (cotizacion: Partial<CotizacionData>) => {
-    const isMonthly = cotizacion.tipo_pago === 'mensual';
+    const isAnual = cotizacion.tipo_pago === 'anual';
     const ivaPct = (cotizacion.iva_porcentaje || 13) / 100;
-    const recargoMensualPct = (cotizacion.recargo_mensual_porcentaje || 20) / 100;
-    const totalAnual = cotizacion.total_anual || 0;
+    const baseSurchargePct = (cotizacion.recargo_mensual_porcentaje || 20) / 100;
+    const totalGeneral = cotizacion.total_anual || 0;
     const pagoInicial = cotizacion.monto_anticipo || 0;
+    const plazoMeses = cotizacion.plazo_meses || (isAnual ? 12 : 1);
 
-    // Lo que queda por pagar después del anticipo
-    const totalRecurrenteConIVA = totalAnual - pagoInicial;
-
-    let subtotalRecurrenteBase = 0;
-    let recargoFinanciamiento = 0;
-    let ivaRecurrente = 0;
-
-    if (isMonthly) {
-        // base = total / ((1 + recargo) * (1 + iva))
-        subtotalRecurrenteBase = totalRecurrenteConIVA / ((1 + recargoMensualPct) * (1 + ivaPct));
-        recargoFinanciamiento = subtotalRecurrenteBase * recargoMensualPct;
-        ivaRecurrente = (subtotalRecurrenteBase + recargoFinanciamiento) * ivaPct;
-    } else {
-        subtotalRecurrenteBase = totalRecurrenteConIVA / (1 + ivaPct);
-        ivaRecurrente = subtotalRecurrenteBase * ivaPct;
+    // Determinamos el recargo basado en el plazo REAL
+    let termSurchargePct = 0;
+    if (!isAnual) {
+        if (plazoMeses === 1) termSurchargePct = baseSurchargePct;
+        else if (plazoMeses === 3) termSurchargePct = baseSurchargePct * 0.75;
+        else if (plazoMeses === 6) termSurchargePct = baseSurchargePct * 0.5;
+        else if (plazoMeses === 9) termSurchargePct = baseSurchargePct * 0.25;
     }
 
-    // Cálculos para el Pago Inicial
+    // El totalGeneral = Pagos Únicos (pagoInicial) + Recurrente 12 Meses con Recargo
+    const recurring12MonthsConIVA = totalGeneral - pagoInicial;
+
+    // A. Desglose ANUAL (Para la lista detallada)
+    // Formula: TotalAnual = BaseAnual * (1 + surcharge) * (1 + iva)
+    const subtotalRecurrenteBaseAnual = recurring12MonthsConIVA / ((1 + termSurchargePct) * (1 + ivaPct));
+    const recargoFinanciamientoAnual = subtotalRecurrenteBaseAnual * termSurchargePct;
+    const ivaRecurrenteAnual = (subtotalRecurrenteBaseAnual + recargoFinanciamientoAnual) * ivaPct;
+
+    // B. Cuota MENSUAL (Promedio real que paga el cliente)
+    const cuotaMensual = recurring12MonthsConIVA / 12;
+
+    // C. Total del PERIODO (El pago que toca hacer ahora o en 1 mes)
+    const montoPeriodo = cuotaMensual * plazoMeses;
+
+    // Totales para el Pago Inicial
     const subtotalAnticipo = pagoInicial / (1 + ivaPct);
     const ivaAnticipo = pagoInicial - subtotalAnticipo;
 
     return {
-        isMonthly,
+        isMonthly: !isAnual,
+        plazoMeses,
         ivaPct,
-        recargoMensualPct,
-        totalAnual,
+        termSurchargePct,
+        totalAnual: totalGeneral,
         pagoInicial,
-        subtotalRecurrenteBase,
-        recargoFinanciamiento,
-        ivaRecurrente,
+        // Usamos los valores anuales para el desglose visual de la tarjeta
+        subtotalRecurrenteBase: subtotalRecurrenteBaseAnual,
+        recargoFinanciamiento: recargoFinanciamientoAnual,
+        ivaRecurrente: ivaRecurrenteAnual,
+        // Totales de pago
+        cuotaMensual,
+        montoPeriodo,
+        totalRecurrenteConIVA: montoPeriodo, // Alias para compatibilidad parcial
         subtotalAnticipo,
-        ivaAnticipo,
-        totalRecurrenteConIVA
+        ivaAnticipo
     };
 };
 
