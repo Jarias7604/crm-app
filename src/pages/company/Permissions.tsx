@@ -13,6 +13,7 @@ export default function Permissions() {
     const [definitions, setDefinitions] = useState<PermissionDefinition[]>([]);
     const [roles, setRoles] = useState<CustomRole[]>([]);
     const [rolePermissions, setRolePermissions] = useState<RolePermission[]>([]);
+    const [roleCounts, setRoleCounts] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState<string | null>(null);
     const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['Marketing', 'Mensajes', 'Leads']));
@@ -36,11 +37,12 @@ export default function Permissions() {
         if (!profile?.company_id) return;
         try {
             setLoading(true);
-            const [defs, rolesData, perms, allowed] = await Promise.all([
+            const [defs, rolesData, perms, allowed, counts] = await Promise.all([
                 permissionsService.getDefinitions(),
                 permissionsService.getRoles(profile.company_id),
                 permissionsService.getRolePermissions(),
-                permissionsService.getCompanyAllowedPermissions(profile.company_id)
+                permissionsService.getCompanyAllowedPermissions(profile.company_id),
+                permissionsService.getRoleMemberCounts(profile.company_id)
             ]);
 
             const visibleRoles = rolesData.filter(r => isSuperAdmin || r.base_role !== 'super_admin');
@@ -50,13 +52,13 @@ export default function Permissions() {
                 setSelectedRoleId(visibleRoles[0].id);
             }
 
-            if (isSuperAdmin) {
-                setDefinitions(defs);
-            } else {
-                setDefinitions(defs.filter(d => allowed.includes(d.permission_key)));
-            }
+            const visibleDefs = isSuperAdmin
+                ? defs
+                : defs.filter(d => !d.is_system_only && allowed.includes(d.permission_key));
 
+            setDefinitions(visibleDefs);
             setRolePermissions(perms);
+            setRoleCounts(counts);
         } catch (error) {
             console.error('Error loading permissions:', error);
             toast.error('Error al cargar datos');
@@ -205,13 +207,20 @@ export default function Permissions() {
                                             }`}>
                                             {role.name.charAt(0)}
                                         </div>
-                                        <div className="text-left">
+                                        <div className="text-left relative">
                                             <p className={`font-bold text-[13px] transition-all leading-tight ${selectedRoleId === role.id ? 'text-white' : 'text-gray-900'}`}>
                                                 {role.name}
                                             </p>
                                             <p className={`text-[8px] uppercase tracking-widest font-black opacity-60`}>
                                                 {role.base_role === 'company_admin' ? 'Empresa' : (role.base_role === 'super_admin' ? 'Maestro' : 'Colaborador')}
                                             </p>
+                                            {/* Badge de Conteo */}
+                                            {(roleCounts[role.id] || 0) > 0 && (
+                                                <div className={`absolute -top-1 -right-4 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black transition-all ${selectedRoleId === role.id ? 'bg-white text-indigo-600' : 'bg-indigo-50 text-indigo-600 border border-indigo-100'
+                                                    }`}>
+                                                    {roleCounts[role.id]}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                     {selectedRoleId === role.id && <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>}
@@ -219,7 +228,7 @@ export default function Permissions() {
                             ))}
                         </div>
 
-                        {selectedRole && !selectedRole.is_system && (
+                        {selectedRole && (!selectedRole.is_system || selectedRole.company_id === profile.company_id) && (
                             <div className="mt-4 pt-4 border-t border-gray-50">
                                 <button
                                     onClick={() => handleDeleteRole(selectedRole.id, selectedRole.name)}

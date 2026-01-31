@@ -1,23 +1,49 @@
+import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import MobileNav from '../components/MobileNav';
+import { cn } from '../lib/utils';
+import { useAuth } from '../auth/AuthProvider';
+import { useTranslation } from 'react-i18next';
 
 export default function DashboardLayout() {
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const { profile } = useAuth();
+    const { t, i18n } = useTranslation();
+
     return (
-        <div className="min-h-screen bg-[#F1F3F9]">
+        <div className="min-h-screen bg-[#F8F9FD]">
             {/* Desktop Sidebar - Hidden on mobile */}
             <div className="hidden md:block">
-                <Sidebar />
+                <Sidebar isCollapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} />
             </div>
 
             {/* Mobile Bottom Nav - Hidden on desktop */}
             <MobileNav />
 
             {/* Main Content Area */}
-            {/* Added pb-20 for mobile bottom nav spacing */}
-            <div className="md:pl-64 flex flex-col min-h-screen transition-all duration-300 pb-20 md:pb-0">
-                {/* Symmetric vertical spacing: 32px (pt-8, pb-8) for a perfectly balanced fit */}
-                <main className="flex-1 w-full max-w-[1580px] mx-auto px-4 md:px-8 md:pt-8 md:pb-8">
+            {/* Dynamic padding based on sidebar state */}
+            <div className={cn(
+                "transition-all duration-300 ease-in-out flex flex-col min-h-screen pb-20 md:pb-0",
+                sidebarCollapsed ? "md:pl-20" : "md:pl-64"
+            )}>
+                {/* Optimized Global Header - High Precision Spacing */}
+                <header className="w-full px-4 md:px-8 pt-4 pb-6">
+                    <div className="max-w-[1580px] mx-auto flex items-center justify-start">
+                        <div className="flex flex-col items-start gap-0 group cursor-default">
+                            <h2 className="text-[13px] md:text-[14px] font-black text-gray-800 tracking-tight flex items-center gap-1.5 transition-all group-hover:text-indigo-600">
+                                {t('common.greeting', { name: profile?.full_name?.split(' ')[0] || profile?.email?.split('@')[0] })}
+                                <span className="animate-bounce text-[12px]">✨</span>
+                            </h2>
+                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-[0.25em] opacity-70 group-hover:opacity-100 transition-opacity">
+                                {new Date().toLocaleDateString(i18n.language === 'es' ? 'es-ES' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                            </p>
+                        </div>
+                    </div>
+                </header>
+
+                {/* Main Content Area - Clean separation */}
+                <main className="flex-1 w-full max-w-[1580px] mx-auto px-4 md:px-8 pb-8">
                     <Outlet />
                 </main>
             </div>

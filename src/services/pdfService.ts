@@ -213,7 +213,7 @@ export const pdfService = {
                 doc.setTextColor(15, 23, 42);
                 doc.setFontSize(12);
                 doc.setFont('helvetica', 'bold');
-                doc.text(`$${price.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, pageWidth - margin - 5, currentY, { align: 'right' });
+                doc.text(`$${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - margin - 5, currentY, { align: 'right' });
 
                 doc.setDrawColor(241, 245, 249);
                 doc.line(margin, currentY + 4, pageWidth - margin, currentY + 4);
@@ -245,6 +245,8 @@ export const pdfService = {
                 plazoMeses
             } = financials;
 
+            const divisor = cotizacion.cuotas || (isMonthly ? plazoMeses : 1);
+
             const boxW = 89;
             const gap = 2;
             let bx = margin;
@@ -256,7 +258,7 @@ export const pdfService = {
             }
 
             const drawBox = (x: number, y: number, title: string, subtitle: string, mainValue: number, footerValue: number, color: number[], isRecurrent: boolean = false) => {
-                const h = 42;
+                const h = 50;
                 // Manual Alpha Blending (Base 255 for White background)
                 const r5 = Math.floor(255 - (255 - color[0]) * 0.05);
                 const g5 = Math.floor(255 - (255 - color[1]) * 0.05);
@@ -297,86 +299,86 @@ export const pdfService = {
                 doc.setFont('helvetica', 'normal');
 
                 if (title.includes('INICIAL')) {
-                    doc.text('Implementación + Servicios Adicionales (Pago Único)', x + 7, y + 20);
+                    const subtotalIni = pagoInicial / (1 + financials.ivaPct);
+                    const ivaIni = pagoInicial - subtotalIni;
+
+                    doc.text('Implementación + Servicios', x + 7, y + 18);
+                    doc.text(`$${subtotalIni.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, y + 18, { align: 'right' });
+
+                    doc.text(`IVA (${Math.round(financials.ivaPct * 100)}%)`, x + 7, y + 22);
+                    doc.setTextColor(color[0], color[1], color[2]);
+                    doc.text(`+$ ${ivaIni.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, y + 22, { align: 'right' });
+
+                    doc.setDrawColor(r15, g15, b15);
+                    doc.setLineWidth(0.1);
+                    doc.line(x + 7, y + 24, x + boxW - 7, y + 24);
                 } else {
-                    doc.text('Licencia + Módulos + IVA (Desglose Anual)', x + 7, y + 18);
-                    doc.setFont('helvetica', 'normal');
-                    doc.setTextColor(148, 163, 184);
-                    doc.text('Total Anual Estimado:', x + 7, y + 22);
-                    const annualTotal = mainValue * 12;
-                    doc.setTextColor(100, 116, 139);
+                    const { subtotalRecurrenteBase, recargoFinanciamiento, ivaRecurrente } = financials;
+
+                    doc.text('Licencia + Módulos', x + 7, y + 18);
+                    doc.text(`$${subtotalRecurrenteBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, y + 18, { align: 'right' });
+
+                    if (recargoFinanciamiento > 0) {
+                        doc.text('Recargo Financiamiento', x + 7, y + 22);
+                        doc.text(`+$ ${recargoFinanciamiento.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, y + 22, { align: 'right' });
+
+                        doc.text(`IVA (13%)`, x + 7, y + 26);
+                        doc.setTextColor(color[0], color[1], color[2]);
+                        doc.text(`+$ ${ivaRecurrente.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, y + 26, { align: 'right' });
+                    } else {
+                        doc.text(`IVA (13%)`, x + 7, y + 22);
+                        doc.setTextColor(color[0], color[1], color[2]);
+                        doc.text(`+$ ${ivaRecurrente.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, y + 22, { align: 'right' });
+                    }
+
+                    doc.setDrawColor(r15, g15, b15);
+                    doc.setLineWidth(0.1);
+                    doc.line(x + 7, y + (recargoFinanciamiento > 0 ? 28 : 24), x + boxW - 7, y + (recargoFinanciamiento > 0 ? 28 : 24));
+
+                    doc.setTextColor(51, 65, 85);
+                    doc.setFontSize(6.5);
                     doc.setFont('helvetica', 'bold');
-                    doc.text(`$${annualTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, x + boxW - 7, y + 22, { align: 'right' });
+                    const totalPlanLabel = `Total Plan (${divisor} ${divisor === 1 ? 'Cuota' : 'Cuotas'})`;
+                    doc.text(totalPlanLabel, x + 7, y + (recargoFinanciamiento > 0 ? 32 : 28));
+                    doc.text(`$${(mainValue * divisor).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, y + (recargoFinanciamiento > 0 ? 32 : 28), { align: 'right' });
                 }
 
                 // 5. Main Highlight
                 doc.setTextColor(51, 65, 85);
                 doc.setFontSize(7.5);
                 doc.setFont('helvetica', 'bold');
+
+                const highlightY = isRecurrent ? (financials.recargoFinanciamiento > 0 ? 42 : 38) : 34;
                 const tLabel = isRecurrent
-                    ? (isMonthly ? 'CUOTA MENSUAL' : 'TOTAL RECURRENTE')
-                    : 'INVERSIÓN INICIAL TOTAL';
-                doc.text(tLabel, x + 7, y + 30);
+                    ? (divisor > 1 ? `Cuota de ${divisor}` : 'TOTAL RECURRENTE')
+                    : 'TOTAL INICIAL';
+
+                doc.text(tLabel, x + 7, y + highlightY);
 
                 doc.setTextColor(color[0], color[1], color[2]);
                 doc.setFontSize(13);
                 doc.setFont('helvetica', 'bold');
-                const tText = `$${mainValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-                doc.text(tText, x + boxW - 7, y + 30, { align: 'right' });
+                const tText = `$${mainValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                doc.text(tText, x + boxW - 14, y + highlightY, { align: 'right' });
 
-                if (isRecurrent && isMonthly) {
+                if (isRecurrent && divisor > 1) {
                     doc.setFontSize(6);
-                    doc.text('/mes', x + (boxW - 7) + 1, y + 30);
+                    doc.text(' / cuota', x + (boxW - 14) + 1, y + highlightY);
                 }
 
-                // 6. Impact Footer Box
-                doc.setFillColor(r10, g10, b10);
-                doc.roundedRect(x + 4, y + 33, boxW - 8, 7, 2, 2, 'F');
-
-                doc.setTextColor(color[0], color[1], color[2]);
-                doc.setFontSize(5.2);
-                doc.setFont('helvetica', 'bold');
-                const footerLabel = isRecurrent
-                    ? (isMonthly
-                        ? (plazoMeses === 1 ? 'PAGO MENSUAL (1 de 12)' :
-                            plazoMeses === 3 ? 'PAGO TOTAL TRIMESTRAL' :
-                                plazoMeses === 6 ? 'PAGO TOTAL SEMESTRAL' :
-                                    plazoMeses === 12 ? 'PAGO TOTAL ANUAL' :
-                                        `PAGO TOTAL ${plazoMeses} MESES`)
-                        : 'TOTAL ANUAL PROYECTADO')
-                    : 'REQUERIDO PARA ACTIVAR';
-
-                doc.text(footerLabel, x + 7, y + 36.5);
-
-                if (isRecurrent && isMonthly) {
-                    doc.setFontSize(4);
-                    doc.setFont('helvetica', 'normal');
-                    doc.setTextColor(148, 163, 184);
-                    doc.text(`${plazoMeses} mes${plazoMeses === 1 ? '' : 'es'} x $${mainValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, x + 7, y + 38.8);
-
-                    doc.setTextColor(148, 163, 184);
-                    doc.setFontSize(4);
+                if (isRecurrent) {
+                    doc.setFontSize(5);
+                    doc.setTextColor(color[0], color[1], color[2]);
                     doc.setFont('helvetica', 'italic');
-                    doc.text('* Compromiso anual (12 meses)', x + boxW / 2, y + 41.5, { align: 'center' });
+                    doc.text('* Plan de pagos consecutivos.', x + boxW / 2, y + highlightY + 4, { align: 'center' });
                 }
-
-                doc.setFontSize(7);
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(color[0], color[1], color[2]);
-                doc.text(`$${footerValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`, x + boxW - 7, y + 38, { align: 'right' });
             };
 
             // Drawing boxes
             drawBox(bx, by, 'PAGO INICIAL', 'Requerido para activar', pagoInicial, pagoInicial, COLORS.ORANGE);
             const cColor = isMonthly ? COLORS.BLUE : COLORS.GREEN;
             const cTitle = isMonthly ? 'PAGO RECURRENTE' : 'RECURRENTE ANUAL';
-            const cSubtitle = isMonthly
-                ? (plazoMeses === 1 ? '12 cuotas mensuales' :
-                    plazoMeses === 3 ? '4 pagos trimestrales (12 meses)' :
-                        plazoMeses === 6 ? '2 pagos semestrales (12 meses)' :
-                            plazoMeses === 12 ? '1 pago anual (12 meses)' :
-                                `${plazoMeses} meses de servicio`)
-                : 'Pago anual (12 meses)';
+            const cSubtitle = divisor > 1 ? `Pago en ${divisor} cuotas` : 'Pago único acumulado';
             drawBox(bx + boxW + gap, by, cTitle, cSubtitle, isMonthly ? cuotaMensual : totalAnual, isMonthly ? montoPeriodo : totalAnual, cColor, true);
 
             drawFooter(1);

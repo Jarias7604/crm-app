@@ -36,6 +36,7 @@ export interface CotizacionData {
     total_mensual: number;
     notes?: string;
     incluir_implementacion: boolean;
+    cuotas?: number; // V3: Dynamic installments (renamed from cantidad_cuotas)
     company?: {
         name: string;
         logo_url?: string;
@@ -77,8 +78,9 @@ export const calculateQuoteFinancials = (cotizacion: Partial<CotizacionData>) =>
     const recargoFinanciamientoAnual = subtotalRecurrenteBaseAnual * termSurchargePct;
     const ivaRecurrenteAnual = (subtotalRecurrenteBaseAnual + recargoFinanciamientoAnual) * ivaPct;
 
-    // B. Cuota MENSUAL (Promedio real que paga el cliente)
-    const cuotaMensual = recurring12MonthsConIVA / 12;
+    // B. Cuota (Monto real por pago según divisor de cuotas)
+    const divisor = cotizacion.cuotas || (isAnual ? 1 : (plazoMeses || 1));
+    const cuotaMensual = recurring12MonthsConIVA / divisor;
 
     // C. Total del PERIODO (El pago que toca hacer ahora o en 1 mes)
     const montoPeriodo = cuotaMensual * plazoMeses;

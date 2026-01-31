@@ -6,6 +6,7 @@ import { AuthProvider } from './auth/AuthProvider';
 import AuthLayout from './layouts/AuthLayout';
 import DashboardLayout from './layouts/DashboardLayout';
 import ProtectedRoute from './components/ProtectedRoute';
+import RoleProtectedRoute from './components/RoleProtectedRoute';
 import { Toaster } from 'react-hot-toast';
 
 // Auth pages (not lazy loaded - needed immediately)
@@ -22,6 +23,7 @@ const Permissions = lazy(() => import('./pages/company/Permissions'));
 const Cotizaciones = lazy(() => import('./pages/Cotizaciones'));
 const NuevaCotizacion = lazy(() => import('./pages/NuevaCotizacionDinamica'));
 const PricingConfig = lazy(() => import('./pages/PricingConfig'));
+const FinancialRules = lazy(() => import('./pages/admin/FinancialRules'));
 const GestionPaquetes = lazy(() => import('./pages/GestionPaquetes'));
 const GestionItems = lazy(() => import('./pages/GestionItems'));
 const CotizadorPro = lazy(() => import('./pages/CotizadorPro'));
@@ -35,6 +37,9 @@ const AiAgentsConfig = lazy(() => import('./pages/marketing/AiAgentsConfig'));
 const MarketingSettings = lazy(() => import('./pages/marketing/MarketingSettings'));
 const ChatHub = lazy(() => import('./pages/marketing/ChatHub'));
 
+import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+
 // Loading component
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-screen">
@@ -43,6 +48,14 @@ const PageLoader = () => (
 );
 
 function App() {
+  const { i18n } = useTranslation();
+
+  useEffect(() => {
+    if (i18n.language) {
+      document.documentElement.lang = i18n.language;
+    }
+  }, [i18n.language]);
+
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
@@ -65,17 +78,21 @@ function App() {
                   <Route path="/cotizaciones/:id/editar" element={<CotizadorPro />} />
                   <Route path="/cotizaciones/:id" element={<CotizacionDetalle />} />
                   <Route path="/calendar" element={<Calendar />} />
-                  <Route path="/pricing" element={<PricingConfig />} />
-                  <Route path="/paquetes" element={<GestionPaquetes />} />
-                  <Route path="/items" element={<GestionItems />} />
+                  {/* Company & Config Routes (Admin only) */}
+                  <Route element={<RoleProtectedRoute allowedRoles={['super_admin', 'company_admin']} />}>
+                    <Route path="/company/team" element={<Team />} />
+                    <Route path="/company/permissions" element={<Permissions />} />
+                    <Route path="/company/branding" element={<Branding />} />
+                    <Route path="/pricing" element={<PricingConfig />} />
+                    <Route path="/financial-rules" element={<FinancialRules />} />
+                    <Route path="/paquetes" element={<GestionPaquetes />} />
+                    <Route path="/items" element={<GestionItems />} />
+                  </Route>
 
-                  {/* Company Routes */}
-                  <Route path="/company/team" element={<Team />} />
-                  <Route path="/company/permissions" element={<Permissions />} />
-                  <Route path="/company/branding" element={<Branding />} />
-
-                  {/* Admin Routes */}
-                  <Route path="/admin/companies" element={<Companies />} />
+                  {/* System Admin Routes (Super Admin only) */}
+                  <Route element={<RoleProtectedRoute allowedRoles={['super_admin']} />}>
+                    <Route path="/admin/companies" element={<Companies />} />
+                  </Route>
 
                   {/* Marketing Routes */}
                   <Route path="/marketing" element={<MarketingDashboard />} />

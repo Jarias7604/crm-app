@@ -161,7 +161,7 @@ export default function ChatHub() {
         }
     }, [selectedConv?.id]);
 
-    // --- 💎 GLOBAL AUTO-QUOTE DELIVERY ENGINE ---
+    // --- \uD83D\uDC8E GLOBAL AUTO-QUOTE DELIVERY ENGINE ---
     // Watches ALL conversations for AI Quote Triggers and sends PDFs automatically.
     useEffect(() => {
         if (!profile?.company_id) return;
@@ -520,9 +520,10 @@ export default function ChatHub() {
     });
 
     return (
-        <div className="flex h-[calc(100vh-64px)] bg-white rounded-[3.5rem] shadow-[0_48px_96px_-24px_rgba(0,0,0,0.15)] border border-white/60 overflow-hidden font-sans text-slate-900 selection:bg-blue-100 selection:text-blue-900 relative animate-in fade-in duration-500">
-            {/* Capa decorativa premium */}
-            <div className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#4449AA 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
+        <div className="flex h-[calc(100vh-64px)] bg-[#F8FAFC] rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] border border-white/20 overflow-hidden font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900 relative animate-in fade-in duration-700">
+            {/* Soft decorative light */}
+            <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-indigo-50/20 to-transparent pointer-events-none"></div>
+
             <input
                 type="file"
                 ref={fileInputRef}
@@ -531,7 +532,7 @@ export default function ChatHub() {
                 accept="application/pdf,image/*"
             />
 
-            <div className="w-[360px] flex flex-col bg-white rounded-[32px] shadow-xl border border-white/50 shrink-0 relative overflow-hidden h-full">
+            <div className="w-[380px] flex flex-col bg-white/60 backdrop-blur-3xl border-r border-slate-100 shrink-0 relative overflow-hidden h-full">
                 <div className="p-6 pb-2 space-y-4 relative z-10">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -573,12 +574,10 @@ export default function ChatHub() {
                         >
                             <div className="flex gap-4 relative z-10">
                                 <div className="relative shrink-0">
-                                    <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center font-black text-lg transition-transform group-hover:scale-105 ${selectedConv?.id === conv.id ? 'bg-white text-blue-600 shadow-lg' : 'bg-slate-100 text-slate-500'
-                                        }`}>
+                                    <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center font-black text-lg transition-transform group-hover:scale-105 ${selectedConv?.id === conv.id ? 'bg-white text-blue-600 shadow-lg' : 'bg-slate-100 text-slate-500'}`}>
                                         {conv.lead?.name?.[0] || '?'}
                                     </div>
-                                    <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center ring-2 ring-white shadow-sm ${conv.channel === 'telegram' ? 'bg-sky-500' : 'bg-emerald-500'
-                                        }`}>
+                                    <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center ring-2 ring-white shadow-sm ${conv.channel === 'telegram' ? 'bg-sky-500' : 'bg-emerald-500'}`}>
                                         {conv.channel === 'telegram' ? <TelegramIcon className="w-2.5 h-2.5 text-white" /> : <Smartphone className="w-2.5 h-2.5 text-white" />}
                                     </div>
                                 </div>
@@ -676,60 +675,62 @@ export default function ChatHub() {
                                         )}
                                     </div>
                                 </div>
-                            </div> {/* Closing the flex gap-3 container */}
+                            </div>
                         </header>
 
-                        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-8 space-y-6 custom-scrollbar scroll-smooth">
+                        <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-10 space-y-8 custom-scrollbar scroll-smooth">
                             {messages.map((msg, idx) => (
-                                <div key={msg.id || idx} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'} group w-full`}>
-                                    <div className={`flex flex-col gap-1.5 ${msg.direction === 'outbound' ? 'items-end' : 'items-start'} w-full`}>
-                                        <div className={`px-6 py-4 rounded-[24px] text-[15px] leading-relaxed relative shadow-sm transition-all hover:shadow-md w-fit max-w-[90%] break-words ${msg.direction === 'outbound'
-                                            ? 'bg-slate-900 text-white rounded-br-none shadow-slate-900/10'
+                                <div key={msg.id || idx} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'} group w-full animate-in fade-in slide-in-from-bottom-2 duration-300`}>
+                                    <div className={`flex flex-col gap-2 ${msg.direction === 'outbound' ? 'items-end' : 'items-start'} max-w-[85%]`}>
+                                        <div className={`px-5 py-3.5 rounded-[1.5rem] shadow-sm relative transition-all group-hover:shadow-md ${msg.direction === 'outbound'
+                                            ? 'bg-indigo-600 text-white rounded-br-none shadow-indigo-200/50'
                                             : 'bg-white text-slate-700 border border-slate-100 rounded-bl-none shadow-slate-200/40'
                                             }`}>
-                                            {msg.content.startsWith('__QUOTE__') ? (
-                                                <div className="w-fit max-w-[80%] min-w-[200px]">
-                                                    <div className="flex items-center gap-4 mb-3 pb-3 border-b border-white/10">
-                                                        <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-blue-400">
-                                                            <FileText className="w-5 h-5" />
+                                            <div className="text-[14.5px] font-medium leading-[1.6]">
+                                                {msg.content.startsWith('__QUOTE__') ? (
+                                                    <div className="w-fit max-w-[80%] min-w-[200px]">
+                                                        <div className="flex items-center gap-4 mb-3 pb-3 border-b border-white/10">
+                                                            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-blue-400">
+                                                                <FileText className="w-5 h-5" />
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-[9px] font-black uppercase text-white/60 tracking-widest">Documento</p>
+                                                                <p className="text-sm font-bold text-white truncate">Propuesta Comercial</p>
+                                                            </div>
                                                         </div>
-                                                        <div>
-                                                            <p className="text-[9px] font-black uppercase text-white/60 tracking-widest">Documento</p>
-                                                            <p className="text-sm font-bold text-white truncate">Propuesta Comercial</p>
-                                                        </div>
+                                                        <button
+                                                            onClick={() => { try { const d = JSON.parse(msg.content.substring(9).trim()); navigate(`/cotizaciones/${d.id}`); } catch (e) { } }}
+                                                            className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-900/20"
+                                                        >
+                                                            Ver PDF
+                                                        </button>
                                                     </div>
-                                                    <button
-                                                        onClick={() => { try { const d = JSON.parse(msg.content.substring(9).trim()); navigate(`/cotizaciones/${d.id}`); } catch (e) { } }}
-                                                        className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-900/20"
-                                                    >
-                                                        Ver PDF
-                                                    </button>
-                                                </div>
-                                            ) : msg.type === 'image' && msg.metadata?.url ? (
-                                                <img src={msg.metadata.url} className="rounded-xl max-w-full cursor-pointer hover:opacity-95 shadow-sm border border-black/5" onClick={() => window.open(msg.metadata.url)} />
-                                            ) : msg.type === 'file' ? (
-                                                <a href={msg.metadata?.url} target="_blank" className="flex items-center gap-3 p-2 group-hover/link:underline w-full">
-                                                    <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-white shrink-0"><Paperclip className="w-5 h-5" /></div>
-                                                    <span className="font-bold underline-offset-4 truncate">{msg.metadata?.fileName || 'Adjunto'}</span>
-                                                </a>
-                                            ) : (
-                                                msg.content
-                                            )}
+                                                ) : msg.type === 'image' && msg.metadata?.url ? (
+                                                    <img src={msg.metadata.url} className="rounded-xl max-w-full cursor-pointer hover:opacity-95 shadow-sm border border-black/5" onClick={() => window.open(msg.metadata.url)} />
+                                                ) : msg.type === 'file' ? (
+                                                    <a href={msg.metadata?.url} target="_blank" className="flex items-center gap-3 p-2 group-hover/link:underline w-full">
+                                                        <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-white shrink-0"><Paperclip className="w-5 h-5" /></div>
+                                                        <span className="font-bold underline-offset-4 truncate">{msg.metadata?.fileName || 'Adjunto'}</span>
+                                                    </a>
+                                                ) : (
+                                                    msg.content
+                                                )}
 
-                                            {/* DELETE BUTTON FOR ADMINS */}
-                                            {isAdmin() && (
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg.id); }}
-                                                    className={`absolute -top-2 ${msg.direction === 'outbound' ? '-left-8' : '-right-8'} p-1.5 rounded-full bg-white text-slate-400 hover:text-red-500 hover:bg-slate-50 opacity-0 group-hover:opacity-100 transition-all shadow-sm border border-slate-100 z-10`}
-                                                    title="Eliminar mensaje"
-                                                >
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
-                                            )}
+                                                {/* DELETE BUTTON FOR ADMINS */}
+                                                {isAdmin() && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg.id); }}
+                                                        className={`absolute -top-2 ${msg.direction === 'outbound' ? '-left-8' : '-right-8'} p-1.5 rounded-full bg-white text-slate-400 hover:text-red-500 hover:bg-slate-50 opacity-0 group-hover:opacity-100 transition-all shadow-sm border border-slate-100 z-10`}
+                                                        title="Eliminar mensaje"
+                                                    >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest px-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                {formatTime(msg.sent_at)} \u2022 {msg.direction === 'outbound' ? 'Entregado' : 'Recibido'}
+                                            </span>
                                         </div>
-                                        <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest px-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            {formatTime(msg.sent_at)} • {msg.direction === 'outbound' ? 'Entregado' : 'Recibido'}
-                                        </span>
                                     </div>
                                 </div>
                             ))}
@@ -745,7 +746,7 @@ export default function ChatHub() {
                                     <div className="p-5">
                                         <div className="flex justify-between items-start mb-4">
                                             <div>
-                                                <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide">Proceso de Cotización</h4>
+                                                <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide">Proceso de Cotizaci\u00F3n</h4>
                                                 <p className="text-[11px] text-slate-400 font-medium mt-0.5">Editando propuesta para {pendingQuote.nombre_cliente}</p>
                                             </div>
                                             <div className="bg-blue-50 text-blue-600 px-2 py-1 rounded text-[9px] font-black uppercase tracking-wider border border-blue-100">
@@ -755,7 +756,7 @@ export default function ChatHub() {
 
                                         <div className="flex gap-3 mt-4">
                                             <button onClick={handleEditPendingQuote} className="px-4 py-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors">
-                                                ← Editar
+                                                \u2190 Editar
                                             </button>
                                             <button onClick={handlePreviewQuote} className="flex-1 py-3 bg-white border-2 border-slate-100 hover:border-blue-200 text-slate-700 hover:text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 group">
                                                 <Eye className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
@@ -770,24 +771,24 @@ export default function ChatHub() {
                             </div>
                         )}
 
-                        <div className="px-8 pb-8 pt-2 bg-gradient-to-t from-white via-white to-transparent">
-                            <form onSubmit={handleSendMessage} className="bg-white rounded-[24px] p-2 flex items-center gap-2 border border-slate-200 shadow-[0_10px_30px_-10px_rgba(0,0,0,0.05)] focus-within:ring-4 focus-within:ring-blue-100 focus-within:border-blue-300 transition-all">
-                                <button type="button" className="p-3 text-slate-400 hover:text-blue-500 transition-colors"><Smile className="w-5 h-5" /></button>
+                        <div className="px-8 pb-8 pt-4 bg-gradient-to-t from-white via-white to-transparent">
+                            <form onSubmit={handleSendMessage} className="bg-white rounded-[1.5rem] p-2 flex items-center gap-2 border border-slate-200/60 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.08)] focus-within:ring-4 focus-within:ring-indigo-100/50 focus-within:border-indigo-200 transition-all duration-300">
+                                <button type="button" className="p-3 text-slate-400 hover:text-indigo-600 transition-all hover:scale-110"><Smile className="w-5 h-5" /></button>
                                 <textarea
                                     value={newMessage}
                                     onChange={e => setNewMessage(e.target.value)}
                                     onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(e as any); } }}
-                                    placeholder="Escribe un mensaje..."
-                                    className="flex-1 bg-transparent py-3 text-sm font-medium text-slate-700 outline-none resize-none max-h-24 custom-scrollbar placeholder:text-slate-300"
+                                    placeholder="Escribe un mensaje para tu cliente..."
+                                    className="flex-1 bg-transparent py-3 text-[14px] font-semibold text-slate-700 outline-none resize-none max-h-32 custom-scrollbar placeholder:text-slate-300"
                                     rows={1}
                                 />
-                                <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 text-slate-400 hover:text-blue-500 transition-colors"><Paperclip className="w-5 h-5" /></button>
+                                <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 text-slate-400 hover:text-indigo-600 transition-all hover:scale-110"><Paperclip className="w-5 h-5" /></button>
                                 <button
                                     type="submit"
                                     disabled={!newMessage.trim() || isSending}
-                                    className={`p-3 bg-slate-900 text-white rounded-xl transition-all shadow-md ${(!newMessage.trim() || isSending) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}`}
+                                    className={`h-12 w-12 flex items-center justify-center bg-indigo-600 text-white rounded-2xl transition-all shadow-xl shadow-indigo-600/20 active:scale-95 ${(!newMessage.trim() || isSending) ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-indigo-700 hover:-translate-y-0.5'}`}
                                 >
-                                    {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                    {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                                 </button>
                             </form>
                         </div>
@@ -798,53 +799,52 @@ export default function ChatHub() {
                             <MessageSquare className="w-14 h-14 text-slate-200" />
                         </div>
                         <h2 className="text-4xl font-black text-slate-900 mb-6 tracking-tighter">Inbox Centralizado</h2>
-                        <p className="text-[12px] text-slate-400 max-w-sm leading-loose font-black uppercase tracking-[0.25em]">Selecciona una conversación o lead para ver los detalles y mensajes.</p>
+                        <p className="text-[12px] text-slate-400 max-w-sm leading-loose font-black uppercase tracking-[0.25em]">Selecciona una conversaci\u00F3n o lead para ver los detalles y mensajes.</p>
                     </div>
                 )}
             </div>
 
-            {
-                selectedConv && showDetails && (
-                    <div className="w-[260px] bg-white rounded-[32px] border border-slate-100 shadow-sm flex flex-col overflow-y-auto shrink-0 p-5 space-y-6">
-                        <div className="text-center space-y-3">
-                            <div className="relative inline-block">
-                                <div className="w-20 h-20 rounded-[24px] bg-slate-50 mx-auto flex items-center justify-center text-4xl font-black text-slate-900 shadow-inner border border-white">
-                                    {selectedConv.lead?.name?.[0] || '?'}
-                                </div>
-                                <div className="absolute -bottom-2 inset-x-0 flex justify-center">
-                                    <div className="bg-white/90 backdrop-blur-sm border border-slate-100 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
-                                        <Zap className="w-3 h-3 text-yellow-500 fill-yellow-500" />
-                                        <span className="text-[8px] font-black uppercase tracking-wider text-slate-600">High Value</span>
-                                    </div>
+            {selectedConv && showDetails && (
+                <div className="w-[260px] bg-white rounded-[32px] border border-slate-100 shadow-sm flex flex-col overflow-y-auto shrink-0 p-5 space-y-6">
+                    <div className="text-center space-y-3">
+                        <div className="relative inline-block">
+                            <div className="w-20 h-20 rounded-[24px] bg-slate-50 mx-auto flex items-center justify-center text-4xl font-black text-slate-900 shadow-inner border border-white">
+                                {selectedConv.lead?.name?.[0] || '?'}
+                            </div>
+                            <div className="absolute -bottom-2 inset-x-0 flex justify-center">
+                                <div className="bg-white/90 backdrop-blur-sm border border-slate-100 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+                                    <Zap className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                                    <span className="text-[8px] font-black uppercase tracking-wider text-slate-600">High Value</span>
                                 </div>
                             </div>
-                            <div className="pt-2">
-                                <h3 className="text-lg font-black text-slate-900 leading-tight truncate px-2">{selectedConv.lead?.name || 'Visitante'}</h3>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{selectedConv.lead?.company_name || 'Individual'}</p>
-                            </div>
                         </div>
-
-                        <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-[20px] border border-blue-100 text-center relative overflow-hidden group">
-                            <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1 relative z-10">IA Score</p>
-                            <div className="text-3xl font-black text-blue-600 tracking-tighter relative z-10 group-hover:scale-110 transition-transform">98</div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div className="space-y-3">
-                                <InfoItem icon={Mail} label="EMAIL" value={selectedConv.lead?.email || 'No identificado'} />
-                                <InfoItem icon={PhoneIcon} label="TELÉFONO" value={selectedConv.lead?.phone || 'Sin número'} />
-                            </div>
-                            <button onClick={() => navigate('/leads', { state: { leadId: selectedConv.lead?.id } })} className="w-full py-3 rounded-xl border-2 border-slate-100 font-black text-[9px] uppercase tracking-widest text-slate-500 hover:border-slate-300 hover:text-slate-900 transition-all">Ver Perfil</button>
+                        <div className="pt-2">
+                            <h3 className="text-lg font-black text-slate-900 leading-tight truncate px-2">{selectedConv.lead?.name || 'Visitante'}</h3>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{selectedConv.lead?.company_name || 'Individual'}</p>
                         </div>
                     </div>
-                )
-            }
+
+                    <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-[20px] border border-blue-100 text-center relative overflow-hidden group">
+                        <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1 relative z-10">IA Score</p>
+                        <div className="text-3xl font-black text-blue-600 tracking-tighter relative z-10 group-hover:scale-110 transition-transform">98</div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="space-y-3">
+                            <InfoItem icon={Mail} label="EMAIL" value={selectedConv.lead?.email || 'No identificado'} />
+                            <InfoItem icon={PhoneIcon} label="TEL\u00C9FONO" value={selectedConv.lead?.phone || 'Sin n\u00FAmero'} />
+                        </div>
+                        <button onClick={() => navigate('/leads', { state: { leadId: selectedConv.lead?.id } })} className="w-full py-3 rounded-xl border-2 border-slate-100 font-black text-[9px] uppercase tracking-widest text-slate-500 hover:border-slate-300 hover:text-slate-900 transition-all">Ver Perfil</button>
+                    </div>
+                </div>
+            )}
+
             {showNewChatModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
                     <div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300" style={{ width: '700px', height: '650px', maxWidth: '95vw', display: 'flex', flexDirection: 'column' }}>
                         <div className="p-8 border-b border-slate-50 flex items-center justify-between">
                             <div>
-                                <h3 className="text-2xl font-black text-slate-900 tracking-tighter">Nueva Conversación</h3>
+                                <h3 className="text-2xl font-black text-slate-900 tracking-tighter">Nueva Conversaci\u00F3n</h3>
                                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Busca un lead para chatear</p>
                             </div>
                             <button onClick={() => setShowNewChatModal(false)} className="p-2 rounded-full hover:bg-slate-100 transition-colors text-slate-400"><CloseIcon className="w-6 h-6" /></button>
@@ -876,7 +876,7 @@ export default function ChatHub() {
                                 <input
                                     autoFocus
                                     type="text"
-                                    placeholder="Nombre del cliente o teléfono..."
+                                    placeholder="Nombre del cliente o tel\u00E9fono..."
                                     value={leadSearch}
                                     onChange={(e) => searchLeads(e.target.value)}
                                     className="w-full pl-14 pr-6 py-4.5 bg-slate-50 border-2 border-transparent rounded-[20px] text-sm font-bold text-slate-700 placeholder:text-slate-400 focus:bg-white focus:border-blue-500/20 focus:ring-4 focus:ring-blue-500/5 transition-all"
@@ -902,7 +902,7 @@ export default function ChatHub() {
                                                             {lead.status || 'Nuevo'}
                                                         </span>
                                                     </div>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{lead.phone || 'Sin teléfono'}</p>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{lead.phone || 'Sin tel\u00E9fono'}</p>
                                                 </div>
                                             </div>
                                             <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500 translate-x-0 group-hover:translate-x-1 transition-all" />
@@ -921,7 +921,7 @@ export default function ChatHub() {
                     </div>
                 </div>
             )}
-        </div >
+        </div>
     );
 }
 

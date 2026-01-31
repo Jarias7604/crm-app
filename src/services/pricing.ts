@@ -1,7 +1,48 @@
 import { supabase } from './supabase';
-import type { PricingItem, PricingConfig } from '../types/pricing';
+import type { PricingItem, PricingConfig, PaymentSettings, FinancingPlan } from '../types/pricing';
 
 class PricingService {
+    // Obtener configuración de pagos (IVA, descuentos base, etc)
+    async getPaymentSettings(companyId?: string): Promise<PaymentSettings | null> {
+        let query = supabase.from('payment_settings').select('*');
+
+        if (companyId) {
+            query = query.eq('company_id', companyId);
+        } else {
+            query = query.is('company_id', null);
+        }
+
+        const { data, error } = await query.maybeSingle();
+        if (error) {
+            console.error('Error fetching payment settings:', error);
+            return null;
+        }
+        return data;
+    }
+
+    // Obtener planes de financiamiento dinámicos
+    async getFinancingPlans(companyId?: string): Promise<FinancingPlan[]> {
+        let query = supabase
+            .from('financing_plans')
+            .select('*')
+            .eq('activo', true)
+            .order('orden', { ascending: true });
+
+        // Intentar obtener de la compañía, si no hay, obtener globales (null)
+        const { data, error } = await query;
+        if (error) {
+            console.error('Error fetching financing plans:', error);
+            return [];
+        }
+
+        // Si hay planes específicos de la compañía, usarlos. 
+        // Si no, filtrar los que tienen company_id null (globales)
+        if (companyId && data.some(p => p.company_id === companyId)) {
+            return data.filter(p => p.company_id === companyId);
+        }
+
+        return data.filter(p => p.company_id === null);
+    }
     // Obtener toda la configuración de precios
     async getPricingConfig(): Promise<PricingConfig> {
         const { data, error } = await supabase
@@ -167,6 +208,78 @@ class PricingService {
             precio_calculado: Number(precio_calculado.toFixed(2)),
             descripcion_calculo
         };
+    }
+    // --- ADMINISTRACIÓN DE FINANCIAMIENTO ---
+
+    async createFinancingPlan(plan: Omit<FinancingPlan, 'id' | 'created_at'>) {
+        const { data, error } = await supabase
+            .from('financing_plans')
+            .insert(plan)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    }
+
+    async updateFinancingPlan(id: string, updates: Partial<FinancingPlan>) {
+        const { data, error } = await supabase
+            .from('financing_plans')
+            .update(updates)
+            .eq('id', id)
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    }
+
+    async deleteFinancingPlan(id: string) {
+        // En lugar de borrar, mejor desactivar (soft delete) para historial
+        const { error } = await supabase
+            .from('financing_plans')
+            .delete() // Usamos delete físico por simplicidad inicial, o cambiar a update activo=false
+            .eq('id', id);
+
+        if (error) throw error;
+    }
+
+    // --- CONFIGURACIÓN GLOBAL DE PAGOS ---
+
+    async updatePaymentSettings(companyId: string, settings: Partial<PaymentSettings>) {
+        // Upsert basado en company_id
+        const { data, error } = await supabase
+            .from('payment_settings')
+            .upsert({
+                company_id: companyId,
+                ...settings,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'company_id' })
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    }
+    async updateFinancingPlansOrder(items: { id: string, orden: number }[]) {
+        // Usamos Promise.all para actualizaciones paralelas ya que upsert requiere todos los campos NOT NULL
+        const promises = items.map(item =>
+            supabase
+                .from('financing_plans')
+                .update({
+                    orden: item.orden,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', item.id)
+        );
+
+        const results = await Promise.all(promises);
+
+        // Verificar si hubo algún error en alguna de las promesas
+        const error = results.find(r => r.error)?.error;
+        if (error) throw error;
+
+        return true;
     }
 }
 

@@ -56,7 +56,8 @@ export interface CotizacionCalculada {
 
     // Pagos Recurrentes (licencias, módulos, servicios recurrentes)
     subtotal_recurrente_base: number;      // Sin recargo
-    recargo_mensual_porcentaje: number;    // 20% por defecto, configurable
+    recargo_mensual_porcentaje: number;    // Base (e.g. 20%)
+    recargo_aplicado_porcentaje: number;   // Calculated based on period (e.g. 10% for 6 months)
     recargo_mensual_monto: number;         // Solo si forma_pago = 'mensual'
 
     // Forma de pago y cálculos
@@ -81,6 +82,10 @@ export interface CotizacionCalculada {
     paquete: CotizadorPaquete;
     items_seleccionados: CotizadorItem[];
     desglose: DetalleLinea[];
+
+    // V4: Installments Meta
+    cuotas: number;
+    es_financiado: boolean;
 }
 
 // =====================================================
@@ -224,16 +229,27 @@ class CotizadorService {
 
     // =================== CÁLCULOS ===================
 
+    // =====================================================
+    // MOTOR DE CÁLCULO UNIFICADO V2
+    // =====================================================
+
     calcularCotizacion(
         paquete: CotizadorPaquete,
         items: CotizadorItem[],
         cantidad_dtes: number,
-        forma_pago: 'anual' | 'mensual' = 'mensual',
-        descuento_porcentaje: number = 0,
-        iva_porcentaje: number = 13,
-        incluir_implementacion: boolean = true,
-        recargo_mensual_porcentaje: number = 20,
-        meses_pago: number = 1
+        // Configuración Financiera (Plan + IVA)
+        config: {
+            forma_pago: 'anual' | 'mensual'; // (Derivado del plan.meses: 12='anual' si es contado, sino 'mensual' visualmente) 
+            //  NOTA: En V2 'forma_pago' es más visual. Lo que importa son 'meses' y 'tipo_ajuste'.
+            meses: number;
+            tipo_ajuste: 'discount' | 'recharge' | 'none';  // Nuevo V2
+            tasa_ajuste: number; // Porcentaje (interes o descuento)
+
+
+            iva_porcentaje: number;
+            incluir_implementacion: boolean;
+            cuotas?: number; // V3: Cantidad de pagos (divisor)
+        }
     ): CotizacionCalculada {
 
         let subtotal_pagos_unicos = 0;
@@ -241,7 +257,7 @@ class CotizadorService {
         const desglose: DetalleLinea[] = [];
 
         // 1. IMPLEMENTACIÓN (Pago Único)
-        if (incluir_implementacion && paquete.costo_implementacion > 0) {
+        if (config.incluir_implementacion && paquete.costo_implementacion > 0) {
             subtotal_pagos_unicos += paquete.costo_implementacion;
             desglose.push({
                 es_pago_unico: true,
@@ -267,7 +283,6 @@ class CotizadorService {
         // 3. ITEMS (separar únicos de recurrentes)
         items.forEach(item => {
             if (item.pago_unico > 0) {
-                // ✅ Pago único - NO va a mensual
                 subtotal_pagos_unicos += item.pago_unico;
                 desglose.push({
                     es_pago_unico: true,
@@ -278,7 +293,6 @@ class CotizadorService {
                     descripcion: 'Pago único'
                 });
             } else if (item.precio_por_dte > 0) {
-                // Precio por DTE (recurrente)
                 const precio = cantidad_dtes * item.precio_por_dte;
                 subtotal_recurrente_base += precio;
                 desglose.push({
@@ -290,7 +304,6 @@ class CotizadorService {
                     descripcion: `${cantidad_dtes.toLocaleString()} DTEs × $${item.precio_por_dte}`
                 });
             } else {
-                // Recurrente normal
                 const precio = item.precio_anual || (item.precio_mensual * 12);
                 subtotal_recurrente_base += precio;
                 desglose.push({
@@ -304,84 +317,105 @@ class CotizadorService {
             }
         });
 
-        // 4. CALCULAR SEGÚN FORMA DE PAGO
-        let precio_recurrente_final = 0;
+        // 4. LÓGICA FINANCIERA UNIFICADA (V2)
+        // Ya no hay caminos separados para "Anual" o "Mensual", todo depende de tipo_ajuste y tasa.
+
+        let precio_recurrente_final = subtotal_recurrente_base;
+        let descuento_monto = 0;
         let recargo_monto = 0;
-        let cuota_mensual = 0;
-        let ahorro_pago_anual = 0;
+        let ahorro_total = 0;
 
-        if (forma_pago === 'anual') {
-            // Pago anual: precio base sin recargo
-            precio_recurrente_final = subtotal_recurrente_base;
-            recargo_monto = 0;
-            cuota_mensual = 0;
-            ahorro_pago_anual = subtotal_recurrente_base * (recargo_mensual_porcentaje / 100);
-            meses_pago = 12;
-        } else {
-            // Pago mensual: recargo dinámico según el plazo
-            let surchargePct = recargo_mensual_porcentaje;
-            if (meses_pago === 3) surchargePct = recargo_mensual_porcentaje * 0.75;
-            else if (meses_pago === 6) surchargePct = recargo_mensual_porcentaje * 0.5;
-            else if (meses_pago === 9) surchargePct = recargo_mensual_porcentaje * 0.25;
-            else if (meses_pago === 12) surchargePct = 0;
+        // Base para cálculos visuales de ahorro (asume que el precio de lista es lo que paga si es 'none' o 'recharge')
+        // Si hay descuento, el ahorro es tangible.
 
-            recargo_monto = subtotal_recurrente_base * (surchargePct / 100);
+        if (config.tipo_ajuste === 'discount') {
+            // APLICA DESCUENTO
+            descuento_monto = subtotal_recurrente_base * (config.tasa_ajuste / 100);
+            precio_recurrente_final = subtotal_recurrente_base - descuento_monto;
+            ahorro_total = descuento_monto;
+        } else if (config.tipo_ajuste === 'recharge') {
+            // APLICA RECARGO
+            recargo_monto = subtotal_recurrente_base * (config.tasa_ajuste / 100);
             precio_recurrente_final = subtotal_recurrente_base + recargo_monto;
-
-            // La cuota mensual es (SubtotalBase + Recargo) / 12
-            // PERO si el usuario quiere ver el "Monto del periodo", sería (Total / 12) * meses_pago
-            cuota_mensual = (precio_recurrente_final / 12) * meses_pago;
-            ahorro_pago_anual = (subtotal_recurrente_base * (recargo_mensual_porcentaje / 100));
+            // No hay ahorro real, es un costo extra
+        } else {
+            // NEUTRO ('none') o cualquier otro
+            // Precio de lista.
         }
 
-        // 5. APLICAR DESCUENTO (solo a recurrentes)
-        const descuento_monto = (precio_recurrente_final * descuento_porcentaje) / 100;
-        const recurrente_con_descuento = precio_recurrente_final - descuento_monto;
+        // 5. CÁLCULO DE CUOTAS
+        // V3: La cuota debe ser el (Total con Recargo e IVA) dividido entre cuotas.
+        // Primero calculamos IVA Recurrente
+        const iva_recurrente = (precio_recurrente_final * config.iva_porcentaje) / 100;
+        const total_recurrente = precio_recurrente_final + iva_recurrente;
+
+        // Divisor: Usamos 'cuotas' explícito si existe y es mayor a 0, sino fallback a 'meses'
+        // Salvaguarda V4: Si es pago anual, forzamos 1 cuota a menos que se indique financiamiento
+        let divisor_cuotas = (config.cuotas && config.cuotas > 0) ? config.cuotas : (config.meses || 1);
+        if (config.forma_pago === 'anual' && !config.cuotas) {
+            divisor_cuotas = 1;
+        }
+
+        // V4: es_financiado depende de si hay más de una cuota
+        const es_financiado = divisor_cuotas > 1;
+
+        // V4: Lógica de Frecuencia Visual
+        // Si son cuotas consecutivas (es_financiado), la frecuencia es siempre 1 (Mensual).
+        // Si no (pago único), usamos 'meses' (ej. 12 para anual).
+        const frecuencia_pago = es_financiado ? 1 : config.meses;
+
+        // Cuota periódica REAL que pagará el cliente (Total Recurrente / Divisor)
+        const cuota_periodo = total_recurrente / divisor_cuotas;
+
 
         // 6. CALCULAR IVA
-        const iva_pagos_unicos = (subtotal_pagos_unicos * iva_porcentaje) / 100;
-        const iva_recurrente = (recurrente_con_descuento * iva_porcentaje) / 100;
+        const iva_pagos_unicos = (subtotal_pagos_unicos * config.iva_porcentaje) / 100;
 
-        // 7. TOTALES
+
+        // 7. TOTALES FINALES
         const total_pagos_unicos = subtotal_pagos_unicos + iva_pagos_unicos;
-        const total_recurrente = recurrente_con_descuento + iva_recurrente;
+        // total_recurrente ya calculado arriba para V3
         const total_general = total_pagos_unicos + total_recurrente;
 
-        // Recalcular cuota mensual si hay descuento
-        if (forma_pago === 'mensual') {
-            cuota_mensual = total_recurrente / 12;
-        }
-
         return {
-            // Pagos únicos
             subtotal_pagos_unicos: Number(subtotal_pagos_unicos.toFixed(2)),
             iva_pagos_unicos: Number(iva_pagos_unicos.toFixed(2)),
             total_pagos_unicos: Number(total_pagos_unicos.toFixed(2)),
 
-            // Recurrentes
             subtotal_recurrente_base: Number(subtotal_recurrente_base.toFixed(2)),
-            recargo_mensual_porcentaje,
+
+            // Mapeo legacy para compatibilidad visual
+            recargo_mensual_porcentaje: config.tipo_ajuste === 'recharge' ? config.tasa_ajuste : 0,
+            recargo_aplicado_porcentaje: config.tipo_ajuste === 'recharge' ? config.tasa_ajuste : 0,
             recargo_mensual_monto: Number(recargo_monto.toFixed(2)),
 
-            // Forma de pago
-            forma_pago,
-            meses_pago,
-            precio_anual_sin_recargo: Number(subtotal_recurrente_base.toFixed(2)),
-            precio_anual_con_recargo: Number((subtotal_recurrente_base + recargo_monto).toFixed(2)),
-            cuota_mensual: Number(cuota_mensual.toFixed(2)),
-            ahorro_pago_anual: Number(ahorro_pago_anual.toFixed(2)),
+            forma_pago: config.forma_pago, // Passthrough visual
+            // V4: Usamos la frecuencia calculada (1 para cuotas, N para pagos espaciados)
+            meses_pago: frecuencia_pago,
 
-            // Descuentos e impuestos
-            descuento_porcentaje,
+            // V4: Metadatos extra para UI
+            cuotas: divisor_cuotas,
+            es_financiado: es_financiado,
+
+            precio_anual_sin_recargo: Number(subtotal_recurrente_base.toFixed(2)),
+            precio_anual_con_recargo: Number(precio_recurrente_final.toFixed(2)),
+
+            cuota_mensual: Number(cuota_periodo.toFixed(2)),
+
+            // Ahorro se calcula diferente según el caso.
+            // Si es descuento: Ahorro es el descuento.
+            // Si es recargo: No hay ahorro, pero visualmente podríamos compararlo con el pago de contado.
+            ahorro_pago_anual: Number(ahorro_total.toFixed(2)),
+
+            descuento_porcentaje: config.tipo_ajuste === 'discount' ? config.tasa_ajuste : 0,
             descuento_monto: Number(descuento_monto.toFixed(2)),
-            iva_porcentaje,
+
+            iva_porcentaje: config.iva_porcentaje,
             iva_monto_recurrente: Number(iva_recurrente.toFixed(2)),
 
-            // Totales
             total_recurrente: Number(total_recurrente.toFixed(2)),
             total_general: Number(total_general.toFixed(2)),
 
-            // Información adicional
             paquete,
             items_seleccionados: items,
             desglose

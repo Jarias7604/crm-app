@@ -22,6 +22,17 @@ export const teamService = {
         return company.max_users || 5;
     },
 
+    async getCompanyPermissions(companyId: string) {
+        const { data, error } = await supabase
+            .from('companies')
+            .select('allowed_permissions')
+            .eq('id', companyId)
+            .single();
+
+        if (error) throw error;
+        return (data?.allowed_permissions || []) as string[];
+    },
+
     // Get all members of my company - Updated with all fields
     async getTeamMembers(companyId: string) {
         const { data, error } = await supabase
@@ -106,13 +117,37 @@ export const teamService = {
 
     // Get roles
     async getRoles(companyId: string) {
+        // Obtenemos roles de sistema (empresa 0000...) y roles de la empresa actual
         const { data, error } = await supabase
             .from('custom_roles')
             .select('*')
-            .or(`company_id.eq.${companyId},is_system.eq.true`)
-            .order('is_system', { ascending: false });
+            .or(`company_id.eq.${companyId},company_id.eq.00000000-0000-0000-0000-000000000000`)
+            .order('is_system', { ascending: false })
+            .order('created_at', { ascending: true });
 
         if (error) throw error;
-        return data as CustomRole[];
+
+        // Eliminar duplicados por nombre, priorizando los que tienen company_id específico
+        // y excluyendo super_admin para el contexto de equipo de empresa
+        const uniqueRoles: CustomRole[] = [];
+        const seenNames = new Set<string>();
+
+        // Primero procesamos los de la empresa (si hay)
+        data.forEach(role => {
+            if (role.company_id === companyId && role.base_role !== 'super_admin') {
+                uniqueRoles.push(role);
+                seenNames.add(role.name.toLowerCase());
+            }
+        });
+
+        // Luego agregamos los de sistema solo si no existe ya uno con ese nombre
+        data.forEach(role => {
+            if (role.company_id !== companyId && !seenNames.has(role.name.toLowerCase()) && role.base_role !== 'super_admin') {
+                uniqueRoles.push(role);
+                seenNames.add(role.name.toLowerCase());
+            }
+        });
+
+        return uniqueRoles;
     }
 };

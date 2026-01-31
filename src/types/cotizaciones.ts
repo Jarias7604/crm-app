@@ -43,6 +43,7 @@ export interface Cotizacion {
     // Términos de Pago (Nuevo)
     tipo_pago?: 'contado' | 'credito' | 'anual' | 'mensual';
     plazo_meses?: number;
+    cuotas?: number;
     monto_anticipo?: number;
     subtotal_anticipo?: number;
     iva_anticipo?: number;

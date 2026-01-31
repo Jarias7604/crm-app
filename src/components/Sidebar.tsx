@@ -2,71 +2,78 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthProvider';
-import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Tag, Layers, Building2, Megaphone, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Tag, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { brandingService } from '../services/branding';
-
+import { supabase } from '../services/supabase';
 import type { Company } from '../types';
 
-export default function Sidebar() {
+export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolean, onToggle: () => void }) {
     const { profile, signOut } = useAuth();
-    // const { hasPermission } = usePermissions(); // Removed: hasPermission is not used in the current code
     const location = useLocation();
     const { t } = useTranslation();
-    const configPaths = ['/company/branding', '/pricing', '/paquetes', '/items'];
+    const configPaths = ['/company/branding', '/pricing', '/paquetes', '/items', '/financial-rules'];
     const [configOpen, setConfigOpen] = useState(configPaths.some(path => location.pathname === path));
-    const [company, setCompany] = useState<Company | null>(() => {
-        const saved = localStorage.getItem('company_branding');
-        if (saved) {
-            try {
-                return JSON.parse(saved);
-            } catch (e) {
-                return null;
-            }
-        }
-        return null;
-    });
+    const [company, setCompany] = useState<Company | null>(null);
 
     useEffect(() => {
+        // Cargar datos de la empresa si hay un company_id
         if (profile?.company_id) {
             loadCompany();
+        } else if (profile?.role === 'super_admin') {
+            // Placeholder para super admin si no tiene empresa vinculada
+            setCompany({ name: 'System Administration' } as Company);
         }
-    }, [profile?.company_id]);
+    }, [profile?.company_id, profile?.role]);
 
     const loadCompany = async () => {
         try {
             const data = await brandingService.getMyCompany();
-            setCompany(data);
-            localStorage.setItem('company_branding', JSON.stringify(data));
+            if (data) {
+                setCompany(data);
+            }
         } catch (error) {
             console.error('Error loading company branding for sidebar:', error);
+            // Intentar fallback si falla el servicio pero tenemos el ID
+            if (profile?.company_id && !company) {
+                const { data: fallbackCompany } = await supabase
+                    .from('companies')
+                    .select('name, logo_url')
+                    .eq('id', profile.company_id)
+                    .single();
+                if (fallbackCompany) setCompany(fallbackCompany as Company);
+            }
         }
     };
 
     // --- PERMISSION LOGIC ---
     const canAccess = (feature: 'leads' | 'quotes' | 'calendar' | 'marketing' | 'chat') => {
-        if (!profile || !company) return false;
+        if (!profile) return false;
 
-        // Representante de cada modulo para verificar licencia de empresa
+        // Si es super_admin tiene acceso a todo
+        if (profile.role === 'super_admin') return true;
+
+        // Si no hay empresa cargada todavía, esperamos
+        if (!company) return false;
+
         const licenseKeys: Record<string, string> = {
             leads: 'leads_view',
             quotes: 'cotizaciones.manage_implementation',
             calendar: 'calendar_view_own',
             marketing: 'mkt_view_dashboard',
-            chat: 'chat_view_all'
+            chat: 'chat_view_all',
+            branding: 'branding',
+            pricing: 'pricing',
+            paquetes: 'paquetes',
+            items: 'items'
         };
 
         const licenseKey = licenseKeys[feature];
-
-        // 1. Verificar si la empresa tiene el modulo habilitado (Licencia)
         const isLicensed = company.allowed_permissions?.includes(licenseKey);
-        if (!isLicensed) return false;
+        if (!isLicensed && (profile?.role as string) !== 'super_admin') return false;
 
-        // 2. Verificar el rol y permiso individual
-        if (profile.role === 'super_admin' || profile.role === 'company_admin') return true;
-
-        // Agentes deben tener el permiso habilitado en su objeto permissions
+        if (profile.role === 'company_admin') return true;
         return profile.permissions?.[feature] !== false;
     };
 
@@ -86,7 +93,6 @@ export default function Sidebar() {
         navigation.push({ name: t('sidebar.calendar'), href: '/calendar', icon: Calendar, current: location.pathname.startsWith('/calendar') });
     }
 
-    // Marketing & Chat
     if (canAccess('marketing')) {
         navigation.push({
             name: 'Marketing Hub',
@@ -106,40 +112,16 @@ export default function Sidebar() {
     }
 
     const configSubItemsRaw = [
-        {
-            name: 'Marca de Empresa',
-            href: '/company/branding',
-            icon: Building,
-            current: location.pathname === '/company/branding',
-            allowedRoles: ['super_admin', 'company_admin']
-        },
-        {
-            name: 'Gestión Precios',
-            href: '/pricing',
-            icon: Tag,
-            current: location.pathname === '/pricing',
-            allowedRoles: ['super_admin', 'company_admin']
-        },
-        {
-            name: 'Gestión Paquete',
-            href: '/paquetes',
-            icon: Package,
-            current: location.pathname === '/paquetes',
-            allowedRoles: ['super_admin', 'company_admin']
-        },
-        {
-            name: 'Gestión Item',
-            href: '/items',
-            icon: Layers,
-            current: location.pathname === '/items',
-            allowedRoles: ['super_admin', 'company_admin']
-        },
+        { name: 'Marca de Empresa', href: '/company/branding', icon: Building, current: location.pathname === '/company/branding', permissionKey: 'branding' },
+        { name: 'Gestión Precios', href: '/pricing', icon: Tag, current: location.pathname === '/pricing', permissionKey: 'pricing' },
+        { name: 'Gestión Paquete', href: '/paquetes', icon: Package, current: location.pathname === '/paquetes', permissionKey: 'paquetes' },
+        { name: 'Gestión Item', href: '/items', icon: Layers, current: location.pathname === '/items', permissionKey: 'items' },
+        { name: 'Gestión Financiera', href: '/financial-rules', icon: CreditCard, current: location.pathname === '/financial-rules', permissionKey: 'financial_rules' },
     ];
 
-    // Filtrar subitems según permiso
     const configSubItems = configSubItemsRaw.filter(item => {
-        if (!profile?.role) return false;
-        return item.allowedRoles.includes(profile.role);
+        if (profile?.role === 'super_admin' || profile?.role === 'company_admin') return true;
+        return profile?.permissions?.[item.permissionKey!] === true;
     });
 
     if (profile?.role === 'super_admin') {
@@ -159,107 +141,223 @@ export default function Sidebar() {
     };
 
     return (
-        <div className="flex flex-col w-64 bg-[#0f172a] h-screen fixed left-0 top-0 z-10 transition-transform duration-300 ease-in-out transform translate-x-0 border-r border-[#1e293b]">
-            <div className="flex items-center justify-center min-h-[5rem] border-b border-[#1e293b] flex-col bg-[#0f172a] px-4 py-2">
-                <div className="w-full flex items-center justify-center h-12 mb-1">
+        <div className={cn(
+            "flex flex-col bg-[#0f172a] h-screen fixed left-0 top-0 z-20 transition-all duration-300 ease-in-out border-r border-[#1e293b] group/sidebar",
+            isCollapsed ? "w-20 overflow-visible" : "w-64"
+        )}>
+            {/* Header / Brand */}
+            <div className="relative flex flex-col items-center justify-center min-h-[6.5rem] border-b border-[#1e293b] bg-[#0f172a] px-4 py-2">
+                {/* Toggle Button - Modern White Style */}
+                <button
+                    onClick={onToggle}
+                    className={cn(
+                        "absolute -right-3.5 top-10 flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-[#0f172a]/80 backdrop-blur-md shadow-[0_4px_20px_rgba(0,0,0,0.4)] transition-all duration-300 hover:border-blue-500/50 hover:shadow-[0_0_15px_rgba(59,130,246,0.4)] active:scale-95 group/toggle z-50",
+                        isCollapsed ? "rotate-180" : ""
+                    )}
+                >
+                    <div className="relative flex items-center justify-center transition-transform duration-300 group-hover/toggle:scale-125">
+                        <div className="absolute inset-0 bg-blue-500/20 blur-md rounded-full opacity-0 group-hover/toggle:opacity-100 transition-opacity" />
+                        <ChevronLeft className="h-[18px] w-[18px] text-blue-400 group-hover:text-white transition-colors relative z-10" />
+                    </div>
+                </button>
+
+                <div className={cn(
+                    "w-full flex items-center h-14 overflow-hidden transition-all duration-300",
+                    isCollapsed ? "justify-center" : "justify-center px-2"
+                )}>
                     {company?.logo_url ? (
-                        <img src={company.logo_url} alt={company.name} className="max-h-full max-w-full object-contain" />
+                        <img src={company.logo_url} alt={company.name} className={cn("max-h-full max-w-full object-contain transition-all", isCollapsed ? "scale-110" : "")} />
                     ) : company?.name ? (
-                        <div className="flex items-center gap-2 text-white">
-                            <Building2 className="w-5 h-5 text-blue-500" />
-                            <span className="text-sm font-black tracking-tight uppercase truncate">
-                                {company.name}
-                            </span>
+                        <div className={cn(
+                            "flex items-center gap-3 text-white shrink-0 transition-all",
+                            isCollapsed ? "justify-center" : "flex-col text-center"
+                        )}>
+                            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shrink-0 border border-blue-400/30 shadow-lg shadow-blue-900/20">
+                                <Building2 className="w-6 h-6 text-white" />
+                            </div>
+                            {!isCollapsed && (
+                                <div className="flex flex-col min-w-0 max-w-[180px]">
+                                    <span className="text-[13px] font-black tracking-tight uppercase truncate text-white leading-tight">
+                                        {company.name}
+                                    </span>
+                                    <span className="text-[8px] font-black text-blue-400 uppercase tracking-[0.25em] mt-0.5 opacity-80">SaaS Business</span>
+                                </div>
+                            )}
                         </div>
                     ) : (
-                        <div className="flex items-center gap-2 text-white/20 animate-pulse">
+                        <div className="flex items-center gap-2 text-white/20 animate-pulse shrink-0">
                             <Building2 className="w-5 h-5" />
-                            <div className="h-4 w-24 bg-white/10 rounded" />
+                            {!isCollapsed && <div className="h-4 w-24 bg-white/10 rounded" />}
                         </div>
                     )}
                 </div>
-                <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest bg-gray-900/50 px-2 py-0.5 rounded-full border border-gray-800/10">
-                    {getRoleTitle()}
-                </span>
+
+                {!isCollapsed && (
+                    <div className="mt-2 flex items-center gap-1.5">
+                        <div className="w-1 h-1 rounded-full bg-blue-500 animate-pulse" />
+                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest bg-gray-900/50 px-2.5 py-1 rounded-full border border-gray-800/10">
+                            {getRoleTitle()}
+                        </span>
+                    </div>
+                )}
             </div>
-            <div className="flex-1 flex flex-col overflow-y-auto pt-4">
-                <nav className="flex-1 px-2 space-y-2">
+
+            {/* Navigation */}
+            <div className={cn(
+                "flex-1 flex flex-col pt-6 px-3 custom-scrollbar",
+                isCollapsed ? "overflow-visible" : "overflow-y-auto"
+            )}>
+                <nav className="flex-1 space-y-1.5 focus:outline-none">
                     {navigation.map((item) => (
                         <Link
                             key={item.name}
                             to={item.href}
                             className={cn(
-                                item.current ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-gray-300 hover:bg-[#1e293b] hover:text-white',
-                                'group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200'
+                                item.current
+                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
+                                    : 'text-gray-400 hover:bg-[#1e293b] hover:text-white',
+                                'group flex items-center rounded-xl transition-all duration-200 focus:outline-none relative',
+                                isCollapsed ? "justify-center p-3" : "px-4 py-3"
                             )}
                         >
                             <item.icon className={cn(
                                 item.current ? 'text-white' : 'text-gray-400 group-hover:text-white',
-                                "mr-3 flex-shrink-0 h-5 w-5 transition-colors"
+                                "h-5 w-5 transition-colors shrink-0",
+                                !isCollapsed && "mr-3"
                             )} aria-hidden="true" />
-                            {item.name}
+
+                            {!isCollapsed ? (
+                                <span className="text-sm font-semibold tracking-wide truncate">{item.name}</span>
+                            ) : (
+                                /* Premium Dark Tooltip (Floating Label) */
+                                <div className="absolute left-full ml-4 px-3.5 py-2.5 bg-[#0f172a]/95 backdrop-blur-xl text-white text-[11px] font-bold rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-300 translate-x-[-12px] group-hover:translate-x-0 z-[100] whitespace-nowrap border border-white/10 ring-1 ring-white/5">
+                                    <div className="absolute left-[-4px] top-1/2 -translate-y-1/2 w-2 h-2 bg-[#0f172a] rotate-45 border-l border-b border-white/10" />
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-1 h-1 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                                        {item.name}
+                                    </div>
+                                </div>
+                            )}
                         </Link>
                     ))}
 
-                    {/* ACORDEON DE CONFIGURACIÓN */}
+                    {/* ACORDEON DE CONFIGURACIÓN / FLYOUT */}
                     {configSubItems.length > 0 && (
-                        <div className="space-y-1">
+                        <div className="group/config relative pt-2">
                             <button
-                                onClick={() => setConfigOpen(!configOpen)}
+                                onClick={() => !isCollapsed && setConfigOpen(!configOpen)}
                                 className={cn(
-                                    configPaths.some(path => location.pathname === path) ? 'text-white' : 'text-gray-300 hover:bg-[#1e293b] hover:text-white',
-                                    'group flex items-center justify-between w-full px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 outline-none'
+                                    configPaths.some(path => location.pathname === path) ? 'text-white' : 'text-gray-400 hover:bg-[#1e293b] hover:text-white',
+                                    'group flex items-center justify-between w-full rounded-xl transition-all duration-200 outline-none p-3',
+                                    !isCollapsed && "px-4"
                                 )}
                             >
                                 <div className="flex items-center">
                                     <Settings className={cn(
                                         configPaths.some(path => location.pathname === path) ? 'text-white' : 'text-gray-400 group-hover:text-white',
-                                        "mr-3 flex-shrink-0 h-5 w-5 transition-colors"
+                                        "h-5 w-5 transition-colors shrink-0",
+                                        !isCollapsed && "mr-3"
                                     )} />
-                                    <span>Configuración</span>
+                                    {!isCollapsed && <span className="text-sm font-semibold">Configuración</span>}
                                 </div>
-                                {configOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                {!isCollapsed && (configOpen ? <ChevronDown className="h-4 w-4 opacity-50" /> : <ChevronRight className="h-4 w-4 opacity-50" />)}
                             </button>
 
-                            {configOpen && configSubItems.length > 0 && (
-                                <div className="space-y-1 ml-4 pt-1">
-                                    {configSubItems.map((subItem) => (
-                                        <Link
-                                            key={subItem.name}
-                                            to={subItem.href}
-                                            className={cn(
-                                                subItem.current ? 'bg-blue-600/20 text-blue-400 border-l-2 border-blue-500' : 'text-gray-400 hover:bg-[#1e293b] hover:text-white',
-                                                'group flex items-center px-4 py-2 text-xs font-bold rounded-r-lg transition-all duration-200'
-                                            )}
-                                        >
-                                            <subItem.icon className={cn(
-                                                subItem.current ? 'text-blue-400' : 'text-gray-500 group-hover:text-white',
-                                                "mr-3 h-4 w-4"
-                                            )} />
-                                            {subItem.name}
-                                        </Link>
-                                    ))}
+                            {/* Flyout Menu (Only when collapsed) */}
+                            {isCollapsed ? (
+                                <div className="absolute left-full bottom-0 ml-1 w-56 bg-[#0f172a]/95 backdrop-blur-2xl rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 opacity-0 group-hover/config:opacity-100 pointer-events-none group-hover/config:pointer-events-auto transition-all duration-300 translate-x-[-12px] group-hover/config:translate-x-0 z-[100] overflow-hidden mb-[-8px]">
+                                    {/* Invisible Hover Bridge (Crucial to prevent closing) */}
+                                    {/* Extends from the icon to the menu to catch fast mouse movements */}
+                                    <div className="absolute left-[-40px] top-[-100px] w-[40px] h-[300px]" />
+
+                                    <div className="bg-gradient-to-r from-blue-600/20 to-indigo-600/20 px-4 py-3 border-b border-white/5">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                                            <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Configuración</span>
+                                        </div>
+                                    </div>
+                                    <div className="p-2 space-y-1">
+                                        {configSubItems.map((subItem) => (
+                                            <Link
+                                                key={subItem.name}
+                                                to={subItem.href}
+                                                className={cn(
+                                                    subItem.current ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40' : 'text-gray-300 hover:bg-white/10 hover:text-white',
+                                                    'flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group/subitem'
+                                                )}
+                                            >
+                                                <subItem.icon className={cn(
+                                                    "h-4 w-4 shrink-0 transition-transform duration-300",
+                                                    !subItem.current && "group-hover/subitem:scale-125 group-hover/subitem:text-blue-400"
+                                                )} />
+                                                <span className="text-[11px] font-bold truncate tracking-wide">{subItem.name}</span>
+                                            </Link>
+                                        ))}
+                                    </div>
                                 </div>
+                            ) : (
+                                /* Regular Accordion (When expanded) */
+                                configOpen && (
+                                    <div className="ml-4 pl-4 border-l border-gray-800/50 pt-1 space-y-1">
+                                        {configSubItems.map((subItem) => (
+                                            <Link
+                                                key={subItem.name}
+                                                to={subItem.href}
+                                                className={cn(
+                                                    subItem.current ? 'text-blue-400 bg-blue-500/5 shadow-sm' : 'text-gray-500 hover:text-gray-300 hover:bg-[#1e293b]/50',
+                                                    'group flex items-center rounded-lg transition-all duration-200 px-3 py-2 text-xs font-bold'
+                                                )}
+                                            >
+                                                <subItem.icon className={cn(
+                                                    subItem.current ? 'text-blue-400' : 'text-gray-600 group-hover:text-gray-300',
+                                                    "h-4 w-4 mr-3"
+                                                )} />
+                                                <span className="truncate">{subItem.name}</span>
+                                            </Link>
+                                        ))}
+                                    </div>
+                                )
                             )}
                         </div>
                     )}
                 </nav>
             </div>
-            <div className="flex-shrink-0 flex border-t border-[#1e293b] p-4 flex-col gap-2 bg-[#0f172a]">
-                <LanguageSwitcher />
-                <div className="flex items-center w-full rounded-lg p-2 transition-colors hover:bg-[#1e293b] cursor-pointer" onClick={signOut}>
-                    <div className="flex items-center">
-                        <div>
-                            <LogOut className="inline-block h-5 w-5 text-gray-400" />
-                        </div>
-                        <div className="ml-3">
-                            <p className="text-sm font-medium text-gray-200">
-                                {profile?.email}
-                            </p>
-                            <p className="text-xs font-medium text-gray-400">
-                                {t('sidebar.signOut')}
-                            </p>
-                        </div>
+
+            {/* Footer */}
+            <div className="flex-shrink-0 flex border-t border-[#1e293b] p-4 flex-col gap-3 bg-[#0f172a]">
+                {!isCollapsed && <LanguageSwitcher />}
+
+                <div
+                    className={cn(
+                        "flex items-center w-full rounded-xl transition-all hover:bg-red-500/10 cursor-pointer group/logout relative",
+                        isCollapsed ? "justify-center p-3" : "p-3 bg-[#1e293b]/40 border border-gray-800/50 shadow-inner"
+                    )}
+                    onClick={signOut}
+                >
+                    <div className="flex items-center min-w-0">
+                        <LogOut className={cn(
+                            "h-5 w-5 transition-colors shrink-0",
+                            isCollapsed ? "text-gray-400 group-hover/logout:text-red-500" : "text-gray-500 group-hover/logout:text-red-400"
+                        )} />
+                        {!isCollapsed ? (
+                            <div className="ml-3 min-w-0">
+                                <p className="text-[11px] font-black text-gray-200 truncate leading-none mb-1">
+                                    {company?.name || profile?.email?.split('@')[0]}
+                                </p>
+                                <p className="text-[9px] font-black text-gray-500 group-hover/logout:text-red-400/80 uppercase tracking-widest transition-colors">
+                                    {t('sidebar.signOut')}
+                                </p>
+                            </div>
+                        ) : (
+                            /* Premium Dark Sign Out Tooltip */
+                            <div className="absolute left-full ml-4 px-3.5 py-2.5 bg-red-600/95 backdrop-blur-xl text-white text-[11px] font-bold rounded-xl shadow-[0_10px_30px_rgba(220,38,38,0.3)] opacity-0 group-hover/logout:opacity-100 pointer-events-none transition-all duration-300 translate-x-[-12px] group-hover/logout:translate-x-0 z-[100] whitespace-nowrap border border-white/20">
+                                <div className="absolute left-[-4px] top-1/2 -translate-y-1/2 w-2 h-2 bg-red-600 rotate-45 border-l border-b border-white/10" />
+                                <div className="flex items-center gap-2">
+                                    <LogOut className="w-3.5 h-3.5" />
+                                    {t('sidebar.signOut')}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

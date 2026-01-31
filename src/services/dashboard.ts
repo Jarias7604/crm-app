@@ -11,7 +11,7 @@ export const dashboardService = {
      * Get all dashboard statistics in a single query
      * @param startDate - Optional start date filter
      * @param endDate - Optional end date filter
-     * @returns All dashboard data (stats, byStatus, bySource, byPriority, topOpportunities)
+     * @returns All dashboard data (stats, byStatus, bySource, byPriority, topOpportunities, upcomingFollowUps, recentConversions)
      */
     async getDashboardStats(startDate?: string, endDate?: string) {
         try {
@@ -19,11 +19,40 @@ export const dashboardService = {
 
             logger.time('getDashboardStats');
 
+            // 1. Fetch main stats via RPC
             const { data, error } = await supabase.rpc('get_dashboard_stats', {
                 p_company_id: companyId,
                 p_start_date: startDate || null,
                 p_end_date: endDate || null
             });
+
+            // 2. Fetch upcoming follow-ups manually since we can't update the RPC
+            const { data: upcomingFollowUps } = await supabase
+                .from('leads')
+                .select('id, name, next_followup_date, next_action_notes, priority')
+                .eq('company_id', companyId)
+                .not('next_followup_date', 'is', null)
+                .gte('next_followup_date', new Date().toISOString().split('T')[0])
+                .order('next_followup_date', { ascending: true })
+                .limit(5);
+
+            // 3. Fetch recent conversions
+            const { data: recentConversions } = await supabase
+                .from('leads')
+                .select('id, name, company_name, value, closing_amount, created_at')
+                .eq('company_id', companyId)
+                .in('status', ['Cerrado', 'Cliente'])
+                .order('created_at', { ascending: false })
+                .limit(5);
+
+            // 4. Fetch top opportunities with source manually since RPC is missing it
+            const { data: topOpportunitiesManual } = await supabase
+                .from('leads')
+                .select('id, name, company_name, value, status, priority, source, created_at')
+                .eq('company_id', companyId)
+                .gt('value', 0)
+                .order('value', { ascending: false })
+                .limit(5);
 
             logger.timeEnd('getDashboardStats');
 
@@ -37,11 +66,6 @@ export const dashboardService = {
                 throw error;
             }
 
-            logger.debug('Dashboard stats fetched successfully', {
-                totalLeads: data?.stats?.totalLeads,
-                hasData: !!data
-            });
-
             return {
                 stats: data?.stats || {
                     totalLeads: 0,
@@ -52,7 +76,9 @@ export const dashboardService = {
                 byStatus: data?.byStatus || [],
                 bySource: data?.bySource || [],
                 byPriority: data?.byPriority || [],
-                topOpportunities: data?.topOpportunities || []
+                topOpportunities: topOpportunitiesManual || [],
+                upcomingFollowUps: upcomingFollowUps || [],
+                recentConversions: recentConversions || []
             };
         } catch (error) {
             logger.error('Unhandled error in getDashboardStats', error, {

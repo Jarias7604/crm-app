@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { leadsService } from '../services/leads';
 import type { Lead, LeadStatus, LeadPriority, FollowUp } from '../types';
-import { PRIORITY_CONFIG, STATUS_CONFIG, ACTION_TYPES, SOURCE_CONFIG } from '../types';
+import { PRIORITY_CONFIG, STATUS_CONFIG, ACTION_TYPES, SOURCE_CONFIG, SOURCE_OPTIONS } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2, Layout, MessageSquare, Send as TelegramIcon, Smartphone } from 'lucide-react';
+import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2, Layout, MessageSquare, Send as TelegramIcon, Smartphone, Filter, ChevronDown, CheckCircle, Shield, ArrowUpDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { csvHelper } from '../utils/csvHelper';
@@ -17,6 +17,9 @@ import { CreateLeadFullscreen } from '../components/CreateLeadFullscreen';
 import { MobileQuickActions } from '../components/MobileQuickActions';
 import { LeadKanban } from '../components/LeadKanban';
 import { logger } from '../utils/logger';
+import { CustomDatePicker } from '../components/ui/CustomDatePicker';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { GripVertical } from 'lucide-react';
 
 export default function Leads() {
     const { profile } = useAuth();
@@ -45,6 +48,9 @@ export default function Leads() {
         assigned_to: '' as string | null, // Permanent owner
     });
 
+    const [isPriorityFilterOpen, setIsPriorityFilterOpen] = useState(false);
+    const priorityFilterRef = useRef<HTMLDivElement>(null);
+
     // State for Next Follow Up section (manual save)
     // State for Next Follow Up section (manual save)
     const [nextFollowUpData, setNextFollowUpData] = useState({
@@ -54,6 +60,24 @@ export default function Leads() {
     });
     const [isSavingFollowUp, setIsSavingFollowUp] = useState(false);
     const [viewMode, setViewMode] = useState<'grid' | 'list' | 'kanban'>('kanban');
+    const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+    const [sortConfig, setSortConfig] = useState<{ key: keyof Lead | 'value'; direction: 'asc' | 'desc' } | null>(null);
+
+    // Column order persistence
+    const [columnOrder, setColumnOrder] = useState<string[]>(() => {
+        const saved = localStorage.getItem('lead_column_order');
+        return saved ? JSON.parse(saved) : ['name', 'status', 'priority', 'source', 'value', 'assigned_to'];
+    });
+
+    const handleOnDragEnd = (result: any) => {
+        if (!result.destination) return;
+        const items = Array.from(columnOrder);
+        const [reorderedItem] = items.splice(result.source.index, 1);
+        items.splice(result.destination.index, 0, reorderedItem);
+        setColumnOrder(items);
+        localStorage.setItem('lead_column_order', JSON.stringify(items));
+    };
+
     const [isImporting, setIsImporting] = useState(false);
     const [priorityFilter, setPriorityFilter] = useState<string>('all');
     const [filteredLeadId, setFilteredLeadId] = useState<string | null>(null);
@@ -118,8 +142,8 @@ export default function Leads() {
         if (!selectedLead) return;
         setIsSavingFollowUp(true);
         try {
-            // Ensure date is null if empty
-            const dateToSave = nextFollowUpData.date ? nextFollowUpData.date : null;
+            // Ensure date is midnight/noon local to avoid UTC offset issues on save
+            const dateToSave = nextFollowUpData.date ? `${nextFollowUpData.date}T12:00:00` : null;
 
             // 1. Update the Lead with the NEXT follow up info
             await leadsService.updateLead(selectedLead.id, {
@@ -128,13 +152,11 @@ export default function Leads() {
                 next_action_notes: nextFollowUpData.notes
             });
 
-            // 2. Create a HISTORY entry for this action
-            // We log this as a "Planificación" or just a general update
             await leadsService.createFollowUp({
                 lead_id: selectedLead.id,
                 notes: `Programado: ${nextFollowUpData.notes || 'Seguimiento general'}`,
-                date: new Date().toISOString().split('T')[0], // Logged today
-                action_type: 'other' // Could be dynamic, but 'other' is safe for now
+                date: new Date().toISOString(), // Usar ISO completo para que la trazabilidad sea exacta
+                action_type: 'other'
             });
 
             // Force reload to ensure UI is in sync
@@ -163,10 +185,32 @@ export default function Leads() {
         }
     };
 
-    useEffect(() => {
-        loadLeads();
-        loadTeamMembers();
-    }, []);
+    const toggleLeadSelection = (id: string) => {
+        setSelectedLeadIds(prev =>
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedLeadIds.length === filteredLeads.length) {
+            setSelectedLeadIds([]);
+        } else {
+            setSelectedLeadIds(filteredLeads.map(l => l.id));
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (!window.confirm(`¿Estás seguro de que deseas eliminar ${selectedLeadIds.length} prospectos?`)) return;
+
+        try {
+            await Promise.all(selectedLeadIds.map(id => leadsService.deleteLead(id)));
+            toast.success(`${selectedLeadIds.length} prospectos eliminados correctamente`);
+            setSelectedLeadIds([]);
+            loadLeads();
+        } catch (error) {
+            toast.error("Error al eliminar algunos prospectos");
+        }
+    };
 
     const filteredLeads = useMemo(() => {
         return leads.filter(lead => {
@@ -175,6 +219,23 @@ export default function Leads() {
             return true;
         });
     }, [leads, priorityFilter, filteredLeadId]);
+
+    const sortedLeads = useMemo(() => {
+        if (!sortConfig) return filteredLeads;
+        return [...filteredLeads].sort((a, b) => {
+            const { key, direction } = sortConfig;
+            const valA = a[key] ?? '';
+            const valB = b[key] ?? '';
+            if (valA < valB) return direction === 'asc' ? -1 : 1;
+            if (valA > valB) return direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }, [filteredLeads, sortConfig]);
+
+    useEffect(() => {
+        loadLeads();
+        loadTeamMembers();
+    }, []);
 
     const handleDeleteLead = async (id: string, name: string) => {
         if (!confirm(`¿Estás seguro de eliminar el lead "${name}"? Esta acción no se puede deshacer.`)) return;
@@ -253,6 +314,70 @@ export default function Leads() {
     const handleDownloadTemplate = () => {
         csvHelper.generateTemplate();
     };
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (priorityFilterRef.current && !priorityFilterRef.current.contains(event.target as Node)) {
+                setIsPriorityFilterOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const PriorityDropdown = () => (
+        <div className="relative" ref={priorityFilterRef}>
+            <button
+                onClick={() => setIsPriorityFilterOpen(!isPriorityFilterOpen)}
+                className="flex items-center space-x-2 bg-white border border-gray-100 text-[#4449AA] px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm h-10 min-w-[180px] justify-between"
+            >
+                <div className="flex items-center gap-2">
+                    <Filter className="h-3.5 w-3.5 text-[#007BFF]" />
+                    <span>{priorityFilter === 'all' ? 'Todas las Prioridades' : (PRIORITY_CONFIG as any)[priorityFilter]?.label}</span>
+                </div>
+                <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition-transform duration-300 ${isPriorityFilterOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isPriorityFilterOpen && (
+                <div className="absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-50 z-50 py-2 animate-in fade-in slide-in-from-top-2">
+                    <button
+                        onClick={() => {
+                            setPriorityFilter('all');
+                            setFilteredLeadId(null);
+                            setIsPriorityFilterOpen(false);
+                        }}
+                        className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-between ${priorityFilter === 'all'
+                            ? 'bg-blue-50 text-[#007BFF]'
+                            : 'text-gray-500 hover:bg-gray-50'
+                            }`}
+                    >
+                        <span>Todas las Prioridades</span>
+                        {priorityFilter === 'all' && <CheckCircle className="w-4 h-4 text-[#007BFF]" />}
+                    </button>
+                    {(Object.entries(PRIORITY_CONFIG) as [LeadPriority, { label: string, icon: string, color: string, textColor: string }][]).map(([key, config]) => (
+                        <button
+                            key={key}
+                            onClick={() => {
+                                setPriorityFilter(key);
+                                setFilteredLeadId(null);
+                                setIsPriorityFilterOpen(false);
+                            }}
+                            className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-between ${priorityFilter === key
+                                ? 'bg-blue-50 text-[#007BFF]'
+                                : 'text-gray-500 hover:bg-gray-50'
+                                }`}
+                        >
+                            <span className="flex items-center gap-2">
+                                <span className="text-sm">{config.icon}</span>
+                                {config.label}
+                            </span>
+                            {priorityFilter === key && <CheckCircle className="w-4 h-4 text-[#007BFF]" />}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
 
     const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -375,8 +500,15 @@ export default function Leads() {
 
     const PriorityBadge = ({ priority }: { priority: LeadPriority }) => {
         const config = PRIORITY_CONFIG[priority] || PRIORITY_CONFIG.medium;
+        const icons = {
+            very_high: '🔥',
+            high: '🟠',
+            medium: '🟡',
+            low: '❄️'
+        };
         return (
-            <span className={`inline-block w-[100px] text-center px-2 py-0.5 text-xs font-bold rounded ${config.color} ${config.textColor}`}>
+            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-md ${config.color} ${config.textColor} shadow-sm`}>
+                <span>{icons[priority]}</span>
                 {config.label}
             </span>
         );
@@ -385,7 +517,8 @@ export default function Leads() {
     const StatusBadge = ({ status }: { status: LeadStatus }) => {
         const config = STATUS_CONFIG[status] || STATUS_CONFIG['Prospecto'];
         return (
-            <span className={`inline-block w-[140px] text-center px-2 py-0.5 text-xs font-medium rounded-full ${config.bgColor} ${config.color}`}>
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold uppercase tracking-tight rounded-full ${config.bgColor} ${config.color} border border-current opacity-90`}>
+                <span>{config.icon}</span>
                 {config.label}
             </span>
         );
@@ -403,20 +536,8 @@ export default function Leads() {
                         </p>
                         <div className="hidden sm:block w-px h-4 bg-gray-300"></div>
                         <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Filtrar:</span>
-                            <select
-                                value={priorityFilter}
-                                onChange={(e) => {
-                                    setPriorityFilter(e.target.value);
-                                    setFilteredLeadId(null); // Clear specific lead filter
-                                }}
-                                className="text-xs border-gray-300 rounded-md py-1 pr-8 focus:ring-blue-500 focus:border-blue-500"
-                            >
-                                <option value="all">Todas las Prioridades</option>
-                                {Object.entries(PRIORITY_CONFIG).map(([key, config]) => (
-                                    <option key={key} value={key}>{config.label}</option>
-                                ))}
-                            </select>
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-2">Filtrar:</span>
+                            <PriorityDropdown />
                         </div>
                     </div>
                 </div>
@@ -477,7 +598,7 @@ export default function Leads() {
 
                     <Button
                         onClick={() => setIsModalOpen(true)}
-                        className="flex-1 sm:flex-none justify-center h-10 bg-[#4449AA] hover:bg-[#383d8f] px-6 text-[10px] font-black uppercase tracking-widest"
+                        className="flex-1 sm:flex-none justify-center h-10 bg-[#4449AA] hover:bg-[#383d8f] px-6 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-indigo-100 transition-all border-none"
                     >
                         <Plus className="w-4 h-4 mr-2" />
                         Nuevo Prospecto
@@ -515,47 +636,77 @@ export default function Leads() {
                                     <p className="text-sm text-gray-500 font-medium">{lead.company_name}</p>
                                 )}
 
-                                <div className="mt-4 grid grid-cols-2 gap-2">
-                                    <div className="flex items-center text-blue-600">
-                                        <DollarSign className="w-4 h-4 mr-1" />
-                                        <span className="text-sm">Pot: <b>${(lead.value || 0).toLocaleString()}</b></span>
+                                <div className="mt-5 grid grid-cols-2 gap-4 pb-4">
+                                    <div className="flex flex-col">
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Valor Potencial</p>
+                                        <p className="text-sm font-black text-indigo-600 tracking-tight">
+                                            ${(lead.value || 0).toLocaleString()}
+                                        </p>
                                     </div>
-                                    {(lead.closing_amount || 0) > 0 && (
-                                        <div className="flex items-center text-green-600">
-                                            <TrendingUp className="w-4 h-4 mr-1" />
-                                            <span className="text-sm">Cierre: <b>${(lead.closing_amount || 0).toLocaleString()}</b></span>
-                                        </div>
-                                    )}
+                                    <div className="flex flex-col items-end">
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 text-right">Monto Cierre</p>
+                                        <p className={`text-sm font-black tracking-tight ${(lead.closing_amount || 0) > 0 ? 'text-green-600' : 'text-gray-300'}`}>
+                                            ${(lead.closing_amount || 0).toLocaleString()}
+                                        </p>
+                                    </div>
+
                                     {lead.next_followup_date && (
-                                        <div className="flex items-center text-xs text-blue-600 col-span-2 font-medium">
-                                            <Clock className="w-3.5 h-3.5 mr-1" />
-                                            Seguimiento: {(() => {
-                                                try {
-                                                    const dateStr = lead.next_followup_date.split('T')[0];
-                                                    const dateObj = new Date(dateStr + 'T12:00:00');
-                                                    if (isNaN(dateObj.getTime())) return 'Fecha inválida';
-                                                    return format(dateObj, 'EEEE dd MMM yyyy', { locale: es });
-                                                } catch (e) {
-                                                    return 'Error fecha';
-                                                }
-                                            })()}
+                                        <div className="col-span-2 bg-blue-50/50 rounded-lg p-2.5 flex items-center justify-between border border-blue-100/30">
+                                            <div className="flex items-center gap-2">
+                                                <Clock className="w-3.5 h-3.5 text-blue-500" />
+                                                <span className="text-[11px] font-bold text-blue-700">Seguimiento:</span>
+                                            </div>
+                                            <span className="text-[11px] font-black text-blue-900 uppercase">
+                                                {(() => {
+                                                    try {
+                                                        const dateStr = lead.next_followup_date.split('T')[0];
+                                                        const dateObj = new Date(dateStr + 'T12:00:00');
+                                                        return format(dateObj, 'dd MMM yyyy', { locale: es });
+                                                    } catch (e) { return 'N/A'; }
+                                                })()}
+                                            </span>
                                         </div>
                                     )}
-                                    {lead.assigned_to && (() => {
-                                        const assignee = teamMembers.find(m => m.id === lead.assigned_to);
-                                        return (
-                                            <div className="flex items-center text-xs text-blue-700 col-span-2 font-semibold mt-1">
-                                                {assignee?.avatar_url ? (
-                                                    <img src={assignee.avatar_url} alt="" className="w-8 h-8 rounded-full object-cover mr-2 border border-blue-200 shadow-sm" />
-                                                ) : (
-                                                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-2 border border-blue-200">
-                                                        <User className="w-4 h-4 text-blue-400" />
+
+                                    <div className="col-span-2 grid grid-cols-2 gap-4 pt-2 border-t border-gray-50 mt-2">
+                                        {lead.assigned_to && (() => {
+                                            const owner = teamMembers.find(m => m.id === lead.assigned_to);
+                                            return (
+                                                <div className="flex items-center gap-2">
+                                                    {owner?.avatar_url ? (
+                                                        <img src={owner.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover border border-white shadow-sm" />
+                                                    ) : (
+                                                        <div className="w-6 h-6 rounded-full bg-indigo-50 flex items-center justify-center border border-white shadow-sm">
+                                                            <User className="w-3 h-3 text-indigo-400" />
+                                                        </div>
+                                                    )}
+                                                    <div>
+                                                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-0.5">Responsable</p>
+                                                        <p className="text-[10px] font-bold text-gray-700 truncate">{owner?.full_name || owner?.email.split('@')[0]}</p>
                                                     </div>
-                                                )}
-                                                <span>Asignado: {assignee?.full_name || assignee?.email.split('@')[0]}</span>
-                                            </div>
-                                        );
-                                    })()}
+                                                </div>
+                                            );
+                                        })()}
+
+                                        {lead.next_followup_assignee && (() => {
+                                            const assignee = teamMembers.find(m => m.id === lead.next_followup_assignee);
+                                            return (
+                                                <div className="flex items-center gap-2 border-l border-gray-100 pl-4">
+                                                    {assignee?.avatar_url ? (
+                                                        <img src={assignee.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover border border-white shadow-sm" />
+                                                    ) : (
+                                                        <div className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center border border-white shadow-sm">
+                                                            <User className="w-3 h-3 text-blue-400" />
+                                                        </div>
+                                                    )}
+                                                    <div>
+                                                        <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest leading-none mb-0.5">Asignado a</p>
+                                                        <p className="text-[10px] font-bold text-gray-700 truncate">{assignee?.full_name || assignee?.email.split('@')[0]}</p>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
                                 </div>
 
                                 <div className="mt-3 pt-3 border-t border-gray-100 flex gap-3 text-xs text-gray-400">
@@ -567,109 +718,208 @@ export default function Leads() {
                     ))}
                 </div>
             ) : viewMode === 'list' ? (
-                /* List View */
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre / Empresa</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prioridad</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fuente</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Responsable</th>
-                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creado</th>
-                                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                {filteredLeads.map((lead) => (
-                                    <tr key={lead.id} onClick={() => openLeadDetail(lead)} className="hover:bg-gray-50 cursor-pointer transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-medium text-gray-900">{lead.name}</span>
-                                                <div className="flex flex-col text-xs text-gray-500 mb-2">
-                                                    {lead.company_name && <span className="font-medium text-gray-700">{lead.company_name}</span>}
-                                                    {lead.phone && <span className="text-blue-600 font-bold">📞 {lead.phone}</span>}
-                                                    {lead.email && <span className="truncate">{lead.email}</span>}
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <StatusBadge status={lead.status} />
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <PriorityBadge priority={lead.priority} />
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            {lead.source && SOURCE_CONFIG[lead.source] ? (
-                                                <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                                                    <span>{SOURCE_CONFIG[lead.source].icon}</span>
-                                                    <span>{SOURCE_CONFIG[lead.source].label}</span>
-                                                </div>
-                                            ) : (
-                                                <span className="text-xs text-gray-400">-</span>
-                                            )}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            <div className="font-medium text-gray-900">${(lead.value || 0).toLocaleString()}</div>
-                                            {(lead.closing_amount || 0) > 0 && <div className="text-xs text-green-600 font-medium">Cierre: ${lead.closing_amount.toLocaleString()}</div>}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {lead.assigned_to ? (() => {
-                                                const assignee = teamMembers.find(m => m.id === lead.assigned_to);
-                                                return (
-                                                    <div className="flex items-center gap-2">
-                                                        {assignee?.avatar_url ? (
-                                                            <img src={assignee.avatar_url} alt="" className="w-12 h-12 rounded-full object-cover border border-blue-100 shadow-sm" />
-                                                        ) : (
-                                                            <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center border border-blue-100">
-                                                                <User className="w-6 h-6 text-blue-400" />
+                /* List View - Modern Premium Redesign */
+                <div className="relative">
+                    <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/80 overflow-hidden transition-all duration-300">
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-50">
+                                <DragDropContext onDragEnd={handleOnDragEnd}>
+                                    <Droppable droppableId="columns" direction="horizontal">
+                                        {(provided) => (
+                                            <thead className="bg-[#FAFAFB]">
+                                                <tr ref={provided.innerRef} {...provided.droppableProps}>
+                                                    <th scope="col" className="px-6 py-4 text-left bg-[#FAFAFB]">
+                                                        <div className="flex items-center">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedLeadIds.length === sortedLeads.length && sortedLeads.length > 0}
+                                                                onChange={toggleSelectAll}
+                                                                className="w-4 h-4 rounded border-gray-300 text-[#4449AA] focus:ring-[#4449AA] cursor-pointer"
+                                                            />
+                                                        </div>
+                                                    </th>
+
+                                                    {columnOrder.map((colId, index) => (
+                                                        <Draggable key={colId} draggableId={colId} index={index}>
+                                                            {(provided, snapshot) => (
+                                                                <th
+                                                                    ref={provided.innerRef}
+                                                                    {...provided.draggableProps}
+                                                                    scope="col"
+                                                                    className={`px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest transition-all ${snapshot.isDragging ? 'bg-indigo-50/80 shadow-sm z-50' : 'bg-[#FAFAFB]'}`}
+                                                                >
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-[#4449AA]">
+                                                                            <GripVertical className="w-3 h-3" />
+                                                                        </div>
+
+                                                                        {colId === 'name' && (
+                                                                            <div
+                                                                                className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                onClick={() => setSortConfig({
+                                                                                    key: 'name',
+                                                                                    direction: sortConfig?.key === 'name' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                })}
+                                                                            >
+                                                                                Nombre / Empresa
+                                                                                <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'name' ? 'text-[#4449AA]' : 'opacity-0 group-hover:opacity-100'}`} />
+                                                                            </div>
+                                                                        )}
+
+                                                                        {colId === 'status' && "Estado"}
+                                                                        {colId === 'priority' && "Prioridad"}
+                                                                        {colId === 'source' && "Fuente"}
+
+                                                                        {colId === 'value' && (
+                                                                            <div
+                                                                                className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                onClick={() => setSortConfig({
+                                                                                    key: 'value',
+                                                                                    direction: sortConfig?.key === 'value' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                })}
+                                                                            >
+                                                                                Valor
+                                                                                <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'value' ? 'text-[#4449AA]' : 'opacity-0 group-hover:opacity-100'}`} />
+                                                                            </div>
+                                                                        )}
+
+                                                                        {colId === 'assigned_to' && "Asignado"}
+                                                                    </div>
+                                                                </th>
+                                                            )}
+                                                        </Draggable>
+                                                    ))}
+
+                                                    {provided.placeholder}
+                                                    <th scope="col" className="px-6 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest bg-[#FAFAFB]">
+                                                        Acciones
+                                                    </th>
+                                                </tr>
+                                            </thead>
+                                        )}
+                                    </Droppable>
+                                </DragDropContext>
+                                <tbody className="bg-white divide-y divide-gray-50/50">
+                                    {sortedLeads.map((lead) => {
+                                        const isSelected = selectedLeadIds.includes(lead.id);
+                                        return (
+                                            <tr
+                                                key={lead.id}
+                                                className={`group transition-all duration-200 ${isSelected ? 'bg-indigo-50/30' : 'hover:bg-[#FDFDFE]'}`}
+                                            >
+                                                <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        onChange={() => toggleLeadSelection(lead.id)}
+                                                        className="w-4 h-4 rounded border-gray-300 text-[#4449AA] focus:ring-[#4449AA] cursor-pointer"
+                                                    />
+                                                </td>
+                                                {columnOrder.map((colId) => (
+                                                    <td key={colId} className="px-4 py-4 whitespace-nowrap">
+                                                        {colId === 'name' && (
+                                                            <div className="flex flex-col cursor-pointer" onClick={() => openLeadDetail(lead)}>
+                                                                <span className="text-sm font-bold text-gray-900 group-hover:text-[#4449AA] transition-colors">{lead.name}</span>
+                                                                <span className="text-[11px] text-blue-600 font-bold">{lead.company_name || 'Individual'}</span>
                                                             </div>
                                                         )}
-                                                        <span className="text-sm font-medium text-gray-900">
-                                                            {assignee?.full_name || assignee?.email.split('@')[0]}
-                                                        </span>
+
+                                                        {colId === 'status' && <StatusBadge status={lead.status} />}
+
+                                                        {colId === 'priority' && <PriorityBadge priority={lead.priority} />}
+
+                                                        {colId === 'source' && (
+                                                            lead.source && SOURCE_CONFIG[lead.source] ? (
+                                                                <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100 w-fit">
+                                                                    <span>{SOURCE_CONFIG[lead.source].icon}</span>
+                                                                    <span className="uppercase tracking-tight">{SOURCE_CONFIG[lead.source].label}</span>
+                                                                </div>
+                                                            ) : <span className="text-xs text-gray-300">-</span>
+                                                        )}
+
+                                                        {colId === 'value' && (
+                                                            <div>
+                                                                <div className="text-sm font-black text-slate-900">${(lead.value || 0).toLocaleString()}</div>
+                                                                {(lead.closing_amount || 0) > 0 && <div className="text-[10px] text-indigo-600 font-black uppercase tracking-tighter">Cierre: ${lead.closing_amount.toLocaleString()}</div>}
+                                                            </div>
+                                                        )}
+
+                                                        {colId === 'assigned_to' && (
+                                                            lead.assigned_to ? (() => {
+                                                                const owner = teamMembers.find(m => m.id === lead.assigned_to);
+                                                                return (
+                                                                    <div className="flex items-center gap-2">
+                                                                        <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shadow-sm">
+                                                                            {owner?.avatar_url ? (
+                                                                                <img src={owner.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                                            ) : (
+                                                                                <User className="w-3.5 h-3.5 text-slate-400" />
+                                                                            )}
+                                                                        </div>
+                                                                        <span className="text-[11px] font-bold text-slate-600 truncate max-w-[80px]">
+                                                                            {owner?.full_name?.split(' ')[0] || owner?.email.split('@')[0]}
+                                                                        </span>
+                                                                    </div>
+                                                                );
+                                                            })() : <span className="text-gray-300">-</span>
+                                                        )}
+                                                    </td>
+                                                ))}
+
+                                                <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                    <div className="flex justify-end gap-1.5 transition-all">
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); openLeadDetail(lead); }}
+                                                            className="p-1.5 text-indigo-400 hover:text-white hover:bg-[#4449AA] rounded-lg transition-all shadow-sm bg-indigo-50/50"
+                                                        >
+                                                            <ChevronRight className="w-4 h-4" />
+                                                        </button>
+                                                        {isAdmin && (
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleDeleteLead(lead.id, lead.name); }}
+                                                                className="p-1.5 text-rose-400 hover:text-white hover:bg-rose-600 rounded-lg transition-all shadow-sm bg-rose-50/50"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        )}
                                                     </div>
-                                                );
-                                            })() : <span className="text-gray-400">-</span>}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            {lead.created_at ? (() => {
-                                                try {
-                                                    const dateObj = new Date(lead.created_at);
-                                                    if (isNaN(dateObj.getTime())) return '-';
-                                                    return format(dateObj, 'dd MMM yyyy', { locale: es });
-                                                } catch (e) {
-                                                    return '-';
-                                                }
-                                            })() : '-'}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <div className="flex justify-end gap-2">
-                                                {isAdmin && (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleDeleteLead(lead.id, lead.name);
-                                                        }}
-                                                        className="text-gray-400 hover:text-red-600 transition-colors p-1"
-                                                        title="Eliminar Lead"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                )}
-                                                <button className="text-blue-600 hover:text-blue-900 transition-colors p-1">
-                                                    <ChevronRight className="w-5 h-5" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
+
+                    {/* Floating Bulk Actions Bar */}
+                    {selectedLeadIds.length > 0 && (
+                        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom-5 duration-300">
+                            <div className="bg-white px-6 py-4 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-gray-100 flex items-center gap-6">
+                                <div className="flex items-center gap-2 pr-6 border-r border-gray-100">
+                                    <div className="w-6 h-6 bg-[#4449AA] rounded-full flex items-center justify-center text-[10px] font-black text-white">
+                                        {selectedLeadIds.length}
+                                    </div>
+                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Seleccionados</span>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <button
+                                        onClick={() => setSelectedLeadIds([])}
+                                        className="text-xs font-black text-gray-400 hover:text-gray-600 uppercase tracking-widest transition-colors"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={handleBulkDelete}
+                                        className="flex items-center gap-2 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        Eliminar Seleccionados
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             ) : (
                 /* Kanban View */
@@ -728,59 +978,66 @@ export default function Leads() {
                     <div className="absolute inset-0 bg-black/30" onClick={() => setIsDetailOpen(false)} />
                     <div className="absolute inset-y-0 right-0 max-w-lg w-full bg-white shadow-xl flex flex-col">
                         {/* Header */}
-                        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                            <div>
-                                {/* Editable Name */}
-                                <input
-                                    type="text"
-                                    defaultValue={selectedLead.name}
-                                    onBlur={(e) => handleUpdateLead({ name: e.target.value })}
-                                    className="block w-full text-lg font-bold text-gray-900 border-none hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 rounded px-2 -ml-2 transition-all bg-transparent"
-                                />
-                                <div className="space-y-1 mt-1">
-                                    {/* Editable Company */}
-                                    <input
-                                        type="text"
-                                        defaultValue={selectedLead.company_name || ''}
-                                        placeholder="Agregar Empresa..."
-                                        onBlur={(e) => handleUpdateLead({ company_name: e.target.value })}
-                                        className="block w-full text-sm font-medium text-gray-500 border-none hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 rounded px-2 -ml-2 transition-all bg-transparent"
-                                    />
-                                    <div className="flex flex-wrap gap-x-4 gap-y-1">
-                                        <div className="flex items-center gap-1 group">
-                                            <Phone className="w-3 h-3 text-gray-400" />
-                                            <input
-                                                type="text"
-                                                defaultValue={selectedLead.phone || ''}
-                                                placeholder="Agregar teléfono..."
-                                                onBlur={(e) => handleUpdateLead({ phone: e.target.value })}
-                                                className="text-xs text-blue-600 font-bold border-none hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 rounded px-1 -ml-1 w-32 bg-transparent"
-                                            />
-                                        </div>
-                                        <div className="flex items-center gap-1 group">
-                                            <Mail className="w-3 h-3 text-gray-400" />
-                                            <input
-                                                type="text"
-                                                defaultValue={selectedLead.email || ''}
-                                                placeholder="Agregar email..."
-                                                onBlur={(e) => handleUpdateLead({ email: e.target.value })}
-                                                className="text-xs text-gray-500 hover:text-blue-600 border-none hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 rounded px-1 -ml-1 w-48 bg-transparent"
-                                            />
-                                        </div>
+                        <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-white to-gray-50 flex justify-between items-center relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-16 -mt-16 opacity-50 blur-2xl"></div>
+                            <div className="relative z-10 flex-1">
+                                <div className="flex items-center gap-3 mb-1">
+                                    <div className="w-10 h-10 bg-[#4449AA] rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
+                                        <User className="w-5 h-5" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <input
+                                            type="text"
+                                            defaultValue={selectedLead.name}
+                                            onBlur={(e) => handleUpdateLead({ name: e.target.value })}
+                                            className="block w-full text-xl font-black text-gray-900 border-none hover:bg-white/50 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded px-2 -ml-2 transition-all bg-transparent"
+                                        />
+                                        <input
+                                            type="text"
+                                            defaultValue={selectedLead.company_name || ''}
+                                            placeholder="Empresa no especificada"
+                                            onBlur={(e) => handleUpdateLead({ company_name: e.target.value })}
+                                            className="block w-full text-[13px] font-bold text-gray-400 border-none hover:bg-white/50 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded px-2 -ml-2 transition-all bg-transparent"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3">
+                                    <div className="flex items-center gap-2 group bg-white px-3 py-1.5 rounded-lg border border-gray-100 shadow-sm transition-all hover:border-blue-200">
+                                        <Phone className="w-3.5 h-3.5 text-blue-500" />
+                                        <input
+                                            type="text"
+                                            defaultValue={selectedLead.phone || ''}
+                                            placeholder="Añadir teléfono"
+                                            onBlur={(e) => handleUpdateLead({ phone: e.target.value })}
+                                            className="text-xs text-gray-700 font-bold border-none bg-transparent p-0 focus:ring-0 w-28"
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-2 group bg-white px-3 py-1.5 rounded-lg border border-gray-100 shadow-sm transition-all hover:border-blue-200">
+                                        <Mail className="w-3.5 h-3.5 text-blue-500" />
+                                        <input
+                                            type="text"
+                                            defaultValue={selectedLead.email || ''}
+                                            placeholder="Añadir email"
+                                            onBlur={(e) => handleUpdateLead({ email: e.target.value })}
+                                            className="text-xs text-gray-700 font-bold border-none bg-transparent p-0 focus:ring-0 w-40"
+                                        />
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-2 relative z-10 ml-4">
                                 {isAdmin && (
                                     <button
                                         onClick={() => handleDeleteLead(selectedLead.id, selectedLead.name)}
-                                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all mr-1"
+                                        className="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100 shadow-sm hover:shadow-md"
                                         title="Eliminar Lead"
                                     >
                                         <Trash2 className="w-5 h-5" />
                                     </button>
                                 )}
-                                <button onClick={() => setIsDetailOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-all">
+                                <button
+                                    onClick={() => setIsDetailOpen(false)}
+                                    className="p-2.5 bg-gray-100 text-gray-500 hover:bg-gray-200 rounded-xl transition-all border border-gray-200 shadow-sm active:scale-95"
+                                >
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
@@ -790,17 +1047,17 @@ export default function Leads() {
                         <div className="flex-1 overflow-y-auto p-6 space-y-6">
                             {/* Quick Stats */}
                             <div className="flex gap-4">
-                                <div className="flex-1 bg-green-50 p-4 rounded-lg text-center">
-                                    <p className="text-2xl font-bold text-green-600">${(selectedLead.value || 0).toLocaleString()}</p>
-                                    <p className="text-xs text-green-700">Valor</p>
+                                <div className="flex-1 bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-100/50 shadow-sm text-center group transition-transform hover:scale-[1.02]">
+                                    <p className="text-2xl font-black text-green-600 tracking-tighter">${(selectedLead.value || 0).toLocaleString()}</p>
+                                    <p className="text-[10px] font-black text-green-800/40 uppercase tracking-[0.2em] mt-2">Inversión Potencial</p>
                                 </div>
-                                <div className="flex-1 bg-gray-50 p-4 rounded-lg text-center">
+                                <div className="flex-1 bg-gradient-to-br from-orange-50 to-red-50 p-4 rounded-xl border border-orange-100/50 shadow-sm text-center group transition-transform hover:scale-[1.02]">
                                     <PriorityBadge priority={selectedLead.priority || 'medium'} />
-                                    <p className="text-xs text-gray-500 mt-1">Prioridad</p>
+                                    <p className="text-[10px] font-black text-orange-800/40 uppercase tracking-[0.2em] mt-2">Temperatura</p>
                                 </div>
-                                <div className="flex-1 bg-gray-50 p-4 rounded-lg text-center">
+                                <div className="flex-1 bg-gradient-to-br from-indigo-50 to-blue-50 p-4 rounded-xl border border-blue-100/50 shadow-sm text-center group transition-transform hover:scale-[1.02]">
                                     <StatusBadge status={selectedLead.status} />
-                                    <p className="text-xs text-gray-500 mt-1">Estado</p>
+                                    <p className="text-[10px] font-black text-blue-800/40 uppercase tracking-[0.2em] mt-2">Estado Actual</p>
                                 </div>
                             </div>
 
@@ -836,28 +1093,53 @@ export default function Leads() {
 
                             {/* Edit Status & Priority */}
                             <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">Cambiar Estado</label>
-                                    <select
-                                        value={selectedLead.status}
-                                        onChange={(e) => handleUpdateLead({ status: e.target.value as LeadStatus })}
-                                        className="block w-full rounded-md border-gray-300 shadow-sm text-sm"
-                                    >
-                                        {Object.entries(STATUS_CONFIG).map(([key, config]) => (
-                                            <option key={key} value={key}>
-                                                {config.icon} {config.label}
-                                            </option>
-                                        ))}
-                                    </select>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Cambiar Estado</label>
+                                    <div className="relative">
+                                        <select
+                                            value={selectedLead.status}
+                                            onChange={(e) => handleUpdateLead({ status: e.target.value as LeadStatus })}
+                                            className="block w-full rounded-xl border-gray-200 shadow-sm text-sm font-bold text-gray-700 bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all pl-3 py-2.5"
+                                        >
+                                            {Object.entries(STATUS_CONFIG).map(([key, config]) => (
+                                                <option key={key} value={key}>
+                                                    {config.icon} {config.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">Cambiar Prioridad</label>
-                                    <select value={selectedLead.priority || 'medium'} onChange={(e) => handleUpdateLead({ priority: e.target.value as LeadPriority })} className="block w-full rounded-md border-gray-300 shadow-sm text-sm">
-                                        <option value="very_high">🔴 Altísima</option>
-                                        <option value="high">🟠 Alta</option>
-                                        <option value="medium">🟡 Media</option>
-                                        <option value="low">⚪ Baja</option>
-                                    </select>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Temperatura</label>
+                                    <div className="relative">
+                                        <select
+                                            value={selectedLead.priority || 'medium'}
+                                            onChange={(e) => handleUpdateLead({ priority: e.target.value as LeadPriority })}
+                                            className="block w-full rounded-xl border-gray-200 shadow-sm text-sm font-bold text-gray-700 bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all pl-3 py-2.5"
+                                        >
+                                            <option value="very_high">🔥 Altísima (Hot)</option>
+                                            <option value="high">🟠 Alta (Warm)</option>
+                                            <option value="medium">🟡 Media</option>
+                                            <option value="low">❄️ Baja (Cold)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5 col-span-2">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Fuente del Lead</label>
+                                    <div className="relative">
+                                        <select
+                                            value={selectedLead.source || ''}
+                                            onChange={(e) => handleUpdateLead({ source: e.target.value || null })}
+                                            className="block w-full rounded-xl border-gray-200 shadow-sm text-sm font-bold text-gray-700 bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all pl-3 py-2.5"
+                                        >
+                                            <option value="">Sin especificar</option>
+                                            {SOURCE_OPTIONS.map(opt => (
+                                                <option key={opt.value} value={opt.value}>
+                                                    {opt.icon} {opt.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                                 <div className="col-span-2 bg-blue-50 p-3 rounded-lg border border-blue-100 flex items-center gap-3">
                                     <div className="flex-shrink-0">
@@ -873,11 +1155,13 @@ export default function Leads() {
                                         })()}
                                     </div>
                                     <div className="flex-1">
-                                        <label className="block text-xs font-bold text-blue-700 mb-1">👤 Responsable Principal</label>
+                                        <label className="block text-xs font-bold text-blue-700 mb-1 flex items-center gap-1">
+                                            <Shield className="w-3 h-3" /> Dueño / Responsable Principal
+                                        </label>
                                         <select
                                             value={selectedLead.assigned_to || ''}
                                             onChange={(e) => handleUpdateLead({ assigned_to: e.target.value || null })}
-                                            className="block w-full rounded-md border-blue-200 shadow-sm text-sm bg-white focus:ring-blue-500 focus:border-blue-500"
+                                            className="block w-full rounded-md border-blue-200 shadow-sm text-sm bg-white focus:ring-blue-500 focus:border-blue-500 font-bold"
                                         >
                                             <option value="">Sin asignar</option>
                                             {teamMembers.map(m => (
@@ -891,97 +1175,98 @@ export default function Leads() {
                             </div>
 
                             {/* Editable Values Section */}
-                            <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-                                <h4 className="text-sm font-semibold text-gray-700 mb-2">💰 Valores</h4>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-xs text-gray-500 mb-1">Valor Potencial ($)</label>
-                                        <Input
-                                            type="number"
-                                            defaultValue={selectedLead.value || 0}
-                                            onBlur={(e) => handleUpdateLead({ value: Number(e.target.value) })}
-                                            className="text-sm"
-                                        />
+                            <div className="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-5 border border-gray-100 shadow-sm space-y-4">
+                                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                    <DollarSign className="w-4 h-4 text-green-600" /> Proyecciones Económicas
+                                </h4>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase ml-1 tracking-tight">Potencial ($)</label>
+                                        <div className="relative">
+                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</div>
+                                            <Input
+                                                type="number"
+                                                defaultValue={selectedLead.value || 0}
+                                                onBlur={(e) => handleUpdateLead({ value: Number(e.target.value) })}
+                                                className="pl-7 rounded-xl border-gray-100 bg-white font-black text-gray-900 focus:ring-green-500"
+                                            />
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="block text-xs text-gray-500 mb-1">Monto de Cierre ($)</label>
-                                        <Input
-                                            type="number"
-                                            defaultValue={selectedLead.closing_amount || 0}
-                                            onBlur={(e) => handleUpdateLead({ closing_amount: Number(e.target.value) })}
-                                            className="text-sm"
-                                        />
+                                    <div className="space-y-1.5">
+                                        <label className="block text-[10px] font-bold text-gray-500 uppercase ml-1 tracking-tight">Cierre Real ($)</label>
+                                        <div className="relative">
+                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</div>
+                                            <Input
+                                                type="number"
+                                                defaultValue={selectedLead.closing_amount || 0}
+                                                onBlur={(e) => handleUpdateLead({ closing_amount: Number(e.target.value) })}
+                                                className="pl-7 rounded-xl border-gray-100 bg-white font-black text-green-600 focus:ring-green-500"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Next Follow-up Edit Section */}
-                            <div className="bg-blue-50 rounded-lg p-4 space-y-3">
-                                <div className="flex justify-between items-center mb-2">
+                            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-6 text-white shadow-xl shadow-blue-100 relative group">
+                                <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
+                                <div className="flex justify-between items-start mb-5 relative z-10">
                                     <div>
-                                        <h4 className="text-sm font-semibold text-blue-700">📅 Próximo Seguimiento</h4>
-                                        {nextFollowUpData.date && (
-                                            <p className="text-[10px] text-blue-500 font-bold capitalize">
-                                                {(() => {
-                                                    try {
-                                                        const safeDate = nextFollowUpData.date + 'T12:00:00';
-                                                        const dateObj = new Date(safeDate);
-                                                        if (isNaN(dateObj.getTime())) return 'Fecha inválida';
-                                                        return format(dateObj, 'EEEE dd MMMM', { locale: es });
-                                                    } catch (e) {
-                                                        return 'Error fecha';
-                                                    }
-                                                })()}
-                                            </p>
-                                        )}
+                                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] opacity-70 mb-1">PLAN DE ACCIÓN</h4>
+                                        <p className="text-xl font-black tracking-tight flex items-center gap-2">
+                                            <Clock className="w-5 h-5 text-blue-200" /> Próximo Paso
+                                        </p>
                                     </div>
-                                    {isSavingFollowUp && <span className="text-xs text-blue-500 animate-pulse">Guardando...</span>}
+                                    {isSavingFollowUp && (
+                                        <span className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse border border-white/20">
+                                            Guardando...
+                                        </span>
+                                    )}
                                 </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-xs text-blue-600 mb-1">Fecha</label>
-                                        <Input
-                                            type="date"
-                                            value={nextFollowUpData.date}
-                                            onChange={(e) => setNextFollowUpData({ ...nextFollowUpData, date: e.target.value })}
-                                            className="text-sm bg-white"
+                                <div className="space-y-4 relative z-10">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <label className="block text-[9px] font-black uppercase tracking-widest opacity-60 ml-1">Fecha de Ejecución</label>
+                                            <CustomDatePicker
+                                                value={nextFollowUpData.date}
+                                                onChange={(date) => setNextFollowUpData({ ...nextFollowUpData, date })}
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="block text-[9px] font-black uppercase tracking-widest opacity-60 ml-1">Ejecutivo de Seguimiento</label>
+                                            <select
+                                                value={nextFollowUpData.assignee}
+                                                onChange={(e) => setNextFollowUpData({ ...nextFollowUpData, assignee: e.target.value })}
+                                                className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-sm font-bold focus:bg-white focus:text-gray-900 focus:ring-0 transition-all outline-none"
+                                            >
+                                                <option value="" className="text-gray-900">Sin asignar</option>
+                                                {teamMembers.map(m => (
+                                                    <option key={m.id} value={m.id} className="text-gray-900">
+                                                        {m.full_name || m.email.split('@')[0]}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="block text-[9px] font-black uppercase tracking-widest opacity-60 ml-1">Objetivo del Próximo Contacto</label>
+                                        <textarea
+                                            value={nextFollowUpData.notes}
+                                            onChange={(e) => setNextFollowUpData({ ...nextFollowUpData, notes: e.target.value })}
+                                            rows={2}
+                                            placeholder="Detalla qué planeas lograr en la siguiente interacción..."
+                                            className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-sm font-medium placeholder:text-white/40 focus:bg-white focus:text-gray-900 focus:ring-0 transition-all outline-none resize-none"
                                         />
                                     </div>
-                                    <div>
-                                        <label className="block text-xs text-blue-600 mb-1">Asignar a</label>
-                                        <select
-                                            value={nextFollowUpData.assignee}
-                                            onChange={(e) => setNextFollowUpData({ ...nextFollowUpData, assignee: e.target.value })}
-                                            className="block w-full rounded-md border-gray-300 shadow-sm text-sm"
+                                    <div className="flex justify-end pt-2">
+                                        <Button
+                                            onClick={handleSaveNextFollowUp}
+                                            disabled={isSavingFollowUp}
+                                            className="bg-white text-blue-600 hover:bg-blue-50 font-black px-6 py-5 rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-blue-900/20 active:scale-95 transition-all"
                                         >
-                                            <option value="">Sin asignar</option>
-                                            {teamMembers.map(m => (
-                                                <option key={m.id} value={m.id}>
-                                                    {m.full_name ? `${m.full_name} (${m.email.split('@')[0]})` : m.email}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            Confirmar Próxima Acción
+                                        </Button>
                                     </div>
-                                </div>
-                                <div>
-                                    <label className="block text-xs text-blue-600 mb-1">Notas próxima acción</label>
-                                    <textarea
-                                        value={nextFollowUpData.notes}
-                                        onChange={(e) => setNextFollowUpData({ ...nextFollowUpData, notes: e.target.value })}
-                                        rows={2}
-                                        placeholder="¿Qué se debe hacer en el próximo contacto?"
-                                        className="w-full rounded-md border-gray-300 shadow-sm text-sm"
-                                    />
-                                </div>
-                                <div className="flex justify-end pt-2">
-                                    <Button
-                                        onClick={handleSaveNextFollowUp}
-                                        disabled={isSavingFollowUp}
-                                        size="sm"
-                                        className="bg-blue-600 hover:bg-blue-700 text-white"
-                                    >
-                                        Guardar Cambios
-                                    </Button>
                                 </div>
                             </div>
 
@@ -1047,42 +1332,60 @@ export default function Leads() {
                             </div>
 
                             {/* Follow-up History - Always visible */}
-                            <div className="border-t border-gray-200 pt-4">
-                                <h3 className="font-medium text-gray-900 mb-3">📋 Historial de Seguimientos</h3>
+                            <div className="pt-4 border-t border-gray-100">
+                                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+                                    <Clock className="w-4 h-4 text-indigo-500" /> Trazabilidad del Prospecto
+                                </h4>
                                 {followUps.length > 0 ? (
-                                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                                        {followUps.map((fu) => (
-                                            <div key={fu.id} className="flex gap-3 p-3 bg-gray-50 rounded-lg">
-                                                <div className="text-lg">
-                                                    {ACTION_TYPES.find(t => t.value === fu.action_type)?.icon || '📝'}
+                                    <div className="relative pl-8 space-y-8 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-100">
+                                        {[...followUps].sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime()).map((fu) => (
+                                            <div key={fu.id} className="relative group">
+                                                {/* Timeline Node */}
+                                                <div className="absolute -left-[30px] top-1 w-6 h-6 rounded-lg bg-white border-2 border-gray-100 flex items-center justify-center shadow-sm z-10 group-hover:border-indigo-400 group-hover:scale-110 transition-all">
+                                                    <span className="text-xs">
+                                                        {ACTION_TYPES.find(t => t.value === fu.action_type)?.icon || '📝'}
+                                                    </span>
                                                 </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="text-sm text-gray-800 truncate">{fu.notes || 'Sin notas'}</p>
-                                                    <p className="text-xs text-gray-500">
-                                                        {(() => {
-                                                            try {
-                                                                if (!fu.date) return 'Sin fecha';
-                                                                // Ensure date string is safe for parsing
-                                                                const safeDate = fu.date.includes('T') ? fu.date : `${fu.date}T12:00:00`;
-                                                                const dateObj = new Date(safeDate);
-                                                                if (isNaN(dateObj.getTime())) return 'Fecha inválida';
-                                                                return format(dateObj, 'dd/MM/yyyy');
-                                                            } catch (e) {
-                                                                return 'Error fecha';
-                                                            }
-                                                        })()} · <span className="font-bold text-gray-700">{fu.profiles?.full_name || fu.profiles?.email?.split('@')[0] || 'Usuario'}</span>
+
+                                                <div className="bg-white rounded-xl p-4 border border-gray-50 shadow-sm group-hover:border-indigo-100 group-hover:shadow-md transition-all">
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <p className="text-xs font-black text-gray-400 uppercase tracking-widest">
+                                                            {(() => {
+                                                                try {
+                                                                    if (!fu.date) return 'Sin fecha';
+                                                                    // Forzamos mediodía local para evitar desfase UTC si es solo fecha
+                                                                    const pureDate = fu.date.split('T')[0];
+                                                                    const dateObj = new Date(`${pureDate}T12:00:00`);
+                                                                    return format(dateObj, 'dd MMM, yyyy', { locale: es });
+                                                                } catch (e) { return 'Fecha error'; }
+                                                            })()}
+                                                        </p>
+                                                        {fu.profiles?.avatar_url ? (
+                                                            <img src={fu.profiles.avatar_url} alt="" className="w-6 h-6 rounded-full border border-gray-100 shadow-sm" />
+                                                        ) : (
+                                                            <div className="w-6 h-6 rounded-full bg-indigo-50 flex items-center justify-center border border-indigo-100">
+                                                                <User className="w-3 h-3 text-indigo-400" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-sm font-medium text-gray-700 leading-relaxed">
+                                                        {fu.notes || 'Registro de actividad sin comentarios.'}
                                                     </p>
+                                                    <div className="mt-3 pt-3 border-t border-gray-50 flex items-center gap-2">
+                                                        <p className="text-[10px] font-bold text-gray-400">Registrado por:</p>
+                                                        <p className="text-[10px] font-black text-indigo-600 uppercase tracking-wider">
+                                                            {fu.profiles?.full_name || fu.profiles?.email?.split('@')[0] || 'Sistema'}
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                {fu.profiles?.avatar_url && (
-                                                    <img src={fu.profiles.avatar_url} alt="" className="w-8 h-8 rounded-full border border-gray-200" />
-                                                )}
                                             </div>
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-sm text-gray-400 text-center py-4 bg-gray-50 rounded-lg">
-                                        No hay seguimientos aún
-                                    </p>
+                                    <div className="text-center py-10 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                                        <Clock className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Sin actividad registrada</p>
+                                    </div>
                                 )}
                             </div>
                         </div>

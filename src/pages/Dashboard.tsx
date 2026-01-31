@@ -5,7 +5,7 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
-import { BadgeDollarSign, TrendingUp, Users, Target, Building, Calendar, CheckCircle, ChevronDown, Edit2 } from 'lucide-react';
+import { BadgeDollarSign, TrendingUp, Users, Target, Building, Calendar, Clock, CheckCircle, ChevronDown, Edit2 } from 'lucide-react';
 import { adminService } from '../services/admin';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import {
@@ -16,7 +16,9 @@ import {
     startOfYear, endOfYear
 } from 'date-fns';
 import { useAuth } from '../auth/AuthProvider';
-import { STATUS_CONFIG, PRIORITY_CONFIG, DATE_RANGE_OPTIONS, type DateRange } from '../types';
+import { STATUS_CONFIG, PRIORITY_CONFIG, SOURCE_CONFIG, DATE_RANGE_OPTIONS, type DateRange } from '../types';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
@@ -24,16 +26,19 @@ import { logger } from '../utils/logger';
 import { useDashboardStats } from '../hooks/useDashboard';
 
 const THEME = {
-    primary: '#007BFF',   // Azul Eléctrico
-    background: '#FFFFFF', // Blanco Nieve
-    surface: '#F5F7FA',    // Gris Ultra-Claro
-    text: '#4449AA',       // Gris Carbón
-    accent: '#FFA500',     // Naranja Coral
-    success: '#3DCC91',     // Verde Menta
-    neutral: '#94a3b8'
+    primary: '#4F46E5',   // Indigo Moderno
+    background: '#F8FAFC', // Slate 50 tint
+    surface: '#FFFFFF',    // Pure White
+    text: '#1E293B',       // Slate 800
+    accent: '#F59E0B',     // Amber 500
+    success: '#10B981',    // Emerald 500
+    neutral: '#64748B',    // Slate 500
+    chart1: '#3B82F6',     // Blue 500
+    chart2: '#8B5CF6',     // Violet 500
+    chart3: '#EC4899',     // Pink 500
 };
 
-const PIE_COLORS = [THEME.primary, THEME.success, THEME.accent, '#8b5cf6', '#64748b', '#E2E8F0'];
+const PIE_COLORS = [THEME.primary, THEME.success, THEME.accent, THEME.chart2, THEME.chart3, '#94A3B8'];
 
 const FunnelInfographic = ({ data }: { data: any[] }) => {
     // Logic: Exact status match per layer, strictly following user requested order.
@@ -125,6 +130,8 @@ export default function Dashboard() {
     const [funnelData, setFunnelData] = useState<any[]>([]);
     const [sourceData, setSourceData] = useState<any[]>([]);
     const [priorityData, setPriorityData] = useState<any[]>([]);
+    const [upcomingFollowUps, setUpcomingFollowUps] = useState<any[]>([]);
+    const [recentConversions, setRecentConversions] = useState<any[]>([]);
     const [topOpportunities, setTopOpportunities] = useState<any[]>([]);
 
     const navigate = useNavigate();
@@ -209,12 +216,20 @@ export default function Dashboard() {
             // Calculate source percentages
             const total = dashboardData.bySource.reduce((sum: number, s: any) => sum + s.value, 0);
             setSourceData(dashboardData.bySource.map((s: any) => ({
-                name: s.name,
+                key: s.name,
+                name: SOURCE_CONFIG[s.name]?.label || s.name,
+                icon: SOURCE_CONFIG[s.name]?.icon || '📊',
                 value: total > 0 ? Math.round((s.value / total) * 100) : 0
             })));
 
             // Set top opportunities
             setTopOpportunities(dashboardData.topOpportunities || []);
+
+            // Set upcoming follow-ups
+            setUpcomingFollowUps(dashboardData.upcomingFollowUps || []);
+
+            // Set recent conversions
+            setRecentConversions(dashboardData.recentConversions || []);
 
             // Map priority data with labels
             setPriorityData(dashboardData.byPriority.map((p: any) => ({
@@ -266,6 +281,37 @@ export default function Dashboard() {
             logger.error('Failed to load admin data', error, { action: 'loadSuperAdminData' });
         }
     };
+
+    if (isDashboardLoading) {
+        return (
+            <div className="flex h-[60vh] items-center justify-center">
+                <div className="flex flex-col items-center gap-6">
+                    <div className="w-16 h-16 border-4 border-slate-100 border-t-indigo-600 rounded-full animate-spin shadow-lg"></div>
+                    <div className="text-center">
+                        <p className="text-slate-900 font-black text-xs uppercase tracking-[0.3em] mb-1">Optimizando Métricas</p>
+                        <p className="text-slate-400 font-medium text-[10px] animate-pulse">Cargando inteligencia de negocio...</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (dashboardError) {
+        return (
+            <div className="flex h-[60vh] items-center justify-center">
+                <div className="text-center max-w-sm px-6 py-10 bg-white rounded-[2.5rem] shadow-xl border border-red-50">
+                    <div className="w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                        <XAxis className="w-8 h-8" />
+                    </div>
+                    <h3 className="text-xl font-black text-slate-900 tracking-tight mb-2">Error de Conexión</h3>
+                    <p className="text-slate-500 text-sm mb-8 leading-relaxed">Hubo un problema al sincronizar tus datos. Por favor, intenta de nuevo.</p>
+                    <Button onClick={() => setRefreshKey(Date.now())} className="h-14 bg-indigo-600 hover:bg-indigo-700 text-white font-black px-10 rounded-2xl shadow-xl shadow-indigo-600/20 transition-all">
+                        Reintentar Sincronización
+                    </Button>
+                </div>
+            </div>
+        );
+    }
 
     const handleEditCompany = (company: any) => {
         setEditingCompany({ ...company });
@@ -462,7 +508,7 @@ export default function Dashboard() {
 
     // CRM DASHBOARD VIEW
     return (
-        <div className="w-full max-w-[1500px] mx-auto pb-6 space-y-8 animate-in fade-in duration-500">
+        <div className="w-full max-w-[1580px] mx-auto pb-12 space-y-8 animate-in fade-in duration-700">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h2 className="text-2xl font-extrabold text-[#4449AA] leading-tight tracking-tight">{t('dashboard.crm.title')}</h2>
@@ -472,45 +518,153 @@ export default function Dashboard() {
             </div>
 
             {/* KPI Cards - Global Standard */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                 {[
-                    { name: t('dashboard.crm.totalPipeline'), value: `$${stats.totalPipeline.toLocaleString()}`, icon: BadgeDollarSign, color: 'text-indigo-600', bg: 'bg-indigo-50/50' },
-                    { name: t('dashboard.crm.totalLeads'), value: stats.totalLeads, icon: Users, color: 'text-[#4449AA]', bg: 'bg-slate-100/50' },
-                    { name: t('dashboard.crm.wonDeals'), value: stats.wonDeals, icon: Target, color: 'text-emerald-600', bg: 'bg-emerald-50/50' },
-                    { name: t('dashboard.crm.conversionRate'), value: `${stats.conversionRate}%`, icon: TrendingUp, color: 'text-amber-600', bg: 'bg-amber-50/50' },
+                    { name: t('dashboard.crm.totalPipeline'), value: `$${stats.totalPipeline.toLocaleString()}`, icon: BadgeDollarSign, color: 'text-indigo-600', bg: 'bg-indigo-50/50', trend: '+12.5%' },
+                    { name: t('dashboard.crm.totalLeads'), value: stats.totalLeads, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50/50', trend: '+5.2%' },
+                    { name: t('dashboard.crm.wonDeals'), value: stats.wonDeals, icon: Target, color: 'text-emerald-600', bg: 'bg-emerald-50/50', trend: '+8.1%' },
+                    { name: t('dashboard.crm.conversionRate'), value: `${stats.conversionRate}%`, icon: TrendingUp, color: 'text-amber-600', bg: 'bg-amber-50/50', trend: '+2.4%' },
                 ].map((item) => (
-                    <div key={item.name} className="group relative overflow-hidden rounded-2xl bg-white p-5 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300">
-                        <div className={`p-2.5 rounded-xl ${item.bg} w-fit mb-3 transition-transform group-hover:scale-110`}>
-                            <item.icon className={`h-5 w-5 ${item.color}`} />
+                    <div key={item.name} className="group relative overflow-hidden rounded-3xl bg-white p-5 shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 hover:-translate-y-1">
+                        <div className="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 bg-slate-50 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+                        <div className="flex flex-col h-full relative z-10">
+                            <div className={`p-3.5 rounded-2xl ${item.bg} w-fit mb-4 transition-transform group-hover:scale-110 shadow-sm shadow-black/5`}>
+                                <item.icon className={`h-6 w-6 ${item.color}`} />
+                            </div>
+                            <dt className="text-[11px] font-black text-slate-400 uppercase tracking-[0.15em] mb-1">{item.name}</dt>
+                            <div className="flex items-baseline gap-2">
+                                <dd className="text-3xl font-black text-slate-900 tracking-tighter">{item.value}</dd>
+                                <span className="text-[10px] font-black text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded-lg">{item.trend}</span>
+                            </div>
                         </div>
-                        <dt className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{item.name}</dt>
-                        <dd className="mt-1 text-2xl font-black text-[#4449AA] tracking-tighter">{item.value}</dd>
                     </div>
                 ))}
             </div>
 
-            {/* Main Content Area */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Funnel Infographic */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-50 lg:col-span-12 xl:col-span-8 flex flex-col">
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="text-lg font-bold text-[#4449AA]">{t('dashboard.crm.funnelTitle')}</h3>
-                        <div className="bg-[#F5F7FA] px-3 py-0.5 rounded-full text-[9px] font-bold text-gray-400 tracking-wider">VISUAL KPI</div>
+            {/* Main Content Area: Grouped Proportions */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+
+                {/* Row 1: Funnel + Strategic Priority */}
+                <div className="bg-white p-5 rounded-3xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 lg:col-span-8 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500">
+                    <div className="flex justify-between items-center mb-5">
+                        <div className="flex flex-col">
+                            <h3 className="text-[12px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('dashboard.crm.funnelTitle')}</h3>
+                            <p className="text-[11px] text-gray-400 font-medium">Conversión por etapa</p>
+                        </div>
+                        <div className="bg-indigo-50 px-3 py-1 rounded-full text-[9px] font-black text-indigo-600 tracking-wider">VISUAL KPI</div>
                     </div>
                     <div className="flex-grow flex items-center justify-center">
                         <FunnelInfographic data={funnelData} />
                     </div>
                 </div>
 
-                {/* Sources Pie */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-50 lg:col-span-12 xl:col-span-4">
-                    <h3 className="text-lg font-bold text-[#4449AA] mb-4">{t('dashboard.crm.sourcesTitle')}</h3>
-                    <div className="flex flex-col items-center">
-                        <div className="h-52 w-full relative">
+                <div className="bg-white p-5 rounded-3xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 lg:col-span-4 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500">
+                    <div className="flex justify-between items-center mb-6">
+                        <div className="flex flex-col">
+                            <h3 className="text-[12px] font-black text-slate-400 uppercase tracking-[0.2em]">Priorización</h3>
+                            <p className="text-[11px] text-gray-400 font-medium">Enfoque estratégico</p>
+                        </div>
+                        <Target className="w-5 h-5 text-amber-500 opacity-30" />
+                    </div>
+                    <div className="flex-grow min-h-[250px]">
+                        {priorityData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={priorityData} layout="vertical" margin={{ left: -20 }}>
+                                    <XAxis type="number" hide />
+                                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} width={80} />
+                                    <Tooltip
+                                        cursor={{ fill: 'transparent' }}
+                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                    />
+                                    <Bar
+                                        dataKey="value"
+                                        radius={[0, 4, 4, 0]}
+                                        barSize={20}
+                                    >
+                                        {priorityData.map((entry, index) => (
+                                            <Cell
+                                                key={`cell-${index}`}
+                                                fill={
+                                                    entry.key === 'very_high' ? '#10b981' :
+                                                        entry.key === 'high' ? '#3b82f6' :
+                                                            entry.key === 'medium' ? '#f59e0b' : '#e2e8f0'
+                                                }
+                                            />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-gray-300 font-bold text-[9px] uppercase tracking-widest">Sin actividad</div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Row 2: Top Opportunities + Sources */}
+                <div className="bg-white rounded-3xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 overflow-hidden lg:col-span-8 group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500">
+                    <div className="p-5 pb-4 border-b border-slate-100 flex justify-between items-center">
+                        <div className="flex flex-col">
+                            <h3 className="text-[12px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('dashboard.crm.topOppTitle')}</h3>
+                            <p className="text-[11px] text-gray-400 font-medium">Mayores contratos en pipeline</p>
+                        </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full">
+                            <thead className="bg-slate-50/50">
+                                <tr>
+                                    <th className="px-10 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('dashboard.crm.columnName')}</th>
+                                    <th className="px-6 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Fecha</th>
+                                    <th className="px-6 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Fuente</th>
+                                    <th className="px-6 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('dashboard.crm.columnValue')}</th>
+                                    <th className="px-10 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('dashboard.crm.columnStatus')}</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {topOpportunities.length > 0 ? topOpportunities.map((lead) => (
+                                    <tr key={lead.id} className="hover:bg-gray-50/50 transition-colors">
+                                        <td className="px-10 py-5">
+                                            <div className="text-xs font-black text-slate-900 leading-tight">{lead.name}</div>
+                                            {lead.company_name && <div className="text-[10px] font-medium text-gray-400 mt-0.5">{lead.company_name}</div>}
+                                        </td>
+                                        <td className="px-6 py-5 text-[11px] text-slate-500 font-bold">{lead.created_at ? format(new Date(lead.created_at), 'dd MMM yyyy', { locale: es }) : '-'}</td>
+                                        <td className="px-6 py-5">
+                                            {lead.source && SOURCE_CONFIG[lead.source] ? (
+                                                <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100 w-fit">
+                                                    <span>{SOURCE_CONFIG[lead.source].icon}</span>
+                                                    <span className="uppercase tracking-tight">{SOURCE_CONFIG[lead.source].label}</span>
+                                                </div>
+                                            ) : <span className="text-[10px] text-slate-300 font-bold">-</span>}
+                                        </td>
+                                        <td className="px-6 py-5 text-sm font-black text-emerald-600 font-mono">${(lead.value || 0).toLocaleString()}</td>
+                                        <td className="px-10 py-5 text-right">
+                                            <span className="px-3 py-1 text-[9px] font-black uppercase rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100">
+                                                {STATUS_CONFIG[lead.status as keyof typeof STATUS_CONFIG]?.label || lead.status}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                )) : (
+                                    <tr>
+                                        <td colSpan={5} className="px-10 py-20 text-center text-gray-400 font-bold text-[10px] uppercase tracking-widest">
+                                            Sin oportunidades activas
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div className="bg-white p-5 rounded-3xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 lg:col-span-4 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500">
+                    <div className="flex flex-col mb-6">
+                        <h3 className="text-[12px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('dashboard.crm.sourcesTitle')}</h3>
+                        <p className="text-[11px] text-gray-400 font-medium">Origen de leads</p>
+                    </div>
+                    <div className="flex-grow flex flex-col items-center">
+                        <div className="h-48 w-full relative">
                             {sourceData.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
-                                        <Pie data={sourceData} cx="50%" cy="50%" innerRadius={55} outerRadius={70} paddingAngle={8} dataKey="value" stroke="none">
+                                        <Pie data={sourceData} cx="50%" cy="50%" innerRadius={55} outerRadius={75} paddingAngle={8} dataKey="value" stroke="none">
                                             {sourceData.map((_, index) => (
                                                 <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                                             ))}
@@ -524,104 +678,98 @@ export default function Dashboard() {
                                 <div className="h-full flex items-center justify-center text-gray-300 font-bold text-[10px]">SIN DATOS</div>
                             )}
                         </div>
-                        <div className="grid grid-cols-2 gap-3 w-full mt-4">
-                            {sourceData.slice(0, 4).map((entry, index) => (
-                                <div key={entry.name} className="flex flex-col">
-                                    <div className="flex items-center gap-1.5 mb-0.5">
-                                        <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} />
-                                        <span className="text-[9px] font-bold text-gray-400 uppercase truncate">{entry.name}</span>
+                        <div className="flex flex-col gap-3 w-full mt-6">
+                            {sourceData.slice(0, 6).map((entry, index) => (
+                                <div key={index} className="flex items-center justify-between group/item">
+                                    <div className="flex items-center gap-2.5">
+                                        <div
+                                            className="w-2.5 h-2.5 rounded-full border border-white shadow-sm"
+                                            style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}
+                                        />
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-[11px] opacity-70">{entry.icon}</span>
+                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{entry.name}</span>
+                                        </div>
                                     </div>
-                                    <span className="text-base font-extrabold text-[#4449AA] ml-3">{entry.value}%</span>
+                                    <span className="text-xs font-black text-slate-900">{entry.value}%</span>
                                 </div>
                             ))}
                         </div>
                     </div>
                 </div>
 
-                {/* Priority Chart */}
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-50 lg:col-span-12">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-bold text-[#4449AA] flex items-center gap-2">
-                            <Target className="w-5 h-5 text-[#FFA500]" />
-                            Priorización Estratégica
-                        </h3>
-                    </div>
-                    <div className="h-56">
-                        {priorityData.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={priorityData}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F5F7FA" />
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                                    <Tooltip
-                                        cursor={{ fill: '#F5F7FA' }}
-                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                    />
-                                    <Bar
-                                        dataKey="value"
-                                        radius={[6, 6, 6, 6]}
-                                        barSize={32}
-                                    >
-                                        {priorityData.map((entry, index) => (
-                                            <Cell
-                                                key={`cell-${index}`}
-                                                onClick={() => navigate('/leads', { state: { priority: entry.key } })}
-                                                fill={
-                                                    entry.key === 'very_high' ? '#3DCC91' :
-                                                        entry.key === 'high' ? '#007BFF' :
-                                                            entry.key === 'medium' ? '#FFA500' : '#E2E8F0'
-                                                }
-                                                className="cursor-pointer hover:opacity-80 transition-opacity"
-                                            />
-                                        ))}
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
-                        ) : (
-                            <div className="h-full flex items-center justify-center text-gray-300 font-bold text-[9px] uppercase tracking-widest">Sin actividad</div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Top Opportunities Table */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-50 overflow-hidden lg:col-span-12">
-                    <div className="p-6 border-b border-gray-50">
-                        <h3 className="text-lg font-bold text-[#4449AA]">{t('dashboard.crm.topOppTitle')}</h3>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full">
-                            <thead className="bg-[#F5F7FA]">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t('dashboard.crm.columnName')}</th>
-                                    <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Fecha</th>
-                                    <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t('dashboard.crm.columnValue')}</th>
-                                    <th className="px-6 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t('dashboard.crm.columnStatus')}</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                {topOpportunities.length > 0 ? topOpportunities.map((lead) => (
-                                    <tr key={lead.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-6 py-3.5">
-                                            <div className="text-xs font-bold text-[#4449AA]">{lead.name}</div>
-                                            {lead.company_name && <div className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">{lead.company_name}</div>}
-                                        </td>
-                                        <td className="px-6 py-3.5 text-[10px] text-[#94a3b8] font-bold">{lead.created_at ? new Date(lead.created_at).toLocaleDateString() : '-'}</td>
-                                        <td className="px-6 py-3.5 text-base font-extrabold text-[#3DCC91] font-mono">${(lead.value || 0).toLocaleString()}</td>
-                                        <td className="px-6 py-3.5 text-right">
-                                            <span className="px-3 py-1 text-[9px] font-extrabold uppercase rounded-full bg-blue-50 text-[#007BFF]">
-                                                {STATUS_CONFIG[lead.status as keyof typeof STATUS_CONFIG]?.label || lead.status}
+                {/* Row 3: Follow-ups & Conversions */}
+                <div className="lg:col-span-12 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="bg-white rounded-3xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 overflow-hidden flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500">
+                        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white">
+                            <div className="flex flex-col">
+                                <h3 className="text-[12px] font-black text-blue-700 uppercase tracking-[0.2em] flex items-center gap-2">
+                                    <Clock className="w-4 h-4" /> Próximos Seguimientos
+                                </h3>
+                                <p className="text-[11px] text-blue-600/60 font-medium mt-0.5">Pendientes por realizar</p>
+                            </div>
+                            <button onClick={() => navigate('/leads')} className="text-[10px] font-black text-blue-600 hover:text-blue-800 uppercase tracking-[0.2em] bg-blue-50 px-4 py-2 rounded-xl transition-all">Ver todos</button>
+                        </div>
+                        <div className="p-6 space-y-3">
+                            {upcomingFollowUps.length > 0 ? (
+                                upcomingFollowUps.map((lead) => (
+                                    <div key={lead.id} onClick={() => navigate('/leads', { state: { leadId: lead.id } })} className="p-5 bg-gray-50/50 rounded-2xl border border-transparent hover:border-blue-100 hover:bg-white transition-all cursor-pointer group/item">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <h4 className="text-sm font-black text-slate-900 group-hover/item:text-blue-600 transition-colors uppercase tracking-tight">{lead.name}</h4>
+                                            <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100">
+                                                {(() => {
+                                                    try {
+                                                        const dateObj = new Date(lead.next_followup_date);
+                                                        return format(dateObj, 'dd MMM', { locale: es });
+                                                    } catch (e) { return 'N/A'; }
+                                                })()}
                                             </span>
-                                        </td>
-                                    </tr>
-                                )) : (
-                                    <tr>
-                                        <td colSpan={4} className="px-6 py-10 text-center text-gray-400 font-bold text-[10px] uppercase tracking-widest">
-                                            Sin oportunidades
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
+                                        </div>
+                                        <p className="text-[11px] text-slate-500 font-medium line-clamp-2 leading-relaxed">{lead.next_action_notes || 'Sin notas de acción específicas.'}</p>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center py-20 opacity-30">
+                                    <CheckCircle className="w-10 h-10 mb-4 text-emerald-500" />
+                                    <p className="text-[11px] font-black uppercase tracking-[0.2em]">¡Al día con tus tareas!</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-3xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 overflow-hidden flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500">
+                        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white">
+                            <div className="flex flex-col">
+                                <h3 className="text-[12px] font-black text-emerald-700 uppercase tracking-[0.2em] flex items-center gap-2">
+                                    <TrendingUp className="w-4 h-4" /> Conversiones Recientes
+                                </h3>
+                                <p className="text-[11px] text-emerald-600/60 font-medium mt-0.5">Últimos cierres exitosos</p>
+                            </div>
+                            <div className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[9px] font-black tracking-widest">WINNING</div>
+                        </div>
+                        <div className="p-6 space-y-3">
+                            {recentConversions.length > 0 ? (
+                                recentConversions.map((lead) => (
+                                    <div key={lead.id} className="p-5 bg-gray-50/50 rounded-2xl border border-transparent hover:border-emerald-100 hover:bg-white transition-all group/item">
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight">{lead.name}</h4>
+                                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">{lead.company_name || 'Particular'}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-base font-black text-emerald-600 tracking-tighter">${(lead.closing_amount || lead.value || 0).toLocaleString()}</p>
+                                                <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Monto Cerrado</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center py-20 opacity-30">
+                                    <Target className="w-10 h-10 mb-4 text-indigo-400" />
+                                    <p className="text-[11px] font-black uppercase tracking-[0.2em]">En busca del próximo cierre</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

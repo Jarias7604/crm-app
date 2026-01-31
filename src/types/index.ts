@@ -65,6 +65,9 @@ export interface Company {
         marketing: boolean;
         chat: boolean;
     };
+    date_format?: string;
+    time_format?: string;
+    timezone?: string;
     allowed_permissions?: string[];
 }
 
@@ -109,10 +112,10 @@ export interface FollowUp {
 
 // Helper constants for UI
 export const PRIORITY_CONFIG = {
-    very_high: { label: 'Altísima', color: 'bg-red-500', textColor: 'text-white' },
-    high: { label: 'Alta', color: 'bg-orange-500', textColor: 'text-white' },
-    medium: { label: 'Media', color: 'bg-yellow-400', textColor: 'text-gray-900' },
-    low: { label: 'Baja', color: 'bg-gray-300', textColor: 'text-gray-700' },
+    very_high: { label: 'Altísima', color: 'bg-red-500', textColor: 'text-white', icon: '🔥' },
+    high: { label: 'Alta', color: 'bg-orange-500', textColor: 'text-white', icon: '⚡' },
+    medium: { label: 'Media', color: 'bg-yellow-400', textColor: 'text-gray-900', icon: '💎' },
+    low: { label: 'Baja', color: 'bg-gray-300', textColor: 'text-gray-700', icon: '🌊' },
 };
 
 export const STATUS_CONFIG: Record<LeadStatus, { label: string; color: string; bgColor: string; icon: string }> = {

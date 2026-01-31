@@ -120,7 +120,7 @@ export const leadsService = {
     async getTopOpportunities(limit = 5, startDate?: string, endDate?: string) {
         let query = supabase
             .from('leads')
-            .select('id, name, company_name, status, value, created_at')
+            .select('id, name, company_name, status, value, created_at, source')
             .order('value', { ascending: false })
             .limit(limit);
 

@@ -90,59 +90,77 @@ export default function CotizacionDetalle() {
 
     return (
         <div className="min-h-screen bg-gray-50/50 pb-20">
-            {/* Action Bar */}
-            <div className="bg-white border-b border-gray-200 sticky top-0 z-50 px-4 md:px-8 py-4 shadow-sm">
-                <div className="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-4">
-                    <Button variant="ghost" onClick={() => navigate('/cotizaciones')} className="text-gray-500 hover:text-gray-900 group">
-                        <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
-                        Volver
-                    </Button>
+            {/* Action Bar - Immersive, Edge-to-Edge, Zero Gaps */}
+            <div className="-mt-8 -mx-4 md:-mx-8 sticky top-0 z-50 bg-white border-b border-gray-200 w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] transition-all overflow-hidden shadow-sm">
+                <div className="h-20 px-4 md:px-8 flex justify-between items-center max-w-[1580px] mx-auto">
+                    <div className="flex items-center gap-6">
+                        <Button
+                            variant="ghost"
+                            onClick={() => navigate('/cotizaciones')}
+                            className="text-gray-400 hover:text-gray-900 group flex items-center gap-2 px-0 hover:bg-transparent"
+                        >
+                            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+                            <span className="text-sm font-bold uppercase tracking-widest">Volver</span>
+                        </Button>
 
-                    <div className="flex items-center gap-2 md:gap-3">
+                        <div className="h-8 w-px bg-gray-100"></div>
+
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] leading-none mb-1.5">ID Propuesta</span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-base font-black text-slate-900 leading-none">#{cotizacion.id.slice(0, 8).toUpperCase()}</span>
+                                <span className="px-2 py-0.5 rounded-md bg-blue-50 text-[9px] font-black text-blue-600 uppercase tracking-tighter">Oficial</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-4">
                         <Button
                             variant="default"
                             onClick={handleDownloadPDF}
                             disabled={isGeneratingPDF}
                             className={`
-                                min-w-[160px] relative transition-all duration-300
-                                bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-200/50 
-                                hover:shadow-blue-300/50 hover:-translate-y-0.5 active:scale-95
-                                disabled:opacity-80 disabled:cursor-not-allowed
-                                flex items-center justify-center
+                                h-12 px-8 rounded-xl transition-all duration-300
+                                bg-[#4449AA] hover:bg-[#383d8f] text-white shadow-lg shadow-[#4449AA]/20
+                                font-black text-[11px] uppercase tracking-widest
                             `}
                         >
                             {isGeneratingPDF ? (
-                                <>
-                                    <div className="w-4 h-4 mr-2 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    <span className="animate-pulse">Generando...</span>
-                                </>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    <span>Generando...</span>
+                                </div>
                             ) : (
-                                <>
-                                    <Download className="w-4 h-4 mr-2" />
-                                    Descargar PDF
-                                </>
+                                <div className="flex items-center gap-2">
+                                    <Download className="w-4 h-4" />
+                                    <span>Descargar PDF</span>
+                                </div>
                             )}
                         </Button>
+
                         <Button
                             variant="default"
                             onClick={handleShareTelegram}
-                            className="bg-[#0088cc] text-white hover:bg-[#0077b5]"
+                            className="h-12 px-6 bg-white border border-gray-200 text-slate-800 hover:bg-gray-50 hover:border-gray-300 font-bold text-[11px] uppercase tracking-widest rounded-xl shadow-sm hidden md:flex items-center gap-2"
                         >
-                            <Send className="w-4 h-4 mr-2" />
+                            <Send className="w-4 h-4 text-[#0088cc]" />
                             Compartir
                         </Button>
+
+                        <div className="h-8 w-px bg-gray-100 hidden md:block mx-1"></div>
+
                         <Button
                             variant="ghost"
                             onClick={handleDelete}
-                            className="text-red-500 hover:bg-red-50"
+                            className="h-12 w-12 p-0 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
                         >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-5 h-5" />
                         </Button>
                     </div>
                 </div>
             </div>
 
-            <div className="max-w-5xl mx-auto mt-8 px-4">
+            <div className="max-w-5xl mx-auto mt-6 px-4">
                 {/* Quote Document */}
                 <div className="bg-white shadow-2xl rounded-3xl overflow-hidden border border-gray-100 print:shadow-none print:border-none print:m-0">
                     {/* Visual Header - Exact PDF Style */}
@@ -354,6 +372,8 @@ export default function CotizacionDetalle() {
                                         montoPeriodo            // Term Total
                                     } = financials;
 
+                                    const divisor = cotizacion.cuotas || (isMonthly ? plazoMeses : 1);
+
                                     const ivaPctLabel = cotizacion.iva_porcentaje || 13;
 
                                     return (
@@ -372,19 +392,19 @@ export default function CotizacionDetalle() {
                                                 <div className="space-y-1.5">
                                                     <div className="flex justify-between text-[11px] text-slate-500 font-medium">
                                                         <span>Implementación + Servicios</span>
-                                                        <span className="font-bold text-slate-700">${(pagoInicial / (1 + (cotizacion.iva_porcentaje || 13) / 100)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                        <span className="font-bold text-slate-700">${(pagoInicial / (1 + (cotizacion.iva_porcentaje || 13) / 100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                     </div>
                                                     <div className="flex justify-between text-[11px] text-slate-500 font-medium">
                                                         <span>IVA ({cotizacion.iva_porcentaje || 13}%)</span>
-                                                        <span className="font-bold text-orange-600">+$ {(pagoInicial - (pagoInicial / (1 + (cotizacion.iva_porcentaje || 13) / 100))).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                        <span className="font-bold text-orange-600">+$ {(pagoInicial - (pagoInicial / (1 + (cotizacion.iva_porcentaje || 13) / 100))).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                     </div>
                                                     <div className="pt-4 border-t border-orange-200 mt-2 flex justify-between items-end">
                                                         <span className="text-[10px] font-black text-slate-900 uppercase">Total Inicial</span>
-                                                        <span className="text-2xl font-black text-orange-600 tracking-tighter leading-none">${pagoInicial.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                        <span className="text-2xl font-black text-orange-600 tracking-tighter leading-none">${pagoInicial.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                     </div>
                                                     <div className="mt-3 bg-orange-100/50 rounded-xl px-4 py-2 flex justify-between items-center border border-orange-100">
                                                         <span className="text-[9px] font-bold text-orange-800 uppercase tracking-tighter">Total a pagar hoy</span>
-                                                        <span className="text-sm font-black text-orange-600">${pagoInicial.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                        <span className="text-sm font-black text-orange-600">${pagoInicial.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -397,13 +417,7 @@ export default function CotizacionDetalle() {
                                                             {isMonthly ? 'PAGO RECURRENTE' : 'RECURRENTE ANUAL'}
                                                         </h4>
                                                         <p className={`text-[10px] ${isMonthly ? 'text-blue-500' : 'text-green-500'} font-bold mt-1`}>
-                                                            {isMonthly
-                                                                ? (plazoMeses === 1 ? '12 cuotas mensuales' :
-                                                                    plazoMeses === 3 ? '4 pagos trimestrales (12 meses)' :
-                                                                        plazoMeses === 6 ? '2 pagos semestrales (12 meses)' :
-                                                                            plazoMeses === 12 ? '1 pago anual (12 meses)' :
-                                                                                `${plazoMeses} meses de servicio`)
-                                                                : 'Pago anual (12 meses)'}
+                                                            {divisor > 1 ? `Pago en ${divisor} cuotas` : 'Pago único acumulado'}
                                                         </p>
                                                     </div>
                                                     <div className={`w-10 h-10 rounded-xl ${isMonthly ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'} flex items-center justify-center`}>
@@ -413,53 +427,34 @@ export default function CotizacionDetalle() {
                                                 <div className="space-y-1.5">
                                                     <div className="flex justify-between text-[11px] text-slate-500 font-medium">
                                                         <span>Licencia + Módulos</span>
-                                                        <span className="font-bold text-slate-700">${subtotalRecurrenteBase.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                        <span className="font-bold text-slate-700">${subtotalRecurrenteBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                     </div>
                                                     {isMonthly && termSurchargePct > 0 && (
                                                         <div className="flex justify-between text-[11px] text-blue-600 font-medium">
                                                             <span>+ Recargo ({Math.round(termSurchargePct * 100)}%)</span>
-                                                            <span className="font-bold">+$ {recargoFinanciamiento.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                            <span className="font-bold">+$ {recargoFinanciamiento.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                         </div>
                                                     )}
                                                     <div className="flex justify-between text-[11px] text-slate-500 font-medium">
                                                         <span>IVA ({ivaPctLabel}%)</span>
-                                                        <span className={`font-bold ${isMonthly ? 'text-blue-600' : 'text-green-600'}`}>+$ {ivaRecurrente.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                        <span className={`font-bold ${isMonthly ? 'text-blue-600' : 'text-green-600'}`}>+$ {ivaRecurrente.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                     </div>
                                                     <div className="flex justify-between text-[11px] text-slate-900 font-bold border-t border-slate-100 pt-1.5 mt-1.5">
-                                                        <span>Total Recurrente (Anual)</span>
-                                                        <span>${(subtotalRecurrenteBase + recargoFinanciamiento + ivaRecurrente).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                        <span>Total Plan ({divisor} {divisor === 1 ? 'Cuota' : 'Cuotas'})</span>
+                                                        <span className={isMonthly ? 'text-blue-700' : 'text-green-700'}>${(isMonthly ? (cuotaMensual * divisor) : totalAnual).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                     </div>
                                                     <div className={`pt-4 border-t-2 ${isMonthly ? 'border-blue-200/80' : 'border-green-200/80'} mt-2 flex justify-between items-end`}>
                                                         <span className="text-sm font-bold text-slate-900">
-                                                            {isMonthly ? 'CUOTA MENSUAL' : 'TOTAL RECURRENTE'}
+                                                            {divisor > 1 ? `Cuota de ${divisor}` : 'Total recurrente'}
                                                         </span>
                                                         <span className={`text-2xl font-black ${isMonthly ? 'text-blue-600' : 'text-green-600'} tracking-tighter leading-none`}>
-                                                            ${(isMonthly ? cuotaMensual : totalAnual).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                                            {isMonthly && <span className="text-[10px] opacity-60 ml-1">/mes</span>}
+                                                            ${(isMonthly ? cuotaMensual : totalAnual).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            {divisor > 1 && <span className="text-[10px] opacity-60 ml-1">/ cuota</span>}
                                                         </span>
                                                     </div>
                                                     <p className={`text-[9px] font-bold ${isMonthly ? 'text-blue-400' : 'text-green-400'} mt-1 text-center italic`}>
-                                                        * Contrato por compromiso anual (12 meses)
+                                                        * Plan de pagos consecutivos.
                                                     </p>
-                                                    <div className={`mt-3 ${isMonthly ? 'bg-blue-100/50 border-blue-100' : 'bg-green-100/50 border-green-100'} rounded-xl px-4 py-2 flex flex-col items-start border w-full`}>
-                                                        <span className={`text-[9px] font-bold ${isMonthly ? 'text-blue-800' : 'text-green-800'} uppercase tracking-tighter`}>
-                                                            {isMonthly
-                                                                ? (plazoMeses === 1 ? 'PAGO MENSUAL (1 de 12)' :
-                                                                    plazoMeses === 3 ? 'TOTAL PAGO TRIMESTRAL (3 MESES)' :
-                                                                        plazoMeses === 6 ? 'TOTAL PAGO SEMESTRAL (6 MESES)' :
-                                                                            plazoMeses === 12 ? 'TOTAL PAGO ANUAL (12 MESES)' :
-                                                                                `TOTAL EN ${plazoMeses} MES${plazoMeses === 1 ? '' : 'ES'}`)
-                                                                : 'TOTAL ANUAL PROYECTADO'}
-                                                        </span>
-                                                        <div className="flex justify-between items-center w-full">
-                                                            <span className={`text-[10px] font-bold opacity-60 ${isMonthly ? 'text-blue-600' : 'text-green-600'}`}>
-                                                                {isMonthly ? `${plazoMeses} mes${plazoMeses === 1 ? '' : 'es'} x $${cuotaMensual.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : '12 meses proyectados'}
-                                                            </span>
-                                                            <span className={`text-sm font-black ${isMonthly ? 'text-blue-600' : 'text-green-600'}`}>
-                                                                ${(isMonthly ? montoPeriodo : totalAnual).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                                            </span>
-                                                        </div>
-                                                    </div>
                                                 </div>
                                             </div>
 

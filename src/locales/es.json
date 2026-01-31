@@ -94,6 +94,7 @@
         }
     },
     "common": {
+        "greeting": "¡Qué bueno verte de nuevo, {{name}}!",
         "loading": "Cargando...",
         "cancel": "Cancelar",
         "save": "Guardar",

@@ -6,6 +6,7 @@ export interface PermissionDefinition {
     category: string;
     permission_key: string;
     label: string;
+    is_system_only: boolean;
 }
 
 export interface CustomRole {
@@ -48,15 +49,54 @@ export const permissionsService = {
     },
 
     async getRoles(companyId: string) {
+        // Obtenemos roles de sistema (empresa 0000...) y roles de la empresa actual
         const { data, error } = await supabase
             .from('custom_roles')
             .select('*')
-            .or(`company_id.eq.${companyId},is_system.eq.true`)
+            .or(`company_id.eq.${companyId},company_id.eq.00000000-0000-0000-0000-000000000000`)
             .order('is_system', { ascending: false })
             .order('created_at', { ascending: true });
 
         if (error) throw error;
-        return data as CustomRole[];
+
+        // Eliminar duplicados por nombre, priorizando los que tienen company_id específico
+        const uniqueRoles: CustomRole[] = [];
+        const seenNames = new Set<string>();
+
+        // Primero procesamos los de la empresa (si hay)
+        data.forEach(role => {
+            if (role.company_id === companyId) {
+                uniqueRoles.push(role);
+                seenNames.add(role.name.toLowerCase());
+            }
+        });
+
+        // Luego agregamos los de sistema solo si no existe ya uno con ese nombre para la empresa
+        data.forEach(role => {
+            if (role.company_id !== companyId && !seenNames.has(role.name.toLowerCase())) {
+                uniqueRoles.push(role);
+                seenNames.add(role.name.toLowerCase());
+            }
+        });
+
+        return uniqueRoles;
+    },
+
+    async getRoleMemberCounts(companyId: string) {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('custom_role_id')
+            .eq('company_id', companyId);
+
+        if (error) throw error;
+
+        const counts: Record<string, number> = {};
+        data.forEach(p => {
+            if (p.custom_role_id) {
+                counts[p.custom_role_id] = (counts[p.custom_role_id] || 0) + 1;
+            }
+        });
+        return counts;
     },
 
     async createRole(role: Partial<CustomRole>) {

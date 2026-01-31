@@ -725,7 +725,7 @@ export default function NuevaCotizacionDinamica() {
                             <span className="text-3xl font-extrabold text-[#3DCC91]">${totales.total_anual.toLocaleString()}</span>
                         </div>
                         <div className="flex justify-between items-center mt-2">
-                            <span className="text-sm text-gray-600">Total Mensual (12 cuotas)</span>
+                            <span className="text-sm text-gray-600">Total Mensual</span>
                             <span className="text-xl font-bold text-gray-700">${(totales.total_mensual / 12).toLocaleString()}</span>
                         </div>
                     </div>

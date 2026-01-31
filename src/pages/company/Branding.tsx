@@ -22,7 +22,10 @@ export default function Branding() {
         address: '',
         phone: '',
         logo_url: '',
-        terminos_condiciones: ''
+        terminos_condiciones: '',
+        date_format: 'DD/MM/YYYY',
+        time_format: '24h',
+        timezone: 'America/El_Salvador'
     });
 
     // Cropping state
@@ -47,7 +50,10 @@ export default function Branding() {
                 address: data.address || '',
                 phone: data.phone || '',
                 logo_url: data.logo_url || '',
-                terminos_condiciones: data.terminos_condiciones || ''
+                terminos_condiciones: data.terminos_condiciones || '',
+                date_format: data.date_format || 'DD/MM/YYYY',
+                time_format: data.time_format || '24h',
+                timezone: data.timezone || 'America/El_Salvador'
             });
         } catch (error) {
             console.error('Error loading branding:', error);
@@ -105,7 +111,10 @@ export default function Branding() {
                 address: formData.address,
                 phone: formData.phone,
                 logo_url: formData.logo_url,
-                terminos_condiciones: formData.terminos_condiciones
+                terminos_condiciones: formData.terminos_condiciones,
+                date_format: formData.date_format,
+                time_format: formData.time_format,
+                timezone: formData.timezone
             });
             toast.success('Configuración global actualizada');
         } catch (error: any) {
@@ -252,6 +261,58 @@ export default function Branding() {
                                             )}
                                         </div>
                                     )}
+                                </div>
+                            </div>
+
+                            {/* Localization Section */}
+                            <div className="space-y-6">
+                                <label className="block text-xs font-black text-blue-600 uppercase tracking-widest px-1">Configuración de Localización (Fechas y Horas)</label>
+                                <div className="p-8 border-2 border-slate-100 rounded-[2.5rem] bg-indigo-50/30 space-y-8">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        <div className="space-y-2">
+                                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Formato de Fecha</label>
+                                            <select
+                                                value={formData.date_format}
+                                                onChange={e => setFormData({ ...formData, date_format: e.target.value })}
+                                                className="w-full h-14 rounded-2xl border-gray-200 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-slate-700 bg-white shadow-sm transition-all outline-none px-4"
+                                            >
+                                                <option value="DD/MM/YYYY">DD/MM/YYYY (Ej: 30/01/2026)</option>
+                                                <option value="MM/DD/YYYY">MM/DD/YYYY (Ej: 01/30/2026)</option>
+                                                <option value="YYYY-MM-DD">YYYY-MM-DD (Ej: 2026-01-30)</option>
+                                                <option value="dd MMM, yyyy">30 Ene, 2026</option>
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Formato de Hora</label>
+                                            <select
+                                                value={formData.time_format}
+                                                onChange={e => setFormData({ ...formData, time_format: e.target.value })}
+                                                className="w-full h-14 rounded-2xl border-gray-200 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-slate-700 bg-white shadow-sm transition-all outline-none px-4"
+                                            >
+                                                <option value="24h">24 Horas (Ej: 17:00)</option>
+                                                <option value="12h">12 Horas (Ej: 05:00 PM)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Zona Horaria de Operación</label>
+                                        <select
+                                            value={formData.timezone}
+                                            onChange={e => setFormData({ ...formData, timezone: e.target.value })}
+                                            className="w-full h-14 rounded-2xl border-gray-200 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 font-bold text-slate-700 bg-white shadow-sm transition-all outline-none px-4"
+                                        >
+                                            <option value="America/El_Salvador">El Salvador (CST)</option>
+                                            <option value="America/Mexico_City">México (CST)</option>
+                                            <option value="America/Bogota">Colombia (EST)</option>
+                                            <option value="America/New_York">New York (EST)</option>
+                                            <option value="Europe/Madrid">Madrid (CET)</option>
+                                        </select>
+                                        <p className="text-[10px] text-slate-400 font-medium ml-1 mt-1">
+                                            * Esta configuración afectará cómo se registran y muestran las fechas en el sistema para todos los usuarios.
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
 

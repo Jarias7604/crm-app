@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, FileText, DollarSign, Search, X, Package, Globe } from 'lucide-react';
 import { cotizadorService, type CotizadorPaquete, type CotizadorItem, type CotizacionCalculada } from '../services/cotizador';
+import { pricingService } from '../services/pricing';
+import type { FinancingPlan, PaymentSettings } from '../types/pricing';
 import { leadsService } from '../services/leads';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -61,15 +63,17 @@ export default function CotizadorPro() {
     });
 
     const [paqueteSugerido, setPaqueteSugerido] = useState<CotizadorPaquete | null>(null);
-    // Estado para overrides de precios
     const [overrides, setOverrides] = useState<Record<string, number>>({});
     const [implementationOverride, setImplementationOverride] = useState<number | null>(null);
     const [totales, setTotales] = useState<CotizacionCalculada | null>(null);
 
+    // Nuevos estados para pagos dinámicos
+    const [financingPlans, setFinancingPlans] = useState<FinancingPlan[]>([]);
+    const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null);
+    const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+
     // Permisos con fallback para admin
     const canChangePaymentMethod = hasPermission('cotizaciones.change_payment_method') || profile?.role === 'super_admin' || profile?.role === 'company_admin';
-    const canEditMonthlySurcharge = hasPermission('cotizaciones.edit_monthly_surcharge') || profile?.role === 'super_admin' || profile?.role === 'company_admin';
-    const canViewAdvancedConfig = hasPermission('cotizaciones.view_advanced_config') || profile?.role === 'super_admin' || profile?.role === 'company_admin';
 
     // Estado para widget de precio
     const [isWidgetOpen, setIsWidgetOpen] = useState(true);
@@ -152,22 +156,63 @@ export default function CotizadorPro() {
 
     useEffect(() => {
         calcularTotales();
-    }, [formData.paquete_id, formData.modulos_ids, formData.servicios_ids, formData.descuento_porcentaje, formData.volumen_dtes, formData.incluir_implementacion, overrides, implementationOverride]);
+    }, [
+        formData.paquete_id,
+        formData.modulos_ids,
+        formData.servicios_ids,
+        formData.volumen_dtes,
+        formData.incluir_implementacion,
+        formData.descuento_porcentaje,
+        formData.iva_porcentaje,
+        formData.recargo_mensual_porcentaje,
+        overrides,
+        implementationOverride,
+        selectedPlanId,
+        financingPlans
+    ]);
 
     const loadData = async () => {
         try {
             setLoading(true);
-            const [paqData, itemsData] = await Promise.all([
+            const [paqData, itemsData, plansData, settingsData] = await Promise.all([
                 cotizadorService.getAllPaquetes(),
-                cotizadorService.getAllItems()
+                cotizadorService.getAllItems(),
+                pricingService.getFinancingPlans(profile?.company_id),
+                pricingService.getPaymentSettings(profile?.company_id)
             ]);
 
             setPaquetes(paqData);
             setModulos(itemsData.filter(i => i.tipo === 'modulo'));
             setServicios(itemsData.filter(i => i.tipo === 'servicio'));
+            setFinancingPlans(plansData);
+            setPaymentSettings(settingsData);
+
+            // Configuración Inicial Inteligente
+            let defaultPlan: FinancingPlan | undefined = undefined;
+            if (plansData.length > 0) {
+                // Priorizar plan anual con descuento (pago contado)
+                defaultPlan = plansData.find(p => p.tipo_ajuste === 'discount') || plansData[0];
+                setSelectedPlanId(defaultPlan.id);
+            }
+
+            if (settingsData || defaultPlan) {
+                setFormData(prev => {
+                    const isDiscountPlan = defaultPlan?.tipo_ajuste === 'discount';
+
+                    return {
+                        ...prev,
+                        iva_porcentaje: settingsData?.iva_defecto ?? 13,
+                        recargo_mensual_porcentaje: settingsData?.recargo_financiamiento_base ?? 20,
+                        // El descuento manual empieza en 0, el del plan es interno
+                        descuento_porcentaje: 0,
+                        forma_pago: isDiscountPlan ? 'anual' : 'mensual',
+                        meses_pago: defaultPlan?.meses ?? 1
+                    };
+                });
+            }
         } catch (error) {
             logger.error('Error loading data', error, { action: 'loadData' });
-            toast.error('Error al cargar datos');
+            toast.error('Error al cargar datos dinámicos');
         } finally {
             setLoading(false);
         }
@@ -236,16 +281,24 @@ export default function CotizadorPro() {
             ? { ...paqueteSeleccionado, costo_implementacion: implementationOverride }
             : paqueteSeleccionado;
 
+        const selectedPlan = financingPlans.find(p => p.id === selectedPlanId);
+
+        // MOTOR V2: Construir configuración unificada
+        const config = {
+            forma_pago: (selectedPlan?.tipo_ajuste === 'discount' ? 'anual' : 'mensual') as 'anual' | 'mensual',
+            meses: selectedPlan?.meses || 1,
+            cuotas: selectedPlan?.cuotas, // V3: Inyectamos cuotas explícitas si existen
+            tipo_ajuste: selectedPlan?.tipo_ajuste || 'none',
+            tasa_ajuste: selectedPlan?.interes_porcentaje || 0,
+            iva_porcentaje: formData.iva_porcentaje,
+            incluir_implementacion: formData.incluir_implementacion
+        };
+
         const cotizacion = cotizadorService.calcularCotizacion(
             packageWithOverride,
             itemsSeleccionados,
             formData.volumen_dtes,
-            formData.forma_pago,
-            formData.descuento_porcentaje,
-            formData.iva_porcentaje,
-            formData.incluir_implementacion,
-            formData.recargo_mensual_porcentaje,
-            formData.meses_pago
+            config
         );
 
         setTotales(cotizacion);
@@ -411,6 +464,7 @@ export default function CotizadorPro() {
                 // iva_recurrente: totales.iva_monto_recurrente,
                 tipo_pago: formData.forma_pago,
                 plazo_meses: formData.forma_pago === 'mensual' ? formData.meses_pago : 12,
+                cuotas: totales.cuotas,
                 incluir_implementacion: formData.incluir_implementacion,
                 estado: 'borrador' as const
             };
@@ -949,165 +1003,90 @@ export default function CotizadorPro() {
                                 )}
                             </div>
 
-                            {/* Opciones de Pago */}
+                            {/* Opciones de Pago Dinámicas */}
                             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                                {/* 1 MES */}
-                                <button
-                                    type="button"
-                                    onClick={() => canChangePaymentMethod && setFormData({ ...formData, forma_pago: 'mensual', meses_pago: 1 })}
-                                    disabled={!canChangePaymentMethod}
-                                    className={`relative p-4 rounded-xl border-2 transition-all group ${formData.forma_pago === 'mensual' && formData.meses_pago === 1
-                                        ? 'border-blue-600 bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg scale-[1.02]'
-                                        : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
-                                        } ${!canChangePaymentMethod ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
-                                >
-                                    <div className="text-center">
-                                        <div className="text-2xl mb-2">📅</div>
-                                        <p className="font-bold text-gray-900 text-sm">1 Mes</p>
-                                        <p className="text-[10px] text-gray-500 mt-1">
-                                            Pago mensual
-                                        </p>
-                                        <div className="mt-2 pt-2 border-t border-gray-200">
-                                            <p className="text-xs text-blue-600 font-bold">
-                                                +{formData.recargo_mensual_porcentaje}%
-                                            </p>
-                                        </div>
-                                    </div>
-                                    {formData.forma_pago === 'mensual' && formData.meses_pago === 1 && (
-                                        <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center shadow-lg">
-                                            <span className="text-white text-xs">✓</span>
-                                        </div>
-                                    )}
-                                </button>
+                                {financingPlans.length > 0 ? (
+                                    financingPlans.map((plan) => {
+                                        const isSelected = selectedPlanId === plan.id;
+                                        const isAnual = plan.meses === 12 && plan.interes_porcentaje === 0 && plan.titulo.toLowerCase().includes('pago');
 
-                                {/* 3 MESES */}
-                                <button
-                                    type="button"
-                                    onClick={() => canChangePaymentMethod && setFormData({ ...formData, forma_pago: 'mensual', meses_pago: 3 })}
-                                    disabled={!canChangePaymentMethod}
-                                    className={`relative p-4 rounded-xl border-2 transition-all group ${formData.forma_pago === 'mensual' && formData.meses_pago === 3
-                                        ? 'border-purple-600 bg-gradient-to-br from-purple-50 to-purple-100 shadow-lg scale-[1.02]'
-                                        : 'border-gray-200 hover:border-purple-300 hover:shadow-md'
-                                        } ${!canChangePaymentMethod ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
-                                >
-                                    <div className="text-center">
-                                        <div className="text-2xl mb-2">📊</div>
-                                        <p className="font-bold text-gray-900 text-sm">3 Meses</p>
-                                        <p className="text-[10px] text-gray-500 mt-1">
-                                            Trimestral
-                                        </p>
-                                        <div className="mt-2 pt-2 border-t border-gray-200">
-                                            <p className="text-xs text-purple-600 font-bold">
-                                                +{Math.round(formData.recargo_mensual_porcentaje * 0.75)}%
-                                            </p>
-                                        </div>
-                                    </div>
-                                    {formData.forma_pago === 'mensual' && formData.meses_pago === 3 && (
-                                        <div className="absolute -top-2 -right-2 w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center shadow-lg">
-                                            <span className="text-white text-xs">✓</span>
-                                        </div>
-                                    )}
-                                </button>
+                                        return (
+                                            <button
+                                                key={plan.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    if (canChangePaymentMethod) {
+                                                        setSelectedPlanId(plan.id);
+                                                        const isDiscountPlan = plan.tipo_ajuste === 'discount';
 
-                                {/* 6 MESES */}
-                                <button
-                                    type="button"
-                                    onClick={() => canChangePaymentMethod && setFormData({ ...formData, forma_pago: 'mensual', meses_pago: 6 })}
-                                    disabled={!canChangePaymentMethod}
-                                    className={`relative p-4 rounded-xl border-2 transition-all group ${formData.forma_pago === 'mensual' && formData.meses_pago === 6
-                                        ? 'border-indigo-600 bg-gradient-to-br from-indigo-50 to-indigo-100 shadow-lg scale-[1.02]'
-                                        : 'border-gray-200 hover:border-indigo-300 hover:shadow-md'
-                                        } ${!canChangePaymentMethod ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
-                                >
-                                    <div className="text-center">
-                                        <div className="text-2xl mb-2">📈</div>
-                                        <p className="font-bold text-gray-900 text-sm">6 Meses</p>
-                                        <p className="text-[10px] text-gray-500 mt-1">
-                                            Semestral
-                                        </p>
-                                        <div className="mt-2 pt-2 border-t border-gray-200">
-                                            <p className="text-xs text-indigo-600 font-bold">
-                                                +{Math.round(formData.recargo_mensual_porcentaje * 0.5)}%
-                                            </p>
-                                        </div>
+                                                        setFormData({
+                                                            ...formData,
+                                                            forma_pago: isDiscountPlan ? 'anual' : 'mensual',
+                                                            meses_pago: plan.meses,
+                                                            // Reiniciamos descuento manual para evitar doble descuento accidental
+                                                            descuento_porcentaje: 0
+                                                        });
+                                                    }
+                                                }}
+                                                disabled={!canChangePaymentMethod}
+                                                className={`relative p-4 rounded-xl border-2 transition-all group ${isSelected
+                                                    ? isAnual
+                                                        ? 'border-green-600 bg-gradient-to-br from-green-50 to-green-100 shadow-lg scale-[1.02]'
+                                                        : 'border-blue-600 bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg scale-[1.02]'
+                                                    : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
+                                                    } ${!canChangePaymentMethod ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+                                            >
+                                                <div className="text-center">
+                                                    <div className="text-2xl mb-2">
+                                                        {plan.meses === 12 && plan.interes_porcentaje === 0 ? '💰' :
+                                                            plan.meses === 3 ? '📊' :
+                                                                plan.meses === 6 ? '📈' :
+                                                                    plan.meses === 9 ? '📉' : '📅'}
+                                                    </div>
+                                                    <p className="font-bold text-gray-900 text-sm">{plan.titulo}</p>
+                                                    {plan.descripcion && (
+                                                        <p className="text-[10px] text-gray-500 mt-1 truncate">
+                                                            {plan.meses === 1 && plan.interes_porcentaje > 0 ? 'Mensual' : plan.descripcion}
+                                                        </p>
+                                                    )}
+                                                    <div className="mt-2 pt-2 border-t border-gray-200">
+                                                        <p className={`text-xs font-bold ${plan.tipo_ajuste === 'discount' ? 'text-green-600' : plan.tipo_ajuste === 'recharge' ? 'text-blue-600' : 'text-gray-500'}`}>
+                                                            {plan.tipo_ajuste === 'discount' ? `-${plan.interes_porcentaje}% OFF` :
+                                                                plan.tipo_ajuste === 'recharge' ? `+${plan.interes_porcentaje}% Interés` :
+                                                                    'Precio Base'}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                {isSelected && (
+                                                    <div className={`absolute -top-2 -right-2 w-6 h-6 ${isAnual ? 'bg-green-600' : 'bg-blue-600'} rounded-full flex items-center justify-center shadow-lg`}>
+                                                        <span className="text-white text-xs">✓</span>
+                                                    </div>
+                                                )}
+                                                {plan.es_popular && !isAnual && (
+                                                    <div className="absolute -top-2 -left-2">
+                                                        <span className="bg-yellow-400 text-yellow-900 text-[9px] font-black px-2 py-0.5 rounded-full shadow-sm">
+                                                            POPULAR
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {isAnual && (
+                                                    <div className="absolute -top-2 -left-2">
+                                                        <span className="bg-green-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-sm">
+                                                            {paymentSettings?.nota_mejor_precio || 'MEJOR PRECIO'}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </button>
+                                        );
+                                    })
+                                ) : (
+                                    <div className="col-span-full py-4 text-center text-gray-400 text-xs italic">
+                                        Cargando planes de financiamiento...
                                     </div>
-                                    {formData.forma_pago === 'mensual' && formData.meses_pago === 6 && (
-                                        <div className="absolute -top-2 -right-2 w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center shadow-lg">
-                                            <span className="text-white text-xs">✓</span>
-                                        </div>
-                                    )}
-                                    <div className="absolute -top-2 -left-2">
-                                        <span className="bg-yellow-400 text-yellow-900 text-[9px] font-black px-2 py-0.5 rounded-full shadow-sm">
-                                            POPULAR
-                                        </span>
-                                    </div>
-                                </button>
-
-                                {/* 9 MESES */}
-                                <button
-                                    type="button"
-                                    onClick={() => canChangePaymentMethod && setFormData({ ...formData, forma_pago: 'mensual', meses_pago: 9 })}
-                                    disabled={!canChangePaymentMethod}
-                                    className={`relative p-4 rounded-xl border-2 transition-all group ${formData.forma_pago === 'mensual' && formData.meses_pago === 9
-                                        ? 'border-teal-600 bg-gradient-to-br from-teal-50 to-teal-100 shadow-lg scale-[1.02]'
-                                        : 'border-gray-200 hover:border-teal-300 hover:shadow-md'
-                                        } ${!canChangePaymentMethod ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
-                                >
-                                    <div className="text-center">
-                                        <div className="text-2xl mb-2">📉</div>
-                                        <p className="font-bold text-gray-900 text-sm">9 Meses</p>
-                                        <p className="text-[10px] text-gray-500 mt-1">
-                                            3 trimestres
-                                        </p>
-                                        <div className="mt-2 pt-2 border-t border-gray-200">
-                                            <p className="text-xs text-teal-600 font-bold">
-                                                +{Math.round(formData.recargo_mensual_porcentaje * 0.25)}%
-                                            </p>
-                                        </div>
-                                    </div>
-                                    {formData.forma_pago === 'mensual' && formData.meses_pago === 9 && (
-                                        <div className="absolute -top-2 -right-2 w-6 h-6 bg-teal-600 rounded-full flex items-center justify-center shadow-lg">
-                                            <span className="text-white text-xs">✓</span>
-                                        </div>
-                                    )}
-                                </button>
-
-                                {/* 12 MESES - ANUAL */}
-                                <button
-                                    type="button"
-                                    onClick={() => canChangePaymentMethod && setFormData({ ...formData, forma_pago: 'anual', meses_pago: 12 })}
-                                    disabled={!canChangePaymentMethod}
-                                    className={`relative p-4 rounded-xl border-2 transition-all group ${formData.forma_pago === 'anual'
-                                        ? 'border-green-600 bg-gradient-to-br from-green-50 to-green-100 shadow-lg scale-[1.02]'
-                                        : 'border-gray-200 hover:border-green-300 hover:shadow-md'
-                                        } ${!canChangePaymentMethod ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
-                                >
-                                    <div className="text-center">
-                                        <div className="text-2xl mb-2">💰</div>
-                                        <p className="font-bold text-gray-900 text-sm">12 Meses</p>
-                                        <p className="text-[10px] text-gray-500 mt-1">
-                                            Pago anual
-                                        </p>
-                                        <div className="mt-2 pt-2 border-t border-gray-200">
-                                            <p className="text-xs text-green-600 font-bold">
-                                                Ahorrás {formData.recargo_mensual_porcentaje}%
-                                            </p>
-                                        </div>
-                                    </div>
-                                    {formData.forma_pago === 'anual' && (
-                                        <div className="absolute -top-2 -right-2 w-6 h-6 bg-green-600 rounded-full flex items-center justify-center shadow-lg">
-                                            <span className="text-white text-xs">✓</span>
-                                        </div>
-                                    )}
-                                    <div className="absolute -top-2 -left-2">
-                                        <span className="bg-green-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-sm">
-                                            MEJOR PRECIO
-                                        </span>
-                                    </div>
-                                </button>
+                                )}
                             </div>
 
-                            {/* Información contextual */}
+                            {/* Información contextual Dinámica */}
                             <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-100">
                                 <div className="flex items-start gap-3">
                                     <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
@@ -1115,22 +1094,10 @@ export default function CotizadorPro() {
                                     </div>
                                     <div className="flex-1">
                                         <p className="text-sm font-bold text-gray-900 mb-1">
-                                            {formData.forma_pago === 'anual'
-                                                ? '¡Excelente elección! Máximo ahorro'
-                                                : formData.meses_pago === 6
-                                                    ? 'Opción equilibrada - Flexibilidad y ahorro'
-                                                    : 'Flexibilidad de pago - Mayor comodidad'
-                                            }
+                                            {financingPlans.find(p => p.id === selectedPlanId)?.titulo || 'Forma de Pago'}
                                         </p>
                                         <p className="text-xs text-gray-600">
-                                            {formData.forma_pago === 'anual'
-                                                ? `Pago único anual con ${formData.recargo_mensual_porcentaje}% de descuento. Sin recargos ni intereses.`
-                                                : `Pago dividido en ${formData.meses_pago} cuotas con un recargo de ${formData.meses_pago === 1 ? formData.recargo_mensual_porcentaje :
-                                                    formData.meses_pago === 3 ? Math.round(formData.recargo_mensual_porcentaje * 0.75) :
-                                                        formData.meses_pago === 6 ? Math.round(formData.recargo_mensual_porcentaje * 0.5) :
-                                                            Math.round(formData.recargo_mensual_porcentaje * 0.25)
-                                                }% por financiamiento.`
-                                            }
+                                            {financingPlans.find(p => p.id === selectedPlanId)?.descripcion || 'Seleccione una opción de pago.'}
                                         </p>
                                         {formData.forma_pago === 'mensual' && (totales?.ahorro_pago_anual || 0) > 0 && (
                                             <div className="mt-2 pt-2 border-t border-blue-200">
@@ -1145,50 +1112,7 @@ export default function CotizadorPro() {
                         </div>
 
 
-                        {/* CONFIGURACIÓN AVANZADA (solo para admin con permiso) */}
-                        {canViewAdvancedConfig && (
-                            <details className="mb-6">
-                                <summary className="text-sm text-gray-600 cursor-pointer hover:text-gray-900 font-bold">
-                                    ⚙️ Configuración Avanzada
-                                </summary>
-                                <div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                                    {canEditMonthlySurcharge ? (
-                                        <>
-                                            <label className="block text-sm font-bold text-gray-700 mb-2">
-                                                Recargo Pago Mensual (%)
-                                            </label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                max="100"
-                                                step="0.5"
-                                                value={formData.recargo_mensual_porcentaje}
-                                                onChange={(e) => setFormData({
-                                                    ...formData,
-                                                    recargo_mensual_porcentaje: parseFloat(e.target.value) || 20
-                                                })}
-                                                className="w-32 p-2 border border-gray-300 rounded-lg"
-                                            />
-                                            <p className="text-xs text-gray-500 mt-1">
-                                                Por defecto: 20%
-                                            </p>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <label className="block text-sm font-bold text-gray-700 mb-2">
-                                                Recargo Pago Mensual
-                                            </label>
-                                            <p className="text-lg font-black text-blue-600">
-                                                {formData.recargo_mensual_porcentaje}%
-                                            </p>
-                                            <p className="text-xs text-gray-500 mt-1">
-                                                Solo lectura (requiere permiso para editar)
-                                            </p>
-                                        </>
-                                    )}
-                                </div>
-                            </details>
-                        )}
+                        {/* CONFIGURACIÓN AVANZADA REMOVIDA A PETICIÓN */}
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {/* Descuento */}
@@ -1258,15 +1182,15 @@ export default function CotizadorPro() {
                                             <div className="space-y-1.5">
                                                 <div className="flex justify-between text-[11px] text-gray-500 font-medium leading-none">
                                                     <span>Implementación + Únicos</span>
-                                                    <span>${totales.subtotal_pagos_unicos.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                    <span>${totales.subtotal_pagos_unicos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                 </div>
                                                 <div className="flex justify-between text-[11px] text-gray-500 font-medium leading-none">
                                                     <span>IVA ({formData.iva_porcentaje}%)</span>
-                                                    <span className="text-orange-600">+${totales.iva_pagos_unicos.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                    <span className="text-orange-600">+${totales.iva_pagos_unicos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                 </div>
                                                 <div className="pt-2 border-t border-orange-200 mt-2 flex justify-between items-end">
                                                     <span className="text-[10px] font-black text-gray-900 uppercase">Total inicial</span>
-                                                    <span className="text-xl font-black text-orange-600 tracking-tighter leading-none">${totales.total_pagos_unicos.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                    <span className="text-xl font-black text-orange-600 tracking-tighter leading-none">${totales.total_pagos_unicos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -1277,11 +1201,8 @@ export default function CotizadorPro() {
                                         <div className="flex justify-between items-center mb-3">
                                             <div>
                                                 <h4 className={`text-[10px] font-black ${formData.forma_pago === 'mensual' ? 'text-blue-600' : 'text-green-600'} uppercase tracking-widest leading-none`}>
-                                                    {formData.forma_pago === 'mensual' ? `PAGO EN ${formData.meses_pago} MESES` : 'PAGO ANUAL'}
+                                                    {totales.cuotas > 1 ? `PAGO EN ${totales.cuotas} CUOTAS` : (formData.forma_pago === 'mensual' ? 'PAGO MENSUAL' : 'PAGO ANUAL')}
                                                 </h4>
-                                                <p className={`text-[9px] ${formData.forma_pago === 'mensual' ? 'text-blue-400' : 'text-green-400'} font-bold mt-0.5`}>
-                                                    {formData.forma_pago === 'mensual' ? `${formData.meses_pago} cuotas mensuales` : 'Pago completo anual'}
-                                                </p>
                                             </div>
                                             <div className={`w-8 h-8 ${formData.forma_pago === 'mensual' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'} rounded-lg flex items-center justify-center`}>
                                                 <Globe className="w-4 h-4" />
@@ -1290,41 +1211,41 @@ export default function CotizadorPro() {
                                         <div className="space-y-1.5">
                                             <div className="flex justify-between text-[11px] text-gray-500 font-medium leading-none">
                                                 <span>Base Recurrente</span>
-                                                <span>${totales.subtotal_recurrente_base.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                <span>${totales.subtotal_recurrente_base.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                             </div>
 
-                                            {formData.forma_pago === 'mensual' && totales.recargo_mensual_monto > 0 && (
+                                            {totales.recargo_mensual_monto > 0 && (
                                                 <div className="flex justify-between text-[11px] text-blue-600 font-medium leading-none">
-                                                    <span>+ Financiamiento ({formData.recargo_mensual_porcentaje}%)</span>
-                                                    <span className="font-bold">+${totales.recargo_mensual_monto.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                    <span>+ Financiamiento ({totales.recargo_aplicado_porcentaje}%)</span>
+                                                    <span className="font-bold">+${totales.recargo_mensual_monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                </div>
+                                            )}
+
+                                            {/* Mostrar descuento del plan si existe */}
+                                            {financingPlans.find(p => p.id === selectedPlanId)?.tipo_ajuste === 'discount' && totales.ahorro_pago_anual > 0 && (
+                                                <div className="flex justify-between text-[11px] text-green-600 font-medium leading-none">
+                                                    <span>- Descuento Pago Anticipado</span>
+                                                    <span className="font-bold">-${totales.ahorro_pago_anual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                 </div>
                                             )}
 
                                             <div className="flex justify-between text-[11px] text-gray-500 font-medium leading-none">
                                                 <span>IVA ({formData.iva_porcentaje}%)</span>
                                                 <span className={formData.forma_pago === 'mensual' ? 'text-blue-600' : 'text-green-600'}>
-                                                    +${totales.iva_monto_recurrente.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                    +${totales.iva_monto_recurrente.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </span>
                                             </div>
 
                                             <div className={`pt-2 border-t ${formData.forma_pago === 'mensual' ? 'border-blue-200' : 'border-green-200'} mt-2 space-y-2`}>
                                                 <div className="flex justify-between items-end">
                                                     <span className="text-[10px] font-black text-gray-900 uppercase">
-                                                        {formData.forma_pago === 'mensual' ? 'Cuota mensual' : 'Total recurrente'}
+                                                        {totales.cuotas > 1 ? `Cuota de ${totales.cuotas}` : (formData.forma_pago === 'mensual' ? 'Cuota mensual' : 'Total recurrente')}
                                                     </span>
                                                     <span className={`text-xl font-black ${formData.forma_pago === 'mensual' ? 'text-blue-600' : 'text-green-600'} tracking-tighter leading-none`}>
-                                                        ${(formData.forma_pago === 'mensual' ? totales.cuota_mensual : totales.total_recurrente).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                                        {formData.forma_pago === 'mensual' && <span className="text-[10px] opacity-60 font-medium ml-1">/mes</span>}
+                                                        ${(totales.cuota_mensual).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                     </span>
                                                 </div>
-                                                {formData.forma_pago === 'mensual' && (
-                                                    <div className="bg-blue-100/50 rounded-lg px-2 py-1.5 flex justify-between items-center text-blue-700">
-                                                        <span className="text-[9px] font-black uppercase tracking-wider">Total en 1 mes</span>
-                                                        <span className="text-xs font-black tracking-tight">
-                                                            ${(totales.cuota_mensual).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                                        </span>
-                                                    </div>
-                                                )}
+
                                             </div>
                                         </div>
                                     </div>
@@ -1335,17 +1256,9 @@ export default function CotizadorPro() {
                                         <div className="flex justify-between items-end relative z-10">
                                             <div>
                                                 <h4 className="text-[9px] font-black uppercase tracking-[0.2em] opacity-60 mb-1">INVERSIÓN TOTAL</h4>
-                                                <p className="text-[9px] font-bold opacity-80 leading-tight">
-                                                    Incluye todo el plan
-                                                </p>
                                             </div>
                                             <div className="text-right">
-                                                <p className="text-2xl font-black tracking-tighter leading-none">${totales.total_general.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                                                {formData.forma_pago === 'mensual' && (
-                                                    <p className="text-[10px] font-bold text-indigo-200 mt-0.5">
-                                                        ${totales.cuota_mensual.toLocaleString(undefined, { minimumFractionDigits: 2 })}/mes
-                                                    </p>
-                                                )}
+                                                <p className="text-2xl font-black tracking-tighter leading-none">${totales.total_general.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                                             </div>
                                         </div>
                                     </div>
@@ -1358,7 +1271,6 @@ export default function CotizadorPro() {
                                     </div>
                                 </div>
                             </div>
-
                         )}
 
                         {/* Elaborado por */}
@@ -1470,10 +1382,16 @@ export default function CotizadorPro() {
                                             <span>Total General:</span>
                                             <span>${totales.total_general.toLocaleString()}</span>
                                         </div>
-                                        {formData.forma_pago === 'mensual' && (
+                                        {totales.cuotas > 1 ? (
                                             <p className="text-xs text-gray-500 text-right">
-                                                ${totales.cuota_mensual.toLocaleString()}/mes
+                                                ${totales.cuota_mensual.toLocaleString()} / {totales.cuotas} cuotas
                                             </p>
+                                        ) : (
+                                            formData.forma_pago === 'mensual' && (
+                                                <p className="text-xs text-gray-500 text-right">
+                                                    ${totales.cuota_mensual.toLocaleString()}/mes
+                                                </p>
+                                            )
                                         )}
                                     </div>
                                 </div>

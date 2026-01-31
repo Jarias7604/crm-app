@@ -1,6 +1,6 @@
 import { X, Plus, User, Mail, DollarSign, Shield, Building2, MapPin } from 'lucide-react';
 import type { Lead, LeadStatus, LeadPriority, Profile } from '../types';
-import { STATUS_CONFIG } from '../types';
+import { STATUS_CONFIG, SOURCE_OPTIONS, SOURCE_CONFIG } from '../types';
 import { Input } from './ui/Input';
 import { Button } from './ui/Button';
 
@@ -175,6 +175,22 @@ export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, t
                                             ))}
                                         </select>
                                     </div>
+
+                                    <div className="md:col-span-3">
+                                        <label className="block text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-2 px-1">Fuente del Lead</label>
+                                        <select
+                                            value={formData.source || ''}
+                                            onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                                            className="w-full h-12 rounded-2xl border-gray-200 focus:ring-blue-500 font-bold bg-gray-50/30 px-4 transition-all outline-none"
+                                        >
+                                            <option value="">Seleccionar fuente...</option>
+                                            {SOURCE_OPTIONS.map(opt => (
+                                                <option key={opt.value} value={opt.value}>
+                                                    {opt.icon} {opt.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
 
@@ -189,7 +205,9 @@ export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, t
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="md:col-span-2 bg-blue-50/50 p-6 rounded-[2rem] border border-blue-100 space-y-4">
-                                        <label className="block text-[10px] font-black text-blue-700 uppercase tracking-[0.2em] mb-2 px-1">Responsable del Registro (Account Manager) *</label>
+                                        <label className="block text-[10px] font-black text-blue-700 uppercase tracking-[0.2em] mb-2 px-1 flex items-center gap-2">
+                                            <Shield className="w-3.5 h-3.5" /> Dueño / Responsable Principal del Prospecto *
+                                        </label>
                                         <select
                                             required
                                             value={formData.assigned_to || ''}
@@ -240,6 +258,11 @@ export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, t
                                             <p className="text-xl font-black leading-tight tracking-tight truncate">{formData.name || 'Empresa ABC'}</p>
                                             <div className="flex flex-col text-[9px] text-blue-100 font-black uppercase tracking-widest mt-1 opacity-70">
                                                 {formData.company_name && <span className="truncate">{formData.company_name}</span>}
+                                                {formData.source && SOURCE_CONFIG[formData.source] && (
+                                                    <span className="flex items-center gap-1.5 mt-1 text-[8px] opacity-80">
+                                                        {SOURCE_CONFIG[formData.source].icon} {SOURCE_CONFIG[formData.source].label}
+                                                    </span>
+                                                )}
                                                 <span className="flex items-center gap-1.5 mt-0.5">
                                                     <div className="w-1.5 h-1.5 rounded-full bg-blue-400"></div>
                                                     Potencial Pipeline

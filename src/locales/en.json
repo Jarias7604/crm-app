@@ -94,6 +94,7 @@
         }
     },
     "common": {
+        "greeting": "Great to see you again, {{name}}!",
         "loading": "Loading...",
         "cancel": "Cancel",
         "save": "Save",

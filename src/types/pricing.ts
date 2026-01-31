@@ -48,3 +48,32 @@ export interface CotizacionItem {
     tipo: string;
     editable: boolean;
 }
+
+export interface PaymentSettings {
+    id: string;
+    company_id: string | null;
+    iva_defecto: number;
+    descuento_pago_unico_defecto: number;
+    recargo_financiamiento_base: number;
+    nota_mejor_precio: string;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface FinancingPlan {
+    id: string;
+    company_id: string | null;
+    titulo: string;
+    meses: number;
+    // V3: Nuevo campo para definir cantidad de pagos (Si es null, usamos 'meses' por defecto)
+    cuotas?: number;
+    // V2: Nuevo campo para tipo de ajuste explícito
+    tipo_ajuste?: 'discount' | 'recharge' | 'none';
+    interes_porcentaje: number;
+    descripcion: string;
+    es_popular: boolean;
+    activo: boolean;
+    orden: number;
+    created_at: string;
+    updated_at: string;
+}
