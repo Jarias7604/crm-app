@@ -203,7 +203,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                     )}
                 </div>
 
-                {!isCollapsed && (profile?.id === 'c9c01b04-4160-4e4c-9718-15298c961e9b' || profile?.id === '292bc954-0d25-4147-9526-b7a7268be8e1' || profile?.email?.toLowerCase() === 'jarias7604@gmail.com' || profile?.email?.toLowerCase() === 'jarias@ariasdefense.com') && (
+                {!isCollapsed && window.location.hostname === 'localhost' && (profile?.id === 'c9c01b04-4160-4e4c-9718-15298c961e9b' || profile?.id === '292bc954-0d25-4147-9526-b7a7268be8e1' || profile?.email?.toLowerCase() === 'jarias7604@gmail.com' || profile?.email?.toLowerCase() === 'jarias@ariasdefense.com') && (
                     <div className="mt-2 flex flex-col items-center gap-1.5 w-full">
                         <div className="flex flex-col items-center gap-1">
                             <div className="flex items-center gap-1.5">
