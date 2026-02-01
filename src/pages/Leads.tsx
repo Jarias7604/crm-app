@@ -59,7 +59,7 @@ export default function Leads() {
         notes: ''
     });
     const [isSavingFollowUp, setIsSavingFollowUp] = useState(false);
-    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'kanban'>('kanban');
+    const [viewMode, setViewMode] = useState<'grid' | 'list' | 'kanban'>('list');
     const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
     const [sortConfig, setSortConfig] = useState<{ key: keyof Lead | 'value'; direction: 'asc' | 'desc' } | null>(null);
 
