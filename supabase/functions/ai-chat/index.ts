@@ -28,16 +28,20 @@ serve(async (req) => {
 
         if (!conv) throw new Error("Conversation not found");
 
-        // 2. Get OpenAI Key for this company
+        // 2. Get OpenAI Key for this company (Multi-tenant Security)
         const { data: integration } = await supabase
-            .from('marketing_integrations')
-            .select('settings')
+            .from('company_integrations')
+            .select('credentials')
             .eq('company_id', conv.company_id)
             .eq('provider', 'openai')
+            .eq('is_active', true)
             .single();
 
-        const apiKey = integration?.settings?.apiKey;
-        if (!apiKey) throw new Error("OpenAI API Key not found for this company");
+        const apiKey = integration?.credentials?.apiKey;
+        if (!apiKey) {
+            console.error(`Missing OpenAI key for company ${conv.company_id}`);
+            throw new Error("OpenAI no está configurado para esta empresa.");
+        }
 
         // 3. Call OpenAI
         const response = await fetch('https://api.openai.com/v1/chat/completions', {

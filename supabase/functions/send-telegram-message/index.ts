@@ -43,21 +43,21 @@ Deno.serve(async (req) => {
         const chatId = conversation.external_id;
         const companyId = conversation.company_id;
 
-        // 2. Fetch Bot Token
+        // 2. Fetch Bot Token (Multi-tenant)
         const { data: integration } = await supabase
-            .from('marketing_integrations')
-            .select('settings')
+            .from('company_integrations')
+            .select('credentials')
             .eq('company_id', companyId)
-            .eq('type', 'telegram')
+            .eq('provider', 'telegram')
             .eq('is_active', true)
             .single();
 
-        if (!integration?.settings?.token) {
+        if (!integration?.credentials?.token) {
             await supabase.from('marketing_messages').update({ status: 'failed', metadata: { ...record.metadata, error: 'Token missing' } }).eq('id', record.id);
             return new Response('Token missing', { status: 400, headers: corsHeaders });
         }
 
-        const botToken = integration.settings.token;
+        const botToken = integration.credentials.token;
         console.log(`[Send-Telegram] Using Token: ...${botToken.slice(-5)} for Chat: ${chatId}`);
 
         const formData = new FormData();

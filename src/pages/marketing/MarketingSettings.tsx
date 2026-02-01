@@ -48,19 +48,24 @@ export default function MarketingSettings() {
 
         setIsLoading(true);
         try {
-            const typeMap: Record<string, any> = {
-                'gmail': 'email', 'resend': 'email', 'outlook': 'email',
-                'twilio': 'whatsapp', 'meta': 'whatsapp',
-                'telegram': 'telegram',
-                'openai': 'chat'
-            };
+            // New Schema: provider + credentials
+            // Map internal UI keys to DB providers
+            let dbProvider = selectedProvider;
+            if (selectedProvider === 'meta') dbProvider = 'whatsapp';
+            if (selectedProvider === 'gmmail') dbProvider = 'email'; // Typos or variations
+
+            // Only allow supported backends
+            if (dbProvider === 'twilio') {
+                toast.error('La integración por Twilio está temporalmente deshabilitada. Use Meta Cloud API.');
+                setIsLoading(false);
+                return;
+            }
 
             await integrationService.saveIntegration({
                 company_id: profile.company_id,
-                type: typeMap[selectedProvider!] || 'email',
-                provider: selectedProvider as any,
+                provider: dbProvider as any,
                 name: selectedProvider?.toUpperCase() + ' Integration',
-                settings: formData,
+                credentials: formData,
                 is_active: true
             });
 
@@ -68,6 +73,7 @@ export default function MarketingSettings() {
             setSelectedProvider(null);
             loadIntegrations();
         } catch (error) {
+            console.error(error);
             toast.error('Error al guardar conexión');
         } finally {
             setIsLoading(false);
@@ -75,7 +81,16 @@ export default function MarketingSettings() {
     };
 
     const getActiveIntegrationForTab = (tab: TabType) => {
-        return integrations.find(i => i.type === tab && i.is_active);
+        // Map tab to providers
+        const tabProviders: Record<string, string[]> = {
+            'chat': ['openai'],
+            'telegram': ['telegram'],
+            'email': ['gmail', 'outlook', 'resend'],
+            'whatsapp': ['twilio', 'meta']
+        };
+
+        const allowed = tabProviders[tab] || [];
+        return integrations.find(i => allowed.includes(i.provider) && i.is_active);
     };
 
     const currentActive = getActiveIntegrationForTab(activeTab);
@@ -141,7 +156,7 @@ export default function MarketingSettings() {
                                 <button
                                     onClick={() => {
                                         setSelectedProvider(currentActive.provider);
-                                        setFormData(currentActive.settings);
+                                        setFormData(currentActive.credentials);
                                     }}
                                     className="px-5 py-2.5 bg-white text-blue-600 text-sm font-bold rounded-xl hover:shadow-md transition-all border border-blue-200"
                                 >

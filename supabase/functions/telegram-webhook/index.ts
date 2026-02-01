@@ -71,19 +71,32 @@ serve(async (req) => {
             return new Response('OK', { status: 200 }); // Ignore stickers/voice for now
         }
 
-        // 4. Identify Company (Senior Logic: Find company with active Telegram integration)
+        // 4. Identify Company (Multi-tenant Logic)
+        // Strategy: 
+        // A. Look for ?company_id=UUID in the Webhook URL (New Clients)
+        // B. Fallback to 'Arias Defense' (Legacy/Default) because Jimmy is the Super Admin
+
+        const url = new URL(req.url);
+        let targetCompanyId = url.searchParams.get('company_id');
+
+        if (!targetCompanyId) {
+            // Fallback for current setup
+            console.log("No company_id in URL, assuming Legacy Master (Arias Defense)");
+            targetCompanyId = '7a582ba5-f7d0-4ae3-9985-35788deb1c30';
+        }
+
         const { data: integration } = await supabase
-            .from('marketing_integrations')
+            .from('company_integrations')
             .select('company_id')
+            .eq('company_id', targetCompanyId)
             .eq('provider', 'telegram')
             .eq('is_active', true)
-            .limit(1)
-            .single();
+            .maybeSingle(); // Use maybeSingle to avoid error if not found
 
         const companyId = integration?.company_id;
 
         if (!companyId) {
-            console.error('No company with active Telegram integration found');
+            console.error(`No active Telegram integration found for company: ${targetCompanyId}`);
             return new Response('OK', { status: 200 });
         }
 
