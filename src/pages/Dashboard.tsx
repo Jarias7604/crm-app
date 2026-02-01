@@ -11,9 +11,9 @@ import { useEffect, useState, useRef, useMemo } from 'react';
 import {
     startOfToday, endOfToday,
     startOfWeek, endOfWeek,
-    startOfMonth, endOfMonth,
+    startOfMonth,
     subMonths,
-    startOfYear, endOfYear
+    startOfYear
 } from 'date-fns';
 import { useAuth } from '../auth/AuthProvider';
 import { STATUS_CONFIG, PRIORITY_CONFIG, SOURCE_CONFIG, DATE_RANGE_OPTIONS, type DateRange } from '../types';
@@ -117,7 +117,7 @@ export default function Dashboard() {
 
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const filterRef = useRef<HTMLDivElement>(null);
-    const [selectedDateRange, setSelectedDateRange] = useState<DateRange>('this_month');
+    const [selectedDateRange, setSelectedDateRange] = useState<DateRange>('all');
     const [refreshKey, setRefreshKey] = useState(Date.now());
 
     // Real data states
@@ -162,28 +162,32 @@ export default function Dashboard() {
 
         switch (selectedDateRange) {
             case 'today':
-                startDate = startOfToday().toISOString().split('.')[0] + 'Z';
-                endDate = endOfToday().toISOString().split('.')[0] + 'Z';
+                startDate = startOfToday().toISOString();
+                endDate = endOfToday().toISOString();
                 break;
             case 'this_week':
-                startDate = startOfWeek(now, { weekStartsOn: 1 }).toISOString().split('.')[0] + 'Z';
-                endDate = endOfWeek(now, { weekStartsOn: 1 }).toISOString().split('.')[0] + 'Z';
+                startDate = startOfWeek(now, { weekStartsOn: 1 }).toISOString();
+                endDate = endOfWeek(now, { weekStartsOn: 1 }).toISOString();
                 break;
             case 'this_month':
-                startDate = startOfMonth(now).toISOString().split('.')[0] + 'Z';
-                endDate = endOfMonth(now).toISOString().split('.')[0] + 'Z';
+                startDate = startOfMonth(now).toISOString();
+                endDate = endOfToday().toISOString(); // End of today is better for "this month"
                 break;
             case 'last_3_months':
-                startDate = startOfMonth(subMonths(now, 2)).toISOString().split('.')[0] + 'Z';
-                endDate = endOfMonth(now).toISOString().split('.')[0] + 'Z';
+                startDate = startOfMonth(subMonths(now, 2)).toISOString();
+                endDate = endOfToday().toISOString();
                 break;
             case 'last_6_months':
-                startDate = startOfMonth(subMonths(now, 5)).toISOString().split('.')[0] + 'Z';
-                endDate = endOfMonth(now).toISOString().split('.')[0] + 'Z';
+                startDate = startOfMonth(subMonths(now, 5)).toISOString();
+                endDate = endOfToday().toISOString();
                 break;
             case 'this_year':
-                startDate = startOfYear(now).toISOString().split('.')[0] + 'Z';
-                endDate = endOfYear(now).toISOString().split('.')[0] + 'Z';
+                startDate = startOfYear(now).toISOString();
+                endDate = endOfToday().toISOString();
+                break;
+            case 'all':
+                startDate = undefined;
+                endDate = undefined;
                 break;
         }
 
@@ -192,6 +196,7 @@ export default function Dashboard() {
 
     // Use optimized dashboard hook (replaces 5 queries with 1)
     const { data: dashboardData, isLoading: isDashboardLoading, error: dashboardError } = useDashboardStats(
+        profile?.company_id,
         dateRange.startDate,
         dateRange.endDate
     );
@@ -375,8 +380,17 @@ export default function Dashboard() {
         </div>
     );
 
-    // SUPER ADMIN VIEW
-    if (profile?.role === 'super_admin') {
+    // --- SELECCIÓN DE VISTA DE DASHBOARD ---
+    // Leemos directamente de localStorage para máxima reactividad
+    const localSimRole = localStorage.getItem('simulated_role');
+
+    // Si somos super_admin, comprobamos si hay una simulación de administrador de empresa activa
+    const isActuallySimulatingAdmin = profile?.role === 'company_admin' || localSimRole === 'company_admin';
+
+    console.log('📊 DASHBOARD VIEW SELECTION:', { role: profile?.role, localSimRole, isActuallySimulatingAdmin });
+
+    // CRITICAL OVERRIDE: Si estamos en modo simulación de empresa, SALTAMOS la vista de Super Admin
+    if (profile?.role === 'super_admin' && !isActuallySimulatingAdmin) {
         return (
             <div className="space-y-6 pb-6">
                 <div className="flex justify-between items-center">
@@ -514,7 +528,18 @@ export default function Dashboard() {
                     <h2 className="text-2xl font-extrabold text-[#4449AA] leading-tight tracking-tight">{t('dashboard.crm.title')}</h2>
                     <p className="text-[13px] text-gray-400 font-medium font-inter transition-all">Análisis de rendimiento y prospección en tiempo real</p>
                 </div>
-                <FilterDropdown />
+                <div className="flex items-center gap-3">
+                    <Button
+                        onClick={() => setRefreshKey(Date.now())}
+                        variant="outline"
+                        size="sm"
+                        className="h-10 px-4 rounded-xl border-gray-100 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all font-bold text-xs uppercase tracking-widest gap-2"
+                    >
+                        <TrendingUp className="w-3.5 h-3.5" />
+                        Sincronizar
+                    </Button>
+                    <FilterDropdown />
+                </div>
             </div>
 
             {/* KPI Cards - Global Standard */}

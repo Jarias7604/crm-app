@@ -54,7 +54,7 @@ export default function MarketingDashboard() {
                         desc="Configura canales y responde"
                     />
                 </Link>
-                <Link to="/marketing/agents">
+                <Link to="/marketing/ai-agents">
                     <ActionCard
                         icon={Bot}
                         color="bg-blue-100 text-blue-600"

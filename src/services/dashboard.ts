@@ -13,24 +13,27 @@ export const dashboardService = {
      * @param endDate - Optional end date filter
      * @returns All dashboard data (stats, byStatus, bySource, byPriority, topOpportunities, upcomingFollowUps, recentConversions)
      */
-    async getDashboardStats(startDate?: string, endDate?: string) {
+    async getDashboardStats(startDate?: string, endDate?: string, companyId?: string) {
         try {
-            const companyId = await getCurrentUserCompanyId();
+            const finalCompanyId = companyId || await getCurrentUserCompanyId();
+            console.log('🔍 FETCHING DASHBOARD STATS:', { companyId: finalCompanyId, startDate, endDate });
 
             logger.time('getDashboardStats');
 
             // 1. Fetch main stats via RPC
             const { data, error } = await supabase.rpc('get_dashboard_stats', {
-                p_company_id: companyId,
+                p_company_id: finalCompanyId,
                 p_start_date: startDate || null,
                 p_end_date: endDate || null
             });
+
+            console.log('✅ RPC DASHBOARD RESPONSE:', data);
 
             // 2. Fetch upcoming follow-ups manually since we can't update the RPC
             const { data: upcomingFollowUps } = await supabase
                 .from('leads')
                 .select('id, name, next_followup_date, next_action_notes, priority')
-                .eq('company_id', companyId)
+                .eq('company_id', finalCompanyId)
                 .not('next_followup_date', 'is', null)
                 .gte('next_followup_date', new Date().toISOString().split('T')[0])
                 .order('next_followup_date', { ascending: true })
@@ -40,7 +43,7 @@ export const dashboardService = {
             const { data: recentConversions } = await supabase
                 .from('leads')
                 .select('id, name, company_name, value, closing_amount, created_at')
-                .eq('company_id', companyId)
+                .eq('company_id', finalCompanyId)
                 .in('status', ['Cerrado', 'Cliente'])
                 .order('created_at', { ascending: false })
                 .limit(5);
@@ -49,7 +52,7 @@ export const dashboardService = {
             const { data: topOpportunitiesManual } = await supabase
                 .from('leads')
                 .select('id, name, company_name, value, status, priority, source, created_at')
-                .eq('company_id', companyId)
+                .eq('company_id', finalCompanyId)
                 .gt('value', 0)
                 .order('value', { ascending: false })
                 .limit(5);
@@ -59,7 +62,7 @@ export const dashboardService = {
             if (error) {
                 logger.error('Failed to fetch dashboard stats', error, {
                     action: 'getDashboardStats',
-                    companyId,
+                    companyId: finalCompanyId,
                     startDate,
                     endDate
                 });

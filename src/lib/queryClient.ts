@@ -40,8 +40,8 @@ export const queryKeys = {
     // Dashboard queries
     dashboard: {
         all: ['dashboard'] as const,
-        stats: (startDate?: string, endDate?: string) =>
-            ['dashboard', 'stats', { startDate, endDate }] as const,
+        stats: (companyId: string, startDate?: string, endDate?: string) =>
+            ['dashboard', 'stats', companyId, { startDate, endDate }] as const,
     },
 
     // Leads queries

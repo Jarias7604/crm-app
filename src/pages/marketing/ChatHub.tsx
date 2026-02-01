@@ -520,7 +520,7 @@ export default function ChatHub() {
     });
 
     return (
-        <div className="flex h-[calc(100vh-64px)] bg-[#F8FAFC] rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] border border-white/20 overflow-hidden font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900 relative animate-in fade-in duration-700">
+        <div className="flex h-[calc(100vh-140px)] bg-[#F8FAFC] rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] border border-white/20 overflow-hidden font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900 relative animate-in fade-in duration-700">
             {/* Soft decorative light */}
             <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-indigo-50/20 to-transparent pointer-events-none"></div>
 

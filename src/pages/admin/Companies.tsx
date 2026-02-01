@@ -14,7 +14,12 @@ export default function Companies() {
     const [formData, setFormData] = useState({
         name: '',
         license_status: 'active' as LicenseStatus,
+        rnc: '',
+        telefono: '',
+        email: '',
+        direccion: '',
     });
+    const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
     const [permissionDefinitions, setPermissionDefinitions] = useState<any[]>([]);
     const [isLicenseModalOpen, setIsLicenseModalOpen] = useState(false);
     const [selectedCompany, setSelectedCompany] = useState<any>(null);
@@ -48,13 +53,18 @@ export default function Companies() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await adminService.createCompany(formData);
+            if (editingCompanyId) {
+                await adminService.updateCompany(editingCompanyId, formData);
+            } else {
+                await adminService.createCompany(formData);
+            }
             setIsModalOpen(false);
-            setFormData({ name: '', license_status: 'active' });
+            setEditingCompanyId(null);
+            setFormData({ name: '', license_status: 'active', rnc: '', telefono: '', email: '', direccion: '' });
             loadCompanies();
         } catch (error) {
-            console.error('Failed to create company', error);
-            alert('Failed to create company');
+            console.error('Failed to save company', error);
+            alert('Error al guardar la empresa');
         }
     };
 
@@ -120,7 +130,7 @@ export default function Companies() {
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuarios / Límite</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creado</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Creado</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Empresa</th>
                             <th className="relative px-6 py-3"><span className="sr-only">Acciones</span></th>
                         </tr>
                     </thead>
@@ -171,6 +181,9 @@ export default function Companies() {
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                     {format(new Date(company.created_at), 'dd MMM yyyy')}
                                 </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-400">
+                                    {company.id.slice(0, 8)}...
+                                </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                                     <Button
                                         size="sm"
@@ -182,7 +195,22 @@ export default function Companies() {
                                         <Shield className="h-4 h-4 mr-1" />
                                         Licencia
                                     </Button>
-                                    <button className="text-gray-400 hover:text-gray-600 p-2">
+                                    <button
+                                        onClick={() => {
+                                            setEditingCompanyId(company.id);
+                                            setFormData({
+                                                name: company.name,
+                                                license_status: company.license_status,
+                                                rnc: company.rnc || '',
+                                                telefono: company.telefono || '',
+                                                email: company.email || '',
+                                                direccion: company.direccion || '',
+                                            });
+                                            setIsModalOpen(true);
+                                        }}
+                                        className="text-blue-600 hover:text-blue-900 p-2"
+                                        title="Editar Perfil"
+                                    >
                                         <MoreHorizontal className="h-5 w-5" />
                                     </button>
                                 </td>
@@ -202,33 +230,81 @@ export default function Companies() {
                 </table>
             </div>
 
-            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add New Company">
+            <Modal
+                isOpen={isModalOpen}
+                onClose={() => {
+                    setIsModalOpen(false);
+                    setEditingCompanyId(null);
+                    setFormData({ name: '', license_status: 'active', rnc: '', telefono: '', email: '', direccion: '' });
+                }}
+                title={editingCompanyId ? `Editar Empresa: ${formData.name}` : "Registrar Nueva Empresa"}
+            >
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Company Name</label>
-                        <Input
-                            required
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            className="mt-1"
-                            placeholder="Startups Inc."
-                        />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-bold text-gray-700 mb-1">Nombre de la Empresa</label>
+                            <Input
+                                required
+                                value={formData.name}
+                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                placeholder="Ej: Arias Defense"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">RNC / Tax ID</label>
+                            <Input
+                                value={formData.rnc}
+                                onChange={(e) => setFormData({ ...formData, rnc: e.target.value })}
+                                placeholder="001-XXXXXXX-X"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">Estado de Licencia</label>
+                            <select
+                                value={formData.license_status}
+                                onChange={(e) => setFormData({ ...formData, license_status: e.target.value as LicenseStatus })}
+                                className="w-full p-2 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-medium text-sm"
+                            >
+                                <option value="active">Activo</option>
+                                <option value="trial">Prueba (Trial)</option>
+                                <option value="expired">Expirado</option>
+                                <option value="manual_hold">Retenido (Hold)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">Teléfono</label>
+                            <Input
+                                value={formData.telefono}
+                                onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+                                placeholder="+503 XXXX-XXXX"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold text-gray-700 mb-1">Email Corporativo</label>
+                            <Input
+                                type="email"
+                                value={formData.email}
+                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                placeholder="contacto@empresa.com"
+                            />
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-bold text-gray-700 mb-1">Dirección Física</label>
+                            <Input
+                                value={formData.direccion}
+                                onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
+                                placeholder="Ave. Principal, Edificio X, Nivel Y"
+                            />
+                        </div>
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">License Status</label>
-                        <select
-                            value={formData.license_status}
-                            onChange={(e) => setFormData({ ...formData, license_status: e.target.value as LicenseStatus })}
-                            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                        >
-                            <option value="active">Active</option>
-                            <option value="trial">Trial</option>
-                            <option value="manual_hold">Manual Hold</option>
-                        </select>
-                    </div>
-                    <div className="flex justify-end pt-4">
-                        <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)} className="mr-2">Cancel</Button>
-                        <Button type="submit">Create Company</Button>
+                    <div className="flex justify-end pt-6 border-t gap-3 mt-4">
+                        <Button type="button" variant="ghost" onClick={() => {
+                            setIsModalOpen(false);
+                            setEditingCompanyId(null);
+                        }}>Cancelar</Button>
+                        <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white font-bold">
+                            {editingCompanyId ? "Guardar Cambios" : "Crear Empresa"}
+                        </Button>
                     </div>
                 </form>
             </Modal>

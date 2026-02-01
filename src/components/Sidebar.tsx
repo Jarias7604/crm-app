@@ -10,7 +10,7 @@ import { supabase } from '../services/supabase';
 import type { Company } from '../types';
 
 export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolean, onToggle: () => void }) {
-    const { profile, signOut } = useAuth();
+    const { profile, signOut, setSimulatedCompanyId, setSimulatedRole } = useAuth();
     const location = useLocation();
     const { t } = useTranslation();
     const configPaths = ['/company/branding', '/pricing', '/paquetes', '/items', '/financial-rules'];
@@ -142,11 +142,22 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
 
     return (
         <div className={cn(
-            "flex flex-col bg-[#0f172a] h-screen fixed left-0 top-0 z-20 transition-all duration-300 ease-in-out border-r border-[#1e293b] group/sidebar",
+            "flex flex-col bg-[#0f172a] h-screen fixed left-0 top-0 z-50 transition-all duration-300 ease-in-out border-r border-[#1e293b] group/sidebar",
             isCollapsed ? "w-20 overflow-visible" : "w-64"
         )}>
             {/* Header / Brand */}
             <div className="relative flex flex-col items-center justify-center min-h-[6.5rem] border-b border-[#1e293b] bg-[#0f172a] px-4 py-2">
+                {window.location.hostname === 'localhost' && (
+                    <div className="absolute top-2 px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded-md">
+                        <p className="text-[8px] font-bold text-amber-500 uppercase tracking-widest flex items-center gap-1">
+                            <span className="relative flex h-1.5 w-1.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
+                            </span>
+                            DEV
+                        </p>
+                    </div>
+                )}
                 {/* Toggle Button - Modern White Style */}
                 <button
                     onClick={onToggle}
@@ -193,11 +204,62 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                 </div>
 
                 {!isCollapsed && (
-                    <div className="mt-2 flex items-center gap-1.5">
-                        <div className="w-1 h-1 rounded-full bg-blue-500 animate-pulse" />
-                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest bg-gray-900/50 px-2.5 py-1 rounded-full border border-gray-800/10">
-                            {getRoleTitle()}
-                        </span>
+                    <div className="mt-2 flex flex-col items-center gap-1.5 w-full">
+                        <div className="flex flex-col items-center gap-1">
+                            <div className="flex items-center gap-1.5">
+                                <div className={cn("w-1.5 h-1.5 rounded-full animate-pulse", localStorage.getItem('simulated_role') ? "bg-amber-500" : "bg-blue-500")} />
+                                <span className={cn(
+                                    "text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full border",
+                                    localStorage.getItem('simulated_role') ? "text-amber-500 bg-amber-500/10 border-amber-500/20" : "text-gray-400 bg-gray-900/50 border-gray-800/10"
+                                )}>
+                                    {getRoleTitle()} {localStorage.getItem('simulated_role') && " (SIM)"}
+                                </span>
+                            </div>
+                            {localStorage.getItem('simulated_role') && (
+                                <button
+                                    onClick={() => setSimulatedRole(null)}
+                                    className="text-[8px] font-black text-amber-500/60 hover:text-amber-500 uppercase tracking-[0.2em] transition-all"
+                                >
+                                    [ Revertir Maestro ]
+                                </button>
+                            )}
+                        </div>
+
+                        {(profile?.email?.toLowerCase() === 'jarias7604@gmail.com' || profile?.email?.toLowerCase() === 'jarias@ariasdefense.com') && (
+                            <div className="mt-2 w-full px-2 space-y-2">
+                                <div className="bg-black/20 rounded-lg p-2 border border-white/5">
+                                    <p className="text-[7px] text-gray-500 uppercase tracking-tighter mb-1 font-black">Master Debug Info</p>
+                                    <div className="grid grid-cols-2 gap-1 text-[7px] font-mono text-gray-400">
+                                        <span className="opacity-50">ROLE:</span>
+                                        <span className="text-blue-400 truncate">{profile?.role}</span>
+                                        <span className="opacity-50">COMP:</span>
+                                        <span className="text-amber-400 truncate">{profile?.company_id?.substring(0, 8)}...</span>
+                                        <span className="opacity-50">LS_R:</span>
+                                        <span className="text-emerald-400 truncate">{localStorage.getItem('simulated_role') || 'none'}</span>
+                                    </div>
+                                </div>
+
+                                <select
+                                    className="w-full bg-[#1e293b]/50 border border-gray-800 shadow-inner rounded-lg px-2 py-1.5 text-[10px] font-bold text-gray-300 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all cursor-pointer hover:bg-[#1e293b]"
+                                    value={profile?.company_id || ''}
+                                    onChange={(e) => {
+                                        setSimulatedCompanyId(e.target.value || null);
+                                    }}
+                                >
+                                    <option value="">Contexto Global</option>
+                                    <option value="7a582ba5-f7d0-4ae3-9985-35788deb1c30">Arias Defense Salvador</option>
+                                </select>
+
+                                <select
+                                    className="w-full bg-[#1e293b]/50 border border-gray-800 shadow-inner rounded-lg px-2 py-1.5 text-[10px] font-bold text-gray-300 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all cursor-pointer hover:bg-[#1e293b]"
+                                    value={localStorage.getItem('simulated_role') || 'super_admin'}
+                                    onChange={(e) => setSimulatedRole(e.target.value as any)}
+                                >
+                                    <option value="super_admin">Rol: Super Admin</option>
+                                    <option value="company_admin">Rol: Administrador Empr.</option>
+                                </select>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -322,6 +384,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                     )}
                 </nav>
             </div>
+
 
             {/* Footer */}
             <div className="flex-shrink-0 flex border-t border-[#1e293b] p-4 flex-col gap-3 bg-[#0f172a]">

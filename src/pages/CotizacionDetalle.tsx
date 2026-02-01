@@ -91,8 +91,8 @@ export default function CotizacionDetalle() {
     return (
         <div className="min-h-screen bg-gray-50/50 pb-20">
             {/* Action Bar - Immersive, Edge-to-Edge, Zero Gaps */}
-            <div className="-mt-8 -mx-4 md:-mx-8 sticky top-0 z-50 bg-white border-b border-gray-200 w-[calc(100%+2rem)] md:w-[calc(100%+4rem)] transition-all overflow-hidden shadow-sm">
-                <div className="h-20 px-4 md:px-8 flex justify-between items-center max-w-[1580px] mx-auto">
+            <div className="sticky top-0 z-40 bg-white border-b border-gray-200 w-full transition-all overflow-hidden shadow-sm">
+                <div className="h-20 px-12 flex justify-between items-center w-full">
                     <div className="flex items-center gap-6">
                         <Button
                             variant="ghost"
@@ -369,7 +369,6 @@ export default function CotizacionDetalle() {
                                         recargoFinanciamiento,  // Annualized
                                         ivaRecurrente,          // Annualized
                                         cuotaMensual,           // Monthly
-                                        montoPeriodo            // Term Total
                                     } = financials;
 
                                     const divisor = cotizacion.cuotas || (isMonthly ? plazoMeses : 1);

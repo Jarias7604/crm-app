@@ -7,14 +7,15 @@ import { logger } from '../utils/logger';
  * Hook to fetch dashboard statistics using optimized SQL function
  * Automatically caches data for 5 minutes
  */
-export function useDashboardStats(startDate?: string, endDate?: string) {
+export function useDashboardStats(companyId?: string, startDate?: string, endDate?: string) {
     return useQuery({
-        queryKey: queryKeys.dashboard.stats(startDate, endDate),
+        queryKey: queryKeys.dashboard.stats(companyId || 'no-company', startDate, endDate),
         queryFn: async () => {
-            logger.debug('Fetching dashboard stats', { startDate, endDate });
-            return dashboardService.getDashboardStats(startDate, endDate);
+            logger.debug('Fetching dashboard stats', { companyId, startDate, endDate });
+            return dashboardService.getDashboardStats(startDate, endDate, companyId);
         },
-        staleTime: 5 * 60 * 1000, // 5 minutes
-        gcTime: 10 * 60 * 1000, // 10 minutes
+        enabled: !!companyId,
+        staleTime: 30 * 1000, // 30 seconds
+        gcTime: 5 * 60 * 1000, // 5 minutes
     });
 }
