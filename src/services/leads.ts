@@ -327,5 +327,37 @@ export const leadsService = {
 
         if (error) throw error;
         return data;
+    },
+
+    // Get chat messages for a lead
+    async getLeadMessages(leadId: string) {
+        // 1. Get conversations for this lead
+        const { data: conversations } = await supabase
+            .from('marketing_conversations')
+            .select('id, channel')
+            .eq('lead_id', leadId);
+
+        if (!conversations || conversations.length === 0) return [];
+
+        const conversationIds = conversations.map(c => c.id);
+
+        // 2. Get messages
+        const { data: messages, error } = await supabase
+            .from('marketing_messages')
+            .select('*')
+            .in('conversation_id', conversationIds)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            logger.error('Error fetching messages', error, { action: 'getLeadMessages', leadId });
+            return [];
+        }
+
+        // Enrich with channel info
+        return messages.map(msg => ({
+            ...msg,
+            channel: conversations.find(c => c.id === msg.conversation_id)?.channel || 'unknown'
+        }));
     }
 };
+

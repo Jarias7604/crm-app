@@ -30,6 +30,7 @@ export default function Leads() {
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
     const [followUps, setFollowUps] = useState<FollowUp[]>([]);
+    const [messages, setMessages] = useState<any[]>([]);
     const [teamMembers, setTeamMembers] = useState<any[]>([]);
 
     const [formData, setFormData] = useState({
@@ -419,10 +420,14 @@ export default function Leads() {
 
     const loadFollowUps = async (leadId: string) => {
         try {
-            const data = await leadsService.getFollowUps(leadId);
-            setFollowUps(data || []);
+            const [followUpsData, messagesData] = await Promise.all([
+                leadsService.getFollowUps(leadId),
+                leadsService.getLeadMessages(leadId)
+            ]);
+            setFollowUps(followUpsData || []);
+            setMessages(messagesData || []);
         } catch (error) {
-            logger.error('Failed to load follow-ups', error, { action: 'loadFollowUps', leadId });
+            logger.error('Failed to load history', error, { action: 'loadFollowUps', leadId });
         }
     };
 
@@ -1336,48 +1341,83 @@ export default function Leads() {
                                 <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
                                     <Clock className="w-4 h-4 text-indigo-500" /> Trazabilidad del Prospecto
                                 </h4>
-                                {followUps.length > 0 ? (
+                                {(followUps.length > 0 || messages.length > 0) ? (
                                     <div className="relative pl-8 space-y-8 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-100">
-                                        {[...followUps].sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime()).map((fu) => (
-                                            <div key={fu.id} className="relative group">
-                                                {/* Timeline Node */}
-                                                <div className="absolute -left-[30px] top-1 w-6 h-6 rounded-lg bg-white border-2 border-gray-100 flex items-center justify-center shadow-sm z-10 group-hover:border-indigo-400 group-hover:scale-110 transition-all">
-                                                    <span className="text-xs">
-                                                        {ACTION_TYPES.find(t => t.value === fu.action_type)?.icon || '📝'}
-                                                    </span>
-                                                </div>
-
-                                                <div className="bg-white rounded-xl p-4 border border-gray-50 shadow-sm group-hover:border-indigo-100 group-hover:shadow-md transition-all">
-                                                    <div className="flex justify-between items-start mb-2">
-                                                        <p className="text-xs font-black text-gray-400 uppercase tracking-widest">
-                                                            {(() => {
-                                                                try {
-                                                                    if (!fu.date) return 'Sin fecha';
-                                                                    // Forzamos mediodía local para evitar desfase UTC si es solo fecha
-                                                                    const pureDate = fu.date.split('T')[0];
-                                                                    const dateObj = new Date(`${pureDate}T12:00:00`);
-                                                                    return format(dateObj, 'dd MMM, yyyy', { locale: es });
-                                                                } catch (e) { return 'Fecha error'; }
-                                                            })()}
-                                                        </p>
-                                                        {fu.profiles?.avatar_url ? (
-                                                            <img src={fu.profiles.avatar_url} alt="" className="w-6 h-6 rounded-full border border-gray-100 shadow-sm" />
-                                                        ) : (
-                                                            <div className="w-6 h-6 rounded-full bg-indigo-50 flex items-center justify-center border border-indigo-100">
-                                                                <User className="w-3 h-3 text-indigo-400" />
+                                        {[
+                                            ...followUps.map(f => ({ ...f, itemType: 'follow_up' })),
+                                            ...messages.map(m => ({ ...m, itemType: 'message', date: m.created_at }))
+                                        ].sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime()).map((item: any) => (
+                                            <div key={item.id} className="relative group">
+                                                {item.itemType === 'message' ? (
+                                                    <>
+                                                        {/* Message Icon */}
+                                                        <div className={`absolute -left-[30px] top-1 w-6 h-6 rounded-lg ${item.channel === 'whatsapp' ? 'bg-green-100 border-green-200 text-green-600' : 'bg-sky-100 border-sky-200 text-sky-600'} border-2 flex items-center justify-center shadow-sm z-10 group-hover:scale-110 transition-all`}>
+                                                            {item.channel === 'whatsapp' ? <Smartphone className="w-3 h-3" /> : <TelegramIcon className="w-3 h-3" />}
+                                                        </div>
+                                                        <div className={`rounded-xl p-4 border shadow-sm transition-all ${item.direction === 'inbound' ? 'bg-white border-gray-100' : 'bg-blue-50/50 border-blue-100'}`}>
+                                                            <div className="flex justify-between items-start mb-2">
+                                                                <p className="text-xs font-black text-gray-400 uppercase tracking-widest">
+                                                                    {(() => {
+                                                                        try {
+                                                                            const dateObj = new Date(item.created_at);
+                                                                            return format(dateObj, 'dd MMM, HH:mm', { locale: es });
+                                                                        } catch (e) { return 'Fecha error'; }
+                                                                    })()}
+                                                                </p>
+                                                                <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider ${item.direction === 'inbound' ? 'bg-gray-100 text-gray-500' : 'bg-blue-100 text-blue-600'}`}>
+                                                                    {item.direction === 'inbound' ? 'Recibido' : 'Enviado'}
+                                                                </span>
                                                             </div>
-                                                        )}
-                                                    </div>
-                                                    <p className="text-sm font-medium text-gray-700 leading-relaxed">
-                                                        {fu.notes || 'Registro de actividad sin comentarios.'}
-                                                    </p>
-                                                    <div className="mt-3 pt-3 border-t border-gray-50 flex items-center gap-2">
-                                                        <p className="text-[10px] font-bold text-gray-400">Registrado por:</p>
-                                                        <p className="text-[10px] font-black text-indigo-600 uppercase tracking-wider">
-                                                            {fu.profiles?.full_name || fu.profiles?.email?.split('@')[0] || 'Sistema'}
-                                                        </p>
-                                                    </div>
-                                                </div>
+                                                            <p className="text-sm font-medium text-gray-700 leading-relaxed whitespace-pre-wrap">
+                                                                {item.content}
+                                                            </p>
+                                                            <div className="mt-2 pt-2 border-t border-gray-50/50 flex items-center gap-2">
+                                                                <span className="text-[10px] font-bold text-gray-400">Canal: {item.channel}</span>
+                                                            </div>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        {/* Timeline Node */}
+                                                        <div className="absolute -left-[30px] top-1 w-6 h-6 rounded-lg bg-white border-2 border-gray-100 flex items-center justify-center shadow-sm z-10 group-hover:border-indigo-400 group-hover:scale-110 transition-all">
+                                                            <span className="text-xs">
+                                                                {ACTION_TYPES.find(t => t.value === item.action_type)?.icon || '📝'}
+                                                            </span>
+                                                        </div>
+
+                                                        <div className="bg-white rounded-xl p-4 border border-gray-50 shadow-sm group-hover:border-indigo-100 group-hover:shadow-md transition-all">
+                                                            <div className="flex justify-between items-start mb-2">
+                                                                <p className="text-xs font-black text-gray-400 uppercase tracking-widest">
+                                                                    {(() => {
+                                                                        try {
+                                                                            if (!item.date) return 'Sin fecha';
+                                                                            const pureDate = item.date.split('T')[0];
+                                                                            const dateObj = new Date(`${pureDate}T12:00:00`);
+                                                                            return format(dateObj, 'dd MMM, yyyy', { locale: es });
+                                                                        } catch (e) { return 'Fecha error'; }
+                                                                    })()}
+                                                                </p>
+                                                                {item.profiles?.avatar_url ? (
+                                                                    <img src={item.profiles.avatar_url} alt="" className="w-6 h-6 rounded-full border border-gray-100 shadow-sm" />
+                                                                ) : (
+                                                                    <div className="w-6 h-6 rounded-full bg-indigo-50 flex items-center justify-center border border-indigo-100">
+                                                                        <User className="w-3 h-3 text-indigo-400" />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-sm font-medium text-gray-700 leading-relaxed">
+                                                                {item.notes || 'Registro de actividad sin comentarios.'}
+                                                            </p>
+                                                            <div className="mt-3 pt-3 border-t border-gray-50 flex items-center gap-2">
+                                                                <p className="text-[10px] font-bold text-gray-400">Registrado por:</p>
+                                                                <p className="text-[10px] font-black text-indigo-600 uppercase tracking-wider">
+                                                                    {item.profiles?.full_name || item.profiles?.email?.split('@')[0] || 'Sistema'}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </>
+                                                )}
+
                                             </div>
                                         ))}
                                     </div>
