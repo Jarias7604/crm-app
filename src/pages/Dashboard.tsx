@@ -387,8 +387,6 @@ export default function Dashboard() {
     // Si somos super_admin, comprobamos si hay una simulación de administrador de empresa activa
     const isActuallySimulatingAdmin = profile?.role === 'company_admin' || localSimRole === 'company_admin';
 
-    console.log('📊 DASHBOARD VIEW SELECTION:', { role: profile?.role, localSimRole, isActuallySimulatingAdmin });
-
     // CRITICAL OVERRIDE: Si estamos en modo simulación de empresa, SALTAMOS la vista de Super Admin
     if (profile?.role === 'super_admin' && !isActuallySimulatingAdmin) {
         return (
