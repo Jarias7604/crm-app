@@ -9,8 +9,8 @@ const corsHeaders = {
 };
 
 // 🌍 CONFIGURACIÓN DE DOMINIO
-// const FRONTEND_URL = "http://localhost:5173"; // Para pruebas locales
-const FRONTEND_URL = "https://crm-app-v2.vercel.app"; // Producción Vercel
+// const FRONTEND_URL = "http://localhost:5173"; 
+const FRONTEND_URL = "https://crm-app-v2.vercel.app";
 /**
  * 💎 V59: THE RESTORED MASTERPIECE
  * - Exact Layout Match with pdfService.ts
