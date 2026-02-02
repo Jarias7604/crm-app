@@ -12,6 +12,7 @@ export default function PublicQuoteView() {
     const { id } = useParams<{ id: string }>();
     const [cotizacion, setCotizacion] = useState<CotizacionData | null>(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
     const [isAccepting, setIsAccepting] = useState(false);
     const [signerName, setSignerName] = useState('');
@@ -38,7 +39,8 @@ export default function PublicQuoteView() {
                 modulos_adicionales: parseModules(data.modulos_adicionales)
             } as CotizacionData);
         } catch (error: any) {
-            console.error('Error:', error);
+            console.error('Error fetching quote:', error);
+            setError(error.message || 'Error desconocido');
             toast.error('No se pudo cargar la propuesta');
         } finally {
             setLoading(false);
@@ -94,9 +96,17 @@ export default function PublicQuoteView() {
 
     if (!cotizacion) return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50">
-            <div className="text-center">
+            <div className="text-center p-8 bg-white rounded-3xl shadow-xl max-w-md">
+                <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <FileText className="w-8 h-8" />
+                </div>
                 <h1 className="text-2xl font-bold text-slate-800">Propuesta no encontrada</h1>
                 <p className="text-slate-500 mt-2">El enlace puede haber expirado o es incorrecto.</p>
+                {error && (
+                    <div className="mt-6 p-4 bg-slate-50 rounded-xl text-xs text-slate-400 font-mono break-all text-left">
+                        Error Detail: {error}
+                    </div>
+                )}
             </div>
         </div>
     );
