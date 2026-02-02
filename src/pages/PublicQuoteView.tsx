@@ -101,12 +101,24 @@ export default function PublicQuoteView() {
                     <FileText className="w-8 h-8" />
                 </div>
                 <h1 className="text-2xl font-bold text-slate-800">Propuesta no encontrada</h1>
-                <p className="text-slate-500 mt-2">El enlace puede haber expirado o es incorrecto.</p>
-                {error && (
-                    <div className="mt-6 p-4 bg-slate-50 rounded-xl text-xs text-slate-400 font-mono break-all text-left">
-                        Error Detail: {error}
-                    </div>
-                )}
+                <p className="text-slate-500 mt-2 text-sm leading-relaxed">El enlace puede haber expirado o es incorrecto.</p>
+
+                <div className="mt-8 p-6 bg-slate-50 rounded-2xl text-[10px] text-slate-400 font-mono break-all text-left space-y-3">
+                    <p className="flex justify-between border-b border-slate-200/50 pb-2">
+                        <span className="font-bold text-slate-500 uppercase tracking-tighter">Entorno:</span>
+                        <span>{window.location.host}</span>
+                    </p>
+                    <p className="flex justify-between border-b border-slate-200/50 pb-2">
+                        <span className="font-bold text-slate-500 uppercase tracking-tighter">Proyecto Supabase:</span>
+                        <span>{(supabase as any).supabaseUrl}</span>
+                    </p>
+                    {error && (
+                        <div className="pt-1">
+                            <span className="font-bold text-slate-500 uppercase tracking-tighter block mb-1">Detalle del Error:</span>
+                            <span className="text-red-400 leading-normal">{error}</span>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
