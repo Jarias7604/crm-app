@@ -398,13 +398,15 @@ export default function PublicQuoteView() {
                 </div>
 
                 {/* Creator Footer Mobile Optimized */}
-                <div className="bg-slate-900 rounded-[2.5rem] p-8 md:p-12 mb-12 flex flex-col md:flex-row items-center justify-between gap-10">
+                <div className="bg-slate-900 rounded-[2.5rem] p-8 md:p-12 mb-12 flex flex-col md:flex-row items-start md:items-center justify-between gap-10">
                     <div className="flex items-center gap-6">
-                        <div className="w-20 h-20 rounded-3xl bg-white/10 flex items-center justify-center p-1 relative overflow-hidden ring-4 ring-indigo-500/20 rotate-3">
+                        <div className="w-20 h-20 rounded-3xl bg-white/10 flex items-center justify-center p-1 relative overflow-hidden ring-4 ring-indigo-500/20 rotate-3 shrink-0">
                             {cotizacion.creator?.avatar_url ? (
                                 <img src={cotizacion.creator.avatar_url} alt="" className="w-full h-full object-cover rounded-2xl" />
                             ) : (
-                                <span className="text-white font-black text-3xl">A</span>
+                                <span className="text-white font-black text-3xl">
+                                    {(cotizacion.creator?.full_name || cotizacion.creator?.email || 'A').charAt(0).toUpperCase()}
+                                </span>
                             )}
                         </div>
                         <div>
@@ -413,7 +415,7 @@ export default function PublicQuoteView() {
                             <p className="text-[10px] font-bold text-slate-500 mt-2 lowercase">{cotizacion.creator?.email}</p>
                         </div>
                     </div>
-                    <div className="w-20 h-20 bg-white p-2.5 rounded-2xl shadow-2xl rotate-[-3deg]">
+                    <div className="w-20 h-20 bg-white p-2.5 rounded-2xl shadow-2xl rotate-[-3deg] self-start md:self-auto ml-2 md:ml-0">
                         <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${window.location.href}`} alt="QR" className="w-full h-full grayscale opacity-70" />
                     </div>
                 </div>
