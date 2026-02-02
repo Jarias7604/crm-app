@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../services/supabase';
-import { Building2, Package, Globe, Download, FileText, CheckCircle2, User, PencilLine, Mail, Phone, Settings, MessageSquare } from 'lucide-react';
+import { Building2, Package, Globe, Download, FileText, CheckCircle2, User, PencilLine, Mail, Phone, Settings, MessageSquare, ChevronRight } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { calculateQuoteFinancials, parseModules, type CotizacionData } from '../utils/quoteUtils';
 import { pdfService } from '../services/pdfService';
@@ -103,22 +103,9 @@ export default function PublicQuoteView() {
                 </div>
                 <h1 className="text-2xl font-bold text-slate-800">Propuesta no encontrada</h1>
                 <p className="text-slate-500 mt-2 text-sm leading-relaxed">El enlace puede haber expirado o es incorrecto.</p>
-
-                <div className="mt-8 p-6 bg-slate-50 rounded-2xl text-[10px] text-slate-400 font-mono break-all text-left space-y-3">
-                    <p className="flex justify-between border-b border-slate-200/50 pb-2">
-                        <span className="font-bold text-slate-500 uppercase tracking-tighter">Entorno:</span>
-                        <span>{window.location.host}</span>
-                    </p>
-                    <p className="flex justify-between border-b border-slate-200/50 pb-2">
-                        <span className="font-bold text-slate-500 uppercase tracking-tighter">Proyecto Supabase:</span>
-                        <span>{(supabase as any).supabaseUrl}</span>
-                    </p>
-                    {error && (
-                        <div className="pt-1">
-                            <span className="font-bold text-slate-500 uppercase tracking-tighter block mb-1">Detalle del Error:</span>
-                            <span className="text-red-400 leading-normal">{error}</span>
-                        </div>
-                    )}
+                <div className="mt-8 p-6 bg-slate-50 rounded-2xl text-[10px] text-slate-400 font-mono text-left">
+                    <p>SUPABASE: {(supabase as any).supabaseUrl}</p>
+                    {error && <p className="mt-1 text-red-400">ERROR: {error}</p>}
                 </div>
             </div>
         </div>
@@ -127,442 +114,369 @@ export default function PublicQuoteView() {
     const financials = calculateQuoteFinancials(cotizacion);
 
     return (
-        <div className="min-h-screen bg-gray-50/50 pb-20 font-sans">
-            {/* Action Bar - Replicating CotizacionDetalle but for Public View */}
-            <div className="sticky top-0 z-40 bg-white border-b border-gray-200 w-full shadow-sm overflow-hidden">
-                <div className="h-20 px-4 md:px-12 flex justify-between items-center w-full max-w-7xl mx-auto">
-                    <div className="flex items-center gap-4 md:gap-6">
+        <div className="min-h-screen bg-[#F8FAFC] font-sans pb-32 md:pb-20 overflow-x-hidden">
+            {/* Header Mobile App Style - Sticky */}
+            <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 w-full transition-all">
+                <div className="h-16 md:h-20 px-4 md:px-12 flex justify-between items-center w-full max-w-7xl mx-auto">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-black text-xs md:text-sm shadow-lg shadow-indigo-600/20">
+                            {cotizacion.company?.name?.charAt(0) || 'A'}
+                        </div>
                         <div className="flex flex-col">
-                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] leading-none mb-1.5">ID Propuesta</span>
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm md:text-base font-black text-slate-900 leading-none">#{cotizacion.id.slice(0, 8).toUpperCase()}</span>
-                                <span className="px-2 py-0.5 rounded-md bg-blue-50 text-[8px] md:text-[9px] font-black text-blue-600 uppercase tracking-tighter">Oficial</span>
-                            </div>
+                            <span className="text-[10px] md:text-base font-black text-slate-900 leading-none">PROPUESTA #{cotizacion.id.slice(0, 8).toUpperCase()}</span>
+                            <span className="text-[8px] font-bold text-indigo-500 uppercase tracking-widest mt-0.5">VENCE EN 30 DÍAS</span>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3 md:gap-4">
+                    {/* Desktop Actions */}
+                    <div className="hidden md:flex items-center gap-4">
                         <Button
                             variant="default"
                             onClick={handleDownloadPDF}
                             disabled={isGeneratingPDF}
-                            className="h-10 md:h-12 px-4 md:px-8 rounded-xl bg-[#4449AA] hover:bg-[#383d8f] text-white font-black text-[9px] md:text-[11px] uppercase tracking-widest shadow-lg shadow-[#4449AA]/20 transition-all"
+                            className="h-12 px-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-900 font-black text-[11px] uppercase tracking-widest transition-all"
                         >
-                            {isGeneratingPDF ? 'Generando...' : (
-                                <span className="flex items-center gap-2"><Download className="w-4 h-4" /> <span className="hidden sm:inline">PDF</span></span>
-                            )}
+                            {isGeneratingPDF ? 'Generando...' : <span className="flex items-center gap-2"><Download className="w-4 h-4" /> PDF</span>}
                         </Button>
 
                         {cotizacion.estado !== 'aceptada' ? (
                             <Button
                                 variant="default"
                                 onClick={() => setShowSignatureModal(true)}
-                                className="h-10 md:h-12 px-4 md:px-8 bg-green-600 hover:bg-green-700 text-white font-black text-[9px] md:text-[11px] uppercase tracking-widest rounded-xl shadow-lg shadow-green-600/20 transition-all"
+                                className="h-12 px-8 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[11px] uppercase tracking-widest rounded-xl shadow-lg shadow-indigo-600/20 transition-all"
                             >
-                                <span className="flex items-center gap-2 font-black"><CheckCircle2 className="w-4 h-4" /> Aceptar</span>
+                                <span className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> Aceptar</span>
                             </Button>
                         ) : (
-                            <div className="h-10 md:h-12 px-4 md:px-8 flex items-center gap-2 bg-green-50 text-green-600 font-black text-[9px] md:text-[11px] uppercase tracking-widest rounded-xl border border-green-200">
-                                <CheckCircle2 className="w-4 h-4 text-green-600" /> ¡Aceptada!
+                            <div className="h-12 px-8 flex items-center gap-2 bg-green-50 text-green-600 font-black text-[11px] uppercase tracking-widest rounded-xl border border-green-200">
+                                <CheckCircle2 className="w-4 h-4" /> Aceptada
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Mobile Quick Action */}
+                    <div className="md:hidden">
+                        {cotizacion.estado === 'aceptada' ? (
+                            <div className="w-10 h-10 rounded-full bg-green-50 text-green-600 flex items-center justify-center border border-green-100">
+                                <CheckCircle2 className="w-5 h-5" />
+                            </div>
+                        ) : (
+                            <div className="w-10 h-10 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
+                                <FileText className="w-5 h-5" />
                             </div>
                         )}
                     </div>
                 </div>
             </div>
 
-            <div className="max-w-5xl mx-auto mt-6 px-4 md:px-6">
-                {/* Success Banner */}
-                {cotizacion.estado === 'aceptada' && (
-                    <div className="mb-6 bg-green-600 text-white px-8 py-4 rounded-3xl flex items-center justify-between shadow-xl shadow-green-600/20 animate-in fade-in slide-in-from-top-4">
-                        <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
-                                <CheckCircle2 className="w-6 h-6" />
-                            </div>
-                            <div>
-                                <p className="font-black text-xl leading-none uppercase tracking-tight">Propuesta Aceptada Exitosamente</p>
-                                <p className="text-sm opacity-80 mt-1 font-medium">{cotizacion.descripcion_pago}</p>
-                            </div>
+            <div className="max-w-4xl mx-auto px-4 md:px-6 pt-6">
+                {/* Mobile Floating Action Bar (Permanent) */}
+                <div className="md:hidden fixed bottom-6 left-4 right-4 z-50 flex gap-3">
+                    <button
+                        onClick={handleDownloadPDF}
+                        disabled={isGeneratingPDF}
+                        className="flex-1 h-14 bg-white border-2 border-slate-100 rounded-2xl flex items-center justify-center text-slate-900 font-black text-[10px] uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+                    >
+                        {isGeneratingPDF ? '...' : <><Download className="w-5 h-5 mr-2 text-indigo-600" /> PDF</>}
+                    </button>
+                    {cotizacion.estado !== 'aceptada' ? (
+                        <button
+                            onClick={() => setShowSignatureModal(true)}
+                            className="flex-[2] h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center font-black text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-600/30 active:scale-95 transition-all"
+                        >
+                            <CheckCircle2 className="w-5 h-5 mr-2" /> Aceptar Propuesta
+                        </button>
+                    ) : (
+                        <div className="flex-[2] h-14 bg-green-600 text-white rounded-2xl flex items-center justify-center font-black text-[10px] uppercase tracking-widest shadow-xl shadow-green-600/30">
+                            <CheckCircle2 className="w-5 h-5 mr-2" /> Propuesta Aceptada
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
 
-                {/* Quote Document - Exact Style of CotizacionDetalle */}
-                <div className="bg-white shadow-2xl rounded-[2.5rem] overflow-hidden border border-gray-100 mb-20">
-                    {/* Visual Header - Dark Slate Slate Style */}
-                    <div className="bg-[#0f172a] py-10 px-8 md:py-12 md:px-14 text-white relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-blue-900/20 to-transparent"></div>
+                {/* Header Section - App-like Hero */}
+                <div className="bg-[#0f172a] rounded-[2.5rem] p-8 md:p-12 text-white relative overflow-hidden mb-8 shadow-2xl shadow-slate-900/20">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-[100px] -mr-32 -mt-32"></div>
 
-                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 relative z-10">
-                            <div className="flex flex-col gap-6">
-                                <div className="h-20 flex items-center">
+                    <div className="relative z-10 space-y-8">
+                        <div className="flex flex-col md:flex-row justify-between gap-8">
+                            <div className="space-y-4">
+                                <div className="h-16 flex items-center">
                                     {cotizacion.company?.logo_url ? (
                                         <img src={cotizacion.company.logo_url} alt="" className="max-h-full object-contain" />
                                     ) : (
-                                        <div className="flex items-center gap-2 text-blue-400">
-                                            <Building2 className="w-12 h-12" />
-                                            <span className="text-3xl font-black uppercase tracking-tighter">BRAND</span>
+                                        <div className="flex items-center gap-2 text-indigo-400">
+                                            <Building2 className="w-10 h-10" />
+                                            <span className="text-2xl font-black uppercase tracking-tighter italic">ARIAS DEFENSE</span>
                                         </div>
                                     )}
                                 </div>
-                                <div>
-                                    <h2 className="text-2xl font-black tracking-tight leading-none text-white uppercase opacity-95">
-                                        {cotizacion.company?.name || 'SU EMPRESA'}
-                                    </h2>
-                                    <div className="flex flex-col text-[10px] text-gray-500 font-bold uppercase tracking-[0.2em] mt-3 gap-1">
-                                        <p className="opacity-80">
-                                            {cotizacion.company?.address || 'EL SALVADOR'}
-                                        </p>
-                                        <p className="text-blue-400 font-black">
-                                            {cotizacion.company?.website?.replace(/^https?:\/\//, '').toUpperCase() || 'WWW.ARIASDEFENSE.COM'}
-                                        </p>
+                                <div className="space-y-1">
+                                    <h2 className="text-xl font-black uppercase tracking-tight opacity-90">{cotizacion.company?.name || 'ARIAS DEFENSE COMPONENTS'}</h2>
+                                    <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em]">{cotizacion.company?.website?.replace(/^https?:\/\//, '') || 'WWW.ARIASDEFENSE.COM'}</p>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col md:items-end gap-2">
+                                <span className="bg-indigo-500/20 text-indigo-300 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border border-indigo-500/30 w-fit">
+                                    Documento: {cotizacion.id.slice(0, 8).toUpperCase()}
+                                </span>
+                                <div className="flex gap-6 mt-4 md:text-right">
+                                    <div>
+                                        <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">EMITIDO</p>
+                                        <p className="text-sm font-black">{format(new Date(cotizacion.created_at), 'dd/MM/yy')}</p>
+                                    </div>
+                                    <div className="w-px h-8 bg-slate-800"></div>
+                                    <div>
+                                        <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">VENCE</p>
+                                        <p className="text-sm font-black text-indigo-400">30 DÍAS</p>
                                     </div>
                                 </div>
-                            </div>
-
-                            <div className="flex flex-col items-start md:items-end gap-3">
-                                <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.4em]">Propuesta Comercial</p>
-                                <h1 className="text-6xl font-black tracking-tighter text-white uppercase leading-none">
-                                    {cotizacion.id.slice(0, 8)}
-                                </h1>
-                                <div className="w-24 h-1 bg-blue-500/50 rounded-full mt-2 self-start md:self-end"></div>
-                                <div className="flex gap-10 mt-4">
-                                    <div className="text-left md:text-right">
-                                        <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest leading-none mb-1.5">Fecha Emisión</p>
-                                        <p className="text-xs font-bold text-gray-300">{format(new Date(cotizacion.created_at), 'dd / MM / yyyy')}</p>
-                                    </div>
-                                    <div className="text-left md:text-right">
-                                        <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest leading-none mb-1.5">Validez</p>
-                                        <p className="text-xs font-bold text-gray-300">30 DÍAS CALENDARIO</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="p-8 md:p-14 space-y-16 bg-white">
-                        {/* Client Info Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-12 gap-12 items-start">
-                            <div className="md:col-span-7 space-y-8">
-                                <div>
-                                    <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.3em] mb-4">PREPARADO PARA</p>
-                                    <h3 className="text-5xl font-black text-slate-900 tracking-tighter leading-none mb-3">
-                                        {cotizacion.nombre_cliente}
-                                    </h3>
-                                    {cotizacion.empresa_cliente && (
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
-                                            <p className="text-blue-600 font-black text-sm uppercase tracking-widest leading-none">{cotizacion.empresa_cliente}</p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-8 border-t border-slate-100">
-                                    <div className="bg-slate-50 border border-slate-200/60 rounded-2xl px-5 py-4 flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400">
-                                            <Mail className="w-5 h-5" />
-                                        </div>
-                                        <span className="text-sm font-bold text-slate-600 truncate">{cotizacion.email_cliente || 'SIN CORREO'}</span>
-                                    </div>
-                                    {cotizacion.telefono_cliente && (
-                                        <div className="bg-slate-50 border border-slate-200/60 rounded-2xl px-5 py-4 flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-slate-400">
-                                                <Phone className="w-5 h-5" />
-                                            </div>
-                                            <span className="text-sm font-bold text-slate-600">{cotizacion.telefono_cliente}</span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            <div className="md:col-span-5 flex flex-col items-start md:items-end">
-                                <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.3em] mb-4 text-left md:text-right w-full">RESUMEN DEL PLAN</p>
-                                <div className="w-full bg-indigo-600 rounded-[2rem] p-8 text-white shadow-xl shadow-indigo-600/20 text-center relative overflow-hidden group">
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:scale-110 transition-transform"></div>
-                                    <p className="text-[10px] font-black text-indigo-200 uppercase tracking-widest mb-3">LICENCIA ACTIVA</p>
-                                    <p className="text-4xl font-black tracking-tight leading-none uppercase mb-4">
-                                        {cotizacion.plan_nombre}
-                                    </p>
-                                    <div className="h-px bg-indigo-500/30 my-5 mx-8"></div>
-                                    <p className="text-sm font-medium text-indigo-100">
-                                        CAPACIDAD: <span className="font-black">{(cotizacion.volumen_dtes || 0).toLocaleString()} DTEs</span>
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* DESGLOSE DE INVERSIÓN */}
-                        <div className="space-y-8">
-                            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                                <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em]">DESGLOSE DE INVERSIÓN</p>
-                                <span className="text-[9px] font-black text-blue-500 bg-blue-50 px-3 py-1 rounded-full uppercase tracking-widest">Valores en Dólares USD</span>
-                            </div>
-
-                            <div className="overflow-hidden border border-slate-100 rounded-3xl shadow-sm bg-slate-50/10">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="bg-slate-50 border-b border-slate-100">
-                                            <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Servicio / Licencia</th>
-                                            <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Inversión Bruta</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100 bg-white">
-                                        <tr className="hover:bg-slate-50/30 transition-colors">
-                                            <td className="px-8 py-8">
-                                                <div className="flex items-center gap-6">
-                                                    <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center flex-shrink-0 text-indigo-600 shadow-sm">
-                                                        <FileText className="w-7 h-7" />
-                                                    </div>
-                                                    <div>
-                                                        <span className="font-black text-slate-900 text-lg block">Licenciamiento Anual {cotizacion.plan_nombre}</span>
-                                                        <span className="text-[10px] text-slate-400 font-bold uppercase mt-1 block">Acceso completo + Soporte Premier</span>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-8 py-8 text-right font-black text-slate-900 text-2xl tracking-tighter">
-                                                ${(Number(cotizacion.costo_plan_anual) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                            </td>
-                                        </tr>
-                                        {cotizacion.incluir_implementacion && (
-                                            <tr className="hover:bg-slate-50/30 transition-colors">
-                                                <td className="px-8 py-8">
-                                                    <div className="flex items-center gap-6">
-                                                        <div className="w-14 h-14 rounded-2xl bg-orange-50 border border-orange-100 flex items-center justify-center flex-shrink-0 text-orange-600 shadow-sm">
-                                                            <Settings className="w-7 h-7" />
-                                                        </div>
-                                                        <div>
-                                                            <div className="flex items-center gap-3">
-                                                                <span className="font-black text-slate-900 text-lg">Servicio de Implementación</span>
-                                                                <span className="bg-orange-100 text-orange-700 text-[9px] font-black px-2 py-1 rounded-lg tracking-tighter uppercase">Pago Único</span>
-                                                            </div>
-                                                            <span className="text-[10px] text-slate-400 font-bold uppercase mt-1 block">Configuración de ambiente + Firma Digital</span>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-8 py-8 text-right font-black text-slate-900 text-2xl tracking-tighter">
-                                                    ${(Number(cotizacion.costo_implementacion) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                                </td>
-                                            </tr>
-                                        )}
-                                        {cotizacion.servicio_whatsapp && (
-                                            <tr className="hover:bg-slate-50/30 transition-colors">
-                                                <td className="px-8 py-8">
-                                                    <div className="flex items-center gap-6">
-                                                        <div className="w-14 h-14 rounded-2xl bg-green-50 border border-green-100 flex items-center justify-center flex-shrink-0 text-green-600 shadow-sm">
-                                                            <MessageSquare className="w-7 h-7" />
-                                                        </div>
-                                                        <div>
-                                                            <span className="font-black text-slate-900 text-lg block">Integración Roger AI - WhatsApp</span>
-                                                            <span className="text-[10px] text-slate-400 font-bold uppercase mt-1 block">Asistente Virtual 24/7</span>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-8 py-8 text-right font-black text-slate-900 text-2xl tracking-tighter">
-                                                    ${(cotizacion.costo_whatsapp || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                                </td>
-                                            </tr>
-                                        )}
-                                        {(cotizacion.modulos_adicionales || []).map((mod: any, idx: number) => (
-                                            <tr key={idx} className="hover:bg-slate-50/30 transition-colors">
-                                                <td className="px-8 py-8">
-                                                    <div className="flex items-center gap-6">
-                                                        <div className="w-14 h-14 rounded-2xl bg-purple-50 border border-purple-100 flex items-center justify-center flex-shrink-0 text-purple-600 shadow-sm">
-                                                            <Package className="w-7 h-7" />
-                                                        </div>
-                                                        <div>
-                                                            <span className="font-black text-slate-900 text-lg block">{mod.nombre}</span>
-                                                            <span className="text-[10px] text-slate-400 font-bold uppercase mt-1 block">Módulo Adicional Especializado</span>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-8 py-8 text-right font-black text-slate-900 text-2xl tracking-tighter">
-                                                    ${(Number(mod.costo_anual || mod.costo) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        {/* TOTALS GRID - Horizontal Professional Look */}
-                        <div className="pt-12">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                                {/* PAGO INICIAL BOX */}
-                                <div className="bg-orange-50 border-2 border-orange-100 rounded-[2.5rem] p-10 shadow-xl shadow-orange-900/5 flex flex-col justify-between relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-orange-200/20 rounded-full blur-3xl -mr-16 -mt-16"></div>
-                                    <div className="flex justify-between items-start mb-8 relative z-10">
-                                        <div>
-                                            <h4 className="text-2xl font-black text-orange-900 uppercase tracking-tighter leading-none">Pago Hoy</h4>
-                                            <p className="text-[11px] text-orange-600/70 font-bold mt-2 tracking-widest uppercase">Inversión Inicial de Activación</p>
-                                        </div>
-                                        <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center text-orange-600 shadow-sm">
-                                            <Package className="w-7 h-7" />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-4 relative z-10">
-                                        <div className="flex justify-between text-sm text-slate-600 font-medium">
-                                            <span>Servicios + Impuestos</span>
-                                            <span className="font-black text-slate-900">${financials.pagoInicial.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                        </div>
-                                        <div className="pt-6 border-t border-orange-200 mt-4 flex justify-between items-end">
-                                            <span className="text-[11px] font-black text-slate-900 uppercase tracking-widest">Total a Pagar</span>
-                                            <span className="text-4xl font-black text-orange-600 tracking-tighter leading-none text-right">
-                                                ${financials.pagoInicial.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* TOTAL ANUAL / RECURRENTE BOX */}
-                                <div className={`${financials.isMonthly ? 'bg-blue-50 border-blue-100' : 'bg-green-50 border-green-100'} border-2 rounded-[2.5rem] p-10 shadow-xl shadow-slate-900/5 flex flex-col justify-between relative overflow-hidden`}>
-                                    <div className={`absolute top-0 right-0 w-32 h-32 ${financials.isMonthly ? 'bg-blue-200/20' : 'bg-green-200/20'} rounded-full blur-3xl -mr-16 -mt-16`}></div>
-                                    <div className="flex justify-between items-start mb-8 relative z-10">
-                                        <div>
-                                            <h4 className={`text-2xl font-black ${financials.isMonthly ? 'text-blue-900' : 'text-green-900'} uppercase tracking-tighter leading-none`}>
-                                                {financials.isMonthly ? 'Recurrente' : 'Anualidad'}
-                                            </h4>
-                                            <p className={`text-[11px] ${financials.isMonthly ? 'text-blue-600/70' : 'text-green-600/70'} font-bold mt-2 tracking-widest uppercase`}>
-                                                Licencia de Operaciones
-                                            </p>
-                                        </div>
-                                        <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center shadow-sm">
-                                            <Globe className={`w-7 h-7 ${financials.isMonthly ? 'text-blue-600' : 'text-green-600'}`} />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-4 relative z-10">
-                                        <div className="flex justify-between text-sm text-slate-600 font-medium">
-                                            <span>Mantenimiento + Cloud</span>
-                                            <span className="font-black text-slate-900">
-                                                ${(financials.isMonthly ? financials.cuotaMensual : financials.totalAnual).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                            </span>
-                                        </div>
-                                        <div className={`pt-6 border-t ${financials.isMonthly ? 'border-blue-200' : 'border-green-200'} mt-4 flex justify-between items-end`}>
-                                            <span className="text-[11px] font-black text-slate-900 uppercase tracking-widest">
-                                                {financials.isMonthly ? 'Mensualidad' : 'Total Anual'}
-                                            </span>
-                                            <span className={`text-4xl font-black ${financials.isMonthly ? 'text-blue-600' : 'text-green-600'} tracking-tighter leading-none text-right`}>
-                                                ${(financials.isMonthly ? financials.cuotaMensual : financials.totalAnual).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                                {financials.isMonthly && <span className="text-sm opacity-50 ml-1">/ MES</span>}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* TÉRMINOS Y CONDICIONES SECTION */}
-                        <div className="mt-16 pt-16 border-t border-slate-100">
-                            <div className="flex items-center gap-4 mb-10">
-                                <div className="w-12 h-12 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-center text-slate-400">
-                                    <FileText className="w-6 h-6" />
-                                </div>
-                                <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Términos del Servicio</h2>
-                            </div>
-
-                            <div className="bg-slate-50 border border-slate-100 rounded-[2rem] p-10 md:p-12">
-                                <div className="space-y-8 max-h-[500px] overflow-y-auto pr-6 custom-scrollbar">
-                                    {(cotizacion.company?.terminos_condiciones || '').split('\n\n').filter((p: string) => p.trim()).map((para: string, idx: number) => (
-                                        <div key={idx} className="flex gap-6 items-start">
-                                            <span className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-sm font-black text-indigo-600 shrink-0 shadow-sm">
-                                                {idx + 1}
-                                            </span>
-                                            <div className="flex-1">
-                                                <p className="text-sm text-slate-600 leading-relaxed font-semibold">
-                                                    {para.trim().split(/(\*\*.*?\*\*)/).map((part, i) =>
-                                                        part.startsWith('**') && part.endsWith('**')
-                                                            ? <strong key={i} className="text-slate-900 font-extrabold">{part.slice(2, -2)}</strong>
-                                                            : part
-                                                    )}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* CREATOR FOOTER - Same as internal */}
-                    <div className="bg-slate-50 px-10 py-12 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-12">
-                        <div className="flex items-center gap-8">
-                            <div className="w-20 h-20 rounded-3xl bg-[#0f172a] flex items-center justify-center text-white font-black text-2xl shadow-2xl border-4 border-white overflow-hidden rotate-3">
-                                {cotizacion.creator?.avatar_url ? (
-                                    <img src={cotizacion.creator.avatar_url} alt="" className="w-full h-full object-cover" />
-                                ) : (
-                                    (cotizacion.creator?.full_name || cotizacion.creator?.email || 'A').charAt(0).toUpperCase()
-                                )}
-                            </div>
-                            <div>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 font-extrabold">Propuesta Gestada por</p>
-                                <h4 className="text-2xl font-black text-slate-900 tracking-tight">{(cotizacion.creator?.full_name || 'Agente Comercial').toUpperCase()}</h4>
-                                <div className="flex items-center gap-4 mt-2 text-[10px] font-black text-blue-500 uppercase tracking-wider">
-                                    <span className="flex items-center gap-2"><Mail className="w-3.5 h-3.5" /> {cotizacion.creator?.email}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-6">
-                            <div className="w-20 h-20 bg-white p-3 rounded-2xl shadow-xl border border-slate-100 rotate-[-3deg]">
-                                <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${window.location.href}`} alt="QR" className="w-full h-full grayscale opacity-80" />
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Footer Copyright */}
-                <div className="text-center pb-20">
-                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.5em]">Powered by Arias Defense Intelligence CRM</p>
+                {/* Recipient Card */}
+                <div className="bg-white rounded-[2rem] p-8 border border-slate-200/60 shadow-sm mb-8">
+                    <div className="flex flex-col md:flex-row justify-between gap-8">
+                        <div className="space-y-6 flex-1">
+                            <div>
+                                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em] mb-3">PREPARADO PARA</p>
+                                <h3 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-none mb-2">{cotizacion.nombre_cliente}</h3>
+                                {cotizacion.empresa_cliente && (
+                                    <p className="text-slate-500 font-black text-sm uppercase tracking-widest">{cotizacion.empresa_cliente}</p>
+                                )}
+                            </div>
+                            <div className="flex flex-wrap gap-3">
+                                <div className="bg-slate-50 px-4 py-2 rounded-xl flex items-center gap-2 border border-slate-100">
+                                    <Mail className="w-3.5 h-3.5 text-slate-400" />
+                                    <span className="text-[10px] font-bold text-slate-600">{cotizacion.email_cliente || 'SIN CORREO'}</span>
+                                </div>
+                                {cotizacion.telefono_cliente && (
+                                    <div className="bg-slate-50 px-4 py-2 rounded-xl flex items-center gap-2 border border-slate-100">
+                                        <Phone className="w-3.5 h-3.5 text-slate-400" />
+                                        <span className="text-[10px] font-bold text-slate-600">{cotizacion.telefono_cliente}</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="md:w-64">
+                            <div className="bg-indigo-600 rounded-3xl p-6 text-white shadow-xl shadow-indigo-600/20 text-center flex flex-col items-center">
+                                <Package className="w-8 h-8 mb-3 opacity-50" />
+                                <p className="text-[10px] font-black uppercase tracking-widest opacity-80 mb-1">SOFTWARE PLAN</p>
+                                <p className="text-2xl font-black tracking-tight uppercase leading-none">{cotizacion.plan_nombre}</p>
+                                <div className="w-full h-px bg-white/20 my-4"></div>
+                                <p className="text-[10px] font-bold">{(cotizacion.volumen_dtes || 0).toLocaleString()} DTEs/AÑO</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Investment List - Tappable Mobile List */}
+                <div className="space-y-4 mb-10">
+                    <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] px-2 mb-4">DETALLE DE LA INVERSIÓN</h4>
+
+                    {/* Items List */}
+                    <div className="space-y-3">
+                        <div className="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm flex items-center justify-between group active:scale-[0.98] transition-all">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                                    <FileText className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <p className="font-black text-slate-900 text-sm leading-none m-0 uppercase">Licenciamiento Anual</p>
+                                    <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase">PLAN {cotizacion.plan_nombre}</p>
+                                </div>
+                            </div>
+                            <span className="text-lg font-black text-slate-900 tracking-tight">${Number(cotizacion.costo_plan_anual).toLocaleString()}</span>
+                        </div>
+
+                        {cotizacion.incluir_implementacion && (
+                            <div className="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm flex items-center justify-between group active:scale-[0.98] transition-all">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-600">
+                                        <Settings className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <p className="font-black text-slate-900 text-sm leading-none m-0 uppercase">Implementación</p>
+                                        <span className="inline-block mt-1 text-[8px] font-black bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">PAGO ÚNICO</span>
+                                    </div>
+                                </div>
+                                <span className="text-lg font-black text-slate-900 tracking-tight">${Number(cotizacion.costo_implementacion).toLocaleString()}</span>
+                            </div>
+                        )}
+
+                        {cotizacion.servicio_whatsapp && (
+                            <div className="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm flex items-center justify-between group active:scale-[0.98] transition-all">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-xl bg-green-50 border border-green-100 flex items-center justify-center text-green-600">
+                                        <MessageSquare className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <p className="font-black text-slate-900 text-sm leading-none m-0 uppercase">WhatsApp AI Agent</p>
+                                        <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase">INTEGRACIÓN ROGER</p>
+                                    </div>
+                                </div>
+                                <span className="text-lg font-black text-slate-900 tracking-tight">${Number(cotizacion.costo_whatsapp).toLocaleString()}</span>
+                            </div>
+                        )}
+
+                        {(cotizacion.modulos_adicionales || []).map((mod: any, idx: number) => (
+                            <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm flex items-center justify-between group active:scale-[0.98] transition-all text-xs">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600">
+                                        <Package className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <p className="font-black text-slate-900 text-sm leading-none m-0 uppercase">{mod.nombre}</p>
+                                        <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-tighter">MÓDULO ADICIONAL</p>
+                                    </div>
+                                </div>
+                                <span className="text-lg font-black text-slate-900 tracking-tight">${(Number(mod.costo_anual || mod.costo)).toLocaleString()}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Mobile Financial Summary */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
+                    <div className="bg-orange-600 rounded-[2.5rem] p-8 text-white shadow-xl shadow-orange-600/20 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-2xl -mr-12 -mt-12"></div>
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 bg-white/20 rounded-2xl flex items-center justify-center">
+                                <Package className="w-5 h-5" />
+                            </div>
+                            <p className="text-[10px] font-black uppercase tracking-widest leading-none">INVERSIÓN DE ACTIVACIÓN</p>
+                        </div>
+                        <h4 className="text-[10px] font-bold opacity-60 uppercase mb-1">Pago Inicial Hoy</h4>
+                        <p className="text-4xl font-black tracking-tighter">${financials.pagoInicial.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        <p className="text-[9px] font-bold opacity-70 mt-4 uppercase tracking-[0.2em]">REQUERIDO PARA ACTIVAR SERVICIOS</p>
+                    </div>
+
+                    <div className={`${financials.isMonthly ? 'bg-indigo-600' : 'bg-emerald-600'} rounded-[2.5rem] p-8 text-white shadow-xl shadow-slate-900/20 relative overflow-hidden`}>
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-2xl -mr-12 -mt-12"></div>
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="w-10 h-10 bg-white/20 rounded-2xl flex items-center justify-center">
+                                <Globe className="w-5 h-5" />
+                            </div>
+                            <p className="text-[10px] font-black uppercase tracking-widest leading-none">{financials.isMonthly ? 'MENSUALIDAD ESTIMADA' : 'INVERSIÓN ANUAL'}</p>
+                        </div>
+                        <h4 className="text-[10px] font-bold opacity-60 uppercase mb-1">Costo Recurrente</h4>
+                        <p className="text-4xl font-black tracking-tighter">
+                            ${(financials.isMonthly ? financials.cuotaMensual : financials.totalAnual).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {financials.isMonthly && <span className="text-xs opacity-50 ml-1">/ MES</span>}
+                        </p>
+                        <p className="text-[9px] font-bold opacity-70 mt-4 uppercase tracking-[0.2em]">LICENCIAMIENTO + SOPORTE</p>
+                    </div>
+                </div>
+
+                {/* Terms of Service Accordion-style Area */}
+                <div className="mb-20">
+                    <div className="flex items-center gap-3 px-2 mb-6">
+                        <FileText className="w-5 h-5 text-indigo-500" />
+                        <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-[0.3em]">TÉRMINOS DEL SERVICIO</h4>
+                    </div>
+                    <div className="bg-white rounded-[2rem] border border-slate-200/60 p-6 md:p-10 space-y-6">
+                        <div className="max-h-80 overflow-y-auto pr-4 custom-scrollbar space-y-8">
+                            {(cotizacion.company?.terminos_condiciones || '').split('\n\n').filter((p: string) => p.trim()).map((para: string, idx: number) => (
+                                <div key={idx} className="flex gap-4 items-start group">
+                                    <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-[10px] font-black text-indigo-600 shrink-0 group-hover:bg-indigo-50 transition-colors">
+                                        {idx + 1}
+                                    </div>
+                                    <p className="text-xs text-slate-600 leading-relaxed font-semibold">
+                                        {para.trim().split(/(\*\*.*?\*\*)/).map((part, i) =>
+                                            part.startsWith('**') && part.endsWith('**')
+                                                ? <strong key={i} className="text-slate-900 font-extrabold">{part.slice(2, -2)}</strong>
+                                                : part
+                                        )}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Creator Footer Mobile Optimized */}
+                <div className="bg-slate-900 rounded-[2.5rem] p-8 md:p-12 mb-12 flex flex-col md:flex-row items-center justify-between gap-10">
+                    <div className="flex items-center gap-6">
+                        <div className="w-20 h-20 rounded-3xl bg-white/10 flex items-center justify-center p-1 relative overflow-hidden ring-4 ring-indigo-500/20 rotate-3">
+                            {cotizacion.creator?.avatar_url ? (
+                                <img src={cotizacion.creator.avatar_url} alt="" className="w-full h-full object-cover rounded-2xl" />
+                            ) : (
+                                <span className="text-white font-black text-3xl">A</span>
+                            )}
+                        </div>
+                        <div>
+                            <p className="text-[8px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-1">ASESOR COMERCIAL</p>
+                            <h4 className="text-xl font-black text-white leading-none uppercase tracking-tight">{cotizacion.creator?.full_name || 'AGENTE OFICIAL'}</h4>
+                            <p className="text-[10px] font-bold text-slate-500 mt-2 lowercase">{cotizacion.creator?.email}</p>
+                        </div>
+                    </div>
+                    <div className="w-20 h-20 bg-white p-2.5 rounded-2xl shadow-2xl rotate-[-3deg]">
+                        <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${window.location.href}`} alt="QR" className="w-full h-full grayscale opacity-70" />
+                    </div>
                 </div>
             </div>
 
-            {/* Signature Modal - Enhanced Design */}
+            {/* Signature Bottom Sheet Style Modal */}
             {showSignatureModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
-                    <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-10 shadow-2xl space-y-8 animate-in zoom-in-95 duration-200">
-                        <div className="text-center space-y-4">
-                            <div className="w-20 h-20 bg-indigo-50 text-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-2 shadow-inner border border-indigo-100">
-                                <PencilLine className="w-10 h-10" />
+                <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="bg-white w-full max-w-lg rounded-t-[3rem] md:rounded-[3rem] p-8 md:p-10 shadow-2xl space-y-8 animate-in slide-in-from-bottom-10 md:zoom-in-95 duration-300">
+                        {/* Mobile Handle */}
+                        <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto md:hidden -mt-2 mb-6"></div>
+
+                        <div className="text-center space-y-3">
+                            <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
+                                <PencilLine className="w-8 h-8" />
                             </div>
-                            <h2 className="text-4xl font-black text-slate-900 tracking-tighter">Firma Digital</h2>
-                            <p className="text-sm text-slate-500 font-medium leading-relaxed max-w-xs mx-auto">Para formalizar y activar esta propuesta comercial, ingresa tu nombre completo como firma digital vinculante.</p>
+                            <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase m-0">FIRMA DIGITAL</h2>
+                            <p className="text-[11px] text-slate-500 font-bold leading-relaxed max-w-[240px] mx-auto uppercase tracking-wide">Ingresa tu nombre para formalizar la aceptación.</p>
                         </div>
 
-                        <div className="space-y-8">
-                            <div className="space-y-3">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Nombre Completo del Firmante</label>
-                                <div className="relative">
-                                    <User className="absolute left-5 top-1/2 -translate-y-1/2 w-6 h-6 text-slate-300" />
-                                    <input
-                                        type="text"
-                                        value={signerName}
-                                        onChange={(e) => setSignerName(e.target.value)}
-                                        placeholder="Ej: Ing. Christopher Arias"
-                                        className="w-full pl-14 pr-6 h-16 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all font-black text-xl text-slate-800 placeholder:text-slate-300 placeholder:font-bold"
-                                        autoFocus
-                                    />
-                                </div>
+                        <div className="space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">NOMBRE COMPLETO</label>
+                                <input
+                                    type="text"
+                                    value={signerName}
+                                    onChange={(e) => setSignerName(e.target.value)}
+                                    placeholder="CRISTOBAL ARIAS"
+                                    className="w-full h-16 bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 outline-none transition-all font-black text-xl text-slate-800 placeholder:text-slate-200 uppercase"
+                                    autoFocus
+                                />
                             </div>
 
-                            <div className="flex flex-col gap-4">
+                            <div className="flex flex-col gap-3">
                                 <Button
                                     variant="default"
                                     onClick={handleAccept}
                                     disabled={isAccepting || !signerName.trim()}
-                                    className="h-16 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-2xl shadow-indigo-600/30 transition-all active:scale-95"
+                                    className="h-16 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-2xl transition-all"
                                 >
-                                    {isAccepting ? 'Procesando Aceptación...' : 'Confirmar y Firmar Documento'}
+                                    {isAccepting ? 'PROCESANDO...' : 'CONFIRMAR Y FIRMAR'}
                                 </Button>
-                                <Button
-                                    variant="ghost"
+                                <button
                                     onClick={() => setShowSignatureModal(false)}
-                                    className="h-14 text-slate-400 hover:text-slate-600 font-black text-[10px] uppercase tracking-widest transition-colors"
+                                    className="h-12 text-slate-400 hover:text-slate-600 font-black text-[9px] uppercase tracking-widest transition-colors"
                                 >
-                                    Revisar Propuesta Nuevamente
-                                </Button>
+                                    VOLVER A REVISAR
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
+
+            <style dangerouslySetInnerHTML={{
+                __html: `
+                .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 10px; }
+                @media (max-width: 768px) {
+                    body { -webkit-tap-highlight-color: transparent; }
+                }
+            `}} />
         </div>
     );
 }
