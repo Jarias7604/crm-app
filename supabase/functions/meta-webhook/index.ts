@@ -60,7 +60,7 @@ serve(async (req) => {
                             if (targetCompanyId) {
                                 // Validate it exists
                                 const { data: integration } = await supabase
-                                    .from('company_integrations')
+                                    .from('marketing_integrations')
                                     .select('company_id')
                                     .eq('company_id', targetCompanyId)
                                     .eq('provider', 'whatsapp')
@@ -73,11 +73,13 @@ serve(async (req) => {
                             if (!companyId && phoneNumberId) {
                                 console.log(`Looking up company for PhoneID: ${phoneNumberId}`);
                                 // Access JSONB field: credentials ->> 'phoneNumberId'
+                                // NOTE: In Postgres JSONB, text lookup needs ->>
                                 const { data: integ } = await supabase
-                                    .from('company_integrations')
+                                    .from('marketing_integrations')
                                     .select('company_id')
                                     .eq('provider', 'whatsapp')
                                     .filter('credentials->>phoneNumberId', 'eq', phoneNumberId)
+                                    .eq('is_active', true)
                                     .maybeSingle();
 
                                 if (integ) companyId = integ.company_id;
@@ -119,7 +121,7 @@ serve(async (req) => {
                                 }
 
                                 // RPC CALL
-                                const { error } = await supabase.rpc('process_incoming_marketing_message', {
+                                const { data: convId, error } = await supabase.rpc('process_incoming_marketing_message', {
                                     p_company_id: companyId,
                                     p_channel: 'whatsapp',
                                     p_external_id: chatId,
@@ -128,7 +130,21 @@ serve(async (req) => {
                                     p_metadata: metadata
                                 });
 
-                                if (error) console.error('RPC Error saving WhatsApp msg:', error);
+                                if (error) {
+                                    console.error('RPC Error saving WhatsApp msg:', error);
+                                } else if (convId) {
+                                    // FIRE AND FORGET AI
+                                    const aiPromise = (async () => {
+                                        console.log(`Invoking AI for conversation ${convId} (Company: ${companyId}) from WhatsApp`);
+                                        await supabase.functions.invoke('ai-chat-processor', {
+                                            body: { conversationId: convId }
+                                        });
+                                    })();
+
+                                    if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+                                        EdgeRuntime.waitUntil(aiPromise);
+                                    }
+                                }
                             }
                         }
                     }

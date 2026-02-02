@@ -36,7 +36,9 @@ export interface CotizacionData {
     total_mensual: number;
     notes?: string;
     incluir_implementacion: boolean;
-    cuotas?: number; // V3: Dynamic installments (renamed from cantidad_cuotas)
+    cuotas?: number;
+    descripcion_pago?: string; // Para almacenar la firma/confirmación digital
+    metadata?: any;
     company?: {
         name: string;
         logo_url?: string;

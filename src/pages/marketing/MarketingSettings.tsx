@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Mail, ArrowLeft, CheckCircle, Server, Shield, Cloud, MessageSquare, Bot, Globe, Smartphone, Send } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { integrationService, type MarketingIntegration } from '../../services/marketing/integrationService';
+import { supabase } from '../../services/supabase';
 import toast from 'react-hot-toast';
 
 type TabType = 'email' | 'whatsapp' | 'chat' | 'telegram';
@@ -69,12 +70,30 @@ export default function MarketingSettings() {
                 is_active: true
             });
 
+            // AUTOMATIC CONFIGURATION FOR TELEGRAM
+            if (dbProvider === 'telegram' && formData.token) {
+                try {
+                    toast.loading('Configurando Webhook en Telegram...', { id: 'tg-setup' });
+                    const { error } = await supabase.functions.invoke('setup-telegram', {
+                        body: {
+                            botToken: formData.token,
+                            companyId: profile.company_id
+                        }
+                    });
+                    if (error) throw error;
+                    toast.success('¡Bot conectado exitosamente con el sistema!', { id: 'tg-setup' });
+                } catch (tgError: any) {
+                    console.error('Telegram Setup Error:', tgError);
+                    toast.error('Credenciales guardadas, pero falló la conexión automática con Telegram.', { id: 'tg-setup' });
+                }
+            }
+
             toast.success('¡Conexión guardada con éxito!');
             setSelectedProvider(null);
             loadIntegrations();
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            toast.error('Error al guardar conexión');
+            toast.error('Error al guardar: ' + (error.message || 'Error desconocido'));
         } finally {
             setIsLoading(false);
         }

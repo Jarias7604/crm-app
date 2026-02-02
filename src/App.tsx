@@ -36,6 +36,7 @@ const EmailBuilder = lazy(() => import('./pages/marketing/EmailBuilder'));
 const AiAgentsConfig = lazy(() => import('./pages/marketing/AiAgentsConfig'));
 const MarketingSettings = lazy(() => import('./pages/marketing/MarketingSettings'));
 const ChatHub = lazy(() => import('./pages/marketing/ChatHub'));
+const PublicQuoteView = lazy(() => import('./pages/PublicQuoteView'));
 
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -105,6 +106,9 @@ function App() {
                   <Route path="/marketing/chat" element={<ChatHub />} />
                 </Route>
               </Route>
+
+              {/* Public Proposal Page (No Auth Required) */}
+              <Route path="/propuesta/:id" element={<PublicQuoteView />} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

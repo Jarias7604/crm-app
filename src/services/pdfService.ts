@@ -229,7 +229,8 @@ export const pdfService = {
                 drawRow('Comunicación WhatsApp', cotizacion.costo_whatsapp || 0);
             }
             modulos.forEach((m: any) => {
-                drawRow(m.nombre, m.costo_anual || 0, (m.costo_mensual || 0) === 0);
+                const currentCosto = m.costo_anual || m.costo || 0;
+                drawRow(m.nombre, currentCosto, (m.costo_mensual || 0) === 0 && currentCosto > 0);
             });
 
             // ==========================================

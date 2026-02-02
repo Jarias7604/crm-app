@@ -255,7 +255,7 @@ export default function CotizacionDetalle() {
                                     </p>
                                     <div className="h-px bg-slate-200 my-3 mx-4"></div>
                                     <p className="text-xs text-slate-600 font-medium">
-                                        Volumen: <span className="font-bold text-slate-900">{cotizacion.volumen_dtes.toLocaleString()} DTEs/año</span>
+                                        Volumen: <span className="font-bold text-slate-900">{(cotizacion.volumen_dtes || 0).toLocaleString()} DTEs/año</span>
                                     </p>
                                     <div className="mt-3 flex justify-center">
                                         <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-2 border ${cotizacion.estado === 'aceptada' ? 'bg-green-50 text-green-600 border-green-100' :
@@ -298,7 +298,7 @@ export default function CotizacionDetalle() {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-6 text-right font-black text-slate-900 text-lg">
-                                                ${cotizacion.costo_plan_anual.toLocaleString()}
+                                                ${(Number(cotizacion.costo_plan_anual) || 0).toLocaleString()}
                                             </td>
                                         </tr>
                                         {cotizacion.incluir_implementacion && (
@@ -315,7 +315,7 @@ export default function CotizacionDetalle() {
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-6 text-right font-black text-slate-900 text-lg">
-                                                    ${cotizacion.costo_implementacion.toLocaleString()}
+                                                    ${(Number(cotizacion.costo_implementacion) || 0).toLocaleString()}
                                                 </td>
                                             </tr>
                                         )}
@@ -345,7 +345,7 @@ export default function CotizacionDetalle() {
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-6 text-right font-black text-slate-900 text-lg">
-                                                    ${mod.costo_anual.toLocaleString()}
+                                                    ${(Number(mod.costo_anual || mod.costo) || 0).toLocaleString()}
                                                 </td>
                                             </tr>
                                         ))}

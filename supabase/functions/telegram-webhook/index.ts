@@ -80,23 +80,22 @@ serve(async (req) => {
         let targetCompanyId = url.searchParams.get('company_id');
 
         if (!targetCompanyId) {
-            // Fallback for current setup
-            console.log("No company_id in URL, assuming Legacy Master (Arias Defense)");
-            targetCompanyId = '7a582ba5-f7d0-4ae3-9985-35788deb1c30';
+            console.error("CRITICAL: Message received without company_id. Webhook not properly configured for multi-tenancy.");
+            return new Response('OK', { status: 200 });
         }
 
         const { data: integration } = await supabase
-            .from('company_integrations')
+            .from('marketing_integrations')
             .select('company_id')
             .eq('company_id', targetCompanyId)
             .eq('provider', 'telegram')
             .eq('is_active', true)
-            .maybeSingle(); // Use maybeSingle to avoid error if not found
+            .maybeSingle();
 
         const companyId = integration?.company_id;
 
         if (!companyId) {
-            console.error(`No active Telegram integration found for company: ${targetCompanyId}`);
+            console.error(`Security Warning: No active Telegram integration found for target company: ${targetCompanyId}`);
             return new Response('OK', { status: 200 });
         }
 
@@ -110,6 +109,26 @@ serve(async (req) => {
             p_content: content,
             p_metadata: metadata
         });
+
+        if (!error && data) {
+            // FIRE AND FORGET AI
+            // We use EdgeRuntime.waitUntil to keep the function alive while AI processes
+            const aiPromise = (async () => {
+                console.log(`Invoking AI for conversation ${data} (Company: ${companyId})`);
+                await supabase.functions.invoke('ai-chat-processor', {
+                    body: { conversationId: data }
+                });
+            })();
+
+            if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+                EdgeRuntime.waitUntil(aiPromise);
+            } else {
+                // Determine if we await or float?
+                // Floating might be killed. But standard fetch in simple handlers often floats.
+                // We'll log it.
+                // await aiPromise; // Don't await, it will timeout Telegram
+            }
+        }
 
         if (error) {
             console.error('RPC Error:', error);
