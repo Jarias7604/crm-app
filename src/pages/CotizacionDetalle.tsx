@@ -26,11 +26,11 @@ export default function CotizacionDetalle() {
                 .select(`
                     *,
                     company:companies(*),
-                    creator:profiles(*),
+                    creator:profiles!created_by(*),
                     lead:leads(*)
                 `)
                 .eq('id', id)
-                .single();
+                .maybeSingle();
 
             if (error) throw error;
 

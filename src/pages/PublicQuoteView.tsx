@@ -24,20 +24,33 @@ export default function PublicQuoteView() {
 
     async function fetchCotizacion() {
         try {
-            const { data, error } = await supabase
+            // 1. Fetch main quote data WITHOUT joins to avoid coercion errors
+            const { data: quotes, error: quoteError } = await supabase
                 .from('cotizaciones')
-                .select(`
-                    *,
-                    company:companies(*),
-                    creator:profiles(*)
-                `)
+                .select('*')
                 .eq('id', id)
-                .single();
+                .limit(1);
 
-            if (error) throw error;
+            const quote = quotes?.[0];
+
+            if (quoteError) throw quoteError;
+            if (!quote) return; // Will be handled by the check below
+
+            // 2. Fetch related data manually (simulates the join but safer)
+            const [companyRes, creatorRes] = await Promise.all([
+                quote.company_id
+                    ? supabase.from('companies').select('*').eq('id', quote.company_id).single()
+                    : Promise.resolve({ data: null }),
+                quote.created_by
+                    ? supabase.from('profiles').select('*').eq('id', quote.created_by).single()
+                    : Promise.resolve({ data: null })
+            ]);
+
             setCotizacion({
-                ...data,
-                modulos_adicionales: parseModules(data.modulos_adicionales)
+                ...quote,
+                company: companyRes.data,
+                creator: creatorRes.data,
+                modulos_adicionales: parseModules(quote.modulos_adicionales)
             } as CotizacionData);
         } catch (error: any) {
             console.error('Error fetching quote:', error);
