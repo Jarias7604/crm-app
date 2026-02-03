@@ -2,10 +2,16 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 /**
- * 🚀 OUTBOUND MESSAGE DISPATCHER (Telegram)
+ * 🚀 OUTBOUND MESSAGE DISPATCHER (Telegram) - ENHANCED
  * ----------------------------------------
  * This function triggers when a new 'outbound' message is inserted into 'marketing_messages'.
  * It pushes the content/files to the external provider (Telegram API).
+ * 
+ * MEJORAS v2:
+ * - Parse mode mejorado (Markdown)
+ * - Retry logic con exponential backoff
+ * - Mejor formato de mensajes
+ * - Validación de contenido
  */
 
 const corsHeaders = {
@@ -14,12 +20,59 @@ const corsHeaders = {
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+/**
+ * Formatea el contenido del mensaje para Telegram con Markdown
+ */
+function formatTelegramMessage(content: string): string {
+    if (!content) return '';
+
+    // Escapar caracteres especiales de Markdown excepto los que queremos usar
+    let formatted = content
+        // Mantener negritas existentes
+        .replace(/\*\*(.+?)\*\*/g, '*$1*')
+        // Convertir headers en negritas
+        .replace(/^#+\s+(.+)$/gm, '*$1*')
+        // Agregar saltos de línea para mejor legibilidad
+        .trim();
+
+    return formatted;
+}
+
+/**
+ * Retry con exponential backoff
+ */
+async function retryWithBackoff<T>(
+    fn: () => Promise<T>,
+    maxRetries: number = 3,
+    baseDelay: number = 1000
+): Promise<T> {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            return await fn();
+        } catch (error) {
+            if (i === maxRetries - 1) throw error;
+
+            const delay = baseDelay * Math.pow(2, i);
+            console.log(`Retry ${i + 1}/${maxRetries} after ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+    throw new Error('Max retries exceeded');
+}
+
 Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
     try {
         const payload = await req.json();
         const record = payload.record;
+
+        // NUEVO: Soporte para llamadas directas (sin record, usado por queue processor)
+        const directInvocation = payload.chat_id && payload.text;
+
+        if (!directInvocation && (!record || record.direction !== 'outbound' || record.status === 'delivered')) {
+            return new Response('Skipped', { status: 200, headers: corsHeaders });
+        }
 
         if (!record || record.direction !== 'outbound' || record.status === 'delivered') {
             return new Response('Skipped', { status: 200, headers: corsHeaders });

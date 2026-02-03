@@ -2,16 +2,28 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { format } from 'date-fns';
-import { Building2, Mail, Phone, Package, Globe, Trash2, Send, Download, ArrowLeft, Settings, FileText, MessageSquare } from 'lucide-react';
+import { Building2, Mail, Phone, Package, Globe, Trash2, Send, Download, ArrowLeft, Settings, FileText, MessageSquare, CreditCard } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { pdfService } from '../services/pdfService';
-import { calculateQuoteFinancials, parseModules, type CotizacionData } from '../utils/quoteUtils';
+import { parseModules, type CotizacionData } from '../utils/quoteUtils';
 import toast from 'react-hot-toast';
+
+interface FinancingPlan {
+    id: string;
+    titulo: string;
+    descripcion: string;
+    cuotas: number;
+    meses: number;
+    interes_porcentaje: number;
+    tipo_ajuste: 'discount' | 'recharge' | 'none';
+    es_popular: boolean;
+}
 
 export default function CotizacionDetalle() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const [cotizacion, setCotizacion] = useState<CotizacionData | null>(null);
+    const [financingPlan, setFinancingPlan] = useState<FinancingPlan | null>(null);
     const [loading, setLoading] = useState(true);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
@@ -41,6 +53,28 @@ export default function CotizacionDetalle() {
             };
 
             setCotizacion(parsedData as CotizacionData);
+
+            // Cargar el plan de financiamiento correspondiente
+            // Usar plazo_meses si cuotas es 1 o no existe
+            const numCuotas = (data?.cuotas && data.cuotas > 1) ? data.cuotas : (data?.plazo_meses || 1);
+
+            if (numCuotas && data?.company_id) {
+                const { data: planData } = await supabase
+                    .from('financing_plans')
+                    .select('*')
+                    .or(`company_id.eq.${data.company_id},company_id.is.null`)
+                    .eq('cuotas', numCuotas)
+                    .eq('activo', true)
+                    .order('company_id', { ascending: false, nullsFirst: false })
+                    .limit(1)
+                    .maybeSingle();
+
+                console.log('[CotizacionDetalle] Buscando plan con cuotas:', numCuotas, 'encontrado:', planData?.titulo);
+
+                if (planData) {
+                    setFinancingPlan(planData as FinancingPlan);
+                }
+            }
         } catch (error: any) {
             console.error('Error fetching cotizacion:', error);
             toast.error('No se pudo cargar la cotización');
@@ -354,109 +388,181 @@ export default function CotizacionDetalle() {
                             </div>
                         </div>
 
-                        {/* Section 4: Summary & Financials - Horizontal Layout */}
+                        {/* Section 4: Summary & Financials - Dynamic Layout */}
                         <div className="pt-8 space-y-8 px-8 md:px-12">
+                            {/* Título dinámico del plan de pago */}
+                            {(() => {
+                                // Calcular cuotas reales para el título (misma lógica que los cuadros)
+                                const cuotasDisplay = (Number(cotizacion.cuotas) > 1) ? Number(cotizacion.cuotas) : (Number(cotizacion.plazo_meses) || 1);
+                                const tituloDisplay = financingPlan?.titulo || cotizacion.descripcion_pago || (cuotasDisplay <= 1 ? '1 Solo pago' : `${cuotasDisplay} Meses`);
+
+                                return (
+                                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                        <p className="text-[9px] font-black text-blue-400 uppercase tracking-[0.2em]">RESUMEN DE INVERSIÓN</p>
+                                        <div className="flex items-center gap-2">
+                                            <CreditCard className="w-4 h-4 text-slate-400" />
+                                            <p className="text-xs font-bold text-slate-600">
+                                                {tituloDisplay}
+                                            </p>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 {(() => {
-                                    const financials = calculateQuoteFinancials(cotizacion);
-                                    const {
-                                        isMonthly,
-                                        plazoMeses,
-                                        termSurchargePct,
-                                        pagoInicial,
-                                        totalAnual,
-                                        subtotalRecurrenteBase, // Annualized
-                                        recargoFinanciamiento,  // Annualized
-                                        ivaRecurrente,          // Annualized
-                                        cuotaMensual,           // Monthly
-                                    } = financials;
+                                    // Lógica corregida: si cuotas=1 pero plazo_meses>1, usar plazo_meses
+                                    const cuotasVal = Number(cotizacion.cuotas) || 0;
+                                    const plazoVal = Number(cotizacion.plazo_meses) || 0;
 
-                                    const divisor = cotizacion.cuotas || (isMonthly ? plazoMeses : 1);
+                                    // Si cuotas es 1 o 0, verificar si plazo_meses indica cuotas mayores
+                                    let cuotas = 1;
+                                    if (cuotasVal > 1) {
+                                        cuotas = cuotasVal;
+                                    } else if (plazoVal > 1) {
+                                        cuotas = plazoVal;
+                                    }
 
-                                    const ivaPctLabel = cotizacion.iva_porcentaje || 13;
+                                    const isPagoUnico = cuotas <= 1;
+
+                                    // Valores base de la cotización
+                                    const licenciaAnual = Number(cotizacion.costo_plan_anual) || 0;
+                                    const implementacion = Number(cotizacion.costo_implementacion) || 0;
+                                    const ivaPct = (cotizacion.iva_porcentaje || 13) / 100;
+
+                                    // Obtener recargo/descuento del plan de financiamiento
+                                    const ajustePct = Number(financingPlan?.interes_porcentaje || cotizacion.recargo_mensual_porcentaje || 0) / 100;
+                                    const tipoAjuste = financingPlan?.tipo_ajuste || (ajustePct > 0 ? 'recharge' : 'none');
+
+                                    // Calcular licencia ajustada (con recargo/descuento)
+                                    let licenciaAjustada = licenciaAnual;
+                                    let ajusteLabel = '';
+                                    let recargoMonto = 0;
+                                    if (tipoAjuste === 'discount') {
+                                        licenciaAjustada = licenciaAnual * (1 - ajustePct);
+                                        ajusteLabel = `Descuento ${Math.round(ajustePct * 100)}%`;
+                                    } else if (tipoAjuste === 'recharge' && ajustePct > 0) {
+                                        recargoMonto = licenciaAnual * ajustePct;
+                                        licenciaAjustada = licenciaAnual + recargoMonto;
+                                        ajusteLabel = `Financiamiento (${Math.round(ajustePct * 100)}%)`;
+                                    }
+
+                                    // Calcular montos de licencia
+                                    const ivaLicencia = licenciaAjustada * ivaPct;
+                                    const totalLicencia = licenciaAjustada + ivaLicencia;
+
+                                    // CLAVE: Dividir total entre número de cuotas para obtener pago mensual
+                                    const cuotaMensual = cuotas > 1 ? totalLicencia / cuotas : totalLicencia;
+
+                                    // Calcular montos de implementación (pago único)
+                                    const ivaImplementacion = implementacion * ivaPct;
+                                    const totalImplementacion = implementacion + ivaImplementacion;
+
+                                    // Texto dinámico del plan
+                                    const planTitulo = financingPlan?.titulo || (isPagoUnico ? '1 Solo pago' : `${cuotas} Meses`);
 
                                     return (
                                         <>
-                                            {/* PAGO INICIAL BOX */}
-                                            <div className={`bg-orange-50 border border-orange-200 rounded-3xl p-8 shadow-sm flex flex-col justify-between ${pagoInicial === 0 ? 'opacity-50 grayscale' : ''}`}>
+                                            {/* CUADRO NARANJA: INVERSIÓN DE ACTIVACIÓN (Implementación) */}
+                                            <div className={`bg-gradient-to-br from-orange-500 to-orange-600 rounded-3xl p-8 shadow-lg flex flex-col justify-between text-white ${implementacion === 0 ? 'opacity-50' : ''}`}>
                                                 <div className="flex justify-between items-start mb-6">
-                                                    <div>
-                                                        <h4 className="text-xl font-black text-orange-900 uppercase tracking-tight leading-none">PAGO INICIAL</h4>
-                                                        <p className="text-[10px] text-orange-500 font-bold mt-1">Requerido antes de activar</p>
-                                                    </div>
-                                                    <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600">
-                                                        <Package className="w-5 h-5" />
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
+                                                            <Package className="w-6 h-6 text-white" />
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="text-lg font-black uppercase tracking-tight leading-none">INVERSIÓN DE ACTIVACIÓN</h4>
+                                                            <p className="text-[10px] text-orange-100 font-bold mt-1">PAGO INICIAL HOY</p>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div className="space-y-1.5">
-                                                    <div className="flex justify-between text-[11px] text-slate-500 font-medium">
-                                                        <span>Implementación + Servicios</span>
-                                                        <span className="font-bold text-slate-700">${(pagoInicial / (1 + (cotizacion.iva_porcentaje || 13) / 100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                <div className="space-y-2">
+                                                    <div className="flex justify-between text-[11px] text-orange-100 font-medium">
+                                                        <span>Implementación + servicios únicos</span>
+                                                        <span className="font-bold text-white">${implementacion.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                     </div>
-                                                    <div className="flex justify-between text-[11px] text-slate-500 font-medium">
+                                                    <div className="flex justify-between text-[11px] text-orange-100 font-medium">
                                                         <span>IVA ({cotizacion.iva_porcentaje || 13}%)</span>
-                                                        <span className="font-bold text-orange-600">+$ {(pagoInicial - (pagoInicial / (1 + (cotizacion.iva_porcentaje || 13) / 100))).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                        <span className="font-bold text-white">+${ivaImplementacion.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                     </div>
-                                                    <div className="pt-4 border-t border-orange-200 mt-2 flex justify-between items-end">
-                                                        <span className="text-[10px] font-black text-slate-900 uppercase">Total Inicial</span>
-                                                        <span className="text-2xl font-black text-orange-600 tracking-tighter leading-none">${pagoInicial.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                    </div>
-                                                    <div className="mt-3 bg-orange-100/50 rounded-xl px-4 py-2 flex justify-between items-center border border-orange-100">
-                                                        <span className="text-[9px] font-bold text-orange-800 uppercase tracking-tighter">Total a pagar hoy</span>
-                                                        <span className="text-sm font-black text-orange-600">${pagoInicial.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                    <div className="pt-4 border-t border-white/20 mt-2">
+                                                        <div className="flex justify-between items-end">
+                                                            <span className="text-[10px] font-black uppercase tracking-wide">Total a pagar hoy</span>
+                                                            <span className="text-3xl font-black tracking-tighter leading-none">${totalImplementacion.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                        </div>
+                                                        <p className="text-[9px] text-orange-200 mt-2 text-center">Requerido para activar servicios</p>
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            {/* PAGO RECURRENTE BOX */}
-                                            <div className={`${isMonthly ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'} border rounded-3xl p-8 shadow-sm flex flex-col justify-between`}>
+                                            {/* CUADRO AZUL/VERDE: PAGO MENSUAL o LICENCIA ANUAL */}
+                                            <div className={`bg-gradient-to-br ${isPagoUnico ? 'from-emerald-500 to-emerald-600' : 'from-indigo-500 to-indigo-600'} rounded-3xl p-8 shadow-lg flex flex-col justify-between text-white`}>
                                                 <div className="flex justify-between items-start mb-6">
-                                                    <div>
-                                                        <h4 className={`text-xl font-black ${isMonthly ? 'text-blue-900' : 'text-green-900'} uppercase tracking-tight leading-none`}>
-                                                            {isMonthly ? 'PAGO RECURRENTE' : 'RECURRENTE ANUAL'}
-                                                        </h4>
-                                                        <p className={`text-[10px] ${isMonthly ? 'text-blue-500' : 'text-green-500'} font-bold mt-1`}>
-                                                            {divisor > 1 ? `Pago en ${divisor} cuotas` : 'Pago único acumulado'}
-                                                        </p>
-                                                    </div>
-                                                    <div className={`w-10 h-10 rounded-xl ${isMonthly ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'} flex items-center justify-center`}>
-                                                        <Globe className="w-5 h-5" />
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
+                                                            <Globe className="w-6 h-6 text-white" />
+                                                        </div>
+                                                        <div>
+                                                            <h4 className="text-lg font-black uppercase tracking-tight leading-none">
+                                                                {isPagoUnico ? 'LICENCIA ANUAL' : 'PAGO MENSUAL'}
+                                                            </h4>
+                                                            <p className={`text-[10px] ${isPagoUnico ? 'text-emerald-100' : 'text-indigo-100'} font-bold mt-1`}>
+                                                                {isPagoUnico ? 'PAGO ÚNICO ADELANTADO' : `${cuotas} CUOTAS CONSECUTIVAS`}
+                                                            </p>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div className="space-y-1.5">
-                                                    <div className="flex justify-between text-[11px] text-slate-500 font-medium">
-                                                        <span>Licencia + Módulos</span>
-                                                        <span className="font-bold text-slate-700">${subtotalRecurrenteBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                <div className="space-y-2">
+                                                    {/* Base Recurrente */}
+                                                    <div className={`flex justify-between text-[11px] ${isPagoUnico ? 'text-emerald-100' : 'text-indigo-100'} font-medium`}>
+                                                        <span>Base Recurrente</span>
+                                                        <span className="font-bold text-white">${licenciaAnual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                     </div>
-                                                    {isMonthly && termSurchargePct > 0 && (
-                                                        <div className="flex justify-between text-[11px] text-blue-600 font-medium">
-                                                            <span>+ Recargo ({Math.round(termSurchargePct * 100)}%)</span>
-                                                            <span className="font-bold">+$ {recargoFinanciamiento.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                    {/* Financiamiento (solo si hay recargo) */}
+                                                    {!isPagoUnico && recargoMonto > 0 && (
+                                                        <div className="flex justify-between text-[11px] text-indigo-200 font-medium">
+                                                            <span>{ajusteLabel}</span>
+                                                            <span className="font-bold text-yellow-300">+${recargoMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                         </div>
                                                     )}
-                                                    <div className="flex justify-between text-[11px] text-slate-500 font-medium">
-                                                        <span>IVA ({ivaPctLabel}%)</span>
-                                                        <span className={`font-bold ${isMonthly ? 'text-blue-600' : 'text-green-600'}`}>+$ {ivaRecurrente.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                    {/* Descuento (solo si aplica) */}
+                                                    {isPagoUnico && tipoAjuste === 'discount' && ajusteLabel && (
+                                                        <div className="flex justify-between text-[11px] text-emerald-200 font-medium">
+                                                            <span>🎉 {ajusteLabel}</span>
+                                                            <span className="font-bold">Aplicado</span>
+                                                        </div>
+                                                    )}
+                                                    {/* IVA */}
+                                                    <div className={`flex justify-between text-[11px] ${isPagoUnico ? 'text-emerald-100' : 'text-indigo-100'} font-medium`}>
+                                                        <span>IVA ({cotizacion.iva_porcentaje || 13}%)</span>
+                                                        <span className="font-bold text-white">+${ivaLicencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                     </div>
-                                                    <div className="flex justify-between text-[11px] text-slate-900 font-bold border-t border-slate-100 pt-1.5 mt-1.5">
-                                                        <span>Total Plan ({divisor} {divisor === 1 ? 'Cuota' : 'Cuotas'})</span>
-                                                        <span className={isMonthly ? 'text-blue-700' : 'text-green-700'}>${(isMonthly ? (cuotaMensual * divisor) : totalAnual).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                    {/* Total/Cuota */}
+                                                    <div className="pt-4 border-t border-white/20 mt-2">
+                                                        <div className="flex justify-between items-end">
+                                                            <div>
+                                                                <span className="text-[10px] font-black uppercase tracking-wide block">
+                                                                    {isPagoUnico ? 'Total Licencia Anual' : 'Cuota Mensual'}
+                                                                </span>
+                                                                {!isPagoUnico && (
+                                                                    <span className="text-[9px] opacity-70">{planTitulo}</span>
+                                                                )}
+                                                            </div>
+                                                            <div className="text-right">
+                                                                <span className="text-3xl font-black tracking-tighter leading-none">
+                                                                    ${(isPagoUnico ? totalLicencia : cuotaMensual).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                </span>
+                                                                {!isPagoUnico && <span className="text-sm opacity-70">/mes</span>}
+                                                            </div>
+                                                        </div>
+                                                        {!isPagoUnico && (
+                                                            <p className="text-[9px] text-indigo-200 mt-2 text-center">
+                                                                Total {cuotas} cuotas: ${totalLicencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            </p>
+                                                        )}
                                                     </div>
-                                                    <div className={`pt-4 border-t-2 ${isMonthly ? 'border-blue-200/80' : 'border-green-200/80'} mt-2 flex justify-between items-end`}>
-                                                        <span className="text-sm font-bold text-slate-900">
-                                                            {divisor > 1 ? `Cuota de ${divisor}` : 'Total recurrente'}
-                                                        </span>
-                                                        <span className={`text-2xl font-black ${isMonthly ? 'text-blue-600' : 'text-green-600'} tracking-tighter leading-none`}>
-                                                            ${(isMonthly ? cuotaMensual : totalAnual).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                            {divisor > 1 && <span className="text-[10px] opacity-60 ml-1">/ cuota</span>}
-                                                        </span>
-                                                    </div>
-                                                    <p className={`text-[9px] font-bold ${isMonthly ? 'text-blue-400' : 'text-green-400'} mt-1 text-center italic`}>
-                                                        * Plan de pagos consecutivos.
-                                                    </p>
                                                 </div>
                                             </div>
-
                                         </>
                                     );
                                 })()}

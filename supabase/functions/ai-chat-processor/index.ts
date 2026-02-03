@@ -381,7 +381,10 @@ Deno.serve(async (req) => {
             Recuerda lo que el usuario ha dicho anteriormente (ver historial adjunto).
             
             REGLA CRÍTICA DE COTIZACIÓN (MANDATORIA):
-            Cuando el cliente pida precios, una cotización, o acepte una recomendación, DEBES incluir este bloque EXACTO al final de tu mensaje:
+            1. JAMÁS inventes ni escribas un enlace de tipo "crm-app-v2.vercel.app/propuesta/...". ESO ESTÁ PROHIBIDO.
+            2. TU ÚNICA FORMA de generar una cotización es incluir el bloque JSON al final. El sistema generará el enlace real por ti.
+            3. Cuando el cliente pida precios, una cotización, o acepte una recomendación, DEBES incluir este bloque EXACTO al final de tu mensaje:
+            
             QUOTE_TRIGGER: { "plan_name": "NombreDelPlan", "dte_volume": 5000, "items": ["Modulo1", "Modulo2"] }
             
             - plan_name: Debe ser uno de los nombres del catálogo anterior (ej: "Starter", "Business" o "Enterprise").
@@ -430,6 +433,8 @@ Deno.serve(async (req) => {
         });
         const aiData = await response.json();
         const aiContent = aiData.choices?.[0]?.message?.content || "";
+        console.log("DEBUG: Raw AI Content Length:", aiContent.length);
+        console.log("DEBUG: Raw AI Content Preview:", aiContent.substring(0, 200));
 
         // 4. PDF Generation Logic
         let finalPdfUrl = null;
@@ -445,6 +450,14 @@ Deno.serve(async (req) => {
             }
         }
 
+        // 🛡️ ANTI-HALLUCINATION HALLWAY MONITOR
+        // If the AI invented a link, DESTROY IT immediately.
+        if (cleanText.includes('crm-app-v2.vercel.app/propuesta/')) {
+            console.warn("🚨 HALLUCINATION DETECTED: AI invented a URL. Censoring it.");
+            cleanText = cleanText.replace(/https?:\/\/crm-app-v2\.vercel\.app\/propuesta\/[\w-]+/g, '_(Enlace Generando...)_');
+            cleanText = cleanText.replace(/crm-app-v2\.vercel\.app\/propuesta\/[\w-]+/g, '_(Enlace Generando...)_');
+        }
+
         const triggerMatch = cleanText.match(/\[\[QUOTE:\s*({[\s\S]*?})\s*\]\]/) || cleanText.includes('QUOTE_TRIGGER:');
 
         if (triggerMatch) {
@@ -453,28 +466,42 @@ Deno.serve(async (req) => {
             let planNameRequested = "";
             let extraItems = [];
 
-            // Parsing Logic
+            // 4.1. ROBUST JSON EXTRACTION
+            // Clean up markdown code blocks if present
+            const jsonBlock = aiContent.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+
+            // Try explicit trigger first
+            const triggerIndex = jsonBlock.indexOf('QUOTE_TRIGGER:');
+
+            let dataStr = "";
+
+            if (triggerIndex !== -1) {
+                // If explicit label found, take everything after it
+                dataStr = jsonBlock.substring(triggerIndex + 'QUOTE_TRIGGER:'.length).trim();
+            } else {
+                // Fallback: Try to find the first '{' and last '}'
+                const firstBrace = jsonBlock.indexOf('{');
+                const lastBrace = jsonBlock.lastIndexOf('}');
+                if (firstBrace !== -1 && lastBrace !== -1) {
+                    dataStr = jsonBlock.substring(firstBrace, lastBrace + 1);
+                }
+            }
+
             try {
-                if (aiContent.includes('QUOTE_TRIGGER:')) {
-                    const parts = aiContent.split('QUOTE_TRIGGER:');
-                    cleanText = parts[0].trim();
-                    const data = JSON.parse(parts[1].trim());
+                if (dataStr) {
+                    const data = JSON.parse(dataStr);
                     volume = data.dte_volume || 3000;
                     planNameRequested = data.plan_name || "";
                     extraItems = data.items || [];
-                } else {
-                    const m = aiContent.match(/\[\[QUOTE:\s*({[\s\S]*?})\s*\]\]/);
-                    if (m) {
-                        const data = JSON.parse(m[1]);
-                        volume = data.dte_volume || 3000;
-                        planNameRequested = data.plan_name || "";
-                        extraItems = data.items || [];
-                    }
                 }
-            } catch (e) { console.error("Parse Error", e); }
+            } catch (e) {
+                console.error("JSON Parse Error:", e);
+                console.log("Failed Data String:", dataStr);
+            }
 
-            // Semantic Cleanup: Always remove the trigger block from the user message
-            cleanText = aiContent.replace(/\[\[\s*QUOTE\s*:[\s\S]*?\]\]/gi, '').replace(/QUOTE_TRIGGER:[\s\S]*/gi, '').trim();
+            // Semantic Cleanup: Remove the technical block from user message
+            cleanText = aiContent.replace(/QUOTE_TRIGGER:[\s\S]*/gi, '').replace(/\{[\s\S]*\}/gi, '').trim();
+            if (cleanText.includes('```')) cleanText = cleanText.replace(/```json/g, '').replace(/```/g, '');
 
             // 4.1. FIND REAL PLAN AND PRICES
             // Get Pricing Context (specific for this company)
@@ -521,12 +548,30 @@ Deno.serve(async (req) => {
 
             // 4.2. Generate Data
             const { data: comp } = await supabase.from('companies').select('*').eq('id', companyId).single();
-            const { data: profiles } = await supabase.from('profiles').select('full_name, email').eq('company_id', companyId).limit(1);
-            const prof = profiles?.[0] || { full_name: 'Agente AI', email: 'ai@ariasdefense.com' };
+
+            // Determine Representative (Human or Default)
+            let prof = { full_name: 'Agente AI', email: 'ai@ariasdefense.com', avatar_url: null, id: null };
+            let creatorId = null;
+
+            if (agent.representative_id) {
+                const { data: rep } = await supabase.from('profiles').select('id, full_name, email, avatar_url').eq('id', agent.representative_id).single();
+                if (rep) {
+                    prof = rep;
+                    creatorId = rep.id;
+                }
+            } else {
+                // Fallback to first profile found if no representative assigned
+                const { data: profiles } = await supabase.from('profiles').select('id, full_name, email, avatar_url').eq('company_id', companyId).limit(1);
+                if (profiles?.[0]) {
+                    prof = profiles[0];
+                    creatorId = profiles[0].id;
+                }
+            }
 
             const { data: quoteObj, error: quoteError } = await supabase.from('cotizaciones').insert({
                 company_id: companyId,
                 lead_id: lead.id,
+                created_by: creatorId, // Explicitly assign creator
                 nombre_cliente: lead?.name || 'Cliente',
                 volumen_dtes: volume,
                 plan_nombre: selectedPlan?.nombre || 'PLAN PERSONALIZADO',

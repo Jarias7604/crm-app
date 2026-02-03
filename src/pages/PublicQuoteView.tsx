@@ -1,16 +1,28 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../services/supabase';
-import { Building2, Package, Globe, Download, FileText, CheckCircle2, User, PencilLine, Mail, Phone, Settings, MessageSquare, ChevronRight } from 'lucide-react';
+import { Building2, Package, Globe, Download, FileText, CheckCircle2, PencilLine, Mail, Phone, Settings, MessageSquare, CreditCard } from 'lucide-react';
 import { Button } from '../components/ui/Button';
-import { calculateQuoteFinancials, parseModules, type CotizacionData } from '../utils/quoteUtils';
+import { parseModules, type CotizacionData } from '../utils/quoteUtils';
 import { pdfService } from '../services/pdfService';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
+interface FinancingPlan {
+    id: string;
+    titulo: string;
+    descripcion: string;
+    cuotas: number;
+    meses: number;
+    interes_porcentaje: number;
+    tipo_ajuste: 'discount' | 'recharge' | 'none';
+    es_popular: boolean;
+}
+
 export default function PublicQuoteView() {
     const { id } = useParams<{ id: string }>();
     const [cotizacion, setCotizacion] = useState<CotizacionData | null>(null);
+    const [financingPlan, setFinancingPlan] = useState<FinancingPlan | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -52,6 +64,23 @@ export default function PublicQuoteView() {
                 creator: creatorRes.data,
                 modulos_adicionales: parseModules(quote.modulos_adicionales)
             } as CotizacionData);
+
+            // Cargar el plan de financiamiento correspondiente
+            if (quote?.cuotas && quote?.company_id) {
+                const { data: planData } = await supabase
+                    .from('financing_plans')
+                    .select('*')
+                    .or(`company_id.eq.${quote.company_id},company_id.is.null`)
+                    .eq('cuotas', quote.cuotas)
+                    .eq('activo', true)
+                    .order('company_id', { ascending: false, nullsFirst: false })
+                    .limit(1)
+                    .maybeSingle();
+
+                if (planData) {
+                    setFinancingPlan(planData as FinancingPlan);
+                }
+            }
         } catch (error: any) {
             console.error('Error fetching quote:', error);
             setError(error.message || 'Error desconocido');
@@ -124,7 +153,31 @@ export default function PublicQuoteView() {
         </div>
     );
 
-    const financials = calculateQuoteFinancials(cotizacion);
+    // Cálculos financieros dinámicos
+    const cuotas = cotizacion.cuotas || 1;
+    const isPagoUnico = cuotas === 1;
+    const licenciaAnual = Number(cotizacion.costo_plan_anual) || 0;
+    const implementacion = Number(cotizacion.costo_implementacion) || 0;
+    const ivaPct = (cotizacion.iva_porcentaje || 13) / 100;
+
+    // Obtener recargo/descuento del plan de financiamiento
+    const ajustePct = Number(financingPlan?.interes_porcentaje || 0) / 100;
+    const tipoAjuste = financingPlan?.tipo_ajuste || 'none';
+
+    // Calcular licencia ajustada
+    let licenciaAjustada = licenciaAnual;
+    if (tipoAjuste === 'discount') {
+        licenciaAjustada = licenciaAnual * (1 - ajustePct);
+    } else if (tipoAjuste === 'recharge') {
+        licenciaAjustada = licenciaAnual * (1 + ajustePct);
+    }
+
+    const ivaLicencia = licenciaAjustada * ivaPct;
+    const totalLicencia = licenciaAjustada + ivaLicencia;
+    const cuotaMensual = totalLicencia / cuotas;
+
+    const ivaImplementacion = implementacion * ivaPct;
+    const totalImplementacion = implementacion + ivaImplementacion;
 
     return (
         <div className="min-h-screen bg-[#F8FAFC] font-sans pb-32 md:pb-20 overflow-x-hidden">
@@ -352,9 +405,18 @@ export default function PublicQuoteView() {
                     </div>
                 </div>
 
-                {/* Mobile Financial Summary */}
+                {/* Mobile Financial Summary - Dynamic */}
+                <div className="flex items-center justify-between px-2 mb-4">
+                    <p className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em]">RESUMEN DE INVERSIÓN</p>
+                    <div className="flex items-center gap-2">
+                        <CreditCard className="w-4 h-4 text-slate-400" />
+                        <p className="text-xs font-bold text-slate-600">
+                            {financingPlan?.titulo || cotizacion.descripcion_pago || (isPagoUnico ? '1 Solo pago' : `${cuotas} Meses`)}
+                        </p>
+                    </div>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
-                    <div className="bg-orange-600 rounded-[2.5rem] p-8 text-white shadow-xl shadow-orange-600/20 relative overflow-hidden">
+                    <div className={`bg-gradient-to-br from-orange-500 to-orange-600 rounded-[2.5rem] p-8 text-white shadow-xl shadow-orange-600/20 relative overflow-hidden ${implementacion === 0 ? 'opacity-50' : ''}`}>
                         <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-2xl -mr-12 -mt-12"></div>
                         <div className="flex items-center gap-3 mb-6">
                             <div className="w-10 h-10 bg-white/20 rounded-2xl flex items-center justify-center">
@@ -363,24 +425,26 @@ export default function PublicQuoteView() {
                             <p className="text-[10px] font-black uppercase tracking-widest leading-none">INVERSIÓN DE ACTIVACIÓN</p>
                         </div>
                         <h4 className="text-[10px] font-bold opacity-60 uppercase mb-1">Pago Inicial Hoy</h4>
-                        <p className="text-4xl font-black tracking-tighter">${financials.pagoInicial.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        <p className="text-4xl font-black tracking-tighter">${totalImplementacion.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                         <p className="text-[9px] font-bold opacity-70 mt-4 uppercase tracking-[0.2em]">REQUERIDO PARA ACTIVAR SERVICIOS</p>
                     </div>
 
-                    <div className={`${financials.isMonthly ? 'bg-indigo-600' : 'bg-emerald-600'} rounded-[2.5rem] p-8 text-white shadow-xl shadow-slate-900/20 relative overflow-hidden`}>
+                    <div className={`bg-gradient-to-br ${isPagoUnico ? 'from-emerald-500 to-emerald-600' : 'from-indigo-500 to-indigo-600'} rounded-[2.5rem] p-8 text-white shadow-xl shadow-slate-900/20 relative overflow-hidden`}>
                         <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-2xl -mr-12 -mt-12"></div>
                         <div className="flex items-center gap-3 mb-6">
                             <div className="w-10 h-10 bg-white/20 rounded-2xl flex items-center justify-center">
                                 <Globe className="w-5 h-5" />
                             </div>
-                            <p className="text-[10px] font-black uppercase tracking-widest leading-none">{financials.isMonthly ? 'MENSUALIDAD ESTIMADA' : 'INVERSIÓN ANUAL'}</p>
+                            <p className="text-[10px] font-black uppercase tracking-widest leading-none">{isPagoUnico ? 'LICENCIA ANUAL' : 'MENSUALIDAD ESTIMADA'}</p>
                         </div>
-                        <h4 className="text-[10px] font-bold opacity-60 uppercase mb-1">Costo Recurrente</h4>
+                        <h4 className="text-[10px] font-bold opacity-60 uppercase mb-1">{financingPlan?.descripcion?.toUpperCase() || 'Costo Recurrente'}</h4>
                         <p className="text-4xl font-black tracking-tighter">
-                            ${(financials.isMonthly ? financials.cuotaMensual : financials.totalAnual).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            {financials.isMonthly && <span className="text-xs opacity-50 ml-1">/ MES</span>}
+                            ${(isPagoUnico ? totalLicencia : cuotaMensual).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {!isPagoUnico && <span className="text-xs opacity-50 ml-1">/ MES</span>}
                         </p>
-                        <p className="text-[9px] font-bold opacity-70 mt-4 uppercase tracking-[0.2em]">LICENCIAMIENTO + SOPORTE</p>
+                        <p className="text-[9px] font-bold opacity-70 mt-4 uppercase tracking-[0.2em]">
+                            {!isPagoUnico ? `Total ${cuotas} cuotas: $${totalLicencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'LICENCIAMIENTO + SOPORTE'}
+                        </p>
                     </div>
                 </div>
 
