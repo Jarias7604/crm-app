@@ -196,7 +196,8 @@ export default function NuevaCotizacionDinamica() {
                     nombre: modulo.nombre,
                     precio_anual: calculoModulo.precio_calculado,
                     precio_mensual: modulo.precio_mensual,
-                    descripcion: calculoModulo.descripcion_calculo
+                    calculo: calculoModulo.descripcion_calculo,
+                    item_descripcion: modulo.descripcion
                 });
             }
         });
@@ -220,7 +221,8 @@ export default function NuevaCotizacionDinamica() {
                     nombre: servicio.nombre,
                     precio_anual: calculoServicio.precio_calculado,
                     precio_mensual: servicio.precio_mensual,
-                    calculo: calculoServicio.descripcion_calculo
+                    calculo: calculoServicio.descripcion_calculo,
+                    item_descripcion: servicio.descripcion
                 });
             }
         });
@@ -688,12 +690,13 @@ export default function NuevaCotizacionDinamica() {
                 <div className="space-y-3">
                     {totales.desglose.map((item, idx) => (
                         <div key={idx} className="flex justify-between items-start border-b border-gray-100 pb-2">
-                            <div>
+                            <div className="flex-1 pr-4">
                                 <p className="font-semibold text-gray-700">{item.nombre}</p>
                                 <p className="text-xs text-gray-500">{item.tipo}</p>
-                                {item.calculo && <p className="text-xs text-blue-600">{item.calculo}</p>}
+                                {item.item_descripcion && <p className="text-xs text-gray-600 mt-1">{item.item_descripcion}</p>}
+                                {item.calculo && <p className="text-xs text-blue-600 mt-0.5">{item.calculo}</p>}
                             </div>
-                            <div className="text-right">
+                            <div className="text-right flex-shrink-0">
                                 <p className="font-bold text-[#3DCC91]">${item.precio_anual.toLocaleString()}/año</p>
                                 {item.implementacion && (
                                     <p className="text-xs text-gray-500">+ ${item.implementacion} implementación</p>

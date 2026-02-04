@@ -195,7 +195,7 @@ export const pdfService = {
             currentY += 14;
             const modulos = parseModules(cotizacion.modulos_adicionales);
 
-            const drawRow = (name: string, price: number, isOneTime: boolean = false) => {
+            const drawRow = (name: string, price: number, isOneTime: boolean = false, description?: string) => {
                 doc.setTextColor(15, 23, 42);
                 doc.setFontSize(10);
                 doc.setFont('helvetica', 'bold');
@@ -215,6 +215,22 @@ export const pdfService = {
                 doc.setFont('helvetica', 'bold');
                 doc.text(`$${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, pageWidth - margin - 5, currentY, { align: 'right' });
 
+                // Display description if provided
+                if (description) {
+                    currentY += 4;
+                    doc.setTextColor(100, 116, 139); // slate-500
+                    doc.setFontSize(7);
+                    doc.setFont('helvetica', 'normal');
+                    // Split description to fit within available width
+                    const maxDescWidth = pageWidth - (margin * 2) - 60;
+                    const descLines = doc.splitTextToSize(description, maxDescWidth);
+                    descLines.forEach((line: string) => {
+                        doc.text(line, margin + 5, currentY);
+                        currentY += 3.5;
+                    });
+                    currentY -= 3.5; // Adjust for the last line
+                }
+
                 doc.setDrawColor(241, 245, 249);
                 doc.line(margin, currentY + 4, pageWidth - margin, currentY + 4);
                 currentY += 12;
@@ -230,7 +246,8 @@ export const pdfService = {
             }
             modulos.forEach((m: any) => {
                 const currentCosto = m.costo_anual || m.costo || 0;
-                drawRow(m.nombre, currentCosto, (m.costo_mensual || 0) === 0 && currentCosto > 0);
+                const isOneTime = (m.costo_mensual || 0) === 0 && currentCosto > 0;
+                drawRow(m.nombre, currentCosto, isOneTime, m.descripcion);
             });
 
 

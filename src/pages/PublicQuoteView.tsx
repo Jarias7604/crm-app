@@ -379,21 +379,24 @@ export default function PublicQuoteView() {
                             const esPagoUnico = (Number(mod.pago_unico) || 0) > 0;
                             const monto = esPagoUnico ? Number(mod.pago_unico) : (Number(mod.costo_anual || mod.costo) || 0);
                             return (
-                                <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm flex items-center justify-between group active:scale-[0.98] transition-all text-xs">
-                                    <div className="flex items-center gap-4">
-                                        <div className={`w-12 h-12 rounded-xl ${esPagoUnico ? 'bg-orange-50 border-orange-100 text-orange-600' : 'bg-purple-50 border-purple-100 text-purple-600'} border flex items-center justify-center`}>
+                                <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm flex items-start justify-between group active:scale-[0.98] transition-all text-xs">
+                                    <div className="flex items-start gap-4">
+                                        <div className={`w-12 h-12 rounded-xl ${esPagoUnico ? 'bg-orange-50 border-orange-100 text-orange-600' : 'bg-purple-50 border-purple-100 text-purple-600'} border flex items-center justify-center flex-shrink-0`}>
                                             <Package className="w-6 h-6" />
                                         </div>
-                                        <div>
+                                        <div className="flex flex-col gap-1">
                                             <p className="font-black text-slate-900 text-sm leading-none m-0 uppercase">{mod.nombre}</p>
+                                            {mod.descripcion && (
+                                                <p className="text-[10px] text-slate-500 font-medium leading-relaxed mt-1">{mod.descripcion}</p>
+                                            )}
                                             {esPagoUnico ? (
-                                                <span className="inline-block mt-1 text-[8px] font-black bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">PAGO ÚNICO</span>
+                                                <span className="inline-block mt-1 text-[8px] font-black bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full w-fit">PAGO ÚNICO</span>
                                             ) : (
                                                 <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-tighter">MÓDULO ADICIONAL</p>
                                             )}
                                         </div>
                                     </div>
-                                    <span className="text-lg font-black text-slate-900 tracking-tight">${monto.toLocaleString()}</span>
+                                    <span className="text-lg font-black text-slate-900 tracking-tight flex-shrink-0">${monto.toLocaleString()}</span>
                                 </div>
                             );
                         })}

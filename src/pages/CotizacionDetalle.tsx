@@ -437,19 +437,24 @@ export default function CotizacionDetalle() {
                                             return (
                                                 <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                                                     <td className="px-6 py-6">
-                                                        <div className="flex items-center gap-4">
+                                                        <div className="flex items-start gap-4">
                                                             <div className={`w-10 h-10 rounded-xl ${esPagoUnico ? 'bg-orange-50 border-orange-100 text-orange-600' : 'bg-purple-50 border-purple-100 text-purple-600'} border flex items-center justify-center flex-shrink-0`}>
                                                                 <Package className="w-5 h-5" />
                                                             </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="font-black text-slate-900">{mod.nombre}</span>
-                                                                {esPagoUnico && (
-                                                                    <span className="bg-orange-100 text-orange-700 text-[8px] font-black px-1.5 py-0.5 rounded tracking-tighter">PAGO ÚNICO</span>
+                                                            <div className="flex flex-col gap-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="font-black text-slate-900">{mod.nombre}</span>
+                                                                    {esPagoUnico && (
+                                                                        <span className="bg-orange-100 text-orange-700 text-[8px] font-black px-1.5 py-0.5 rounded tracking-tighter">PAGO ÚNICO</span>
+                                                                    )}
+                                                                </div>
+                                                                {mod.descripcion && (
+                                                                    <p className="text-xs text-slate-500 leading-relaxed">{mod.descripcion}</p>
                                                                 )}
                                                             </div>
                                                         </div>
                                                     </td>
-                                                    <td className="px-6 py-6 text-right font-black text-slate-900 text-lg">
+                                                    <td className="px-6 py-6 text-right font-black text-slate-900 text-lg align-top">
                                                         ${monto.toLocaleString()}
                                                     </td>
                                                 </tr>
