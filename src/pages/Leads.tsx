@@ -159,12 +159,13 @@ export default function Leads() {
                 next_action_notes: nextFollowUpData.notes
             });
 
+            // 2. Create a history record with the assigned person
             await leadsService.createFollowUp({
                 lead_id: selectedLead.id,
                 notes: `Programado: ${nextFollowUpData.notes || 'Seguimiento general'}`,
                 date: new Date().toISOString(), // Usar ISO completo para que la trazabilidad sea exacta
                 action_type: 'other'
-            });
+            }, nextFollowUpData.assignee || undefined); // Pass assignee to the follow-up
 
             // Force reload to ensure UI is in sync
             const result = await leadsService.getLeads();
@@ -1415,9 +1416,9 @@ export default function Leads() {
                                                                 {item.notes || 'Registro de actividad sin comentarios.'}
                                                             </p>
                                                             <div className="mt-3 pt-3 border-t border-gray-50 flex items-center gap-2">
-                                                                <p className="text-[10px] font-bold text-gray-400">Registrado por:</p>
+                                                                <p className="text-[10px] font-bold text-gray-400">Asignado a:</p>
                                                                 <p className="text-[10px] font-black text-indigo-600 uppercase tracking-wider">
-                                                                    {item.profiles?.full_name || item.profiles?.email?.split('@')[0] || 'Sistema'}
+                                                                    {item.assigned_profile?.full_name || item.assigned_profile?.email?.split('@')[0] || item.profiles?.full_name || item.profiles?.email?.split('@')[0] || 'Sin asignar'}
                                                                 </p>
                                                             </div>
                                                         </div>

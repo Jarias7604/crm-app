@@ -284,7 +284,11 @@ export const leadsService = {
     async getFollowUps(leadId: string) {
         const { data, error } = await supabase
             .from('follow_ups')
-            .select('*, profiles(email, full_name, avatar_url)')
+            .select(`
+                *,
+                profiles:user_id(email, full_name, avatar_url),
+                assigned_profile:assigned_to(email, full_name, avatar_url)
+            `)
             .eq('lead_id', leadId)
             .order('date', { ascending: false });
 
@@ -292,17 +296,22 @@ export const leadsService = {
         return data as FollowUp[];
     },
 
-    // Create a new follow-up
-    async createFollowUp(followUp: Partial<FollowUp>) {
+    // Create a new follow-up (with assigned_to support)
+    async createFollowUp(followUp: Partial<FollowUp>, assignedTo?: string) {
         const { data: { user } } = await supabase.auth.getUser();
         const { data, error } = await supabase
             .from('follow_ups')
             .insert({
                 ...followUp,
                 user_id: user?.id,
+                assigned_to: assignedTo || null,
                 action_type: followUp.action_type || 'call'
             })
-            .select('*, profiles(email)')
+            .select(`
+                *,
+                profiles:user_id(email, full_name, avatar_url),
+                assigned_profile:assigned_to(email, full_name, avatar_url)
+            `)
             .single();
 
         if (error) throw error;
