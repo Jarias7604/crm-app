@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import { supabase } from './supabase';
 import { format } from 'date-fns';
-import { calculateQuoteFinancials, parseModules, type CotizacionData } from '../utils/quoteUtils';
+import { calculateQuoteFinancialsV2, parseModules, type CotizacionData } from '../utils/quoteUtils';
 import { imageCache } from '../utils/imageCache';
 
 /**
@@ -233,20 +233,69 @@ export const pdfService = {
                 drawRow(m.nombre, currentCosto, (m.costo_mensual || 0) === 0 && currentCosto > 0);
             });
 
+
             // ==========================================
             // HORIZONTAL TOTALS - 3 COLUMNS
             // ==========================================
-            const financials = calculateQuoteFinancials(cotizacion);
-            const {
-                pagoInicial,
-                totalAnual,
-                cuotaMensual,
-                montoPeriodo,
-                isMonthly,
-                plazoMeses
-            } = financials;
+            // 🎯 CARGAR PLAN DE FINANCIAMIENTO PARA CÁLCULOS CORRECTOS
+            const cuotasVal = Number(cotizacion.cuotas);
+            const plazoVal = Number(cotizacion.plazo_meses) || 0;
+            let numCuotas = 1;
+            if (!isNaN(cuotasVal) && cuotasVal >= 1) {
+                numCuotas = cuotasVal;
+            } else if (plazoVal > 1) {
+                numCuotas = plazoVal;
+            }
 
-            const divisor = cotizacion.cuotas || (isMonthly ? plazoMeses : 1);
+            // Buscar el plan de financiamiento correspondiente
+            const companyId = (cotizacion as any).company_id || (cotizacion.company as any)?.id;
+            let financingPlan: { titulo?: string; descripcion?: string; interes_porcentaje?: number; tipo_ajuste?: 'discount' | 'recharge' | 'none' } | undefined;
+            if (numCuotas && companyId) {
+                const { data: planData } = await supabase
+                    .from('financing_plans')
+                    .select('titulo, descripcion, interes_porcentaje, tipo_ajuste')
+                    .or(`company_id.eq.${companyId},company_id.is.null`)
+                    .eq('cuotas', numCuotas)
+                    .eq('activo', true)
+                    .order('company_id', { ascending: false, nullsFirst: false })
+                    .limit(1)
+                    .maybeSingle();
+
+                if (planData) {
+                    financingPlan = planData;
+                    console.log('[PDF] Plan de financiamiento encontrado:', planData.titulo, 'Interés:', planData.interes_porcentaje);
+                }
+            }
+
+            // 🎯 USAR FUNCIÓN CENTRALIZADA PARA CÁLCULOS CON EL PLAN
+            const financialsV2 = calculateQuoteFinancialsV2(cotizacion, financingPlan);
+            const {
+                cuotas: divisor,
+                isPagoUnico,
+                licenciaAnual: subtotalRecurrenteBase,
+                ivaPct,
+                ajustePct,
+                recargoMonto: recargoFinanciamiento,
+                ivaLicencia: ivaRecurrente,
+                totalLicencia,
+                cuotaMensual,
+                totalImplementacion: pagoInicial
+            } = financialsV2;
+
+            // Adaptar al formato que espera el código del PDF
+            const financials = {
+                pagoInicial,
+                totalAnual: totalLicencia,
+                cuotaMensual,
+                montoPeriodo: totalLicencia,
+                isMonthly: !isPagoUnico,
+                plazoMeses: divisor,
+                ivaPct,
+                ajustePct,
+                subtotalRecurrenteBase,
+                recargoFinanciamiento,
+                ivaRecurrente
+            };
 
             const boxW = 89;
             const gap = 2;
@@ -258,16 +307,28 @@ export const pdfService = {
                 by = 20;
             }
 
-            const drawBox = (x: number, y: number, title: string, subtitle: string, mainValue: number, footerValue: number, color: number[], isRecurrent: boolean = false) => {
-                const h = 50;
+            const drawBox = (x: number, y: number, title: string, subtitle: string, mainValue: number, _footerValue: number, color: number[], isRecurrent: boolean = false) => {
+                // Calcular número de items para determinar altura dinámica
+                const modulosArr = parseModules(cotizacion.modulos_adicionales);
+                const serviciosUnicos = modulosArr.filter((m: any) => (Number(m.pago_unico) || 0) > 0);
+                const serviciosRec = modulosArr.filter((m: any) => (Number(m.pago_unico) || 0) === 0 && ((Number(m.costo_anual) || Number(m.costo) || 0) > 0));
+                const costoWhatsApp = cotizacion.servicio_whatsapp ? (Number(cotizacion.costo_whatsapp) || 0) : 0;
+                const implementacionBase = Number(cotizacion.costo_implementacion) || 0;
+
+                // Calcular número de líneas que se van a dibujar
+                let numLineasInicial = (implementacionBase > 0 ? 1 : 0) + serviciosUnicos.length + 1; // +1 para IVA
+                let numLineasRecurrente = 1 + serviciosRec.length + (costoWhatsApp > 0 ? 1 : 0) + (financials.recargoFinanciamiento > 0 ? 1 : 0) + 1 + 1; // Licencia + módulos + WhatsApp + Financiamiento + IVA + Total Plan
+
+                const numLineas = isRecurrent ? numLineasRecurrente : numLineasInicial;
+                const lineHeight = 4;
+                const headerHeight = 16; // Espacio para título y subtítulo
+                const footerHeight = 20; // Espacio para el monto principal
+                const h = Math.max(50, headerHeight + (numLineas * lineHeight) + footerHeight);
+
                 // Manual Alpha Blending (Base 255 for White background)
                 const r5 = Math.floor(255 - (255 - color[0]) * 0.05);
                 const g5 = Math.floor(255 - (255 - color[1]) * 0.05);
                 const b5 = Math.floor(255 - (255 - color[2]) * 0.05);
-
-                const r10 = Math.floor(255 - (255 - color[0]) * 0.10);
-                const g10 = Math.floor(255 - (255 - color[1]) * 0.10);
-                const b10 = Math.floor(255 - (255 - color[2]) * 0.10);
 
                 const r15 = Math.floor(255 - (255 - color[0]) * 0.15);
                 const g15 = Math.floor(255 - (255 - color[1]) * 0.15);
@@ -299,88 +360,124 @@ export const pdfService = {
                 doc.setFontSize(5.5);
                 doc.setFont('helvetica', 'normal');
 
+                let finalLineY = y + 18; // Guardar la última posición Y
+
                 if (title.includes('INICIAL')) {
+                    // Desglose de pagos únicos
+                    let lineY = y + 18;
+
+                    if (implementacionBase > 0) {
+                        doc.text('Implementación', x + 7, lineY);
+                        doc.text(`$${implementacionBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, lineY, { align: 'right' });
+                        lineY += lineHeight;
+                    }
+
+                    serviciosUnicos.forEach((serv: any) => {
+                        const monto = Number(serv.pago_unico) || 0;
+                        doc.text(serv.nombre.substring(0, 18), x + 7, lineY);
+                        doc.text(`$${monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, lineY, { align: 'right' });
+                        lineY += lineHeight;
+                    });
+
                     const subtotalIni = pagoInicial / (1 + financials.ivaPct);
                     const ivaIni = pagoInicial - subtotalIni;
 
-                    doc.text('Implementación + Servicios', x + 7, y + 18);
-                    doc.text(`$${subtotalIni.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, y + 18, { align: 'right' });
-
-                    doc.text(`IVA (${Math.round(financials.ivaPct * 100)}%)`, x + 7, y + 22);
+                    doc.text(`IVA (${Math.round(financials.ivaPct * 100)}%)`, x + 7, lineY);
                     doc.setTextColor(color[0], color[1], color[2]);
-                    doc.text(`+$ ${ivaIni.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, y + 22, { align: 'right' });
+                    doc.text(`+$ ${ivaIni.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, lineY, { align: 'right' });
 
                     doc.setDrawColor(r15, g15, b15);
                     doc.setLineWidth(0.1);
-                    doc.line(x + 7, y + 24, x + boxW - 7, y + 24);
+                    doc.line(x + 7, lineY + 2, x + boxW - 7, lineY + 2);
+
+                    finalLineY = lineY + 4;
                 } else {
-                    const { subtotalRecurrenteBase, recargoFinanciamiento, ivaRecurrente } = financials;
+                    // Desglose de recurrentes
+                    const licenciaBase = Number(cotizacion.costo_plan_anual) || 0;
 
-                    doc.text('Licencia + Módulos', x + 7, y + 18);
-                    doc.text(`$${subtotalRecurrenteBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, y + 18, { align: 'right' });
+                    let lineY = y + 18;
 
-                    if (recargoFinanciamiento > 0) {
-                        doc.text('Recargo Financiamiento', x + 7, y + 22);
-                        doc.text(`+$ ${recargoFinanciamiento.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, y + 22, { align: 'right' });
+                    // Licencia
+                    doc.text(`Licencia ${cotizacion.plan_nombre}`, x + 7, lineY);
+                    doc.text(`$${licenciaBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, lineY, { align: 'right' });
+                    lineY += lineHeight;
 
-                        doc.text(`IVA (13%)`, x + 7, y + 26);
-                        doc.setTextColor(color[0], color[1], color[2]);
-                        doc.text(`+$ ${ivaRecurrente.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, y + 26, { align: 'right' });
-                    } else {
-                        doc.text(`IVA (13%)`, x + 7, y + 22);
-                        doc.setTextColor(color[0], color[1], color[2]);
-                        doc.text(`+$ ${ivaRecurrente.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, y + 22, { align: 'right' });
+                    // Módulos recurrentes
+                    serviciosRec.forEach((serv: any) => {
+                        const monto = Number(serv.costo_anual) || Number(serv.costo) || 0;
+                        doc.text(serv.nombre.substring(0, 18), x + 7, lineY);
+                        doc.text(`$${monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, lineY, { align: 'right' });
+                        lineY += lineHeight;
+                    });
+
+                    // WhatsApp
+                    if (costoWhatsApp > 0) {
+                        doc.text('WhatsApp', x + 7, lineY);
+                        doc.text(`$${costoWhatsApp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, lineY, { align: 'right' });
+                        lineY += lineHeight;
                     }
 
+                    const { recargoFinanciamiento, ivaRecurrente } = financials;
+
+                    if (recargoFinanciamiento > 0) {
+                        const pctLabel = financials.ajustePct ? ` (${Math.round(financials.ajustePct * 100)}%)` : '';
+                        doc.text(`Financiamiento${pctLabel}`, x + 7, lineY);
+                        doc.text(`+$ ${recargoFinanciamiento.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, lineY, { align: 'right' });
+                        lineY += lineHeight;
+                    }
+
+                    doc.text(`IVA (${Math.round(financials.ivaPct * 100)}%)`, x + 7, lineY);
+                    doc.setTextColor(color[0], color[1], color[2]);
+                    doc.text(`+$ ${ivaRecurrente.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, lineY, { align: 'right' });
+
                     doc.setDrawColor(r15, g15, b15);
                     doc.setLineWidth(0.1);
-                    doc.line(x + 7, y + (recargoFinanciamiento > 0 ? 28 : 24), x + boxW - 7, y + (recargoFinanciamiento > 0 ? 28 : 24));
+                    doc.line(x + 7, lineY + 2, x + boxW - 7, lineY + 2);
+
+                    lineY += 5;
 
                     doc.setTextColor(51, 65, 85);
-                    doc.setFontSize(6.5);
+                    doc.setFontSize(6);
                     doc.setFont('helvetica', 'bold');
                     const totalPlanLabel = `Total Plan (${divisor} ${divisor === 1 ? 'Cuota' : 'Cuotas'})`;
-                    doc.text(totalPlanLabel, x + 7, y + (recargoFinanciamiento > 0 ? 32 : 28));
-                    doc.text(`$${(mainValue * divisor).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, y + (recargoFinanciamiento > 0 ? 32 : 28), { align: 'right' });
+                    doc.text(totalPlanLabel, x + 7, lineY);
+                    doc.text(`$${(mainValue * divisor).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, lineY, { align: 'right' });
+
+                    finalLineY = lineY + 4;
                 }
 
-                // 5. Main Highlight
+                // 5. Main Highlight - Posición dinámica basada en el contenido
                 doc.setTextColor(51, 65, 85);
-                doc.setFontSize(7.5);
+                doc.setFontSize(7);
                 doc.setFont('helvetica', 'bold');
 
-                const highlightY = isRecurrent ? (financials.recargoFinanciamiento > 0 ? 42 : 38) : 34;
+                const highlightY = finalLineY + 3;
                 const tLabel = isRecurrent
-                    ? (divisor > 1 ? `Cuota de ${divisor}` : 'TOTAL RECURRENTE')
-                    : 'TOTAL INICIAL';
+                    ? (divisor > 1 ? `CUOTA DE ${divisor}` : 'TOTAL ANUAL')
+                    : 'TOTAL A PAGAR HOY';
 
-                doc.text(tLabel, x + 7, y + highlightY);
+                doc.text(tLabel, x + 7, highlightY);
 
                 doc.setTextColor(color[0], color[1], color[2]);
-                doc.setFontSize(13);
+                doc.setFontSize(11);
                 doc.setFont('helvetica', 'bold');
                 const tText = `$${mainValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                doc.text(tText, x + boxW - 14, y + highlightY, { align: 'right' });
-
-                if (isRecurrent && divisor > 1) {
-                    doc.setFontSize(6);
-                    doc.text(' / cuota', x + (boxW - 14) + 1, y + highlightY);
-                }
+                doc.text(tText, x + boxW - 7, highlightY, { align: 'right' });
 
                 if (isRecurrent) {
-                    doc.setFontSize(5);
-                    doc.setTextColor(color[0], color[1], color[2]);
+                    doc.setFontSize(4.5);
+                    doc.setTextColor(148, 163, 184);
                     doc.setFont('helvetica', 'italic');
-                    doc.text('* Plan de pagos consecutivos.', x + boxW / 2, y + highlightY + 4, { align: 'center' });
+                    doc.text('* Plan de pagos consecutivos.', x + boxW / 2, highlightY + 4, { align: 'center' });
                 }
             };
 
             // Drawing boxes
             drawBox(bx, by, 'PAGO INICIAL', 'Requerido para activar', pagoInicial, pagoInicial, COLORS.ORANGE);
-            const cColor = isMonthly ? COLORS.BLUE : COLORS.GREEN;
-            const cTitle = isMonthly ? 'PAGO RECURRENTE' : 'RECURRENTE ANUAL';
+            const cColor = financials.isMonthly ? COLORS.BLUE : COLORS.GREEN;
+            const cTitle = financials.isMonthly ? 'PAGO RECURRENTE' : 'RECURRENTE ANUAL';
             const cSubtitle = divisor > 1 ? `Pago en ${divisor} cuotas` : 'Pago único acumulado';
-            drawBox(bx + boxW + gap, by, cTitle, cSubtitle, isMonthly ? cuotaMensual : totalAnual, isMonthly ? montoPeriodo : totalAnual, cColor, true);
+            drawBox(bx + boxW + gap, by, cTitle, cSubtitle, financials.isMonthly ? cuotaMensual : financials.totalAnual, financials.isMonthly ? financials.montoPeriodo : financials.totalAnual, cColor, true);
 
             drawFooter(1);
 

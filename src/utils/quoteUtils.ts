@@ -111,6 +111,154 @@ export const calculateQuoteFinancials = (cotizacion: Partial<CotizacionData>) =>
     };
 };
 
+/**
+ * 🎯 LÓGICA CENTRALIZADA DE CÁLCULO DE CUOTAS
+ * Esta función implementa la jerarquía correcta: cuotas > plazo_meses > 1
+ * Todas las vistas (web, móvil, PDF) DEBEN usar esta función
+ */
+export interface QuoteFinancialsV2 {
+    // Configuración de pago
+    cuotas: number;                    // Número real de cuotas (después de jerarquía)
+    isPagoUnico: boolean;              // true si cuotas === 1
+
+    // Valores base
+    licenciaAnual: number;             // Costo base de licencia sin ajustes
+    implementacion: number;            // Costo de implementación
+    ivaPct: number;                    // Porcentaje de IVA (ej: 0.13)
+
+    // Ajustes de financiamiento
+    ajustePct: number;                 // Porcentaje de recargo/descuento
+    tipoAjuste: 'discount' | 'recharge' | 'none';
+    recargoMonto: number;              // Monto del recargo en dinero
+    ajusteLabel: string;               // Label para mostrar (ej: "Financiamiento (20%)")
+
+    // Licencia ajustada
+    licenciaAjustada: number;          // Licencia con recargo/descuento aplicado
+    ivaLicencia: number;               // IVA sobre licencia ajustada
+    totalLicencia: number;             // Total licencia + IVA
+    cuotaMensual: number;              // Pago mensual (totalLicencia / cuotas)
+
+    // Implementación
+    ivaImplementacion: number;         // IVA sobre implementación
+    totalImplementacion: number;       // Total implementación + IVA
+
+    // Display
+    planTitulo: string;                // Título del plan (ej: "12 CUOTAS CONSECUTIVAS")
+    planDescripcion: string;           // Descripción del plan
+}
+
+export const calculateQuoteFinancialsV2 = (
+    cotizacion: Partial<CotizacionData>,
+    financingPlan?: {
+        titulo?: string;
+        descripcion?: string;
+        interes_porcentaje?: number;
+        tipo_ajuste?: 'discount' | 'recharge' | 'none';
+    }
+): QuoteFinancialsV2 => {
+    // 1. JERARQUÍA DE CUOTAS (LA LÓGICA MAESTRA)
+    const cuotasVal = Number(cotizacion.cuotas);
+    const plazoVal = Number(cotizacion.plazo_meses) || 0;
+
+    let cuotas = 1;
+
+    // Si cuotas está definido y es un número válido (incluso 1), usarlo
+    if (!isNaN(cuotasVal) && cuotasVal >= 1) {
+        cuotas = cuotasVal;
+    }
+    // Solo si cuotas NO está definido o es 0, usar plazo_meses como fallback
+    else if (plazoVal > 1) {
+        cuotas = plazoVal;
+    }
+
+    const isPagoUnico = cuotas <= 1;
+
+    // 2. VALORES BASE - SEPARAR PAGOS ÚNICOS DE RECURRENTES
+    const licenciaBase = Number(cotizacion.costo_plan_anual) || 0;
+
+    // Parsear módulos adicionales
+    const modulosAdicionales = parseModules(cotizacion.modulos_adicionales);
+
+    // SEPARAR: Pagos únicos vs Recurrentes en módulos/servicios
+    let costoModulosRecurrentes = 0;
+    let costoServiciosUnicos = 0;
+
+    modulosAdicionales.forEach((mod: any) => {
+        const pagoUnico = Number(mod.pago_unico) || 0;
+        const costoAnual = Number(mod.costo_anual) || Number(mod.costo) || 0;
+
+        if (pagoUnico > 0) {
+            // Servicio con pago único → Va al Pago Inicial
+            costoServiciosUnicos += pagoUnico;
+        } else if (costoAnual > 0) {
+            // Módulo/servicio recurrente → Va al Pago Recurrente
+            costoModulosRecurrentes += costoAnual;
+        }
+    });
+
+    // Sumar WhatsApp si está habilitado (RECURRENTE - se diluye en cuotas)
+    const costoWhatsApp = cotizacion.servicio_whatsapp ? (Number(cotizacion.costo_whatsapp) || 0) : 0;
+
+    // LICENCIA ANUAL = Licencia base + Módulos recurrentes + WhatsApp (todos los recurrentes)
+    const licenciaAnual = licenciaBase + costoModulosRecurrentes + costoWhatsApp;
+
+    // IMPLEMENTACIÓN = Implementación + Servicios únicos (todo lo que se paga una vez)
+    const implementacionBase = Number(cotizacion.costo_implementacion) || 0;
+    const implementacion = implementacionBase + costoServiciosUnicos;
+
+    const ivaPct = (cotizacion.iva_porcentaje || 13) / 100;
+
+    // 3. AJUSTES DE FINANCIAMIENTO
+    const ajustePct = Number(financingPlan?.interes_porcentaje || cotizacion.recargo_mensual_porcentaje || 0) / 100;
+    const tipoAjuste = financingPlan?.tipo_ajuste || (ajustePct > 0 ? 'recharge' : 'none');
+
+    let licenciaAjustada = licenciaAnual;
+    let ajusteLabel = '';
+    let recargoMonto = 0;
+
+    if (tipoAjuste === 'discount') {
+        licenciaAjustada = licenciaAnual * (1 - ajustePct);
+        ajusteLabel = `Descuento ${Math.round(ajustePct * 100)}%`;
+    } else if (tipoAjuste === 'recharge' && ajustePct > 0) {
+        recargoMonto = licenciaAnual * ajustePct;
+        licenciaAjustada = licenciaAnual + recargoMonto;
+        ajusteLabel = `Financiamiento (${Math.round(ajustePct * 100)}%)`;
+    }
+
+    // 4. CÁLCULOS DE LICENCIA
+    const ivaLicencia = licenciaAjustada * ivaPct;
+    const totalLicencia = licenciaAjustada + ivaLicencia;
+    const cuotaMensual = cuotas > 1 ? totalLicencia / cuotas : totalLicencia;
+
+    // 5. CÁLCULOS DE IMPLEMENTACIÓN
+    const ivaImplementacion = implementacion * ivaPct;
+    const totalImplementacion = implementacion + ivaImplementacion;
+
+    // 6. DISPLAY
+    const planTitulo = financingPlan?.titulo || cotizacion.descripcion_pago || (isPagoUnico ? '1 Solo pago' : `${cuotas} Meses`);
+    const planDescripcion = financingPlan?.descripcion || (isPagoUnico ? 'Pago único adelantado' : `${cuotas} cuotas consecutivas`);
+
+    return {
+        cuotas,
+        isPagoUnico,
+        licenciaAnual,
+        implementacion,
+        ivaPct,
+        ajustePct,
+        tipoAjuste,
+        recargoMonto,
+        ajusteLabel,
+        licenciaAjustada,
+        ivaLicencia,
+        totalLicencia,
+        cuotaMensual,
+        ivaImplementacion,
+        totalImplementacion,
+        planTitulo,
+        planDescripcion
+    };
+};
+
 export const parseModules = (modules: any): CotizacionItem[] => {
     if (!modules) return [];
     if (Array.isArray(modules)) return modules;

@@ -349,11 +349,16 @@ class CotizadorService {
         const iva_recurrente = (precio_recurrente_final * config.iva_porcentaje) / 100;
         const total_recurrente = precio_recurrente_final + iva_recurrente;
 
-        // Divisor: Usamos 'cuotas' explícito si existe y es mayor a 0, sino fallback a 'meses'
-        // Salvaguarda V4: Si es pago anual, forzamos 1 cuota a menos que se indique financiamiento
-        let divisor_cuotas = (config.cuotas && config.cuotas > 0) ? config.cuotas : (config.meses || 1);
-        if (config.forma_pago === 'anual' && !config.cuotas) {
-            divisor_cuotas = 1;
+        // Divisor: LÓGICA CORREGIDA - Respetar cuotas explícitas (incluso si es 1)
+        // Solo usar 'meses' como fallback si cuotas NO está definido o es 0
+        let divisor_cuotas = 1;
+
+        if (config.cuotas !== undefined && config.cuotas !== null && config.cuotas >= 1) {
+            // Si cuotas está explícitamente definido (incluso 1), usarlo
+            divisor_cuotas = config.cuotas;
+        } else if (config.meses && config.meses > 1) {
+            // Solo si cuotas NO está definido, usar meses como fallback
+            divisor_cuotas = config.meses;
         }
 
         // V4: es_financiado depende de si hay más de una cuota

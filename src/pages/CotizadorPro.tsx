@@ -406,15 +406,20 @@ export default function CotizadorPro() {
                 )
             ].map(item => {
                 const manualPrice = overrides[item.id];
+                const esPagoUnico = (item.pago_unico || 0) > 0;
+                const costoCalculado = manualPrice !== undefined
+                    ? manualPrice
+                    : (item.precio_por_dte > 0
+                        ? formData.volumen_dtes * item.precio_por_dte
+                        : (item.pago_unico || item.precio_anual));
+
                 return {
                     nombre: item.nombre,
                     tipo: item.tipo,
                     descripcion: item.descripcion || '',
-                    costo_anual: manualPrice !== undefined
-                        ? manualPrice
-                        : (item.precio_por_dte > 0
-                            ? formData.volumen_dtes * item.precio_por_dte
-                            : (item.pago_unico || item.precio_anual)),
+                    // Si es pago único, guardarlo en pago_unico; si no, en costo_anual
+                    pago_unico: esPagoUnico ? costoCalculado : 0,
+                    costo_anual: esPagoUnico ? 0 : costoCalculado,
                     costo_mensual: item.precio_mensual || 0
                 };
             });
@@ -462,9 +467,14 @@ export default function CotizadorPro() {
                 // TODO: Re-enable after running EJECUTAR_EN_SUPABASE.sql migration
                 // subtotal_recurrente: totales.subtotal_recurrente_base,
                 // iva_recurrente: totales.iva_monto_recurrente,
-                tipo_pago: formData.forma_pago,
-                plazo_meses: formData.forma_pago === 'mensual' ? formData.meses_pago : 12,
+
+                // CORRECCIÓN: Usar valores del plan de financiamiento seleccionado
+                tipo_pago: (totales.es_financiado ? 'credito' : 'contado') as 'credito' | 'contado',
+                plazo_meses: totales.cuotas, // Usar cuotas como plazo_meses para consistencia
                 cuotas: totales.cuotas,
+                descripcion_pago: financingPlans.find(p => p.id === selectedPlanId)?.titulo ||
+                    (totales.cuotas > 1 ? `${totales.cuotas} Cuotas` : '1 Solo pago'),
+
                 incluir_implementacion: formData.incluir_implementacion,
                 estado: 'borrador' as const
             };

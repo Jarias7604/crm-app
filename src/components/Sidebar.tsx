@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthProvider';
-import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Tag, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { brandingService } from '../services/branding';
@@ -113,7 +113,8 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
 
     const configSubItemsRaw = [
         { name: 'Marca de Empresa', href: '/company/branding', icon: Building, current: location.pathname === '/company/branding', permissionKey: 'branding' },
-        { name: 'Gestión Precios', href: '/pricing', icon: Tag, current: location.pathname === '/pricing', permissionKey: 'pricing' },
+        // NOTA: 'Gestión Precios' ocultado - redundante con Gestión Paquete/Item. Ruta /pricing sigue disponible si se necesita.
+        // { name: 'Gestión Precios', href: '/pricing', icon: Tag, current: location.pathname === '/pricing', permissionKey: 'pricing' },
         { name: 'Gestión Paquete', href: '/paquetes', icon: Package, current: location.pathname === '/paquetes', permissionKey: 'paquetes' },
         { name: 'Gestión Item', href: '/items', icon: Layers, current: location.pathname === '/items', permissionKey: 'items' },
         { name: 'Gestión Financiera', href: '/financial-rules', icon: CreditCard, current: location.pathname === '/financial-rules', permissionKey: 'financial_rules' },

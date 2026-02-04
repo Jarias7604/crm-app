@@ -5,7 +5,7 @@ import { format } from 'date-fns';
 import { Building2, Mail, Phone, Package, Globe, Trash2, Send, Download, ArrowLeft, Settings, FileText, MessageSquare, CreditCard } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { pdfService } from '../services/pdfService';
-import { parseModules, type CotizacionData } from '../utils/quoteUtils';
+import { parseModules, calculateQuoteFinancialsV2, type CotizacionData } from '../utils/quoteUtils';
 import toast from 'react-hot-toast';
 
 interface FinancingPlan {
@@ -55,8 +55,17 @@ export default function CotizacionDetalle() {
             setCotizacion(parsedData as CotizacionData);
 
             // Cargar el plan de financiamiento correspondiente
-            // Usar plazo_meses si cuotas es 1 o no existe
-            const numCuotas = (data?.cuotas && data.cuotas > 1) ? data.cuotas : (data?.plazo_meses || 1);
+            // LÓGICA CORREGIDA: Respetar cuotas explícitas (incluso si es 1)
+            // Solo usar plazo_meses como fallback si cuotas NO está definido
+            const cuotasVal = Number(data?.cuotas);
+            const plazoVal = Number(data?.plazo_meses) || 0;
+
+            let numCuotas = 1;
+            if (!isNaN(cuotasVal) && cuotasVal >= 1) {
+                numCuotas = cuotasVal;
+            } else if (plazoVal > 1) {
+                numCuotas = plazoVal;
+            }
 
             if (numCuotas && data?.company_id) {
                 const { data: planData } = await supabase
@@ -368,21 +377,30 @@ export default function CotizacionDetalle() {
                                                 </td>
                                             </tr>
                                         )}
-                                        {(Array.isArray(cotizacion.modulos_adicionales) ? cotizacion.modulos_adicionales : [])?.map((mod: any, idx: number) => (
-                                            <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                                                <td className="px-6 py-6">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center flex-shrink-0 text-purple-600">
-                                                            <Package className="w-5 h-5" />
+                                        {(Array.isArray(cotizacion.modulos_adicionales) ? cotizacion.modulos_adicionales : [])?.map((mod: any, idx: number) => {
+                                            const esPagoUnico = (Number(mod.pago_unico) || 0) > 0;
+                                            const monto = esPagoUnico ? Number(mod.pago_unico) : (Number(mod.costo_anual || mod.costo) || 0);
+                                            return (
+                                                <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
+                                                    <td className="px-6 py-6">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className={`w-10 h-10 rounded-xl ${esPagoUnico ? 'bg-orange-50 border-orange-100 text-orange-600' : 'bg-purple-50 border-purple-100 text-purple-600'} border flex items-center justify-center flex-shrink-0`}>
+                                                                <Package className="w-5 h-5" />
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-black text-slate-900">{mod.nombre}</span>
+                                                                {esPagoUnico && (
+                                                                    <span className="bg-orange-100 text-orange-700 text-[8px] font-black px-1.5 py-0.5 rounded tracking-tighter">PAGO ÚNICO</span>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                        <span className="font-black text-slate-900">{mod.nombre}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-6 text-right font-black text-slate-900 text-lg">
-                                                    ${(Number(mod.costo_anual || mod.costo) || 0).toLocaleString()}
-                                                </td>
-                                            </tr>
-                                        ))}
+                                                    </td>
+                                                    <td className="px-6 py-6 text-right font-black text-slate-900 text-lg">
+                                                        ${monto.toLocaleString()}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
@@ -390,183 +408,215 @@ export default function CotizacionDetalle() {
 
                         {/* Section 4: Summary & Financials - Dynamic Layout */}
                         <div className="pt-8 space-y-8 px-8 md:px-12">
-                            {/* Título dinámico del plan de pago */}
+                            {/* RESUMEN DE INVERSIÓN - USANDO FUNCIÓN CENTRALIZADA */}
                             {(() => {
-                                // Calcular cuotas reales para el título (misma lógica que los cuadros)
-                                const cuotasDisplay = (Number(cotizacion.cuotas) > 1) ? Number(cotizacion.cuotas) : (Number(cotizacion.plazo_meses) || 1);
-                                const tituloDisplay = financingPlan?.titulo || cotizacion.descripcion_pago || (cuotasDisplay <= 1 ? '1 Solo pago' : `${cuotasDisplay} Meses`);
+                                // 🎯 USAR FUNCIÓN CENTRALIZADA PARA CÁLCULOS
+                                const financials = calculateQuoteFinancialsV2(cotizacion, financingPlan || undefined);
+                                const {
+                                    cuotas,
+                                    isPagoUnico,
+                                    licenciaAnual,
+                                    implementacion,
+                                    ivaPct,
+                                    recargoMonto,
+                                    ajusteLabel,
+                                    ivaLicencia,
+                                    totalLicencia,
+                                    cuotaMensual,
+                                    ivaImplementacion,
+                                    totalImplementacion,
+                                    planTitulo,
+                                    tipoAjuste
+                                } = financials;
 
                                 return (
-                                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                                        <p className="text-[9px] font-black text-blue-400 uppercase tracking-[0.2em]">RESUMEN DE INVERSIÓN</p>
-                                        <div className="flex items-center gap-2">
-                                            <CreditCard className="w-4 h-4 text-slate-400" />
-                                            <p className="text-xs font-bold text-slate-600">
-                                                {tituloDisplay}
-                                            </p>
+                                    <>
+                                        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                            <p className="text-[9px] font-black text-blue-400 uppercase tracking-[0.2em]">RESUMEN DE INVERSIÓN</p>
+                                            <div className="flex items-center gap-2">
+                                                <CreditCard className="w-4 h-4 text-slate-400" />
+                                                <p className="text-xs font-bold text-slate-600">
+                                                    {planTitulo}
+                                                </p>
+                                            </div>
                                         </div>
-                                    </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                            {/* CUADRO PAGO INICIAL - Estilo claro con borde naranja con DESGLOSE */}
+                                            {(() => {
+                                                // Calcular desglose de pagos únicos
+                                                const implementacionBase = Number(cotizacion.costo_implementacion) || 0;
+
+                                                // Servicios únicos de modulos_adicionales (incluye cualquier servicio con pago_unico > 0)
+                                                const modulosArr = Array.isArray(cotizacion.modulos_adicionales) ? cotizacion.modulos_adicionales : [];
+                                                const serviciosUnicos = modulosArr
+                                                    .filter((mod: any) => (Number(mod.pago_unico) || 0) > 0)
+                                                    .map((mod: any) => ({
+                                                        nombre: mod.nombre,
+                                                        monto: Number(mod.pago_unico) || 0
+                                                    }));
+
+                                                const subtotalUnicos = implementacionBase + serviciosUnicos.reduce((sum: number, s: any) => sum + s.monto, 0);
+
+                                                return (
+                                                    <div className={`bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl p-6 shadow-sm border-2 border-orange-200 flex flex-col justify-between ${implementacion === 0 ? 'opacity-50' : ''}`}>
+                                                        <div className="flex justify-between items-start mb-4">
+                                                            <div>
+                                                                <h4 className="text-lg font-black uppercase tracking-tight leading-none text-slate-800">PAGO INICIAL</h4>
+                                                                <p className="text-[11px] text-orange-500 font-bold mt-1">Requerido antes de activar</p>
+                                                            </div>
+                                                            <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
+                                                                <Package className="w-5 h-5 text-orange-500" />
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            {/* Implementación */}
+                                                            {implementacionBase > 0 && (
+                                                                <div className="flex justify-between items-center text-[11px] text-slate-600 font-medium gap-2">
+                                                                    <span className="truncate flex-1">Implementación</span>
+                                                                    <span className="font-bold text-slate-800 whitespace-nowrap">${implementacionBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                </div>
+                                                            )}
+                                                            {/* Servicios únicos (incluye personalización, sucursal, etc) */}
+                                                            {serviciosUnicos.map((serv: any, idx: number) => (
+                                                                <div key={idx} className="flex justify-between items-center text-[11px] text-slate-600 font-medium gap-2">
+                                                                    <span className="truncate flex-1">{serv.nombre}</span>
+                                                                    <span className="font-bold text-slate-800 whitespace-nowrap">${serv.monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                </div>
+                                                            ))}
+                                                            {/* Subtotal si hay más de un item */}
+                                                            {(implementacionBase > 0 ? 1 : 0) + serviciosUnicos.length > 1 && (
+                                                                <div className="flex justify-between items-center text-[11px] text-slate-500 font-medium pt-1 border-t border-orange-100 gap-2">
+                                                                    <span className="truncate flex-1">Subtotal</span>
+                                                                    <span className="font-bold text-slate-700 whitespace-nowrap">${subtotalUnicos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                </div>
+                                                            )}
+                                                            {/* IVA */}
+                                                            <div className="flex justify-between items-center text-[11px] text-slate-500 font-medium gap-2">
+                                                                <span className="truncate flex-1">IVA ({Math.round(ivaPct * 100)}%)</span>
+                                                                <span className="font-bold text-orange-500 whitespace-nowrap">+$ {ivaImplementacion.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                            </div>
+                                                            {/* Total */}
+                                                            <div className="pt-3 border-t border-orange-200 mt-2">
+                                                                <div className="flex justify-between items-center">
+                                                                    <span className="text-[11px] font-black uppercase tracking-wide text-slate-700">TOTAL A PAGAR HOY</span>
+                                                                    <span className="text-2xl font-black tracking-tighter leading-none text-orange-600">${totalImplementacion.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
+
+                                            {/* CUADRO PAGO RECURRENTE - Estilo claro con borde azul con DESGLOSE */}
+                                            {(() => {
+                                                // Calcular desglose de recurrentes
+                                                const licenciaBase = Number(cotizacion.costo_plan_anual) || 0;
+                                                const costoWhatsApp = cotizacion.servicio_whatsapp ? (Number(cotizacion.costo_whatsapp) || 0) : 0;
+
+                                                // Módulos recurrentes de modulos_adicionales
+                                                const modulosArr = Array.isArray(cotizacion.modulos_adicionales) ? cotizacion.modulos_adicionales : [];
+                                                const serviciosRecurrentes = modulosArr
+                                                    .filter((mod: any) => (Number(mod.pago_unico) || 0) === 0 && ((Number(mod.costo_anual) || Number(mod.costo) || 0) > 0))
+                                                    .map((mod: any) => ({
+                                                        nombre: mod.nombre,
+                                                        monto: Number(mod.costo_anual) || Number(mod.costo) || 0
+                                                    }));
+
+                                                const totalRecurrenteBase = licenciaBase + serviciosRecurrentes.reduce((sum: number, s: any) => sum + s.monto, 0) + costoWhatsApp;
+
+                                                return (
+                                                    <div className={`bg-gradient-to-br ${isPagoUnico ? 'from-emerald-50 to-green-50 border-emerald-200' : 'from-blue-50 to-indigo-50 border-blue-200'} rounded-2xl p-6 shadow-sm border-2 flex flex-col justify-between`}>
+                                                        <div className="flex justify-between items-start mb-4">
+                                                            <div>
+                                                                <h4 className="text-lg font-black uppercase tracking-tight leading-none text-slate-800">
+                                                                    {isPagoUnico ? 'LICENCIA ANUAL' : 'PAGO RECURRENTE'}
+                                                                </h4>
+                                                                <p className={`text-[11px] ${isPagoUnico ? 'text-emerald-500' : 'text-blue-500'} font-bold mt-1`}>
+                                                                    {isPagoUnico ? 'Pago único adelantado' : `Pago en ${cuotas} cuotas`}
+                                                                </p>
+                                                            </div>
+                                                            <div className={`w-10 h-10 rounded-xl ${isPagoUnico ? 'bg-emerald-100' : 'bg-blue-100'} flex items-center justify-center`}>
+                                                                <Globe className={`w-5 h-5 ${isPagoUnico ? 'text-emerald-500' : 'text-blue-500'}`} />
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-1.5">
+                                                            {/* Licencia base */}
+                                                            <div className="flex justify-between items-center text-[11px] text-slate-600 font-medium gap-2">
+                                                                <span className="truncate flex-1">Licencia {cotizacion.plan_nombre}</span>
+                                                                <span className="font-bold text-slate-800 whitespace-nowrap">${licenciaBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                            </div>
+                                                            {/* Módulos recurrentes */}
+                                                            {serviciosRecurrentes.map((serv: any, idx: number) => (
+                                                                <div key={idx} className="flex justify-between items-center text-[11px] text-slate-600 font-medium gap-2">
+                                                                    <span className="truncate flex-1">{serv.nombre}</span>
+                                                                    <span className="font-bold text-slate-800 whitespace-nowrap">${serv.monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                </div>
+                                                            ))}
+                                                            {/* WhatsApp */}
+                                                            {costoWhatsApp > 0 && (
+                                                                <div className="flex justify-between items-center text-[11px] text-slate-600 font-medium gap-2">
+                                                                    <span className="truncate flex-1">WhatsApp</span>
+                                                                    <span className="font-bold text-slate-800 whitespace-nowrap">${costoWhatsApp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                </div>
+                                                            )}
+                                                            {/* Financiamiento (solo si hay recargo) */}
+                                                            {!isPagoUnico && recargoMonto > 0 && (
+                                                                <div className="flex justify-between items-center text-[11px] text-slate-500 font-medium gap-2">
+                                                                    <span className="truncate flex-1">{ajusteLabel}</span>
+                                                                    <span className="font-bold text-orange-500 whitespace-nowrap">+${recargoMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                </div>
+                                                            )}
+                                                            {/* Descuento (solo si aplica) */}
+                                                            {isPagoUnico && tipoAjuste === 'discount' && ajusteLabel && (
+                                                                <div className="flex justify-between items-center text-[11px] text-emerald-600 font-medium gap-2">
+                                                                    <span className="truncate flex-1">🎉 {ajusteLabel}</span>
+                                                                    <span className="font-bold whitespace-nowrap">Aplicado</span>
+                                                                </div>
+                                                            )}
+                                                            {/* IVA */}
+                                                            <div className="flex justify-between items-center text-[11px] text-slate-500 font-medium gap-2">
+                                                                <span className="truncate flex-1">IVA ({Math.round(ivaPct * 100)}%)</span>
+                                                                <span className={`font-bold whitespace-nowrap ${isPagoUnico ? 'text-emerald-500' : 'text-blue-500'}`}>+$ {ivaLicencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                            </div>
+
+                                                            {/* Total Plan (solo para financiado) */}
+                                                            {!isPagoUnico && (
+                                                                <div className="pt-2 mt-1">
+                                                                    <div className="flex justify-between items-center text-[11px] text-slate-700 font-bold gap-2">
+                                                                        <span className="truncate flex-1">Total Plan ({cuotas} Cuotas)</span>
+                                                                        <span className="whitespace-nowrap">${totalLicencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Cuota Final */}
+                                                            <div className="pt-3 border-t border-slate-200 mt-2">
+                                                                <div className="flex justify-between items-end">
+                                                                    <div>
+                                                                        <span className="text-[11px] font-black uppercase tracking-wide block text-slate-700">
+                                                                            {isPagoUnico ? 'Total Licencia Anual' : `Cuota de ${cuotas}`}
+                                                                        </span>
+                                                                        {!isPagoUnico && (
+                                                                            <span className="text-[9px] text-slate-400 italic">* Plan de pagos consecutivos.</span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="text-right">
+                                                                        <span className={`text-2xl font-black tracking-tighter leading-none ${isPagoUnico ? 'text-emerald-600' : 'text-blue-600'}`}>
+                                                                            ${(isPagoUnico ? totalLicencia : cuotaMensual).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                        </span>
+                                                                        {!isPagoUnico && <span className="text-sm text-slate-400">/cuota</span>}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+                                    </>
                                 );
                             })()}
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                {(() => {
-                                    // Lógica corregida: si cuotas=1 pero plazo_meses>1, usar plazo_meses
-                                    const cuotasVal = Number(cotizacion.cuotas) || 0;
-                                    const plazoVal = Number(cotizacion.plazo_meses) || 0;
-
-                                    // Si cuotas es 1 o 0, verificar si plazo_meses indica cuotas mayores
-                                    let cuotas = 1;
-                                    if (cuotasVal > 1) {
-                                        cuotas = cuotasVal;
-                                    } else if (plazoVal > 1) {
-                                        cuotas = plazoVal;
-                                    }
-
-                                    const isPagoUnico = cuotas <= 1;
-
-                                    // Valores base de la cotización
-                                    const licenciaAnual = Number(cotizacion.costo_plan_anual) || 0;
-                                    const implementacion = Number(cotizacion.costo_implementacion) || 0;
-                                    const ivaPct = (cotizacion.iva_porcentaje || 13) / 100;
-
-                                    // Obtener recargo/descuento del plan de financiamiento
-                                    const ajustePct = Number(financingPlan?.interes_porcentaje || cotizacion.recargo_mensual_porcentaje || 0) / 100;
-                                    const tipoAjuste = financingPlan?.tipo_ajuste || (ajustePct > 0 ? 'recharge' : 'none');
-
-                                    // Calcular licencia ajustada (con recargo/descuento)
-                                    let licenciaAjustada = licenciaAnual;
-                                    let ajusteLabel = '';
-                                    let recargoMonto = 0;
-                                    if (tipoAjuste === 'discount') {
-                                        licenciaAjustada = licenciaAnual * (1 - ajustePct);
-                                        ajusteLabel = `Descuento ${Math.round(ajustePct * 100)}%`;
-                                    } else if (tipoAjuste === 'recharge' && ajustePct > 0) {
-                                        recargoMonto = licenciaAnual * ajustePct;
-                                        licenciaAjustada = licenciaAnual + recargoMonto;
-                                        ajusteLabel = `Financiamiento (${Math.round(ajustePct * 100)}%)`;
-                                    }
-
-                                    // Calcular montos de licencia
-                                    const ivaLicencia = licenciaAjustada * ivaPct;
-                                    const totalLicencia = licenciaAjustada + ivaLicencia;
-
-                                    // CLAVE: Dividir total entre número de cuotas para obtener pago mensual
-                                    const cuotaMensual = cuotas > 1 ? totalLicencia / cuotas : totalLicencia;
-
-                                    // Calcular montos de implementación (pago único)
-                                    const ivaImplementacion = implementacion * ivaPct;
-                                    const totalImplementacion = implementacion + ivaImplementacion;
-
-                                    // Texto dinámico del plan
-                                    const planTitulo = financingPlan?.titulo || (isPagoUnico ? '1 Solo pago' : `${cuotas} Meses`);
-
-                                    return (
-                                        <>
-                                            {/* CUADRO NARANJA: INVERSIÓN DE ACTIVACIÓN (Implementación) */}
-                                            <div className={`bg-gradient-to-br from-orange-500 to-orange-600 rounded-3xl p-8 shadow-lg flex flex-col justify-between text-white ${implementacion === 0 ? 'opacity-50' : ''}`}>
-                                                <div className="flex justify-between items-start mb-6">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                                                            <Package className="w-6 h-6 text-white" />
-                                                        </div>
-                                                        <div>
-                                                            <h4 className="text-lg font-black uppercase tracking-tight leading-none">INVERSIÓN DE ACTIVACIÓN</h4>
-                                                            <p className="text-[10px] text-orange-100 font-bold mt-1">PAGO INICIAL HOY</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <div className="flex justify-between text-[11px] text-orange-100 font-medium">
-                                                        <span>Implementación + servicios únicos</span>
-                                                        <span className="font-bold text-white">${implementacion.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                    </div>
-                                                    <div className="flex justify-between text-[11px] text-orange-100 font-medium">
-                                                        <span>IVA ({cotizacion.iva_porcentaje || 13}%)</span>
-                                                        <span className="font-bold text-white">+${ivaImplementacion.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                    </div>
-                                                    <div className="pt-4 border-t border-white/20 mt-2">
-                                                        <div className="flex justify-between items-end">
-                                                            <span className="text-[10px] font-black uppercase tracking-wide">Total a pagar hoy</span>
-                                                            <span className="text-3xl font-black tracking-tighter leading-none">${totalImplementacion.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                        </div>
-                                                        <p className="text-[9px] text-orange-200 mt-2 text-center">Requerido para activar servicios</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* CUADRO AZUL/VERDE: PAGO MENSUAL o LICENCIA ANUAL */}
-                                            <div className={`bg-gradient-to-br ${isPagoUnico ? 'from-emerald-500 to-emerald-600' : 'from-indigo-500 to-indigo-600'} rounded-3xl p-8 shadow-lg flex flex-col justify-between text-white`}>
-                                                <div className="flex justify-between items-start mb-6">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                                                            <Globe className="w-6 h-6 text-white" />
-                                                        </div>
-                                                        <div>
-                                                            <h4 className="text-lg font-black uppercase tracking-tight leading-none">
-                                                                {isPagoUnico ? 'LICENCIA ANUAL' : 'PAGO MENSUAL'}
-                                                            </h4>
-                                                            <p className={`text-[10px] ${isPagoUnico ? 'text-emerald-100' : 'text-indigo-100'} font-bold mt-1`}>
-                                                                {isPagoUnico ? 'PAGO ÚNICO ADELANTADO' : `${cuotas} CUOTAS CONSECUTIVAS`}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    {/* Base Recurrente */}
-                                                    <div className={`flex justify-between text-[11px] ${isPagoUnico ? 'text-emerald-100' : 'text-indigo-100'} font-medium`}>
-                                                        <span>Base Recurrente</span>
-                                                        <span className="font-bold text-white">${licenciaAnual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                    </div>
-                                                    {/* Financiamiento (solo si hay recargo) */}
-                                                    {!isPagoUnico && recargoMonto > 0 && (
-                                                        <div className="flex justify-between text-[11px] text-indigo-200 font-medium">
-                                                            <span>{ajusteLabel}</span>
-                                                            <span className="font-bold text-yellow-300">+${recargoMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                        </div>
-                                                    )}
-                                                    {/* Descuento (solo si aplica) */}
-                                                    {isPagoUnico && tipoAjuste === 'discount' && ajusteLabel && (
-                                                        <div className="flex justify-between text-[11px] text-emerald-200 font-medium">
-                                                            <span>🎉 {ajusteLabel}</span>
-                                                            <span className="font-bold">Aplicado</span>
-                                                        </div>
-                                                    )}
-                                                    {/* IVA */}
-                                                    <div className={`flex justify-between text-[11px] ${isPagoUnico ? 'text-emerald-100' : 'text-indigo-100'} font-medium`}>
-                                                        <span>IVA ({cotizacion.iva_porcentaje || 13}%)</span>
-                                                        <span className="font-bold text-white">+${ivaLicencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                    </div>
-                                                    {/* Total/Cuota */}
-                                                    <div className="pt-4 border-t border-white/20 mt-2">
-                                                        <div className="flex justify-between items-end">
-                                                            <div>
-                                                                <span className="text-[10px] font-black uppercase tracking-wide block">
-                                                                    {isPagoUnico ? 'Total Licencia Anual' : 'Cuota Mensual'}
-                                                                </span>
-                                                                {!isPagoUnico && (
-                                                                    <span className="text-[9px] opacity-70">{planTitulo}</span>
-                                                                )}
-                                                            </div>
-                                                            <div className="text-right">
-                                                                <span className="text-3xl font-black tracking-tighter leading-none">
-                                                                    ${(isPagoUnico ? totalLicencia : cuotaMensual).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                                </span>
-                                                                {!isPagoUnico && <span className="text-sm opacity-70">/mes</span>}
-                                                            </div>
-                                                        </div>
-                                                        {!isPagoUnico && (
-                                                            <p className="text-[9px] text-indigo-200 mt-2 text-center">
-                                                                Total {cuotas} cuotas: ${totalLicencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </>
-                                    );
-                                })()}
-                            </div>
 
                             {/* Terms & Conditions Section - Dedicated Page Area */}
                             <div className="mt-16 pt-12 border-t border-gray-100 flex flex-col">
