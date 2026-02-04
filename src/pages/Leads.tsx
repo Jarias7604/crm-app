@@ -102,6 +102,9 @@ export default function Leads() {
                     setFilteredLeadId(state.leadId); // Filter list to show only this lead
                     setIsDetailOpen(true);
 
+                    // 🔥 FIX: Load follow-up history when opening from Calendar
+                    loadFollowUps(targetLead.id);
+
                     // Clear state to prevent reopening on reload (optional but good practice)
                     window.history.replaceState({}, document.title);
                 }
