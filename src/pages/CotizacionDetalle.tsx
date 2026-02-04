@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { format } from 'date-fns';
-import { Building2, Mail, Phone, Package, Globe, Trash2, Send, Download, ArrowLeft, Settings, FileText, MessageSquare, CreditCard } from 'lucide-react';
+import { Building2, Mail, Phone, Package, Globe, Trash2, Send, Download, ArrowLeft, Settings, FileText, MessageSquare, CreditCard, CheckCircle2 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { pdfService } from '../services/pdfService';
 import { parseModules, calculateQuoteFinancialsV2, type CotizacionData } from '../utils/quoteUtils';
@@ -26,6 +26,7 @@ export default function CotizacionDetalle() {
     const [financingPlan, setFinancingPlan] = useState<FinancingPlan | null>(null);
     const [loading, setLoading] = useState(true);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+    const [isAccepting, setIsAccepting] = useState(false);
 
     useEffect(() => {
         fetchCotizacion();
@@ -128,6 +129,32 @@ export default function CotizacionDetalle() {
         }
     };
 
+    const handleAceptarPropuesta = async () => {
+        if (!cotizacion) return;
+        if (!window.confirm('¿Deseas marcar esta propuesta como ACEPTADA? Esta acción actualizará el estado de la cotización.')) return;
+
+        setIsAccepting(true);
+        try {
+            const { error } = await supabase
+                .from('cotizaciones')
+                .update({
+                    estado: 'aceptada',
+                    descripcion_pago: `Aceptada manualmente el ${new Date().toLocaleString()}`
+                })
+                .eq('id', id);
+
+            if (error) throw error;
+
+            toast.success('¡Propuesta marcada como ACEPTADA!');
+            fetchCotizacion(); // Recargar datos
+        } catch (error) {
+            console.error('Error al aceptar:', error);
+            toast.error('Error al actualizar el estado');
+        } finally {
+            setIsAccepting(false);
+        }
+    };
+
     if (loading) return <div className="p-8 text-center">Cargando cotización...</div>;
     if (!cotizacion) return <div className="p-8 text-center text-red-500">Cotización no encontrada</div>;
 
@@ -189,6 +216,33 @@ export default function CotizacionDetalle() {
                             <Send className="w-4 h-4 text-[#0088cc]" />
                             Compartir
                         </Button>
+
+                        {/* Botón Aceptar Propuesta - Solo visible si no está aceptada */}
+                        {cotizacion.estado !== 'aceptada' ? (
+                            <Button
+                                variant="default"
+                                onClick={handleAceptarPropuesta}
+                                disabled={isAccepting}
+                                className="h-12 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] uppercase tracking-widest rounded-xl shadow-lg shadow-emerald-600/20 hidden md:flex items-center gap-2"
+                            >
+                                {isAccepting ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        <span>Procesando...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <CheckCircle2 className="w-4 h-4" />
+                                        <span>Aceptar</span>
+                                    </>
+                                )}
+                            </Button>
+                        ) : (
+                            <div className="h-12 px-6 flex items-center gap-2 bg-green-50 text-green-600 font-black text-[11px] uppercase tracking-widest rounded-xl border border-green-200">
+                                <CheckCircle2 className="w-4 h-4" />
+                                Aceptada
+                            </div>
+                        )}
 
                         <div className="h-8 w-px bg-gray-100 hidden md:block mx-1"></div>
 

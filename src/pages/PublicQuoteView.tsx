@@ -414,11 +414,10 @@ export default function PublicQuoteView() {
                     {/* CUADRO PAGO INICIAL con DESGLOSE */}
                     {(() => {
                         const implementacionBase = Number(cotizacion.costo_implementacion) || 0;
-                        const ivaPct = Number(cotizacion.iva_porcentaje) || 0.13;
                         const modulos = cotizacion.modulos_adicionales || [];
                         const serviciosUnicos = modulos.filter((m: any) => (Number(m.pago_unico) || 0) > 0);
-                        const subtotalUnicos = implementacionBase + serviciosUnicos.reduce((sum: number, s: any) => sum + (Number(s.pago_unico) || 0), 0);
-                        const ivaImplementacion = subtotalUnicos * ivaPct;
+                        // ✅ USAR financials.ivaPct del servicio centralizado
+                        const { ivaPct, ivaImplementacion } = financials;
 
                         return (
                             <div className={`bg-gradient-to-br from-orange-50 to-amber-50 rounded-[2rem] p-6 shadow-sm border-2 border-orange-200 ${implementacion === 0 ? 'opacity-50' : ''}`}>
@@ -462,12 +461,12 @@ export default function PublicQuoteView() {
                     {/* CUADRO PAGO RECURRENTE con DESGLOSE */}
                     {(() => {
                         const licenciaBase = Number(cotizacion.costo_plan_anual) || 0;
-                        const ivaPct = Number(cotizacion.iva_porcentaje) || 0.13;
                         const costoWhatsApp = cotizacion.servicio_whatsapp ? (Number(cotizacion.costo_whatsapp) || 0) : 0;
                         const modulos = cotizacion.modulos_adicionales || [];
                         const serviciosRecurrentes = modulos.filter((m: any) => (Number(m.pago_unico) || 0) === 0 && ((Number(m.costo_anual) || Number(m.costo) || 0) > 0));
 
-                        const { recargoMonto, ivaLicencia: ivaRecurrente, ajustePct, tipoAjuste } = financials;
+                        // ✅ USAR valores del servicio centralizado
+                        const { ivaPct, recargoMonto, ivaLicencia: ivaRecurrente, ajustePct, tipoAjuste } = financials;
                         const ajusteLabel = tipoAjuste === 'recharge' ? `Financiamiento (${Math.round((ajustePct || 0) * 100)}%)` : '';
 
                         return (
