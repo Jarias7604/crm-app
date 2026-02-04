@@ -138,8 +138,11 @@ export default function Leads() {
                 assignee: selectedLead.next_followup_assignee || '',
                 notes: selectedLead.next_action_notes || ''
             });
+
+            // 🔥 ROBUST FIX: Always load follow-ups when a lead is selected
+            loadFollowUps(selectedLead.id);
         }
-    }, [selectedLead]);
+    }, [selectedLead?.id]); // Use .id to prevent re-running on every re-render
 
     // Function to manually save Next Follow Up data
     const handleSaveNextFollowUp = async () => {
