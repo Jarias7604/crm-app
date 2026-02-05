@@ -149,12 +149,17 @@ class CotizadorService {
     }
 
     async updatePaquete(id: string, updates: Partial<CotizadorPaquete>): Promise<CotizadorPaquete> {
+        console.log('[cotizadorService.updatePaquete] Enviando update:', { id, updates });
+
         const { data, error } = await supabase
             .from('cotizador_paquetes')
             .update(updates)
             .eq('id', id)
             .select()
             .maybeSingle();
+
+        console.log('[cotizadorService.updatePaquete] Respuesta:', { data, error });
+        console.log('[cotizadorService.updatePaquete] Descripcion retornada:', data?.descripcion);
 
         if (error) throw error;
         if (!data) throw new Error('No se pudo actualizar el paquete. Es posible que no tenga permisos para editar este registro global.');
@@ -290,7 +295,7 @@ class CotizadorService {
                     nombre: item.nombre,
                     precio_anual: item.pago_unico,
                     precio_mensual: 0,
-                    descripcion: 'Pago único'
+                    descripcion: item.descripcion || 'Pago único'
                 });
             } else if (item.precio_por_dte > 0) {
                 const precio = cantidad_dtes * item.precio_por_dte;
@@ -301,7 +306,7 @@ class CotizadorService {
                     nombre: item.nombre,
                     precio_anual: precio,
                     precio_mensual: precio / 12,
-                    descripcion: `${cantidad_dtes.toLocaleString()} DTEs × $${item.precio_por_dte}`
+                    descripcion: item.descripcion || `${cantidad_dtes.toLocaleString()} DTEs × $${item.precio_por_dte}`
                 });
             } else {
                 const precio = item.precio_anual || (item.precio_mensual * 12);
@@ -312,7 +317,7 @@ class CotizadorService {
                     nombre: item.nombre,
                     precio_anual: precio,
                     precio_mensual: item.precio_mensual || precio / 12,
-                    descripcion: 'Recurrente'
+                    descripcion: item.descripcion || 'Recurrente'
                 });
             }
         });

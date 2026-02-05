@@ -145,6 +145,38 @@ export const pdfService = {
                 doc.text(cotizacion.company?.website || '', pageWidth - margin, fY + 20, { align: 'right' });
             };
 
+            // 🎯 BUSCAR DESCRIPCIÓN DEL PLAN (con fallback)
+            let planDescription = '';
+            if (cotizacion.plan_nombre) {
+                // Intento 1: Coincidencia exacta
+                const { data: exactItem } = await supabase
+                    .from('cotizador_paquetes')
+                    .select('descripcion')
+                    .eq('paquete', cotizacion.plan_nombre)
+                    .eq('cantidad_dtes', cotizacion.volumen_dtes)
+                    .not('descripcion', 'is', null)
+                    .neq('descripcion', '')
+                    .maybeSingle();
+
+                if (exactItem?.descripcion) {
+                    planDescription = exactItem.descripcion;
+                } else {
+                    // Intento 2: Fallback por nombre
+                    const { data: fallbackItem } = await supabase
+                        .from('cotizador_paquetes')
+                        .select('descripcion')
+                        .eq('paquete', cotizacion.plan_nombre)
+                        .not('descripcion', 'is', null)
+                        .neq('descripcion', '')
+                        .limit(1)
+                        .maybeSingle();
+
+                    if (fallbackItem?.descripcion) {
+                        planDescription = fallbackItem.descripcion;
+                    }
+                }
+            }
+
             // Start Page 1
             drawHeader();
 
@@ -237,7 +269,7 @@ export const pdfService = {
             };
 
             // Main Items
-            drawRow(`Licencia Anual ${cotizacion.plan_nombre}`, cotizacion.costo_plan_anual || 0);
+            drawRow(`Licencia Anual ${cotizacion.plan_nombre}`, cotizacion.costo_plan_anual || 0, false, planDescription);
             if (cotizacion.incluir_implementacion) {
                 drawRow('Implementación y Configuración', cotizacion.costo_implementacion || 0, true);
             }

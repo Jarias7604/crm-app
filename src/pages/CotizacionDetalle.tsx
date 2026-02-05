@@ -24,6 +24,7 @@ export default function CotizacionDetalle() {
     const navigate = useNavigate();
     const [cotizacion, setCotizacion] = useState<CotizacionData | null>(null);
     const [financingPlan, setFinancingPlan] = useState<FinancingPlan | null>(null);
+    const [planDescripcion, setPlanDescripcion] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
     const [isAccepting, setIsAccepting] = useState(false);
@@ -83,6 +84,43 @@ export default function CotizacionDetalle() {
 
                 if (planData) {
                     setFinancingPlan(planData as FinancingPlan);
+                }
+            }
+
+            // Cargar la descripción del plan desde cotizador_paquetes
+            if (data?.plan_nombre) {
+                console.log('[CotizacionDetalle] Buscando descripción para plan:', data.plan_nombre, 'DTEs:', data.volumen_dtes);
+
+                // Intento 1: Coincidencia exacta (Nombre + DTEs)
+                let { data: planItem } = await supabase
+                    .from('cotizador_paquetes')
+                    .select('descripcion')
+                    .eq('paquete', data.plan_nombre)
+                    .eq('cantidad_dtes', data.volumen_dtes)
+                    .not('descripcion', 'is', null)
+                    .neq('descripcion', '')
+                    .maybeSingle();
+
+                // Intento 2: Fallback - Solo por nombre (buscar cualquier variante que tenga descripción)
+                if (!planItem?.descripcion) {
+                    console.log('[CotizacionDetalle] Coincidencia exacta no encontrada o sin descripción. Probando fallback solo por nombre...');
+                    const { data: fallbackItem } = await supabase
+                        .from('cotizador_paquetes')
+                        .select('descripcion')
+                        .eq('paquete', data.plan_nombre)
+                        .not('descripcion', 'is', null)
+                        .neq('descripcion', '')
+                        .limit(1)
+                        .maybeSingle();
+
+                    if (fallbackItem) planItem = fallbackItem;
+                }
+
+                if (planItem?.descripcion) {
+                    console.log('[CotizacionDetalle] Seteando planDescripcion:', planItem.descripcion.substring(0, 50) + '...');
+                    setPlanDescripcion(planItem.descripcion);
+                } else {
+                    console.log('[CotizacionDetalle] No se encontró descripción para el plan (ni siquiera en fallback)');
                 }
             }
         } catch (error: any) {
@@ -387,14 +425,19 @@ export default function CotizacionDetalle() {
                                     <tbody className="divide-y divide-slate-100 bg-white">
                                         <tr className="hover:bg-slate-50/50 transition-colors">
                                             <td className="px-6 py-6 transition-all">
-                                                <div className="flex items-center gap-4">
+                                                <div className="flex items-start gap-4">
                                                     <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center flex-shrink-0 text-indigo-600">
                                                         <FileText className="w-5 h-5" />
                                                     </div>
-                                                    <span className="font-black text-slate-900">Licencia Anual {cotizacion.plan_nombre}</span>
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="font-black text-slate-900">Licencia Anual {cotizacion.plan_nombre}</span>
+                                                        {planDescripcion && (
+                                                            <p className="text-xs text-slate-500 leading-relaxed">{planDescripcion}</p>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-6 text-right font-black text-slate-900 text-lg">
+                                            <td className="px-6 py-6 text-right font-black text-slate-900 text-lg align-top">
                                                 ${(Number(cotizacion.costo_plan_anual) || 0).toLocaleString()}
                                             </td>
                                         </tr>
@@ -474,7 +517,6 @@ export default function CotizacionDetalle() {
                                 const {
                                     cuotas,
                                     isPagoUnico,
-                                    licenciaAnual,
                                     implementacion,
                                     ivaPct,
                                     recargoMonto,
@@ -485,6 +527,7 @@ export default function CotizacionDetalle() {
                                     ivaImplementacion,
                                     totalImplementacion,
                                     planTitulo,
+                                    planDescripcion,
                                     tipoAjuste
                                 } = financials;
 
@@ -494,9 +537,14 @@ export default function CotizacionDetalle() {
                                             <p className="text-[9px] font-black text-blue-400 uppercase tracking-[0.2em]">RESUMEN DE INVERSIÓN</p>
                                             <div className="flex items-center gap-2">
                                                 <CreditCard className="w-4 h-4 text-slate-400" />
-                                                <p className="text-xs font-bold text-slate-600">
-                                                    {planTitulo}
-                                                </p>
+                                                <div className="text-right">
+                                                    <p className="text-xs font-bold text-slate-600">
+                                                        {planTitulo}
+                                                    </p>
+                                                    <p className="text-[10px] text-slate-400 leading-none">
+                                                        {planDescripcion}
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
 
@@ -582,7 +630,7 @@ export default function CotizacionDetalle() {
                                                         monto: Number(mod.costo_anual) || Number(mod.costo) || 0
                                                     }));
 
-                                                const totalRecurrenteBase = licenciaBase + serviciosRecurrentes.reduce((sum: number, s: any) => sum + s.monto, 0) + costoWhatsApp;
+
 
                                                 return (
                                                     <div className={`bg-gradient-to-br ${isPagoUnico ? 'from-emerald-50 to-green-50 border-emerald-200' : 'from-blue-50 to-indigo-50 border-blue-200'} rounded-2xl p-6 shadow-sm border-2 flex flex-col justify-between`}>

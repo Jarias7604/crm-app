@@ -23,6 +23,7 @@ export default function PublicQuoteView() {
     const { id } = useParams<{ id: string }>();
     const [cotizacion, setCotizacion] = useState<CotizacionData | null>(null);
     const [financingPlan, setFinancingPlan] = useState<FinancingPlan | null>(null);
+    const [pricingItemDescripcion, setPricingItemDescripcion] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -79,6 +80,37 @@ export default function PublicQuoteView() {
 
                 if (planData) {
                     setFinancingPlan(planData as FinancingPlan);
+                }
+            }
+
+            // Cargar la descripción del plan desde cotizador_paquetes
+            if (quote?.plan_nombre) {
+                // Intento 1: Coincidencia exacta (Nombre + DTEs)
+                let { data: planItem } = await supabase
+                    .from('cotizador_paquetes')
+                    .select('descripcion')
+                    .eq('paquete', quote.plan_nombre)
+                    .eq('cantidad_dtes', quote.volumen_dtes)
+                    .not('descripcion', 'is', null)
+                    .neq('descripcion', '')
+                    .maybeSingle();
+
+                // Intento 2: Fallback - Solo por nombre (buscar cualquier variante que tenga descripción)
+                if (!planItem?.descripcion) {
+                    const { data: fallbackItem } = await supabase
+                        .from('cotizador_paquetes')
+                        .select('descripcion')
+                        .eq('paquete', quote.plan_nombre)
+                        .not('descripcion', 'is', null)
+                        .neq('descripcion', '')
+                        .limit(1)
+                        .maybeSingle();
+
+                    if (fallbackItem) planItem = fallbackItem;
+                }
+
+                if (planItem?.descripcion) {
+                    setPricingItemDescripcion(planItem.descripcion);
                 }
             }
         } catch (error: any) {
@@ -332,17 +364,20 @@ export default function PublicQuoteView() {
 
                     {/* Items List */}
                     <div className="space-y-3">
-                        <div className="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm flex items-center justify-between group active:scale-[0.98] transition-all">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                        <div className="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm flex items-start justify-between group active:scale-[0.98] transition-all">
+                            <div className="flex items-start gap-4 flex-1">
+                                <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 flex-shrink-0">
                                     <FileText className="w-6 h-6" />
                                 </div>
-                                <div>
+                                <div className="flex flex-col gap-1">
                                     <p className="font-black text-slate-900 text-sm leading-none m-0 uppercase">Licenciamiento Anual</p>
-                                    <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase">PLAN {cotizacion.plan_nombre}</p>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase">PLAN {cotizacion.plan_nombre}</p>
+                                    {pricingItemDescripcion && (
+                                        <p className="text-[10px] text-slate-500 font-medium leading-relaxed mt-1">{pricingItemDescripcion}</p>
+                                    )}
                                 </div>
                             </div>
-                            <span className="text-lg font-black text-slate-900 tracking-tight">${Number(cotizacion.costo_plan_anual).toLocaleString()}</span>
+                            <span className="text-lg font-black text-slate-900 tracking-tight flex-shrink-0">${Number(cotizacion.costo_plan_anual).toLocaleString()}</span>
                         </div>
 
                         {cotizacion.incluir_implementacion && (
@@ -406,11 +441,16 @@ export default function PublicQuoteView() {
                 {/* Mobile Financial Summary - Dynamic with Detailed Breakdown */}
                 <div className="flex items-center justify-between px-2 mb-4">
                     <p className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em]">RESUMEN DE INVERSIÓN</p>
-                    <div className="flex items-center gap-2">
-                        <CreditCard className="w-4 h-4 text-slate-400" />
-                        <p className="text-xs font-bold text-slate-600">
-                            {planTitulo}
-                        </p>
+                    <div className="flex items-center gap-3">
+                        <CreditCard className="w-5 h-5 text-indigo-400 opacity-60 flex-shrink-0" />
+                        <div className="text-right">
+                            <p className="text-xs font-bold text-slate-600">
+                                {planTitulo}
+                            </p>
+                            <p className="text-[10px] text-slate-400 leading-none">
+                                {planDescripcion}
+                            </p>
+                        </div>
                     </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">

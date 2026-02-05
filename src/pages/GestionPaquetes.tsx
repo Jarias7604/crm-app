@@ -67,7 +67,12 @@ export default function GestionPaquetes() {
             // Sanitizar datos: eliminar campos de sistema que no deben enviarse en el update
             const { id, created_at, updated_at, ...updateData } = formData as any;
 
+            console.log('[GestionPaquetes] formData:', formData);
+            console.log('[GestionPaquetes] updateData (lo que se envía):', updateData);
+            console.log('[GestionPaquetes] descripcion en updateData:', updateData.descripcion);
+
             if (editingId) {
+                console.log('[GestionPaquetes] Actualizando paquete ID:', editingId);
                 await cotizadorService.updatePaquete(editingId, updateData);
                 toast.success('✅ Paquete actualizado');
             } else {
