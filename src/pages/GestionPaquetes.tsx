@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Save, X, Search, Settings, Copy } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, Search, Settings, Copy } from 'lucide-react';
 import { cotizadorService, type CotizadorPaquete } from '../services/cotizador';
 import { useAuth } from '../auth/AuthProvider';
 import { usePermissions } from '../hooks/usePermissions';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { Modal } from '../components/ui/Modal';
 import toast from 'react-hot-toast';
 
 export default function GestionPaquetes() {
@@ -53,8 +54,6 @@ export default function GestionPaquetes() {
         setEditingId(paquete.id);
         setFormData(paquete);
         setShowNewForm(false);
-        // Desplazar al formulario para que el usuario lo vea
-        window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const handleSave = async () => {
@@ -226,144 +225,138 @@ export default function GestionPaquetes() {
                 </div>
             </div>
 
-            {/* Formulario de Edición/Creación */}
-            {(showNewForm || editingId) && (
-                <div className="bg-white border-2 border-blue-200 rounded-xl p-6">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-bold text-[#4449AA]">
-                            {editingId ? '✏️ Editar Paquete' : '➕ Nuevo Paquete'}
-                        </h3>
-                        <button onClick={resetForm} className="text-gray-400 hover:text-gray-600">
-                            <X className="w-5 h-5" />
-                        </button>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-2">
-                                Nombre del Paquete *
-                            </label>
-                            <select
-                                value={formData.paquete}
-                                onChange={(e) => setFormData({ ...formData, paquete: e.target.value })}
-                                className="w-full border border-gray-300 rounded-xl px-4 py-2.5"
-                            >
-                                <option value="BASIC">BASIC</option>
-                                <option value="BASIC PLUS">BASIC PLUS</option>
-                                <option value="STARTER">STARTER</option>
-                                <option value="ESSENTIAL">ESSENTIAL</option>
-                                <option value="PRO">PRO</option>
-                                <option value="ENTERPRISE">ENTERPRISE</option>
-                                <option value="ILIMITADO">ILIMITADO</option>
-                                <option value="CUSTOM">CUSTOM</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-2">
-                                Cantidad de DTEs *
-                            </label>
-                            <Input
-                                type="number"
-                                value={formData.cantidad_dtes || ''}
-                                onChange={(e) => setFormData({ ...formData, cantidad_dtes: Number(e.target.value) })}
-                                placeholder="Ej: 2200"
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-2">
-                                Costo Implementación ($)
-                            </label>
-                            <Input
-                                type="number"
-                                step="0.01"
-                                value={formData.costo_implementacion || ''}
-                                onChange={(e) => setFormData({ ...formData, costo_implementacion: Number(e.target.value) })}
-                                placeholder="100.00"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-2">
-                                Costo Paquete Anual ($) *
-                            </label>
-                            <Input
-                                type="number"
-                                step="0.01"
-                                value={formData.costo_paquete_anual || ''}
-                                onChange={(e) => setFormData({ ...formData, costo_paquete_anual: Number(e.target.value) })}
-                                placeholder="295.00"
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-2">
-                                Costo Paquete Mensual ($) *
-                            </label>
-                            <Input
-                                type="number"
-                                step="0.01"
-                                value={formData.costo_paquete_mensual || ''}
-                                onChange={(e) => setFormData({ ...formData, costo_paquete_mensual: Number(e.target.value) })}
-                                placeholder="29.50"
-                                required
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-bold text-gray-700 mb-2">
-                                Orden
-                            </label>
-                            <Input
-                                type="number"
-                                value={formData.orden || 0}
-                                onChange={(e) => setFormData({ ...formData, orden: Number(e.target.value) })}
-                            />
-                        </div>
-
-                        <div className="md:col-span-3">
-                            <label className="block text-sm font-bold text-gray-700 mb-2">
-                                Descripción
-                            </label>
-                            <textarea
-                                value={formData.descripcion || ''}
-                                onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                                className="w-full border border-gray-300 rounded-xl px-4 py-2.5"
-                                rows={2}
-                                placeholder="Descripción opcional del paquete..."
-                            />
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={formData.activo !== false}
-                                    onChange={(e) => setFormData({ ...formData, activo: e.target.checked })}
-                                    className="w-4 h-4 text-blue-600 rounded"
-                                />
-                                <span className="text-sm font-semibold text-gray-700">Activo</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <div className="flex gap-2 mt-6">
-                        <Button
-                            onClick={handleSave}
-                            className="bg-green-600 hover:bg-green-700 text-white"
+            {/* Modal para Nuevo Paquete Solamente */}
+            <Modal
+                isOpen={showNewForm}
+                onClose={resetForm}
+                title="➕ Nuevo Paquete"
+            >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                            Nombre del Paquete *
+                        </label>
+                        <select
+                            value={formData.paquete}
+                            onChange={(e) => setFormData({ ...formData, paquete: e.target.value })}
+                            className="w-full border border-gray-300 rounded-xl px-4 py-2.5 shadow-sm"
                         >
-                            <Save className="w-4 h-4 mr-2" />
-                            Guardar
-                        </Button>
-                        <Button onClick={resetForm} variant="outline">
-                            Cancelar
-                        </Button>
+                            <option value="BASIC">BASIC</option>
+                            <option value="BASIC PLUS">BASIC PLUS</option>
+                            <option value="STARTER">STARTER</option>
+                            <option value="ESSENTIAL">ESSENTIAL</option>
+                            <option value="PRO">PRO</option>
+                            <option value="ENTERPRISE">ENTERPRISE</option>
+                            <option value="ILIMITADO">ILIMITADO</option>
+                            <option value="CUSTOM">CUSTOM</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                            Cantidad de DTEs *
+                        </label>
+                        <Input
+                            type="number"
+                            value={formData.cantidad_dtes || ''}
+                            onChange={(e) => setFormData({ ...formData, cantidad_dtes: Number(e.target.value) })}
+                            placeholder="Ej: 2200"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                            Costo Implementación ($)
+                        </label>
+                        <Input
+                            type="number"
+                            step="0.01"
+                            value={formData.costo_implementacion || ''}
+                            onChange={(e) => setFormData({ ...formData, costo_implementacion: Number(e.target.value) })}
+                            placeholder="100.00"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                            Costo Paquete Anual ($) *
+                        </label>
+                        <Input
+                            type="number"
+                            step="0.01"
+                            value={formData.costo_paquete_anual || ''}
+                            onChange={(e) => setFormData({ ...formData, costo_paquete_anual: Number(e.target.value) })}
+                            placeholder="295.00"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                            Costo Paquete Mensual ($) *
+                        </label>
+                        <Input
+                            type="number"
+                            step="0.01"
+                            value={formData.costo_paquete_mensual || ''}
+                            onChange={(e) => setFormData({ ...formData, costo_paquete_mensual: Number(e.target.value) })}
+                            placeholder="29.50"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                            Orden
+                        </label>
+                        <Input
+                            type="number"
+                            value={formData.orden || 0}
+                            onChange={(e) => setFormData({ ...formData, orden: Number(e.target.value) })}
+                        />
+                    </div>
+
+                    <div className="md:col-span-2">
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                            Descripción
+                        </label>
+                        <textarea
+                            value={formData.descripcion || ''}
+                            onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                            className="w-full border border-gray-300 rounded-xl px-4 py-2.5 shadow-sm"
+                            rows={2}
+                            placeholder="Descripción opcional del paquete..."
+                        />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={formData.activo !== false}
+                                onChange={(e) => setFormData({ ...formData, activo: e.target.checked })}
+                                className="w-4 h-4 text-blue-600 rounded"
+                            />
+                            <span className="text-sm font-semibold text-gray-700">Activo</span>
+                        </label>
                     </div>
                 </div>
-            )}
+
+                <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-100">
+                    <Button onClick={resetForm} variant="outline">
+                        Cancelar
+                    </Button>
+                    <Button
+                        onClick={handleSave}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                        <Save className="w-4 h-4 mr-2" />
+                        Crear Paquete
+                    </Button>
+                </div>
+            </Modal>
 
             {/* Tabla de Paquetes */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -404,97 +397,186 @@ export default function GestionPaquetes() {
                                     </td>
                                 </tr>
                             ) : (
-                                paquetesFiltrados.map((paquete) => (
-                                    <tr key={paquete.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center gap-2">
-                                                <Settings className="w-5 h-5 text-blue-500" />
-                                                <div>
-                                                    <p className="text-sm font-bold text-[#4449AA]">
-                                                        {paquete.paquete}
-                                                    </p>
-                                                    {paquete.company_id && (
-                                                        <span className="text-xs text-purple-600 font-semibold">
-                                                            Custom
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className="text-sm font-semibold text-gray-700">
-                                                {paquete.cantidad_dtes.toLocaleString()} DTEs
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <span className="text-sm font-bold text-green-600">
-                                                ${paquete.costo_paquete_anual.toFixed(2)}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <span className="text-sm font-semibold text-gray-700">
-                                                ${paquete.costo_paquete_mensual.toFixed(2)}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <span className="text-sm font-semibold text-gray-700">
-                                                ${paquete.costo_implementacion.toFixed(2)}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <span
-                                                className={`px-2 py-1 rounded-full text-xs font-bold ${paquete.activo
-                                                    ? 'bg-green-100 text-green-700'
-                                                    : 'bg-red-100 text-red-700'
-                                                    }`}
-                                            >
-                                                {paquete.activo ? 'Activo' : 'Inactivo'}
-                                            </span>
-                                        </td>
-                                        {canEdit && (
+                                paquetesFiltrados.map((paquete) =>
+                                    editingId === paquete.id ? (
+                                        <tr key={paquete.id} className="bg-blue-50/50 ring-2 ring-blue-500 ring-inset">
+                                            <td className="px-6 py-4">
+                                                <select
+                                                    value={formData.paquete}
+                                                    onChange={(e) => setFormData({ ...formData, paquete: e.target.value })}
+                                                    className="w-full border border-gray-300 rounded-lg px-2 py-1 text-sm font-bold text-[#4449AA]"
+                                                >
+                                                    <option value="BASIC">BASIC</option>
+                                                    <option value="BASIC PLUS">BASIC PLUS</option>
+                                                    <option value="STARTER">STARTER</option>
+                                                    <option value="ESSENTIAL">ESSENTIAL</option>
+                                                    <option value="PRO">PRO</option>
+                                                    <option value="ENTERPRISE">ENTERPRISE</option>
+                                                    <option value="ILIMITADO">ILIMITADO</option>
+                                                    <option value="CUSTOM">CUSTOM</option>
+                                                </select>
+                                                <textarea
+                                                    value={formData.descripcion || ''}
+                                                    onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                                                    className="w-full mt-2 border border-gray-300 rounded-lg px-2 py-1 text-xs"
+                                                    placeholder="Descripción..."
+                                                    rows={2}
+                                                />
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <input
+                                                    type="number"
+                                                    value={formData.cantidad_dtes}
+                                                    onChange={(e) => setFormData({ ...formData, cantidad_dtes: Number(e.target.value) })}
+                                                    className="w-full border border-gray-300 rounded-lg px-2 py-1 text-sm font-semibold"
+                                                />
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={formData.costo_paquete_anual}
+                                                    onChange={(e) => setFormData({ ...formData, costo_paquete_anual: Number(e.target.value) })}
+                                                    className="w-24 border border-gray-300 rounded-lg px-2 py-1 text-sm font-bold text-green-600 text-right"
+                                                />
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={formData.costo_paquete_mensual}
+                                                    onChange={(e) => setFormData({ ...formData, costo_paquete_mensual: Number(e.target.value) })}
+                                                    className="w-24 border border-gray-300 rounded-lg px-2 py-1 text-sm font-semibold text-gray-700 text-right"
+                                                />
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={formData.costo_implementacion}
+                                                    onChange={(e) => setFormData({ ...formData, costo_implementacion: Number(e.target.value) })}
+                                                    className="w-24 border border-gray-300 rounded-lg px-2 py-1 text-sm font-semibold text-gray-700 text-right"
+                                                />
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={formData.activo}
+                                                    onChange={(e) => setFormData({ ...formData, activo: e.target.checked })}
+                                                    className="w-4 h-4 text-blue-600 rounded"
+                                                />
+                                            </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center justify-end gap-2">
-                                                    {profile?.role === 'super_admin' || paquete.company_id !== null ? (
-                                                        <button
-                                                            onClick={() => handleEdit(paquete)}
-                                                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                            title="Editar"
-                                                        >
-                                                            <Edit className="w-4 h-4" />
-                                                        </button>
-                                                    ) : (
-                                                        <div className="flex items-center gap-1">
+                                                    <button
+                                                        onClick={handleSave}
+                                                        className="p-2 text-green-600 hover:bg-green-100 rounded-lg shadow-sm bg-white"
+                                                        title="Guardar"
+                                                    >
+                                                        <Save className="w-5 h-5" />
+                                                    </button>
+                                                    <button
+                                                        onClick={resetForm}
+                                                        className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg bg-white"
+                                                        title="Cancelar"
+                                                    >
+                                                        <Plus className="w-5 h-5 transform rotate-45" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        <tr key={paquete.id} className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <Settings className="w-5 h-5 text-blue-500" />
+                                                    <div>
+                                                        <p className="text-sm font-bold text-[#4449AA]">
+                                                            {paquete.paquete}
+                                                        </p>
+                                                        {paquete.company_id && (
+                                                            <span className="text-xs text-purple-600 font-semibold">
+                                                                Custom
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className="text-sm font-semibold text-gray-700">
+                                                    {paquete.cantidad_dtes.toLocaleString()} DTEs
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <span className="text-sm font-bold text-green-600">
+                                                    ${paquete.costo_paquete_anual.toFixed(2)}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <span className="text-sm font-semibold text-gray-700">
+                                                    ${paquete.costo_paquete_mensual.toFixed(2)}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <span className="text-sm font-semibold text-gray-700">
+                                                    ${paquete.costo_implementacion.toFixed(2)}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span
+                                                    className={`px-2 py-1 rounded-full text-xs font-bold ${paquete.activo
+                                                        ? 'bg-green-100 text-green-700'
+                                                        : 'bg-red-100 text-red-700'
+                                                        }`}
+                                                >
+                                                    {paquete.activo ? 'Activo' : 'Inactivo'}
+                                                </span>
+                                            </td>
+                                            {canEdit && (
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        {profile?.role === 'super_admin' || paquete.company_id !== null ? (
                                                             <button
-                                                                disabled
-                                                                className="p-2 text-gray-300 cursor-not-allowed"
-                                                                title="No puedes editar paquetes globales"
+                                                                onClick={() => handleEdit(paquete)}
+                                                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                                title="Editar"
                                                             >
                                                                 <Edit className="w-4 h-4" />
                                                             </button>
-                                                            <button
-                                                                onClick={() => handleClone(paquete)}
-                                                                className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                                                title="Clonar para mi empresa"
-                                                            >
-                                                                <Copy className="w-4 h-4" />
-                                                            </button>
-                                                        </div>
-                                                    )}
+                                                        ) : (
+                                                            <div className="flex items-center gap-1">
+                                                                <button
+                                                                    disabled
+                                                                    className="p-2 text-gray-300 cursor-not-allowed"
+                                                                    title="No puedes editar paquetes globales"
+                                                                >
+                                                                    <Edit className="w-4 h-4" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleClone(paquete)}
+                                                                    className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                                                    title="Clonar para mi empresa"
+                                                                >
+                                                                    <Copy className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        )}
 
-                                                    {(profile?.role === 'super_admin' || paquete.company_id !== null) && (
-                                                        <button
-                                                            onClick={() => handleDelete(paquete.id)}
-                                                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                            title="Desactivar"
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        )}
-                                    </tr>
-                                ))
+                                                        {(profile?.role === 'super_admin' || paquete.company_id !== null) && (
+                                                            <button
+                                                                onClick={() => handleDelete(paquete.id)}
+                                                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                                title="Desactivar"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            )}
+                                        </tr>
+                                    )
+                                )
                             )}
                         </tbody>
                     </table>
