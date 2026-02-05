@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../services/supabase';
-import type { Profile } from '../types';
+import type { Profile, Role } from '../types';
 
 interface AuthContextType {
     session: Session | null;
@@ -11,8 +11,8 @@ interface AuthContextType {
     signOut: () => Promise<void>;
     simulatedCompanyId: string | null;
     setSimulatedCompanyId: (id: string | null) => void;
-    simulatedRole: 'super_admin' | 'company_admin' | null;
-    setSimulatedRole: (role: 'super_admin' | 'company_admin' | null) => void;
+    simulatedRole: Role | null;
+    setSimulatedRole: (role: Role | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [profile, setProfile] = useState<Profile | null>(null);
     const [loading, setLoading] = useState(true);
     const [simulatedCompanyId, setSimulatedCompanyId] = useState<string | null>(localStorage.getItem('simulated_company_id'));
-    const [simulatedRole, setSimulatedRole] = useState<'super_admin' | 'company_admin' | null>(localStorage.getItem('simulated_role') as any);
+    const [simulatedRole, setSimulatedRole] = useState<Role | null>(localStorage.getItem('simulated_role') as any);
 
     const handleSetSimulatedCompanyId = (id: string | null) => {
         try {
@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    const handleSetSimulatedRole = (role: 'super_admin' | 'company_admin' | null) => {
+    const handleSetSimulatedRole = (role: Role | null) => {
         try {
             setSimulatedRole(role);
             if (role) localStorage.setItem('simulated_role', role);
@@ -128,7 +128,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         ...finalProfile,
                         role: (simRole as any) || finalProfile.role,
                         company_id: simCompanyId || finalProfile.company_id,
-                        full_name: (finalProfile.full_name || 'Jimmy') + ' [SIMULACIÓN]'
+                        full_name: (finalProfile.full_name || 'Jimmy') + ' [SIMULACIÓN]',
+                        // Si simulamos agente de ventas, limpiamos permisos para probar el comportamiento por defecto (restricción)
+                        permissions: simRole === 'sales_agent' ? {} : finalProfile.permissions
                     };
                 }
             }

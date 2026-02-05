@@ -57,6 +57,9 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         // Si no hay empresa cargada todavía, esperamos
         if (!company) return false;
 
+        // Definir qué módulos son "Core" (se activan por defecto si hay licencia)
+        const coreFeatures = ['leads', 'quotes', 'calendar'];
+
         const licenseKeys: Record<string, string> = {
             leads: 'leads_view',
             quotes: 'cotizaciones.manage_implementation',
@@ -71,10 +74,25 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
 
         const licenseKey = licenseKeys[feature];
         const isLicensed = company.allowed_permissions?.includes(licenseKey);
+
+        // Si la empresa no tiene licencia para este módulo, nadie (excepto super_admin) entra
         if (!isLicensed && (profile?.role as string) !== 'super_admin') return false;
 
+        // Administradores de empresa tienen acceso a todo lo licenciado por defecto
         if (profile.role === 'company_admin') return true;
-        return profile.permissions?.[feature] !== false;
+
+        // Para otros roles (agentes), verificar permiso explícito
+        const explicitPermission = profile.permissions?.[feature];
+
+        // Caso 1: Tiene permiso explícitamente denegado (false)
+        if (explicitPermission === false) return false;
+
+        // Caso 2: Tiene permiso explícitamente concedido (true)
+        if (explicitPermission === true) return true;
+
+        // Caso 3: Permiso no definido (undefined)
+        // Por defecto: Core = SI, Otros (Marketing/Chat) = NO
+        return coreFeatures.includes(feature);
     };
 
     const navigation = [
@@ -257,6 +275,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                             >
                                 <option value="super_admin">Rol: Super Admin</option>
                                 <option value="company_admin">Rol: Administrador Empr.</option>
+                                <option value="sales_agent">Rol: Vendedor</option>
                             </select>
                         </div>
                     </div>
