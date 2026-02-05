@@ -101,32 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             const isJimmy = jimmyIds.includes(userId) || (emailToUse && jimmyEmails.includes(emailToUse));
 
-            if (isJimmy) {
-                const simRole = localStorage.getItem('simulated_role') || 'super_admin';
-                const simCompanyId = localStorage.getItem('simulated_company_id');
-
-                // Si estamos simulando una empresa pero no hay ID, o es el ID base, usamos el Salvador como default para pruebas
-                const effectiveCompanyId = simCompanyId || (simRole === 'company_admin' ? '7a582ba5-f7d0-4ae3-9985-35788deb1c30' : '00000000-0000-0000-0000-000000000000');
-
-                console.warn('⚡ MASTER BYPASS ACTIVE:', { role: simRole, company: effectiveCompanyId });
-
-                setProfile({
-                    id: userId,
-                    email: emailToUse || (userId === 'c9c01b04-4160-4e4c-9718-15298c961e9b' ? 'jarias7604@gmail.com' : 'jarias@ariasdefense.com'),
-                    role: simRole as any,
-                    company_id: effectiveCompanyId,
-                    full_name: 'Jimmy Arias' + (simRole !== 'super_admin' ? ' [SIMULACION]' : ' [MASTER]'),
-                    description: '',
-                    phone: null,
-                    status: 'active',
-                    created_at: new Date().toISOString(),
-                    permissions: { leads: true, quotes: true, calendar: true, marketing: true, chat: true, branding: true, pricing: true, paquetes: true, items: true }
-                } as any as Profile);
-                setLoading(false);
-                return;
-            }
-
-            // CARGA NORMAL (SOLO PARA OTROS USUARIOS)
+            // CARGA NORMAL (PARA TODOS)
             const { data, error } = await supabase
                 .from('profiles')
                 .select('id, email, role, company_id, full_name, status, created_at, custom_role_id, permissions')
@@ -135,10 +110,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             if (error) {
                 console.error('Error fetching profile:', error);
-            } else {
-                const { data: mergedPerms } = await supabase.rpc('get_user_permissions', { user_id: userId });
-                setProfile({ ...data, permissions: mergedPerms } as Profile);
+                setLoading(false);
+                return;
             }
+
+            const { data: mergedPerms } = await supabase.rpc('get_user_permissions', { user_id: userId });
+            let finalProfile = { ...data, permissions: mergedPerms } as Profile;
+
+            // APLICAR BYPASS SI ES JIMMY Y HAY SIMULACIÓN ACTIVA
+            if (isJimmy) {
+                const simRole = localStorage.getItem('simulated_role');
+                const simCompanyId = localStorage.getItem('simulated_company_id');
+
+                if (simRole || simCompanyId) {
+                    console.warn('⚡ MASTER SIMULATION ACTIVE:', { role: simRole, company: simCompanyId });
+                    finalProfile = {
+                        ...finalProfile,
+                        role: (simRole as any) || finalProfile.role,
+                        company_id: simCompanyId || finalProfile.company_id,
+                        full_name: (finalProfile.full_name || 'Jimmy') + ' [SIMULACIÓN]'
+                    };
+                }
+            }
+
+            setProfile(finalProfile);
         } catch (err) {
             console.error('Unexpected error fetching profile:', err);
         } finally {
