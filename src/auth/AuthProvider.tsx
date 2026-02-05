@@ -99,7 +99,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const jimmyIds = ['c9c01b04-4160-4e4c-9718-15298c961e9b', '292bc954-0d25-4147-9526-b7a7268be8e1'];
             const jimmyEmails = ['jarias7604@gmail.com', 'jarias@ariasdefense.com'];
 
-            const isJimmy = jimmyIds.includes(userId) || (emailToUse && jimmyEmails.includes(emailToUse));
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const isJimmy = (jimmyIds.includes(userId) || (emailToUse && jimmyEmails.includes(emailToUse))) && isLocal;
 
             if (isJimmy) {
                 const simRole = localStorage.getItem('simulated_role') || 'super_admin';
