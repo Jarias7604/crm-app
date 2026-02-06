@@ -274,7 +274,33 @@ export default function MarketingSettings() {
                             )}
 
                             {selectedProvider === 'resend' && (
-                                <InputBlock label="API Key" type="password" value={formData.apiKey} onChange={(v: string) => setFormData({ ...formData, apiKey: v })} placeholder="re_123456789..." />
+                                <>
+                                    <InputBlock
+                                        label="API Key"
+                                        type="password"
+                                        value={formData.apiKey}
+                                        onChange={(v: string) => setFormData({ ...formData, apiKey: v })}
+                                        placeholder="re_123456789..."
+                                    />
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-gray-100 mt-4">
+                                        <InputBlock
+                                            label="Nombre del Remitente"
+                                            type="text"
+                                            value={formData.senderName}
+                                            onChange={(v: string) => setFormData({ ...formData, senderName: v })}
+                                            placeholder="Ej: Ventas Arias Defense"
+                                            hint="El nombre que verán los clientes."
+                                        />
+                                        <InputBlock
+                                            label="Email del Remitente"
+                                            type="email"
+                                            value={formData.senderEmail}
+                                            onChange={(v: string) => setFormData({ ...formData, senderEmail: v })}
+                                            placeholder="Ej: ventas@ariasdefense.com"
+                                            hint="Debe estar verificado en Resend."
+                                        />
+                                    </div>
+                                </>
                             )}
 
                             {selectedProvider === 'twilio' && (

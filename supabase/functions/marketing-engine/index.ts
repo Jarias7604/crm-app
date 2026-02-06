@@ -77,9 +77,23 @@ Deno.serve(async (req) => {
         const results = { success: 0, failed: 0 };
         const trackingBaseUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/tracking`;
 
-        // Fetch integration settings
+        // Fetch integration settings based on campaign type
         let telegramToken = null;
-        if (campaign.type === 'social' || campaign.type === 'whatsapp') {
+        let whatsappConfig = null;
+
+        if (campaign.type === 'whatsapp') {
+            // Fetch Meta Cloud API credentials for WhatsApp
+            const { data: integration } = await supabase
+                .from('marketing_integrations')
+                .select('settings')
+                .eq('company_id', campaign.company_id)
+                .eq('provider', 'whatsapp')
+                .eq('is_active', true)
+                .maybeSingle();
+
+            whatsappConfig = integration?.settings;
+        } else if (campaign.type === 'social') {
+            // Fetch Telegram credentials for social campaigns
             const { data: integration } = await supabase
                 .from('marketing_integrations')
                 .select('settings')
@@ -90,22 +104,103 @@ Deno.serve(async (req) => {
             telegramToken = integration?.settings?.token;
         }
 
-        const resendToken = Deno.env.get("RESEND_API_KEY");
+        // Fetch Resend sender details
+        let senderName = "CRM Marketing";
+        let senderEmail = "marketing@ariasdefense.com";
+
+        const { data: resendIntegration } = await supabase
+            .from('marketing_integrations')
+            .select('settings')
+            .eq('company_id', campaign.company_id)
+            .eq('provider', 'resend')
+            .eq('is_active', true)
+            .maybeSingle();
+
+        // PRIORITIZE Database API Key
+        let resendToken = Deno.env.get("RESEND_API_KEY");
+        if (resendIntegration?.settings?.apiKey) {
+            resendToken = resendIntegration.settings.apiKey;
+        }
+
+        if (resendIntegration?.settings?.senderName) {
+            senderName = resendIntegration.settings.senderName;
+        }
+        if (resendIntegration?.settings?.senderEmail) {
+            senderEmail = resendIntegration.settings.senderEmail;
+        }
+
+        const fromDisplay = `${senderName} <${senderEmail}>`;
 
         for (const lead of leads) {
             try {
                 const messageId = crypto.randomUUID();
                 let conversationId = null;
 
-                // A. Telegram Send logic (Placeholder + Message creation)
-                if ((campaign.type === 'social' || campaign.type === 'whatsapp')) {
-                    const channel = campaign.type === 'whatsapp' ? 'whatsapp' : 'telegram';
+                // A. WhatsApp Send (Meta Cloud API)
+                if (campaign.type === 'whatsapp' && lead.phone) {
                     const { data: conv } = await supabase
                         .from('marketing_conversations')
                         .upsert({
                             company_id: campaign.company_id,
                             lead_id: lead.id,
-                            channel: channel,
+                            channel: 'whatsapp',
+                            status: 'open'
+                        }, { onConflict: 'lead_id,channel' })
+                        .select('id, external_id')
+                        .single();
+                    conversationId = conv?.id;
+
+                    if (whatsappConfig?.token && whatsappConfig?.phoneNumberId) {
+                        try {
+                            // Send via Meta Cloud API
+                            const whatsappRes = await fetch(
+                                `https://graph.facebook.com/v18.0/${whatsappConfig.phoneNumberId}/messages`,
+                                {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'Authorization': `Bearer ${whatsappConfig.token}`
+                                    },
+                                    body: JSON.stringify({
+                                        messaging_product: 'whatsapp',
+                                        to: lead.phone.replace(/\D/g, ''), // Clean phone number
+                                        type: 'text',
+                                        text: {
+                                            body: campaign.content || campaign.name
+                                        }
+                                    })
+                                }
+                            );
+
+                            if (!whatsappRes.ok) {
+                                const errData = await whatsappRes.text();
+                                console.error('WhatsApp API Error:', errData);
+                                throw new Error(`WhatsApp Error: ${errData}`);
+                            }
+
+                            const waData = await whatsappRes.json();
+                            // Update conversation with WhatsApp message ID
+                            if (waData.messages?.[0]?.id) {
+                                await supabase
+                                    .from('marketing_conversations')
+                                    .update({ external_id: waData.messages[0].id })
+                                    .eq('id', conversationId);
+                            }
+                        } catch (waError) {
+                            console.error(`WhatsApp send error for lead ${lead.id}:`, waError);
+                            throw waError;
+                        }
+                    }
+                }
+
+                // B. Telegram Send (for 'social' campaigns)
+                if (campaign.type === 'social') {
+                    const { data: conv } = await supabase
+                        .from('marketing_conversations')
+                        .upsert({
+                            company_id: campaign.company_id,
+                            lead_id: lead.id,
+                            channel: 'telegram',
                             status: 'open'
                         }, { onConflict: 'lead_id,channel' })
                         .select('id, external_id')
@@ -125,26 +220,38 @@ Deno.serve(async (req) => {
                     }
                 }
 
-                // B. Email Send (Resend)
-                if (campaign.type === "email" && lead.email && resendToken) {
+                // C. Email Send (Resend)
+                // Check if we have a token (either from Env or DB)
+                if (campaign.type === "email" && lead.email) {
+                    if (!resendToken) {
+                        console.error(`Missing Resend API Key for company ${campaign.company_id}`);
+                        throw new Error("Missing Resend API Key configuration");
+                    }
+
                     const trackedHtml = `
                 ${campaign.content}
                 <img src="${trackingBaseUrl}?type=open&mid=${messageId}" width="1" height="1" style="display:none;" />
             `;
 
-                    await fetch('https://api.resend.com/emails', {
+                    const res = await fetch('https://api.resend.com/emails', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                             'Authorization': `Bearer ${resendToken}`
                         },
                         body: JSON.stringify({
-                            from: 'CRM Marketing <marketing@ariasdefense.com>',
+                            from: fromDisplay,
                             to: lead.email,
                             subject: campaign.subject || campaign.name,
                             html: trackedHtml
                         })
                     });
+
+                    if (!res.ok) {
+                        const errData = await res.text();
+                        console.error("Resend API Error:", errData);
+                        throw new Error(`Resend Error: ${errData}`);
+                    }
                 }
 
                 // C. Create Message Record

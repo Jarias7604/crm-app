@@ -6,7 +6,7 @@ import type { Lead, LeadStatus, LeadPriority, FollowUp } from '../types';
 import { PRIORITY_CONFIG, STATUS_CONFIG, ACTION_TYPES, SOURCE_CONFIG, SOURCE_OPTIONS } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2, Layout, MessageSquare, Send as TelegramIcon, Smartphone, Filter, ChevronDown, CheckCircle, Shield, ArrowUpDown } from 'lucide-react';
+import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2, Layout, MessageSquare, Send as TelegramIcon, Smartphone, Filter, ChevronDown, CheckCircle, Shield, ArrowUpDown, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { csvHelper } from '../utils/csvHelper';
@@ -81,6 +81,7 @@ export default function Leads() {
 
     const [isImporting, setIsImporting] = useState(false);
     const [priorityFilter, setPriorityFilter] = useState<string>('all');
+    const [searchTerm, setSearchTerm] = useState<string>('');
     const [filteredLeadId, setFilteredLeadId] = useState<string | null>(null);
 
     const [isUploading, setIsUploading] = useState(false);
@@ -222,11 +223,28 @@ export default function Leads() {
 
     const filteredLeads = useMemo(() => {
         return leads.filter(lead => {
+            // Filter by specific lead ID if set
             if (filteredLeadId) return lead.id === filteredLeadId;
+
+            // Filter by search term
+            if (searchTerm.trim()) {
+                const term = searchTerm.toLowerCase().trim();
+                const matchesSearch =
+                    lead.name?.toLowerCase().includes(term) ||
+                    lead.email?.toLowerCase().includes(term) ||
+                    lead.company_name?.toLowerCase().includes(term) ||
+                    lead.phone?.toLowerCase().includes(term) ||
+                    lead.next_action_notes?.toLowerCase().includes(term);
+
+                if (!matchesSearch) return false;
+            }
+
+            // Filter by priority
             if (priorityFilter !== 'all' && lead.priority !== priorityFilter) return false;
+
             return true;
         });
-    }, [leads, priorityFilter, filteredLeadId]);
+    }, [leads, priorityFilter, filteredLeadId, searchTerm]);
 
     const sortedLeads = useMemo(() => {
         if (!sortConfig) return filteredLeads;
@@ -320,7 +338,7 @@ export default function Leads() {
     };
 
     const handleDownloadTemplate = () => {
-        csvHelper.generateTemplate();
+        csvHelper.generateExcelTemplate();
     };
 
     useEffect(() => {
@@ -393,21 +411,83 @@ export default function Leads() {
 
         try {
             setIsImporting(true);
-            const data = await csvHelper.parse(file);
+            const data = await csvHelper.parse(file, teamMembers);
 
             if (data.length === 0) {
-                toast.error('El archivo CSV está vacío.');
+                toast.error('El archivo está vacío.');
                 return;
             }
 
+
             if (confirm(`¿Estás seguro de que quieres importar ${data.length} leads?`)) {
-                await leadsService.importLeads(data);
-                toast.success('Leads importados correctamente');
-                loadLeads(); // Refresh list
+                const results = await leadsService.importLeads(data);
+
+                // Clear all filters so imported leads are visible
+                setSearchTerm('');
+                setPriorityFilter('all');
+                setFilteredLeadId(null);
+
+                // Add successfully imported leads to state
+                if (results.inserted.length > 0) {
+                    setLeads(prev => {
+                        const existingIds = new Set(prev.map(l => l.id));
+                        const newLeads = results.inserted.filter(l => !existingIds.has(l.id));
+                        return [...newLeads, ...prev];
+                    });
+                }
+
+                // Show detailed results
+                if (results.inserted.length > 0 && results.skipped.length === 0 && results.errors.length === 0) {
+                    // Perfect import - all leads inserted
+                    const leadText = results.inserted.length === 1 ? 'lead importado' : 'leads importados';
+                    toast.success(`✅ ${results.inserted.length} ${leadText} correctamente`);
+                } else if (results.inserted.length > 0 && (results.skipped.length > 0 || results.errors.length > 0)) {
+                    // Partial import - some succeeded, some failed/skipped
+                    const messages = [
+                        `✅ ${results.inserted.length} importado(s)`,
+                        results.skipped.length > 0 ? `⏭️ ${results.skipped.length} omitido(s) (duplicados)` : '',
+                        results.errors.length > 0 ? `❌ ${results.errors.length} error(es)` : ''
+                    ].filter(Boolean).join('\n');
+
+                    toast.success(messages, { duration: 5000 });
+
+                    // Log details for debugging
+                    if (results.skipped.length > 0) {
+                        console.log('🔍 Duplicados omitidos:');
+                        results.skipped.forEach(({ lead, reason }) => {
+                            console.log(`  - ${lead.name}: ${reason}`);
+                        });
+                    }
+                } else if (results.inserted.length === 0 && results.skipped.length > 0) {
+                    // All duplicates - nothing imported
+                    const duplicateText = results.skipped.length === 1 ? 'Este lead ya existe' : `Estos ${results.skipped.length} leads ya existen`;
+                    const leadName = results.skipped[0]?.lead?.name || 'Sin nombre';
+
+                    let message = results.skipped.length === 1
+                        ? `⚠️ ${duplicateText}: ${leadName}`
+                        : `⚠️ ${duplicateText}`;
+
+                    toast(message, { duration: 6000, icon: '⚠️' });
+                } else {
+                    // All failed
+                    toast.error('❌ No se pudo importar ningún lead. Revisa el formato del archivo.');
+                }
+
+                // Background sync to ensure consistency
+                setTimeout(async () => {
+                    try {
+                        const { data: freshData } = await leadsService.getLeads();
+                        if (freshData) {
+                            setLeads(freshData);
+                        }
+                    } catch (err) {
+                        console.error('Background sync failed:', err);
+                    }
+                }, 2000);
             }
         } catch (error: any) {
             logger.error('Lead import failed', error, { action: 'handleImportCSV' });
-            toast.error(`Fallo en la importación: ${error.message || 'Verifica el formato del archivo CSV'}`);
+            toast.error(`Fallo en la importación: ${error.message || 'Verifica el formato del archivo'}`);
         } finally {
             setIsImporting(false);
             // Reset input
@@ -555,6 +635,28 @@ export default function Leads() {
                 </div>
 
                 <div className="flex flex-wrap gap-2 w-full xl:w-auto">
+                    {/* Search Bar */}
+                    <div className="flex-1 min-w-[280px] max-w-md">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Buscar por nombre, email, empresa, teléfono..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                            />
+                            {searchTerm && (
+                                <button
+                                    onClick={() => setSearchTerm('')}
+                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
                     <div className="flex bg-gray-50 rounded-xl p-1 border border-gray-100">
                         <button
                             onClick={() => setViewMode('grid')}
@@ -589,10 +691,23 @@ export default function Leads() {
                             <span className="hidden lg:inline">Plantilla</span>
                         </Button>
 
+                        <Button
+                            variant="outline"
+                            className="hidden sm:flex items-center gap-2 h-10 px-4 text-[10px] font-black uppercase tracking-widest border-gray-100"
+                            onClick={() => {
+                                const leadsToExport = filteredLeads.length > 0 ? filteredLeads : leads;
+                                csvHelper.exportLeads(leadsToExport, teamMembers);
+                                toast.success('Exportación iniciada');
+                            }}
+                        >
+                            <Download className="w-3.5 h-3.5 rotate-180" /> {/* Reused icon, rotated to signify UP/OUT? Or just use same icon */}
+                            <span className="hidden lg:inline">Exportar</span>
+                        </Button>
+
                         <div className="relative flex-1 sm:flex-none">
                             <input
                                 type="file"
-                                accept=".csv"
+                                accept=".csv,.xlsx"
                                 onChange={handleImportCSV}
                                 className="absolute inset-0 opacity-0 cursor-pointer"
                                 disabled={isImporting}

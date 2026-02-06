@@ -4,16 +4,20 @@ import { logger } from '../utils/logger';
 
 export const leadsService = {
     // Get all leads for the company - Optimized for performance
-    async getLeads(page = 1, pageSize = 50) {
+    async getLeads(page = 1, pageSize = 1000) {
         try {
-            const from = (page - 1) * pageSize;
-            const to = from + pageSize - 1;
+            console.log('🔍 Fetching ALL leads from database...');
 
             const { data, error, count } = await supabase
                 .from('leads')
                 .select('*', { count: 'exact' })
-                .order('created_at', { ascending: false })
-                .range(from, to);
+                .order('created_at', { ascending: false });
+
+            console.log('📥 Supabase getLeads response:');
+            console.log('  - Data count:', data?.length);
+            console.log('  - Total count:', count);
+            console.log('  - Error:', error);
+            console.log('  - First lead:', data?.[0]);
 
             if (error) {
                 logger.error('Error loading leads', error, { action: 'getLeads', page, pageSize });
@@ -194,7 +198,8 @@ export const leadsService = {
         return data as Lead;
     },
 
-    // Import multiple leads
+
+    // Import multiple leads with duplicate detection
     async importLeads(leads: Partial<Lead>[]) {
         try {
             const { data: { user } } = await supabase.auth.getUser();
@@ -221,7 +226,7 @@ export const leadsService = {
             const leadsToInsert = leads.map(lead => {
                 const cleanedLead: any = {
                     company_id: profile.company_id,
-                    assigned_to: lead.assigned_to || user.id, // Auto-assign to importer if not specified
+                    assigned_to: lead.assigned_to || user.id,
                     priority: lead.priority || 'medium',
                     status: lead.status || 'Prospecto',
                     value: lead.value || 0
@@ -234,24 +239,71 @@ export const leadsService = {
                     }
                 });
 
+                // Convert empty strings to null for email and phone
+                if (cleanedLead.email === '') cleanedLead.email = null;
+                if (cleanedLead.phone === '') cleanedLead.phone = null;
+
                 return cleanedLead;
             });
 
             logger.debug('Attempting to import leads', { count: leadsToInsert.length });
 
-            const { data, error } = await supabase
-                .from('leads')
-                .insert(leadsToInsert)
-                .select();
+            // Insert leads one by one to handle duplicates gracefully
+            const results = {
+                inserted: [] as Lead[],
+                skipped: [] as Array<{ lead: any; reason: string }>,
+                errors: [] as Array<{ lead: any; error: any }>
+            };
 
-            if (error) {
-                logger.error('Supabase insert error', error, { action: 'importLeads', count: leadsToInsert.length });
-                throw error;
+            for (const lead of leadsToInsert) {
+                try {
+                    const { data, error } = await supabase
+                        .from('leads')
+                        .insert(lead)
+                        .select()
+                        .single();
+
+                    if (error) {
+                        // Check if it's a unique constraint violation (duplicate)
+                        if (error.code === '23505') {
+                            const isDuplicateEmail = error.message.includes('leads_company_email_unique');
+                            const isDuplicatePhone = error.message.includes('leads_company_phone_unique');
+
+                            let reason = 'Duplicate';
+                            if (isDuplicateEmail && isDuplicatePhone) {
+                                reason = `Duplicate email (${lead.email}) and phone (${lead.phone})`;
+                            } else if (isDuplicateEmail) {
+                                reason = `Duplicate email (${lead.email})`;
+                            } else if (isDuplicatePhone) {
+                                reason = `Duplicate phone (${lead.phone})`;
+                            }
+
+                            results.skipped.push({ lead, reason });
+                            logger.warn('Skipped duplicate lead', { reason, lead: lead.name });
+                        } else {
+                            // Other database error
+                            results.errors.push({ lead, error });
+                            logger.error('Failed to insert lead', error, { lead: lead.name });
+                        }
+                    } else {
+                        results.inserted.push(data);
+                    }
+                } catch (err) {
+                    results.errors.push({ lead, error: err });
+                    logger.error('Exception during lead insert', err, { lead: lead.name });
+                }
             }
 
-            logger.debug('Successfully imported leads', { count: data?.length });
-            return data as Lead[];
+            logger.info('Import completed', {
+                inserted: results.inserted.length,
+                skipped: results.skipped.length,
+                errors: results.errors.length
+            });
+
+            // Return full results object
+            return results;
         } catch (error: any) {
+            console.error('💥 Import service failed:', error);
             logger.error('Lead import service failed', error, { action: 'importLeads' });
             throw error;
         }
