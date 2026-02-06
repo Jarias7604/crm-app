@@ -54,50 +54,57 @@ export const campaignService = {
         if (error) throw error;
     },
 
-    // Simulates sending the campaign
+    // Triggers the real marketing-engine Edge Function
     async sendCampaign(id: string) {
-        // 1. Update status to 'sending'
-        await this.updateCampaign(id, { status: 'sending' });
+        const { data: { session } } = await supabase.auth.getSession();
 
-        // 2. Simulate delay (sending emails...)
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
-        // 3. Update status to 'completed' and mock stats
-        const mockStats = {
-            sent: Math.floor(Math.random() * 100) + 50,
-            opened: 0,
-            clicked: 0
-        };
-
-        await this.updateCampaign(id, {
-            status: 'completed',
-            sent_at: new Date().toISOString(),
-            stats: mockStats
+        const { data, error } = await supabase.functions.invoke('marketing-engine', {
+            body: { campaignId: id },
+            headers: {
+                Authorization: `Bearer ${session?.access_token}`
+            }
         });
+
+        if (error) throw error;
+        return data;
     },
 
-    // NEW: Get audience preview based on filters
-    async getAudiencePreview(filters: { status?: string[], dateRange?: 'all' | 'new' }, companyId: string) {
+    // NEW: Get audience preview based on advanced filters
+    async getAudiencePreview(filters: {
+        status?: string[],
+        priority?: string,
+        dateRange?: 'all' | 'new',
+        specificIds?: string[],
+        idType?: 'id' | 'google_place_id'
+    }, companyId: string) {
         if (!companyId) return [];
 
         let query = supabase
             .from('leads')
-            .select('id, name, company_name, email, created_at, status')
-            // .eq('company_id', companyId) // Removed to allow Super Admin to see all leads (RLS handles security)
+            .select('id, name, company_name, email, created_at, status, priority')
+            .eq('company_id', companyId)
             .not('email', 'is', null);
 
-        if (filters.dateRange === 'new') {
-            // Last 30 days
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-            query = query.gte('created_at', thirtyDaysAgo.toISOString());
+        if (filters.specificIds && filters.specificIds.length > 0) {
+            const idField = filters.idType || 'id';
+            query = query.in(idField, filters.specificIds);
+        } else {
+            if (filters.dateRange === 'new') {
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                query = query.gte('created_at', thirtyDaysAgo.toISOString());
+            }
+
+            if (filters.status && filters.status.length > 0) {
+                query = query.in('status', filters.status);
+            }
+
+            if (filters.priority && filters.priority !== 'all') {
+                query = query.eq('priority', filters.priority);
+            }
         }
 
-        if (filters.status && filters.status.length > 0) {
-            query = query.in('status', filters.status);
-        }
-
-        const { data, error } = await query.limit(50); // Preview limit
+        const { data, error } = await query.limit(100);
 
         if (error) {
             console.error('Error fetching audience:', error);
@@ -106,5 +113,23 @@ export const campaignService = {
         }
 
         return data || [];
+    },
+
+    async uploadMarketingAsset(file: File) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substring(2)}${Date.now()}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+            .from('marketing_assets')
+            .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+            .from('marketing_assets')
+            .getPublicUrl(filePath);
+
+        return publicUrl;
     }
 };

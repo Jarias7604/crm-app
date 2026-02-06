@@ -166,8 +166,8 @@ export default function Dashboard() {
                 endDate = endOfToday().toISOString();
                 break;
             case 'this_week':
-                startDate = startOfWeek(now, { weekStartsOn: 1 }).toISOString();
-                endDate = endOfWeek(now, { weekStartsOn: 1 }).toISOString();
+                startDate = startOfWeek(now, { weekStartsOn: 0 }).toISOString();
+                endDate = endOfWeek(now, { weekStartsOn: 0 }).toISOString();
                 break;
             case 'this_month':
                 startDate = startOfMonth(now).toISOString();

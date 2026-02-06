@@ -100,9 +100,9 @@ function App() {
                   <Route element={<FeatureProtectedRoute feature="marketing" />}>
                     <Route path="/marketing" element={<MarketingDashboard />} />
                     <Route path="/marketing/lead-hunter" element={<LeadHunter />} />
-                    <Route path="/marketing/campaigns" element={<EmailCampaigns />} />
-                    <Route path="/marketing/campaigns/new" element={<EmailBuilder />} />
-                    <Route path="/marketing/campaigns/:id/edit" element={<EmailBuilder />} />
+                    <Route path="/marketing/email" element={<EmailCampaigns />} />
+                    <Route path="/marketing/email/new" element={<EmailBuilder />} />
+                    <Route path="/marketing/email/:id/edit" element={<EmailBuilder />} />
                     <Route path="/marketing/ai-agents" element={<AiAgentsConfig />} />
                     <Route path="/marketing/settings" element={<MarketingSettings />} />
                   </Route>

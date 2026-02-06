@@ -74,8 +74,8 @@ export function CustomDatePicker({ value, onChange, placeholder = "Seleccionar f
     const renderCalendar = () => {
         const monthStart = startOfMonth(currentMonth);
         const monthEnd = endOfMonth(monthStart);
-        const startDate = startOfWeek(monthStart, { locale: es });
-        const endDate = endOfWeek(monthEnd, { locale: es });
+        const startDate = startOfWeek(monthStart, { weekStartsOn: 0 });
+        const endDate = endOfWeek(monthEnd, { weekStartsOn: 0 });
 
         const calendarDays = eachDayOfInterval({
             start: startDate,

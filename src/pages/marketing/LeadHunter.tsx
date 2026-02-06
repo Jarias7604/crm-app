@@ -1,16 +1,18 @@
 import { useState, useMemo } from 'react';
-import { Search, MapPin, Plus, Check, Star, Globe, Phone, Building2, LayoutGrid, CheckSquare, Square, Download, Filter, X } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Search, MapPin, Check, Star, Globe, Phone, Building2, LayoutGrid, CheckSquare, Square, Download, Filter, Zap } from 'lucide-react';
 import { leadDiscoveryService, type DiscoveredLead } from '../../services/marketing/leadDiscovery';
 import { useAuth } from '../../auth/AuthProvider';
 import toast from 'react-hot-toast';
-import { Link } from 'react-router-dom';
 
 export default function LeadHunter() {
+    const navigate = useNavigate();
     const { profile } = useAuth();
     const [query, setQuery] = useState('');
     const [location, setLocation] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
+    const [isStartingCampaign, setIsStartingCampaign] = useState(false);
     const [results, setResults] = useState<DiscoveredLead[]>([]);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -76,31 +78,46 @@ export default function LeadHunter() {
         }
     };
 
-    const handleImportBulk = async () => {
+    const handleImportBulk = async (shouldRedirect = false) => {
         if (!profile?.company_id) {
             toast.error('No se pudo identificar tu empresa.');
             return;
         }
 
         const toImport = filteredResults.filter(r => selectedIds.has(r.id) && !r.is_imported);
-        if (toImport.length === 0) return;
 
-        setIsImporting(true);
+        if (toImport.length === 0 && !shouldRedirect) return;
+
+        if (shouldRedirect) setIsStartingCampaign(true);
+        else setIsImporting(true);
+
         try {
-            toast.loading(`Importando ${toImport.length} leads...`, { id: 'bulkImport' });
-            await leadDiscoveryService.importLeadsBulk(toImport, profile.company_id);
+            if (toImport.length > 0) {
+                toast.loading(`Importando ${toImport.length} leads...`, { id: 'bulkImport' });
+                const stats = await leadDiscoveryService.importLeadsBulk(toImport, profile.company_id);
 
-            setResults(prev => prev.map(r =>
-                selectedIds.has(r.id) ? { ...r, is_imported: true } : r
-            ));
-            setSelectedIds(new Set());
+                setResults(prev => prev.map(r =>
+                    selectedIds.has(r.id) ? { ...r, is_imported: true } : r
+                ));
+                toast.success(`✅ ${stats.success} prospectos agregados.`, { id: 'bulkImport' });
+            }
 
-            toast.success(`✅ ${toImport.length} prospectos agregados masivamente.`, { id: 'bulkImport' });
+            if (shouldRedirect) {
+                navigate('/marketing/email/new', {
+                    state: {
+                        preSelectedLeads: Array.from(selectedIds),
+                        campaignSource: 'lead-hunter'
+                    }
+                });
+            } else {
+                setSelectedIds(new Set());
+            }
         } catch (error) {
             console.error(error);
-            toast.error('Error durante la importación masiva.', { id: 'bulkImport' });
+            toast.error('Error durante el proceso.', { id: 'bulkImport' });
         } finally {
             setIsImporting(false);
+            setIsStartingCampaign(false);
         }
     };
 
@@ -154,13 +171,22 @@ export default function LeadHunter() {
                     {selectedIds.size > 0 && (
                         <div className="flex items-center gap-4 bg-[#0f172a] p-1.5 pl-6 rounded-2xl animate-in fade-in slide-in-from-right-4 duration-300">
                             <span className="text-white font-bold text-sm">{selectedIds.size} seleccionados</span>
-                            <button
-                                onClick={handleImportBulk}
-                                disabled={isImporting}
-                                className="bg-amber-500 hover:bg-amber-600 text-white font-black px-6 py-3 rounded-xl shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
-                            >
-                                <Download className="w-5 h-5" /> Importar Ahora
-                            </button>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => handleImportBulk(false)}
+                                    disabled={isImporting || isStartingCampaign}
+                                    className="bg-white/10 hover:bg-white/20 text-white font-bold px-4 py-3 rounded-xl transition-all flex items-center gap-2 disabled:opacity-50 border border-white/10"
+                                >
+                                    <Download className="w-5 h-5 text-amber-500" /> Importar
+                                </button>
+                                <button
+                                    onClick={() => handleImportBulk(true)}
+                                    disabled={isImporting || isStartingCampaign}
+                                    className="bg-gradient-to-r from-orange-500 to-pink-600 hover:from-orange-600 hover:to-pink-700 text-white font-black px-6 py-3 rounded-xl shadow-lg shadow-orange-500/30 transition-all flex items-center gap-2 disabled:opacity-50"
+                                >
+                                    <Zap className="w-5 h-5" /> Iniciar Campaña
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -295,7 +321,7 @@ export default function LeadHunter() {
                             key={lead.id}
                             onClick={() => !lead.is_imported && toggleSelection(lead.id)}
                             className={`bg-white rounded-[2rem] border p-1 transition-all relative group cursor-pointer ${lead.is_imported ? 'opacity-70 grayscale-[0.5]' :
-                                    isSelected ? 'border-amber-500 ring-2 ring-amber-500/20 shadow-xl' : 'border-gray-100 hover:border-amber-200 hover:shadow-lg'
+                                isSelected ? 'border-amber-500 ring-2 ring-amber-500/20 shadow-xl' : 'border-gray-100 hover:border-amber-200 hover:shadow-lg'
                                 }`}
                         >
                             <div className="p-6">
@@ -340,8 +366,8 @@ export default function LeadHunter() {
                                     }}
                                     disabled={lead.is_imported}
                                     className={`w-full py-4 rounded-2xl font-black transition-all border-2 text-sm uppercase tracking-widest ${lead.is_imported
-                                            ? 'bg-green-50 border-green-200 text-green-700 cursor-default'
-                                            : isSelected ? 'bg-amber-500 border-amber-500 text-white shadow-lg' : 'bg-white border-gray-100 text-gray-900 hover:bg-gray-50'
+                                        ? 'bg-green-50 border-green-200 text-green-700 cursor-default'
+                                        : isSelected ? 'bg-amber-500 border-amber-500 text-white shadow-lg' : 'bg-white border-gray-100 text-gray-900 hover:bg-gray-50'
                                         }`}
                                 >
                                     {lead.is_imported ? 'Importado' : isSelected ? 'Seleccionado' : 'Importar Solo Este'}

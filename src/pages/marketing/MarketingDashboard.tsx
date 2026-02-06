@@ -73,56 +73,113 @@ export default function MarketingDashboard() {
                 </Link>
             </div>
 
-            {/* Stats Overview */}
+            {/* Stats Overview & Interest Heatmap */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Main Chart Area Placeholder */}
-                <div className="lg:col-span-2 bg-white p-5 rounded-2xl shadow-sm border border-gray-100 min-h-[300px]">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-bold text-gray-800">Rendimiento de Campañas</h3>
-                        <select className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1 text-xs font-medium text-gray-600">
-                            <option>Últimos 30 días</option>
-                            <option>Este trimestre</option>
-                        </select>
-                    </div>
-                    <div className="flex items-center justify-center h-[200px] bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
-                        <div className="text-center text-gray-400">
-                            <TrendingUp className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                            <p className="text-xs">Gráfico de Opens/Clicks vs Tiempo</p>
+                {/* Interest Heatmap Area */}
+                <div className="lg:col-span-2 bg-white p-6 rounded-3xl shadow-sm border border-gray-100 min-h-[400px]">
+                    <div className="flex justify-between items-center mb-6">
+                        <div>
+                            <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
+                                <TrendingUp className="w-5 h-5 text-orange-500" />
+                                Mapa de Calor de Interés
+                            </h3>
+                            <p className="text-sm text-gray-500 mt-1">Leads con mayor interacción en tiempo real.</p>
                         </div>
+                        <button className="text-blue-600 text-sm font-bold hover:underline">Ver todos</button>
+                    </div>
+
+                    <div className="space-y-4">
+                        {/* Heatmap List */}
+                        <div className="overflow-hidden rounded-2xl border border-gray-100">
+                            <table className="w-full text-left">
+                                <thead className="bg-gray-50 text-[10px] font-black uppercase text-gray-400">
+                                    <tr>
+                                        <th className="px-6 py-4">Prospecto</th>
+                                        <th className="px-6 py-4">Envíos</th>
+                                        <th className="px-6 py-4">Aperturas</th>
+                                        <th className="px-6 py-4">Clicks</th>
+                                        <th className="px-6 py-4 text-right">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50 font-medium text-sm">
+                                    {/* Real data would map from lead_marketing_stats view here */}
+                                    <tr className="hover:bg-gray-50/50 transition-colors">
+                                        <td className="px-6 py-4">
+                                            <div className="font-bold text-gray-900">Farmacia San Rafael</div>
+                                            <div className="text-[10px] text-gray-400">sanrafael@email.com</div>
+                                        </td>
+                                        <td className="px-6 py-4">12</td>
+                                        <td className="px-6 py-4">
+                                            <span className="bg-orange-50 text-orange-700 px-2 py-1 rounded-lg font-black text-[10px]">8 APERTURAS</span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className="bg-blue-50 text-blue-700 px-2 py-1 rounded-lg font-black text-[10px]">3 CLICKS</span>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <button className="p-2 hover:bg-blue-50 rounded-lg text-blue-600 transition-colors">
+                                                <Zap className="w-4 h-4" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr className="hover:bg-gray-50/50 transition-colors opacity-60">
+                                        <td className="px-6 py-4">
+                                            <div className="font-bold text-gray-900">Hospital Central</div>
+                                            <div className="text-[10px] text-gray-400">adm@hospcentral.com</div>
+                                        </td>
+                                        <td className="px-6 py-4">5</td>
+                                        <td className="px-6 py-4">
+                                            <span className="bg-gray-50 text-gray-500 px-2 py-1 rounded-lg font-black text-[10px]">3 APERTURAS</span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className="bg-gray-50 text-gray-500 px-2 py-1 rounded-lg font-black text-[10px]">0 CLICKS</span>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <button className="p-2 hover:bg-blue-50 rounded-lg text-blue-600 transition-colors">
+                                                <Zap className="w-4 h-4" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p className="text-[10px] text-gray-400 italic text-center">Los datos se actualizan automáticamente al detectar aperturas.</p>
                     </div>
                 </div>
 
-                {/* Right Side Stats */}
+                {/* Tracking Summaries */}
                 <div className="space-y-4">
                     <StatCard
-                        title="Total Enviados"
-                        value="12,543"
+                        title="Impactos Totales"
+                        value="12.5k"
                         trend="+12%"
                         trendUp={true}
                     />
                     <StatCard
-                        title="Tasa de Apertura"
-                        value="45.2%"
+                        title="Interés Promedio"
+                        value="38%"
                         trend="+5.4%"
                         trendUp={true}
                     />
-                    <StatCard
-                        title="Leads Generados"
-                        value="892"
-                        trend="+23%"
-                        trendUp={true}
-                    />
 
-                    <div className="bg-gradient-to-br from-[#0f172a] to-[#1e293b] p-6 rounded-2xl text-white relative overflow-hidden">
+                    {/* Active Campaign Card */}
+                    <div className="bg-gradient-to-br from-[#0f172a] to-[#1e293b] p-6 rounded-3xl text-white relative overflow-hidden shadow-xl shadow-slate-200">
                         <div className="relative z-10">
-                            <h3 className="text-lg font-bold mb-1">Lead Hunter AI</h3>
-                            <p className="text-gray-400 text-sm mb-4">Descubre 500+ prospectos nuevos esta semana.</p>
-                            <Link to="/marketing/lead-hunter" className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2 rounded-lg text-sm font-semibold w-full transition-colors flex items-center justify-center gap-2">
-                                <Search className="w-4 h-4" />
-                                Iniciar Búsqueda
+                            <div className="flex items-center gap-2 mb-4">
+                                <span className="w-2 h-2 bg-green-500 rounded-full animate-ping"></span>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-green-400">Campaña Activa</span>
+                            </div>
+                            <h3 className="text-lg font-bold mb-1">Promo Farmacias Oriente</h3>
+                            <div className="flex justify-between text-xs text-gray-400 mb-4">
+                                <span>Progreso: 85%</span>
+                                <span>142/168 enviados</span>
+                            </div>
+                            <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden mb-6">
+                                <div className="bg-gradient-to-r from-blue-400 to-indigo-500 h-full w-[85%] rounded-full shadow-[0_0_8px_rgba(96,165,250,0.5)]"></div>
+                            </div>
+                            <Link to="/marketing/email" className="bg-white text-slate-900 px-4 py-2.5 rounded-xl text-sm font-black w-full transition-all flex items-center justify-center gap-2 hover:bg-blue-50 hover:scale-[1.02] active:scale-[0.98]">
+                                Ver Reporte Completo
                             </Link>
                         </div>
-                        <Search className="absolute -bottom-4 -right-4 w-32 h-32 text-white/5 rotate-12" />
                     </div>
                 </div>
             </div>
