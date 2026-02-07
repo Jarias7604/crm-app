@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Search, MapPin, Check, Star, Globe, Phone, Building2, LayoutGrid, CheckSquare, Square, Download, Filter, Zap } from 'lucide-react';
+import { Search, MapPin, Check, Star, Globe, Phone, Mail, Building2, LayoutGrid, CheckSquare, Square, Download, Filter, Zap } from 'lucide-react';
 import { leadDiscoveryService, type DiscoveredLead } from '../../services/marketing/leadDiscovery';
 import { useAuth } from '../../auth/AuthProvider';
 import toast from 'react-hot-toast';
@@ -21,7 +21,8 @@ export default function LeadHunter() {
     const [filters, setFilters] = useState({
         minRating: 0,
         hasPhone: false,
-        hasWebsite: false
+        hasWebsite: false,
+        hasEmail: false
     });
 
     const handleSearch = async (e: React.FormEvent) => {
@@ -55,6 +56,7 @@ export default function LeadHunter() {
             if (lead.rating && lead.rating < filters.minRating) return false;
             if (filters.hasPhone && !lead.phone) return false;
             if (filters.hasWebsite && !lead.website) return false;
+            if (filters.hasEmail && !lead.website) return false;
             return true;
         });
     }, [results, filters]);
@@ -239,6 +241,13 @@ export default function LeadHunter() {
                                 }`}
                         >
                             <Globe className="w-4 h-4 inline mr-2" /> Solo con Web
+                        </button>
+                        <button
+                            onClick={() => setFilters({ ...filters, hasEmail: !filters.hasEmail })}
+                            className={`px-6 py-3 rounded-xl font-bold text-sm transition-all border ${filters.hasEmail ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100'
+                                }`}
+                        >
+                            <Mail className="w-4 h-4 inline mr-2" /> Solo con Email
                         </button>
                     </div>
 
