@@ -22,7 +22,7 @@ It resets `verify_jwt` to `true` by default, which BREAKS functions that need pu
 | setup-telegram | **false** | - |
 | send-whatsapp-message | **false** | WHATSAPP_TOKEN |
 | process-message-queue | **false** | - |
-| marketing-engine | **true** | - |
+| marketing-engine | **false** | RESEND_API_KEY |
 | tracking | **false** | - |
 
 ## Deployment Steps

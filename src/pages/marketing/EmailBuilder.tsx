@@ -132,8 +132,12 @@ export default function EmailBuilder() {
 
             if (!isDraft) {
                 toast.loading('Enviando campaña...', { id: 'sending' });
-                await campaignService.sendCampaign(savedId);
-                toast.success('¡Campaña enviada!', { id: 'sending' });
+                const result = await campaignService.sendCampaign(savedId);
+                console.log('📧 CAMPAIGN RESULT:', JSON.stringify(result, null, 2));
+                const sent = result?.results?.success || 0;
+                const failed = result?.results?.failed || 0;
+                if (result?.debug) console.log('🔍 DEBUG:', result.debug.join('\n'));
+                toast.success(`¡Campaña enviada! ${sent} enviados, ${failed} fallidos`, { id: 'sending' });
             } else {
                 toast.success(isEditMode ? 'Campaña actualizada' : 'Borrador guardado');
             }

@@ -115,7 +115,7 @@ export const campaignService = {
             }
         }
 
-        const { data, error } = await query.limit(100);
+        const { data, error } = await query.limit(1000);
 
         if (error) {
             console.error('Error fetching audience:', error);
