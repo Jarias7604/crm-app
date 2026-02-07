@@ -34,6 +34,17 @@ export const campaignService = {
         return data as Campaign[];
     },
 
+    async getCampaignById(id: string) {
+        const { data, error } = await supabase
+            .from('marketing_campaigns')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+        if (error) throw error;
+        return data as Campaign;
+    },
+
     async createCampaign(campaign: Partial<Campaign>) {
         const { data, error } = await supabase
             .from('marketing_campaigns')

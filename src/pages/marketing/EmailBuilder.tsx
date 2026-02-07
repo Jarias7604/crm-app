@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Save, Send, ArrowLeft, Users, FileText, Eye, X, Zap, Building2 } from 'lucide-react';
 import { campaignService } from '../../services/marketing/campaignService';
 import toast from 'react-hot-toast';
@@ -10,6 +10,8 @@ import RichTextEditor from '../../components/marketing/RichTextEditor';
 export default function EmailBuilder() {
     const { profile } = useAuth();
     const navigate = useNavigate();
+    const { id: campaignId } = useParams();
+    const isEditMode = !!campaignId;
 
 
     const [formData, setFormData] = useState({
@@ -29,7 +31,27 @@ export default function EmailBuilder() {
     const location = useLocation();
 
     useEffect(() => {
-        if (location.state?.preSelectedLeads) {
+        if (campaignId) {
+            // Edit mode: load existing campaign
+            campaignService.getCampaignById(campaignId).then(campaign => {
+                setFormData({
+                    name: campaign.name || '',
+                    subject: campaign.subject || '',
+                    content: campaign.content || '',
+                    audience_filter: campaign.audience_filters || {
+                        status: [],
+                        dateRange: 'all',
+                        priority: 'all',
+                        specificIds: [],
+                        idType: 'id'
+                    }
+                });
+            }).catch(err => {
+                console.error(err);
+                toast.error('Error al cargar la campaña');
+                navigate('/marketing/email');
+            });
+        } else if (location.state?.preSelectedLeads) {
             const leadIds = location.state.preSelectedLeads;
             setFormData(prev => ({
                 ...prev,
@@ -41,10 +63,9 @@ export default function EmailBuilder() {
                 }
             }));
             setIsDirectConnect(true);
-            // Trigger preview for these specific leads
             handlePreviewAudience(leadIds);
         }
-    }, [location.state]);
+    }, [campaignId, location.state]);
 
     const possibleStatuses = ["Prospecto", "Cerrado", "En seguimiento", "Cliente", "Negociación", "Lead calificado"];
 
@@ -85,28 +106,36 @@ export default function EmailBuilder() {
                 return;
             }
 
-            const newCampaign = {
+            const campaignData = {
                 name: formData.name,
                 subject: formData.subject,
                 content: formData.content,
                 type: 'email' as 'email',
                 status: 'draft' as 'draft',
-
                 total_recipients: Math.floor(Math.random() * 500) + 50,
-                company_id: profile?.company_id || undefined, // Handle company context
+                company_id: profile?.company_id || undefined,
                 audience_filters: formData.audience_filter,
                 stats: { sent: 0, delivered: 0, opened: 0, clicked: 0, replied: 0, bounced: 0 }
             };
 
-            const data = await campaignService.createCampaign(newCampaign);
+            let savedId: string;
+
+            if (isEditMode && campaignId) {
+                // Update existing campaign
+                await campaignService.updateCampaign(campaignId, campaignData);
+                savedId = campaignId;
+            } else {
+                // Create new campaign
+                const data = await campaignService.createCampaign(campaignData);
+                savedId = data.id;
+            }
 
             if (!isDraft) {
-                // Si no es borrador (es decir, "Enviar"), simulamos el envío inmediato
                 toast.loading('Enviando campaña...', { id: 'sending' });
-                await campaignService.sendCampaign(data.id);
+                await campaignService.sendCampaign(savedId);
                 toast.success('¡Campaña enviada!', { id: 'sending' });
             } else {
-                toast.success('Borrador guardado');
+                toast.success(isEditMode ? 'Campaña actualizada' : 'Borrador guardado');
             }
 
             navigate('/marketing/email');
@@ -126,8 +155,8 @@ export default function EmailBuilder() {
                     <ArrowLeft className="w-6 h-6" />
                 </button>
                 <div>
-                    <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Nueva Campaña de Email</h1>
-                    <p className="text-gray-500 text-sm font-medium">Configura y diseña tu correo para maximizar conversiones.</p>
+                    <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">{isEditMode ? 'Editar Campaña' : 'Nueva Campaña de Email'}</h1>
+                    <p className="text-gray-500 text-sm font-medium">{isEditMode ? 'Modifica y actualiza tu campaña.' : 'Configura y diseña tu correo para maximizar conversiones.'}</p>
                 </div>
             </div>
 
@@ -325,7 +354,7 @@ export default function EmailBuilder() {
                             className="w-full py-4 text-gray-700 font-bold bg-white border border-gray-200 rounded-2xl hover:bg-gray-50 transition-colors flex justify-center items-center gap-2"
                         >
                             <Save className="w-5 h-5" />
-                            Guardar Borrador
+                            {isEditMode ? 'Guardar Cambios' : 'Guardar Borrador'}
                         </button>
                         <button
                             onClick={() => handleSave(false)}

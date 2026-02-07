@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Plus, Mail, Clock, CheckCircle, BarChart2, Play, Edit } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Plus, Mail, Clock, CheckCircle, BarChart2, Play, Edit, Copy } from 'lucide-react';
 import { campaignService, type Campaign } from '../../services/marketing/campaignService';
 import toast from 'react-hot-toast';
 
 export default function EmailCampaigns() {
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
     const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
 
     useEffect(() => {
         loadCampaigns();
@@ -25,7 +26,7 @@ export default function EmailCampaigns() {
     };
 
     const handleQuickSend = async (id: string) => {
-        if (!confirm('¿Estás seguro de enviar esta campaña ahora? (Simulación)')) return;
+        if (!confirm('¿Estás seguro de enviar esta campaña ahora?')) return;
 
         try {
             toast.loading('Enviando campaña...', { id: 'sending' });
@@ -34,6 +35,27 @@ export default function EmailCampaigns() {
             loadCampaigns();
         } catch (error) {
             toast.error('Error al enviar', { id: 'sending' });
+        }
+    };
+
+    const handleDuplicate = async (campaign: Campaign) => {
+        try {
+            const newCampaign = {
+                name: `${campaign.name} (copia)`,
+                subject: campaign.subject,
+                content: campaign.content,
+                type: campaign.type,
+                status: 'draft' as const,
+                total_recipients: 0,
+                company_id: campaign.company_id,
+                audience_filters: campaign.audience_filters,
+                stats: { sent: 0, delivered: 0, opened: 0, clicked: 0, replied: 0, bounced: 0 }
+            };
+            const data = await campaignService.createCampaign(newCampaign);
+            toast.success('Campaña duplicada como borrador');
+            navigate(`/marketing/email/${data.id}/edit`);
+        } catch (error) {
+            toast.error('Error al duplicar');
         }
     };
 
@@ -104,20 +126,37 @@ export default function EmailCampaigns() {
                                 </div>
 
                                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    {/* Editar - siempre visible */}
+                                    <button
+                                        onClick={() => navigate(`/marketing/email/${campaign.id}/edit`)}
+                                        className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                                        title="Editar"
+                                    >
+                                        <Edit className="w-5 h-5" />
+                                    </button>
+
+                                    {/* Enviar - solo para drafts */}
                                     {campaign.status === 'draft' && (
-                                        <>
-                                            <button className="p-2 text-gray-400 hover:text-blue-600 transition-colors" title="Editar">
-                                                <Edit className="w-5 h-5" />
-                                            </button>
-                                            <button
-                                                onClick={() => handleQuickSend(campaign.id)}
-                                                className="p-2 text-gray-400 hover:text-green-600 transition-colors"
-                                                title="Enviar Ahora"
-                                            >
-                                                <Play className="w-5 h-5" />
-                                            </button>
-                                        </>
+                                        <button
+                                            onClick={() => handleQuickSend(campaign.id)}
+                                            className="p-2 text-gray-400 hover:text-green-600 transition-colors"
+                                            title="Enviar Ahora"
+                                        >
+                                            <Play className="w-5 h-5" />
+                                        </button>
                                     )}
+
+                                    {/* Duplicar - para completed (reenviar como nueva) */}
+                                    {campaign.status === 'completed' && (
+                                        <button
+                                            onClick={() => handleDuplicate(campaign)}
+                                            className="p-2 text-gray-400 hover:text-orange-600 transition-colors"
+                                            title="Duplicar como nuevo borrador"
+                                        >
+                                            <Copy className="w-5 h-5" />
+                                        </button>
+                                    )}
+
                                     <button className="p-2 text-gray-400 hover:text-purple-600 transition-colors" title="Ver Reporte">
                                         <BarChart2 className="w-5 h-5" />
                                     </button>
