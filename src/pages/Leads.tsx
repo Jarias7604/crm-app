@@ -67,7 +67,14 @@ export default function Leads() {
     // Column order persistence
     const [columnOrder, setColumnOrder] = useState<string[]>(() => {
         const saved = localStorage.getItem('lead_column_order');
-        return saved ? JSON.parse(saved) : ['name', 'status', 'priority', 'source', 'value', 'assigned_to'];
+        const defaultCols = ['name', 'email', 'phone', 'status', 'priority', 'source', 'value', 'assigned_to'];
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            // Add new columns if missing from saved order
+            const newCols = defaultCols.filter(c => !parsed.includes(c));
+            return newCols.length > 0 ? [...parsed.slice(0, 1), ...newCols, ...parsed.slice(1)] : parsed;
+        }
+        return defaultCols;
     });
 
     const handleOnDragEnd = (result: any) => {
@@ -81,6 +88,9 @@ export default function Leads() {
 
     const [isImporting, setIsImporting] = useState(false);
     const [priorityFilter, setPriorityFilter] = useState<string>('all');
+    const [assignedFilter, setAssignedFilter] = useState<string>('all');
+    const [isAssignedFilterOpen, setIsAssignedFilterOpen] = useState(false);
+    const assignedFilterRef = useRef<HTMLDivElement>(null);
     const [searchTerm, setSearchTerm] = useState<string>('');
     const [filteredLeadId, setFilteredLeadId] = useState<string | null>(null);
 
@@ -242,9 +252,18 @@ export default function Leads() {
             // Filter by priority
             if (priorityFilter !== 'all' && lead.priority !== priorityFilter) return false;
 
+            // Filter by assigned user
+            if (assignedFilter !== 'all') {
+                if (assignedFilter === 'unassigned') {
+                    if (lead.assigned_to) return false;
+                } else {
+                    if (lead.assigned_to !== assignedFilter) return false;
+                }
+            }
+
             return true;
         });
-    }, [leads, priorityFilter, filteredLeadId, searchTerm]);
+    }, [leads, priorityFilter, assignedFilter, filteredLeadId, searchTerm]);
 
     const sortedLeads = useMemo(() => {
         if (!sortConfig) return filteredLeads;
@@ -345,6 +364,9 @@ export default function Leads() {
         const handleClickOutside = (event: MouseEvent) => {
             if (priorityFilterRef.current && !priorityFilterRef.current.contains(event.target as Node)) {
                 setIsPriorityFilterOpen(false);
+            }
+            if (assignedFilterRef.current && !assignedFilterRef.current.contains(event.target as Node)) {
+                setIsAssignedFilterOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -627,9 +649,51 @@ export default function Leads() {
                             {leads.length} prospectos {!isAdmin && '(Asignados)'} · <span className="text-[#4449AA] font-black">${leads.reduce((sum, l) => sum + (l.value || 0), 0).toLocaleString()}</span> en pipeline
                         </p>
                         <div className="hidden sm:block w-px h-4 bg-gray-300"></div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-2">Filtrar:</span>
                             <PriorityDropdown />
+                            {/* Assigned User Filter */}
+                            <div className="relative" ref={assignedFilterRef}>
+                                <button
+                                    onClick={() => setIsAssignedFilterOpen(!isAssignedFilterOpen)}
+                                    className={`flex items-center space-x-2 bg-white border px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm h-10 min-w-[160px] justify-between ${assignedFilter !== 'all' ? 'border-indigo-300 text-indigo-600' : 'border-gray-100 text-[#4449AA]'}`}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <User className="h-3.5 w-3.5" />
+                                        <span>{assignedFilter === 'all' ? 'Todos' : assignedFilter === 'unassigned' ? 'Sin Asignar' : teamMembers.find(m => m.id === assignedFilter)?.full_name?.split(' ')[0] || 'Usuario'}</span>
+                                    </div>
+                                    <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition-transform duration-300 ${isAssignedFilterOpen ? 'rotate-180' : ''}`} />
+                                </button>
+                                {isAssignedFilterOpen && (
+                                    <div className="absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-50 z-50 py-2 animate-in fade-in slide-in-from-top-2">
+                                        <button
+                                            onClick={() => { setAssignedFilter('all'); setIsAssignedFilterOpen(false); }}
+                                            className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors ${assignedFilter === 'all' ? 'bg-blue-50 text-[#007BFF]' : 'text-gray-500 hover:bg-gray-50'}`}
+                                        >
+                                            Todos los Usuarios
+                                        </button>
+                                        <button
+                                            onClick={() => { setAssignedFilter('unassigned'); setIsAssignedFilterOpen(false); }}
+                                            className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors ${assignedFilter === 'unassigned' ? 'bg-blue-50 text-[#007BFF]' : 'text-gray-500 hover:bg-gray-50'}`}
+                                        >
+                                            Sin Asignar
+                                        </button>
+                                        <div className="border-t border-gray-100 my-1" />
+                                        {teamMembers.map(member => (
+                                            <button
+                                                key={member.id}
+                                                onClick={() => { setAssignedFilter(member.id); setIsAssignedFilterOpen(false); }}
+                                                className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors flex items-center gap-2 ${assignedFilter === member.id ? 'bg-blue-50 text-[#007BFF]' : 'text-gray-500 hover:bg-gray-50'}`}
+                                            >
+                                                <div className="w-5 h-5 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
+                                                    {member.avatar_url ? <img src={member.avatar_url} alt="" className="w-full h-full object-cover" /> : <User className="w-3 h-3 text-slate-400" />}
+                                                </div>
+                                                {member.full_name || member.email}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -893,6 +957,8 @@ export default function Leads() {
                                                                             </div>
                                                                         )}
 
+                                                                        {colId === 'email' && "Email"}
+                                                                        {colId === 'phone' && "Teléfono"}
                                                                         {colId === 'status' && "Estado"}
                                                                         {colId === 'priority' && "Prioridad"}
                                                                         {colId === 'source' && "Fuente"}
@@ -949,6 +1015,24 @@ export default function Leads() {
                                                                 <span className="text-sm font-bold text-gray-900 group-hover:text-[#4449AA] transition-colors">{lead.name}</span>
                                                                 <span className="text-[11px] text-blue-600 font-bold">{lead.company_name || 'Individual'}</span>
                                                             </div>
+                                                        )}
+
+                                                        {colId === 'email' && (
+                                                            lead.email ? (
+                                                                <div className="flex items-center gap-1.5 max-w-[180px]">
+                                                                    <Mail className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                                                    <span className="text-[11px] font-semibold text-gray-700 truncate" title={lead.email}>{lead.email}</span>
+                                                                </div>
+                                                            ) : <span className="text-xs text-gray-300">—</span>
+                                                        )}
+
+                                                        {colId === 'phone' && (
+                                                            lead.phone ? (
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <Phone className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                                                                    <span className="text-[11px] font-semibold text-gray-700">{lead.phone}</span>
+                                                                </div>
+                                                            ) : <span className="text-xs text-gray-300">—</span>
                                                         )}
 
                                                         {colId === 'status' && <StatusBadge status={lead.status} />}

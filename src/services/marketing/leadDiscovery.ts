@@ -7,6 +7,7 @@ export interface DiscoveredLead {
     address: string;
     phone?: string;
     website?: string;
+    email?: string;
     rating?: number;
     review_count?: number;
     source: 'google_maps' | 'linkedin' | 'database';
@@ -71,7 +72,7 @@ class LeadDiscoveryService {
     }
 
     // Extract clean domain from website URL
-    private cleanDomain(website: string): string {
+    cleanDomain(website: string): string {
         try {
             let domain = website.replace(/^https?:\/\//, '').replace(/^www\./, '');
             domain = domain.split('/')[0]; // Remove paths
@@ -82,11 +83,21 @@ class LeadDiscoveryService {
         }
     }
 
+    // Derive email from website domain (excluding social media)
+    deriveEmail(website?: string): string | null {
+        if (!website) return null;
+        const excluded = ['facebook.com', 'google.com', 'yelp.com', 'instagram.com', 'twitter.com', 'tiktok.com', 'youtube.com', 'linkedin.com', 'tripadvisor.com', 'maps.google'];
+        if (excluded.some(d => website.toLowerCase().includes(d))) return null;
+        const domain = this.cleanDomain(website);
+        if (!domain || !domain.includes('.')) return null;
+        return `info@${domain}`;
+    }
+
     async importLead(lead: DiscoveredLead, companyId: string): Promise<void> {
         const newLead = {
             name: lead.business_name,
             company_name: lead.business_name,
-            email: null,
+            email: lead.email || null,
             phone: lead.phone || null,
             source: 'Lead Hunter AI',
             status: 'Prospecto' as const,
@@ -114,7 +125,7 @@ class LeadDiscoveryService {
                 const newLead = {
                     name: lead.business_name,
                     company_name: lead.business_name,
-                    email: null,
+                    email: lead.email || null,
                     phone: lead.phone || null,
                     source: 'Lead Hunter AI',
                     status: 'Prospecto' as const,

@@ -50,13 +50,20 @@ export default function LeadHunter() {
         }
     };
 
+    // Check if website has a real domain usable for email (not social media/listings)
+    const hasEmailableDomain = (website?: string) => {
+        if (!website) return false;
+        const excluded = ['facebook.com', 'google.com', 'yelp.com', 'instagram.com', 'twitter.com', 'tiktok.com', 'youtube.com', 'linkedin.com', 'tripadvisor.com', 'maps.google'];
+        return !excluded.some(domain => website.toLowerCase().includes(domain));
+    };
+
     // Apply client-side filtering
     const filteredResults = useMemo(() => {
         return results.filter(lead => {
             if (lead.rating && lead.rating < filters.minRating) return false;
             if (filters.hasPhone && !lead.phone) return false;
             if (filters.hasWebsite && !lead.website) return false;
-            if (filters.hasEmail && !lead.website) return false;
+            if (filters.hasEmail && !lead.email) return false;
             return true;
         });
     }, [results, filters]);
@@ -360,15 +367,27 @@ export default function LeadHunter() {
                                     </div>
                                 </div>
 
-                                <div className="space-y-3 text-sm text-gray-500 mb-6 font-medium">
+                                <div className="space-y-2 text-sm text-gray-500 mb-6 font-medium">
                                     <div className="flex items-start gap-2">
                                         <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
                                         <span className="line-clamp-2 leading-tight">{lead.address}</span>
                                     </div>
+                                    {lead.phone && (
+                                        <div className="flex items-center gap-2">
+                                            <Phone className="w-4 h-4 text-green-500" />
+                                            <span className="text-gray-700 font-semibold">{lead.phone}</span>
+                                        </div>
+                                    )}
+                                    {lead.email && (
+                                        <div className="flex items-center gap-2">
+                                            <Mail className="w-4 h-4 text-blue-500" />
+                                            <span className="text-blue-600 truncate text-xs">{lead.email}</span>
+                                        </div>
+                                    )}
                                     {lead.website && (
                                         <div className="flex items-center gap-2">
                                             <Globe className="w-4 h-4 text-gray-400" />
-                                            <span className="text-blue-600 truncate">{lead.website}</span>
+                                            <span className="text-gray-500 truncate text-xs">{lead.website}</span>
                                         </div>
                                     )}
                                 </div>
