@@ -70,18 +70,29 @@ class LeadDiscoveryService {
         }));
     }
 
+    // Extract clean domain from website URL
+    private cleanDomain(website: string): string {
+        try {
+            let domain = website.replace(/^https?:\/\//, '').replace(/^www\./, '');
+            domain = domain.split('/')[0]; // Remove paths
+            domain = domain.split('?')[0]; // Remove query strings
+            return domain;
+        } catch {
+            return website;
+        }
+    }
+
     async importLead(lead: DiscoveredLead, companyId: string): Promise<void> {
-        // 1. Preparar objeto Lead
         const newLead = {
             name: lead.business_name,
             company_name: lead.business_name,
-            email: lead.website ? `contacto@${lead.website.replace('www.', '')}` : null,
-            phone: lead.phone,
+            email: null,
+            phone: lead.phone || null,
             source: 'Lead Hunter AI',
             status: 'Prospecto' as const,
             company_id: companyId,
-            google_place_id: lead.id, // ID único de Google Maps (place_id)
-            next_action_notes: `Prospecto importado de Lead Hunter. Dirección: ${lead.address}. Rating: ${lead.rating?.toFixed(1)}`
+            google_place_id: lead.id,
+            next_action_notes: `Prospecto de Lead Hunter. Dirección: ${lead.address}. Rating: ${lead.rating?.toFixed(1)}${lead.website ? `. Web: ${this.cleanDomain(lead.website)}` : ''}`
         };
 
         // 2. Insertar en Supabase con prevención de duplicados
@@ -95,25 +106,44 @@ class LeadDiscoveryService {
     async importLeadsBulk(leads: DiscoveredLead[], companyId: string): Promise<{ success: number; failed: number }> {
         if (!leads.length) return { success: 0, failed: 0 };
 
-        const newLeads = leads.map(lead => ({
-            name: lead.business_name,
-            company_name: lead.business_name,
-            email: lead.website ? `contacto@${lead.website.replace('www.', '')}` : null,
-            phone: lead.phone,
-            source: 'Lead Hunter AI',
-            status: 'Prospecto' as const,
-            company_id: companyId,
-            google_place_id: lead.id,
-            next_action_notes: `Importación masiva. Rating: ${lead.rating?.toFixed(1)}`
-        }));
+        let success = 0;
+        let failed = 0;
 
-        const { error } = await supabase
-            .from('leads')
-            .upsert(newLeads, { onConflict: 'google_place_id' });
+        for (const lead of leads) {
+            try {
+                const newLead = {
+                    name: lead.business_name,
+                    company_name: lead.business_name,
+                    email: null,
+                    phone: lead.phone || null,
+                    source: 'Lead Hunter AI',
+                    status: 'Prospecto' as const,
+                    company_id: companyId,
+                    google_place_id: lead.id,
+                    next_action_notes: `Importación masiva. Dirección: ${lead.address}. Rating: ${lead.rating?.toFixed(1)}${lead.website ? `. Web: ${this.cleanDomain(lead.website)}` : ''}`
+                };
 
-        if (error) throw error;
+                const { error } = await supabase
+                    .from('leads')
+                    .upsert(newLead, { onConflict: 'google_place_id' });
 
-        return { success: leads.length, failed: 0 };
+                if (error) {
+                    // If duplicate email/phone, skip silently
+                    if (error.code === '23505') {
+                        failed++;
+                    } else {
+                        console.error(`Error importing ${lead.business_name}:`, error);
+                        failed++;
+                    }
+                } else {
+                    success++;
+                }
+            } catch (err) {
+                failed++;
+            }
+        }
+
+        return { success, failed };
     }
 }
 

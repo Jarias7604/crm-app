@@ -99,7 +99,12 @@ export default function LeadHunter() {
                 setResults(prev => prev.map(r =>
                     selectedIds.has(r.id) ? { ...r, is_imported: true } : r
                 ));
-                toast.success(`✅ ${stats.success} prospectos agregados.`, { id: 'bulkImport' });
+
+                if (stats.failed > 0) {
+                    toast.success(`✅ ${stats.success} importados, ${stats.failed} omitidos (duplicados)`, { id: 'bulkImport' });
+                } else {
+                    toast.success(`✅ ${stats.success} prospectos agregados.`, { id: 'bulkImport' });
+                }
             }
 
             if (shouldRedirect) {
