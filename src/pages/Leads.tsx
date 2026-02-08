@@ -6,7 +6,7 @@ import type { Lead, LeadStatus, LeadPriority, FollowUp } from '../types';
 import { PRIORITY_CONFIG, STATUS_CONFIG, ACTION_TYPES, SOURCE_CONFIG, SOURCE_OPTIONS } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2, Layout, MessageSquare, Send as TelegramIcon, Smartphone, Filter, ChevronDown, CheckCircle, Shield, ArrowUpDown, Search } from 'lucide-react';
+import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2, Layout, MessageSquare, Send, Smartphone, Filter, ChevronDown, CheckCircle, Shield, ArrowUpDown, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { csvHelper } from '../utils/csvHelper';
@@ -1121,6 +1121,20 @@ export default function Leads() {
                                         Cancelar
                                     </button>
                                     <button
+                                        onClick={() => {
+                                            navigate('/marketing/campaign/new', {
+                                                state: {
+                                                    preSelectedLeads: selectedLeadIds,
+                                                    campaignSource: 'leads-bulk'
+                                                }
+                                            });
+                                        }}
+                                        className="flex items-center gap-2 bg-indigo-50 text-indigo-600 hover:bg-[#4449AA] hover:text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm"
+                                    >
+                                        <Send className="w-3.5 h-3.5" />
+                                        Preparar Mensaje
+                                    </button>
+                                    <button
                                         onClick={handleBulkDelete}
                                         className="flex items-center gap-2 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm"
                                     >
@@ -1285,7 +1299,7 @@ export default function Leads() {
                                         }}
                                         className="flex items-center justify-center gap-2 py-3 bg-sky-50 text-sky-600 rounded-xl font-bold text-xs hover:bg-sky-100 transition-all border border-sky-100"
                                     >
-                                        <TelegramIcon className="w-4 h-4" /> Telegram Bot
+                                        <Send className="w-4 h-4" /> Telegram Bot
                                     </button>
                                     <button
                                         onClick={(e) => {
@@ -1557,28 +1571,47 @@ export default function Leads() {
                                                 {item.itemType === 'message' ? (
                                                     <>
                                                         {/* Message Icon */}
-                                                        <div className={`absolute -left-[30px] top-1 w-6 h-6 rounded-lg ${item.channel === 'whatsapp' ? 'bg-green-100 border-green-200 text-green-600' : 'bg-sky-100 border-sky-200 text-sky-600'} border-2 flex items-center justify-center shadow-sm z-10 group-hover:scale-110 transition-all`}>
-                                                            {item.channel === 'whatsapp' ? <Smartphone className="w-3 h-3" /> : <TelegramIcon className="w-3 h-3" />}
+                                                        <div className={`absolute -left-[30px] top-1 w-6 h-6 rounded-lg border-2 flex items-center justify-center shadow-sm z-10 group-hover:scale-110 transition-all ${item.channel === 'whatsapp' ? 'bg-green-100 border-green-200 text-green-600' :
+                                                            item.channel === 'telegram' ? 'bg-sky-100 border-sky-200 text-sky-600' :
+                                                                item.channel === 'email' ? 'bg-amber-100 border-amber-200 text-amber-600' :
+                                                                    'bg-gray-100 border-gray-200 text-gray-600'
+                                                            }`}>
+                                                            {item.channel === 'whatsapp' ? <Smartphone className="w-3 h-3" /> :
+                                                                item.channel === 'telegram' ? <Send className="w-3 h-3" /> :
+                                                                    item.channel === 'email' ? <Mail className="w-3 h-3" /> :
+                                                                        <MessageSquare className="w-3 h-3" />}
                                                         </div>
                                                         <div className={`rounded-xl p-4 border shadow-sm transition-all ${item.direction === 'inbound' ? 'bg-white border-gray-100' : 'bg-blue-50/50 border-blue-100'}`}>
                                                             <div className="flex justify-between items-start mb-2">
-                                                                <p className="text-xs font-black text-gray-400 uppercase tracking-widest">
-                                                                    {(() => {
-                                                                        try {
-                                                                            const dateObj = new Date(item.created_at);
-                                                                            return format(dateObj, 'dd MMM, HH:mm', { locale: es });
-                                                                        } catch (e) { return 'Fecha error'; }
-                                                                    })()}
-                                                                </p>
+                                                                <div className="flex flex-col gap-0.5">
+                                                                    <p className="text-xs font-black text-gray-400 uppercase tracking-widest">
+                                                                        {(() => {
+                                                                            try {
+                                                                                const dateObj = new Date(item.created_at);
+                                                                                return format(dateObj, 'dd MMM, HH:mm', { locale: es });
+                                                                            } catch (e) { return 'Fecha error'; }
+                                                                        })()}
+                                                                    </p>
+                                                                    {item.metadata?.campaign_id && (
+                                                                        <span className="text-[8px] font-black text-indigo-500 uppercase tracking-tighter flex items-center gap-1">
+                                                                            <TrendingUp className="w-2 h-2" /> Campaña de Marketing
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                                 <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider ${item.direction === 'inbound' ? 'bg-gray-100 text-gray-500' : 'bg-blue-100 text-blue-600'}`}>
                                                                     {item.direction === 'inbound' ? 'Recibido' : 'Enviado'}
                                                                 </span>
                                                             </div>
                                                             <p className="text-sm font-medium text-gray-700 leading-relaxed whitespace-pre-wrap">
-                                                                {item.content}
+                                                                {item.channel === 'email' && item.metadata?.campaign_id
+                                                                    ? 'Email de campaña enviado'
+                                                                    : item.content}
                                                             </p>
-                                                            <div className="mt-2 pt-2 border-t border-gray-50/50 flex items-center gap-2">
-                                                                <span className="text-[10px] font-bold text-gray-400">Canal: {item.channel}</span>
+                                                            <div className="mt-2 pt-2 border-t border-gray-50/50 flex items-center justify-between">
+                                                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Canal: {item.channel}</span>
+                                                                {item.status && (
+                                                                    <span className="text-[10px] font-black text-gray-300 uppercase italic">{item.status}</span>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </>

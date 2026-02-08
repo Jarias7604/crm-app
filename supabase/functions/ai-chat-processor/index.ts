@@ -8,37 +8,58 @@ const corsHeaders = {
 
 const FRONTEND_URL = "https://crm-app-v2.vercel.app";
 
-/**
- * V39: CONSULTATIVE AI AGENT - Database-Driven Intelligence
- * 
- * Key Features:
- * - Uses system_prompt from database (not hardcoded)
- * - Injects lead context (name, company, phone, status)
- * - Injects pricing data dynamically
- * - Enforces qualification before quoting
- * - Atomic transport: saves + sends to Telegram in one flow
- */
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+const supabase = createClient(
+    SUPABASE_URL || '',
+    SUPABASE_SERVICE_ROLE_KEY || '',
+    { auth: { persistSession: false } }
+);
+
+console.log(`[AI-Processor] Initialized with URL: ${SUPABASE_URL ? 'OK' : 'MISSING'}`);
 
 Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+    const logs: string[] = [];
+    const log = (...args: any[]) => {
+        const msg = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+        logs.push(`[${new Date().toISOString()}] ${msg}`);
+        console.log(msg);
+    };
+
     try {
-        const { conversationId } = await req.json();
-        const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+        const body = await req.json().catch(() => ({}));
+        const { conversationId } = body;
+
+        if (typeof conversationId !== 'string') {
+            log(`Invalid conversationId type: ${typeof conversationId}`);
+            return new Response(JSON.stringify({ error: "conversationId must be a string", logs }), { status: 400, headers: corsHeaders });
+        }
 
         // ===========================================
         // 1. LOAD CONVERSATION + LEAD DATA
         // ===========================================
-        const { data: conv } = await supabase.from('marketing_conversations')
+        log(`Starting session for Conv: ${conversationId}`);
+        const { data: conv, error: convError } = await supabase.from('marketing_conversations')
             .select('*, lead:leads(*)')
             .eq('id', conversationId)
-            .single();
+            .maybeSingle();
 
-        if (!conv) throw new Error("Conversation not found");
+        if (convError) {
+            log(`DB error loading conversation: ${JSON.stringify(convError)}`);
+            throw convError;
+        }
+        if (!conv) {
+            log(`Conv ${conversationId} not found`);
+            return new Response(JSON.stringify({ error: "Conversation not found", logs }), { status: 404, headers: corsHeaders });
+        }
 
         const companyId = conv.company_id;
         const lead = conv.lead;
         const chatId = conv.external_id;
+        console.log(`[AI-Processor] Company: ${companyId}, Lead: ${lead?.id}, Chat: ${chatId}`);
 
         // ===========================================
         // 2. LOAD AI AGENT (with system_prompt from DB)
@@ -50,8 +71,10 @@ Deno.serve(async (req) => {
             .maybeSingle();
 
         if (!agent) {
+            console.warn(`[AI-Processor] No active agent found for Company: ${companyId}`);
             return new Response(JSON.stringify({ skipped: true, reason: "No active agent" }), { headers: corsHeaders });
         }
+        log(`Using Agent: ${agent.name}`);
 
         // ===========================================
         // 3. LOAD PRICING DATA (Plans + Modules)
@@ -67,7 +90,9 @@ Deno.serve(async (req) => {
             modulos: pricingItems?.filter((i: any) => i.tipo === 'modulo') || [],
             servicios: pricingItems?.filter((i: any) => i.tipo === 'servicio') || []
         };
+        log(`Loaded ${pricingItems?.length || 0} pricing items`);
 
+        // ... (pricing info building remains the same) ...
         // Build pricing context for AI
         const planesInfo = pricing.planes.map((p: any) =>
             `• ${p.nombre}: $${p.precio_anual}/año (implementación: $${p.costo_unico || 0})`
@@ -77,45 +102,48 @@ Deno.serve(async (req) => {
             `• ${m.nombre}: $${m.precio_anual}/año - ${m.descripcion || 'Módulo adicional'}`
         ).join('\n');
 
+        const serviciosInfo = pricing.servicios.map((s: any) =>
+            `• ${s.nombre}: $${s.precio_anual > 0 ? s.precio_anual + '/año' : (s.precio_por_dte > 0 ? s.precio_por_dte + ' por mensaje' : s.costo_unico + ' (pago único)')} - ${s.descripcion || 'Servicio adicional'}`
+        ).join('\n');
+
         // ===========================================
         // 4. BUILD DYNAMIC CONTEXT (Lead + Pricing)
         // ===========================================
         const leadContext = `
-=== INFORMACIÓN DEL LEAD EN BASE DE DATOS ===
+=== INFORMACIÓN DEL LEAD (BASE DE DATOS) ===
 Nombre: ${lead?.name || 'No registrado'}
 Empresa: ${lead?.company_name || 'No registrada'}
 Teléfono: ${lead?.phone || 'No registrado'}
 Email: ${lead?.email || 'No registrado'}
-Estado actual: ${lead?.status || 'nuevo'}
-Prioridad: ${lead?.priority || 'normal'}
-Valor estimado: ${lead?.value ? `$${lead.value}` : 'No estimado'}
-Notas de seguimiento: ${lead?.next_action_notes || 'Sin notas'}
-Fuente: ${lead?.source || 'telegram'}
+Estado: ${lead?.status || 'nuevo'}
+Volumen aproximado (registrado): ${lead?.metadata?.volume || 'No definido aún'}
 
-=== PRODUCTOS Y PRECIOS DISPONIBLES ===
+=== PORTAFOLIO DE PRODUCTOS Y PRECIOS (CATÁLOGO REAL) ===
 
-PLANES DISPONIBLES:
+PLANES PRINCIPALES (Suscripción):
 ${planesInfo || 'No hay planes configurados'}
 
-MÓDULOS ADICIONALES:
+MÓDULOS ADICIONALES (Complementos):
 ${modulosInfo || 'No hay módulos configurados'}
 
-=== REGLAS CRÍTICAS DE COTIZACIÓN ===
+SERVICIOS Y COSTOS VARIABLES:
+${serviciosInfo || 'No hay servicios configurados'}
 
-⚠️ ANTES de generar cualquier cotización DEBES tener esta información:
-1. Nombre del contacto ✓ o preguntarlo
-2. Nombre de la empresa (si es para empresa)
-3. Volumen aproximado de facturas mensuales/anuales
-4. Confirmación de que quiere una cotización formal
+=== REGLAS DE INTELIGENCIA COMERCIAL ===
 
-❌ NUNCA generes una cotización si no tienes al menos el nombre y el volumen.
-❌ NUNCA inventes URLs de cotización - el sistema las genera automáticamente.
+1. 🔍 MEMORIA DE CONVERSACIÓN: 
+   - SIEMPRE revisa los mensajes previos. Si el cliente ya mencionó que usa "250 facturas", "5 sucursales", etc., NO se lo vuelvas a preguntar. Úsalo directamente para tus cálculos.
 
-✅ Cuando tengas toda la información y el cliente CONFIRME que quiere cotización, incluye al FINAL de tu mensaje:
-QUOTE_TRIGGER: { "plan_name": "NombreDelPlan", "dte_volume": NUMERO, "items": ["Modulo1", "Modulo2"] }
+2. 🧮 CÁLCULOS DINÁMICOS EN EL CHAT:
+   - Tienes permiso para mencionar precios unitarios y realizar cálculos para ayudar al cliente a entender su inversión.
+   - Ej: "Como nos comentas que emites 250 facturas mensuales, el servicio de WhatsApp tendría un costo de sólo $7.50 mensuales ($0.03 x 250)."
 
-Ejemplo: Si el cliente quiere el Plan Business con 500 DTEs y el módulo Inventario:
-QUOTE_TRIGGER: { "plan_name": "Business", "dte_volume": 500, "items": ["Inventario"] }
+3. ⚠️ GENERACIÓN DE COTIZACIÓN FORMAL:
+   - Solo usa QUOTE_TRIGGER cuando el cliente confirme que desea una propuesta formal.
+   - Incluye todos los módulos y servicios solicitados en la lista de 'items'.
+
+✅ Link de cotización (solo al final si se solicita):
+QUOTE_TRIGGER: { "plan_name": "NombreDelPlan", "dte_volume": NUMERO, "items": ["Modulo1", "Servicio1"] }
 `;
 
         // Combine base system_prompt from DB + dynamic context
@@ -134,7 +162,11 @@ ${leadContext}`;
             .maybeSingle();
 
         const apiKey = iconf?.settings?.apiKey;
-        if (!apiKey) throw new Error("OpenAI API Key not found");
+        if (!apiKey) {
+            log(`OpenAI API Key missing for Company: ${companyId}`);
+            throw new Error("OpenAI API Key not found");
+        }
+        log(`Found OpenAI Key: ...${apiKey.slice(-5)}`);
 
         // ===========================================
         // 6. GET CONVERSATION HISTORY (Last 20 messages)
@@ -145,26 +177,105 @@ ${leadContext}`;
             .order('created_at', { ascending: false })
             .limit(20);
 
-        const previousMessages = (history || []).reverse().map((msg: any) => ({
-            role: msg.direction === 'inbound' ? 'user' : 'assistant',
-            content: msg.type === 'image' ? '[Usuario envió una imagen]' : msg.content
-        }));
+        const lastMsg = history?.[0];
+        log(`History count: ${history?.length || 0}. Last message direction: ${lastMsg?.direction}`);
 
         // Skip if last message was outbound (avoid double-response)
-        const lastMsg = history?.[0];
         if (lastMsg?.direction === 'outbound') {
+            console.warn(`[AI-Processor] Skipping: last message was already outbound`);
             return new Response(JSON.stringify({ skipped: true, reason: "Last message was outbound" }), { headers: corsHeaders });
         }
 
+        const previousMessages = (history || []).reverse().map((msg: any) => ({
+            role: msg.direction === 'inbound' ? 'user' : 'assistant',
+            content: msg.type === 'image' ? '[Usuario envió una imagen]' :
+                (msg.type === 'audio' && msg.metadata?.is_voice) || msg.type === 'voice' ? `[Nota de voz: ${msg.metadata?.transcription || 'Sin transcribir'}]` :
+                    msg.type === 'audio' ? `[Audio: ${msg.metadata?.transcription || 'Sin transcribir'}]` :
+                        msg.content
+        }));
+
         // ===========================================
-        // 7. CALL OPENAI
+        // 7. HANDLE VOICE TRANSCRIPTION (Whisper)
+        // ===========================================
+        let userMessage = lastMsg?.content || "";
+        if (lastMsg?.direction === 'inbound' && (lastMsg?.type === 'voice' || lastMsg?.type === 'audio')) {
+            const fileId = lastMsg.metadata?.file_id;
+            if (fileId && !lastMsg.metadata?.transcription) {
+                log(`Audio detected. Transcribing file_id: ${fileId}`);
+                console.log(`[Whisper] Audio detected. FileID: ${fileId}`);
+                try {
+                    // Get Telegram Bot Token
+                    const { data: tgIntegration } = await supabase
+                        .from('marketing_integrations')
+                        .select('settings')
+                        .eq('company_id', companyId)
+                        .eq('provider', 'telegram')
+                        .eq('is_active', true)
+                        .maybeSingle();
+
+                    const botToken = tgIntegration?.settings?.token;
+                    if (botToken) {
+                        // 1. Get file path from Telegram
+                        const fileInfoResp = await fetch(`https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`);
+                        const fileInfo = await fileInfoResp.json();
+
+                        if (fileInfo.ok && fileInfo.result.file_path) {
+                            const filePath = fileInfo.result.file_path;
+                            const fileUrl = `https://api.telegram.org/file/bot${botToken}/${filePath}`;
+
+                            // 2. Download file
+                            const audioResp = await fetch(fileUrl);
+                            const audioBlob = await audioResp.blob();
+
+                            // 3. Send to Whisper
+                            const formData = new FormData();
+                            formData.append('file', audioBlob, 'audio.ogg');
+                            formData.append('model', 'whisper-1');
+
+                            const whisperResp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+                                method: 'POST',
+                                headers: { 'Authorization': `Bearer ${apiKey}` },
+                                body: formData
+                            });
+
+                            const whisperData = await whisperResp.json();
+                            if (whisperData.text) {
+                                log(`Transcription successful: ${whisperData.text}`);
+                                userMessage = whisperData.text;
+
+                                // Update message in DB with transcription
+                                await supabase.from('marketing_messages')
+                                    .update({
+                                        content: `[Nota de voz]: ${whisperData.text}`,
+                                        metadata: { ...lastMsg.metadata, transcription: whisperData.text }
+                                    })
+                                    .eq('id', lastMsg.id);
+
+                                // Update history content for prompt
+                                previousMessages[previousMessages.length - 1].content = `[Nota de voz]: ${whisperData.text}`;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    log(`Transcription error: ${e.message}`);
+                }
+            } else if (lastMsg.metadata?.transcription) {
+                userMessage = lastMsg.metadata.transcription;
+            }
+        }
+
+        // ===========================================
+        // 8. CALL OPENAI (GPT-4)
         // ===========================================
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 model: 'gpt-4o',
-                messages: [{ role: 'system', content: fullSystemPrompt }, ...previousMessages],
+                messages: [
+                    { role: 'system', content: fullSystemPrompt },
+                    ...previousMessages
+                ],
                 temperature: 0.7,
             }),
         });
@@ -206,10 +317,11 @@ ${leadContext}`;
 
             // Match plan from DB
             const planes = pricingItems?.filter((i: any) => i.tipo === 'plan') || [];
-            const modulos = pricingItems?.filter((i: any) => i.tipo === 'modulo') || [];
+            const modulosYServicios = pricingItems?.filter((i: any) => i.tipo === 'modulo' || i.tipo === 'servicio') || [];
 
             let selectedPlan = planes.find((p: any) =>
-                p.nombre.toLowerCase().includes(planNameRequested.toLowerCase())
+                p.nombre.toLowerCase().includes(planNameRequested.toLowerCase()) ||
+                planNameRequested.toLowerCase().includes(p.nombre.toLowerCase())
             ) || planes[0];
 
             if (!selectedPlan) {
@@ -222,16 +334,27 @@ ${leadContext}`;
                 const dbExtras: any[] = [];
                 for (const itemName of extraItems) {
                     const name = typeof itemName === 'string' ? itemName : (itemName as any).name;
-                    const dbMod = modulos.find((m: any) =>
-                        m.nombre.toLowerCase().includes(name.toLowerCase())
+                    const dbItem = modulosYServicios.find((m: any) =>
+                        m.nombre.toLowerCase().includes(name.toLowerCase()) ||
+                        name.toLowerCase().includes(m.nombre.toLowerCase())
                     );
-                    if (dbMod) {
+                    if (dbItem) {
+                        // Calculate cost based on type
+                        let itemCost = Number(dbItem.precio_anual || 0);
+                        if (dbItem.tipo === 'servicio' && dbItem.precio_por_dte > 0) {
+                            // Variable cost per DTE/Message
+                            itemCost = Number(dbItem.precio_por_dte) * volume;
+                        } else if (dbItem.costo_unico > 0 && itemCost === 0) {
+                            itemCost = Number(dbItem.costo_unico);
+                        }
+
                         dbExtras.push({
-                            nombre: dbMod.nombre,
-                            costo: dbMod.precio_anual,
-                            costo_anual: dbMod.precio_anual
+                            nombre: dbItem.nombre,
+                            costo: itemCost,
+                            costo_anual: dbItem.tipo === 'modulo' ? itemCost : 0,
+                            tipo: dbItem.tipo
                         });
-                        extrasTotal += Number(dbMod.precio_anual || 0);
+                        extrasTotal += itemCost;
                     }
                 }
 
@@ -295,15 +418,24 @@ ${leadContext}`;
                 status: 'pending',
                 metadata: {
                     isAiGenerated: true,
-                    version: 'v39-database-driven',
-                    agentName: agent.name,
-                    leadId: lead?.id
+                    processed_by: 'edge-function',
+                    version: 'v39-final-fixed',
+                    agentName: agent.name || 'AI',
+                    leadId: lead?.id || null
                 }
             })
             .select()
-            .single();
+            .maybeSingle();
 
-        if (insertError) throw insertError;
+        if (insertError) {
+            log(`Insert error: ${JSON.stringify(insertError)}`);
+            throw insertError;
+        }
+
+        if (!savedMsg) {
+            log(`Insert succeeded but returned no data. Check triggers.`);
+            throw new Error("Message not saved (Blocked by database policy)");
+        }
 
         // ===========================================
         // 10. SEND TO TELEGRAM (Atomic Transport)
@@ -315,7 +447,7 @@ ${leadContext}`;
                 .eq('company_id', companyId)
                 .eq('provider', 'telegram')
                 .eq('is_active', true)
-                .single();
+                .maybeSingle();
 
             const botToken = tgIntegration?.settings?.token;
             if (botToken) {
@@ -363,13 +495,19 @@ ${leadContext}`;
 
         return new Response(JSON.stringify({
             success: true,
-            version: 'v39',
+            version: 'v40-stable',
             agent: agent.name,
             leadContext: !!lead
         }), { headers: corsHeaders });
 
     } catch (err: any) {
-        console.error('FATAL:', err.message);
-        return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+        console.error('FATAL ERROR in AI Processor:', err);
+        return new Response(JSON.stringify({
+            error: String(err),
+            message: err.message,
+            stack: err.stack,
+            at: new Date().toISOString(),
+            execution_logs: logs
+        }), { status: 500, headers: corsHeaders });
     }
 });

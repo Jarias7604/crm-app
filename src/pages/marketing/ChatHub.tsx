@@ -33,6 +33,8 @@ export default function ChatHub() {
     const [isAiProcessing, setIsAiProcessing] = useState(false);
     const [isSending, setIsSending] = useState(false);
     const [agentStatus, setAgentStatus] = useState<boolean>(false);
+    const [pendingFile, setPendingFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const location = useLocation();
@@ -288,7 +290,7 @@ export default function ChatHub() {
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newMessage.trim() || !selectedConv || isSending) return;
+        if ((!newMessage.trim() && !pendingFile) || !selectedConv || isSending) return;
 
         const content = newMessage;
         setNewMessage('');
@@ -309,7 +311,23 @@ export default function ChatHub() {
                 setConversations(prev => [newConv, ...prev]);
             }
 
-            await chatService.sendMessage(convId, content, 'text', 'outbound');
+            if (pendingFile) {
+                if (!profile?.company_id) throw new Error("Compañía no identificada");
+                const path = await storageService.uploadMessageFile(profile.company_id, convId, pendingFile);
+                const url = await storageService.getPublicUrl(path);
+                const isImage = pendingFile.type.startsWith('image/');
+
+                await chatService.sendMessage(
+                    convId,
+                    content || (isImage ? '\u200B' : ''), // Use message as caption, or invisible space if image and no text
+                    isImage ? 'image' : 'file',
+                    'outbound',
+                    { url, fileName: pendingFile.name, fileSize: pendingFile.size }
+                );
+                removePendingFile();
+            } else {
+                await chatService.sendMessage(convId, content, 'text', 'outbound');
+            }
         } catch (error: any) {
             toast.error('Error al enviar: ' + error.message);
             setNewMessage(content); // Restore message on failure
@@ -346,29 +364,26 @@ export default function ChatHub() {
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file || !selectedConv?.id || !profile?.company_id) return;
+        if (!file || !selectedConv || !profile?.company_id) return;
 
-        try {
-            const path = await storageService.uploadMessageFile(profile.company_id, selectedConv.id, file);
-            const url = await storageService.getDownloadUrl(path);
-
-            const isImage = file.type.startsWith('image/');
-            await chatService.sendMessage(
-                selectedConv.id,
-                `📁 Archivo: ${file.name}`,
-                isImage ? 'image' : 'file',
-                'outbound',
-                { url, fileName: file.name, fileSize: file.size }
-            );
-
-            toast.success('Archivo enviado correctamente');
-        } catch (error: any) {
-            console.error('Upload error:', error);
-            toast.error('Error al subir el archivo');
-        } finally {
-            if (fileInputRef.current) fileInputRef.current.value = '';
+        // Stage file for preview instead of sending immediately
+        setPendingFile(file);
+        if (file.type.startsWith('image/')) {
+            const url = URL.createObjectURL(file);
+            setPreviewUrl(url);
+        } else {
+            setPreviewUrl(null);
         }
+
+        if (fileInputRef.current) fileInputRef.current.value = '';
     };
+
+    const removePendingFile = () => {
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        setPendingFile(null);
+        setPreviewUrl(null);
+    };
+
 
     const searchLeads = (query: string) => {
         setLeadSearch(query);
@@ -592,7 +607,9 @@ export default function ChatHub() {
                                     </div>
                                     <div className="flex justify-between items-end">
                                         <p className={`text-xs truncate max-w-[180px] font-medium ${selectedConv?.id === conv.id ? 'text-blue-100' : 'text-slate-500'}`}>
-                                            {conv.last_message || 'Nueva conversación'}
+                                            {conv.last_message
+                                                ? (conv.last_message.replace(/<[^>]*>?/gm, '').replace(/\s+/g, ' ').trim() || 'Archivo/Imagen')
+                                                : 'Nueva conversación'}
                                         </p>
 
                                         {/* ADMIN ACTIONS: DELETE CONVERSATION */}
@@ -683,9 +700,9 @@ export default function ChatHub() {
                                 <div key={msg.id || idx} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'} group w-full animate-in fade-in slide-in-from-bottom-2 duration-300`}>
                                     <div className={`flex flex-col gap-2 ${msg.direction === 'outbound' ? 'items-end' : 'items-start'} max-w-[85%]`}>
                                         <div className={`px-5 py-3.5 rounded-[1.5rem] shadow-sm relative transition-all group-hover:shadow-md ${msg.direction === 'outbound'
-                                            ? 'bg-indigo-600 text-white rounded-br-none shadow-indigo-200/50'
+                                            ? (selectedConv.channel === 'email' || msg.type === 'image' || msg.type === 'file' ? 'bg-white text-slate-900 border border-slate-200' : 'bg-indigo-600 text-white shadow-indigo-200/50')
                                             : 'bg-white text-slate-700 border border-slate-100 rounded-bl-none shadow-slate-200/40'
-                                            }`}>
+                                            } ${msg.direction === 'outbound' && (selectedConv.channel === 'email' || msg.type === 'image' || msg.type === 'file') ? 'rounded-br-none' : msg.direction === 'outbound' ? 'rounded-br-none' : ''}`}>
                                             <div className="text-[14.5px] font-medium leading-[1.6]">
                                                 {msg.content.startsWith('__QUOTE__') ? (
                                                     <div className="w-fit max-w-[80%] min-w-[200px]">
@@ -706,12 +723,42 @@ export default function ChatHub() {
                                                         </button>
                                                     </div>
                                                 ) : msg.type === 'image' && msg.metadata?.url ? (
-                                                    <img src={msg.metadata.url} className="rounded-xl max-w-full cursor-pointer hover:opacity-95 shadow-sm border border-black/5" onClick={() => window.open(msg.metadata.url)} />
+                                                    <div className="flex flex-col gap-2">
+                                                        <img src={msg.metadata.url} className="rounded-2xl max-w-full cursor-pointer hover:opacity-98 transition-all shadow-sm border border-black/5" onClick={() => window.open(msg.metadata.url)} />
+                                                        {msg.content && <p className="text-[13px] px-3 pb-2 opacity-90">{msg.content}</p>}
+                                                    </div>
                                                 ) : msg.type === 'file' ? (
-                                                    <a href={msg.metadata?.url} target="_blank" className="flex items-center gap-3 p-2 group-hover/link:underline w-full">
-                                                        <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-white shrink-0"><Paperclip className="w-5 h-5" /></div>
-                                                        <span className="font-bold underline-offset-4 truncate">{msg.metadata?.fileName || 'Adjunto'}</span>
+                                                    <a href={msg.metadata?.url} target="_blank" className="flex items-center gap-3 p-1.5 group/file w-full">
+                                                        <div className="w-9 h-9 rounded-xl bg-slate-800/10 flex items-center justify-center text-slate-700 shrink-0"><Paperclip className="w-4.5 h-4.5" /></div>
+                                                        <div className="flex flex-col">
+                                                            <span className="font-bold text-[13px] truncate">{msg.metadata?.fileName || 'Archivo'}</span>
+                                                            <span className="text-[10px] opacity-70">Haz clic para descargar</span>
+                                                        </div>
                                                     </a>
+                                                ) : msg.type === 'voice' || msg.type === 'audio' ? (
+                                                    <div className="flex flex-col gap-2 min-w-[220px]">
+                                                        <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                                            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+                                                                <PhoneIcon className="w-5 h-5" />
+                                                            </div>
+                                                            <div className="flex-1">
+                                                                <p className="text-[10px] font-black uppercase text-indigo-600/60 tracking-widest">
+                                                                    {msg.metadata?.is_voice || msg.type === 'voice' ? 'Nota de Voz' : 'Audio'}
+                                                                </p>
+                                                                <p className="text-xs font-bold text-slate-700">Audio recibido</p>
+                                                            </div>
+                                                        </div>
+                                                        {msg.metadata?.transcription && (
+                                                            <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-50 italic text-[13px] text-slate-600 leading-relaxed shadow-sm">
+                                                                "{msg.metadata.transcription}"
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ) : selectedConv.channel === 'email' || msg.content.includes('</') ? (
+                                                    <div
+                                                        className={`prose prose-sm max-w-none break-words ${msg.direction === 'outbound' && selectedConv.channel === 'email' ? 'text-slate-900' : msg.direction === 'outbound' ? 'text-white' : 'text-slate-700'}`}
+                                                        dangerouslySetInnerHTML={{ __html: msg.content }}
+                                                    />
                                                 ) : (
                                                     msg.content
                                                 )}
@@ -772,6 +819,36 @@ export default function ChatHub() {
                         )}
 
                         <div className="px-8 pb-8 pt-4 bg-gradient-to-t from-white via-white to-transparent">
+                            {/* ATTACHMENT PREVIEW */}
+                            {pendingFile && (
+                                <div className="mb-4 animate-in slide-in-from-bottom-2 duration-300">
+                                    <div className="relative inline-block group">
+                                        <div className="bg-slate-50 rounded-2xl border-2 border-indigo-100 p-2 shadow-sm overflow-hidden">
+                                            {previewUrl ? (
+                                                <img src={previewUrl} className="h-32 w-auto rounded-xl object-contain border border-slate-100" alt="Preview" />
+                                            ) : (
+                                                <div className="h-20 w-48 flex items-center gap-3 px-4">
+                                                    <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
+                                                        <FileText className="w-5 h-5" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-[10px] font-black text-slate-800 uppercase tracking-wider truncate">{pendingFile.name}</p>
+                                                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{(pendingFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={removePendingFile}
+                                                className="absolute -top-2 -right-2 p-1 bg-white text-slate-400 hover:text-red-500 rounded-full shadow-md border border-slate-100 transition-all hover:scale-110 z-10"
+                                            >
+                                                <CloseIcon className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             <form onSubmit={handleSendMessage} className="bg-white rounded-[1.5rem] p-2 flex items-center gap-2 border border-slate-200/60 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.08)] focus-within:ring-4 focus-within:ring-indigo-100/50 focus-within:border-indigo-200 transition-all duration-300">
                                 <button type="button" className="p-3 text-slate-400 hover:text-indigo-600 transition-all hover:scale-110"><Smile className="w-5 h-5" /></button>
                                 <textarea
@@ -785,8 +862,8 @@ export default function ChatHub() {
                                 <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 text-slate-400 hover:text-indigo-600 transition-all hover:scale-110"><Paperclip className="w-5 h-5" /></button>
                                 <button
                                     type="submit"
-                                    disabled={!newMessage.trim() || isSending}
-                                    className={`h-12 w-12 flex items-center justify-center bg-indigo-600 text-white rounded-2xl transition-all shadow-xl shadow-indigo-600/20 active:scale-95 ${(!newMessage.trim() || isSending) ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-indigo-700 hover:-translate-y-0.5'}`}
+                                    disabled={(!newMessage.trim() && !pendingFile) || isSending}
+                                    className={`h-12 w-12 flex items-center justify-center bg-indigo-600 text-white rounded-2xl transition-all shadow-xl shadow-indigo-600/20 active:scale-95 ${((!newMessage.trim() && !pendingFile) || isSending) ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-indigo-700 hover:-translate-y-0.5'}`}
                                 >
                                     {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                                 </button>

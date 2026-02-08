@@ -96,21 +96,25 @@ Deno.serve(async (req) => {
         const chatId = conversation.external_id;
         const companyId = conversation.company_id;
 
-        // 2. Fetch Bot Token (Multi-tenant)
+        // 2. Fetch Bot Token (Multi-tenant SaaS)
         const { data: integration } = await supabase
-            .from('company_integrations')
-            .select('credentials')
+            .from('marketing_integrations')
+            .select('settings')
             .eq('company_id', companyId)
             .eq('provider', 'telegram')
             .eq('is_active', true)
-            .single();
+            .maybeSingle();
 
-        if (!integration?.credentials?.token) {
-            await supabase.from('marketing_messages').update({ status: 'failed', metadata: { ...record.metadata, error: 'Token missing' } }).eq('id', record.id);
-            return new Response('Token missing', { status: 400, headers: corsHeaders });
+        if (!integration?.settings?.token) {
+            console.error(`[Send-Telegram] Error: No active Telegram token found for Company: ${companyId}`);
+            await supabase.from('marketing_messages').update({
+                status: 'failed',
+                metadata: { ...record.metadata, error: 'Configuración de Telegram incompleta o inactiva.' }
+            }).eq('id', record.id);
+            return new Response('Config missing', { status: 400, headers: corsHeaders });
         }
 
-        const botToken = integration.credentials.token;
+        const botToken = integration.settings.token;
         console.log(`[Send-Telegram] Using Token: ...${botToken.slice(-5)} for Chat: ${chatId}`);
 
         const formData = new FormData();

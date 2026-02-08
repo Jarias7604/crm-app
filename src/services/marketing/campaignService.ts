@@ -3,7 +3,7 @@ import { supabase } from '../supabase';
 export interface Campaign {
     id: string;
     name: string;
-    type: 'email' | 'whatsapp' | 'sms';
+    type: 'email' | 'whatsapp' | 'telegram' | 'sms';
     status: 'draft' | 'scheduled' | 'sending' | 'completed';
     subject?: string;
     content?: string;
@@ -87,14 +87,24 @@ export const campaignService = {
         dateRange?: 'all' | 'new',
         specificIds?: string[],
         idType?: 'id' | 'google_place_id'
-    }, companyId: string) {
+    }, companyId: string, channel: string = 'email') {
         if (!companyId) return [];
 
         let query = supabase
             .from('leads')
-            .select('id, name, company_name, email, created_at, status, priority')
+            .select(`
+                id, name, company_name, email, phone, created_at, status, priority,
+                marketing_conversations(external_id)
+            `)
             .eq('company_id', companyId)
-            .not('email', 'is', null);
+            .eq('marketing_conversations.channel', channel);
+
+        // Filter by availability based on channel
+        if (channel === 'email') {
+            query = query.not('email', 'is', null);
+        } else {
+            query = query.not('phone', 'is', null);
+        }
 
         if (filters.specificIds && filters.specificIds.length > 0) {
             const idField = filters.idType || 'id';

@@ -34,6 +34,7 @@ const MarketingDashboard = lazy(() => import('./pages/marketing/MarketingDashboa
 const LeadHunter = lazy(() => import('./pages/marketing/LeadHunter'));
 const EmailCampaigns = lazy(() => import('./pages/marketing/EmailCampaigns'));
 const EmailBuilder = lazy(() => import('./pages/marketing/EmailBuilder'));
+const CampaignBuilder = lazy(() => import('./pages/marketing/CampaignBuilder'));
 const AiAgentsConfig = lazy(() => import('./pages/marketing/AiAgentsConfig'));
 const MarketingSettings = lazy(() => import('./pages/marketing/MarketingSettings'));
 const ChatHub = lazy(() => import('./pages/marketing/ChatHub'));
@@ -101,8 +102,12 @@ function App() {
                     <Route path="/marketing" element={<MarketingDashboard />} />
                     <Route path="/marketing/lead-hunter" element={<LeadHunter />} />
                     <Route path="/marketing/email" element={<EmailCampaigns />} />
-                    <Route path="/marketing/email/new" element={<EmailBuilder />} />
-                    <Route path="/marketing/email/:id/edit" element={<EmailBuilder />} />
+
+                    {/* Unified Campaign Routes */}
+                    <Route path="/marketing/email/new" element={<Navigate to="/marketing/campaign/new" replace />} />
+                    <Route path="/marketing/email/:id/edit" element={<CampaignBuilder />} />
+                    <Route path="/marketing/campaign/new" element={<CampaignBuilder />} />
+                    <Route path="/marketing/campaign/:id/edit" element={<CampaignBuilder />} />
                     <Route path="/marketing/ai-agents" element={<AiAgentsConfig />} />
                     <Route path="/marketing/settings" element={<MarketingSettings />} />
                   </Route>

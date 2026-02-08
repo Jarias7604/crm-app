@@ -1,5 +1,4 @@
 import {
-    Mail,
     MessageSquare,
     Search,
     TrendingUp,
@@ -29,7 +28,7 @@ export default function MarketingDashboard() {
                         <Settings className="w-4 h-4" />
                         Configurar Envíos
                     </Link>
-                    <Link to="/marketing/email/new" className="bg-gradient-to-r from-orange-500 to-pink-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 transition-all flex items-center gap-2">
+                    <Link to="/marketing/campaign/new" className="bg-gradient-to-r from-indigo-600 to-blue-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 transition-all flex items-center gap-2">
                         <Zap className="w-4 h-4" />
                         Nueva Campaña
                     </Link>
@@ -40,10 +39,10 @@ export default function MarketingDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Link to="/marketing/email">
                     <ActionCard
-                        icon={Mail}
+                        icon={Zap}
                         color="bg-purple-100 text-purple-600"
-                        title="Email Marketing"
-                        desc="Newsletters y secuencias"
+                        title="Gestión de Campañas"
+                        desc="Email, WhatsApp & Telegram"
                     />
                 </Link>
                 <Link to="/marketing/settings" state={{ tab: 'whatsapp' }}>

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthProvider';
-import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft, Zap, Search, Bot } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { brandingService } from '../services/branding';
@@ -13,6 +13,14 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     const { profile, signOut, setSimulatedCompanyId, setSimulatedRole } = useAuth();
     const location = useLocation();
     const { t } = useTranslation();
+
+    interface NavItem {
+        name: string;
+        href: string;
+        icon: any;
+        current: boolean;
+        subItems?: { name: string; href: string; icon: any }[];
+    }
     const configPaths = ['/company/branding', '/pricing', '/paquetes', '/items', '/financial-rules'];
     const [configOpen, setConfigOpen] = useState(configPaths.some(path => location.pathname === path));
     const [company, setCompany] = useState<Company | null>(null);
@@ -95,7 +103,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         return coreFeatures.includes(feature);
     };
 
-    const navigation = [
+    const navigation: NavItem[] = [
         { name: t('sidebar.dashboard'), href: '/', icon: LayoutDashboard, current: location.pathname === '/' }
     ];
 
@@ -116,7 +124,14 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
             name: 'Marketing Hub',
             href: '/marketing',
             icon: Megaphone,
-            current: location.pathname.startsWith('/marketing') && !location.pathname.startsWith('/marketing/chat')
+            current: location.pathname.startsWith('/marketing') && !location.pathname.startsWith('/marketing/chat'),
+            subItems: [
+                { name: 'Dashboard', href: '/marketing', icon: LayoutDashboard },
+                { name: 'Campañas', href: '/marketing/email', icon: Zap },
+                { name: 'Lead Hunter', href: '/marketing/lead-hunter', icon: Search },
+                { name: 'Agentes AI', href: '/marketing/ai-agents', icon: Bot },
+                { name: 'Configuración', href: '/marketing/settings', icon: Settings },
+            ]
         });
     }
 
@@ -289,36 +304,74 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
             )}>
                 <nav className="flex-1 space-y-1.5 focus:outline-none">
                     {navigation.map((item) => (
-                        <Link
-                            key={item.name}
-                            to={item.href}
-                            className={cn(
-                                item.current
-                                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
-                                    : 'text-gray-400 hover:bg-[#1e293b] hover:text-white',
-                                'group flex items-center rounded-xl transition-all duration-200 focus:outline-none relative',
-                                isCollapsed ? "justify-center p-3" : "px-4 py-3"
-                            )}
-                        >
-                            <item.icon className={cn(
-                                item.current ? 'text-white' : 'text-gray-400 group-hover:text-white',
-                                "h-5 w-5 transition-colors shrink-0",
-                                !isCollapsed && "mr-3"
-                            )} aria-hidden="true" />
-
-                            {!isCollapsed ? (
-                                <span className="text-sm font-semibold tracking-wide truncate">{item.name}</span>
-                            ) : (
-                                /* Premium Dark Tooltip (Floating Label) */
-                                <div className="absolute left-full ml-4 px-3.5 py-2.5 bg-[#0f172a]/95 backdrop-blur-xl text-white text-[11px] font-bold rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-300 translate-x-[-12px] group-hover:translate-x-0 z-[100] whitespace-nowrap border border-white/10 ring-1 ring-white/5">
-                                    <div className="absolute left-[-4px] top-1/2 -translate-y-1/2 w-2 h-2 bg-[#0f172a] rotate-45 border-l border-b border-white/10" />
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1 h-1 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
-                                        {item.name}
+                        <div key={item.name} className="space-y-1">
+                            {item.subItems && !isCollapsed ? (
+                                <>
+                                    <div
+                                        className={cn(
+                                            item.current ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40' : 'text-gray-400 hover:bg-[#1e293b] hover:text-white',
+                                            'group flex items-center justify-between rounded-xl transition-all duration-200 focus:outline-none p-3 px-4'
+                                        )}
+                                    >
+                                        <div className="flex items-center">
+                                            <item.icon className={cn(
+                                                item.current ? 'text-white' : 'text-gray-400 group-hover:text-white',
+                                                "h-5 w-5 transition-colors shrink-0 mr-3"
+                                            )} aria-hidden="true" />
+                                            <span className="text-sm font-semibold tracking-wide truncate">{item.name}</span>
+                                        </div>
                                     </div>
-                                </div>
+                                    <div className="ml-4 pl-4 border-l border-gray-800/50 pt-1 space-y-1">
+                                        {item.subItems.map((sub) => (
+                                            <Link
+                                                key={sub.name}
+                                                to={sub.href}
+                                                className={cn(
+                                                    location.pathname === sub.href ? 'text-blue-400 bg-blue-500/5' : 'text-gray-500 hover:text-gray-300 hover:bg-[#1e293b]/50',
+                                                    'group flex items-center rounded-lg transition-all duration-200 px-3 py-2 text-xs font-bold'
+                                                )}
+                                            >
+                                                <sub.icon className={cn(
+                                                    location.pathname === sub.href ? 'text-blue-400' : 'text-gray-600 group-hover:text-gray-300',
+                                                    "h-4 w-4 mr-3"
+                                                )} />
+                                                <span className="truncate">{sub.name}</span>
+                                            </Link>
+                                        ))}
+                                    </div>
+                                </>
+                            ) : (
+                                <Link
+                                    to={item.href}
+                                    className={cn(
+                                        item.current
+                                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
+                                            : 'text-gray-400 hover:bg-[#1e293b] hover:text-white',
+                                        'group flex items-center rounded-xl transition-all duration-200 focus:outline-none relative',
+                                        isCollapsed ? "justify-center p-3" : "px-4 py-3"
+                                    )}
+                                >
+                                    <item.icon className={cn(
+                                        item.current ? 'text-white' : 'text-gray-400 group-hover:text-white',
+                                        "h-5 w-5 transition-colors shrink-0",
+                                        !isCollapsed && "mr-3"
+                                    )} aria-hidden="true" />
+
+                                    {!isCollapsed ? (
+                                        <span className="text-sm font-semibold tracking-wide truncate">{item.name}</span>
+                                    ) : (
+                                        /* Premium Dark Tooltip (Floating Label) */
+                                        <div className="absolute left-full ml-4 px-3.5 py-2.5 bg-[#0f172a]/95 backdrop-blur-xl text-white text-[11px] font-bold rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-300 translate-x-[-12px] group-hover:translate-x-0 z-[100] whitespace-nowrap border border-white/10 ring-1 ring-white/5">
+                                            <div className="absolute left-[-4px] top-1/2 -translate-y-1/2 w-2 h-2 bg-[#0f172a] rotate-45 border-l border-b border-white/10" />
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-1 h-1 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                                                {item.name}
+                                            </div>
+                                        </div>
+                                    )}
+                                </Link>
                             )}
-                        </Link>
+                        </div>
                     ))}
 
                     {/* ACORDEON DE CONFIGURACIÓN / FLYOUT */}

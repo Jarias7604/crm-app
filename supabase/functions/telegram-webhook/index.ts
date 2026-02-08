@@ -67,9 +67,26 @@ serve(async (req) => {
             content = `[Archivo: ${msg.document.file_name}]`;
             metadata.file_id = msg.document.file_id;
             metadata.fileName = msg.document.file_name;
+        } else if (msg.voice) {
+            type = 'audio';
+            content = `[Nota de voz]`;
+            metadata.file_id = msg.voice.file_id;
+            metadata.duration = msg.voice.duration;
+            metadata.mime_type = msg.voice.mime_type;
+            metadata.is_voice = true;
+        } else if (msg.audio) {
+            type = 'audio';
+            content = `[Audio: ${msg.audio.title || 'Desconocido'}]`;
+            metadata.file_id = msg.audio.file_id;
+            metadata.duration = msg.audio.duration;
+            metadata.fileName = msg.audio.file_name;
+            metadata.is_voice = false;
         } else {
-            return new Response('OK', { status: 200 }); // Ignore stickers/voice for now
+            return new Response('OK', { status: 200 }); // Ignore other types
         }
+
+        // Add type to metadata so the RPC can extract it correctly
+        metadata.type = type;
 
         // 4. Identify Company (Multi-tenant Logic)
         // Strategy: 

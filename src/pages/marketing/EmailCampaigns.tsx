@@ -1,10 +1,24 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Mail, Clock, CheckCircle, BarChart2, Play, Edit, Copy } from 'lucide-react';
+import { Plus, Mail, CheckCircle, BarChart2, Play, Edit, Copy, Send, Smartphone, MessageSquare } from 'lucide-react';
 import { campaignService, type Campaign } from '../../services/marketing/campaignService';
 import toast from 'react-hot-toast';
 
 export default function EmailCampaigns() {
+    const CHANNEL_ICONS = {
+        email: Mail,
+        whatsapp: Smartphone,
+        telegram: Send,
+        sms: MessageSquare
+    };
+
+    const CHANNEL_COLORS = {
+        email: 'amber',
+        whatsapp: 'green',
+        telegram: 'sky',
+        sms: 'indigo'
+    };
+
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
@@ -53,7 +67,7 @@ export default function EmailCampaigns() {
             };
             const data = await campaignService.createCampaign(newCampaign);
             toast.success('Campaña duplicada como borrador');
-            navigate(`/marketing/email/${data.id}/edit`);
+            navigate(`/marketing/campaign/${data.id}/edit`);
         } catch (error) {
             toast.error('Error al duplicar');
         }
@@ -68,12 +82,12 @@ export default function EmailCampaigns() {
                             ← Volver al Dashboard
                         </Link>
                     </div>
-                    <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Email Marketing</h1>
+                    <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Marketing Omnicanal</h1>
                     <p className="text-gray-500 mt-1">
-                        Crea, gestiona y analiza tus campañas de correo masivo.
+                        Crea, gestiona y analiza tus campañas por Email, WhatsApp y Telegram.
                     </p>
                 </div>
-                <Link to="/marketing/email/new" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-blue-500/30 transition-all flex items-center gap-2">
+                <Link to="/marketing/campaign/new" className="bg-indigo-600 hover:bg-black text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-indigo-500/30 transition-all flex items-center gap-2">
                     <Plus className="w-5 h-5" />
                     Crear Campaña
                 </Link>
@@ -88,7 +102,7 @@ export default function EmailCampaigns() {
                             <Mail className="w-16 h-16 mx-auto mb-4 text-gray-300" />
                             <h3 className="text-lg font-bold text-gray-900">No hay campañas aún</h3>
                             <p className="text-gray-500 mb-6">Comienza creando tu primera campaña de email.</p>
-                            <Link to="/marketing/email/new" className="text-blue-600 font-bold hover:underline">
+                            <Link to="/marketing/campaign/new" className="text-blue-600 font-bold hover:underline">
                                 Crear ahora
                             </Link>
                         </div>
@@ -96,14 +110,25 @@ export default function EmailCampaigns() {
                         campaigns.map((campaign) => (
                             <div key={campaign.id} className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all flex items-center justify-between group">
                                 <div className="flex items-center gap-4">
-                                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${campaign.status === 'completed' ? 'bg-green-100 text-green-600' :
+                                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${campaign.status === 'completed' ? `bg-${CHANNEL_COLORS[campaign.type as keyof typeof CHANNEL_COLORS]}-100 text-${CHANNEL_COLORS[campaign.type as keyof typeof CHANNEL_COLORS]}-600` :
                                         campaign.status === 'sending' ? 'bg-blue-100 text-blue-600' :
                                             'bg-gray-100 text-gray-500'
                                         }`}>
-                                        <Mail className="w-6 h-6" />
+                                        {(() => {
+                                            const Icon = CHANNEL_ICONS[campaign.type as keyof typeof CHANNEL_ICONS] || MessageSquare;
+                                            return <Icon className="w-6 h-6" />;
+                                        })()}
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-gray-900">{campaign.name}</h3>
+                                        <div className="flex items-center gap-2">
+                                            <h3 className="font-bold text-gray-900">{campaign.name}</h3>
+                                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border uppercase tracking-tighter ${campaign.type === 'email' ? 'border-amber-200 text-amber-600 bg-amber-50' :
+                                                campaign.type === 'whatsapp' ? 'border-green-200 text-green-600 bg-green-50' :
+                                                    'border-sky-200 text-sky-600 bg-sky-50'
+                                                }`}>
+                                                {campaign.type}
+                                            </span>
+                                        </div>
                                         <div className="flex items-center gap-3 text-sm text-gray-500 mt-1">
                                             <span className={`px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide ${campaign.status === 'completed' ? 'bg-green-100 text-green-700' :
                                                 campaign.status === 'draft' ? 'bg-gray-100 text-gray-600' :
@@ -113,12 +138,7 @@ export default function EmailCampaigns() {
                                             </span>
                                             {campaign.status === 'completed' && (
                                                 <span className="flex items-center gap-1">
-                                                    <CheckCircle className="w-3 h-3" /> Enviado: {campaign.stats.sent}
-                                                </span>
-                                            )}
-                                            {campaign.scheduled_at && (
-                                                <span className="flex items-center gap-1">
-                                                    <Clock className="w-3 h-3" /> Programado
+                                                    <CheckCircle className="w-3 h-3" /> Procesado: {campaign.stats.sent}
                                                 </span>
                                             )}
                                         </div>
@@ -126,9 +146,8 @@ export default function EmailCampaigns() {
                                 </div>
 
                                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    {/* Editar - siempre visible */}
                                     <button
-                                        onClick={() => navigate(`/marketing/email/${campaign.id}/edit`)}
+                                        onClick={() => navigate(`/marketing/campaign/${campaign.id}/edit`)}
                                         className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
                                         title="Editar"
                                     >

@@ -2,7 +2,7 @@ import { supabase } from '../supabase';
 
 export interface ChatConversation {
     id: string;
-    channel: 'whatsapp' | 'telegram' | 'web';
+    channel: 'whatsapp' | 'telegram' | 'web' | 'email';
     status: string;
     last_message: string;
     last_message_at: string;

@@ -38,12 +38,12 @@ export default function EmailBuilder() {
                     name: campaign.name || '',
                     subject: campaign.subject || '',
                     content: campaign.content || '',
-                    audience_filter: campaign.audience_filters || {
-                        status: [],
-                        dateRange: 'all',
-                        priority: 'all',
-                        specificIds: [],
-                        idType: 'id'
+                    audience_filter: {
+                        status: campaign.audience_filters?.status || [],
+                        dateRange: campaign.audience_filters?.dateRange || 'all',
+                        priority: campaign.audience_filters?.priority || 'all',
+                        specificIds: campaign.audience_filters?.specificIds || [],
+                        idType: campaign.audience_filters?.idType || 'id'
                     }
                 });
             }).catch(err => {
@@ -230,14 +230,14 @@ export default function EmailBuilder() {
                                 Audiencia Objetivo
                             </div>
                             <span className="bg-blue-50 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-lg">
-                                {isDirectConnect ? 'Selección Directa' : formData.audience_filter.status.length > 0 ? `${formData.audience_filter.status.length} filtros` : 'Todos'}
+                                {isDirectConnect ? 'Selección Directa' : (formData.audience_filter?.status?.length || 0) > 0 ? `${formData.audience_filter.status.length} filtros` : 'Todos'}
                             </span>
                         </h2>
 
                         {isDirectConnect && (
                             <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
                                 <p className="text-sm font-medium text-blue-800 mb-3">
-                                    Has seleccionado <span className="font-black">{formData.audience_filter.specificIds.length}</span> prospectos específicos desde Lead Hunter.
+                                    Has seleccionado <span className="font-black">{formData.audience_filter?.specificIds?.length || 0}</span> prospectos específicos desde Lead Hunter.
                                 </p>
                                 <button
                                     onClick={() => {
@@ -289,7 +289,7 @@ export default function EmailBuilder() {
                                             <button
                                                 key={status}
                                                 onClick={() => {
-                                                    const current = formData.audience_filter.status;
+                                                    const current = formData.audience_filter?.status || [];
                                                     const newStatus = isSelected
                                                         ? current.filter(s => s !== status)
                                                         : [...current, status];
