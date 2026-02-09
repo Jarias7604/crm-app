@@ -6,7 +6,7 @@ import type { Lead, LeadStatus, LeadPriority, FollowUp, LossReason } from '../ty
 import { PRIORITY_CONFIG, STATUS_CONFIG, ACTION_TYPES, SOURCE_CONFIG, SOURCE_OPTIONS } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2, Layout, MessageSquare, Send, Smartphone, Filter, ChevronDown, CheckCircle, Shield, ArrowUpDown, Search, Target } from 'lucide-react';
+import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2, Layout, MessageSquare, Send, Smartphone, Filter, ChevronDown, CheckCircle, Shield, ArrowUpDown, Search, Target, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { csvHelper } from '../utils/csvHelper';
@@ -77,7 +77,7 @@ export default function Leads() {
     // Column order persistence
     const [columnOrder, setColumnOrder] = useState<string[]>(() => {
         const saved = localStorage.getItem('lead_column_order');
-        const defaultCols = ['name', 'email', 'phone', 'status', 'priority', 'source', 'value', 'assigned_to'];
+        const defaultCols = ['name', 'email', 'phone', 'status', 'priority', 'source', 'value', 'assigned_to', 'created_at'];
         if (saved) {
             const parsed = JSON.parse(saved);
             // Add new columns if missing from saved order
@@ -1250,6 +1250,7 @@ export default function Leads() {
                                                                             {colId === 'status' && "Estado"}
                                                                             {colId === 'priority' && "Prioridad"}
                                                                             {colId === 'source' && "Fuente"}
+                                                                            {colId === 'created_at' && "Fecha"}
 
                                                                             {colId === 'value' && (
                                                                                 <div
@@ -1361,6 +1362,13 @@ export default function Leads() {
                                                                         </div>
                                                                     );
                                                                 })() : <span className="text-gray-300">-</span>
+                                                            )}
+
+                                                            {colId === 'created_at' && (
+                                                                <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500">
+                                                                    <Calendar className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                                                                    <span>{format(new Date(lead.created_at), 'dd/MM/yyyy')}</span>
+                                                                </div>
                                                             )}
                                                         </td>
                                                     ))}
@@ -1508,7 +1516,7 @@ export default function Leads() {
                     <div className="absolute inset-0 bg-black/30" onClick={() => setIsDetailOpen(false)} />
                     <div className="absolute inset-y-0 right-0 max-w-lg w-full bg-white shadow-xl flex flex-col">
                         {/* Header */}
-                        <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-white to-gray-50 flex justify-between items-center relative overflow-hidden">
+                        <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-white to-gray-50 flex justify-between items-center relative z-30">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-16 -mt-16 opacity-50 blur-2xl"></div>
                             <div className="relative z-10 flex-1">
                                 <div className="flex items-center gap-3 mb-1">
@@ -1528,6 +1536,17 @@ export default function Leads() {
                                             placeholder="Empresa no especificada"
                                             onBlur={(e) => handleUpdateLead({ company_name: e.target.value })}
                                             className="block w-full text-[13px] font-bold text-gray-400 border-none hover:bg-white/50 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded px-2 -ml-2 transition-all bg-transparent"
+                                        />
+                                        <CustomDatePicker
+                                            value={selectedLead.created_at || ''}
+                                            onChange={(date) => {
+                                                if (date) {
+                                                    const newDate = new Date(`${date}T12:00:00Z`);
+                                                    handleUpdateLead({ created_at: newDate.toISOString() });
+                                                }
+                                            }}
+                                            variant="light"
+                                            className="w-40"
                                         />
                                     </div>
                                 </div>

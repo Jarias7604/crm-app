@@ -3,6 +3,7 @@ import type { Lead, LeadStatus, LeadPriority, Profile } from '../types';
 import { STATUS_CONFIG, SOURCE_OPTIONS, SOURCE_CONFIG } from '../types';
 import { Input } from './ui/Input';
 import { Button } from './ui/Button';
+import { CustomDatePicker } from './ui/CustomDatePicker';
 
 interface CreateLeadFullscreenProps {
     isOpen: boolean;
@@ -176,7 +177,7 @@ export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, t
                                         </select>
                                     </div>
 
-                                    <div className="md:col-span-3">
+                                    <div className="md:col-span-2">
                                         <label className="block text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-2 px-1">Fuente del Lead</label>
                                         <select
                                             value={formData.source || ''}
@@ -190,6 +191,22 @@ export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, t
                                                 </option>
                                             ))}
                                         </select>
+                                    </div>
+
+                                    <div className="md:col-span-1">
+                                        <label className="block text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-2 px-1">Fecha de Ingreso</label>
+                                        <div className="relative">
+                                            <CustomDatePicker
+                                                value={formData.created_at || ''}
+                                                onChange={(date) => {
+                                                    if (date) {
+                                                        const newDate = new Date(`${date}T12:00:00Z`);
+                                                        setFormData({ ...formData, created_at: newDate.toISOString() });
+                                                    }
+                                                }}
+                                                variant="light"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             </div>

@@ -23,9 +23,16 @@ interface CustomDatePickerProps {
     onChange: (date: string) => void;
     placeholder?: string;
     className?: string;
+    variant?: 'light' | 'dark' | 'transparent';
 }
 
-export function CustomDatePicker({ value, onChange, placeholder = "Seleccionar fecha", className = "" }: CustomDatePickerProps) {
+export function CustomDatePicker({
+    value,
+    onChange,
+    placeholder = "Seleccionar fecha",
+    className = "",
+    variant = "dark"
+}: CustomDatePickerProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [company, setCompany] = useState<Company | null>(null);
@@ -85,7 +92,7 @@ export function CustomDatePicker({ value, onChange, placeholder = "Seleccionar f
         const weekDays = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
         return (
-            <div className="absolute z-[100] mt-2 bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-slate-100 p-5 w-[310px] animate-in fade-in zoom-in duration-200 right-0 md:right-auto md:left-0 transform origin-top-left">
+            <div className="absolute z-[10001] mt-2 bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-slate-100 p-5 w-[310px] animate-in fade-in zoom-in duration-200 right-0 md:right-auto md:left-0 transform origin-top-left">
                 <div className="flex items-center justify-between mb-4">
                     <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] capitalize">
                         {format(currentMonth, 'MMMM yyyy', { locale: es })}
@@ -157,22 +164,40 @@ export function CustomDatePicker({ value, onChange, placeholder = "Seleccionar f
         );
     };
 
+    const triggerClasses = {
+        dark: "bg-white/10 border-white/20 text-white hover:bg-white/20",
+        light: "bg-indigo-50/50 border-indigo-100 text-indigo-700 hover:bg-indigo-100/50",
+        transparent: "bg-transparent border-transparent text-gray-700 hover:bg-gray-50"
+    };
+
+    const iconClasses = {
+        dark: "text-white opacity-60",
+        light: "text-indigo-500",
+        transparent: "text-gray-400"
+    };
+
+    const textClasses = {
+        dark: activeDate ? "text-white" : "text-white/40",
+        light: activeDate ? "text-indigo-700" : "text-indigo-300",
+        transparent: activeDate ? "text-gray-700" : "text-gray-400"
+    };
+
     return (
         <div className={`relative ${className}`} ref={containerRef}>
             <div
                 onClick={toggleCalendar}
-                className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-sm font-bold flex items-center justify-between cursor-pointer hover:bg-white/20 transition-all outline-none"
+                className={`w-full border rounded-xl px-4 py-2.5 text-sm font-bold flex items-center justify-between cursor-pointer transition-all outline-none ${triggerClasses[variant]}`}
             >
                 <div className="flex items-center gap-3 overflow-hidden">
-                    <CalendarIcon className="w-4 h-4 text-white opacity-60 flex-shrink-0" />
-                    <span className={`truncate ${activeDate ? "text-white" : "text-white/40"}`}>
+                    <CalendarIcon className={`w-4 h-4 flex-shrink-0 ${iconClasses[variant]}`} />
+                    <span className={`truncate ${textClasses[variant]}`}>
                         {activeDate ? format(activeDate, displayFormat, { locale: es }) : placeholder}
                     </span>
                 </div>
                 {activeDate && (
                     <button
                         onClick={(e) => { e.stopPropagation(); onChange(''); }}
-                        className="p-1 hover:bg-white/10 rounded-full text-white/40 hover:text-white transition-colors flex-shrink-0"
+                        className={`p-1 rounded-full transition-colors flex-shrink-0 ${variant === 'dark' ? 'hover:bg-white/10 text-white/40 hover:text-white' : 'hover:bg-indigo-100/50 text-indigo-300 hover:text-indigo-600'}`}
                     >
                         <X className="w-3 h-3" />
                     </button>

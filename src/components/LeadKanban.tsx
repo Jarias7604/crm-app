@@ -9,7 +9,8 @@ import {
     Phone,
     Mail,
     User,
-    Target
+    Target,
+    Calendar
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -36,7 +37,8 @@ const COLUMN_COLORS: Record<LeadStatus, string> = {
     'En seguimiento': 'bg-indigo-700',
     'Negociación': 'bg-cyan-700',
     'Cerrado': 'bg-emerald-700',
-    'Cliente': 'bg-blue-600'
+    'Cliente': 'bg-blue-600',
+    'Perdido': 'bg-gray-500'
 };
 
 export function LeadKanban({ leads, teamMembers, onUpdateStatus, onOpenDetail }: LeadKanbanProps) {
@@ -194,20 +196,28 @@ export function LeadKanban({ leads, teamMembers, onUpdateStatus, onOpenDetail }:
                                                             )}
                                                         </div>
 
-                                                        {/* Footer - Close Date & Icons */}
-                                                        <div className="flex items-center justify-between text-[11px]">
-                                                            <div className={`flex items-center gap-1.5 font-bold ${lead.next_followup_date && new Date(lead.next_followup_date) < new Date()
-                                                                ? 'text-rose-500'
-                                                                : 'text-slate-400 font-semibold'
-                                                                }`}>
-                                                                <div className="bg-slate-50 px-2 py-1 rounded-md flex items-center gap-1.5 border border-slate-100">
-                                                                    <Clock className="w-3 h-3 opacity-60" />
-                                                                    <span>Cierre: {lead.next_followup_date ? (() => {
-                                                                        try {
-                                                                            const pureDate = lead.next_followup_date.split('T')[0];
-                                                                            return format(new Date(`${pureDate}T12:00:00`), 'dd MMM', { locale: es });
-                                                                        } catch (e) { return 'TBD'; }
-                                                                    })() : 'TBD'}</span>
+                                                        {/* Footer - Dates & Icons */}
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex flex-col gap-1.5">
+                                                                <div className={`flex items-center gap-1.5 text-[11px] font-bold ${lead.next_followup_date && new Date(lead.next_followup_date) < new Date()
+                                                                    ? 'text-rose-500'
+                                                                    : 'text-slate-400'
+                                                                    }`}>
+                                                                    <div className="bg-slate-50 px-2 py-0.5 rounded-md flex items-center gap-1.5 border border-slate-100">
+                                                                        <Clock className="w-3 h-3 opacity-60" />
+                                                                        <span className="whitespace-nowrap font-black">Prox: {lead.next_followup_date ? (() => {
+                                                                            try {
+                                                                                const pureDate = lead.next_followup_date.split('T')[0];
+                                                                                return format(new Date(`${pureDate}T12:00:00`), 'dd MMM', { locale: es });
+                                                                            } catch (e) { return 'TBD'; }
+                                                                        })() : 'TBD'}</span>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
+                                                                    <div className="bg-slate-50 px-2 py-0.5 rounded-md flex items-center gap-1.5 border border-slate-100">
+                                                                        <Calendar className="w-3 h-3 opacity-60" />
+                                                                        <span className="whitespace-nowrap font-bold">Ingreso: {format(new Date(lead.created_at), 'dd MMM', { locale: es })}</span>
+                                                                    </div>
                                                                 </div>
                                                             </div>
 
@@ -239,4 +249,3 @@ export function LeadKanban({ leads, teamMembers, onUpdateStatus, onOpenDetail }:
         </DragDropContext>
     );
 }
-
