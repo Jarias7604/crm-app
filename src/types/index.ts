@@ -17,7 +17,8 @@ export type LeadStatus =
     | 'En seguimiento'
     | 'Negociación'
     | 'Cerrado'
-    | 'Cliente';
+    | 'Cliente'
+    | 'Perdido';
 export type LeadPriority = 'very_high' | 'high' | 'medium' | 'low';
 export type FollowUpActionType = 'call' | 'email' | 'meeting' | 'whatsapp' | 'other';
 export type DateRange = 'today' | 'this_week' | 'this_month' | 'last_3_months' | 'last_6_months' | 'this_year' | 'all';
@@ -96,6 +97,11 @@ export interface Lead {
     next_action_notes: string | null;
     address?: string | null;
     document_path?: string | null;
+    lost_reason_id?: string | null;
+    lost_at_stage?: string | null;
+    lost_notes?: string | null;
+    lost_date?: string | null;
+    internal_won_date?: string | null;
     created_at: string;
 }
 
@@ -108,6 +114,16 @@ export interface FollowUp {
     action_type: FollowUpActionType;
     created_at: string;
     profiles?: { email: string; full_name?: string | null; avatar_url?: string | null };
+}
+
+export interface LossReason {
+    id: string;
+    company_id: string | null;
+    reason: string;
+    is_active: boolean;
+    display_order: number;
+    created_at: string;
+    updated_at?: string;
 }
 
 // Helper constants for UI
@@ -125,6 +141,7 @@ export const STATUS_CONFIG: Record<LeadStatus, { label: string; color: string; b
     'Negociación': { label: 'Negociación', color: 'text-yellow-700', bgColor: 'bg-yellow-100', icon: '💼' },
     'Cerrado': { label: 'Cerrado', color: 'text-purple-700', bgColor: 'bg-purple-100', icon: '🔒' },
     'Cliente': { label: 'Cliente', color: 'text-green-700', bgColor: 'bg-green-100', icon: '✅' },
+    'Perdido': { label: 'Perdido', color: 'text-red-700', bgColor: 'bg-red-100', icon: '❌' },
 };
 
 export const ACTION_TYPES = [

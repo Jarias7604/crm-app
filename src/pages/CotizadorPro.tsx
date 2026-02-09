@@ -536,894 +536,896 @@ export default function CotizadorPro() {
     }
 
     return (
-        <div className="max-w-5xl mx-auto space-y-6">
-            {/* Header */}
-            <div>
-                <h1 className="text-2xl font-extrabold text-[#4449AA]">📋 Nueva Cotización Profesional</h1>
-                <p className="text-sm text-gray-500 mt-1">Sistema dinámico de cotización basado en paquetes</p>
-            </div>
+        <>
+            <div className="max-w-5xl mx-auto space-y-6">
+                {/* Header */}
+                <div>
+                    <h1 className="text-2xl font-extrabold text-[#4449AA]">📋 Nueva Cotización Profesional</h1>
+                    <p className="text-sm text-gray-500 mt-1">Sistema dinámico de cotización basado en paquetes</p>
+                </div>
 
-            {/* Indicador de Pasos Rediseñado y Uniforme */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <div className="flex items-center justify-between w-full max-w-4xl mx-auto">
-                    {[1, 2, 3, 4].map((paso) => (
-                        <div key={paso} className={`flex items-center ${paso < 4 ? 'flex-1' : ''}`}>
-                            {/* Círculo del Número */}
-                            <div className="flex flex-col items-center gap-2">
-                                <div className="flex items-center gap-3">
-                                    <div
-                                        className={`w-10 h-10 rounded-full flex items-center justify-center font-black shadow-sm transition-all duration-300 ${paso <= pasoActual
-                                            ? 'bg-blue-600 text-white ring-4 ring-blue-50'
-                                            : 'bg-gray-100 text-gray-400 border border-gray-200'
-                                            }`}
-                                        style={{ fontSize: '15px' }}
-                                    >
-                                        {paso}
+                {/* Indicador de Pasos Rediseñado y Uniforme */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+                    <div className="flex items-center justify-between w-full max-w-4xl mx-auto">
+                        {[1, 2, 3, 4].map((paso) => (
+                            <div key={paso} className={`flex items-center ${paso < 4 ? 'flex-1' : ''}`}>
+                                {/* Círculo del Número */}
+                                <div className="flex flex-col items-center gap-2">
+                                    <div className="flex items-center gap-3">
+                                        <div
+                                            className={`w-10 h-10 rounded-full flex items-center justify-center font-black shadow-sm transition-all duration-300 ${paso <= pasoActual
+                                                ? 'bg-blue-600 text-white ring-4 ring-blue-50'
+                                                : 'bg-gray-100 text-gray-400 border border-gray-200'
+                                                }`}
+                                            style={{ fontSize: '15px' }}
+                                        >
+                                            {paso}
+                                        </div>
+                                        <span className={`text-sm font-bold whitespace-nowrap ${paso <= pasoActual ? 'text-blue-600' : 'text-gray-400'}`}>
+                                            {paso === 1 && 'Cliente'}
+                                            {paso === 2 && 'Paquete'}
+                                            {paso === 3 && 'Módulos/Servicios'}
+                                            {paso === 4 && 'Resumen'}
+                                        </span>
                                     </div>
-                                    <span className={`text-sm font-bold whitespace-nowrap ${paso <= pasoActual ? 'text-blue-600' : 'text-gray-400'}`}>
-                                        {paso === 1 && 'Cliente'}
-                                        {paso === 2 && 'Paquete'}
-                                        {paso === 3 && 'Módulos/Servicios'}
-                                        {paso === 4 && 'Resumen'}
-                                    </span>
                                 </div>
+
+                                {/* Línea de Conexión */}
+                                {paso < 4 && (
+                                    <div className="flex-1 mx-4 h-0.5 bg-gray-100 relative overflow-hidden rounded-full">
+                                        <div
+                                            className="absolute inset-y-0 left-0 bg-blue-600 transition-all duration-500 ease-out"
+                                            style={{ width: paso < pasoActual ? '100%' : '0%' }}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Contenido */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    {/* PASO 1: Cliente */}
+                    {pasoActual === 1 && (
+                        <div className="space-y-6">
+                            <div>
+                                <h2 className="text-2xl font-extrabold text-[#4449AA] mb-2">Información del Cliente</h2>
+                                <p className="text-sm text-gray-500">Configure los detalles del cliente para esta cotización</p>
                             </div>
 
-                            {/* Línea de Conexión */}
-                            {paso < 4 && (
-                                <div className="flex-1 mx-4 h-0.5 bg-gray-100 relative overflow-hidden rounded-full">
-                                    <div
-                                        className="absolute inset-y-0 left-0 bg-blue-600 transition-all duration-500 ease-out"
-                                        style={{ width: paso < pasoActual ? '100%' : '0%' }}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            {/* Contenido */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                {/* PASO 1: Cliente */}
-                {pasoActual === 1 && (
-                    <div className="space-y-6">
-                        <div>
-                            <h2 className="text-2xl font-extrabold text-[#4449AA] mb-2">Información del Cliente</h2>
-                            <p className="text-sm text-gray-500">Configure los detalles del cliente para esta cotización</p>
-                        </div>
-
-                        {/* Selector de Lead Ultra Profesional */}
-                        {!formData.usar_lead ? (
-                            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl p-8 hover:shadow-lg transition-all duration-300">
-                                <div className="flex items-start gap-6">
-                                    <div className="flex-shrink-0">
-                                        <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
-                                            <FileText className="w-8 h-8 text-white" />
+                            {/* Selector de Lead Ultra Profesional */}
+                            {!formData.usar_lead ? (
+                                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl p-8 hover:shadow-lg transition-all duration-300">
+                                    <div className="flex items-start gap-6">
+                                        <div className="flex-shrink-0">
+                                            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
+                                                <FileText className="w-8 h-8 text-white" />
+                                            </div>
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="text-lg font-bold text-gray-900 mb-2">¿Trabajar con un Lead existente?</h3>
+                                            <p className="text-sm text-gray-600 mb-4">
+                                                Seleccione un Lead de su pipeline para auto-completar la información del cliente de forma inmediata.
+                                            </p>
+                                            <button
+                                                onClick={() => setShowLeadSelector(true)}
+                                                className="inline-flex items-center gap-2 bg-white border-2 border-blue-600 text-blue-600 px-6 py-3 rounded-xl font-bold hover:bg-blue-600 hover:text-white transition-all duration-200 shadow-sm hover:shadow-md"
+                                            >
+                                                <Search className="w-5 h-5" />
+                                                Seleccionar Lead Existente
+                                            </button>
                                         </div>
                                     </div>
-                                    <div className="flex-1">
-                                        <h3 className="text-lg font-bold text-gray-900 mb-2">¿Trabajar con un Lead existente?</h3>
-                                        <p className="text-sm text-gray-600 mb-4">
-                                            Seleccione un Lead de su pipeline para auto-completar la información del cliente de forma inmediata.
-                                        </p>
+                                </div>
+                            ) : (
+                                <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center">
+                                                <FileText className="w-6 h-6 text-white" />
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-semibold text-green-700 uppercase tracking-wide">Lead Seleccionado</p>
+                                                <p className="text-lg font-bold text-gray-900">{formData.cliente_nombre}</p>
+                                                {formData.cliente_email && (
+                                                    <p className="text-sm text-gray-600">{formData.cliente_email}</p>
+                                                )}
+                                            </div>
+                                        </div>
                                         <button
-                                            onClick={() => setShowLeadSelector(true)}
-                                            className="inline-flex items-center gap-2 bg-white border-2 border-blue-600 text-blue-600 px-6 py-3 rounded-xl font-bold hover:bg-blue-600 hover:text-white transition-all duration-200 shadow-sm hover:shadow-md"
+                                            onClick={() => {
+                                                setFormData({
+                                                    ...formData,
+                                                    usar_lead: false,
+                                                    lead_id: null,
+                                                    cliente_nombre: '',
+                                                    cliente_email: ''
+                                                });
+                                            }}
+                                            className="p-2 hover:bg-red-100 rounded-lg transition-colors text-red-600"
+                                            title="Remover Lead"
                                         >
-                                            <Search className="w-5 h-5" />
-                                            Seleccionar Lead Existente
+                                            <X className="w-5 h-5" />
                                         </button>
                                     </div>
                                 </div>
-                            </div>
-                        ) : (
-                            <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center">
-                                            <FileText className="w-6 h-6 text-white" />
-                                        </div>
-                                        <div>
-                                            <p className="text-xs font-semibold text-green-700 uppercase tracking-wide">Lead Seleccionado</p>
-                                            <p className="text-lg font-bold text-gray-900">{formData.cliente_nombre}</p>
-                                            {formData.cliente_email && (
-                                                <p className="text-sm text-gray-600">{formData.cliente_email}</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={() => {
-                                            setFormData({
-                                                ...formData,
-                                                usar_lead: false,
-                                                lead_id: null,
-                                                cliente_nombre: '',
-                                                cliente_email: ''
-                                            });
-                                        }}
-                                        className="p-2 hover:bg-red-100 rounded-lg transition-colors text-red-600"
-                                        title="Remover Lead"
-                                    >
-                                        <X className="w-5 h-5" />
-                                    </button>
-                                </div>
-                            </div>
-                        )}
+                            )}
 
-                        {/* Formulario de Datos */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">
-                                    Nombre del Cliente *
-                                </label>
-                                <Input
-                                    value={formData.cliente_nombre}
-                                    onChange={(e) => setFormData({ ...formData, cliente_nombre: e.target.value })}
-                                    placeholder="Empresa ABC S.A."
-                                    disabled={formData.usar_lead}
-                                    className={formData.usar_lead ? 'bg-gray-100 cursor-not-allowed' : ''}
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">
-                                    Email
-                                </label>
-                                <Input
-                                    type="email"
-                                    value={formData.cliente_email}
-                                    onChange={(e) => setFormData({ ...formData, cliente_email: e.target.value })}
-                                    placeholder="contacto@empresa.com"
-                                    disabled={formData.usar_lead}
-                                    className={formData.usar_lead ? 'bg-gray-100 cursor-not-allowed border-gray-100' : ''}
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">
-                                    Empresa
-                                </label>
-                                <Input
-                                    value={formData.cliente_empresa}
-                                    onChange={(e) => setFormData({ ...formData, cliente_empresa: e.target.value })}
-                                    placeholder="Nombre de la Empresa"
-                                    disabled={formData.usar_lead}
-                                    className={formData.usar_lead ? 'bg-gray-100 cursor-not-allowed border-gray-100' : ''}
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">
-                                    Teléfono
-                                </label>
-                                <Input
-                                    value={formData.cliente_telefono}
-                                    onChange={(e) => setFormData({ ...formData, cliente_telefono: e.target.value })}
-                                    placeholder="7000-0000"
-                                    disabled={formData.usar_lead}
-                                    className={formData.usar_lead ? 'bg-gray-100 cursor-not-allowed border-gray-100' : ''}
-                                />
-                            </div>
-
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-bold text-gray-700 mb-2">
-                                    Dirección Fiscal o Entrega
-                                </label>
-                                <Input
-                                    value={formData.cliente_direccion}
-                                    onChange={(e) => setFormData({ ...formData, cliente_direccion: e.target.value })}
-                                    placeholder="Calle 123, Ciudad"
-                                    disabled={formData.usar_lead}
-                                    className={formData.usar_lead ? 'bg-gray-100 cursor-not-allowed border-gray-100' : ''}
-                                />
-                            </div>
-
-                            <div className="md:col-span-2">
-                                <label className="block text-sm font-bold text-gray-700 mb-2">
-                                    Cantidad de DTEs al año *
-                                </label>
-                                <Input
-                                    type="number"
-                                    value={formData.volumen_dtes || ''}
-                                    onChange={(e) => setFormData({ ...formData, volumen_dtes: Number(e.target.value) })}
-                                    placeholder="2200"
-                                />
-                                <div className="flex justify-between items-center mt-2">
-                                    <p className="text-xs text-gray-500 italic">
-                                        💡 Equivalente a <b>{Math.round(formData.volumen_dtes / 12).toLocaleString()} DTEs mensuales</b> aprox.
-                                    </p>
-                                    {paqueteSugerido && (
-                                        <p className="text-sm text-green-600 font-semibold flex items-center gap-1.5">
-                                            <span className="bg-green-100 text-green-700 w-5 h-5 rounded-full flex items-center justify-center text-[10px]">✓</span>
-                                            Sugerido: {paqueteSugerido.paquete}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* PASO 2: Paquete */}
-                {pasoActual === 2 && (
-                    <div className="space-y-4">
-                        <h2 className="text-lg font-bold text-[#4449AA]">Seleccionar Paquete Base</h2>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {(() => {
-                                const filtered = paquetes.filter(p => {
-                                    const maxDtes = Math.max(...paquetes.map(paq => paq.cantidad_dtes));
-                                    if (formData.volumen_dtes > maxDtes) return p.cantidad_dtes === maxDtes;
-                                    return p.cantidad_dtes >= formData.volumen_dtes;
-                                });
-
-                                if (filtered.length === 0) {
-                                    return (
-                                        <div className="col-span-full py-10 text-center bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                                            <p className="text-gray-500 font-medium">No se encontraron paquetes compatibles.</p>
-                                            <p className="text-xs text-gray-400 mt-1">Verifique la configuración o intente con otro volumen.</p>
-                                        </div>
-                                    );
-                                }
-
-                                return filtered.slice(0, 8).map((paquete) => (
-                                    <div
-                                        key={paquete.id}
-                                        onClick={() => setFormData({ ...formData, paquete_id: paquete.id })}
-                                        className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${formData.paquete_id === paquete.id
-                                            ? 'border-blue-600 bg-blue-50'
-                                            : 'border-gray-200 hover:border-blue-300'
-                                            }`}
-                                    >
-                                        <div className="flex items-center justify-between mb-2">
-                                            <h3 className="font-bold text-lg text-[#4449AA]">
-                                                {paquete.paquete}
-                                            </h3>
-                                            {paqueteSugerido?.id === paquete.id && (
-                                                <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-bold">
-                                                    ⭐ Sugerido
-                                                </span>
-                                            )}
-                                        </div>
-                                        <p className="text-sm text-gray-600 mb-2">
-                                            {paquete.cantidad_dtes.toLocaleString()} DTEs
-                                        </p>
-                                        <p className="text-2xl font-extrabold text-green-600">
-                                            ${paquete.costo_paquete_anual.toFixed(2)}/año
-                                        </p>
-                                        <p className="text-sm text-gray-500">
-                                            + ${paquete.costo_implementacion.toFixed(2)} implementación
-                                        </p>
-                                    </div>
-                                ));
-                            })()}
-                        </div>
-                    </div>
-                )}
-
-                {/* PASO 3: Módulos y Servicios */}
-                {pasoActual === 3 && (
-                    <div className="space-y-6">
-                        <div>
-                            <h2 className="text-lg font-bold text-[#4449AA] mb-4">📌 Módulos Adicionales</h2>
-                            <div className="space-y-2">
-                                {modulos.map((modulo) => (
-                                    <label
-                                        key={modulo.id}
-                                        className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <input
-                                                type="checkbox"
-                                                checked={formData.modulos_ids.includes(modulo.id)}
-                                                onChange={() => toggleModulo(modulo.id)}
-                                                className="w-5 h-5 text-blue-600 rounded"
-                                            />
-                                            <div>
-                                                <p className="font-semibold text-gray-800">{modulo.nombre}</p>
-                                                {modulo.descripcion && (
-                                                    <p className="text-xs text-gray-500">{modulo.descripcion}</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-4">
-                                            <div className="text-right">
-                                                <div className="text-right flex flex-col items-end">
-                                                    {formData.modulos_ids.includes(modulo.id) && hasPermission('cotizaciones.edit_prices') ? (
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-xs text-gray-400 font-bold">$</span>
-                                                            <input
-                                                                type="number"
-                                                                className="w-24 text-right font-bold text-green-600 border border-blue-200 rounded px-2 py-1 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                                                                value={overrides[modulo.id] ?? modulo.precio_anual}
-                                                                onChange={(e) => {
-                                                                    setOverrides({ ...overrides, [modulo.id]: Number(e.target.value) });
-                                                                }}
-                                                            />
-                                                            <span className="text-[10px] text-gray-400 font-bold uppercase">/año</span>
-                                                        </div>
-                                                    ) : (
-                                                        <>
-                                                            <p className="font-bold text-green-600">
-                                                                ${(overrides[modulo.id] ?? modulo.precio_anual).toFixed(2)}/año
-                                                            </p>
-                                                            <p className="text-xs text-gray-500">
-                                                                ${modulo.precio_mensual.toFixed(2)}/mes
-                                                            </p>
-                                                        </>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
+                            {/* Formulario de Datos */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                                        Nombre del Cliente *
                                     </label>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div>
-                            <h2 className="text-lg font-bold text-[#4449AA] mb-4">🔧 Servicios Adicionales</h2>
-                            <div className="space-y-2">
-                                {servicios.map((servicio) => (
-                                    <label
-                                        key={servicio.id}
-                                        className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <input
-                                                type="checkbox"
-                                                checked={formData.servicios_ids.includes(servicio.id)}
-                                                onChange={() => toggleServicio(servicio.id)}
-                                                className="w-5 h-5 text-blue-600 rounded"
-                                            />
-                                            <div>
-                                                <p className="font-semibold text-gray-800">{servicio.nombre}</p>
-                                                {servicio.descripcion && (
-                                                    <p className="text-xs text-gray-500">{servicio.descripcion}</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="text-right flex flex-col items-end">
-                                            {formData.servicios_ids.includes(servicio.id) && hasPermission('cotizaciones.edit_prices') ? (
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs text-gray-400 font-bold">$</span>
-                                                    <input
-                                                        type="number"
-                                                        className="w-24 text-right font-bold text-green-600 border border-blue-200 rounded px-2 py-1 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                                                        value={overrides[servicio.id] ?? (
-                                                            servicio.precio_por_dte > 0
-                                                                ? (formData.volumen_dtes * servicio.precio_por_dte)
-                                                                : (servicio.pago_unico > 0 ? servicio.pago_unico : servicio.precio_anual)
-                                                        )}
-                                                        onChange={(e) => {
-                                                            setOverrides({ ...overrides, [servicio.id]: Number(e.target.value) });
-                                                        }}
-                                                    />
-                                                    <span className="text-[10px] text-gray-400 font-bold uppercase">
-                                                        {servicio.pago_unico > 0 ? 'Único' : '/año'}
-                                                    </span>
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    {(() => {
-                                                        const currentPrice = overrides[servicio.id] ?? (
-                                                            servicio.precio_por_dte > 0
-                                                                ? (formData.volumen_dtes * servicio.precio_por_dte)
-                                                                : (servicio.pago_unico > 0 ? servicio.pago_unico : servicio.precio_anual)
-                                                        );
-                                                        return (
-                                                            <>
-                                                                <p className="font-bold text-green-600">
-                                                                    ${currentPrice.toFixed(2)}
-                                                                </p>
-                                                                {servicio.precio_por_dte > 0 && !overrides[servicio.id] && (
-                                                                    <p className="text-xs text-gray-500">
-                                                                        {formData.volumen_dtes.toLocaleString()} × ${servicio.precio_por_dte}
-                                                                    </p>
-                                                                )}
-                                                                {servicio.pago_unico > 0 && (
-                                                                    <p className="text-xs text-gray-500">Pago único</p>
-                                                                )}
-                                                                {servicio.precio_anual > 0 && !servicio.pago_unico && !servicio.precio_por_dte && (
-                                                                    <p className="text-xs text-gray-500">/año</p>
-                                                                )}
-                                                            </>
-                                                        );
-                                                    })()}
-                                                </>
-                                            )}
-                                        </div>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* PASO 4: Resumen */}
-                {pasoActual === 4 && (
-                    <div className="space-y-6">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-lg font-bold text-[#4449AA]">💰 Resumen de Cotización</h2>
-                            <div className="text-right">
-                                <p className="text-xs text-gray-500 font-bold uppercase">Volumen Contratado</p>
-                                <p className="text-sm font-black text-blue-600">
-                                    {formData.volumen_dtes.toLocaleString()} DTEs/año
-                                    <span className="text-gray-400 font-normal ml-2">({Math.round(formData.volumen_dtes / 12).toLocaleString()} mes)</span>
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Desglose Premium */}
-                        <div className="space-y-3">
-                            {totales?.desglose.map((item, idx) => (
-                                <div key={idx} className="group relative bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
-                                    <div className="flex justify-between items-start gap-4">
-                                        <div className="flex gap-4">
-                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${item.tipo === 'Paquete' ? 'bg-blue-50 text-blue-600' :
-                                                item.tipo === 'Implementación' ? 'bg-orange-50 text-orange-600' :
-                                                    'bg-purple-50 text-purple-600'
-                                                }`}>
-                                                <FileText className="w-5 h-5" />
-                                            </div>
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <p className="font-bold text-gray-900">{item.nombre}</p>
-                                                    {item.precio_mensual === 0 && (
-                                                        <span className="bg-gray-100 text-gray-600 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter">Pago Único</span>
-                                                    )}
-                                                </div>
-                                                <p className="text-xs text-gray-500 mt-0.5">{item.descripcion}</p>
-                                            </div>
-                                        </div>
-
-                                        <div className="text-right flex flex-col items-end gap-1">
-                                            {item.tipo === 'Implementación' && hasPermission('cotizaciones.edit_implementation') ? (
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs text-gray-400 font-bold">$</span>
-                                                    <input
-                                                        type="number"
-                                                        className="w-24 text-right font-bold text-orange-600 border border-orange-100 rounded px-2 py-1 bg-orange-50/30 focus:ring-2 focus:ring-orange-500 outline-none"
-                                                        value={implementationOverride ?? item.precio_anual}
-                                                        onChange={(e) => setImplementationOverride(Number(e.target.value))}
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <p className="font-black text-gray-800 text-lg">
-                                                    ${(item.precio_anual).toLocaleString()}
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
+                                    <Input
+                                        value={formData.cliente_nombre}
+                                        onChange={(e) => setFormData({ ...formData, cliente_nombre: e.target.value })}
+                                        placeholder="Empresa ABC S.A."
+                                        disabled={formData.usar_lead}
+                                        className={formData.usar_lead ? 'bg-gray-100 cursor-not-allowed' : ''}
+                                    />
                                 </div>
-                            ))}
-                        </div>
 
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                                        Email
+                                    </label>
+                                    <Input
+                                        type="email"
+                                        value={formData.cliente_email}
+                                        onChange={(e) => setFormData({ ...formData, cliente_email: e.target.value })}
+                                        placeholder="contacto@empresa.com"
+                                        disabled={formData.usar_lead}
+                                        className={formData.usar_lead ? 'bg-gray-100 cursor-not-allowed border-gray-100' : ''}
+                                    />
+                                </div>
 
-                        {/* Forma de Pago - Selector Profesional de Períodos */}
-                        <div className="mb-6">
-                            <div className="flex items-center justify-between mb-4">
-                                <label className="text-sm font-bold text-gray-700">
-                                    🎯 Forma de Pago
-                                </label>
-                                {!canChangePaymentMethod && (
-                                    <span className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                                        🔒 Solo lectura
-                                    </span>
-                                )}
-                            </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                                        Empresa
+                                    </label>
+                                    <Input
+                                        value={formData.cliente_empresa}
+                                        onChange={(e) => setFormData({ ...formData, cliente_empresa: e.target.value })}
+                                        placeholder="Nombre de la Empresa"
+                                        disabled={formData.usar_lead}
+                                        className={formData.usar_lead ? 'bg-gray-100 cursor-not-allowed border-gray-100' : ''}
+                                    />
+                                </div>
 
-                            {/* Opciones de Pago Dinámicas */}
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                                {financingPlans.length > 0 ? (
-                                    financingPlans.map((plan) => {
-                                        const isSelected = selectedPlanId === plan.id;
-                                        const isAnual = plan.meses === 12 && plan.interes_porcentaje === 0 && plan.titulo.toLowerCase().includes('pago');
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                                        Teléfono
+                                    </label>
+                                    <Input
+                                        value={formData.cliente_telefono}
+                                        onChange={(e) => setFormData({ ...formData, cliente_telefono: e.target.value })}
+                                        placeholder="7000-0000"
+                                        disabled={formData.usar_lead}
+                                        className={formData.usar_lead ? 'bg-gray-100 cursor-not-allowed border-gray-100' : ''}
+                                    />
+                                </div>
 
-                                        return (
-                                            <button
-                                                key={plan.id}
-                                                type="button"
-                                                onClick={() => {
-                                                    if (canChangePaymentMethod) {
-                                                        setSelectedPlanId(plan.id);
-                                                        const isDiscountPlan = plan.tipo_ajuste === 'discount';
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                                        Dirección Fiscal o Entrega
+                                    </label>
+                                    <Input
+                                        value={formData.cliente_direccion}
+                                        onChange={(e) => setFormData({ ...formData, cliente_direccion: e.target.value })}
+                                        placeholder="Calle 123, Ciudad"
+                                        disabled={formData.usar_lead}
+                                        className={formData.usar_lead ? 'bg-gray-100 cursor-not-allowed border-gray-100' : ''}
+                                    />
+                                </div>
 
-                                                        setFormData({
-                                                            ...formData,
-                                                            forma_pago: isDiscountPlan ? 'anual' : 'mensual',
-                                                            meses_pago: plan.meses,
-                                                            // Reiniciamos descuento manual para evitar doble descuento accidental
-                                                            descuento_porcentaje: 0
-                                                        });
-                                                    }
-                                                }}
-                                                disabled={!canChangePaymentMethod}
-                                                className={`relative p-4 rounded-xl border-2 transition-all group ${isSelected
-                                                    ? isAnual
-                                                        ? 'border-green-600 bg-gradient-to-br from-green-50 to-green-100 shadow-lg scale-[1.02]'
-                                                        : 'border-blue-600 bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg scale-[1.02]'
-                                                    : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
-                                                    } ${!canChangePaymentMethod ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
-                                            >
-                                                <div className="text-center">
-                                                    <div className="text-2xl mb-2">
-                                                        {plan.meses === 12 && plan.interes_porcentaje === 0 ? '💰' :
-                                                            plan.meses === 3 ? '📊' :
-                                                                plan.meses === 6 ? '📈' :
-                                                                    plan.meses === 9 ? '📉' : '📅'}
-                                                    </div>
-                                                    <p className="font-bold text-gray-900 text-sm">{plan.titulo}</p>
-                                                    {plan.descripcion && (
-                                                        <p className="text-[10px] text-gray-500 mt-1 truncate">
-                                                            {plan.meses === 1 && plan.interes_porcentaje > 0 ? 'Mensual' : plan.descripcion}
-                                                        </p>
-                                                    )}
-                                                    <div className="mt-2 pt-2 border-t border-gray-200">
-                                                        <p className={`text-xs font-bold ${plan.tipo_ajuste === 'discount' ? 'text-green-600' : plan.tipo_ajuste === 'recharge' ? 'text-blue-600' : 'text-gray-500'}`}>
-                                                            {plan.tipo_ajuste === 'discount' ? `-${plan.interes_porcentaje}% OFF` :
-                                                                plan.tipo_ajuste === 'recharge' ? `+${plan.interes_porcentaje}% Interés` :
-                                                                    'Precio Base'}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                {isSelected && (
-                                                    <div className={`absolute -top-2 -right-2 w-6 h-6 ${isAnual ? 'bg-green-600' : 'bg-blue-600'} rounded-full flex items-center justify-center shadow-lg`}>
-                                                        <span className="text-white text-xs">✓</span>
-                                                    </div>
-                                                )}
-                                                {plan.es_popular && !isAnual && (
-                                                    <div className="absolute -top-2 -left-2">
-                                                        <span className="bg-yellow-400 text-yellow-900 text-[9px] font-black px-2 py-0.5 rounded-full shadow-sm">
-                                                            POPULAR
-                                                        </span>
-                                                    </div>
-                                                )}
-                                                {isAnual && (
-                                                    <div className="absolute -top-2 -left-2">
-                                                        <span className="bg-green-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-sm">
-                                                            {paymentSettings?.nota_mejor_precio || 'MEJOR PRECIO'}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </button>
-                                        );
-                                    })
-                                ) : (
-                                    <div className="col-span-full py-4 text-center text-gray-400 text-xs italic">
-                                        Cargando planes de financiamiento...
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Información contextual Dinámica */}
-                            <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-100">
-                                <div className="flex items-start gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
-                                        <span className="text-white text-sm">💡</span>
-                                    </div>
-                                    <div className="flex-1">
-                                        <p className="text-sm font-bold text-gray-900 mb-1">
-                                            {financingPlans.find(p => p.id === selectedPlanId)?.titulo || 'Forma de Pago'}
+                                <div className="md:col-span-2">
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                                        Cantidad de DTEs al año *
+                                    </label>
+                                    <Input
+                                        type="number"
+                                        value={formData.volumen_dtes || ''}
+                                        onChange={(e) => setFormData({ ...formData, volumen_dtes: Number(e.target.value) })}
+                                        placeholder="2200"
+                                    />
+                                    <div className="flex justify-between items-center mt-2">
+                                        <p className="text-xs text-gray-500 italic">
+                                            💡 Equivalente a <b>{Math.round(formData.volumen_dtes / 12).toLocaleString()} DTEs mensuales</b> aprox.
                                         </p>
-                                        <p className="text-xs text-gray-600">
-                                            {financingPlans.find(p => p.id === selectedPlanId)?.descripcion || 'Seleccione una opción de pago.'}
-                                        </p>
-                                        {formData.forma_pago === 'mensual' && (totales?.ahorro_pago_anual || 0) > 0 && (
-                                            <div className="mt-2 pt-2 border-t border-blue-200">
-                                                <p className="text-xs font-bold text-blue-700">
-                                                    💰 Ahorrá ${(totales?.ahorro_pago_anual || 0).toFixed(2)} eligiendo pago anual
-                                                </p>
-                                            </div>
+                                        {paqueteSugerido && (
+                                            <p className="text-sm text-green-600 font-semibold flex items-center gap-1.5">
+                                                <span className="bg-green-100 text-green-700 w-5 h-5 rounded-full flex items-center justify-center text-[10px]">✓</span>
+                                                Sugerido: {paqueteSugerido.paquete}
+                                            </p>
                                         )}
                                     </div>
                                 </div>
                             </div>
                         </div>
+                    )}
 
+                    {/* PASO 2: Paquete */}
+                    {pasoActual === 2 && (
+                        <div className="space-y-4">
+                            <h2 className="text-lg font-bold text-[#4449AA]">Seleccionar Paquete Base</h2>
 
-                        {/* CONFIGURACIÓN AVANZADA REMOVIDA A PETICIÓN */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {(() => {
+                                    const filtered = paquetes.filter(p => {
+                                        const maxDtes = Math.max(...paquetes.map(paq => paq.cantidad_dtes));
+                                        if (formData.volumen_dtes > maxDtes) return p.cantidad_dtes === maxDtes;
+                                        return p.cantidad_dtes >= formData.volumen_dtes;
+                                    });
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Descuento */}
+                                    if (filtered.length === 0) {
+                                        return (
+                                            <div className="col-span-full py-10 text-center bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
+                                                <p className="text-gray-500 font-medium">No se encontraron paquetes compatibles.</p>
+                                                <p className="text-xs text-gray-400 mt-1">Verifique la configuración o intente con otro volumen.</p>
+                                            </div>
+                                        );
+                                    }
+
+                                    return filtered.slice(0, 8).map((paquete) => (
+                                        <div
+                                            key={paquete.id}
+                                            onClick={() => setFormData({ ...formData, paquete_id: paquete.id })}
+                                            className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${formData.paquete_id === paquete.id
+                                                ? 'border-blue-600 bg-blue-50'
+                                                : 'border-gray-200 hover:border-blue-300'
+                                                }`}
+                                        >
+                                            <div className="flex items-center justify-between mb-2">
+                                                <h3 className="font-bold text-lg text-[#4449AA]">
+                                                    {paquete.paquete}
+                                                </h3>
+                                                {paqueteSugerido?.id === paquete.id && (
+                                                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-bold">
+                                                        ⭐ Sugerido
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-sm text-gray-600 mb-2">
+                                                {paquete.cantidad_dtes.toLocaleString()} DTEs
+                                            </p>
+                                            <p className="text-2xl font-extrabold text-green-600">
+                                                ${paquete.costo_paquete_anual.toFixed(2)}/año
+                                            </p>
+                                            <p className="text-sm text-gray-500">
+                                                + ${paquete.costo_implementacion.toFixed(2)} implementación
+                                            </p>
+                                        </div>
+                                    ));
+                                })()}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* PASO 3: Módulos y Servicios */}
+                    {pasoActual === 3 && (
+                        <div className="space-y-6">
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">
-                                    Descuento (%)
-                                </label>
-                                <Input
-                                    type="number"
-                                    step="0.1"
-                                    value={formData.descuento_porcentaje || ''}
-                                    onChange={(e) => setFormData({ ...formData, descuento_porcentaje: Number(e.target.value) })}
-                                    placeholder="0"
-                                />
+                                <h2 className="text-lg font-bold text-[#4449AA] mb-4">📌 Módulos Adicionales</h2>
+                                <div className="space-y-2">
+                                    {modulos.map((modulo) => (
+                                        <label
+                                            key={modulo.id}
+                                            className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={formData.modulos_ids.includes(modulo.id)}
+                                                    onChange={() => toggleModulo(modulo.id)}
+                                                    className="w-5 h-5 text-blue-600 rounded"
+                                                />
+                                                <div>
+                                                    <p className="font-semibold text-gray-800">{modulo.nombre}</p>
+                                                    {modulo.descripcion && (
+                                                        <p className="text-xs text-gray-500">{modulo.descripcion}</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                <div className="text-right">
+                                                    <div className="text-right flex flex-col items-end">
+                                                        {formData.modulos_ids.includes(modulo.id) && hasPermission('cotizaciones.edit_prices') ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-xs text-gray-400 font-bold">$</span>
+                                                                <input
+                                                                    type="number"
+                                                                    className="w-24 text-right font-bold text-green-600 border border-blue-200 rounded px-2 py-1 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                                                    value={overrides[modulo.id] ?? modulo.precio_anual}
+                                                                    onChange={(e) => {
+                                                                        setOverrides({ ...overrides, [modulo.id]: Number(e.target.value) });
+                                                                    }}
+                                                                />
+                                                                <span className="text-[10px] text-gray-400 font-bold uppercase">/año</span>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <p className="font-bold text-green-600">
+                                                                    ${(overrides[modulo.id] ?? modulo.precio_anual).toFixed(2)}/año
+                                                                </p>
+                                                                <p className="text-xs text-gray-500">
+                                                                    ${modulo.precio_mensual.toFixed(2)}/mes
+                                                                </p>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </label>
+                                    ))}
+                                </div>
                             </div>
 
-                            {/* IVA */}
                             <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">
-                                    IVA (%)
-                                </label>
-                                <div className="space-y-3">
-                                    <Input
-                                        type="number"
-                                        step="0.1"
-                                        value={formData.iva_porcentaje || ''}
-                                        onChange={(e) => setFormData({ ...formData, iva_porcentaje: Number(e.target.value) })}
-                                        placeholder="13"
-                                    />
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => setFormData({ ...formData, iva_porcentaje: 13 })}
-                                            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${formData.iva_porcentaje === 13 ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                <h2 className="text-lg font-bold text-[#4449AA] mb-4">🔧 Servicios Adicionales</h2>
+                                <div className="space-y-2">
+                                    {servicios.map((servicio) => (
+                                        <label
+                                            key={servicio.id}
+                                            className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
                                         >
-                                            13% (Estandar)
-                                        </button>
-                                        <button
-                                            onClick={() => setFormData({ ...formData, iva_porcentaje: 0 })}
-                                            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${formData.iva_porcentaje === 0 ? 'bg-green-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                                        >
-                                            Exento (0%)
-                                        </button>
-                                    </div>
+                                            <div className="flex items-center gap-3">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={formData.servicios_ids.includes(servicio.id)}
+                                                    onChange={() => toggleServicio(servicio.id)}
+                                                    className="w-5 h-5 text-blue-600 rounded"
+                                                />
+                                                <div>
+                                                    <p className="font-semibold text-gray-800">{servicio.nombre}</p>
+                                                    {servicio.descripcion && (
+                                                        <p className="text-xs text-gray-500">{servicio.descripcion}</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="text-right flex flex-col items-end">
+                                                {formData.servicios_ids.includes(servicio.id) && hasPermission('cotizaciones.edit_prices') ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs text-gray-400 font-bold">$</span>
+                                                        <input
+                                                            type="number"
+                                                            className="w-24 text-right font-bold text-green-600 border border-blue-200 rounded px-2 py-1 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                                            value={overrides[servicio.id] ?? (
+                                                                servicio.precio_por_dte > 0
+                                                                    ? (formData.volumen_dtes * servicio.precio_por_dte)
+                                                                    : (servicio.pago_unico > 0 ? servicio.pago_unico : servicio.precio_anual)
+                                                            )}
+                                                            onChange={(e) => {
+                                                                setOverrides({ ...overrides, [servicio.id]: Number(e.target.value) });
+                                                            }}
+                                                        />
+                                                        <span className="text-[10px] text-gray-400 font-bold uppercase">
+                                                            {servicio.pago_unico > 0 ? 'Único' : '/año'}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        {(() => {
+                                                            const currentPrice = overrides[servicio.id] ?? (
+                                                                servicio.precio_por_dte > 0
+                                                                    ? (formData.volumen_dtes * servicio.precio_por_dte)
+                                                                    : (servicio.pago_unico > 0 ? servicio.pago_unico : servicio.precio_anual)
+                                                            );
+                                                            return (
+                                                                <>
+                                                                    <p className="font-bold text-green-600">
+                                                                        ${currentPrice.toFixed(2)}
+                                                                    </p>
+                                                                    {servicio.precio_por_dte > 0 && !overrides[servicio.id] && (
+                                                                        <p className="text-xs text-gray-500">
+                                                                            {formData.volumen_dtes.toLocaleString()} × ${servicio.precio_por_dte}
+                                                                        </p>
+                                                                    )}
+                                                                    {servicio.pago_unico > 0 && (
+                                                                        <p className="text-xs text-gray-500">Pago único</p>
+                                                                    )}
+                                                                    {servicio.precio_anual > 0 && !servicio.pago_unico && !servicio.precio_por_dte && (
+                                                                        <p className="text-xs text-gray-500">/año</p>
+                                                                    )}
+                                                                </>
+                                                            );
+                                                        })()}
+                                                    </>
+                                                )}
+                                            </div>
+                                        </label>
+                                    ))}
                                 </div>
                             </div>
                         </div>
+                    )}
 
-                        {/* Resumen de Inversión - Profesional y Compacto */}
-                        {totales && (
-                            <div className="mt-6">
-                                <h3 className="font-bold text-xl text-gray-900 mb-4">Resumen de Inversión</h3>
+                    {/* PASO 4: Resumen */}
+                    {pasoActual === 4 && (
+                        <div className="space-y-6">
+                            <div className="flex justify-between items-center">
+                                <h2 className="text-lg font-bold text-[#4449AA]">💰 Resumen de Cotización</h2>
+                                <div className="text-right">
+                                    <p className="text-xs text-gray-500 font-bold uppercase">Volumen Contratado</p>
+                                    <p className="text-sm font-black text-blue-600">
+                                        {formData.volumen_dtes.toLocaleString()} DTEs/año
+                                        <span className="text-gray-400 font-normal ml-2">({Math.round(formData.volumen_dtes / 12).toLocaleString()} mes)</span>
+                                    </p>
+                                </div>
+                            </div>
 
-                                <div className="space-y-3">
+                            {/* Desglose Premium */}
+                            <div className="space-y-3">
+                                {totales?.desglose.map((item, idx) => (
+                                    <div key={idx} className="group relative bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
+                                        <div className="flex justify-between items-start gap-4">
+                                            <div className="flex gap-4">
+                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${item.tipo === 'Paquete' ? 'bg-blue-50 text-blue-600' :
+                                                    item.tipo === 'Implementación' ? 'bg-orange-50 text-orange-600' :
+                                                        'bg-purple-50 text-purple-600'
+                                                    }`}>
+                                                    <FileText className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="font-bold text-gray-900">{item.nombre}</p>
+                                                        {item.precio_mensual === 0 && (
+                                                            <span className="bg-gray-100 text-gray-600 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter">Pago Único</span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-gray-500 mt-0.5">{item.descripcion}</p>
+                                                </div>
+                                            </div>
 
-                                    {/* 1. PAGO INICIAL (ORANGE) */}
-                                    {totales.total_pagos_unicos > 0 && (
-                                        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 shadow-sm">
+                                            <div className="text-right flex flex-col items-end gap-1">
+                                                {item.tipo === 'Implementación' && hasPermission('cotizaciones.edit_implementation') ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs text-gray-400 font-bold">$</span>
+                                                        <input
+                                                            type="number"
+                                                            className="w-24 text-right font-bold text-orange-600 border border-orange-100 rounded px-2 py-1 bg-orange-50/30 focus:ring-2 focus:ring-orange-500 outline-none"
+                                                            value={implementationOverride ?? item.precio_anual}
+                                                            onChange={(e) => setImplementationOverride(Number(e.target.value))}
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <p className="font-black text-gray-800 text-lg">
+                                                        ${(item.precio_anual).toLocaleString()}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+
+                            {/* Forma de Pago - Selector Profesional de Períodos */}
+                            <div className="mb-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <label className="text-sm font-bold text-gray-700">
+                                        🎯 Forma de Pago
+                                    </label>
+                                    {!canChangePaymentMethod && (
+                                        <span className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                                            🔒 Solo lectura
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Opciones de Pago Dinámicas */}
+                                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                    {financingPlans.length > 0 ? (
+                                        financingPlans.map((plan) => {
+                                            const isSelected = selectedPlanId === plan.id;
+                                            const isAnual = plan.meses === 12 && plan.interes_porcentaje === 0 && plan.titulo.toLowerCase().includes('pago');
+
+                                            return (
+                                                <button
+                                                    key={plan.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (canChangePaymentMethod) {
+                                                            setSelectedPlanId(plan.id);
+                                                            const isDiscountPlan = plan.tipo_ajuste === 'discount';
+
+                                                            setFormData({
+                                                                ...formData,
+                                                                forma_pago: isDiscountPlan ? 'anual' : 'mensual',
+                                                                meses_pago: plan.meses,
+                                                                // Reiniciamos descuento manual para evitar doble descuento accidental
+                                                                descuento_porcentaje: 0
+                                                            });
+                                                        }
+                                                    }}
+                                                    disabled={!canChangePaymentMethod}
+                                                    className={`relative p-4 rounded-xl border-2 transition-all group ${isSelected
+                                                        ? isAnual
+                                                            ? 'border-green-600 bg-gradient-to-br from-green-50 to-green-100 shadow-lg scale-[1.02]'
+                                                            : 'border-blue-600 bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg scale-[1.02]'
+                                                        : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
+                                                        } ${!canChangePaymentMethod ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                >
+                                                    <div className="text-center">
+                                                        <div className="text-2xl mb-2">
+                                                            {plan.meses === 12 && plan.interes_porcentaje === 0 ? '💰' :
+                                                                plan.meses === 3 ? '📊' :
+                                                                    plan.meses === 6 ? '📈' :
+                                                                        plan.meses === 9 ? '📉' : '📅'}
+                                                        </div>
+                                                        <p className="font-bold text-gray-900 text-sm">{plan.titulo}</p>
+                                                        {plan.descripcion && (
+                                                            <p className="text-[10px] text-gray-500 mt-1 truncate">
+                                                                {plan.meses === 1 && plan.interes_porcentaje > 0 ? 'Mensual' : plan.descripcion}
+                                                            </p>
+                                                        )}
+                                                        <div className="mt-2 pt-2 border-t border-gray-200">
+                                                            <p className={`text-xs font-bold ${plan.tipo_ajuste === 'discount' ? 'text-green-600' : plan.tipo_ajuste === 'recharge' ? 'text-blue-600' : 'text-gray-500'}`}>
+                                                                {plan.tipo_ajuste === 'discount' ? `-${plan.interes_porcentaje}% OFF` :
+                                                                    plan.tipo_ajuste === 'recharge' ? `+${plan.interes_porcentaje}% Interés` :
+                                                                        'Precio Base'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    {isSelected && (
+                                                        <div className={`absolute -top-2 -right-2 w-6 h-6 ${isAnual ? 'bg-green-600' : 'bg-blue-600'} rounded-full flex items-center justify-center shadow-lg`}>
+                                                            <span className="text-white text-xs">✓</span>
+                                                        </div>
+                                                    )}
+                                                    {plan.es_popular && !isAnual && (
+                                                        <div className="absolute -top-2 -left-2">
+                                                            <span className="bg-yellow-400 text-yellow-900 text-[9px] font-black px-2 py-0.5 rounded-full shadow-sm">
+                                                                POPULAR
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    {isAnual && (
+                                                        <div className="absolute -top-2 -left-2">
+                                                            <span className="bg-green-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-sm">
+                                                                {paymentSettings?.nota_mejor_precio || 'MEJOR PRECIO'}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            );
+                                        })
+                                    ) : (
+                                        <div className="col-span-full py-4 text-center text-gray-400 text-xs italic">
+                                            Cargando planes de financiamiento...
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Información contextual Dinámica */}
+                                <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-100">
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center flex-shrink-0">
+                                            <span className="text-white text-sm">💡</span>
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="text-sm font-bold text-gray-900 mb-1">
+                                                {financingPlans.find(p => p.id === selectedPlanId)?.titulo || 'Forma de Pago'}
+                                            </p>
+                                            <p className="text-xs text-gray-600">
+                                                {financingPlans.find(p => p.id === selectedPlanId)?.descripcion || 'Seleccione una opción de pago.'}
+                                            </p>
+                                            {formData.forma_pago === 'mensual' && (totales?.ahorro_pago_anual || 0) > 0 && (
+                                                <div className="mt-2 pt-2 border-t border-blue-200">
+                                                    <p className="text-xs font-bold text-blue-700">
+                                                        💰 Ahorrá ${(totales?.ahorro_pago_anual || 0).toFixed(2)} eligiendo pago anual
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+
+                            {/* CONFIGURACIÓN AVANZADA REMOVIDA A PETICIÓN */}
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Descuento */}
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                                        Descuento (%)
+                                    </label>
+                                    <Input
+                                        type="number"
+                                        step="0.1"
+                                        value={formData.descuento_porcentaje || ''}
+                                        onChange={(e) => setFormData({ ...formData, descuento_porcentaje: Number(e.target.value) })}
+                                        placeholder="0"
+                                    />
+                                </div>
+
+                                {/* IVA */}
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                                        IVA (%)
+                                    </label>
+                                    <div className="space-y-3">
+                                        <Input
+                                            type="number"
+                                            step="0.1"
+                                            value={formData.iva_porcentaje || ''}
+                                            onChange={(e) => setFormData({ ...formData, iva_porcentaje: Number(e.target.value) })}
+                                            placeholder="13"
+                                        />
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => setFormData({ ...formData, iva_porcentaje: 13 })}
+                                                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${formData.iva_porcentaje === 13 ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                            >
+                                                13% (Estandar)
+                                            </button>
+                                            <button
+                                                onClick={() => setFormData({ ...formData, iva_porcentaje: 0 })}
+                                                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${formData.iva_porcentaje === 0 ? 'bg-green-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                                            >
+                                                Exento (0%)
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Resumen de Inversión - Profesional y Compacto */}
+                            {totales && (
+                                <div className="mt-6">
+                                    <h3 className="font-bold text-xl text-gray-900 mb-4">Resumen de Inversión</h3>
+
+                                    <div className="space-y-3">
+
+                                        {/* 1. PAGO INICIAL (ORANGE) */}
+                                        {totales.total_pagos_unicos > 0 && (
+                                            <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5 shadow-sm">
+                                                <div className="flex justify-between items-center mb-3">
+                                                    <div>
+                                                        <h4 className="text-[10px] font-black text-orange-600 uppercase tracking-widest leading-none">PAGO INICIAL</h4>
+                                                        <p className="text-[9px] text-orange-400 font-bold mt-0.5">Requerido antes de activar</p>
+                                                    </div>
+                                                    <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600">
+                                                        <Package className="w-4 h-4" />
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <div className="flex justify-between text-[11px] text-gray-500 font-medium leading-none">
+                                                        <span>Implementación + Únicos</span>
+                                                        <span>${totales.subtotal_pagos_unicos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                    </div>
+                                                    <div className="flex justify-between text-[11px] text-gray-500 font-medium leading-none">
+                                                        <span>IVA ({formData.iva_porcentaje}%)</span>
+                                                        <span className="text-orange-600">+${totales.iva_pagos_unicos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                    </div>
+                                                    <div className="pt-2 border-t border-orange-200 mt-2 flex justify-between items-end">
+                                                        <span className="text-[10px] font-black text-gray-900 uppercase">Total inicial</span>
+                                                        <span className="text-xl font-black text-orange-600 tracking-tighter leading-none">${totales.total_pagos_unicos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* 2. PAGO RECURRENTE (BLUE/GREEN) */}
+                                        <div className={`${formData.forma_pago === 'mensual' ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'} border rounded-2xl p-5 shadow-sm`}>
                                             <div className="flex justify-between items-center mb-3">
                                                 <div>
-                                                    <h4 className="text-[10px] font-black text-orange-600 uppercase tracking-widest leading-none">PAGO INICIAL</h4>
-                                                    <p className="text-[9px] text-orange-400 font-bold mt-0.5">Requerido antes de activar</p>
+                                                    <h4 className={`text-[10px] font-black ${formData.forma_pago === 'mensual' ? 'text-blue-600' : 'text-green-600'} uppercase tracking-widest leading-none`}>
+                                                        {totales.cuotas > 1 ? `PAGO EN ${totales.cuotas} CUOTAS` : (formData.forma_pago === 'mensual' ? 'PAGO MENSUAL' : 'PAGO ANUAL')}
+                                                    </h4>
                                                 </div>
-                                                <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center text-orange-600">
-                                                    <Package className="w-4 h-4" />
+                                                <div className={`w-8 h-8 ${formData.forma_pago === 'mensual' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'} rounded-lg flex items-center justify-center`}>
+                                                    <Globe className="w-4 h-4" />
                                                 </div>
                                             </div>
                                             <div className="space-y-1.5">
                                                 <div className="flex justify-between text-[11px] text-gray-500 font-medium leading-none">
-                                                    <span>Implementación + Únicos</span>
-                                                    <span>${totales.subtotal_pagos_unicos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                    <span>Base Recurrente</span>
+                                                    <span>${totales.subtotal_recurrente_base.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                 </div>
+
+                                                {totales.recargo_mensual_monto > 0 && (
+                                                    <div className="flex justify-between text-[11px] text-blue-600 font-medium leading-none">
+                                                        <span>+ Financiamiento ({totales.recargo_aplicado_porcentaje}%)</span>
+                                                        <span className="font-bold">+${totales.recargo_mensual_monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                    </div>
+                                                )}
+
+                                                {/* Mostrar descuento del plan si existe */}
+                                                {financingPlans.find(p => p.id === selectedPlanId)?.tipo_ajuste === 'discount' && totales.ahorro_pago_anual > 0 && (
+                                                    <div className="flex justify-between text-[11px] text-green-600 font-medium leading-none">
+                                                        <span>- Descuento Pago Anticipado</span>
+                                                        <span className="font-bold">-${totales.ahorro_pago_anual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                    </div>
+                                                )}
+
                                                 <div className="flex justify-between text-[11px] text-gray-500 font-medium leading-none">
                                                     <span>IVA ({formData.iva_porcentaje}%)</span>
-                                                    <span className="text-orange-600">+${totales.iva_pagos_unicos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                </div>
-                                                <div className="pt-2 border-t border-orange-200 mt-2 flex justify-between items-end">
-                                                    <span className="text-[10px] font-black text-gray-900 uppercase">Total inicial</span>
-                                                    <span className="text-xl font-black text-orange-600 tracking-tighter leading-none">${totales.total_pagos_unicos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* 2. PAGO RECURRENTE (BLUE/GREEN) */}
-                                    <div className={`${formData.forma_pago === 'mensual' ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'} border rounded-2xl p-5 shadow-sm`}>
-                                        <div className="flex justify-between items-center mb-3">
-                                            <div>
-                                                <h4 className={`text-[10px] font-black ${formData.forma_pago === 'mensual' ? 'text-blue-600' : 'text-green-600'} uppercase tracking-widest leading-none`}>
-                                                    {totales.cuotas > 1 ? `PAGO EN ${totales.cuotas} CUOTAS` : (formData.forma_pago === 'mensual' ? 'PAGO MENSUAL' : 'PAGO ANUAL')}
-                                                </h4>
-                                            </div>
-                                            <div className={`w-8 h-8 ${formData.forma_pago === 'mensual' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'} rounded-lg flex items-center justify-center`}>
-                                                <Globe className="w-4 h-4" />
-                                            </div>
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <div className="flex justify-between text-[11px] text-gray-500 font-medium leading-none">
-                                                <span>Base Recurrente</span>
-                                                <span>${totales.subtotal_recurrente_base.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                            </div>
-
-                                            {totales.recargo_mensual_monto > 0 && (
-                                                <div className="flex justify-between text-[11px] text-blue-600 font-medium leading-none">
-                                                    <span>+ Financiamiento ({totales.recargo_aplicado_porcentaje}%)</span>
-                                                    <span className="font-bold">+${totales.recargo_mensual_monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                </div>
-                                            )}
-
-                                            {/* Mostrar descuento del plan si existe */}
-                                            {financingPlans.find(p => p.id === selectedPlanId)?.tipo_ajuste === 'discount' && totales.ahorro_pago_anual > 0 && (
-                                                <div className="flex justify-between text-[11px] text-green-600 font-medium leading-none">
-                                                    <span>- Descuento Pago Anticipado</span>
-                                                    <span className="font-bold">-${totales.ahorro_pago_anual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                </div>
-                                            )}
-
-                                            <div className="flex justify-between text-[11px] text-gray-500 font-medium leading-none">
-                                                <span>IVA ({formData.iva_porcentaje}%)</span>
-                                                <span className={formData.forma_pago === 'mensual' ? 'text-blue-600' : 'text-green-600'}>
-                                                    +${totales.iva_monto_recurrente.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                </span>
-                                            </div>
-
-                                            <div className={`pt-2 border-t ${formData.forma_pago === 'mensual' ? 'border-blue-200' : 'border-green-200'} mt-2 space-y-2`}>
-                                                <div className="flex justify-between items-end">
-                                                    <span className="text-[10px] font-black text-gray-900 uppercase">
-                                                        {totales.cuotas > 1 ? `Cuota de ${totales.cuotas}` : (formData.forma_pago === 'mensual' ? 'Cuota mensual' : 'Total recurrente')}
-                                                    </span>
-                                                    <span className={`text-xl font-black ${formData.forma_pago === 'mensual' ? 'text-blue-600' : 'text-green-600'} tracking-tighter leading-none`}>
-                                                        ${(totales.cuota_mensual).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    <span className={formData.forma_pago === 'mensual' ? 'text-blue-600' : 'text-green-600'}>
+                                                        +${totales.iva_monto_recurrente.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                     </span>
                                                 </div>
 
-                                            </div>
-                                        </div>
-                                    </div>
+                                                <div className={`pt-2 border-t ${formData.forma_pago === 'mensual' ? 'border-blue-200' : 'border-green-200'} mt-2 space-y-2`}>
+                                                    <div className="flex justify-between items-end">
+                                                        <span className="text-[10px] font-black text-gray-900 uppercase">
+                                                            {totales.cuotas > 1 ? `Cuota de ${totales.cuotas}` : (formData.forma_pago === 'mensual' ? 'Cuota mensual' : 'Total recurrente')}
+                                                        </span>
+                                                        <span className={`text-xl font-black ${formData.forma_pago === 'mensual' ? 'text-blue-600' : 'text-green-600'} tracking-tighter leading-none`}>
+                                                            ${(totales.cuota_mensual).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        </span>
+                                                    </div>
 
-                                    {/* 3. INVERSIÓN TOTAL (PURPLE) */}
-                                    <div className="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl p-5 text-white shadow-lg relative overflow-hidden group">
-                                        <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/5 rounded-full blur-2xl group-hover:bg-white/10 transition-all"></div>
-                                        <div className="flex justify-between items-end relative z-10">
-                                            <div>
-                                                <h4 className="text-[9px] font-black uppercase tracking-[0.2em] opacity-60 mb-1">INVERSIÓN TOTAL</h4>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-2xl font-black tracking-tighter leading-none">${totales.total_general.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Nota de validez */}
-                                    <div className="text-center mt-3">
-                                        <p className="text-[10px] text-gray-500 italic">
-                                            Todos los valores expresados en USD
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Elaborado por */}
-                        <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
-                                {(profile?.full_name || profile?.email || 'A').charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Propuesta Elaborada por</p>
-                                <p className="text-sm font-bold text-gray-900">{profile?.full_name || profile?.email || 'Agente Comercial'}</p>
-                            </div>
-                        </div>
-
-                        {/* Notas removed */}
-                    </div>
-                )}
-
-                {/* Botones de Navegación */}
-                <div className="flex justify-between mt-8">
-                    <Button
-                        onClick={handleAnterior}
-                        variant="outline"
-                        disabled={pasoActual === 1}
-                    >
-                        <ArrowLeft className="w-4 h-4 mr-2" />
-                        Anterior
-                    </Button>
-
-                    {pasoActual < 4 ? (
-                        <Button onClick={handleSiguiente} className="bg-blue-600 hover:bg-blue-700 text-white">
-                            Siguiente
-                            <ArrowRight className="w-4 h-4 ml-2" />
-                        </Button>
-                    ) : (
-                        <Button onClick={handleGenerar} className="bg-green-600 hover:bg-green-700 text-white">
-                            <FileText className="w-4 h-4 mr-2" />
-                            Generar Cotización
-                        </Button>
-                    )}
-                </div>
-            </div>
-
-            {/* Widget Flotante de Precio - Colapsable */}
-            {
-                pasoActual > 1 && totales && (
-                    <>
-                        {isWidgetOpen ? (
-                            <div className="fixed top-24 right-6 bg-white border-2 border-green-500 rounded-xl shadow-2xl p-4 w-72 z-50">
-                                <div className="flex items-center justify-between mb-2">
-                                    <h4 className="font-bold text-sm text-[#4449AA] flex items-center gap-2">
-                                        <DollarSign className="w-4 h-4" />
-                                        Precio en Tiempo Real
-                                    </h4>
-                                    <button
-                                        onClick={() => setIsWidgetOpen(false)}
-                                        className="text-gray-400 hover:text-gray-600 transition-colors"
-                                        title="Cerrar"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-                                <div className="space-y-1 text-sm">
-                                    {hasPermission('cotizaciones.manage_implementation') && (
-                                        <div className="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-100 mb-2">
-                                            <span className="text-[10px] font-black uppercase text-gray-400 tracking-tighter">Implementación:</span>
-                                            <label className="flex items-center gap-2 cursor-pointer">
-                                                <span className={`text-[11px] font-bold ${formData.incluir_implementacion ? 'text-green-600' : 'text-gray-400'}`}>
-                                                    {formData.incluir_implementacion ? 'SÍ' : 'NO'}
-                                                </span>
-                                                <div className={`w-8 h-4 rounded-full p-0.5 transition-colors ${formData.incluir_implementacion ? 'bg-green-500' : 'bg-gray-300'}`}>
-                                                    <div className={`w-3 h-3 bg-white rounded-full transition-transform ${formData.incluir_implementacion ? 'translate-x-4' : 'translate-x-0'}`} />
                                                 </div>
-                                                <input
-                                                    type="checkbox"
-                                                    className="hidden"
-                                                    checked={formData.incluir_implementacion}
-                                                    onChange={(e) => setFormData({ ...formData, incluir_implementacion: e.target.checked })}
-                                                />
-                                            </label>
-                                        </div>
-                                    )}
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-600">Subtotal:</span>
-                                        <span className="font-semibold">${(totales.subtotal_pagos_unicos + totales.subtotal_recurrente_base).toLocaleString()}</span>
-                                    </div>
-                                    {totales.descuento_monto > 0 && (
-                                        <div className="flex justify-between text-red-600">
-                                            <span>Descuento:</span>
-                                            <span>-${totales.descuento_monto.toLocaleString()}</span>
-                                        </div>
-                                    )}
-                                    <div className="flex justify-between items-center text-blue-600 bg-blue-50/50 p-1.5 rounded-lg border border-blue-100">
-                                        <div className="flex items-center gap-1">
-                                            <span className="text-[10px] font-black uppercase opacity-70">IVA:</span>
-                                            <div className="flex items-center gap-1">
-                                                <input
-                                                    type="number"
-                                                    className="w-10 bg-white border border-blue-200 rounded px-1 text-[11px] font-black focus:ring-1 focus:ring-blue-400 outline-none"
-                                                    value={formData.iva_porcentaje}
-                                                    onChange={(e) => setFormData({ ...formData, iva_porcentaje: Number(e.target.value) })}
-                                                />
-                                                <span className="text-[10px] font-bold">%</span>
                                             </div>
                                         </div>
-                                        <span className="font-black text-xs">+${(totales.iva_pagos_unicos + totales.iva_monto_recurrente).toLocaleString()}</span>
-                                    </div>
-                                    <div className="border-t pt-2 mt-2">
-                                        <div className="flex justify-between text-lg font-bold text-green-600">
-                                            <span>Total General:</span>
-                                            <span>${totales.total_general.toLocaleString()}</span>
+
+                                        {/* 3. INVERSIÓN TOTAL (PURPLE) */}
+                                        <div className="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl p-5 text-white shadow-lg relative overflow-hidden group">
+                                            <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/5 rounded-full blur-2xl group-hover:bg-white/10 transition-all"></div>
+                                            <div className="flex justify-between items-end relative z-10">
+                                                <div>
+                                                    <h4 className="text-[9px] font-black uppercase tracking-[0.2em] opacity-60 mb-1">INVERSIÓN TOTAL</h4>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-2xl font-black tracking-tighter leading-none">${totales.total_general.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                                                </div>
+                                            </div>
                                         </div>
-                                        {totales.cuotas > 1 ? (
-                                            <p className="text-xs text-gray-500 text-right">
-                                                ${totales.cuota_mensual.toLocaleString()} / {totales.cuotas} cuotas
+
+                                        {/* Nota de validez */}
+                                        <div className="text-center mt-3">
+                                            <p className="text-[10px] text-gray-500 italic">
+                                                Todos los valores expresados en USD
                                             </p>
-                                        ) : (
-                                            formData.forma_pago === 'mensual' && (
-                                                <p className="text-xs text-gray-500 text-right">
-                                                    ${totales.cuota_mensual.toLocaleString()}/mes
-                                                </p>
-                                            )
-                                        )}
+                                        </div>
                                     </div>
                                 </div>
+                            )}
+
+                            {/* Elaborado por */}
+                            <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
+                                    {(profile?.full_name || profile?.email || 'A').charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Propuesta Elaborada por</p>
+                                    <p className="text-sm font-bold text-gray-900">{profile?.full_name || profile?.email || 'Agente Comercial'}</p>
+                                </div>
                             </div>
+
+                            {/* Notas removed */}
+                        </div>
+                    )}
+
+                    {/* Botones de Navegación */}
+                    <div className="flex justify-between mt-8">
+                        <Button
+                            onClick={handleAnterior}
+                            variant="outline"
+                            disabled={pasoActual === 1}
+                        >
+                            <ArrowLeft className="w-4 h-4 mr-2" />
+                            Anterior
+                        </Button>
+
+                        {pasoActual < 4 ? (
+                            <Button onClick={handleSiguiente} className="bg-blue-600 hover:bg-blue-700 text-white">
+                                Siguiente
+                                <ArrowRight className="w-4 h-4 ml-2" />
+                            </Button>
                         ) : (
-                            <button
-                                onClick={() => setIsWidgetOpen(true)}
-                                className="fixed top-24 right-6 bg-green-500 hover:bg-green-600 text-white rounded-full p-3 shadow-2xl z-50 transition-all"
-                                title="Ver precios"
-                            >
-                                <DollarSign className="w-5 h-5" />
-                            </button>
+                            <Button onClick={handleGenerar} className="bg-green-600 hover:bg-green-700 text-white">
+                                <FileText className="w-4 h-4 mr-2" />
+                                Generar Cotización
+                            </Button>
                         )}
-                    </>
-                )
-            }
+                    </div>
+                </div>
+
+                {/* Widget Flotante de Precio - Colapsable */}
+                {
+                    pasoActual > 1 && totales && (
+                        <>
+                            {isWidgetOpen ? (
+                                <div className="fixed top-24 right-6 bg-white border-2 border-green-500 rounded-xl shadow-2xl p-4 w-72 z-50">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h4 className="font-bold text-sm text-[#4449AA] flex items-center gap-2">
+                                            <DollarSign className="w-4 h-4" />
+                                            Precio en Tiempo Real
+                                        </h4>
+                                        <button
+                                            onClick={() => setIsWidgetOpen(false)}
+                                            className="text-gray-400 hover:text-gray-600 transition-colors"
+                                            title="Cerrar"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                    <div className="space-y-1 text-sm">
+                                        {hasPermission('cotizaciones.manage_implementation') && (
+                                            <div className="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-100 mb-2">
+                                                <span className="text-[10px] font-black uppercase text-gray-400 tracking-tighter">Implementación:</span>
+                                                <label className="flex items-center gap-2 cursor-pointer">
+                                                    <span className={`text-[11px] font-bold ${formData.incluir_implementacion ? 'text-green-600' : 'text-gray-400'}`}>
+                                                        {formData.incluir_implementacion ? 'SÍ' : 'NO'}
+                                                    </span>
+                                                    <div className={`w-8 h-4 rounded-full p-0.5 transition-colors ${formData.incluir_implementacion ? 'bg-green-500' : 'bg-gray-300'}`}>
+                                                        <div className={`w-3 h-3 bg-white rounded-full transition-transform ${formData.incluir_implementacion ? 'translate-x-4' : 'translate-x-0'}`} />
+                                                    </div>
+                                                    <input
+                                                        type="checkbox"
+                                                        className="hidden"
+                                                        checked={formData.incluir_implementacion}
+                                                        onChange={(e) => setFormData({ ...formData, incluir_implementacion: e.target.checked })}
+                                                    />
+                                                </label>
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-600">Subtotal:</span>
+                                            <span className="font-semibold">${(totales.subtotal_pagos_unicos + totales.subtotal_recurrente_base).toLocaleString()}</span>
+                                        </div>
+                                        {totales.descuento_monto > 0 && (
+                                            <div className="flex justify-between text-red-600">
+                                                <span>Descuento:</span>
+                                                <span>-${totales.descuento_monto.toLocaleString()}</span>
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between items-center text-blue-600 bg-blue-50/50 p-1.5 rounded-lg border border-blue-100">
+                                            <div className="flex items-center gap-1">
+                                                <span className="text-[10px] font-black uppercase opacity-70">IVA:</span>
+                                                <div className="flex items-center gap-1">
+                                                    <input
+                                                        type="number"
+                                                        className="w-10 bg-white border border-blue-200 rounded px-1 text-[11px] font-black focus:ring-1 focus:ring-blue-400 outline-none"
+                                                        value={formData.iva_porcentaje}
+                                                        onChange={(e) => setFormData({ ...formData, iva_porcentaje: Number(e.target.value) })}
+                                                    />
+                                                    <span className="text-[10px] font-bold">%</span>
+                                                </div>
+                                            </div>
+                                            <span className="font-black text-xs">+${(totales.iva_pagos_unicos + totales.iva_monto_recurrente).toLocaleString()}</span>
+                                        </div>
+                                        <div className="border-t pt-2 mt-2">
+                                            <div className="flex justify-between text-lg font-bold text-green-600">
+                                                <span>Total General:</span>
+                                                <span>${totales.total_general.toLocaleString()}</span>
+                                            </div>
+                                            {totales.cuotas > 1 ? (
+                                                <p className="text-xs text-gray-500 text-right">
+                                                    ${totales.cuota_mensual.toLocaleString()} / {totales.cuotas} cuotas
+                                                </p>
+                                            ) : (
+                                                formData.forma_pago === 'mensual' && (
+                                                    <p className="text-xs text-gray-500 text-right">
+                                                        ${totales.cuota_mensual.toLocaleString()}/mes
+                                                    </p>
+                                                )
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => setIsWidgetOpen(true)}
+                                    className="fixed top-24 right-6 bg-green-500 hover:bg-green-600 text-white rounded-full p-3 shadow-2xl z-50 transition-all"
+                                    title="Ver precios"
+                                >
+                                    <DollarSign className="w-5 h-5" />
+                                </button>
+                            )}
+                        </>
+                    )
+                }
+            </div>
 
             {/* Modal Selector de Leads - Cobertura Total Garantizada (Fuera de contenedores padres para evitar stacking context issues) */}
             {
                 showLeadSelector && (
                     <div
-                        className="fixed inset-0 bg-black flex items-center justify-center"
+                        className="fixed inset-0 bg-black flex items-center justify-center p-4"
                         style={{
                             zIndex: 9999999,
                             position: 'fixed',
@@ -1433,12 +1435,13 @@ export default function CotizadorPro() {
                             bottom: 0,
                             width: '100vw',
                             height: '100vh',
-                            backgroundColor: 'black'
+                            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                            backdropFilter: 'blur(4px)'
                         }}
                         onClick={() => { setShowLeadSelector(false); setSearchLead(''); }}
                     >
                         <div
-                            className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col m-4"
+                            className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col"
                             style={{ position: 'relative', zIndex: 10000000 }}
                             onClick={(e) => e.stopPropagation()}
                         >
@@ -1563,6 +1566,6 @@ export default function CotizadorPro() {
                     </div>
                 )
             }
-        </div >
+        </>
     );
 }

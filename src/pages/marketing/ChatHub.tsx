@@ -156,6 +156,11 @@ export default function ChatHub() {
                     if (prev.find(m => m.id === msg.id)) return prev;
                     return [...prev, msg];
                 });
+
+                // If message is inbound and chat is open, mark as read automatically
+                if (msg.direction === 'inbound') {
+                    chatService.markAsRead(selectedConv.id);
+                }
             });
             return () => { sub.unsubscribe(); };
         } else {
@@ -601,7 +606,10 @@ export default function ChatHub() {
                                         <h3 className={`text-sm font-black truncate tracking-tight ${selectedConv?.id === conv.id ? 'text-white' : 'text-slate-800'}`}>
                                             {conv.lead?.name || 'Prospecto'}
                                         </h3>
-                                        <span className={`text-[9px] font-bold ${selectedConv?.id === conv.id ? 'text-blue-200' : 'text-slate-400'}`}>
+                                        <span className={`text-[9px] font-bold ${selectedConv?.id === conv.id ? 'text-blue-200' : 'text-slate-400'} flex items-center gap-2`}>
+                                            {conv.unread_count > 0 && selectedConv?.id !== conv.id && (
+                                                <span className="flex h-2 w-2 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50 animate-pulse" title={`${conv.unread_count} sin leer`} />
+                                            )}
                                             {formatTime(conv.last_message_at)}
                                         </span>
                                     </div>
@@ -735,33 +743,44 @@ export default function ChatHub() {
                                                             <span className="text-[10px] opacity-70">Haz clic para descargar</span>
                                                         </div>
                                                     </a>
-                                                ) : msg.type === 'voice' || msg.type === 'audio' ? (
-                                                    <div className="flex flex-col gap-2 min-w-[220px]">
-                                                        <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                                                            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+                                                ) : (msg.type as string) === 'voice' || (msg.type as string) === 'audio' ? (
+                                                    <div className="flex flex-col gap-2 min-w-[240px]">
+                                                        <div className="flex items-center gap-3 bg-slate-50/80 p-3 rounded-xl border border-slate-200/50 backdrop-blur-sm">
+                                                            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 shadow-inner">
                                                                 <PhoneIcon className="w-5 h-5" />
                                                             </div>
                                                             <div className="flex-1">
-                                                                <p className="text-[10px] font-black uppercase text-indigo-600/60 tracking-widest">
-                                                                    {msg.metadata?.is_voice || msg.type === 'voice' ? 'Nota de Voz' : 'Audio'}
+                                                                <p className="text-[9px] font-black uppercase text-indigo-600/60 tracking-widest mb-0.5">
+                                                                    {(msg.metadata?.is_voice || (msg.type as string) === 'voice') ? 'Nota de Voz' : 'Audio Recibido'}
                                                                 </p>
-                                                                <p className="text-xs font-bold text-slate-700">Audio recibido</p>
+                                                                <p className="text-xs font-bold text-slate-700">Telegram Channel</p>
                                                             </div>
+                                                            {msg.metadata?.duration && (
+                                                                <span className="text-[10px] font-mono bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full border border-indigo-100/50">
+                                                                    {msg.metadata.duration}s
+                                                                </span>
+                                                            )}
                                                         </div>
-                                                        {msg.metadata?.transcription && (
-                                                            <div className="bg-slate-50/50 p-3 rounded-xl border border-slate-50 italic text-[13px] text-slate-600 leading-relaxed shadow-sm">
+                                                        {msg.metadata?.transcription ? (
+                                                            <div className="bg-white/60 p-3 rounded-xl border border-indigo-100/50 italic text-[13px] text-slate-600 leading-relaxed shadow-sm relative overflow-hidden group/transcription">
+                                                                <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500/20" />
                                                                 "{msg.metadata.transcription}"
+                                                            </div>
+                                                        ) : (
+                                                            <div className="bg-slate-50/30 p-2 rounded-lg border border-dashed border-slate-200 text-center">
+                                                                <span className="text-[10px] text-slate-400 font-medium">Procesando transcripción...</span>
                                                             </div>
                                                         )}
                                                     </div>
-                                                ) : selectedConv.channel === 'email' || msg.content.includes('</') ? (
-                                                    <div
-                                                        className={`prose prose-sm max-w-none break-words ${msg.direction === 'outbound' && selectedConv.channel === 'email' ? 'text-slate-900' : msg.direction === 'outbound' ? 'text-white' : 'text-slate-700'}`}
-                                                        dangerouslySetInnerHTML={{ __html: msg.content }}
-                                                    />
-                                                ) : (
-                                                    msg.content
-                                                )}
+                                                ) :
+                                                    selectedConv.channel === 'email' || msg.content.includes('</') ? (
+                                                        <div
+                                                            className={`prose prose-sm max-w-none break-words ${msg.direction === 'outbound' && selectedConv.channel === 'email' ? 'text-slate-900' : msg.direction === 'outbound' ? 'text-white' : 'text-slate-700'}`}
+                                                            dangerouslySetInnerHTML={{ __html: msg.content }}
+                                                        />
+                                                    ) : (
+                                                        msg.content
+                                                    )}
 
                                                 {/* DELETE BUTTON FOR ADMINS */}
                                                 {isAdmin() && (

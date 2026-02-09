@@ -2,11 +2,11 @@ import { useEffect, useState, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { leadsService } from '../services/leads';
-import type { Lead, LeadStatus, LeadPriority, FollowUp } from '../types';
+import type { Lead, LeadStatus, LeadPriority, FollowUp, LossReason } from '../types';
 import { PRIORITY_CONFIG, STATUS_CONFIG, ACTION_TYPES, SOURCE_CONFIG, SOURCE_OPTIONS } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2, Layout, MessageSquare, Send, Smartphone, Filter, ChevronDown, CheckCircle, Shield, ArrowUpDown, Search } from 'lucide-react';
+import { Plus, User, Phone, Mail, DollarSign, Clock, ChevronRight, X, TrendingUp, LayoutGrid, List, Download, Upload, Loader2, FileText, UploadCloud, Trash2, Layout, MessageSquare, Send, Smartphone, Filter, ChevronDown, CheckCircle, Shield, ArrowUpDown, Search, Target } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { csvHelper } from '../utils/csvHelper';
@@ -17,6 +17,7 @@ import { CreateLeadFullscreen } from '../components/CreateLeadFullscreen';
 import { MobileQuickActions } from '../components/MobileQuickActions';
 import { LeadKanban } from '../components/LeadKanban';
 import { logger } from '../utils/logger';
+import { lossReasonsService } from '../services/lossReasons';
 import { CustomDatePicker } from '../components/ui/CustomDatePicker';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { GripVertical } from 'lucide-react';
@@ -51,6 +52,15 @@ export default function Leads() {
 
     const [isPriorityFilterOpen, setIsPriorityFilterOpen] = useState(false);
     const priorityFilterRef = useRef<HTMLDivElement>(null);
+
+    const [isLossReasonFilterOpen, setIsLossReasonFilterOpen] = useState(false);
+    const lossReasonFilterRef = useRef<HTMLDivElement>(null);
+
+    const [isLostAtStageFilterOpen, setIsLostAtStageFilterOpen] = useState(false);
+    const lostAtStageFilterRef = useRef<HTMLDivElement>(null);
+
+    const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
+    const statusFilterRef = useRef<HTMLDivElement>(null);
 
     // State for Next Follow Up section (manual save)
     // State for Next Follow Up section (manual save)
@@ -87,41 +97,74 @@ export default function Leads() {
     };
 
     const [isImporting, setIsImporting] = useState(false);
-    const [priorityFilter, setPriorityFilter] = useState<string>('all');
-    const [assignedFilter, setAssignedFilter] = useState<string>('all');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [priorityFilter, setPriorityFilter] = useState<LeadPriority | 'all'>('all');
+    const [assignedFilter, setAssignedFilter] = useState<string | 'all'>('all');
+    const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all');
+    const [sourceFilter, setSourceFilter] = useState<string | 'all'>('all');
+    const [lossReasonFilter, setLossReasonFilter] = useState<string | 'all'>('all');
+    const [lostAtStageFilter, setLostAtStageFilter] = useState<string | 'all'>('all');
+    const [filteredLeadId, setFilteredLeadId] = useState<string | null>(null);
     const [isAssignedFilterOpen, setIsAssignedFilterOpen] = useState(false);
     const assignedFilterRef = useRef<HTMLDivElement>(null);
-    const [searchTerm, setSearchTerm] = useState<string>('');
-    const [filteredLeadId, setFilteredLeadId] = useState<string | null>(null);
+    const [filteredLeadIds, setFilteredLeadIds] = useState<string[] | null>(null);
 
     const [isUploading, setIsUploading] = useState(false);
     const location = useLocation();
     const navigate = useNavigate();
+    const processedStateRef = useRef<string | null>(null);
 
+    // Lost Leads Management
+    const [lossReasons, setLossReasons] = useState<LossReason[]>([]);
+    const [isLossModalOpen, setIsLossModalOpen] = useState(false);
+    const [lossData, setLossData] = useState({
+        lost_reason_id: '',
+        lost_notes: ''
+    });
+
+    const [isWonModalOpen, setIsWonModalOpen] = useState(false);
+    const [wonData, setWonData] = useState({
+        won_date: format(new Date(), 'yyyy-MM-dd'),
+    });
+    const [pendingWonStatus, setPendingWonStatus] = useState<LeadStatus | null>(null);
     // Handle incoming state from Dashboard or Calendar
     useEffect(() => {
         if (location.state) {
             const state = location.state as any;
-            if (state.priority) {
-                setPriorityFilter(state.priority);
+            const stateKey = JSON.stringify(state);
+
+            // Only apply filters once per state change to allow manual clearing
+            if (processedStateRef.current !== stateKey) {
+                if (state.priority) setPriorityFilter(state.priority);
+                if (state.status) setStatusFilter(state.status);
+                if (state.source) setSourceFilter(state.source);
+                if (state.lossReasonId) setLossReasonFilter(state.lossReasonId);
+                if (state.lostAtStage) setLostAtStageFilter(state.lostAtStage);
+                if (state.leadIds) {
+                    setFilteredLeadIds(state.leadIds);
+                    if (viewMode === 'kanban') setViewMode('list');
+                }
+                if (state.leadId) {
+                    setFilteredLeadId(state.leadId);
+                    if (viewMode === 'kanban') setViewMode('list');
+                }
+                processedStateRef.current = stateKey;
             }
-            // If a specific lead ID is passed, we wait for leads to load then open it
+
+            // If leads are already loaded OR when they load, handle selection/opening
             if (state.leadId && leads.length > 0) {
                 const targetLead = leads.find(l => l.id === state.leadId);
                 if (targetLead) {
                     setSelectedLead(targetLead);
-                    setFilteredLeadId(state.leadId); // Filter list to show only this lead
                     setIsDetailOpen(true);
-
-                    // 🔥 FIX: Load follow-up history when opening from Calendar
                     loadFollowUps(targetLead.id);
 
-                    // Clear state to prevent reopening on reload (optional but good practice)
+                    // Clear state to prevent reopening on reload
                     window.history.replaceState({}, document.title);
                 }
             }
         }
-    }, [location, leads]); // Added leads dependence to run when leads are loaded
+    }, [location.state, leads.length]);
 
     // Force grid view on mobile initially, but allow changes
     useEffect(() => {
@@ -233,8 +276,11 @@ export default function Leads() {
 
     const filteredLeads = useMemo(() => {
         return leads.filter(lead => {
-            // Filter by specific lead ID if set
+            // Filter by specific lead ID if set (Direct skip)
             if (filteredLeadId) return lead.id === filteredLeadId;
+
+            // Filter by list of lead IDs (KPI logic)
+            if (filteredLeadIds && !filteredLeadIds.includes(lead.id)) return false;
 
             // Filter by search term
             if (searchTerm.trim()) {
@@ -261,9 +307,21 @@ export default function Leads() {
                 }
             }
 
+            // Filter by status
+            if (statusFilter !== 'all' && lead.status !== statusFilter) return false;
+
+            // Filter by source
+            if (sourceFilter !== 'all' && lead.source !== sourceFilter) return false;
+
+            // Filter by loss reason
+            if (lossReasonFilter !== 'all' && lead.lost_reason_id !== lossReasonFilter) return false;
+
+            // Filter by loss stage
+            if (lostAtStageFilter !== 'all' && lead.lost_at_stage !== lostAtStageFilter) return false;
+
             return true;
         });
-    }, [leads, priorityFilter, assignedFilter, filteredLeadId, searchTerm]);
+    }, [leads, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, filteredLeadId, filteredLeadIds, searchTerm]);
 
     const sortedLeads = useMemo(() => {
         if (!sortConfig) return filteredLeads;
@@ -280,7 +338,17 @@ export default function Leads() {
     useEffect(() => {
         loadLeads();
         loadTeamMembers();
+        loadLossReasons();
     }, []);
+
+    const loadLossReasons = async () => {
+        try {
+            const reasons = await lossReasonsService.getLossReasons();
+            setLossReasons(reasons);
+        } catch (error) {
+            logger.error('Failed to load loss reasons', error, { action: 'loadLossReasons' });
+        }
+    };
 
     const handleDeleteLead = async (id: string, name: string) => {
         if (!confirm(`¿Estás seguro de eliminar el lead "${name}"? Esta acción no se puede deshacer.`)) return;
@@ -367,6 +435,15 @@ export default function Leads() {
             }
             if (assignedFilterRef.current && !assignedFilterRef.current.contains(event.target as Node)) {
                 setIsAssignedFilterOpen(false);
+            }
+            if (lossReasonFilterRef.current && !lossReasonFilterRef.current.contains(event.target as Node)) {
+                setIsLossReasonFilterOpen(false);
+            }
+            if (lostAtStageFilterRef.current && !lostAtStageFilterRef.current.contains(event.target as Node)) {
+                setIsLostAtStageFilterOpen(false);
+            }
+            if (statusFilterRef.current && !statusFilterRef.current.contains(event.target as Node)) {
+                setIsStatusFilterOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -562,6 +639,20 @@ export default function Leads() {
 
     const handleUpdateLead = async (updates: Partial<Lead>) => {
         if (!selectedLead) return;
+
+        // Intercept status change to 'Perdido'
+        if ('status' in updates && updates.status === 'Perdido') {
+            setIsLossModalOpen(true);
+            return;
+        }
+
+        // Intercept status change to 'Cerrado' or 'Cliente'
+        if ('status' in updates && (updates.status === 'Cerrado' || updates.status === 'Cliente')) {
+            setPendingWonStatus(updates.status);
+            setWonData({ won_date: format(new Date(), 'yyyy-MM-dd') });
+            setIsWonModalOpen(true);
+            return;
+        }
         try {
             // Clean data - convert empty strings to null for optional fields
             const cleanUpdates = { ...updates };
@@ -592,6 +683,56 @@ export default function Leads() {
         } catch (error: any) {
             logger.error('Update failed', error, { action: 'handleUpdateLead', leadId: selectedLead.id });
             toast.error(`Error al guardar: ${error.message}`);
+        }
+    };
+
+    const handleConfirmLoss = async () => {
+        if (!selectedLead || !lossData.lost_reason_id) {
+            toast.error('Por favor selecciona un motivo de pérdida');
+            return;
+        }
+
+        try {
+            // Capture the stage where the lead was lost
+            const lost_at_stage = selectedLead.status;
+
+            await leadsService.updateLead(selectedLead.id, {
+                status: 'Perdido',
+                lost_reason_id: lossData.lost_reason_id,
+                lost_at_stage,
+                lost_notes: lossData.lost_notes || null,
+                lost_date: new Date().toISOString()
+            });
+
+            setSelectedLead({ ...selectedLead, status: 'Perdido', lost_at_stage, lost_reason_id: lossData.lost_reason_id, lost_notes: lossData.lost_notes });
+            loadLeads();
+
+            setIsLossModalOpen(false);
+            setLossData({ lost_reason_id: '', lost_notes: '' });
+
+            toast.success('Lead marcado como perdido');
+        } catch (error: any) {
+            logger.error('Failed to mark as lost', error, { action: 'handleConfirmLoss', leadId: selectedLead.id });
+            toast.error(`Error: ${error.message}`);
+        }
+    };
+
+    const handleConfirmWon = async () => {
+        if (!selectedLead || !pendingWonStatus) return;
+
+        try {
+            await leadsService.updateLead(selectedLead.id, {
+                status: pendingWonStatus,
+                internal_won_date: new Date(`${wonData.won_date}T12:00:00`).toISOString()
+            });
+
+            setIsWonModalOpen(false);
+            setPendingWonStatus(null);
+            loadLeads();
+            toast.success('¡Felicitaciones! Trato cerrado con éxito.');
+        } catch (error: any) {
+            logger.error('Failed to mark as won', error, { action: 'handleConfirmWon', leadId: selectedLead.id });
+            toast.error(`Error: ${error.message}`);
         }
     };
 
@@ -628,6 +769,43 @@ export default function Leads() {
         );
     };
 
+    const StatusDropdown = () => (
+        <div className="relative" ref={statusFilterRef}>
+            <button
+                onClick={() => setIsStatusFilterOpen(!isStatusFilterOpen)}
+                className={`flex items-center space-x-2 bg-white border px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm h-10 min-w-[170px] justify-between ${statusFilter !== 'all' ? 'border-blue-300 text-blue-600' : 'border-gray-100 text-[#4449AA]'}`}
+            >
+                <div className="flex items-center gap-2">
+                    <CheckCircle className="h-3.5 w-3.5" />
+                    <span>{statusFilter === 'all' ? 'Todos los Estados' : STATUS_CONFIG[statusFilter as LeadStatus]?.label || statusFilter}</span>
+                </div>
+                <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition-transform duration-300 ${isStatusFilterOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isStatusFilterOpen && (
+                <div className="absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-50 z-50 py-2 animate-in fade-in slide-in-from-top-2">
+                    <button
+                        onClick={() => { setStatusFilter('all'); setIsStatusFilterOpen(false); }}
+                        className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors ${statusFilter === 'all' ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}
+                    >
+                        Todos los Estados
+                    </button>
+                    <div className="border-t border-gray-100 my-1" />
+                    {(Object.entries(STATUS_CONFIG) as [LeadStatus, any][]).map(([key, config]) => (
+                        <button
+                            key={key}
+                            onClick={() => { setStatusFilter(key); setIsStatusFilterOpen(false); }}
+                            className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors flex items-center gap-2 ${statusFilter === key ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}
+                        >
+                            <span>{config.icon}</span>
+                            {config.label}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+
     const StatusBadge = ({ status }: { status: LeadStatus }) => {
         const config = STATUS_CONFIG[status] || STATUS_CONFIG['Prospecto'];
         return (
@@ -638,554 +816,681 @@ export default function Leads() {
         );
     };
 
+    const LossReasonDropdown = () => (
+        <div className="relative" ref={lossReasonFilterRef}>
+            <button
+                onClick={() => setIsLossReasonFilterOpen(!isLossReasonFilterOpen)}
+                className={`flex items-center space-x-2 bg-white border px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm h-10 min-w-[200px] justify-between ${lossReasonFilter !== 'all' ? 'border-amber-300 text-amber-600' : 'border-gray-100 text-[#4449AA]'}`}
+            >
+                <div className="flex items-center gap-2">
+                    <Filter className="h-3.5 w-3.5" />
+                    <span>{lossReasonFilter === 'all' ? 'Todos los Motivos' : lossReasons.find(r => r.id === lossReasonFilter)?.reason || 'Motivo'}</span>
+                </div>
+                <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition-transform duration-300 ${isLossReasonFilterOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isLossReasonFilterOpen && (
+                <div className="absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-50 z-50 py-2 animate-in fade-in slide-in-from-top-2">
+                    <button
+                        onClick={() => { setLossReasonFilter('all'); setIsLossReasonFilterOpen(false); }}
+                        className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors ${lossReasonFilter === 'all' ? 'bg-amber-50 text-amber-600' : 'text-gray-500 hover:bg-gray-50'}`}
+                    >
+                        Todos los Motivos
+                    </button>
+                    <div className="border-t border-gray-100 my-1" />
+                    {lossReasons.map(reason => (
+                        <button
+                            key={reason.id}
+                            onClick={() => { setLossReasonFilter(reason.id); setIsLossReasonFilterOpen(false); }}
+                            className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors ${lossReasonFilter === reason.id ? 'bg-amber-50 text-amber-600' : 'text-gray-500 hover:bg-gray-50'}`}
+                        >
+                            {reason.reason}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+
+    const LossStageDropdown = () => (
+        <div className="relative" ref={lostAtStageFilterRef}>
+            <button
+                onClick={() => setIsLostAtStageFilterOpen(!isLostAtStageFilterOpen)}
+                className={`flex items-center space-x-2 bg-white border px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm h-10 min-w-[180px] justify-between ${lostAtStageFilter !== 'all' ? 'border-rose-300 text-rose-600' : 'border-gray-100 text-[#4449AA]'}`}
+            >
+                <div className="flex items-center gap-2">
+                    <Filter className="h-3.5 w-3.5" />
+                    <span>{lostAtStageFilter === 'all' ? 'Todas las Etapas' : STATUS_CONFIG[lostAtStageFilter as LeadStatus]?.label || lostAtStageFilter}</span>
+                </div>
+                <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition-transform duration-300 ${isLostAtStageFilterOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isLostAtStageFilterOpen && (
+                <div className="absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-50 z-50 py-2 animate-in fade-in slide-in-from-top-2">
+                    <button
+                        onClick={() => { setLostAtStageFilter('all'); setIsLostAtStageFilterOpen(false); }}
+                        className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors ${lostAtStageFilter === 'all' ? 'bg-rose-50 text-rose-600' : 'text-gray-500 hover:bg-gray-50'}`}
+                    >
+                        Todas las Etapas
+                    </button>
+                    <div className="border-t border-gray-100 my-1" />
+                    {(Object.entries(STATUS_CONFIG) as [LeadStatus, any][])
+                        .filter(([key]) => key !== 'Perdido') // Can't be lost AT the lost stage
+                        .map(([key, config]) => (
+                            <button
+                                key={key}
+                                onClick={() => { setLostAtStageFilter(key); setIsLostAtStageFilterOpen(false); }}
+                                className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors flex items-center gap-2 ${lostAtStageFilter === key ? 'bg-rose-50 text-rose-600' : 'text-gray-500 hover:bg-gray-50'}`}
+                            >
+                                <span>{config.icon}</span>
+                                {config.label}
+                            </button>
+                        ))}
+                </div>
+            )}
+        </div>
+    );
+
     return (
-        <div className="w-full max-w-[1500px] mx-auto pb-6 space-y-8 animate-in fade-in duration-500">
-            {/* Header - Global Standard */}
-            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
-                <div>
-                    <h1 className="text-2xl font-extrabold text-[#4449AA] tracking-tight">Gestión de Leads</h1>
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-1">
-                        <p className="text-[13px] text-gray-400 font-medium">
-                            {leads.length} prospectos {!isAdmin && '(Asignados)'} · <span className="text-[#4449AA] font-black">${leads.reduce((sum, l) => sum + (l.value || 0), 0).toLocaleString()}</span> en pipeline
-                        </p>
-                        <div className="hidden sm:block w-px h-4 bg-gray-300"></div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-2">Filtrar:</span>
-                            <PriorityDropdown />
-                            {/* Assigned User Filter */}
-                            <div className="relative" ref={assignedFilterRef}>
-                                <button
-                                    onClick={() => setIsAssignedFilterOpen(!isAssignedFilterOpen)}
-                                    className={`flex items-center space-x-2 bg-white border px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm h-10 min-w-[160px] justify-between ${assignedFilter !== 'all' ? 'border-indigo-300 text-indigo-600' : 'border-gray-100 text-[#4449AA]'}`}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <User className="h-3.5 w-3.5" />
-                                        <span>{assignedFilter === 'all' ? 'Todos' : assignedFilter === 'unassigned' ? 'Sin Asignar' : teamMembers.find(m => m.id === assignedFilter)?.full_name?.split(' ')[0] || 'Usuario'}</span>
-                                    </div>
-                                    <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition-transform duration-300 ${isAssignedFilterOpen ? 'rotate-180' : ''}`} />
-                                </button>
-                                {isAssignedFilterOpen && (
-                                    <div className="absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-50 z-50 py-2 animate-in fade-in slide-in-from-top-2">
-                                        <button
-                                            onClick={() => { setAssignedFilter('all'); setIsAssignedFilterOpen(false); }}
-                                            className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors ${assignedFilter === 'all' ? 'bg-blue-50 text-[#007BFF]' : 'text-gray-500 hover:bg-gray-50'}`}
-                                        >
-                                            Todos los Usuarios
-                                        </button>
-                                        <button
-                                            onClick={() => { setAssignedFilter('unassigned'); setIsAssignedFilterOpen(false); }}
-                                            className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors ${assignedFilter === 'unassigned' ? 'bg-blue-50 text-[#007BFF]' : 'text-gray-500 hover:bg-gray-50'}`}
-                                        >
-                                            Sin Asignar
-                                        </button>
-                                        <div className="border-t border-gray-100 my-1" />
-                                        {teamMembers.map(member => (
+        <>
+            <div className="w-full max-w-[1500px] mx-auto pb-6 space-y-8 animate-in fade-in duration-500">
+                {/* Header - Global Standard */}
+                <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+                    <div>
+                        <h1 className="text-2xl font-extrabold text-[#4449AA] tracking-tight">Gestión de Leads</h1>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-1">
+                            <p className="text-[13px] text-gray-400 font-medium">
+                                {leads.length} prospectos {!isAdmin && '(Asignados)'} · <span className="text-[#4449AA] font-black">${leads.reduce((sum, l) => sum + (l.value || 0), 0).toLocaleString()}</span> en pipeline
+                            </p>
+                            <div className="hidden sm:block w-px h-4 bg-gray-300"></div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-2">Filtrar:</span>
+                                <StatusDropdown />
+                                <PriorityDropdown />
+                                {/* Assigned User Filter */}
+                                <div className="relative" ref={assignedFilterRef}>
+                                    <button
+                                        onClick={() => setIsAssignedFilterOpen(!isAssignedFilterOpen)}
+                                        className={`flex items-center space-x-2 bg-white border px-4 py-2 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm h-10 min-w-[160px] justify-between ${assignedFilter !== 'all' ? 'border-indigo-300 text-indigo-600' : 'border-gray-100 text-[#4449AA]'}`}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <User className="h-3.5 w-3.5" />
+                                            <span>{assignedFilter === 'all' ? 'Todos' : assignedFilter === 'unassigned' ? 'Sin Asignar' : teamMembers.find(m => m.id === assignedFilter)?.full_name?.split(' ')[0] || 'Usuario'}</span>
+                                        </div>
+                                        <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition-transform duration-300 ${isAssignedFilterOpen ? 'rotate-180' : ''}`} />
+                                    </button>
+                                    {isAssignedFilterOpen && (
+                                        <div className="absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-50 z-50 py-2 animate-in fade-in slide-in-from-top-2">
                                             <button
-                                                key={member.id}
-                                                onClick={() => { setAssignedFilter(member.id); setIsAssignedFilterOpen(false); }}
-                                                className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors flex items-center gap-2 ${assignedFilter === member.id ? 'bg-blue-50 text-[#007BFF]' : 'text-gray-500 hover:bg-gray-50'}`}
+                                                onClick={() => { setAssignedFilter('all'); setIsAssignedFilterOpen(false); }}
+                                                className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors ${assignedFilter === 'all' ? 'bg-blue-50 text-[#007BFF]' : 'text-gray-500 hover:bg-gray-50'}`}
                                             >
-                                                <div className="w-5 h-5 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
-                                                    {member.avatar_url ? <img src={member.avatar_url} alt="" className="w-full h-full object-cover" /> : <User className="w-3 h-3 text-slate-400" />}
-                                                </div>
-                                                {member.full_name || member.email}
+                                                Todos los Usuarios
                                             </button>
-                                        ))}
-                                    </div>
-                                )}
+                                            <button
+                                                onClick={() => { setAssignedFilter('unassigned'); setIsAssignedFilterOpen(false); }}
+                                                className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors ${assignedFilter === 'unassigned' ? 'bg-blue-50 text-[#007BFF]' : 'text-gray-500 hover:bg-gray-50'}`}
+                                            >
+                                                Sin Asignar
+                                            </button>
+                                            <div className="border-t border-gray-100 my-1" />
+                                            {teamMembers.map(member => (
+                                                <button
+                                                    key={member.id}
+                                                    onClick={() => { setAssignedFilter(member.id); setIsAssignedFilterOpen(false); }}
+                                                    className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors flex items-center gap-2 ${assignedFilter === member.id ? 'bg-blue-50 text-[#007BFF]' : 'text-gray-500 hover:bg-gray-50'}`}
+                                                >
+                                                    <div className="w-5 h-5 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
+                                                        {member.avatar_url ? <img src={member.avatar_url} alt="" className="w-full h-full object-cover" /> : <User className="w-3 h-3 text-slate-400" />}
+                                                    </div>
+                                                    {member.full_name || member.email}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                <LossReasonDropdown />
+                                <LossStageDropdown />
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <div className="flex flex-wrap gap-2 w-full xl:w-auto">
-                    {/* Search Bar */}
-                    <div className="flex-1 min-w-[280px] max-w-md">
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Buscar por nombre, email, empresa, teléfono..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                            />
-                            {searchTerm && (
+                    {/* Active filters display */}
+                    {(filteredLeadId || filteredLeadIds || statusFilter !== 'all' || priorityFilter !== 'all' || assignedFilter !== 'all' || sourceFilter !== 'all' || lossReasonFilter !== 'all' || lostAtStageFilter !== 'all') && (
+                        <div className="flex items-center gap-2 animate-in fade-in slide-in-from-top-2 w-full mb-2">
+                            <div className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border border-indigo-100 flex-wrap">
+                                <Filter className="w-3.5 h-3.5" />
+                                Vista filtrada ({filteredLeads.length} resultados)
+                                {statusFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Estado: {statusFilter}</span>}
+                                {priorityFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Prioridad: {(PRIORITY_CONFIG as any)[priorityFilter]?.label || priorityFilter}</span>}
+                                {sourceFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Fuente: {SOURCE_CONFIG[sourceFilter]?.label || sourceFilter}</span>}
+                                {assignedFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Asignado: {assignedFilter === 'unassigned' ? 'Sin asignar' : teamMembers.find(m => m.id === assignedFilter)?.full_name || 'Agente'}</span>}
+                                {lossReasonFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Motivo: {lossReasons.find(r => r.id === lossReasonFilter)?.reason || 'Motivo'}</span>}
+                                {lostAtStageFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Etapa: {STATUS_CONFIG[lostAtStageFilter as LeadStatus]?.label || lostAtStageFilter}</span>}
                                 <button
-                                    onClick={() => setSearchTerm('')}
-                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                    onClick={() => {
+                                        setFilteredLeadId(null);
+                                        setFilteredLeadIds(null);
+                                        setStatusFilter('all');
+                                        setPriorityFilter('all');
+                                        setAssignedFilter('all');
+                                        setSourceFilter('all');
+                                        setLossReasonFilter('all');
+                                        setLostAtStageFilter('all');
+                                    }}
+                                    className="bg-white/50 hover:bg-white p-0.5 rounded-md transition-colors ml-1"
                                 >
                                     <X className="w-4 h-4" />
                                 </button>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="flex bg-gray-50 rounded-xl p-1 border border-gray-100">
-                        <button
-                            onClick={() => setViewMode('grid')}
-                            className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white shadow-md text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
-                            title="Vista Cuadrícula"
-                        >
-                            <LayoutGrid className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={() => setViewMode('list')}
-                            className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white shadow-md text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
-                            title="Vista Lista"
-                        >
-                            <List className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={() => setViewMode('kanban')}
-                            className={`p-2 rounded-lg transition-all ${viewMode === 'kanban' ? 'bg-white shadow-md text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
-                            title="Tablero Kanban"
-                        >
-                            <Layout className="w-4 h-4" />
-                        </button>
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-1 sm:flex-none">
-                        <Button
-                            variant="outline"
-                            className="hidden sm:flex items-center gap-2 h-10 px-4 text-[10px] font-black uppercase tracking-widest border-gray-100"
-                            onClick={handleDownloadTemplate}
-                        >
-                            <Download className="w-3.5 h-3.5" />
-                            <span className="hidden lg:inline">Plantilla</span>
-                        </Button>
-
-                        <Button
-                            variant="outline"
-                            className="hidden sm:flex items-center gap-2 h-10 px-4 text-[10px] font-black uppercase tracking-widest border-gray-100"
-                            onClick={() => {
-                                const leadsToExport = filteredLeads.length > 0 ? filteredLeads : leads;
-                                csvHelper.exportLeads(leadsToExport, teamMembers);
-                                toast.success('Exportación iniciada');
-                            }}
-                        >
-                            <Download className="w-3.5 h-3.5 rotate-180" /> {/* Reused icon, rotated to signify UP/OUT? Or just use same icon */}
-                            <span className="hidden lg:inline">Exportar</span>
-                        </Button>
-
-                        <div className="relative flex-1 sm:flex-none">
-                            <input
-                                type="file"
-                                accept=".csv,.xlsx"
-                                onChange={handleImportCSV}
-                                className="absolute inset-0 opacity-0 cursor-pointer"
-                                disabled={isImporting}
-                            />
-                            <Button
-                                variant="outline"
-                                className="flex items-center gap-2 h-10 w-full sm:w-auto justify-center px-4 text-[10px] font-black uppercase tracking-widest border-gray-100"
-                                disabled={isImporting}
-                            >
-                                {isImporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                                <span className="inline">Importar</span>
-                            </Button>
-                        </div>
-                    </div>
-
-                    <Button
-                        onClick={() => setIsModalOpen(true)}
-                        className="flex-1 sm:flex-none justify-center h-10 bg-[#4449AA] hover:bg-[#383d8f] px-6 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-indigo-100 transition-all border-none"
-                    >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Nuevo Prospecto
-                    </Button>
-                </div>
-            </div>
-
-            {/* Lead Cards */}
-            {/* Content View */}
-            {viewMode === 'grid' ? (
-                /* Grid View */
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {filteredLeads.map((lead) => (
-                        <div
-                            key={lead.id}
-                            onClick={() => openLeadDetail(lead)}
-                            className="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100 hover:shadow-md transition-all cursor-pointer group"
-                        >
-                            <div className="p-5">
-                                <div className="flex justify-between items-start mb-3">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <PriorityBadge priority={lead.priority || 'medium'} />
-                                        <StatusBadge status={lead.status} />
-                                        {lead.source && SOURCE_CONFIG[lead.source] && (
-                                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${SOURCE_CONFIG[lead.source].bgColor} ${SOURCE_CONFIG[lead.source].color}`}>
-                                                {SOURCE_CONFIG[lead.source].icon} {SOURCE_CONFIG[lead.source].label}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-gray-500 transition-colors" />
-                                </div>
-
-                                <h3 className="text-lg font-semibold text-gray-900">{lead.name}</h3>
-                                {lead.company_name && (
-                                    <p className="text-sm text-gray-500 font-medium">{lead.company_name}</p>
-                                )}
-
-                                <div className="mt-5 grid grid-cols-2 gap-4 pb-4">
-                                    <div className="flex flex-col">
-                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Valor Potencial</p>
-                                        <p className="text-sm font-black text-indigo-600 tracking-tight">
-                                            ${(lead.value || 0).toLocaleString()}
-                                        </p>
-                                    </div>
-                                    <div className="flex flex-col items-end">
-                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 text-right">Monto Cierre</p>
-                                        <p className={`text-sm font-black tracking-tight ${(lead.closing_amount || 0) > 0 ? 'text-green-600' : 'text-gray-300'}`}>
-                                            ${(lead.closing_amount || 0).toLocaleString()}
-                                        </p>
-                                    </div>
-
-                                    {lead.next_followup_date && (
-                                        <div className="col-span-2 bg-blue-50/50 rounded-lg p-2.5 flex items-center justify-between border border-blue-100/30">
-                                            <div className="flex items-center gap-2">
-                                                <Clock className="w-3.5 h-3.5 text-blue-500" />
-                                                <span className="text-[11px] font-bold text-blue-700">Seguimiento:</span>
-                                            </div>
-                                            <span className="text-[11px] font-black text-blue-900 uppercase">
-                                                {(() => {
-                                                    try {
-                                                        const dateStr = lead.next_followup_date.split('T')[0];
-                                                        const dateObj = new Date(dateStr + 'T12:00:00');
-                                                        return format(dateObj, 'dd MMM yyyy', { locale: es });
-                                                    } catch (e) { return 'N/A'; }
-                                                })()}
-                                            </span>
-                                        </div>
-                                    )}
-
-                                    <div className="col-span-2 grid grid-cols-2 gap-4 pt-2 border-t border-gray-50 mt-2">
-                                        {lead.assigned_to && (() => {
-                                            const owner = teamMembers.find(m => m.id === lead.assigned_to);
-                                            return (
-                                                <div className="flex items-center gap-2">
-                                                    {owner?.avatar_url ? (
-                                                        <img src={owner.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover border border-white shadow-sm" />
-                                                    ) : (
-                                                        <div className="w-6 h-6 rounded-full bg-indigo-50 flex items-center justify-center border border-white shadow-sm">
-                                                            <User className="w-3 h-3 text-indigo-400" />
-                                                        </div>
-                                                    )}
-                                                    <div>
-                                                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-0.5">Responsable</p>
-                                                        <p className="text-[10px] font-bold text-gray-700 truncate">{owner?.full_name || owner?.email.split('@')[0]}</p>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })()}
-
-                                        {lead.next_followup_assignee && (() => {
-                                            const assignee = teamMembers.find(m => m.id === lead.next_followup_assignee);
-                                            return (
-                                                <div className="flex items-center gap-2 border-l border-gray-100 pl-4">
-                                                    {assignee?.avatar_url ? (
-                                                        <img src={assignee.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover border border-white shadow-sm" />
-                                                    ) : (
-                                                        <div className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center border border-white shadow-sm">
-                                                            <User className="w-3 h-3 text-blue-400" />
-                                                        </div>
-                                                    )}
-                                                    <div>
-                                                        <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest leading-none mb-0.5">Asignado a</p>
-                                                        <p className="text-[10px] font-bold text-gray-700 truncate">{assignee?.full_name || assignee?.email.split('@')[0]}</p>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })()}
-                                    </div>
-                                </div>
-
-                                <div className="mt-3 pt-3 border-t border-gray-100 flex gap-3 text-xs text-gray-400">
-                                    {lead.email && <span className="flex items-center"><Mail className="w-3 h-3 mr-1" />{lead.email}</span>}
-                                    {lead.phone && <span className="flex items-center"><Phone className="w-3 h-3 mr-1" />{lead.phone}</span>}
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            ) : viewMode === 'list' ? (
-                /* List View - Modern Premium Redesign */
-                <div className="relative">
-                    <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/80 overflow-hidden transition-all duration-300">
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-50">
-                                <DragDropContext onDragEnd={handleOnDragEnd}>
-                                    <Droppable droppableId="columns" direction="horizontal">
-                                        {(provided) => (
-                                            <thead className="bg-[#FAFAFB]">
-                                                <tr ref={provided.innerRef} {...provided.droppableProps}>
-                                                    <th scope="col" className="px-6 py-4 text-left bg-[#FAFAFB]">
-                                                        <div className="flex items-center">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedLeadIds.length === sortedLeads.length && sortedLeads.length > 0}
-                                                                onChange={toggleSelectAll}
-                                                                className="w-4 h-4 rounded border-gray-300 text-[#4449AA] focus:ring-[#4449AA] cursor-pointer"
-                                                            />
-                                                        </div>
-                                                    </th>
-
-                                                    {columnOrder.map((colId, index) => (
-                                                        <Draggable key={colId} draggableId={colId} index={index}>
-                                                            {(provided, snapshot) => (
-                                                                <th
-                                                                    ref={provided.innerRef}
-                                                                    {...provided.draggableProps}
-                                                                    scope="col"
-                                                                    className={`px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest transition-all ${snapshot.isDragging ? 'bg-indigo-50/80 shadow-sm z-50' : 'bg-[#FAFAFB]'}`}
-                                                                >
-                                                                    <div className="flex items-center gap-2">
-                                                                        <div {...provided.dragHandleProps} className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-[#4449AA]">
-                                                                            <GripVertical className="w-3 h-3" />
-                                                                        </div>
-
-                                                                        {colId === 'name' && (
-                                                                            <div
-                                                                                className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
-                                                                                onClick={() => setSortConfig({
-                                                                                    key: 'name',
-                                                                                    direction: sortConfig?.key === 'name' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
-                                                                                })}
-                                                                            >
-                                                                                Nombre / Empresa
-                                                                                <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'name' ? 'text-[#4449AA]' : 'opacity-0 group-hover:opacity-100'}`} />
-                                                                            </div>
-                                                                        )}
-
-                                                                        {colId === 'email' && "Email"}
-                                                                        {colId === 'phone' && "Teléfono"}
-                                                                        {colId === 'status' && "Estado"}
-                                                                        {colId === 'priority' && "Prioridad"}
-                                                                        {colId === 'source' && "Fuente"}
-
-                                                                        {colId === 'value' && (
-                                                                            <div
-                                                                                className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
-                                                                                onClick={() => setSortConfig({
-                                                                                    key: 'value',
-                                                                                    direction: sortConfig?.key === 'value' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
-                                                                                })}
-                                                                            >
-                                                                                Valor
-                                                                                <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'value' ? 'text-[#4449AA]' : 'opacity-0 group-hover:opacity-100'}`} />
-                                                                            </div>
-                                                                        )}
-
-                                                                        {colId === 'assigned_to' && "Asignado"}
-                                                                    </div>
-                                                                </th>
-                                                            )}
-                                                        </Draggable>
-                                                    ))}
-
-                                                    {provided.placeholder}
-                                                    <th scope="col" className="px-6 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest bg-[#FAFAFB]">
-                                                        Acciones
-                                                    </th>
-                                                </tr>
-                                            </thead>
-                                        )}
-                                    </Droppable>
-                                </DragDropContext>
-                                <tbody className="bg-white divide-y divide-gray-50/50">
-                                    {sortedLeads.map((lead) => {
-                                        const isSelected = selectedLeadIds.includes(lead.id);
-                                        return (
-                                            <tr
-                                                key={lead.id}
-                                                className={`group transition-all duration-200 ${isSelected ? 'bg-indigo-50/30' : 'hover:bg-[#FDFDFE]'}`}
-                                            >
-                                                <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={isSelected}
-                                                        onChange={() => toggleLeadSelection(lead.id)}
-                                                        className="w-4 h-4 rounded border-gray-300 text-[#4449AA] focus:ring-[#4449AA] cursor-pointer"
-                                                    />
-                                                </td>
-                                                {columnOrder.map((colId) => (
-                                                    <td key={colId} className="px-4 py-4 whitespace-nowrap">
-                                                        {colId === 'name' && (
-                                                            <div className="flex flex-col cursor-pointer" onClick={() => openLeadDetail(lead)}>
-                                                                <span className="text-sm font-bold text-gray-900 group-hover:text-[#4449AA] transition-colors">{lead.name}</span>
-                                                                <span className="text-[11px] text-blue-600 font-bold">{lead.company_name || 'Individual'}</span>
-                                                            </div>
-                                                        )}
-
-                                                        {colId === 'email' && (
-                                                            lead.email ? (
-                                                                <div className="flex items-center gap-1.5 max-w-[180px]">
-                                                                    <Mail className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                                                                    <span className="text-[11px] font-semibold text-gray-700 truncate" title={lead.email}>{lead.email}</span>
-                                                                </div>
-                                                            ) : <span className="text-xs text-gray-300">—</span>
-                                                        )}
-
-                                                        {colId === 'phone' && (
-                                                            lead.phone ? (
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <Phone className="w-3.5 h-3.5 text-green-500 shrink-0" />
-                                                                    <span className="text-[11px] font-semibold text-gray-700">{lead.phone}</span>
-                                                                </div>
-                                                            ) : <span className="text-xs text-gray-300">—</span>
-                                                        )}
-
-                                                        {colId === 'status' && <StatusBadge status={lead.status} />}
-
-                                                        {colId === 'priority' && <PriorityBadge priority={lead.priority} />}
-
-                                                        {colId === 'source' && (
-                                                            lead.source && SOURCE_CONFIG[lead.source] ? (
-                                                                <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100 w-fit">
-                                                                    <span>{SOURCE_CONFIG[lead.source].icon}</span>
-                                                                    <span className="uppercase tracking-tight">{SOURCE_CONFIG[lead.source].label}</span>
-                                                                </div>
-                                                            ) : <span className="text-xs text-gray-300">-</span>
-                                                        )}
-
-                                                        {colId === 'value' && (
-                                                            <div>
-                                                                <div className="text-sm font-black text-slate-900">${(lead.value || 0).toLocaleString()}</div>
-                                                                {(lead.closing_amount || 0) > 0 && <div className="text-[10px] text-indigo-600 font-black uppercase tracking-tighter">Cierre: ${lead.closing_amount.toLocaleString()}</div>}
-                                                            </div>
-                                                        )}
-
-                                                        {colId === 'assigned_to' && (
-                                                            lead.assigned_to ? (() => {
-                                                                const owner = teamMembers.find(m => m.id === lead.assigned_to);
-                                                                return (
-                                                                    <div className="flex items-center gap-2">
-                                                                        <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shadow-sm">
-                                                                            {owner?.avatar_url ? (
-                                                                                <img src={owner.avatar_url} alt="" className="w-full h-full object-cover" />
-                                                                            ) : (
-                                                                                <User className="w-3.5 h-3.5 text-slate-400" />
-                                                                            )}
-                                                                        </div>
-                                                                        <span className="text-[11px] font-bold text-slate-600 truncate max-w-[80px]">
-                                                                            {owner?.full_name?.split(' ')[0] || owner?.email.split('@')[0]}
-                                                                        </span>
-                                                                    </div>
-                                                                );
-                                                            })() : <span className="text-gray-300">-</span>
-                                                        )}
-                                                    </td>
-                                                ))}
-
-                                                <td className="px-6 py-4 whitespace-nowrap text-right">
-                                                    <div className="flex justify-end gap-1.5 transition-all">
-                                                        <button
-                                                            onClick={(e) => { e.stopPropagation(); openLeadDetail(lead); }}
-                                                            className="p-1.5 text-indigo-400 hover:text-white hover:bg-[#4449AA] rounded-lg transition-all shadow-sm bg-indigo-50/50"
-                                                        >
-                                                            <ChevronRight className="w-4 h-4" />
-                                                        </button>
-                                                        {isAdmin && (
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); handleDeleteLead(lead.id, lead.name); }}
-                                                                className="p-1.5 text-rose-400 hover:text-white hover:bg-rose-600 rounded-lg transition-all shadow-sm bg-rose-50/50"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    {/* Floating Bulk Actions Bar */}
-                    {selectedLeadIds.length > 0 && (
-                        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom-5 duration-300">
-                            <div className="bg-white px-6 py-4 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-gray-100 flex items-center gap-6">
-                                <div className="flex items-center gap-2 pr-6 border-r border-gray-100">
-                                    <div className="w-6 h-6 bg-[#4449AA] rounded-full flex items-center justify-center text-[10px] font-black text-white">
-                                        {selectedLeadIds.length}
-                                    </div>
-                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Seleccionados</span>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    <button
-                                        onClick={() => setSelectedLeadIds([])}
-                                        className="text-xs font-black text-gray-400 hover:text-gray-600 uppercase tracking-widest transition-colors"
-                                    >
-                                        Cancelar
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            navigate('/marketing/campaign/new', {
-                                                state: {
-                                                    preSelectedLeads: selectedLeadIds,
-                                                    campaignSource: 'leads-bulk'
-                                                }
-                                            });
-                                        }}
-                                        className="flex items-center gap-2 bg-indigo-50 text-indigo-600 hover:bg-[#4449AA] hover:text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm"
-                                    >
-                                        <Send className="w-3.5 h-3.5" />
-                                        Preparar Mensaje
-                                    </button>
-                                    <button
-                                        onClick={handleBulkDelete}
-                                        className="flex items-center gap-2 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm"
-                                    >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                        Eliminar Seleccionados
-                                    </button>
-                                </div>
                             </div>
                         </div>
                     )}
+
+                    <div className="flex flex-wrap gap-2 w-full xl:w-auto">
+                        {/* Search Bar */}
+                        <div className="flex-1 min-w-[280px] max-w-md">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar por nombre, email, empresa, teléfono..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                />
+                                {searchTerm && (
+                                    <button
+                                        onClick={() => setSearchTerm('')}
+                                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex bg-gray-50 rounded-xl p-1 border border-gray-100">
+                            <button
+                                onClick={() => setViewMode('grid')}
+                                className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white shadow-md text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
+                                title="Vista Cuadrícula"
+                            >
+                                <LayoutGrid className="w-4 h-4" />
+                            </button>
+                            <button
+                                onClick={() => setViewMode('list')}
+                                className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white shadow-md text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
+                                title="Vista Lista"
+                            >
+                                <List className="w-4 h-4" />
+                            </button>
+                            <button
+                                onClick={() => setViewMode('kanban')}
+                                className={`p-2 rounded-lg transition-all ${viewMode === 'kanban' ? 'bg-white shadow-md text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
+                                title="Tablero Kanban"
+                            >
+                                <Layout className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-1 sm:flex-none">
+                            <Button
+                                variant="outline"
+                                className="hidden sm:flex items-center gap-2 h-10 px-4 text-[10px] font-black uppercase tracking-widest border-gray-100"
+                                onClick={handleDownloadTemplate}
+                            >
+                                <Download className="w-3.5 h-3.5" />
+                                <span className="hidden lg:inline">Plantilla</span>
+                            </Button>
+
+                            <Button
+                                variant="outline"
+                                className="hidden sm:flex items-center gap-2 h-10 px-4 text-[10px] font-black uppercase tracking-widest border-gray-100"
+                                onClick={() => {
+                                    const leadsToExport = filteredLeads.length > 0 ? filteredLeads : leads;
+                                    csvHelper.exportLeads(leadsToExport, teamMembers);
+                                    toast.success('Exportación iniciada');
+                                }}
+                            >
+                                <Download className="w-3.5 h-3.5 rotate-180" /> {/* Reused icon, rotated to signify UP/OUT? Or just use same icon */}
+                                <span className="hidden lg:inline">Exportar</span>
+                            </Button>
+
+                            <div className="relative flex-1 sm:flex-none">
+                                <input
+                                    type="file"
+                                    accept=".csv,.xlsx"
+                                    onChange={handleImportCSV}
+                                    className="absolute inset-0 opacity-0 cursor-pointer"
+                                    disabled={isImporting}
+                                />
+                                <Button
+                                    variant="outline"
+                                    className="flex items-center gap-2 h-10 w-full sm:w-auto justify-center px-4 text-[10px] font-black uppercase tracking-widest border-gray-100"
+                                    disabled={isImporting}
+                                >
+                                    {isImporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                                    <span className="inline">Importar</span>
+                                </Button>
+                            </div>
+                        </div>
+
+                        <Button
+                            onClick={() => setIsModalOpen(true)}
+                            className="flex-1 sm:flex-none justify-center h-10 bg-[#4449AA] hover:bg-[#383d8f] px-6 text-[10px] font-black uppercase tracking-widest text-white shadow-lg shadow-indigo-100 transition-all border-none"
+                        >
+                            <Plus className="w-4 h-4 mr-2" />
+                            Nuevo Prospecto
+                        </Button>
+                    </div>
                 </div>
-            ) : (
-                /* Kanban View */
-                <LeadKanban
-                    leads={filteredLeads}
-                    teamMembers={teamMembers}
-                    onUpdateStatus={async (leadId, newStatus) => {
-                        const lead = leads.find(l => l.id === leadId);
-                        if (!lead) return;
 
-                        try {
-                            // Optimistic update
-                            setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: newStatus } : l));
+                {/* Lead Cards */}
+                {/* Content View */}
+                {viewMode === 'grid' ? (
+                    /* Grid View */
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {filteredLeads.map((lead) => (
+                            <div
+                                key={lead.id}
+                                onClick={() => openLeadDetail(lead)}
+                                className="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100 hover:shadow-md transition-all cursor-pointer group"
+                            >
+                                <div className="p-5">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <PriorityBadge priority={lead.priority || 'medium'} />
+                                            <StatusBadge status={lead.status} />
+                                            {lead.source && SOURCE_CONFIG[lead.source] && (
+                                                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${SOURCE_CONFIG[lead.source].bgColor} ${SOURCE_CONFIG[lead.source].color}`}>
+                                                    {SOURCE_CONFIG[lead.source].icon} {SOURCE_CONFIG[lead.source].label}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                                    </div>
 
-                            await leadsService.updateLead(leadId, { status: newStatus });
-                            toast.success(`Estado actualizado a ${newStatus}`);
-                        } catch (error) {
-                            // Rollback
-                            setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: lead.status } : l));
-                            toast.error('Error al actualizar estado');
-                        }
-                    }}
-                    onOpenDetail={openLeadDetail}
-                />
-            )}
+                                    <h3 className="text-lg font-semibold text-gray-900">{lead.name}</h3>
+                                    {lead.company_name && (
+                                        <p className="text-sm text-gray-500 font-medium">{lead.company_name}</p>
+                                    )}
 
-            {leads.length === 0 && !loading && (
-                <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
-                    <User className="mx-auto h-12 w-12 text-gray-300" />
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">No hay leads</h3>
-                    <p className="mt-1 text-sm text-gray-500">Comienza creando un nuevo lead.</p>
-                </div>
-            )}
+                                    <div className="mt-5 grid grid-cols-2 gap-4 pb-4">
+                                        <div className="flex flex-col">
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Valor Potencial</p>
+                                            <p className="text-sm font-black text-indigo-600 tracking-tight">
+                                                ${(lead.value || 0).toLocaleString()}
+                                            </p>
+                                        </div>
+                                        <div className="flex flex-col items-end">
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 text-right">Monto Cierre</p>
+                                            <p className={`text-sm font-black tracking-tight ${(lead.closing_amount || 0) > 0 ? 'text-green-600' : 'text-gray-300'}`}>
+                                                ${(lead.closing_amount || 0).toLocaleString()}
+                                            </p>
+                                        </div>
 
-            {leads.length > 0 && filteredLeads.length === 0 && !loading && (
-                <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
-                    <TrendingUp className="mx-auto h-12 w-12 text-gray-300" />
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">No hay leads con esta prioridad</h3>
-                    <p className="mt-1 text-sm text-gray-500">Intenta cambiar el filtro de prioridad.</p>
-                </div>
-            )}
+                                        {lead.next_followup_date && (
+                                            <div className="col-span-2 bg-blue-50/50 rounded-lg p-2.5 flex items-center justify-between border border-blue-100/30">
+                                                <div className="flex items-center gap-2">
+                                                    <Clock className="w-3.5 h-3.5 text-blue-500" />
+                                                    <span className="text-[11px] font-bold text-blue-700">Seguimiento:</span>
+                                                </div>
+                                                <span className="text-[11px] font-black text-blue-900 uppercase">
+                                                    {(() => {
+                                                        try {
+                                                            const dateStr = lead.next_followup_date.split('T')[0];
+                                                            const dateObj = new Date(dateStr + 'T12:00:00');
+                                                            return format(dateObj, 'dd MMM yyyy', { locale: es });
+                                                        } catch (e) { return 'N/A'; }
+                                                    })()}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        <div className="col-span-2 grid grid-cols-2 gap-4 pt-2 border-t border-gray-50 mt-2">
+                                            {lead.assigned_to && (() => {
+                                                const owner = teamMembers.find(m => m.id === lead.assigned_to);
+                                                return (
+                                                    <div className="flex items-center gap-2">
+                                                        {owner?.avatar_url ? (
+                                                            <img src={owner.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover border border-white shadow-sm" />
+                                                        ) : (
+                                                            <div className="w-6 h-6 rounded-full bg-indigo-50 flex items-center justify-center border border-white shadow-sm">
+                                                                <User className="w-3 h-3 text-indigo-400" />
+                                                            </div>
+                                                        )}
+                                                        <div>
+                                                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-0.5">Responsable</p>
+                                                            <p className="text-[10px] font-bold text-gray-700 truncate">{owner?.full_name || owner?.email.split('@')[0]}</p>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
+
+                                            {lead.next_followup_assignee && (() => {
+                                                const assignee = teamMembers.find(m => m.id === lead.next_followup_assignee);
+                                                return (
+                                                    <div className="flex items-center gap-2 border-l border-gray-100 pl-4">
+                                                        {assignee?.avatar_url ? (
+                                                            <img src={assignee.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover border border-white shadow-sm" />
+                                                        ) : (
+                                                            <div className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center border border-white shadow-sm">
+                                                                <User className="w-3 h-3 text-blue-400" />
+                                                            </div>
+                                                        )}
+                                                        <div>
+                                                            <p className="text-[8px] font-black text-blue-400 uppercase tracking-widest leading-none mb-0.5">Asignado a</p>
+                                                            <p className="text-[10px] font-bold text-gray-700 truncate">{assignee?.full_name || assignee?.email.split('@')[0]}</p>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-3 pt-3 border-t border-gray-100 flex gap-3 text-xs text-gray-400">
+                                        {lead.email && <span className="flex items-center"><Mail className="w-3 h-3 mr-1" />{lead.email}</span>}
+                                        {lead.phone && <span className="flex items-center"><Phone className="w-3 h-3 mr-1" />{lead.phone}</span>}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : viewMode === 'list' ? (
+                    /* List View - Modern Premium Redesign */
+                    <div className="relative">
+                        <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/80 overflow-hidden transition-all duration-300">
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-50">
+                                    <DragDropContext onDragEnd={handleOnDragEnd}>
+                                        <Droppable droppableId="columns" direction="horizontal">
+                                            {(provided) => (
+                                                <thead className="bg-[#FAFAFB]">
+                                                    <tr ref={provided.innerRef} {...provided.droppableProps}>
+                                                        <th scope="col" className="px-6 py-4 text-left bg-[#FAFAFB]">
+                                                            <div className="flex items-center">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedLeadIds.length === sortedLeads.length && sortedLeads.length > 0}
+                                                                    onChange={toggleSelectAll}
+                                                                    className="w-4 h-4 rounded border-gray-300 text-[#4449AA] focus:ring-[#4449AA] cursor-pointer"
+                                                                />
+                                                            </div>
+                                                        </th>
+
+                                                        {columnOrder.map((colId, index) => (
+                                                            <Draggable key={colId} draggableId={colId} index={index}>
+                                                                {(provided, snapshot) => (
+                                                                    <th
+                                                                        ref={provided.innerRef}
+                                                                        {...provided.draggableProps}
+                                                                        scope="col"
+                                                                        className={`px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest transition-all ${snapshot.isDragging ? 'bg-indigo-50/80 shadow-sm z-50' : 'bg-[#FAFAFB]'}`}
+                                                                    >
+                                                                        <div className="flex items-center gap-2">
+                                                                            <div {...provided.dragHandleProps} className="cursor-move text-gray-300 hover:text-[#4449AA]">
+                                                                                <GripVertical className="w-3 h-3" />
+                                                                            </div>
+
+                                                                            {colId === 'name' && (
+                                                                                <div
+                                                                                    className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                    onClick={() => setSortConfig({
+                                                                                        key: 'name',
+                                                                                        direction: sortConfig?.key === 'name' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                    })}
+                                                                                >
+                                                                                    Nombre / Empresa
+                                                                                    <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'name' ? 'text-[#4449AA]' : 'opacity-0 group-hover:opacity-100'}`} />
+                                                                                </div>
+                                                                            )}
+
+                                                                            {colId === 'email' && "Email"}
+                                                                            {colId === 'phone' && "Teléfono"}
+                                                                            {colId === 'status' && "Estado"}
+                                                                            {colId === 'priority' && "Prioridad"}
+                                                                            {colId === 'source' && "Fuente"}
+
+                                                                            {colId === 'value' && (
+                                                                                <div
+                                                                                    className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                    onClick={() => setSortConfig({
+                                                                                        key: 'value',
+                                                                                        direction: sortConfig?.key === 'value' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                    })}
+                                                                                >
+                                                                                    Valor
+                                                                                    <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'value' ? 'text-[#4449AA]' : 'opacity-0 group-hover:opacity-100'}`} />
+                                                                                </div>
+                                                                            )}
+
+                                                                            {colId === 'assigned_to' && "Asignado"}
+                                                                        </div>
+                                                                    </th>
+                                                                )}
+                                                            </Draggable>
+                                                        ))}
+
+                                                        {provided.placeholder}
+                                                        <th scope="col" className="px-6 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest bg-[#FAFAFB]">
+                                                            Acciones
+                                                        </th>
+                                                    </tr>
+                                                </thead>
+                                            )}
+                                        </Droppable>
+                                    </DragDropContext>
+                                    <tbody className="bg-white divide-y divide-gray-50/50">
+                                        {sortedLeads.map((lead) => {
+                                            const isSelected = selectedLeadIds.includes(lead.id);
+                                            return (
+                                                <tr
+                                                    key={lead.id}
+                                                    className={`group transition-all duration-200 ${isSelected ? 'bg-indigo-50/30' : 'hover:bg-[#FDFDFE]'}`}
+                                                >
+                                                    <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={isSelected}
+                                                            onChange={() => toggleLeadSelection(lead.id)}
+                                                            className="w-4 h-4 rounded border-gray-300 text-[#4449AA] focus:ring-[#4449AA] cursor-pointer"
+                                                        />
+                                                    </td>
+                                                    {columnOrder.map((colId) => (
+                                                        <td key={colId} className="px-4 py-4 whitespace-nowrap">
+                                                            {colId === 'name' && (
+                                                                <div className="flex flex-col cursor-pointer" onClick={() => openLeadDetail(lead)}>
+                                                                    <span className="text-sm font-bold text-gray-900 group-hover:text-[#4449AA] transition-colors">{lead.name}</span>
+                                                                    <span className="text-[11px] text-blue-600 font-bold">{lead.company_name || 'Individual'}</span>
+                                                                </div>
+                                                            )}
+
+                                                            {colId === 'email' && (
+                                                                lead.email ? (
+                                                                    <div className="flex items-center gap-1.5 max-w-[180px]">
+                                                                        <Mail className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                                                        <span className="text-[11px] font-semibold text-gray-700 truncate" title={lead.email}>{lead.email}</span>
+                                                                    </div>
+                                                                ) : <span className="text-xs text-gray-300">—</span>
+                                                            )}
+
+                                                            {colId === 'phone' && (
+                                                                lead.phone ? (
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <Phone className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                                                                        <span className="text-[11px] font-semibold text-gray-700">{lead.phone}</span>
+                                                                    </div>
+                                                                ) : <span className="text-xs text-gray-300">—</span>
+                                                            )}
+
+                                                            {colId === 'status' && <StatusBadge status={lead.status} />}
+
+                                                            {colId === 'priority' && <PriorityBadge priority={lead.priority} />}
+
+                                                            {colId === 'source' && (
+                                                                lead.source && SOURCE_CONFIG[lead.source] ? (
+                                                                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100 w-fit">
+                                                                        <span>{SOURCE_CONFIG[lead.source].icon}</span>
+                                                                        <span className="uppercase tracking-tight">{SOURCE_CONFIG[lead.source].label}</span>
+                                                                    </div>
+                                                                ) : <span className="text-xs text-gray-300">-</span>
+                                                            )}
+
+                                                            {colId === 'value' && (
+                                                                <div>
+                                                                    <div className="text-sm font-black text-slate-900">${(lead.value || 0).toLocaleString()}</div>
+                                                                    {(lead.closing_amount || 0) > 0 && <div className="text-[10px] text-indigo-600 font-black uppercase tracking-tighter">Cierre: ${lead.closing_amount.toLocaleString()}</div>}
+                                                                </div>
+                                                            )}
+
+                                                            {colId === 'assigned_to' && (
+                                                                lead.assigned_to ? (() => {
+                                                                    const owner = teamMembers.find(m => m.id === lead.assigned_to);
+                                                                    return (
+                                                                        <div className="flex items-center gap-2">
+                                                                            <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shadow-sm">
+                                                                                {owner?.avatar_url ? (
+                                                                                    <img src={owner.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                                                ) : (
+                                                                                    <User className="w-3.5 h-3.5 text-slate-400" />
+                                                                                )}
+                                                                            </div>
+                                                                            <span className="text-[11px] font-bold text-slate-600 truncate max-w-[80px]">
+                                                                                {owner?.full_name?.split(' ')[0] || owner?.email.split('@')[0]}
+                                                                            </span>
+                                                                        </div>
+                                                                    );
+                                                                })() : <span className="text-gray-300">-</span>
+                                                            )}
+                                                        </td>
+                                                    ))}
+
+                                                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                        <div className="flex justify-end gap-1.5 transition-all">
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); openLeadDetail(lead); }}
+                                                                className="p-1.5 text-indigo-400 hover:text-white hover:bg-[#4449AA] rounded-lg transition-all shadow-sm bg-indigo-50/50"
+                                                            >
+                                                                <ChevronRight className="w-4 h-4" />
+                                                            </button>
+                                                            {isAdmin && (
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleDeleteLead(lead.id, lead.name); }}
+                                                                    className="p-1.5 text-rose-400 hover:text-white hover:bg-rose-600 rounded-lg transition-all shadow-sm bg-rose-50/50"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* Floating Bulk Actions Bar */}
+                        {selectedLeadIds.length > 0 && (
+                            <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom-5 duration-300">
+                                <div className="bg-white px-6 py-4 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-gray-100 flex items-center gap-6">
+                                    <div className="flex items-center gap-2 pr-6 border-r border-gray-100">
+                                        <div className="w-6 h-6 bg-[#4449AA] rounded-full flex items-center justify-center text-[10px] font-black text-white">
+                                            {selectedLeadIds.length}
+                                        </div>
+                                        <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Seleccionados</span>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <button
+                                            onClick={() => setSelectedLeadIds([])}
+                                            className="text-xs font-black text-gray-400 hover:text-gray-600 uppercase tracking-widest transition-colors"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                navigate('/marketing/campaign/new', {
+                                                    state: {
+                                                        preSelectedLeads: selectedLeadIds,
+                                                        campaignSource: 'leads-bulk'
+                                                    }
+                                                });
+                                            }}
+                                            className="flex items-center gap-2 bg-indigo-50 text-indigo-600 hover:bg-[#4449AA] hover:text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm"
+                                        >
+                                            <Send className="w-3.5 h-3.5" />
+                                            Preparar Mensaje
+                                        </button>
+                                        <button
+                                            onClick={handleBulkDelete}
+                                            className="flex items-center gap-2 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                            Eliminar Seleccionados
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    /* Kanban View */
+                    <LeadKanban
+                        leads={filteredLeads}
+                        teamMembers={teamMembers}
+                        onUpdateStatus={async (leadId, newStatus) => {
+                            const lead = leads.find(l => l.id === leadId);
+                            if (!lead) return;
+
+                            // Intercept status change to 'Perdido' - Open Loss Modal
+                            if (newStatus === 'Perdido') {
+                                setSelectedLead(lead);
+                                setIsLossModalOpen(true);
+                                return;
+                            }
+
+                            // Intercept status change to 'Cerrado' or 'Cliente' - Open Won Modal
+                            if (newStatus === 'Cerrado' || newStatus === 'Cliente') {
+                                setSelectedLead(lead);
+                                setPendingWonStatus(newStatus);
+                                setWonData({ won_date: format(new Date(), 'yyyy-MM-dd') });
+                                setIsWonModalOpen(true);
+                                return;
+                            }
+
+                            try {
+                                // Optimistic update
+                                setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: newStatus } : l));
+
+                                await leadsService.updateLead(leadId, { status: newStatus });
+                                toast.success(`Estado actualizado a ${newStatus}`);
+                            } catch (error) {
+                                // Rollback
+                                setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: lead.status } : l));
+                                toast.error('Error al actualizar estado');
+                            }
+                        }}
+                        onOpenDetail={openLeadDetail}
+                    />
+                )}
+
+                {leads.length === 0 && !loading && (
+                    <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
+                        <User className="mx-auto h-12 w-12 text-gray-300" />
+                        <h3 className="mt-2 text-sm font-medium text-gray-900">No hay leads</h3>
+                        <p className="mt-1 text-sm text-gray-500">Comienza creando un nuevo lead.</p>
+                    </div>
+                )}
+
+                {leads.length > 0 && filteredLeads.length === 0 && !loading && (
+                    <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
+                        <TrendingUp className="mx-auto h-12 w-12 text-gray-300" />
+                        <h3 className="mt-2 text-sm font-medium text-gray-900">No hay leads con estos filtros</h3>
+                        <p className="mt-1 text-sm text-gray-500">Intenta cambiar los filtros superiores o limpiar la búsqueda.</p>
+                    </div>
+                )}
+            </div>
 
             {/* Create Lead Fullscreen */}
             <CreateLeadFullscreen
@@ -1199,7 +1504,7 @@ export default function Leads() {
 
             {/* Lead Detail Slide-Over */}
             {isDetailOpen && selectedLead && (
-                <div className="fixed inset-0 z-50 overflow-hidden">
+                <div className="fixed inset-0 z-[9999] overflow-hidden">
                     <div className="absolute inset-0 bg-black/30" onClick={() => setIsDetailOpen(false)} />
                     <div className="absolute inset-y-0 right-0 max-w-lg w-full bg-white shadow-xl flex flex-col">
                         {/* Header */}
@@ -1442,6 +1747,28 @@ export default function Leads() {
                                             <Clock className="w-5 h-5 text-blue-200" /> Próximo Paso
                                         </p>
                                     </div>
+                                    {/* Active filters display */}
+                                    {(filteredLeadId || filteredLeadIds || statusFilter !== 'all' || priorityFilter !== 'all') && (
+                                        <div className="flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+                                            <div className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border border-indigo-100">
+                                                <Filter className="w-3.5 h-3.5" />
+                                                Vista filtrada ({filteredLeads.length} resultados)
+                                                {statusFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Estado: {statusFilter}</span>}
+                                                {priorityFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Prioridad: {(PRIORITY_CONFIG as any)[priorityFilter]?.label || priorityFilter}</span>}
+                                                <button
+                                                    onClick={() => {
+                                                        setFilteredLeadId(null);
+                                                        setFilteredLeadIds(null);
+                                                        setStatusFilter('all');
+                                                        setPriorityFilter('all');
+                                                    }}
+                                                    className="bg-white/50 hover:bg-white p-0.5 rounded-md transition-colors ml-1"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                     {isSavingFollowUp && (
                                         <span className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse border border-white/20">
                                             Guardando...
@@ -1672,8 +1999,176 @@ export default function Leads() {
                 </div>
             )}
 
+            {/* Won Modal */}
+            {isWonModalOpen && selectedLead && (
+                <div className="fixed inset-0 z-[10000] overflow-y-auto">
+                    <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                        <div className="fixed inset-0 transition-opacity bg-black/50" onClick={() => setIsWonModalOpen(false)} />
+                        <div className="inline-block align-bottom bg-white rounded-3xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative z-10">
+                            <div className={`bg-gradient-to-br ${pendingWonStatus === 'Cerrado' ? 'from-indigo-50 to-purple-50 border-purple-100' : 'from-indigo-50 to-green-50 border-green-100'} px-6 py-5 border-b`}>
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-12 h-12 ${pendingWonStatus === 'Cerrado' ? 'bg-purple-600' : 'bg-indigo-600'} rounded-2xl flex items-center justify-center shadow-lg transition-colors`}>
+                                        <Target className="w-6 h-6 text-white" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-black text-gray-900">{pendingWonStatus === 'Cerrado' ? '¡Trato Cerrado!' : '¡Trato Ganado!'}</h3>
+                                        <p className="text-sm font-medium text-gray-500 mt-0.5">Registra la fecha de cierre oficial</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-white px-6 py-6 space-y-5">
+                                <div className={`${pendingWonStatus === 'Cerrado' ? 'bg-purple-50 border-purple-100' : 'bg-green-50 border-green-100'} border rounded-xl p-4 transition-colors`}>
+                                    <p className={`text-xs font-bold ${pendingWonStatus === 'Cerrado' ? 'text-purple-700' : 'text-green-700'} uppercase tracking-wider mb-1`}>Cliente / Proyecto</p>
+                                    <p className="text-lg font-black text-gray-900">{selectedLead.name}</p>
+                                    {selectedLead.company_name && <p className="text-sm font-medium text-gray-500">{selectedLead.company_name}</p>}
+                                    <div className="mt-4 pt-4 border-t border-black/5 flex flex-col gap-2">
+                                        <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Estado Final:</p>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => setPendingWonStatus('Cerrado')}
+                                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all border ${pendingWonStatus === 'Cerrado'
+                                                    ? 'bg-purple-600 text-white border-purple-600 shadow-md'
+                                                    : 'bg-white text-purple-600 border-purple-100 hover:bg-purple-50'
+                                                    }`}
+                                            >
+                                                {STATUS_CONFIG['Cerrado'].icon} Cerrado
+                                            </button>
+                                            <button
+                                                onClick={() => setPendingWonStatus('Cliente')}
+                                                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all border ${pendingWonStatus === 'Cliente'
+                                                    ? 'bg-green-600 text-white border-green-600 shadow-md'
+                                                    : 'bg-white text-green-600 border-green-100 hover:bg-green-50'
+                                                    }`}
+                                            >
+                                                {STATUS_CONFIG['Cliente'].icon} Cliente
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-xs font-black text-gray-700 uppercase tracking-wider block">
+                                        Fecha de Cierre <span className="text-indigo-500">*</span>
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={wonData.won_date}
+                                        onChange={(e) => setWonData({ ...wonData, won_date: e.target.value })}
+                                        className="w-full rounded-xl border-gray-200 shadow-sm text-sm font-bold text-gray-700 bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all p-3"
+                                    />
+                                    <p className="text-[10px] text-gray-400 font-medium italic">
+                                        Esta fecha se utilizará para tus reportes de ventas y desempeño.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="bg-gray-50 px-6 py-4 flex gap-3 justify-end border-t border-gray-100">
+                                <button
+                                    onClick={() => {
+                                        setIsWonModalOpen(false);
+                                        setPendingWonStatus(null);
+                                    }}
+                                    className="px-6 py-3 rounded-xl font-black text-sm uppercase tracking-wider text-gray-600 hover:bg-gray-100 transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleConfirmWon}
+                                    className="px-6 py-3 rounded-xl font-black text-sm uppercase tracking-wider bg-indigo-600 text-white hover:bg-indigo-700 transition-all shadow-lg hover:shadow-xl"
+                                >
+                                    Guardar y Cerrar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Loss Modal */}
+            {isLossModalOpen && selectedLead && (
+                <div className="fixed inset-0 z-[10000] overflow-y-auto">
+                    <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                        <div className="fixed inset-0 transition-opacity bg-black/50" onClick={() => setIsLossModalOpen(false)} />
+                        <div className="inline-block align-bottom bg-white rounded-3xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative z-10">
+                            <div className="bg-gradient-to-br from-red-50 to-orange-50 px-6 py-5 border-b border-red-100">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-12 h-12 bg-red-500 rounded-2xl flex items-center justify-center shadow-lg">
+                                        <X className="w-6 h-6 text-white" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-black text-gray-900">Lead Perdido</h3>
+                                        <p className="text-sm font-medium text-gray-500 mt-0.5">Registra el motivo de pérdida</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-white px-6 py-6 space-y-5">
+                                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                                    <p className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-1">Lead Actual</p>
+                                    <p className="text-lg font-black text-gray-900">{selectedLead.name}</p>
+                                    <p className="text-sm font-medium text-gray-500">{selectedLead.company_name || 'Sin empresa'}</p>
+                                    <div className="mt-2 flex items-center gap-2">
+                                        <span className="text-xs font-bold text-gray-400">Etapa actual:</span>
+                                        <span className={`text-xs font-black px-2 py-1 rounded-lg ${STATUS_CONFIG[selectedLead.status]?.bgColor} ${STATUS_CONFIG[selectedLead.status]?.color}`}>
+                                            {STATUS_CONFIG[selectedLead.status]?.icon} {STATUS_CONFIG[selectedLead.status]?.label}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-xs font-black text-gray-700 uppercase tracking-wider block">
+                                        Motivo de Pérdida <span className="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                        value={lossData.lost_reason_id}
+                                        onChange={(e) => setLossData({ ...lossData, lost_reason_id: e.target.value })}
+                                        className="w-full rounded-xl border-gray-200 shadow-sm text-sm font-bold text-gray-700 bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-red-500 transition-all p-3"
+                                    >
+                                        <option value="">Selecciona un motivo...</option>
+                                        {lossReasons.map(reason => (
+                                            <option key={reason.id} value={reason.id}>
+                                                {reason.reason}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-xs font-black text-gray-700 uppercase tracking-wider block">
+                                        Notas Adicionales (Opcional)
+                                    </label>
+                                    <textarea
+                                        value={lossData.lost_notes}
+                                        onChange={(e) => setLossData({ ...lossData, lost_notes: e.target.value })}
+                                        placeholder="Añade contexto adicional sobre por qué se perdió este lead..."
+                                        rows={4}
+                                        className="w-full rounded-xl border-gray-200 shadow-sm text-sm font-medium text-gray-700 bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-red-500 transition-all p-3 resize-none"
+                                    />
+                                </div>
+                            </div>
+                            <div className="bg-gray-50 px-6 py-4 flex gap-3 justify-end border-t border-gray-100">
+                                <button
+                                    onClick={() => {
+                                        setIsLossModalOpen(false);
+                                        setLossData({ lost_reason_id: '', lost_notes: '' });
+                                    }}
+                                    className="px-6 py-3 rounded-xl font-black text-sm uppercase tracking-wider text-gray-600 hover:bg-gray-100 transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleConfirmLoss}
+                                    disabled={!lossData.lost_reason_id}
+                                    className="px-6 py-3 rounded-xl font-black text-sm uppercase tracking-wider bg-red-600 text-white hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
+                                >
+                                    Confirmar Pérdida
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Mobile Quick Actions */}
             <MobileQuickActions onCreateLead={() => setIsModalOpen(true)} />
-        </div>
+        </>
     );
 }

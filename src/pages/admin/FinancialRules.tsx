@@ -391,7 +391,7 @@ export default function FinancialRules() {
                                                             {/* DRAG HANDLE - Positioned specifically to not overlap */}
                                                             <div
                                                                 {...provided.dragHandleProps}
-                                                                className="absolute top-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing transition-opacity p-2 text-gray-300 hover:text-gray-500 z-10"
+                                                                className="absolute top-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 cursor-move transition-opacity p-2 text-gray-300 hover:text-gray-500 z-10"
                                                             >
                                                                 <GripVertical className="w-5 h-5 rotate-90" />
                                                             </div>

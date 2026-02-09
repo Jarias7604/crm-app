@@ -110,46 +110,33 @@ Deno.serve(async (req) => {
         // 4. BUILD DYNAMIC CONTEXT (Lead + Pricing)
         // ===========================================
         const leadContext = `
-=== INFORMACIÓN DEL LEAD (BASE DE DATOS) ===
-Nombre: ${lead?.name || 'No registrado'}
-Empresa: ${lead?.company_name || 'No registrada'}
-Teléfono: ${lead?.phone || 'No registrado'}
-Email: ${lead?.email || 'No registrado'}
-Estado: ${lead?.status || 'nuevo'}
-Volumen aproximado (registrado): ${lead?.metadata?.volume || 'No definido aún'}
+=== DATOS DEL CLIENTE (CRM) ===
+• Nombre: ${lead?.name || 'No registrado'}
+• Empresa: ${lead?.company_name || 'No registrada'}
+• Teléfono: ${lead?.phone || 'No registrado'}
+• Email: ${lead?.email || 'No registrado'}
+• Volumen Registrado: ${lead?.metadata?.volume || 'Aún no proporcionado'}
 
-=== PORTAFOLIO DE PRODUCTOS Y PRECIOS (CATÁLOGO REAL) ===
+=== CATÁLOGO DE PRODUCTOS Y PRECIOS ===
+Planes Principales:
+${planesInfo || 'Sin planes'}
 
-PLANES PRINCIPALES (Suscripción):
-${planesInfo || 'No hay planes configurados'}
+Módulos Adicionales:
+${modulosInfo || 'Sin módulos'}
 
-MÓDULOS ADICIONALES (Complementos):
-${modulosInfo || 'No hay módulos configurados'}
+Servicios Variables:
+${serviciosInfo || 'Sin servicios'}
 
-SERVICIOS Y COSTOS VARIABLES:
-${serviciosInfo || 'No hay servicios configurados'}
-
-=== REGLAS DE INTELIGENCIA COMERCIAL ===
-
-1. 🔍 MEMORIA DE CONVERSACIÓN: 
-   - SIEMPRE revisa los mensajes previos. Si el cliente ya mencionó que usa "250 facturas", "5 sucursales", etc., NO se lo vuelvas a preguntar. Úsalo directamente para tus cálculos.
-
-2. 🧮 CÁLCULOS DINÁMICOS EN EL CHAT:
-   - Tienes permiso para mencionar precios unitarios y realizar cálculos para ayudar al cliente a entender su inversión.
-   - Ej: "Como nos comentas que emites 250 facturas mensuales, el servicio de WhatsApp tendría un costo de sólo $7.50 mensuales ($0.03 x 250)."
-
-3. ⚠️ GENERACIÓN DE COTIZACIÓN FORMAL:
-   - Solo usa QUOTE_TRIGGER cuando el cliente confirme que desea una propuesta formal.
-   - Incluye todos los módulos y servicios solicitados en la lista de 'items'.
-
-✅ Link de cotización (solo al final si se solicita):
-QUOTE_TRIGGER: { "plan_name": "NombreDelPlan", "dte_volume": NUMERO, "items": ["Modulo1", "Servicio1"] }
+=== PROTOCOLO DE RESPUESTA ===
+1. MEMORIA: Revisa el historial. Si ya tienes un dato, no lo vuelvas a preguntar.
+2. FLUJO: Respeta ESTRICTAMENTE las Fases (1, 2, 3...) definidas en tus instrucciones principales.
+3. PRECIOS: NO proporciones precios, estimaciones o cálculos hasta que el cliente haya entregado TODA la información requerida en la Fase 2 (Nombre, Empresa, Teléfono y Volumen).
+4. TRIGGER: Solo usa QUOTE_TRIGGER cuando el cliente acepte recibir una propuesta formal y tengas sus datos.
+   Formato: QUOTE_TRIGGER: { "plan_name": "Nombre", "dte_volume": NUMERO, "items": ["Modulo1"] }
 `;
 
         // Combine base system_prompt from DB + dynamic context
-        const fullSystemPrompt = `${agent.system_prompt || 'Eres un asistente de ventas profesional.'}
-
-${leadContext}`;
+        const fullSystemPrompt = `${agent.system_prompt || 'Eres un asesor de ventas profesional.'}\n\n${leadContext}`;
 
         // ===========================================
         // 5. GET OPENAI API KEY
@@ -172,7 +159,7 @@ ${leadContext}`;
         // 6. GET CONVERSATION HISTORY (Last 20 messages)
         // ===========================================
         const { data: history } = await supabase.from('marketing_messages')
-            .select('content, direction, type, created_at')
+            .select('content, direction, type, created_at, metadata')
             .eq('conversation_id', conversationId)
             .order('created_at', { ascending: false })
             .limit(20);

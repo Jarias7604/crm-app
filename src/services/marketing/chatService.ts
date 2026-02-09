@@ -22,7 +22,7 @@ export interface ChatMessage {
     conversation_id: string;
     content: string;
     direction: 'inbound' | 'outbound';
-    type: 'text' | 'image' | 'file';
+    type: 'text' | 'image' | 'file' | 'audio' | 'voice' | 'video';
     status: string;
     metadata: any;
     sent_at: string;
@@ -121,15 +121,6 @@ export const chatService = {
             .single();
 
         if (error) throw error;
-
-        // 2. Update conversation preview
-        await supabase
-            .from('marketing_conversations')
-            .update({
-                last_message: content,
-                last_message_at: new Date().toISOString()
-            })
-            .eq('id', conversationId);
 
         // 3. PROACTIVE DISPATCH (Reliability Fix)
         // Instead of waiting for database triggers which can be slow or blocked,

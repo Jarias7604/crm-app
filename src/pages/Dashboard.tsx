@@ -5,7 +5,7 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
-import { BadgeDollarSign, TrendingUp, Users, Target, Building, Calendar, Clock, CheckCircle, ChevronDown, Edit2 } from 'lucide-react';
+import { BadgeDollarSign, TrendingUp, Users, Target, Building, Calendar, Clock, CheckCircle, ChevronDown, Edit2, Settings } from 'lucide-react';
 import { adminService } from '../services/admin';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import {
@@ -40,69 +40,46 @@ const THEME = {
 
 const PIE_COLORS = [THEME.primary, THEME.success, THEME.accent, THEME.chart2, THEME.chart3, '#94A3B8'];
 
-const FunnelInfographic = ({ data }: { data: any[] }) => {
-    // Logic: Exact status match per layer, strictly following user requested order.
+const FunnelInfographic = ({ data, onStageClick }: { data: any[], onStageClick: (status: string) => void }) => {
     const count = (status: string) => {
         const item = data.find(d => d.key === status);
         return item ? item.value : 0;
     };
 
-    // Data Extraction based on Order
-    const prospectos = count('Prospecto');
-    const calificados = count('Lead calificado');
-    const seguimiento = count('En seguimiento');
-    const negociaciones = count('Negociación');
-    const cerrados = count('Cerrado');
-    const clientes = count('Cliente');
-
-    // Total active for percentage/context
-    const totalLeads = data.reduce((sum, d) => sum + d.value, 0);
-
     const layers = [
-        { label: 'Prospecto', value: prospectos, color: '#3b82f6' },                     // Blue 500
-        { label: 'Lead Calificado', value: calificados, color: '#6366f1' },              // Indigo 500
-        { label: 'En Seguimiento', value: seguimiento, color: '#8b5cf6' },               // Violet 500
-        { label: 'Negociación', value: negociaciones, color: '#f97316' },                // Orange 500
-        { label: 'Cerrado', value: cerrados, color: '#10b981' },                         // Emerald 500
-        { label: 'Cliente', value: clientes, color: '#059669' }                          // Emerald 600
+        { label: 'Prospecto', value: count('Prospecto'), color: '#3b82f6', key: 'Prospecto' },
+        { label: 'Calificado', value: count('Lead calificado'), color: '#6366f1', key: 'Lead calificado' },
+        { label: 'Seguimiento', value: count('En seguimiento'), color: '#8b5cf6', key: 'En seguimiento' },
+        { label: 'Negociación', value: count('Negociación'), color: '#f97316', key: 'Negociación' },
+        { label: 'Cerrado', value: count('Cerrado'), color: '#10b981', key: 'Cerrado' },
+        { label: 'Cliente', value: count('Cliente'), color: '#059669', key: 'Cliente' }
     ];
 
-    logger.debug('Funnel 6-Layers', { layers });
-
-    if (data.length === 0) return <div className="text-gray-400 text-center py-10">No hay datos suficientes</div>;
+    const maxVal = Math.max(...layers.map(l => l.value), 1);
 
     return (
-        <div className="flex flex-col items-center justify-center w-full py-4">
-            <div className="relative w-full max-w-md space-y-1.5">
-                {layers.filter(l => l.value > 0).map((layer, index, filteredLayers) => {
-                    // Tapering logic: Adjust based on filtered count
-                    const maxWidthPercent = 100 - (index * (40 / Math.max(filteredLayers.length, 1)));
-
-                    return (
-                        <div key={layer.label} className="relative group flex flex-col items-center">
-                            {/* Shape with custom clipPath */}
-                            <div
-                                className="h-9 flex items-center justify-center text-white font-bold text-xs shadow-sm relative transition-all duration-300 group-hover:scale-[1.02]"
-                                style={{
-                                    width: `${maxWidthPercent}%`,
-                                    backgroundColor: layer.color,
-                                    // Gentle trapezoid
-                                    clipPath: `polygon(2% 0, 98% 0, 95% 100%, 5% 100%)`,
-                                    zIndex: 20 - index
-                                }}
-                            >
-                                <div className="flex flex-row items-center gap-2 px-2 truncate w-full justify-center">
-                                    <span className="text-[10px] opacity-90 uppercase tracking-widest truncate">{layer.label}</span>
-                                    <span className="text-sm bg-black/10 px-1.5 rounded">{layer.value}</span>
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
-                <div className="text-center mt-4">
-                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Total: {totalLeads}</span>
+        <div className="flex flex-col w-full gap-3 py-1">
+            {layers.map((layer) => (
+                <div
+                    key={layer.key}
+                    className="group cursor-pointer"
+                    onClick={() => onStageClick(layer.key)}
+                >
+                    <div className="flex justify-between items-center mb-1">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-indigo-600 transition-colors">{layer.label}</span>
+                        <span className="text-[11px] font-black text-slate-900">{layer.value}</span>
+                    </div>
+                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                            className="h-full rounded-full transition-all duration-1000 group-hover:brightness-110"
+                            style={{
+                                width: `${(layer.value / maxVal) * 100}%`,
+                                backgroundColor: layer.color
+                            }}
+                        />
+                    </div>
                 </div>
-            </div>
+            ))}
         </div>
     );
 };
@@ -120,11 +97,16 @@ export default function Dashboard() {
     const [selectedDateRange, setSelectedDateRange] = useState<DateRange>('all');
     const [refreshKey, setRefreshKey] = useState(Date.now());
 
+    // Card-specific filter dropdown state
+    const [activeCardFilter, setActiveCardFilter] = useState<string | null>(null);
+    const cardFilterRef = useRef<HTMLDivElement>(null);
+
     // Real data states
     const [stats, setStats] = useState({
         totalLeads: 0,
         totalPipeline: 0,
         wonDeals: 0,
+        totalWonAmount: 0,
         conversionRate: 0,
     });
     const [funnelData, setFunnelData] = useState<any[]>([]);
@@ -133,6 +115,8 @@ export default function Dashboard() {
     const [upcomingFollowUps, setUpcomingFollowUps] = useState<any[]>([]);
     const [recentConversions, setRecentConversions] = useState<any[]>([]);
     const [topOpportunities, setTopOpportunities] = useState<any[]>([]);
+    const [lossReasonData, setLossReasonData] = useState<any[]>([]);
+    const [lossStageData, setLossStageData] = useState<any[]>([]);
 
     const navigate = useNavigate();
 
@@ -245,6 +229,10 @@ export default function Dashboard() {
                 const order = ['very_high', 'high', 'medium', 'low'];
                 return order.indexOf(a.key) - order.indexOf(b.key);
             }));
+
+            // Set loss analytics
+            setLossReasonData(dashboardData.lossReasons || []);
+            setLossStageData(dashboardData.lossStages || []);
         }
     }, [dashboardData]);
 
@@ -258,6 +246,9 @@ export default function Dashboard() {
         const handleClickOutside = (event: MouseEvent) => {
             if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
                 setIsFilterOpen(false);
+            }
+            if (cardFilterRef.current && !cardFilterRef.current.contains(event.target as Node)) {
+                setActiveCardFilter(null);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -520,7 +511,7 @@ export default function Dashboard() {
 
     // CRM DASHBOARD VIEW
     return (
-        <div className="w-full max-w-[1580px] mx-auto pb-12 space-y-8 animate-in fade-in duration-700">
+        <div className="w-full max-w-[1580px] mx-auto pb-4 space-y-3 animate-in fade-in duration-700">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h2 className="text-2xl font-extrabold text-[#4449AA] leading-tight tracking-tight">{t('dashboard.crm.title')}</h2>
@@ -541,23 +532,80 @@ export default function Dashboard() {
             </div>
 
             {/* KPI Cards - Global Standard */}
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {[
-                    { name: t('dashboard.crm.totalPipeline'), value: `$${stats.totalPipeline.toLocaleString()}`, icon: BadgeDollarSign, color: 'text-indigo-600', bg: 'bg-indigo-50/50', trend: '+12.5%' },
-                    { name: t('dashboard.crm.totalLeads'), value: stats.totalLeads, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50/50', trend: '+5.2%' },
-                    { name: t('dashboard.crm.wonDeals'), value: stats.wonDeals, icon: Target, color: 'text-emerald-600', bg: 'bg-emerald-50/50', trend: '+8.1%' },
-                    { name: t('dashboard.crm.conversionRate'), value: `${stats.conversionRate}%`, icon: TrendingUp, color: 'text-amber-600', bg: 'bg-amber-50/50', trend: '+2.4%' },
+                    { name: t('dashboard.crm.totalPipeline'), value: `$${stats.totalPipeline.toLocaleString()}`, icon: BadgeDollarSign, color: 'text-indigo-600', bg: 'bg-indigo-50/50', trend: '+12.5%', onClick: () => navigate('/cotizaciones') },
+                    { name: t('dashboard.crm.totalLeads'), value: stats.totalLeads, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50/50', trend: '+5.2%', onClick: () => navigate('/leads') },
+                    {
+                        name: t('dashboard.crm.wonDeals'),
+                        value: stats.wonDeals,
+                        secondaryValue: `| $${(stats.totalWonAmount || 0).toLocaleString()}`,
+                        icon: Target,
+                        color: 'text-emerald-600',
+                        bg: 'bg-emerald-50/50',
+                        trend: '+8.1%',
+                        onClick: () => navigate('/leads', { state: { status: 'Cliente' } })
+                    },
+                    { name: t('dashboard.crm.conversionRate'), value: `${stats.conversionRate}%`, icon: TrendingUp, color: 'text-amber-600', bg: 'bg-amber-50/50', trend: '+2.4%', onClick: () => navigate('/leads', { state: { status: 'Cliente' } }) },
                 ].map((item) => (
-                    <div key={item.name} className="group relative overflow-hidden rounded-3xl bg-white p-5 shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 hover:-translate-y-1">
-                        <div className="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 bg-slate-50 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+                    <div
+                        key={item.name}
+                        onClick={item.onClick}
+                        className={`group relative rounded-2xl bg-white p-3 shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 hover:-translate-y-1 cursor-pointer ${activeCardFilter === item.name ? 'z-[101]' : 'z-10'}`}
+                    >
+                        <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
+                            <div className="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 bg-slate-50 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+                        </div>
                         <div className="flex flex-col h-full relative z-10">
-                            <div className={`p-3.5 rounded-2xl ${item.bg} w-fit mb-4 transition-transform group-hover:scale-110 shadow-sm shadow-black/5`}>
-                                <item.icon className={`h-6 w-6 ${item.color}`} />
+                            <div className="flex justify-between items-start mb-2">
+                                <div className={`p-2.5 rounded-xl ${item.bg} transition-transform group-hover:scale-110 shadow-sm shadow-black/5`}>
+                                    <item.icon className={`h-5 w-5 ${item.color}`} />
+                                </div>
+                                <div className="relative" ref={activeCardFilter === item.name ? cardFilterRef : null}>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActiveCardFilter(activeCardFilter === item.name ? null : item.name);
+                                        }}
+                                        className={`p-1.5 rounded-lg transition-all ${activeCardFilter === item.name ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                    >
+                                        <Settings className="w-3.5 h-3.5" />
+                                    </button>
+
+                                    {activeCardFilter === item.name && (
+                                        <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-[102] py-2 animate-in fade-in slide-in-from-top-2 overflow-hidden">
+                                            <div className="px-3 py-1 mb-1 border-b border-gray-50 flex items-center justify-between">
+                                                <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Periodo</span>
+                                                <Settings className="w-2.5 h-2.5 text-indigo-200" />
+                                            </div>
+                                            {(Object.entries(DATE_RANGE_OPTIONS) as [DateRange, { label: string }][]).map(([key, option]) => (
+                                                <button
+                                                    key={key}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setSelectedDateRange(key);
+                                                        setActiveCardFilter(null);
+                                                    }}
+                                                    className={`w-full text-left px-3 py-2 text-[11px] transition-colors flex items-center justify-between ${selectedDateRange === key
+                                                        ? 'bg-indigo-50 text-indigo-600 font-black'
+                                                        : 'text-slate-600 font-bold hover:bg-gray-50'
+                                                        }`}
+                                                >
+                                                    {option.label}
+                                                    {selectedDateRange === key && <CheckCircle className="w-3 h-3 text-indigo-600" />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                            <dt className="text-[11px] font-black text-slate-400 uppercase tracking-[0.15em] mb-1">{item.name}</dt>
-                            <div className="flex items-baseline gap-2">
+                            <dt className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] mb-1">{item.name}</dt>
+                            <div className="flex items-baseline gap-1.5 flex-wrap">
                                 <dd className="text-3xl font-black text-slate-900 tracking-tighter">{item.value}</dd>
-                                <span className="text-[10px] font-black text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded-lg">{item.trend}</span>
+                                {item.secondaryValue && (
+                                    <span className="text-xs font-bold text-slate-600 flex items-center">{item.secondaryValue}</span>
+                                )}
+                                <span className="text-[9px] font-black text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded-lg ml-auto">{item.trend}</span>
                             </div>
                         </div>
                     </div>
@@ -565,36 +613,99 @@ export default function Dashboard() {
             </div>
 
             {/* Main Content Area: Grouped Proportions */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch relative z-0">
 
-                {/* Row 1: Funnel + Strategic Priority */}
-                <div className="bg-white p-5 rounded-3xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 lg:col-span-8 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500">
-                    <div className="flex justify-between items-center mb-5">
+                {/* Row 1: Funnel + Strategic Priority + Sources */}
+                <div className={`bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 lg:col-span-4 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'funnel' ? 'z-[50]' : 'z-0'}`}>
+                    <div className="flex justify-between items-center mb-2">
                         <div className="flex flex-col">
-                            <h3 className="text-[12px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('dashboard.crm.funnelTitle')}</h3>
-                            <p className="text-[11px] text-gray-400 font-medium">Conversión por etapa</p>
+                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('dashboard.crm.funnelTitle')}</h3>
+                            <p className="text-[10px] text-gray-400 font-medium">Conversión por etapa</p>
                         </div>
-                        <div className="bg-indigo-50 px-3 py-1 rounded-full text-[9px] font-black text-indigo-600 tracking-wider">VISUAL KPI</div>
+                        <div className="bg-indigo-50 px-2 py-0.5 rounded-full text-[8px] font-black text-indigo-600 tracking-wider">KPI</div>
+                        <div className="relative" ref={activeCardFilter === 'funnel' ? cardFilterRef : null}>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveCardFilter(activeCardFilter === 'funnel' ? null : 'funnel');
+                                }}
+                                className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'funnel' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                            >
+                                <Settings className="w-3.5 h-3.5" />
+                            </button>
+                            {activeCardFilter === 'funnel' && (
+                                <div className="absolute right-0 top-full mt-2 w-44 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-[51] py-2 animate-in fade-in slide-in-from-top-2 overflow-hidden">
+                                    {(Object.entries(DATE_RANGE_OPTIONS) as [DateRange, { label: string }][]).map(([key, option]) => (
+                                        <button
+                                            key={key}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedDateRange(key);
+                                                setActiveCardFilter(null);
+                                            }}
+                                            className={`w-full text-left px-3 py-1.5 text-[10px] transition-colors flex items-center justify-between ${selectedDateRange === key ? 'bg-indigo-50 text-indigo-600 font-black' : 'text-slate-600 font-bold hover:bg-gray-50'}`}
+                                        >
+                                            {option.label}
+                                            {selectedDateRange === key && <CheckCircle className="w-2.5 h-2.5 text-indigo-600" />}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                     <div className="flex-grow flex items-center justify-center">
-                        <FunnelInfographic data={funnelData} />
+                        <FunnelInfographic
+                            data={funnelData}
+                            onStageClick={(status) => navigate('/leads', { state: { status } })}
+                        />
                     </div>
                 </div>
 
-                <div className="bg-white p-5 rounded-3xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 lg:col-span-4 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500">
-                    <div className="flex justify-between items-center mb-6">
+                <div className={`bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 lg:col-span-4 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'priority' ? 'z-[50]' : 'z-0'}`}>
+                    <div className="flex justify-between items-center mb-2">
                         <div className="flex flex-col">
-                            <h3 className="text-[12px] font-black text-slate-400 uppercase tracking-[0.2em]">Priorización</h3>
-                            <p className="text-[11px] text-gray-400 font-medium">Enfoque estratégico</p>
+                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Priorización</h3>
+                            <p className="text-[10px] text-gray-400 font-medium">Enfoque estratégico</p>
                         </div>
-                        <Target className="w-5 h-5 text-amber-500 opacity-30" />
+                        <div className="flex items-center gap-2">
+                            <Target className="w-5 h-5 text-amber-500 opacity-30" />
+                            <div className="relative" ref={activeCardFilter === 'priority' ? cardFilterRef : null}>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveCardFilter(activeCardFilter === 'priority' ? null : 'priority');
+                                    }}
+                                    className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'priority' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                >
+                                    <Settings className="w-3.5 h-3.5" />
+                                </button>
+                                {activeCardFilter === 'priority' && (
+                                    <div className="absolute right-0 top-full mt-2 w-44 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-[51] py-2 animate-in fade-in slide-in-from-top-2 overflow-hidden">
+                                        {(Object.entries(DATE_RANGE_OPTIONS) as [DateRange, { label: string }][]).map(([key, option]) => (
+                                            <button
+                                                key={key}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedDateRange(key);
+                                                    setActiveCardFilter(null);
+                                                }}
+                                                className={`w-full text-left px-3 py-1.5 text-[10px] transition-colors flex items-center justify-between ${selectedDateRange === key ? 'bg-indigo-50 text-indigo-600 font-black' : 'text-slate-600 font-bold hover:bg-gray-50'}`}
+                                            >
+                                                {option.label}
+                                                {selectedDateRange === key && <CheckCircle className="w-2.5 h-2.5 text-indigo-600" />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex-grow min-h-[250px]">
+                    <div className="flex-grow min-h-[200px]">
                         {priorityData.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={priorityData} layout="vertical" margin={{ left: -20 }}>
+                                <BarChart data={priorityData} layout="vertical" margin={{ left: -20, right: 10 }}>
                                     <XAxis type="number" hide />
-                                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} width={80} />
+                                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 700, fill: '#64748b' }} width={70} />
                                     <Tooltip
                                         cursor={{ fill: 'transparent' }}
                                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
@@ -602,7 +713,13 @@ export default function Dashboard() {
                                     <Bar
                                         dataKey="value"
                                         radius={[0, 4, 4, 0]}
-                                        barSize={20}
+                                        barSize={16}
+                                        onClick={(data) => {
+                                            if (data && data.key) {
+                                                navigate('/leads', { state: { priority: data.key } });
+                                            }
+                                        }}
+                                        className="cursor-pointer"
                                     >
                                         {priorityData.map((entry, index) => (
                                             <Cell
@@ -623,71 +740,51 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* Row 2: Top Opportunities + Sources */}
-                <div className="bg-white rounded-3xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 overflow-hidden lg:col-span-8 group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500">
-                    <div className="p-5 pb-4 border-b border-slate-100 flex justify-between items-center">
+                <div className={`bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 lg:col-span-4 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'sources' ? 'z-[50]' : 'z-0'}`}>
+                    <div className="flex justify-between items-start mb-4">
                         <div className="flex flex-col">
-                            <h3 className="text-[12px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('dashboard.crm.topOppTitle')}</h3>
-                            <p className="text-[11px] text-gray-400 font-medium">Mayores contratos en pipeline</p>
+                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('dashboard.crm.sourcesTitle')}</h3>
+                            <div className="flex items-baseline gap-2 mt-1">
+                                <span className="text-3xl font-black text-slate-900 tracking-tighter">{stats.totalLeads}</span>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Prospectos</span>
+                            </div>
+                        </div>
+                        <div className="relative" ref={activeCardFilter === 'sources' ? cardFilterRef : null}>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveCardFilter(activeCardFilter === 'sources' ? null : 'sources');
+                                }}
+                                className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'sources' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                            >
+                                <Settings className="w-3.5 h-3.5" />
+                            </button>
+                            {activeCardFilter === 'sources' && (
+                                <div className="absolute right-0 top-full mt-2 w-44 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-[51] py-2 animate-in fade-in slide-in-from-top-2 overflow-hidden">
+                                    {(Object.entries(DATE_RANGE_OPTIONS) as [DateRange, { label: string }][]).map(([key, option]) => (
+                                        <button
+                                            key={key}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedDateRange(key);
+                                                setActiveCardFilter(null);
+                                            }}
+                                            className={`w-full text-left px-3 py-1.5 text-[10px] transition-colors flex items-center justify-between ${selectedDateRange === key ? 'bg-indigo-50 text-indigo-600 font-black' : 'text-slate-600 font-bold hover:bg-gray-50'}`}
+                                        >
+                                            {option.label}
+                                            {selectedDateRange === key && <CheckCircle className="w-2.5 h-2.5 text-indigo-600" />}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full">
-                            <thead className="bg-slate-50/50">
-                                <tr>
-                                    <th className="px-10 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('dashboard.crm.columnName')}</th>
-                                    <th className="px-6 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Fecha</th>
-                                    <th className="px-6 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Fuente</th>
-                                    <th className="px-6 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('dashboard.crm.columnValue')}</th>
-                                    <th className="px-10 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('dashboard.crm.columnStatus')}</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50">
-                                {topOpportunities.length > 0 ? topOpportunities.map((lead) => (
-                                    <tr key={lead.id} className="hover:bg-gray-50/50 transition-colors">
-                                        <td className="px-10 py-5">
-                                            <div className="text-xs font-black text-slate-900 leading-tight">{lead.name}</div>
-                                            {lead.company_name && <div className="text-[10px] font-medium text-gray-400 mt-0.5">{lead.company_name}</div>}
-                                        </td>
-                                        <td className="px-6 py-5 text-[11px] text-slate-500 font-bold">{lead.created_at ? format(new Date(lead.created_at), 'dd MMM yyyy', { locale: es }) : '-'}</td>
-                                        <td className="px-6 py-5">
-                                            {lead.source && SOURCE_CONFIG[lead.source] ? (
-                                                <div className="flex items-center gap-1.5 text-[9px] font-black text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100 w-fit">
-                                                    <span>{SOURCE_CONFIG[lead.source].icon}</span>
-                                                    <span className="uppercase tracking-tight">{SOURCE_CONFIG[lead.source].label}</span>
-                                                </div>
-                                            ) : <span className="text-[10px] text-slate-300 font-bold">-</span>}
-                                        </td>
-                                        <td className="px-6 py-5 text-sm font-black text-emerald-600 font-mono">${(lead.value || 0).toLocaleString()}</td>
-                                        <td className="px-10 py-5 text-right">
-                                            <span className="px-3 py-1 text-[9px] font-black uppercase rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100">
-                                                {STATUS_CONFIG[lead.status as keyof typeof STATUS_CONFIG]?.label || lead.status}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                )) : (
-                                    <tr>
-                                        <td colSpan={5} className="px-10 py-20 text-center text-gray-400 font-bold text-[10px] uppercase tracking-widest">
-                                            Sin oportunidades activas
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div className="bg-white p-5 rounded-3xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 lg:col-span-4 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500">
-                    <div className="flex flex-col mb-6">
-                        <h3 className="text-[12px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('dashboard.crm.sourcesTitle')}</h3>
-                        <p className="text-[11px] text-gray-400 font-medium">Origen de leads</p>
-                    </div>
-                    <div className="flex-grow flex flex-col items-center">
-                        <div className="h-48 w-full relative">
+                    <div className="flex items-center gap-4 flex-grow">
+                        <div className="h-32 w-1/2 relative">
                             {sourceData.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
-                                        <Pie data={sourceData} cx="50%" cy="50%" innerRadius={55} outerRadius={75} paddingAngle={8} dataKey="value" stroke="none">
+                                        <Pie data={sourceData} cx="50%" cy="50%" innerRadius={35} outerRadius={50} paddingAngle={8} dataKey="value" stroke="none">
                                             {sourceData.map((_, index) => (
                                                 <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                                             ))}
@@ -701,97 +798,351 @@ export default function Dashboard() {
                                 <div className="h-full flex items-center justify-center text-gray-300 font-bold text-[10px]">SIN DATOS</div>
                             )}
                         </div>
-                        <div className="flex flex-col gap-3 w-full mt-6">
-                            {sourceData.slice(0, 6).map((entry, index) => (
-                                <div key={index} className="flex items-center justify-between group/item">
-                                    <div className="flex items-center gap-2.5">
-                                        <div
-                                            className="w-2.5 h-2.5 rounded-full border border-white shadow-sm"
-                                            style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}
-                                        />
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="text-[11px] opacity-70">{entry.icon}</span>
-                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{entry.name}</span>
-                                        </div>
+                        <div className="flex flex-col gap-3 w-1/2">
+                            {sourceData.slice(0, 4).map((entry, index) => (
+                                <div
+                                    key={index}
+                                    onClick={() => navigate('/leads', { state: { source: entry.key } })}
+                                    className="flex items-start gap-2.5 group/item cursor-pointer hover:bg-slate-50 p-1 rounded-lg transition-all"
+                                >
+                                    <div
+                                        className="w-2.5 h-2.5 rounded-sm mt-1 shrink-0 shadow-sm"
+                                        style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }}
+                                    />
+                                    <div className="flex flex-col overflow-hidden">
+                                        <span className="text-xs font-black text-slate-900 leading-none">{entry.value}%</span>
+                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider mt-0.5 truncate group-hover/item:text-indigo-600 transition-colors">{entry.name}</span>
                                     </div>
-                                    <span className="text-xs font-black text-slate-900">{entry.value}%</span>
                                 </div>
                             ))}
                         </div>
                     </div>
                 </div>
 
-                {/* Row 3: Follow-ups & Conversions */}
-                <div className="lg:col-span-12 grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="bg-white rounded-3xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 overflow-hidden flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500">
-                        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white">
-                            <div className="flex flex-col">
-                                <h3 className="text-[12px] font-black text-blue-700 uppercase tracking-[0.2em] flex items-center gap-2">
-                                    <Clock className="w-4 h-4" /> Próximos Seguimientos
-                                </h3>
-                                <p className="text-[11px] text-blue-600/60 font-medium mt-0.5">Pendientes por realizar</p>
-                            </div>
-                            <button onClick={() => navigate('/leads')} className="text-[10px] font-black text-blue-600 hover:text-blue-800 uppercase tracking-[0.2em] bg-blue-50 px-4 py-2 rounded-xl transition-all">Ver todos</button>
+                {/* Row 2: Operations Modular Grid (Opportunities + Follow-ups + Conversions) */}
+                <div className={`lg:col-span-4 bg-white rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'topOpp' ? 'z-[50]' : 'z-0'}`}>
+                    <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-white">
+                        <div className="flex flex-col">
+                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('dashboard.crm.topOppTitle')}</h3>
+                            <p className="text-[10px] text-gray-400 font-medium mt-0.5">Mayores contratos</p>
                         </div>
-                        <div className="p-6 space-y-3">
-                            {upcomingFollowUps.length > 0 ? (
-                                upcomingFollowUps.map((lead) => (
-                                    <div key={lead.id} onClick={() => navigate('/leads', { state: { leadId: lead.id } })} className="p-5 bg-gray-50/50 rounded-2xl border border-transparent hover:border-blue-100 hover:bg-white transition-all cursor-pointer group/item">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <h4 className="text-sm font-black text-slate-900 group-hover/item:text-blue-600 transition-colors uppercase tracking-tight">{lead.name}</h4>
-                                            <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-100">
-                                                {(() => {
-                                                    try {
-                                                        const dateObj = new Date(lead.next_followup_date);
-                                                        return format(dateObj, 'dd MMM', { locale: es });
-                                                    } catch (e) { return 'N/A'; }
-                                                })()}
-                                            </span>
-                                        </div>
-                                        <p className="text-[11px] text-slate-500 font-medium line-clamp-2 leading-relaxed">{lead.next_action_notes || 'Sin notas de acción específicas.'}</p>
+                        <div className="flex items-center gap-2">
+                            <button onClick={() => navigate('/leads')} className="text-[9px] font-black text-slate-400 hover:text-indigo-600 uppercase tracking-[0.2em] transition-all">Ver</button>
+                            <div className="relative" ref={activeCardFilter === 'topOpp' ? cardFilterRef : null}>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveCardFilter(activeCardFilter === 'topOpp' ? null : 'topOpp');
+                                    }}
+                                    className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'topOpp' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                >
+                                    <Settings className="w-3.5 h-3.5" />
+                                </button>
+                                {activeCardFilter === 'topOpp' && (
+                                    <div className="absolute right-0 top-full mt-2 w-44 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-[51] py-2 animate-in fade-in slide-in-from-top-2 overflow-hidden">
+                                        {(Object.entries(DATE_RANGE_OPTIONS) as [DateRange, { label: string }][]).map(([key, option]) => (
+                                            <button
+                                                key={key}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedDateRange(key);
+                                                    setActiveCardFilter(null);
+                                                }}
+                                                className={`w-full text-left px-3 py-1.5 text-[10px] transition-colors flex items-center justify-between ${selectedDateRange === key ? 'bg-indigo-50 text-indigo-600 font-black' : 'text-slate-600 font-bold hover:bg-gray-50'}`}
+                                            >
+                                                {option.label}
+                                                {selectedDateRange === key && <CheckCircle className="w-2.5 h-2.5 text-indigo-600" />}
+                                            </button>
+                                        ))}
                                     </div>
-                                ))
-                            ) : (
-                                <div className="h-full flex flex-col items-center justify-center py-20 opacity-30">
-                                    <CheckCircle className="w-10 h-10 mb-4 text-emerald-500" />
-                                    <p className="text-[11px] font-black uppercase tracking-[0.2em]">¡Al día con tus tareas!</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="p-3 space-y-1.5 flex-grow">
+                        {topOpportunities.length > 0 ? topOpportunities.map((lead) => (
+                            <div
+                                key={lead.id}
+                                onClick={() => navigate('/leads', { state: { leadId: lead.id } })}
+                                className="p-2.5 bg-gray-50/50 rounded-xl border border-transparent hover:border-indigo-100 hover:bg-white transition-all cursor-pointer group/item flex justify-between items-center"
+                            >
+                                <div className="flex flex-col gap-0.5 max-w-[60%]">
+                                    <h4 className="text-[11px] font-black text-slate-900 truncate group-hover/item:text-indigo-600">{lead.name}</h4>
+                                    <div className="flex items-center gap-1.5 opacity-60">
+                                        <span className="text-[9px] font-bold text-slate-500">{lead.source && SOURCE_CONFIG[lead.source]?.icon}</span>
+                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter truncate">{lead.company_name || 'Particular'}</span>
+                                    </div>
                                 </div>
-                            )}
+                                <div className="text-right">
+                                    <p className="text-[11px] font-black text-emerald-600 font-mono">${(lead.value || 0).toLocaleString()}</p>
+                                    <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest">{STATUS_CONFIG[lead.status as keyof typeof STATUS_CONFIG]?.label || lead.status}</p>
+                                </div>
+                            </div>
+                        )) : (
+                            <div className="h-full flex items-center justify-center py-20 opacity-30 text-[9px] font-black uppercase tracking-widest">Sin datos</div>
+                        )}
+                    </div>
+                </div>
+
+                <div className={`lg:col-span-4 bg-white rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'followups' ? 'z-[50]' : 'z-0'}`}>
+                    <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-white">
+                        <div className="flex flex-col">
+                            <h3 className="text-[11px] font-black text-blue-700 uppercase tracking-[0.2em] flex items-center gap-2">
+                                <Clock className="w-3 h-3" /> Seguimientos
+                            </h3>
+                            <p className="text-[10px] text-blue-600/60 font-medium mt-0.5">Pendientes</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button onClick={() => navigate('/leads')} className="text-[9px] font-black text-blue-600 hover:text-blue-800 uppercase tracking-[0.2em] transition-all">Ver</button>
+                            <div className="relative" ref={activeCardFilter === 'followups' ? cardFilterRef : null}>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveCardFilter(activeCardFilter === 'followups' ? null : 'followups');
+                                    }}
+                                    className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'followups' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                >
+                                    <Settings className="w-3.5 h-3.5" />
+                                </button>
+                                {activeCardFilter === 'followups' && (
+                                    <div className="absolute right-0 top-full mt-2 w-44 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-[51] py-2 animate-in fade-in slide-in-from-top-2 overflow-hidden">
+                                        {(Object.entries(DATE_RANGE_OPTIONS) as [DateRange, { label: string }][]).map(([key, option]) => (
+                                            <button
+                                                key={key}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedDateRange(key);
+                                                    setActiveCardFilter(null);
+                                                }}
+                                                className={`w-full text-left px-3 py-1.5 text-[10px] transition-colors flex items-center justify-between ${selectedDateRange === key ? 'bg-indigo-50 text-indigo-600 font-black' : 'text-slate-600 font-bold hover:bg-gray-50'}`}
+                                            >
+                                                {option.label}
+                                                {selectedDateRange === key && <CheckCircle className="w-2.5 h-2.5 text-indigo-600" />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="p-3 space-y-1.5">
+                        {upcomingFollowUps.length > 0 ? (
+                            upcomingFollowUps.map((lead) => (
+                                <div
+                                    key={lead.id}
+                                    onClick={() => navigate('/leads', { state: { leadId: lead.id } })}
+                                    className="p-2.5 bg-gray-50/50 rounded-xl border border-transparent hover:border-blue-100 hover:bg-white transition-all cursor-pointer group/item flex justify-between items-center"
+                                >
+                                    <div className="flex flex-col gap-0.5 max-w-[70%]">
+                                        <h4 className="text-[11px] font-black text-slate-900 truncate group-hover/item:text-blue-600">{lead.name}</h4>
+                                        <p className="text-[9px] text-slate-500 font-medium line-clamp-1">{lead.next_action_notes || 'Revisar contacto'}</p>
+                                    </div>
+                                    <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-lg border border-blue-100 min-w-[35px] text-center">
+                                        {(() => {
+                                            try {
+                                                const dateObj = new Date(lead.next_followup_date);
+                                                return format(dateObj, 'dd MMM', { locale: es });
+                                            } catch (e) { return 'N/A'; }
+                                        })()}
+                                    </span>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center py-20 opacity-30">
+                                <CheckCircle className="w-8 h-8 mb-2 text-emerald-500" />
+                                <p className="text-[10px] font-black uppercase tracking-[0.1em]">Al día</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className={`lg:col-span-4 bg-white rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'conversions' ? 'z-[50]' : 'z-0'}`}>
+                    <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-white">
+                        <div className="flex flex-col">
+                            <h3 className="text-[11px] font-black text-emerald-700 uppercase tracking-[0.2em] flex items-center gap-2">
+                                <TrendingUp className="w-3 h-3" /> Conversiones
+                            </h3>
+                            <p className="text-[10px] text-emerald-600/60 font-medium mt-0.5">Últimos cierres</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[8px] font-black tracking-widest uppercase">Winning</div>
+                            <div className="relative" ref={activeCardFilter === 'conversions' ? cardFilterRef : null}>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveCardFilter(activeCardFilter === 'conversions' ? null : 'conversions');
+                                    }}
+                                    className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'conversions' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                >
+                                    <Settings className="w-3.5 h-3.5" />
+                                </button>
+                                {activeCardFilter === 'conversions' && (
+                                    <div className="absolute right-0 top-full mt-2 w-44 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-[51] py-2 animate-in fade-in slide-in-from-top-2 overflow-hidden">
+                                        {(Object.entries(DATE_RANGE_OPTIONS) as [DateRange, { label: string }][]).map(([key, option]) => (
+                                            <button
+                                                key={key}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedDateRange(key);
+                                                    setActiveCardFilter(null);
+                                                }}
+                                                className={`w-full text-left px-3 py-1.5 text-[10px] transition-colors flex items-center justify-between ${selectedDateRange === key ? 'bg-indigo-50 text-indigo-600 font-black' : 'text-slate-600 font-bold hover:bg-gray-50'}`}
+                                            >
+                                                {option.label}
+                                                {selectedDateRange === key && <CheckCircle className="w-2.5 h-2.5 text-indigo-600" />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="p-3 space-y-1.5">
+                        {recentConversions.length > 0 ? (
+                            recentConversions.map((lead) => (
+                                <div
+                                    key={lead.id}
+                                    onClick={() => navigate('/leads', { state: { leadId: lead.id } })}
+                                    className="p-2.5 bg-gray-50/50 rounded-xl border border-transparent hover:border-emerald-100 hover:bg-white transition-all cursor-pointer group/item flex justify-between items-center"
+                                >
+                                    <div className="flex flex-col gap-0.5 max-w-[60%]">
+                                        <h4 className="text-[11px] font-black text-slate-900 truncate group-hover/item:text-emerald-600">{lead.name}</h4>
+                                        <p className="text-[9px] text-slate-400 font-black uppercase tracking-tighter truncate">{lead.company_name || 'Particular'}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-[11px] font-black text-emerald-600 font-mono">${(lead.closing_amount || lead.value || 0).toLocaleString()}</p>
+                                        <p className="text-[8px] text-slate-300 font-black uppercase tracking-widest">Cerrado</p>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center py-20 opacity-30">
+                                <Target className="w-8 h-8 mb-2 text-indigo-400" />
+                                <p className="text-[10px] font-black uppercase tracking-[0.1em]">En busca del cierre</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Row 3: Lost Leads Analysis */}
+                <div className="lg:col-span-12 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* Lost by Stage */}
+                    <div className={`bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'lostByStage' ? 'z-[50]' : 'z-0'}`}>
+                        <div className="flex justify-between items-start mb-4">
+                            <div className="flex flex-col">
+                                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Leads Perdidos por Etapa</h3>
+                                <p className="text-[10px] text-gray-400 font-medium mt-0.5">Dónde se están perdiendo las oportunidades</p>
+                            </div>
+                            <div className="relative" ref={activeCardFilter === 'lostByStage' ? cardFilterRef : null}>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveCardFilter(activeCardFilter === 'lostByStage' ? null : 'lostByStage');
+                                    }}
+                                    className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'lostByStage' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                >
+                                    <Settings className="w-3.5 h-3.5" />
+                                </button>
+                                {activeCardFilter === 'lostByStage' && (
+                                    <div className="absolute right-0 top-full mt-2 w-44 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-[51] py-2 animate-in fade-in slide-in-from-top-2 overflow-hidden">
+                                        {(Object.entries(DATE_RANGE_OPTIONS) as [DateRange, { label: string }][]).map(([key, option]) => (
+                                            <button
+                                                key={key}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setSelectedDateRange(key);
+                                                    setActiveCardFilter(null);
+                                                }}
+                                                className={`w-full text-left px-3 py-1.5 text-[10px] transition-colors flex items-center justify-between ${selectedDateRange === key ? 'bg-indigo-50 text-indigo-600 font-black' : 'text-slate-600 font-bold hover:bg-gray-50'}`}
+                                            >
+                                                {option.label}
+                                                {selectedDateRange === key && <CheckCircle className="w-2.5 h-2.5 text-indigo-600" />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex-grow flex flex-col gap-2">
+                            {(() => {
+                                const stageLossData = lossStageData.map((s, idx) => ({
+                                    stage: s.stage_name,
+                                    count: s.loss_count,
+                                    color: ['bg-blue-500', 'bg-indigo-500', 'bg-teal-500', 'bg-yellow-500', 'bg-red-500'][idx % 5]
+                                }));
+
+                                const totalLost = stageLossData.reduce((sum, s) => sum + s.count, 0);
+
+                                return totalLost > 0 ? (
+                                    stageLossData.map((item, index) => (
+                                        <div
+                                            key={index}
+                                            className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-all cursor-pointer"
+                                            onClick={() => navigate('/leads', { state: { status: 'Perdido' } })}
+                                        >
+                                            <div className={`w-3 h-3 rounded-full ${item.color} shadow-sm`} />
+                                            <div className="flex-1">
+                                                <p className="text-xs font-black text-slate-700">{item.stage}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-sm font-black text-red-600">{item.count}</p>
+                                                <p className="text-[8px] font-black text-slate-300 uppercase">Perdidos</p>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="h-full flex flex-col items-center justify-center py-12 opacity-30">
+                                        <CheckCircle className="w-10 h-10 mb-2 text-green-400" />
+                                        <p className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">Sin pérdidas registradas</p>
+                                        <p className="text-[9px] font-medium text-slate-300 mt-1">¡Excelente trabajo!</p>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-3xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 overflow-hidden flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500">
-                        <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-white">
-                            <div className="flex flex-col">
-                                <h3 className="text-[12px] font-black text-emerald-700 uppercase tracking-[0.2em] flex items-center gap-2">
-                                    <TrendingUp className="w-4 h-4" /> Conversiones Recientes
-                                </h3>
-                                <p className="text-[11px] text-emerald-600/60 font-medium mt-0.5">Últimos cierres exitosos</p>
-                            </div>
-                            <div className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[9px] font-black tracking-widest">WINNING</div>
+                    {/* Lost by Reason */}
+                    <div className="bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500">
+                        <div className="flex flex-col mb-4">
+                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Motivos de Pérdida</h3>
+                            <p className="text-[10px] text-gray-400 font-medium mt-0.5">Por qué se están perdiendo</p>
                         </div>
-                        <div className="p-6 space-y-3">
-                            {recentConversions.length > 0 ? (
-                                recentConversions.map((lead) => (
-                                    <div key={lead.id} className="p-5 bg-gray-50/50 rounded-2xl border border-transparent hover:border-emerald-100 hover:bg-white transition-all group/item">
-                                        <div className="flex justify-between items-center">
-                                            <div>
-                                                <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight">{lead.name}</h4>
-                                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">{lead.company_name || 'Particular'}</p>
+                        <div className="flex-grow flex flex-col gap-2">
+                            {(() => {
+                                const reasonData = lossReasonData.map(r => ({
+                                    reason: r.reason_name,
+                                    count: r.loss_count,
+                                    percentage: Math.round(r.percentage)
+                                }));
+
+                                const totalReasonsCount = reasonData.reduce((sum, r) => sum + r.count, 0);
+
+                                return totalReasonsCount > 0 ? (
+                                    reasonData.filter(r => r.count > 0).map((item, index) => (
+                                        <div key={index} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-all">
+                                            <div className="flex-1">
+                                                <p className="text-xs font-black text-slate-700">{item.reason}</p>
+                                                <div className="mt-1 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                                    <div
+                                                        className="bg-red-500 h-full rounded-full transition-all duration-500"
+                                                        style={{ width: `${item.percentage}%` }}
+                                                    />
+                                                </div>
                                             </div>
                                             <div className="text-right">
-                                                <p className="text-base font-black text-emerald-600 tracking-tighter">${(lead.closing_amount || lead.value || 0).toLocaleString()}</p>
-                                                <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Monto Cerrado</p>
+                                                <p className="text-sm font-black text-red-600">{item.count}</p>
+                                                <p className="text-[8px] font-black text-slate-300 uppercase">{item.percentage}%</p>
                                             </div>
                                         </div>
+                                    ))
+                                ) : (
+                                    <div className="h-full flex flex-col items-center justify-center py-12 opacity-30">
+                                        <CheckCircle className="w-10 h-10 mb-2 text-green-400" />
+                                        <p className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">Sin pérdidas registradas</p>
+                                        <p className="text-[9px] font-medium text-slate-300 mt-1">¡Sigue así!</p>
                                     </div>
-                                ))
-                            ) : (
-                                <div className="h-full flex flex-col items-center justify-center py-20 opacity-30">
-                                    <Target className="w-10 h-10 mb-4 text-indigo-400" />
-                                    <p className="text-[11px] font-black uppercase tracking-[0.2em]">En busca del próximo cierre</p>
-                                </div>
-                            )}
+                                );
+                            })()}
                         </div>
                     </div>
                 </div>

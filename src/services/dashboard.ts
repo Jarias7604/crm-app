@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { logger } from '../utils/logger';
 import { getCurrentUserCompanyId } from '../utils/auth';
+import { lossStatisticsService } from './lossStatistics';
 
 /**
  * Optimized Dashboard Service
@@ -57,6 +58,15 @@ export const dashboardService = {
                 .order('value', { ascending: false })
                 .limit(5);
 
+            // 5. Fetch Loss Analytics
+            const startD = startDate ? new Date(startDate) : undefined;
+            const endD = endDate ? new Date(endDate) : undefined;
+
+            const [lossReasons, lossStages] = await Promise.all([
+                lossStatisticsService.getLossStatistics(startD, endD),
+                lossStatisticsService.getLossStageStatistics(startD, endD)
+            ]);
+
             logger.timeEnd('getDashboardStats');
 
             if (error) {
@@ -81,7 +91,9 @@ export const dashboardService = {
                 byPriority: data?.byPriority || [],
                 topOpportunities: topOpportunitiesManual || [],
                 upcomingFollowUps: upcomingFollowUps || [],
-                recentConversions: recentConversions || []
+                recentConversions: recentConversions || [],
+                lossReasons: lossReasons || [],
+                lossStages: lossStages || []
             };
         } catch (error) {
             logger.error('Unhandled error in getDashboardStats', error, {

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthProvider';
-import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft, Zap, Search, Bot } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft, Zap, Search, Bot, XCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { brandingService } from '../services/branding';
@@ -21,8 +21,10 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         current: boolean;
         subItems?: { name: string; href: string; icon: any }[];
     }
-    const configPaths = ['/company/branding', '/pricing', '/paquetes', '/items', '/financial-rules'];
+    const configPaths = ['/company/branding', '/pricing', '/paquetes', '/items', '/financial-rules', '/loss-reasons'];
+    const marketingPaths = ['/marketing', '/marketing/email', '/marketing/lead-hunter', '/marketing/ai-agents', '/marketing/settings'];
     const [configOpen, setConfigOpen] = useState(configPaths.some(path => location.pathname === path));
+    const [marketingOpen, setMarketingOpen] = useState(marketingPaths.some(path => location.pathname.startsWith(path) && !location.pathname.startsWith('/marketing/chat')));
     const [company, setCompany] = useState<Company | null>(null);
 
     useEffect(() => {
@@ -151,6 +153,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         { name: 'Gestión Paquete', href: '/paquetes', icon: Package, current: location.pathname === '/paquetes', permissionKey: 'paquetes' },
         { name: 'Gestión Item', href: '/items', icon: Layers, current: location.pathname === '/items', permissionKey: 'items' },
         { name: 'Gestión Financiera', href: '/financial-rules', icon: CreditCard, current: location.pathname === '/financial-rules', permissionKey: 'financial_rules' },
+        { name: 'Motivos de Pérdida', href: '/loss-reasons', icon: XCircle, current: location.pathname === '/loss-reasons', permissionKey: 'loss_reasons' },
     ];
 
     const configSubItems = configSubItemsRaw.filter(item => {
@@ -307,10 +310,11 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                         <div key={item.name} className="space-y-1">
                             {item.subItems && !isCollapsed ? (
                                 <>
-                                    <div
+                                    <button
+                                        onClick={() => setMarketingOpen(!marketingOpen)}
                                         className={cn(
                                             item.current ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40' : 'text-gray-400 hover:bg-[#1e293b] hover:text-white',
-                                            'group flex items-center justify-between rounded-xl transition-all duration-200 focus:outline-none p-3 px-4'
+                                            'group flex items-center justify-between w-full rounded-xl transition-all duration-200 focus:outline-none p-3 px-4'
                                         )}
                                     >
                                         <div className="flex items-center">
@@ -320,25 +324,28 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                                             )} aria-hidden="true" />
                                             <span className="text-sm font-semibold tracking-wide truncate">{item.name}</span>
                                         </div>
-                                    </div>
-                                    <div className="ml-4 pl-4 border-l border-gray-800/50 pt-1 space-y-1">
-                                        {item.subItems.map((sub) => (
-                                            <Link
-                                                key={sub.name}
-                                                to={sub.href}
-                                                className={cn(
-                                                    location.pathname === sub.href ? 'text-blue-400 bg-blue-500/5' : 'text-gray-500 hover:text-gray-300 hover:bg-[#1e293b]/50',
-                                                    'group flex items-center rounded-lg transition-all duration-200 px-3 py-2 text-xs font-bold'
-                                                )}
-                                            >
-                                                <sub.icon className={cn(
-                                                    location.pathname === sub.href ? 'text-blue-400' : 'text-gray-600 group-hover:text-gray-300',
-                                                    "h-4 w-4 mr-3"
-                                                )} />
-                                                <span className="truncate">{sub.name}</span>
-                                            </Link>
-                                        ))}
-                                    </div>
+                                        {marketingOpen ? <ChevronDown className="h-4 w-4 opacity-50" /> : <ChevronRight className="h-4 w-4 opacity-50" />}
+                                    </button>
+                                    {marketingOpen && (
+                                        <div className="ml-4 pl-4 border-l border-gray-800/50 pt-1 space-y-1">
+                                            {item.subItems.map((sub) => (
+                                                <Link
+                                                    key={sub.name}
+                                                    to={sub.href}
+                                                    className={cn(
+                                                        location.pathname === sub.href ? 'text-blue-400 bg-blue-500/5' : 'text-gray-500 hover:text-gray-300 hover:bg-[#1e293b]/50',
+                                                        'group flex items-center rounded-lg transition-all duration-200 px-3 py-2 text-xs font-bold'
+                                                    )}
+                                                >
+                                                    <sub.icon className={cn(
+                                                        location.pathname === sub.href ? 'text-blue-400' : 'text-gray-600 group-hover:text-gray-300',
+                                                        "h-4 w-4 mr-3"
+                                                    )} />
+                                                    <span className="truncate">{sub.name}</span>
+                                                </Link>
+                                            ))}
+                                        </div>
+                                    )}
                                 </>
                             ) : (
                                 <Link

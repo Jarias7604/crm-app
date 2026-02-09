@@ -32,26 +32,40 @@ export const leadsService = {
 
     // Get lead statistics for Dashboard - Optimized selection
     async getLeadStats(startDate?: string, endDate?: string) {
-        let query = supabase
-            .from('leads')
-            .select('status, value, created_at');
+        try {
+            // First, get leads created in range
+            let createdQuery = supabase.from('leads').select('id, value, created_at');
+            if (startDate) createdQuery = createdQuery.gte('created_at', startDate);
+            if (endDate) createdQuery = createdQuery.lte('created_at', endDate);
 
-        if (startDate) query = query.gte('created_at', startDate);
-        if (endDate) query = query.lte('created_at', endDate);
+            const { data: createdLeads, error: createdError } = await createdQuery;
+            if (createdError) throw createdError;
 
-        const { data: leads, error } = await query;
+            // Second, get leads WON in range (using internal_won_date)
+            let wonQuery = supabase.from('leads').select('id, status, value, closing_amount, internal_won_date')
+                .or('status.eq.Cerrado,status.eq.Cliente');
 
-        if (error) throw error;
+            if (startDate) wonQuery = wonQuery.gte('internal_won_date', startDate);
+            if (endDate) wonQuery = wonQuery.lte('internal_won_date', endDate);
 
-        const totalLeads = leads?.length || 0;
-        const wonDeals = leads?.filter(l => l.status === 'Cerrado' || l.status === 'Cliente').length || 0;
+            const { data: wonLeads, error: wonError } = await wonQuery;
+            if (wonError) throw wonError;
 
-        return {
-            totalLeads,
-            totalPipeline: leads?.reduce((sum, l) => sum + (l.value || 0), 0) || 0,
-            wonDeals,
-            conversionRate: totalLeads > 0 ? Math.round((wonDeals / totalLeads) * 100) : 0,
-        };
+            const totalLeads = createdLeads?.length || 0;
+            const wonDealsCount = wonLeads?.length || 0;
+            const totalWonAmount = wonLeads?.reduce((sum, l) => sum + (l.closing_amount || l.value || 0), 0) || 0;
+
+            return {
+                totalLeads,
+                totalPipeline: createdLeads?.reduce((sum, l) => sum + (l.value || 0), 0) || 0,
+                wonDeals: wonDealsCount,
+                totalWonAmount,
+                conversionRate: totalLeads > 0 ? Math.round((wonDealsCount / totalLeads) * 100) : 0,
+            };
+        } catch (err) {
+            logger.error('Error in getLeadStats', err);
+            throw err;
+        }
     },
 
     // Get leads grouped by status for funnel chart
