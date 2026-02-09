@@ -54,28 +54,33 @@ export const dashboardService = {
                 .limit(5);
 
             // 3. Fetch recent conversions within the selected period
+            // IMPORTANT: We filter by internal_won_date to match the KPI logic
             let conversionsQuery = supabase
                 .from('leads')
-                .select('id, name, company_name, value, closing_amount, created_at')
+                .select('id, name, company_name, value, closing_amount, created_at, internal_won_date')
                 .eq('company_id', finalCompanyId)
                 .in('status', ['Cerrado', 'Cliente']);
 
-            if (startDate) conversionsQuery = conversionsQuery.gte('created_at', startDate);
-            if (endDate) conversionsQuery = conversionsQuery.lte('created_at', endDate);
+            if (startDate) conversionsQuery = conversionsQuery.gte('internal_won_date', startDate);
+            if (endDate) conversionsQuery = conversionsQuery.lte('internal_won_date', endDate);
 
             const { data: recentConversions } = await conversionsQuery
-                .order('created_at', { ascending: false })
+                .order('internal_won_date', { ascending: false })
                 .limit(5);
 
             // 4. Fetch top opportunities within the selected period
+            // For general opportunities, we still use created_at, but we include won ones that happened in this period
             let opportunitiesQuery = supabase
                 .from('leads')
-                .select('id, name, company_name, value, status, priority, source, created_at')
+                .select('id, name, company_name, value, status, priority, source, created_at, internal_won_date')
                 .eq('company_id', finalCompanyId)
                 .gt('value', 0);
 
-            if (startDate) opportunitiesQuery = opportunitiesQuery.gte('created_at', startDate);
-            if (endDate) opportunitiesQuery = opportunitiesQuery.lte('created_at', endDate);
+            if (startDate && endDate) {
+                // Return leads created in the period OR won in the period
+                opportunitiesQuery = opportunitiesQuery.or(`created_at.gte.${startDate},and(status.in.("Cerrado","Cliente"),internal_won_date.gte.${startDate})`);
+                opportunitiesQuery = opportunitiesQuery.or(`created_at.lte.${endDate},and(status.in.("Cerrado","Cliente"),internal_won_date.lte.${endDate})`);
+            }
 
             const { data: topOpportunitiesManual } = await opportunitiesQuery
                 .order('value', { ascending: false })
