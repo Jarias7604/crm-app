@@ -9,6 +9,7 @@ import { createPortal } from 'react-dom';
 import { useAuth } from '../../auth/AuthProvider';
 import { storageService } from '../../services/storage';
 import Switch from '../../components/ui/Switch';
+import { CustomDatePicker } from '../../components/ui/CustomDatePicker';
 
 type TabType = 'general' | 'security';
 
@@ -451,7 +452,12 @@ export default function Team() {
                                         <div className="space-y-6">
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] pl-1">Fecha de Nacimiento</label>
-                                                <Input type="date" value={editingMember.birth_date || ''} onChange={e => setEditingMember({ ...editingMember, birth_date: e.target.value })} className="h-14 rounded-xl shadow-inner bg-gray-50/50" />
+                                                <CustomDatePicker
+                                                    value={editingMember.birth_date || ''}
+                                                    onChange={date => setEditingMember({ ...editingMember, birth_date: date })}
+                                                    variant="light"
+                                                    className="w-full"
+                                                />
                                             </div>
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] pl-1">Dirección Física</label>

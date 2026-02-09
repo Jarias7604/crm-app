@@ -2091,11 +2091,10 @@ export default function Leads() {
                                     <label className="text-xs font-black text-gray-700 uppercase tracking-wider block">
                                         Fecha de Cierre <span className="text-indigo-500">*</span>
                                     </label>
-                                    <input
-                                        type="date"
+                                    <CustomDatePicker
                                         value={wonData.won_date}
-                                        onChange={(e) => setWonData({ ...wonData, won_date: e.target.value })}
-                                        className="w-full rounded-xl border-gray-200 shadow-sm text-sm font-bold text-gray-700 bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all p-3"
+                                        onChange={(date) => setWonData({ ...wonData, won_date: date })}
+                                        variant="light"
                                     />
                                     <p className="text-[10px] text-gray-400 font-medium italic">
                                         Esta fecha se utilizará para tus reportes de ventas y desempeño.
