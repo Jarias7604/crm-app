@@ -138,6 +138,50 @@ export default function Dashboard() {
         setRefreshKey(Date.now());
     }, [location.pathname]);
 
+    // Calculate date range labels for the UI
+    const getDateRangeLabelDisplay = (range: DateRange) => {
+        const now = new Date();
+        let start: Date | null = null;
+        let end: Date | null = null;
+
+        switch (range) {
+            case 'today':
+                start = startOfToday();
+                end = endOfToday();
+                break;
+            case 'this_week':
+                start = startOfWeek(now, { weekStartsOn: 0 });
+                end = endOfWeek(now, { weekStartsOn: 0 });
+                break;
+            case 'this_month':
+                start = startOfMonth(now);
+                end = endOfToday();
+                break;
+            case 'last_3_months':
+                start = startOfMonth(subMonths(now, 2));
+                end = endOfToday();
+                break;
+            case 'last_6_months':
+                start = startOfMonth(subMonths(now, 5));
+                end = endOfToday();
+                break;
+            case 'this_year':
+                start = startOfYear(now);
+                end = endOfToday();
+                break;
+            default:
+                return '';
+        }
+
+        if (start && end) {
+            if (range === 'today') {
+                return `(${format(start, 'dd/MM')})`;
+            }
+            return `(${format(start, 'dd/MM')} - ${format(end, 'dd/MM')})`;
+        }
+        return '';
+    };
+
     // Calculate date range based on selected filter
     const dateRange = useMemo(() => {
         const now = new Date();
@@ -358,12 +402,15 @@ export default function Dashboard() {
                                 setSelectedDateRange(key);
                                 setIsFilterOpen(false);
                             }}
-                            className={`w-full text-left px-4 py-3 text-sm transition-colors flex items-center justify-between ${selectedDateRange === key
-                                ? 'bg-blue-50 text-[#007BFF] font-bold'
-                                : 'text-gray-600 hover:bg-gray-50'
+                            className={`w-full text-left px-4 py-3 text-[11px] transition-colors flex items-center justify-between ${selectedDateRange === key
+                                ? 'bg-blue-50 text-[#007BFF] font-black'
+                                : 'text-slate-600 font-bold hover:bg-gray-50'
                                 }`}
                         >
-                            {option.label}
+                            <span className="flex items-center gap-2">
+                                {option.label}
+                                <span className="text-[10px] opacity-40 font-medium">{getDateRangeLabelDisplay(key)}</span>
+                            </span>
                             {selectedDateRange === key && <CheckCircle className="w-4 h-4" />}
                         </button>
                     ))}
@@ -592,7 +639,10 @@ export default function Dashboard() {
                                                         : 'text-slate-600 font-bold hover:bg-gray-50'
                                                         }`}
                                                 >
-                                                    {option.label}
+                                                    <span className="flex items-center gap-1.5">
+                                                        {option.label}
+                                                        <span className="text-[9px] opacity-30 font-medium">{getDateRangeLabelDisplay(key)}</span>
+                                                    </span>
                                                     {selectedDateRange === key && <CheckCircle className="w-3 h-3 text-indigo-600" />}
                                                 </button>
                                             ))}
@@ -1054,9 +1104,12 @@ export default function Dashboard() {
                                                     setSelectedDateRange(key);
                                                     setActiveCardFilter(null);
                                                 }}
-                                                className={`w-full text-left px-3 py-1.5 text-[10px] transition-colors flex items-center justify-between ${selectedDateRange === key ? 'bg-indigo-50 text-indigo-600 font-black' : 'text-slate-600 font-bold hover:bg-gray-50'}`}
+                                                className={`w-full text-left px-4 py-2 text-[10px] transition-colors flex items-center justify-between ${selectedDateRange === key ? 'bg-indigo-50 text-indigo-600 font-black' : 'text-slate-600 font-bold hover:bg-gray-50'}`}
                                             >
-                                                {option.label}
+                                                <span className="flex items-center gap-1.5">
+                                                    {option.label}
+                                                    <span className="text-[9px] opacity-30 font-medium">{getDateRangeLabelDisplay(key)}</span>
+                                                </span>
                                                 {selectedDateRange === key && <CheckCircle className="w-2.5 h-2.5 text-indigo-600" />}
                                             </button>
                                         ))}
