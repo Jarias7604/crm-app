@@ -393,7 +393,7 @@ export default function Team() {
             {/* Premium Tabbed Edit Modal - Master Design */}
             {editingMember && createPortal(
                 <div className="fixed inset-0 min-h-screen w-screen bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
-                    <div className="bg-white rounded-[3rem] shadow-2xl max-w-5xl w-full flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+                    <div className="bg-white rounded-[3rem] shadow-2xl max-w-5xl w-full flex flex-col animate-in zoom-in-95 duration-200">
 
                         <div className="px-12 py-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                             <div className="flex items-center gap-6">

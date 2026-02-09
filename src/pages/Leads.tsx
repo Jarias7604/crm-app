@@ -2045,7 +2045,7 @@ export default function Leads() {
                 <div className="fixed inset-0 z-[10000] overflow-y-auto">
                     <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
                         <div className="fixed inset-0 transition-opacity bg-black/50" onClick={() => setIsWonModalOpen(false)} />
-                        <div className="inline-block align-bottom bg-white rounded-3xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative z-10">
+                        <div className="inline-block align-bottom bg-white rounded-3xl text-left shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full relative z-10">
                             <div className={`bg-gradient-to-br ${pendingWonStatus === 'Cerrado' ? 'from-indigo-50 to-purple-50 border-purple-100' : 'from-indigo-50 to-green-50 border-green-100'} px-6 py-5 border-b`}>
                                 <div className="flex items-center gap-3">
                                     <div className={`w-12 h-12 ${pendingWonStatus === 'Cerrado' ? 'bg-purple-600' : 'bg-indigo-600'} rounded-2xl flex items-center justify-center shadow-lg transition-colors`}>
