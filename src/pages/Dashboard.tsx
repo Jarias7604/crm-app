@@ -536,7 +536,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {[
                     { name: t('dashboard.crm.totalPipeline'), value: `$${stats.totalPipeline.toLocaleString()}`, icon: BadgeDollarSign, color: 'text-indigo-600', bg: 'bg-indigo-50/50', trend: '+12.5%', onClick: () => navigate('/cotizaciones') },
-                    { name: t('dashboard.crm.totalLeads'), value: stats.totalLeads, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50/50', trend: '+5.2%', onClick: () => navigate('/leads') },
+                    { name: t('dashboard.crm.totalLeads'), value: stats.totalLeads, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50/50', trend: '+5.2%', onClick: () => navigate('/leads', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } }) },
                     {
                         name: t('dashboard.crm.wonDeals'),
                         value: stats.wonDeals,
@@ -545,9 +545,9 @@ export default function Dashboard() {
                         color: 'text-emerald-600',
                         bg: 'bg-emerald-50/50',
                         trend: '+8.1%',
-                        onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'] } })
+                        onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'], startDate: dateRange.startDate, endDate: dateRange.endDate } })
                     },
-                    { name: t('dashboard.crm.conversionRate'), value: `${stats.conversionRate}%`, icon: TrendingUp, color: 'text-amber-600', bg: 'bg-amber-50/50', trend: '+2.4%', onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'] } }) },
+                    { name: t('dashboard.crm.conversionRate'), value: `${stats.conversionRate}%`, icon: TrendingUp, color: 'text-amber-600', bg: 'bg-amber-50/50', trend: '+2.4%', onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'], startDate: dateRange.startDate, endDate: dateRange.endDate } }) },
                 ].map((item) => (
                     <div
                         key={item.name}
@@ -657,7 +657,7 @@ export default function Dashboard() {
                     <div className="flex-grow flex items-center justify-center">
                         <FunnelInfographic
                             data={funnelData}
-                            onStageClick={(status) => navigate('/leads', { state: { status } })}
+                            onStageClick={(status) => navigate('/leads', { state: { status, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
                         />
                     </div>
                 </div>
@@ -803,7 +803,7 @@ export default function Dashboard() {
                             {sourceData.slice(0, 4).map((entry, index) => (
                                 <div
                                     key={index}
-                                    onClick={() => navigate('/leads', { state: { source: entry.key } })}
+                                    onClick={() => navigate('/leads', { state: { source: entry.key, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
                                     className="flex items-start gap-2.5 group/item cursor-pointer hover:bg-slate-50 p-1 rounded-lg transition-all"
                                 >
                                     <div
@@ -828,7 +828,7 @@ export default function Dashboard() {
                             <p className="text-[10px] text-gray-400 font-medium mt-0.5">Mayores contratos</p>
                         </div>
                         <div className="flex items-center gap-2">
-                            <button onClick={() => navigate('/leads')} className="text-[9px] font-black text-slate-400 hover:text-indigo-600 uppercase tracking-[0.2em] transition-all">Ver</button>
+                            <button onClick={() => navigate('/leads', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } })} className="text-[9px] font-black text-slate-400 hover:text-indigo-600 uppercase tracking-[0.2em] transition-all">Ver</button>
                             <div className="relative" ref={activeCardFilter === 'topOpp' ? cardFilterRef : null}>
                                 <button
                                     onClick={(e) => {
@@ -1079,7 +1079,7 @@ export default function Dashboard() {
                                         <div
                                             key={index}
                                             className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-all cursor-pointer"
-                                            onClick={() => navigate('/leads', { state: { status: 'Perdido' } })}
+                                            onClick={() => navigate('/leads', { state: { status: 'Perdido', startDate: dateRange.startDate, endDate: dateRange.endDate } })}
                                         >
                                             <div className={`w-3 h-3 rounded-full ${item.color} shadow-sm`} />
                                             <div className="flex-1">

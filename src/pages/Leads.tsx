@@ -108,6 +108,8 @@ export default function Leads() {
     const [isAssignedFilterOpen, setIsAssignedFilterOpen] = useState(false);
     const assignedFilterRef = useRef<HTMLDivElement>(null);
     const [filteredLeadIds, setFilteredLeadIds] = useState<string[] | null>(null);
+    const [startDateFilter, setStartDateFilter] = useState<string | null>(null);
+    const [endDateFilter, setEndDateFilter] = useState<string | null>(null);
 
     const [isUploading, setIsUploading] = useState(false);
     const location = useLocation();
@@ -144,6 +146,8 @@ export default function Leads() {
                     setFilteredLeadIds(state.leadIds);
                     if (viewMode === 'kanban') setViewMode('list');
                 }
+                if (state.startDate) setStartDateFilter(state.startDate);
+                if (state.endDate) setEndDateFilter(state.endDate);
                 if (state.leadId) {
                     setFilteredLeadId(state.leadId);
                     if (viewMode === 'kanban') setViewMode('list');
@@ -325,9 +329,17 @@ export default function Leads() {
             // Filter by loss stage
             if (lostAtStageFilter !== 'all' && lead.lost_at_stage !== lostAtStageFilter) return false;
 
+            // Filter by date range (if provided from dashboard)
+            if (startDateFilter) {
+                if (new Date(lead.created_at) < new Date(startDateFilter)) return false;
+            }
+            if (endDateFilter) {
+                if (new Date(lead.created_at) > new Date(endDateFilter)) return false;
+            }
+
             return true;
         });
-    }, [leads, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, filteredLeadId, filteredLeadIds, searchTerm]);
+    }, [leads, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter]);
 
     const sortedLeads = useMemo(() => {
         if (!sortConfig) return filteredLeads;
@@ -962,7 +974,7 @@ export default function Leads() {
                     </div>
 
                     {/* Active filters display */}
-                    {(filteredLeadId || filteredLeadIds || statusFilter !== 'all' || priorityFilter !== 'all' || assignedFilter !== 'all' || sourceFilter !== 'all' || lossReasonFilter !== 'all' || lostAtStageFilter !== 'all') && (
+                    {(filteredLeadId || filteredLeadIds || statusFilter !== 'all' || priorityFilter !== 'all' || assignedFilter !== 'all' || sourceFilter !== 'all' || lossReasonFilter !== 'all' || lostAtStageFilter !== 'all' || startDateFilter || endDateFilter) && (
                         <div className="flex items-center gap-2 animate-in fade-in slide-in-from-top-2 w-full mb-2">
                             <div className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border border-indigo-100 flex-wrap">
                                 <Filter className="w-3.5 h-3.5" />
@@ -973,6 +985,8 @@ export default function Leads() {
                                 {assignedFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Asignado: {assignedFilter === 'unassigned' ? 'Sin asignar' : teamMembers.find(m => m.id === assignedFilter)?.full_name || 'Agente'}</span>}
                                 {lossReasonFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Motivo: {lossReasons.find(r => r.id === lossReasonFilter)?.reason || 'Motivo'}</span>}
                                 {lostAtStageFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Etapa: {STATUS_CONFIG[lostAtStageFilter as LeadStatus]?.label || lostAtStageFilter}</span>}
+                                {startDateFilter && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Desde: {format(new Date(startDateFilter), 'dd/MM/yyyy')}</span>}
+                                {endDateFilter && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Hasta: {format(new Date(endDateFilter), 'dd/MM/yyyy')}</span>}
                                 <button
                                     onClick={() => {
                                         setFilteredLeadId(null);
@@ -983,6 +997,8 @@ export default function Leads() {
                                         setSourceFilter('all');
                                         setLossReasonFilter('all');
                                         setLostAtStageFilter('all');
+                                        setStartDateFilter(null);
+                                        setEndDateFilter(null);
                                     }}
                                     className="bg-white/50 hover:bg-white p-0.5 rounded-md transition-colors ml-1"
                                 >
