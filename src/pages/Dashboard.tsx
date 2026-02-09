@@ -278,7 +278,8 @@ export default function Dashboard() {
         }
     };
 
-    if (isDashboardLoading) {
+    // Only show full page loader on initial load (when no data exists yet)
+    if (isDashboardLoading && !dashboardData) {
         return (
             <div className="flex h-[60vh] items-center justify-center">
                 <div className="flex flex-col items-center gap-6">
@@ -544,9 +545,9 @@ export default function Dashboard() {
                         color: 'text-emerald-600',
                         bg: 'bg-emerald-50/50',
                         trend: '+8.1%',
-                        onClick: () => navigate('/leads', { state: { status: 'Cliente' } })
+                        onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'] } })
                     },
-                    { name: t('dashboard.crm.conversionRate'), value: `${stats.conversionRate}%`, icon: TrendingUp, color: 'text-amber-600', bg: 'bg-amber-50/50', trend: '+2.4%', onClick: () => navigate('/leads', { state: { status: 'Cliente' } }) },
+                    { name: t('dashboard.crm.conversionRate'), value: `${stats.conversionRate}%`, icon: TrendingUp, color: 'text-amber-600', bg: 'bg-amber-50/50', trend: '+2.4%', onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'] } }) },
                 ].map((item) => (
                     <div
                         key={item.name}
@@ -869,7 +870,7 @@ export default function Dashboard() {
                                 <div className="flex flex-col gap-0.5 max-w-[60%]">
                                     <h4 className="text-[11px] font-black text-slate-900 truncate group-hover/item:text-indigo-600">{lead.name}</h4>
                                     <div className="flex items-center gap-1.5 opacity-60">
-                                        <span className="text-[9px] font-bold text-slate-500">{lead.source && SOURCE_CONFIG[lead.source]?.icon}</span>
+                                        {lead.source && <span className="text-[9px] font-bold text-slate-500">{SOURCE_CONFIG[lead.source]?.icon}</span>}
                                         <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter truncate">{lead.company_name || 'Particular'}</span>
                                     </div>
                                 </div>

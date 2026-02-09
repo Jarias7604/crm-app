@@ -100,7 +100,7 @@ export default function Leads() {
     const [searchTerm, setSearchTerm] = useState('');
     const [priorityFilter, setPriorityFilter] = useState<LeadPriority | 'all'>('all');
     const [assignedFilter, setAssignedFilter] = useState<string | 'all'>('all');
-    const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all');
+    const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all' | LeadStatus[]>('all');
     const [sourceFilter, setSourceFilter] = useState<string | 'all'>('all');
     const [lossReasonFilter, setLossReasonFilter] = useState<string | 'all'>('all');
     const [lostAtStageFilter, setLostAtStageFilter] = useState<string | 'all'>('all');
@@ -308,7 +308,13 @@ export default function Leads() {
             }
 
             // Filter by status
-            if (statusFilter !== 'all' && lead.status !== statusFilter) return false;
+            if (statusFilter !== 'all') {
+                if (Array.isArray(statusFilter)) {
+                    if (!statusFilter.includes(lead.status)) return false;
+                } else {
+                    if (lead.status !== statusFilter) return false;
+                }
+            }
 
             // Filter by source
             if (sourceFilter !== 'all' && lead.source !== sourceFilter) return false;
@@ -777,7 +783,7 @@ export default function Leads() {
             >
                 <div className="flex items-center gap-2">
                     <CheckCircle className="h-3.5 w-3.5" />
-                    <span>{statusFilter === 'all' ? 'Todos los Estados' : STATUS_CONFIG[statusFilter as LeadStatus]?.label || statusFilter}</span>
+                    <span>{statusFilter === 'all' ? 'Todos los Estados' : Array.isArray(statusFilter) ? 'Varios Seleccionados' : STATUS_CONFIG[statusFilter as LeadStatus]?.label || statusFilter}</span>
                 </div>
                 <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition-transform duration-300 ${isStatusFilterOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -961,7 +967,7 @@ export default function Leads() {
                             <div className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border border-indigo-100 flex-wrap">
                                 <Filter className="w-3.5 h-3.5" />
                                 Vista filtrada ({filteredLeads.length} resultados)
-                                {statusFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Estado: {statusFilter}</span>}
+                                {statusFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Estado: {Array.isArray(statusFilter) ? statusFilter.join(', ') : statusFilter}</span>}
                                 {priorityFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Prioridad: {(PRIORITY_CONFIG as any)[priorityFilter]?.label || priorityFilter}</span>}
                                 {sourceFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Fuente: {SOURCE_CONFIG[sourceFilter]?.label || sourceFilter}</span>}
                                 {assignedFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Asignado: {assignedFilter === 'unassigned' ? 'Sin asignar' : teamMembers.find(m => m.id === assignedFilter)?.full_name || 'Agente'}</span>}

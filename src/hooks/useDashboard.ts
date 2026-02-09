@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { queryKeys } from '../lib/queryClient';
 import { dashboardService } from '../services/dashboard';
 import { logger } from '../utils/logger';
@@ -17,5 +17,6 @@ export function useDashboardStats(companyId?: string, startDate?: string, endDat
         enabled: !!companyId,
         staleTime: 30 * 1000, // 30 seconds
         gcTime: 5 * 60 * 1000, // 5 minutes
+        placeholderData: keepPreviousData,
     });
 }

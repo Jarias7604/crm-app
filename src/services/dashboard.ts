@@ -30,31 +30,54 @@ export const dashboardService = {
 
             console.log('✅ RPC DASHBOARD RESPONSE:', data);
 
-            // 2. Fetch upcoming follow-ups manually since we can't update the RPC
-            const { data: upcomingFollowUps } = await supabase
+            // 2. Fetch upcoming follow-ups
+            // We show follow-ups that were scheduled or are relevant to the selected period
+            let followUpsQuery = supabase
                 .from('leads')
                 .select('id, name, next_followup_date, next_action_notes, priority')
                 .eq('company_id', finalCompanyId)
-                .not('next_followup_date', 'is', null)
-                .gte('next_followup_date', new Date().toISOString().split('T')[0])
+                .not('next_followup_date', 'is', null);
+
+            if (startDate) {
+                followUpsQuery = followUpsQuery.gte('next_followup_date', startDate);
+            } else {
+                // If no start date, default to today or later for "Upcoming"
+                followUpsQuery = followUpsQuery.gte('next_followup_date', new Date().toISOString().split('T')[0]);
+            }
+
+            if (endDate) {
+                followUpsQuery = followUpsQuery.lte('next_followup_date', endDate);
+            }
+
+            const { data: upcomingFollowUps } = await followUpsQuery
                 .order('next_followup_date', { ascending: true })
                 .limit(5);
 
-            // 3. Fetch recent conversions
-            const { data: recentConversions } = await supabase
+            // 3. Fetch recent conversions within the selected period
+            let conversionsQuery = supabase
                 .from('leads')
                 .select('id, name, company_name, value, closing_amount, created_at')
                 .eq('company_id', finalCompanyId)
-                .in('status', ['Cerrado', 'Cliente'])
+                .in('status', ['Cerrado', 'Cliente']);
+
+            if (startDate) conversionsQuery = conversionsQuery.gte('created_at', startDate);
+            if (endDate) conversionsQuery = conversionsQuery.lte('created_at', endDate);
+
+            const { data: recentConversions } = await conversionsQuery
                 .order('created_at', { ascending: false })
                 .limit(5);
 
-            // 4. Fetch top opportunities with source manually since RPC is missing it
-            const { data: topOpportunitiesManual } = await supabase
+            // 4. Fetch top opportunities within the selected period
+            let opportunitiesQuery = supabase
                 .from('leads')
                 .select('id, name, company_name, value, status, priority, source, created_at')
                 .eq('company_id', finalCompanyId)
-                .gt('value', 0)
+                .gt('value', 0);
+
+            if (startDate) opportunitiesQuery = opportunitiesQuery.gte('created_at', startDate);
+            if (endDate) opportunitiesQuery = opportunitiesQuery.lte('created_at', endDate);
+
+            const { data: topOpportunitiesManual } = await opportunitiesQuery
                 .order('value', { ascending: false })
                 .limit(5);
 
