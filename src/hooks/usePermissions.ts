@@ -1,35 +1,12 @@
 import { useAuth } from '../auth/AuthProvider';
-import { useEffect, useState } from 'react';
-import { permissionsService, type RolePermission } from '../services/permissions';
 
 /**
  * Hook para verificar permisos del usuario actual
- * Super Admin siempre tiene todos los permisos
+ * Utiliza los permisos consolidados ya cargados en el Profile por AuthProvider
+ * (Procesados vía RPC get_user_permissions y bypass de simulación)
  */
 export function usePermissions() {
-    const { profile } = useAuth();
-    const [rolePermissions, setRolePermissions] = useState<RolePermission[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        loadPermissions();
-    }, [profile?.role]);
-
-    const loadPermissions = async () => {
-        if (!profile?.role) {
-            setLoading(false);
-            return;
-        }
-
-        try {
-            const permissions = await permissionsService.getRolePermissions();
-            setRolePermissions(permissions);
-        } catch (error) {
-            console.error('Error loading permissions:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
+    const { profile, loading: authLoading } = useAuth();
 
     /**
      * Verifica si el usuario tiene un permiso específico
@@ -41,12 +18,17 @@ export function usePermissions() {
             return true;
         }
 
-        // Para otros roles, verificar en la base de datos
-        const permission = rolePermissions.find(
-            p => p.role === profile?.role && p.permission_key === permissionKey
-        );
+        if (!profile?.permissions) return false;
 
-        return permission?.is_enabled ?? false;
+        // Verificar el permiso específico en el mapa de permisos consolidados
+        // Se admite tanto el nombre completo como categorías base
+        if (profile.permissions[permissionKey] === true) return true;
+
+        // Lógica de herencia/granularidad (Ej: 'leads' habilita 'leads_view' si no hay restricción)
+        const moduleKey = permissionKey.split(/[._:]/)[0];
+        if (profile.permissions[moduleKey] === true) return true;
+
+        return false;
     };
 
     /**
@@ -56,7 +38,6 @@ export function usePermissions() {
         if (profile?.role === 'super_admin') {
             return true;
         }
-
         return permissionKeys.some(key => hasPermission(key));
     };
 
@@ -67,7 +48,6 @@ export function usePermissions() {
         if (profile?.role === 'super_admin') {
             return true;
         }
-
         return permissionKeys.every(key => hasPermission(key));
     };
 
@@ -99,7 +79,8 @@ export function usePermissions() {
         isSuperAdmin,
         isCompanyAdmin,
         isAdmin,
-        loading,
-        rolePermissions
+        loading: authLoading, // Sincronizado con el estado de carga de Auth
+        profile
     };
 }
+

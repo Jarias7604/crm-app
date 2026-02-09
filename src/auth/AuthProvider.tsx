@@ -124,14 +124,92 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
                 if (simRole || simCompanyId) {
                     console.warn('⚡ MASTER SIMULATION ACTIVE:', { role: simRole, company: simCompanyId });
-                    finalProfile = {
-                        ...finalProfile,
-                        role: (simRole as any) || finalProfile.role,
-                        company_id: simCompanyId || finalProfile.company_id,
-                        full_name: (finalProfile.full_name || 'Jimmy') + ' [SIMULACIÓN]',
-                        // Si simulamos agente de ventas, limpiamos permisos para probar el comportamiento por defecto (restricción)
-                        permissions: simRole === 'sales_agent' ? {} : finalProfile.permissions
-                    };
+
+                    let simPermissions: any = {};
+                    const effectiveCompanyId = simCompanyId || data.company_id;
+
+                    // Load permissions for the simulated role from the actual role_permissions table
+                    if (effectiveCompanyId && simRole) {
+                        try {
+                            // 1. Load the company license FIRST
+                            const { data: companyData } = await supabase
+                                .from('companies')
+                                .select('allowed_permissions')
+                                .eq('id', effectiveCompanyId)
+                                .single();
+
+                            const companyLicense: string[] = companyData?.allowed_permissions || [];
+
+                            // 2. ADMIN LOGIC: If simulating an Admin, grant FULL license access immediately.
+                            if (simRole === 'company_admin' || simRole === 'super_admin') {
+                                simPermissions = {};
+                                companyLicense.forEach(key => {
+                                    simPermissions![key] = true;
+                                });
+                                // Add infrastructure permissions
+                                ['team_manage', 'team_create_members', 'team_edit_members', 'team_delete_members',
+                                    'team_edit_roles', 'team_invite', 'team_toggle_status', 'team_manage_limits', 'team_view_assigned',
+                                    'dashboard_filter_dates'].forEach(key => {
+                                        simPermissions![key] = true;
+                                    });
+                            }
+                            // 3. COLLABORATOR LOGIC (Standard User)
+                            else {
+                                // Find the most relevant custom_role for this company and base_role
+                                // Priority: 1. Company-specific role, 2. System role
+                                const { data: simRolesData } = await supabase
+                                    .from('custom_roles')
+                                    .select('id, name, company_id')
+                                    .or(`company_id.eq.${effectiveCompanyId},company_id.eq.00000000-0000-0000-0000-000000000000`)
+                                    .eq('base_role', simRole)
+                                    .order('company_id', { ascending: false }); // Nulls/0000 will be last
+
+
+                                // Filter manually to find the best match
+                                const simRoleData = simRolesData?.find(r => r.company_id === effectiveCompanyId)
+                                    || simRolesData?.find(r => r.company_id === '00000000-0000-0000-0000-000000000000')
+                                    || simRolesData?.[0];
+
+                                if (simRoleData) {
+                                    console.log(`🎯 Simulated Role Match: ${simRoleData.name} (${simRoleData.id})`);
+
+                                    // Load enabled permissions for this Collaborator role
+                                    const { data: rolePerms } = await supabase
+                                        .from('role_permissions')
+                                        .select('permission_key, is_enabled')
+                                        .eq('role_id', simRoleData.id);
+
+                                    simPermissions = {};
+                                    (rolePerms || []).forEach((rp: any) => {
+                                        if (rp.is_enabled) {
+                                            // Validate against license
+                                            const moduleKey = rp.permission_key.split(/[._:]/)[0];
+                                            const isLicensed = companyLicense.includes(rp.permission_key)
+                                                || companyLicense.includes(moduleKey)
+                                                || (rp.permission_key.startsWith('mkt_') && companyLicense.includes('marketing'))
+                                                || (rp.permission_key.startsWith('cotizaciones.') && companyLicense.includes('quotes'));
+
+                                            if (isLicensed) {
+                                                simPermissions![rp.permission_key] = true;
+                                            }
+                                        }
+                                    });
+                                } else {
+                                    console.warn('⚠️ No Collaborator role found for simulation');
+                                }
+                            }
+
+                        } catch (e) {
+                            console.error('Error loading simulated role permissions:', e);
+                        }
+
+                        finalProfile = {
+                            ...finalProfile,
+                            role: (simRole as any) || finalProfile.role,
+                            company_id: effectiveCompanyId || finalProfile.company_id,
+                            permissions: simPermissions
+                        };
+                    }
                 }
             }
 
