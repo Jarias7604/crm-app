@@ -121,7 +121,8 @@ export const dashboardService = {
                 upcomingFollowUps: upcomingFollowUps || [],
                 recentConversions: recentConversions || [],
                 lossReasons: lossReasons || [],
-                lossStages: lossStages || []
+                lossStages: lossStages || [],
+                qualityTrend: data?.qualityTrend || []
             };
         } catch (error) {
             logger.error('Unhandled error in getDashboardStats', error, {

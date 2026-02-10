@@ -108,8 +108,10 @@ export default function Dashboard() {
         wonDeals: 0,
         totalWonAmount: 0,
         conversionRate: 0,
+        erroneousLeads: 0,
     });
     const [funnelData, setFunnelData] = useState<any[]>([]);
+    const [qualityTrend, setQualityTrend] = useState<any[]>([]);
     const [sourceData, setSourceData] = useState<any[]>([]);
     const [priorityData, setPriorityData] = useState<any[]>([]);
     const [upcomingFollowUps, setUpcomingFollowUps] = useState<any[]>([]);
@@ -277,6 +279,13 @@ export default function Dashboard() {
             // Set loss analytics
             setLossReasonData(dashboardData.lossReasons || []);
             setLossStageData(dashboardData.lossStages || []);
+            // Process Quality Trend
+            if (dashboardData.qualityTrend) {
+                setQualityTrend(dashboardData.qualityTrend.map((item: any) => ({
+                    date: format(new Date(item.date), 'dd/MM'),
+                    count: item.count
+                })));
+            }
         }
     }, [dashboardData]);
 
@@ -580,7 +589,7 @@ export default function Dashboard() {
             </div>
 
             {/* KPI Cards - Global Standard */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 {[
                     { name: t('dashboard.crm.totalPipeline'), value: `$${stats.totalPipeline.toLocaleString()}`, icon: BadgeDollarSign, color: 'text-indigo-600', bg: 'bg-indigo-50/50', trend: '+12.5%', onClick: () => navigate('/cotizaciones') },
                     { name: t('dashboard.crm.totalLeads'), value: stats.totalLeads, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50/50', trend: '+5.2%', onClick: () => navigate('/leads', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } }) },
@@ -657,6 +666,69 @@ export default function Dashboard() {
                         </div>
                     </div>
                 ))}
+
+                {/* Lead Quality Monitor - Sparkline Card */}
+                <div
+                    onClick={() => navigate('/leads', { state: { status: ['Erróneo'], startDate: dateRange.startDate, endDate: dateRange.endDate } })}
+                    className="group relative rounded-2xl bg-slate-50 p-3 border border-slate-200/60 shadow-inner hover:bg-white hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 cursor-pointer"
+                >
+                    <div className="flex flex-col h-full">
+                        <div className="flex justify-between items-start mb-1">
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Monitor de Calidad</span>
+                            <BadgeDollarSign className="w-3.5 h-3.5 text-slate-300" />
+                        </div>
+                        <div className="flex items-baseline gap-1 mb-2">
+                            <span className="text-xl font-black text-slate-700">{stats.erroneousLeads}</span>
+                            <span className="text-[10px] font-bold text-slate-400">Leads Erróneos</span>
+                        </div>
+                        <div className="h-10 w-full mt-auto">
+                            {qualityTrend.length > 0 && stats.erroneousLeads > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart
+                                        data={qualityTrend.length === 1
+                                            ? [{ date: 'Inicio', count: 0 }, ...qualityTrend]
+                                            : qualityTrend
+                                        }
+                                        margin={{ top: 5, right: 0, left: 0, bottom: 0 }}
+                                    >
+                                        <XAxis
+                                            dataKey="date"
+                                            hide={false}
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fontSize: 7, fill: '#94a3b8', fontWeight: 'bold' }}
+                                            interval="preserveStartEnd"
+                                        />
+                                        <Tooltip
+                                            content={({ active, payload }) => {
+                                                if (active && payload && payload.length) {
+                                                    return (
+                                                        <div className="bg-white px-2 py-1 rounded shadow-sm border border-slate-100 text-[9px] font-bold text-slate-600">
+                                                            {payload[0].payload.date}: {payload[0].value} err
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            }}
+                                        />
+                                        <Area
+                                            type="monotone"
+                                            dataKey="count"
+                                            stroke={stats.erroneousLeads > 5 ? "#f43f5e" : "#94a3b8"}
+                                            fill={stats.erroneousLeads > 5 ? "#fff1f2" : "#e2e8f0"}
+                                            strokeWidth={2}
+                                            fillOpacity={0.4}
+                                        />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="h-full flex items-center justify-center border-t border-slate-100 italic text-[9px] text-slate-300 font-medium">
+                                    {stats.erroneousLeads > 0 ? "Bajo observación" : "Sin errores detectados"}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* Main Content Area: Grouped Proportions */}

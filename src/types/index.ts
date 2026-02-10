@@ -18,7 +18,8 @@ export type LeadStatus =
     | 'Negociación'
     | 'Cerrado'
     | 'Cliente'
-    | 'Perdido';
+    | 'Perdido'
+    | 'Erróneo';
 export type LeadPriority = 'very_high' | 'high' | 'medium' | 'low';
 export type FollowUpActionType = 'call' | 'email' | 'meeting' | 'whatsapp' | 'other';
 export type DateRange = 'today' | 'this_week' | 'this_month' | 'last_3_months' | 'last_6_months' | 'this_year' | 'all';
@@ -142,6 +143,7 @@ export const STATUS_CONFIG: Record<LeadStatus, { label: string; color: string; b
     'Cerrado': { label: 'Cerrado', color: 'text-purple-700', bgColor: 'bg-purple-100', icon: '🔒' },
     'Cliente': { label: 'Cliente', color: 'text-green-700', bgColor: 'bg-green-100', icon: '✅' },
     'Perdido': { label: 'Perdido', color: 'text-red-700', bgColor: 'bg-red-100', icon: '❌' },
+    'Erróneo': { label: 'Erróneo', color: 'text-slate-600', bgColor: 'bg-slate-100', icon: '⚠️' },
 };
 
 export const ACTION_TYPES = [
