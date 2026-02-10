@@ -26,6 +26,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     const [configOpen, setConfigOpen] = useState(configPaths.some(path => location.pathname === path));
     const [marketingOpen, setMarketingOpen] = useState(marketingPaths.some(path => location.pathname.startsWith(path) && !location.pathname.startsWith('/marketing/chat')));
     const [company, setCompany] = useState<Company | null>(null);
+    const [debugOpen, setDebugOpen] = useState(false);
 
     useEffect(() => {
         // Cargar datos de la empresa si hay un company_id
@@ -58,51 +59,10 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     };
 
     // --- PERMISSION LOGIC ---
-    const canAccess = (feature: 'leads' | 'quotes' | 'calendar' | 'marketing' | 'chat') => {
+    const canAccess = (key: string) => {
         if (!profile) return false;
-
-        // Si es super_admin tiene acceso a todo
-        if (profile.role === 'super_admin') return true;
-
-        // Si no hay empresa cargada todavía, esperamos
-        if (!company) return false;
-
-        // Definir qué módulos son "Core" (se activan por defecto si hay licencia)
-        const coreFeatures = ['leads', 'quotes', 'calendar'];
-
-        const licenseKeys: Record<string, string> = {
-            leads: 'leads_view',
-            quotes: 'cotizaciones.manage_implementation',
-            calendar: 'calendar_view_own',
-            marketing: 'mkt_view_dashboard',
-            chat: 'chat_view_all',
-            branding: 'branding',
-            pricing: 'pricing',
-            paquetes: 'paquetes',
-            items: 'items'
-        };
-
-        const licenseKey = licenseKeys[feature];
-        const isLicensed = company.allowed_permissions?.includes(licenseKey);
-
-        // Si la empresa no tiene licencia para este módulo, nadie (excepto super_admin) entra
-        if (!isLicensed && (profile?.role as string) !== 'super_admin') return false;
-
-        // Administradores de empresa tienen acceso a todo lo licenciado por defecto
-        if (profile.role === 'company_admin') return true;
-
-        // Para otros roles (agentes), verificar permiso explícito
-        const explicitPermission = profile.permissions?.[feature];
-
-        // Caso 1: Tiene permiso explícitamente denegado (false)
-        if (explicitPermission === false) return false;
-
-        // Caso 2: Tiene permiso explícitamente concedido (true)
-        if (explicitPermission === true) return true;
-
-        // Caso 3: Permiso no definido (undefined)
-        // Por defecto: Core = SI, Otros (Marketing/Chat) = NO
-        return coreFeatures.includes(feature);
+        // console.log(`🔍 Sidebar Check: ${key} = ${profile.permissions?.[key]}`);
+        return profile.permissions?.[key] === true;
     };
 
     const navigation: NavItem[] = [
@@ -148,18 +108,15 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
 
     const configSubItemsRaw = [
         { name: 'Marca de Empresa', href: '/company/branding', icon: Building, current: location.pathname === '/company/branding', permissionKey: 'branding' },
-        // NOTA: 'Gestión Precios' ocultado - redundante con Gestión Paquete/Item. Ruta /pricing sigue disponible si se necesita.
-        // { name: 'Gestión Precios', href: '/pricing', icon: Tag, current: location.pathname === '/pricing', permissionKey: 'pricing' },
+        { name: 'Gestión Precios', href: '/pricing', icon: Layers, current: location.pathname === '/pricing', permissionKey: 'pricing' },
         { name: 'Gestión Paquete', href: '/paquetes', icon: Package, current: location.pathname === '/paquetes', permissionKey: 'paquetes' },
         { name: 'Gestión Item', href: '/items', icon: Layers, current: location.pathname === '/items', permissionKey: 'items' },
         { name: 'Gestión Financiera', href: '/financial-rules', icon: CreditCard, current: location.pathname === '/financial-rules', permissionKey: 'financial_rules' },
         { name: 'Motivos de Pérdida', href: '/loss-reasons', icon: XCircle, current: location.pathname === '/loss-reasons', permissionKey: 'loss_reasons' },
     ];
 
-    const configSubItems = configSubItemsRaw.filter(item => {
-        if (profile?.role === 'super_admin' || profile?.role === 'company_admin') return true;
-        return profile?.permissions?.[item.permissionKey!] === true;
-    });
+    const configSubItems = configSubItemsRaw.filter(item => canAccess(item.permissionKey!));
+
 
     if (profile?.role === 'super_admin') {
         navigation.push({ name: t('sidebar.companies'), href: '/admin/companies', icon: Building, current: location.pathname.startsWith('/admin/companies') });
@@ -173,8 +130,8 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     const getRoleTitle = () => {
         if (profile?.role === 'super_admin') return 'Super Admin';
         if (profile?.role === 'company_admin') return 'Administrador';
-        if (profile?.role === 'sales_agent') return 'Agente de Ventas';
-        return 'Colaborador';
+        if (profile?.role === 'collaborator') return 'Agente de Ventas';
+        return 'Usuario';
     };
 
     return (
@@ -262,18 +219,33 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                             )}
                         </div>
 
-                        <div className="mt-2 w-full px-2 space-y-2">
-                            <div className="bg-black/20 rounded-lg p-2 border border-white/5">
-                                <p className="text-[7px] text-gray-500 uppercase tracking-tighter mb-1 font-black">Master Debug Info</p>
-                                <div className="grid grid-cols-2 gap-1 text-[7px] font-mono text-gray-400">
-                                    <span className="opacity-50">ROLE:</span>
-                                    <span className="text-blue-400 truncate">{profile?.role}</span>
-                                    <span className="opacity-50">COMP:</span>
-                                    <span className="text-amber-400 truncate">{profile?.company_id?.substring(0, 8)}...</span>
-                                    <span className="opacity-50">LS_R:</span>
-                                    <span className="text-emerald-400 truncate">{localStorage.getItem('simulated_role') || 'none'}</span>
+                        <div className="mt-2 w-full px-2">
+                            <button
+                                onClick={() => setDebugOpen(!debugOpen)}
+                                className="w-full flex items-center justify-between p-1.5 bg-black/20 rounded-lg border border-white/5 hover:bg-white/5 transition-colors group mb-2"
+                            >
+                                <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest group-hover:text-gray-300">Debugger</span>
+                                {debugOpen ? <ChevronDown className="w-3 h-3 text-gray-500" /> : <ChevronRight className="w-3 h-3 text-gray-500" />}
+                            </button>
+
+                            {debugOpen && (
+                                <div className="mb-2 bg-black/20 rounded-lg p-2 border border-white/5 animate-in fade-in slide-in-from-top-1 duration-200">
+                                    <div className="grid grid-cols-2 gap-1 text-[7px] font-mono text-gray-400">
+                                        <span className="opacity-50">ROLE:</span>
+                                        <span className="text-blue-400 truncate">{profile?.role}</span>
+                                        <span className="opacity-50">COMP:</span>
+                                        <span className="text-amber-400 truncate">{profile?.company_id?.substring(0, 8)}...</span>
+                                        <span className="opacity-50">LS_R:</span>
+                                        <span className="text-emerald-400 truncate">{localStorage.getItem('simulated_role') || 'none'}</span>
+                                    </div>
+                                    <div className="mt-2 border-t border-white/5 pt-1">
+                                        <p className="text-[6px] text-gray-500 uppercase tracking-tighter mb-0.5 font-black">Active Perms (Debug):</p>
+                                        <div className="text-[6px] text-gray-400 font-mono leading-tight break-words">
+                                            {Object.keys(profile?.permissions || {}).filter(k => profile?.permissions?.[k]).join(', ')}
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
                             <select
                                 className="w-full bg-[#1e293b]/50 border border-gray-800 shadow-inner rounded-lg px-2 py-1.5 text-[10px] font-bold text-gray-300 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all cursor-pointer hover:bg-[#1e293b]"
@@ -293,7 +265,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                             >
                                 <option value="super_admin">Rol: Super Admin</option>
                                 <option value="company_admin">Rol: Administrador Empr.</option>
-                                <option value="sales_agent">Rol: Vendedor</option>
+                                <option value="collaborator">Rol: Agente de Ventas</option>
                             </select>
                         </div>
                     </div>
@@ -406,8 +378,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                             {/* Flyout Menu (Only when collapsed) */}
                             {isCollapsed ? (
                                 <div className="absolute left-full bottom-0 ml-1 w-56 bg-[#0f172a]/95 backdrop-blur-2xl rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 opacity-0 group-hover/config:opacity-100 pointer-events-none group-hover/config:pointer-events-auto transition-all duration-300 translate-x-[-12px] group-hover/config:translate-x-0 z-[100] overflow-hidden mb-[-8px]">
-                                    {/* Invisible Hover Bridge (Crucial to prevent closing) */}
-                                    {/* Extends from the icon to the menu to catch fast mouse movements */}
+                                    {/* Invisible Hover Bridge */}
                                     <div className="absolute left-[-40px] top-[-100px] w-[40px] h-[300px]" />
 
                                     <div className="bg-gradient-to-r from-blue-600/20 to-indigo-600/20 px-4 py-3 border-b border-white/5">
@@ -462,7 +433,6 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                     )}
                 </nav>
             </div>
-
 
             {/* Footer */}
             <div className="flex-shrink-0 flex border-t border-[#1e293b] p-4 flex-col gap-3 bg-[#0f172a]">

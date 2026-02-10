@@ -1,4 +1,4 @@
-import { Shield, Loader2, ChevronDown, Plus, Trash2, Settings2, Users, Info } from 'lucide-react';
+import { Shield, Loader2, ChevronDown, Plus, Trash2, Settings2, Users, Info, Building, Target, MessageSquare, Megaphone, Calendar, LayoutDashboard, FileText } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../auth/AuthProvider';
 import { permissionsService, type PermissionDefinition, type RolePermission, type CustomRole } from '../../services/permissions';
@@ -16,11 +16,11 @@ export default function Permissions() {
     const [roleCounts, setRoleCounts] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState<string | null>(null);
-    const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['Marketing', 'Mensajes', 'Leads']));
+    const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['Marketing', 'Mensajes', 'Leads', 'Configuración']));
 
     const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
     const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
-    const [newRole, setNewRole] = useState({ name: '', base_role: 'sales_agent' as any });
+    const [newRole, setNewRole] = useState({ name: '', base_role: 'collaborator' as any });
     const [isCreatingRole, setIsCreatingRole] = useState(false);
 
     const isSuperAdmin = profile?.role === 'super_admin';
@@ -54,7 +54,26 @@ export default function Permissions() {
 
             const visibleDefs = isSuperAdmin
                 ? defs
-                : defs.filter(d => !d.is_system_only && allowed.includes(d.permission_key));
+                : defs.filter(d => {
+                    if (d.is_system_only) return false;
+
+                    // Permisos de INFRAESTRUCTURA (Siempre visibles para el Admin de la empresa)
+                    if (['Equipo', 'Dashboard', 'Seguimientos'].includes(d.category)) return true;
+
+                    // Si el permiso base está en la licencia, mostrarlo
+                    if (allowed.includes(d.permission_key)) return true;
+
+                    // Lógica de "Sentido Común": si el prefijo está licenciado, mostrar granularidad
+                    // Ejemplo: 'leads_create' se muestra si 'leads' está en la licencia
+                    const moduleKey = d.permission_key.split(/[._]/)[0];
+                    if (allowed.includes(moduleKey)) return true;
+
+                    // Mapeos especiales manuales para asegurar visibilidad
+                    if (d.permission_key.startsWith('mkt_') && allowed.includes('marketing')) return true;
+                    if (d.permission_key.startsWith('cotizaciones.') && allowed.includes('quotes')) return true;
+
+                    return false;
+                });
 
             setDefinitions(visibleDefs);
             setRolePermissions(perms);
@@ -103,7 +122,7 @@ export default function Permissions() {
             });
             toast.success('Rol creado');
             setIsRoleModalOpen(false);
-            setNewRole({ name: '', base_role: 'sales_agent' });
+            setNewRole({ name: '', base_role: 'collaborator' });
             setSelectedRoleId(role.id);
             loadData();
         } catch (error) {
@@ -141,11 +160,18 @@ export default function Permissions() {
     };
 
     const getCategoryIcon = (category: string) => {
-        const icons: Record<string, string> = {
-            'Configuración': '⚙️', 'Equipo': '👥', 'Leads': '🎯', 'Seguimientos': '📋',
-            'Calendario': '📅', 'Dashboard': '📊', 'Marketing': '📣', 'Mensajes': '💬'
+        const icons: Record<string, any> = {
+            'Configuración': Settings2,
+            'Equipo': Users,
+            'Leads': Target,
+            'Seguimientos': Info,
+            'Calendario': Calendar,
+            'Dashboard': LayoutDashboard,
+            'Marketing': Megaphone,
+            'Mensajes': MessageSquare,
+            'Cotizaciones': FileText
         };
-        return icons[category] || '📌';
+        return icons[category] || Building;
     };
 
     if (!canManage) return <div className="p-8 text-center text-red-500 font-bold">Acceso restringido.</div>;
@@ -279,8 +305,11 @@ export default function Permissions() {
                                                     className={`w-full px-8 py-5 flex items-center justify-between transition-all ${isExpanded ? 'bg-indigo-50/30' : 'hover:bg-gray-50/50'}`}
                                                 >
                                                     <div className="flex items-center gap-5">
-                                                        <div className="text-3xl filter grayscale group-hover:grayscale-0 transition-all">
-                                                            {getCategoryIcon(category)}
+                                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${isExpanded ? 'bg-white shadow-sm ring-1 ring-indigo-100' : 'bg-gray-50'}`}>
+                                                            {(() => {
+                                                                const Icon = getCategoryIcon(category);
+                                                                return <Icon className={`w-6 h-6 ${isExpanded ? 'text-[#4449AA]' : 'text-gray-400'}`} />;
+                                                            })()}
                                                         </div>
                                                         <div className="text-left">
                                                             <h3 className="font-black text-lg text-gray-900 uppercase tracking-tight">{category}</h3>
@@ -354,11 +383,11 @@ export default function Permissions() {
                             <div className="grid grid-cols-2 gap-6">
                                 <button
                                     type="button"
-                                    onClick={() => setNewRole({ ...newRole, base_role: 'sales_agent' })}
-                                    className={`p-10 rounded-[2.5rem] border-2 transition-all flex flex-col items-center gap-4 ${newRole.base_role === 'sales_agent' ? 'border-[#4449AA] bg-indigo-50 shadow-xl scale-[1.02]' : 'border-gray-50 bg-gray-50/30'
+                                    onClick={() => setNewRole({ ...newRole, base_role: 'collaborator' })}
+                                    className={`p-10 rounded-[2.5rem] border-2 transition-all flex flex-col items-center gap-4 ${newRole.base_role === 'collaborator' ? 'border-[#4449AA] bg-indigo-50 shadow-xl scale-[1.02]' : 'border-gray-50 bg-gray-50/30'
                                         }`}
                                 >
-                                    <Users className={`w-10 h-10 ${newRole.base_role === 'sales_agent' ? 'text-[#4449AA]' : 'text-gray-300'}`} />
+                                    <Users className={`w-10 h-10 ${newRole.base_role === 'collaborator' ? 'text-[#4449AA]' : 'text-gray-300'}`} />
                                     <div className="text-center">
                                         <p className="font-black text-xs uppercase tracking-widest mb-1">Colaborador</p>
                                         <p className="text-[10px] text-gray-400 font-bold leading-tight">Visibilidad<br />Restringida</p>

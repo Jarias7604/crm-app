@@ -115,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
 
             const { data: mergedPerms } = await supabase.rpc('get_user_permissions', { user_id: userId });
-            let finalProfile = { ...data, permissions: mergedPerms } as Profile;
+            let finalProfile = { ...data, permissions: mergedPerms || {} } as Profile;
 
             // APLICAR BYPASS SI ES JIMMY Y HAY SIMULACIÓN ACTIVA
             if (isJimmy) {

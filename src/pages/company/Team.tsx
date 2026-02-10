@@ -4,12 +4,14 @@ import { teamService, type Invitation } from '../../services/team';
 import type { Profile, CustomRole } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, Lock, FileText, Tag, Package, Layers, Building } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, Lock, FileText, Tag, Package, Layers, Building, CreditCard, XCircle } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../auth/AuthProvider';
 import { storageService } from '../../services/storage';
+import { supabase } from '../../services/supabase';
 import Switch from '../../components/ui/Switch';
 import { CustomDatePicker } from '../../components/ui/CustomDatePicker';
+
 
 type TabType = 'general' | 'security';
 
@@ -25,6 +27,7 @@ export default function Team() {
 
     // Modal States
     const [editingMember, setEditingMember] = useState<Profile | null>(null);
+    const [baselinePermissions, setBaselinePermissions] = useState<Record<string, boolean>>({});
     const [activeTab, setActiveTab] = useState<TabType>('general');
 
     // Status States
@@ -67,7 +70,7 @@ export default function Team() {
             setAllowedPermissions(allowed);
 
             if (!formData.customRoleId && roles.length > 0) {
-                const defaultRole = roles.find(r => r.base_role === 'sales_agent') || roles[0];
+                const defaultRole = roles.find(r => r.base_role === 'collaborator') || roles[0];
                 setFormData(prev => ({ ...prev, customRoleId: defaultRole.id }));
             }
         } catch (error) {
@@ -158,6 +161,19 @@ export default function Team() {
 
         const selectedRole = customRoles.find(r => r.id === editingMember.custom_role_id);
 
+        // Only save permissions that DIFFER from the role baseline
+        // This prevents stale overrides from getting written to the DB
+        const currentPerms = editingMember.permissions || {};
+        const overrides: Record<string, boolean> = {};
+        let hasOverrides = false;
+
+        for (const key of Object.keys(currentPerms)) {
+            if (currentPerms[key] !== baselinePermissions[key]) {
+                overrides[key] = !!currentPerms[key];
+                hasOverrides = true;
+            }
+        }
+
         setIsSaving(true);
         try {
             await teamService.updateMember(editingMember.id, {
@@ -165,7 +181,7 @@ export default function Team() {
                 phone: editingMember.phone,
                 role: selectedRole?.base_role || editingMember.role,
                 custom_role_id: editingMember.custom_role_id,
-                permissions: editingMember.permissions,
+                permissions: hasOverrides ? overrides : null,
                 birth_date: editingMember.birth_date,
                 address: editingMember.address,
                 avatar_url: editingMember.avatar_url
@@ -183,7 +199,7 @@ export default function Team() {
 
     const RoleBadge = ({ member }: { member: Profile }) => {
         const customRole = customRoles.find(r => r.id === member.custom_role_id);
-        const name = customRole ? customRole.name : (member.role === 'super_admin' ? 'SUPER ADMIN' : (member.role === 'company_admin' ? 'ADMIN EMPRESA' : 'COLABORADOR'));
+        const name = customRole ? customRole.name : (member.role === 'super_admin' ? 'SUPER ADMIN' : (member.role === 'company_admin' ? 'ADMINISTRADOR' : 'AGENTE DE VENTAS'));
 
         const style = member.role === 'super_admin' ? 'bg-purple-50 text-purple-600 border-purple-100' :
             (member.role === 'company_admin' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-green-50 text-green-600 border-green-100');
@@ -358,7 +374,13 @@ export default function Team() {
                                             <RoleBadge member={member} />
                                             <div className="flex items-center gap-1.5">
                                                 <button
-                                                    onClick={() => { setEditingMember(member); setActiveTab('general'); }}
+                                                    onClick={async () => {
+                                                        const { data: mergedPerms } = await supabase.rpc('get_user_permissions', { user_id: member.id });
+                                                        const perms = mergedPerms || {};
+                                                        setBaselinePermissions({ ...perms });
+                                                        setEditingMember({ ...member, permissions: perms });
+                                                        setActiveTab('general');
+                                                    }}
                                                     className="p-1.5 rounded-xl text-gray-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
                                                 >
                                                     <Edit2 className="w-3.5 h-3.5" />
@@ -490,32 +512,38 @@ export default function Team() {
                                             </select>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            {(allowedPermissions.includes('leads_view') || myProfile?.role === 'super_admin') && (
+                                            {(allowedPermissions.includes('leads') || myProfile?.role === 'super_admin') && (
                                                 <PermissionRow title="Gestión de Leads" icon={User} mainKey="leads" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
                                             )}
-                                            {(allowedPermissions.includes('cotizaciones.manage_implementation') || myProfile?.role === 'super_admin') && (
+                                            {(allowedPermissions.includes('quotes') || myProfile?.role === 'super_admin') && (
                                                 <PermissionRow title="Cotizaciones" icon={FileText} mainKey="quotes" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
                                             )}
-                                            {(allowedPermissions.includes('calendar_view_own') || myProfile?.role === 'super_admin') && (
+                                            {(allowedPermissions.includes('calendar') || myProfile?.role === 'super_admin') && (
                                                 <PermissionRow title="Agenda Global" icon={Calendar} mainKey="calendar" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
                                             )}
-                                            {(allowedPermissions.includes('mkt_view_dashboard') || myProfile?.role === 'super_admin') && (
-                                                <PermissionRow title="Marketing Digital" icon={Megaphone} mainKey="marketing" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
+                                            {(allowedPermissions.includes('marketing') || myProfile?.role === 'super_admin') && (
+                                                <PermissionRow title="Marketing Hub" icon={Megaphone} mainKey="marketing" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
                                             )}
-                                            {(allowedPermissions.includes('chat_view_all') || myProfile?.role === 'super_admin') && (
-                                                <PermissionRow title="Comunicación (Chat)" icon={MessageSquare} mainKey="chat" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
+                                            {(allowedPermissions.includes('chat') || myProfile?.role === 'super_admin') && (
+                                                <PermissionRow title="Mensajes (Chat)" icon={MessageSquare} mainKey="chat" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
                                             )}
                                             {(allowedPermissions.includes('branding') || myProfile?.role === 'super_admin') && (
                                                 <PermissionRow title="Marca de Empresa" icon={Building} mainKey="branding" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
                                             )}
                                             {(allowedPermissions.includes('pricing') || myProfile?.role === 'super_admin') && (
-                                                <PermissionRow title="Gestión de Precios" icon={Tag} mainKey="pricing" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
+                                                <PermissionRow title="Config. Precios" icon={Tag} mainKey="pricing" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
                                             )}
                                             {(allowedPermissions.includes('paquetes') || myProfile?.role === 'super_admin') && (
                                                 <PermissionRow title="Gestión Paquetes" icon={Package} mainKey="paquetes" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
                                             )}
                                             {(allowedPermissions.includes('items') || myProfile?.role === 'super_admin') && (
-                                                <PermissionRow title="Gestión Items" icon={Layers} mainKey="items" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
+                                                <PermissionRow title="Catálogo Items" icon={Layers} mainKey="items" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
+                                            )}
+                                            {(allowedPermissions.includes('financial_rules') || myProfile?.role === 'super_admin') && (
+                                                <PermissionRow title="Reglas Financ." icon={CreditCard} mainKey="financial_rules" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
+                                            )}
+                                            {(allowedPermissions.includes('loss_reasons') || myProfile?.role === 'super_admin') && (
+                                                <PermissionRow title="Motiv. Pérdida" icon={XCircle} mainKey="loss_reasons" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
                                             )}
                                         </div>
                                     </div>
@@ -546,9 +574,10 @@ export default function Team() {
 }
 
 function PermissionRow({ title, icon: Icon, mainKey, permissions = {}, onChange }: any) {
-    const isCore = ['leads', 'quotes', 'calendar', 'branding', 'pricing', 'paquetes', 'items'].includes(mainKey);
-    const currentVal = permissions[mainKey];
-    const isChecked = currentVal === undefined ? isCore : currentVal === true;
+    // Ensure permissions is an object to avoid crashes if null is passed
+    const safePermissions = permissions || {};
+    const isChecked = safePermissions[mainKey] === true;
+
 
     return (
         <div className={`p-3 rounded-xl border transition-all flex items-center justify-between ${isChecked ? 'bg-white border-blue-100 shadow-sm' : 'bg-gray-50/50 border-gray-100'}`}>

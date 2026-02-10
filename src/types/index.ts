@@ -1,4 +1,4 @@
-export type Role = 'super_admin' | 'company_admin' | 'sales_agent';
+export type Role = 'super_admin' | 'company_admin' | 'collaborator';
 
 export interface CustomRole {
     id: string;
