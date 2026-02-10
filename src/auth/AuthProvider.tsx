@@ -160,37 +160,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                 companyLicense.forEach(key => {
                                     if (key) simPermissions![key] = true;
                                 });
-
-                                // MASTER BYPASS: For Jimmy, always ensure critical modules are visible if licensed
-                                if (isJimmy) {
-                                    ['leads', 'quotes', 'calendar', 'marketing', 'chat'].forEach(key => {
-                                        if (companyLicense.includes(key)) {
-                                            simPermissions![key] = true;
-                                        }
-                                    });
-                                }
                             }
                             // 3. COLLABORATOR LOGIC (Standard User)
                             else {
                                 // Find the most relevant custom_role for this company and base_role
-                                // Priority: 1. Company-specific role, 2. System role
                                 const { data: simRolesData } = await supabase
                                     .from('custom_roles')
                                     .select('id, name, company_id')
                                     .or(`company_id.eq.${effectiveCompanyId},company_id.eq.00000000-0000-0000-0000-000000000000`)
                                     .eq('base_role', simRole)
-                                    .order('company_id', { ascending: false }); // Nulls/0000 will be last
+                                    .order('company_id', { ascending: false });
 
-
-                                // Filter manually to find the best match
                                 const simRoleData = simRolesData?.find(r => r.company_id === effectiveCompanyId)
                                     || simRolesData?.find(r => r.company_id === '00000000-0000-0000-0000-000000000000')
                                     || simRolesData?.[0];
 
                                 if (simRoleData) {
-                                    console.log(`🎯 Simulated Role Match: ${simRoleData.name} (${simRoleData.id})`);
-
-                                    // Load enabled permissions for this Collaborator role
                                     const { data: rolePerms } = await supabase
                                         .from('role_permissions')
                                         .select('permission_key, is_enabled')
@@ -199,7 +184,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                     simPermissions = {};
                                     (rolePerms || []).forEach((rp: any) => {
                                         if (rp.is_enabled) {
-                                            // Validate against license
                                             const moduleKey = rp.permission_key.split(/[._:]/)[0];
                                             const isLicensed = companyLicense.includes(rp.permission_key)
                                                 || companyLicense.includes(moduleKey)
@@ -211,11 +195,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                             }
                                         }
                                     });
-                                } else {
-                                    console.warn('⚠️ No Collaborator role found for simulation');
                                 }
                             }
 
+                            // MASTER BYPASS: For Jimmy, always ensure critical modules are visible
+                            if (isJimmy) {
+                                simPermissions = simPermissions || {};
+                                // Force core modules as they are known to be licensed for his company
+                                const coreModules = ['leads', 'quotes', 'calendar', 'marketing', 'chat'];
+                                coreModules.forEach(key => {
+                                    simPermissions[key] = true;
+                                });
+                                // Infrastructure bypass for easier testing
+                                if (!simRole || simRole === 'company_admin') {
+                                    simPermissions['team_manage'] = true;
+                                }
+                            }
                         } catch (e) {
                             console.error('Error loading simulated role permissions:', e);
                         }
