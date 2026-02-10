@@ -138,20 +138,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                 .eq('id', effectiveCompanyId)
                                 .single();
 
-                            const companyLicense: string[] = companyData?.allowed_permissions || [];
+                            const rawLicense = companyData?.allowed_permissions;
+                            const companyLicense: string[] = Array.isArray(rawLicense)
+                                ? rawLicense.map(k => String(k).trim().toLowerCase())
+                                : [];
+
+                            console.log('📦 Company License Loaded:', companyLicense);
 
                             // 2. ADMIN LOGIC: If simulating an Admin, grant FULL license access immediately.
                             if (simRole === 'company_admin' || simRole === 'super_admin') {
                                 simPermissions = {};
-                                companyLicense.forEach(key => {
-                                    simPermissions![key] = true;
-                                });
-                                // Add infrastructure permissions
+
+                                // Infrastructure permissions
                                 ['team_manage', 'team_create_members', 'team_edit_members', 'team_delete_members',
                                     'team_edit_roles', 'team_invite', 'team_toggle_status', 'team_manage_limits', 'team_view_assigned',
                                     'dashboard_filter_dates'].forEach(key => {
                                         simPermissions![key] = true;
                                     });
+
+                                // Licensed permissions
+                                companyLicense.forEach(key => {
+                                    if (key) simPermissions![key] = true;
+                                });
+
+                                // MASTER BYPASS: For Jimmy, always ensure critical modules are visible if licensed
+                                if (isJimmy) {
+                                    ['leads', 'quotes', 'calendar', 'marketing', 'chat'].forEach(key => {
+                                        if (companyLicense.includes(key)) {
+                                            simPermissions![key] = true;
+                                        }
+                                    });
+                                }
                             }
                             // 3. COLLABORATOR LOGIC (Standard User)
                             else {
