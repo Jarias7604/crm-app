@@ -375,9 +375,20 @@ export default function Team() {
                                             <div className="flex items-center gap-1.5">
                                                 <button
                                                     onClick={async () => {
+                                                        // Get merged permissions (role + user overrides) for display
                                                         const { data: mergedPerms } = await supabase.rpc('get_user_permissions', { user_id: member.id });
                                                         const perms = mergedPerms || {};
-                                                        setBaselinePermissions({ ...perms });
+
+                                                        // Get ROLE-ONLY baseline permissions (without user overrides)
+                                                        const selectedRole = customRoles.find(r => r.id === member.custom_role_id);
+                                                        let roleOnlyPerms: Record<string, boolean> = {};
+
+                                                        if (selectedRole) {
+                                                            const { data: rolePerms } = await supabase.rpc('get_role_permissions', { role_id: selectedRole.id });
+                                                            roleOnlyPerms = rolePerms || {};
+                                                        }
+
+                                                        setBaselinePermissions(roleOnlyPerms);
                                                         setEditingMember({ ...member, permissions: perms });
                                                         setActiveTab('general');
                                                     }}

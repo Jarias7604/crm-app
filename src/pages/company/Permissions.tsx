@@ -16,7 +16,7 @@ export default function Permissions() {
     const [roleCounts, setRoleCounts] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState<string | null>(null);
-    const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['Marketing', 'Mensajes', 'Leads', 'Configuración']));
+    const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
     const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
     const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
