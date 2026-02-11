@@ -161,21 +161,13 @@ export default function Team() {
 
         const selectedRole = customRoles.find(r => r.id === editingMember.custom_role_id);
 
-        // Only save permissions that DIFFER from the role baseline
-        // This prevents stale overrides from getting written to the DB
+        // DIRECT PERMISSION SAVING: Save exactly what is shown in the UI
         const currentPerms = editingMember.permissions || {};
-        const overrides: Record<string, boolean> = {};
-        let hasOverrides = false;
+        const finalPersistedPerms: Record<string, boolean> = {};
 
-        // Iterate over ALL possible permissions to catch explicit disables
+        // Iterate over ALL possible permissions and save their CURRENT UI state
         for (const key of allowedPermissions) {
-            const userVal = !!currentPerms[key];
-            const roleVal = !!baselinePermissions[key];
-
-            if (userVal !== roleVal) {
-                overrides[key] = userVal;
-                hasOverrides = true;
-            }
+            finalPersistedPerms[key] = !!currentPerms[key];
         }
 
         setIsSaving(true);
@@ -185,7 +177,7 @@ export default function Team() {
                 phone: editingMember.phone,
                 role: selectedRole?.base_role || editingMember.role,
                 custom_role_id: editingMember.custom_role_id,
-                permissions: hasOverrides ? overrides : null,
+                permissions: finalPersistedPerms,
                 birth_date: editingMember.birth_date,
                 address: editingMember.address,
                 avatar_url: editingMember.avatar_url
