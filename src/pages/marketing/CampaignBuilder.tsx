@@ -75,7 +75,15 @@ export default function CampaignBuilder() {
     const [previewLeads, setPreviewLeads] = useState<any[]>([]);
     const [loadingPreview, setLoadingPreview] = useState(false);
     const [showSimulator, setShowSimulator] = useState(false);
+    const [showAudienceModal, setShowAudienceModal] = useState(false);
     const [currentLeadIndex, setCurrentLeadIndex] = useState(0);
+
+    // Auto-update audience preview when filters change
+    useEffect(() => {
+        if (profile?.company_id && formData.audience_filter) {
+            handlePreviewAudience();
+        }
+    }, [formData.audience_filter.status, formData.audience_filter.priority, formData.audience_filter.dateRange, selectedChannel]);
 
     const getGreeting = () => {
         const hour = new Date().getHours();
@@ -411,7 +419,10 @@ export default function CampaignBuilder() {
                         </div>
 
                         <button
-                            onClick={() => handlePreviewAudience()}
+                            onClick={async () => {
+                                await handlePreviewAudience();
+                                setShowAudienceModal(true);
+                            }}
                             disabled={loadingPreview}
                             className="w-full py-4 bg-[#0f172a] hover:bg-black text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all hover:shadow-xl disabled:opacity-70 flex items-center justify-center gap-2"
                         >
@@ -451,7 +462,7 @@ export default function CampaignBuilder() {
             {/* Visual Simulator Modal */}
             {showSimulator && (
                 <div className="fixed inset-0 bg-[#0f172a]/95 backdrop-blur-xl z-[60] flex items-center justify-center p-4">
-                    <div className="w-full max-w-5xl flex flex-col h-[90vh] animate-in zoom-in-95 duration-300">
+                    <div className="w-full max-w-5xl flex flex-col h-[95vh] animate-in zoom-in-95 duration-300">
                         {/* Header */}
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-4">
@@ -484,7 +495,7 @@ export default function CampaignBuilder() {
                                                 {formData.subject || 'Sin Asunto'}
                                             </div>
                                         </div>
-                                        <div className="p-8 h-[500px] overflow-y-auto">
+                                        <div className="p-8 h-[800px] overflow-y-auto">
                                             <div className="flex items-center gap-3 mb-6 pb-6 border-b border-gray-50">
                                                 <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center font-black text-gray-400 text-sm">
                                                     {(profile?.full_name || 'A').charAt(0)}
@@ -745,6 +756,80 @@ export default function CampaignBuilder() {
                                     )}
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Audience Preview Modal */}
+            {showAudienceModal && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowAudienceModal(false)}>
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[80vh] overflow-hidden animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-white/20 rounded-2xl">
+                                    <Users className="w-6 h-6 text-white" />
+                                </div>
+                                <div>
+                                    <h3 className="text-2xl font-black text-white tracking-tight">Audiencia Validada</h3>
+                                    <p className="text-white/70 text-sm font-bold">{displayedLeads.length} contactos seleccionados</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowAudienceModal(false)}
+                                className="p-2 hover:bg-white/10 rounded-xl transition-all text-white"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        {/* Leads List */}
+                        <div className="p-6 overflow-y-auto max-h-[calc(80vh-120px)]">
+                            {displayedLeads.length === 0 ? (
+                                <div className="text-center py-12">
+                                    <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                                    <p className="text-gray-500 font-bold">No se encontraron leads con los filtros seleccionados</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {displayedLeads.map((lead, idx) => (
+                                        <div key={lead.id || idx} className="p-4 bg-gray-50 hover:bg-gray-100 rounded-2xl border border-gray-200 transition-all group">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-4 flex-1">
+                                                    <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-lg">
+                                                        {(lead.name || 'L').charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <h4 className="font-black text-gray-900 text-base">{lead.name || 'Sin nombre'}</h4>
+                                                        <div className="flex items-center gap-3 mt-1">
+                                                            <span className="text-sm text-gray-600 font-medium">{lead.phone || 'Sin teléfono'}</span>
+                                                            {lead.email && (
+                                                                <span className="text-xs text-gray-400">• {lead.email}</span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase ${lead.status === 'Cliente' ? 'bg-green-100 text-green-700' :
+                                                        lead.status === 'Prospecto' ? 'bg-blue-100 text-blue-700' :
+                                                            lead.status === 'Negociación' ? 'bg-amber-100 text-amber-700' :
+                                                                'bg-gray-100 text-gray-700'
+                                                        }`}>
+                                                        {lead.status || 'Sin estado'}
+                                                    </span>
+                                                    <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase ${lead.priority === 'high' ? 'bg-red-100 text-red-700' :
+                                                        lead.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                                                            'bg-gray-100 text-gray-600'
+                                                        }`}>
+                                                        {lead.priority === 'high' ? '🔥' : lead.priority === 'medium' ? '⚡' : '📋'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

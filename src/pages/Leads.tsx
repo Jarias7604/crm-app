@@ -330,11 +330,19 @@ export default function Leads() {
             if (lostAtStageFilter !== 'all' && lead.lost_at_stage !== lostAtStageFilter) return false;
 
             // Filter by date range (if provided from dashboard)
-            if (startDateFilter) {
-                if (new Date(lead.created_at) < new Date(startDateFilter)) return false;
-            }
-            if (endDateFilter) {
-                if (new Date(lead.created_at) > new Date(endDateFilter)) return false;
+            if (startDateFilter || endDateFilter) {
+                // Determine which date to use for comparison
+                // If we are filtering specifically for Won/Client status, we use internal_won_date as primary source of truth
+                const isWonFilter = Array.isArray(statusFilter)
+                    ? (statusFilter.includes('Cerrado') || statusFilter.includes('Cliente'))
+                    : (statusFilter === 'Cerrado' || statusFilter === 'Cliente');
+
+                const dateToCompare = (isWonFilter && (lead.status === 'Cerrado' || lead.status === 'Cliente') && lead.internal_won_date)
+                    ? new Date(lead.internal_won_date)
+                    : new Date(lead.created_at);
+
+                if (startDateFilter && dateToCompare < new Date(startDateFilter)) return false;
+                if (endDateFilter && dateToCompare > new Date(endDateFilter)) return false;
             }
 
             return true;

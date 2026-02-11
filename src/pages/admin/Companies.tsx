@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { adminService } from '../../services/admin';
 import type { Company, LicenseStatus } from '../../types';
 import { Button } from '../../components/ui/Button';
@@ -57,6 +58,38 @@ export default function Companies() {
     });
     const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState<LicenseStatus | 'all'>('all');
+    const location = useLocation();
+
+    // Handle incoming filters from Dashboard
+    useEffect(() => {
+        if (location.state?.status) {
+            setStatusFilter(location.state.status);
+            // Clear location state but keep other possible states if needed, 
+            // though here we just want to avoid re-triggering on history changes
+            window.history.replaceState({}, document.title);
+        }
+
+        if (location.state?.editCompanyId && companies.length > 0) {
+            const companyToEdit = companies.find(c => c.id === location.state.editCompanyId);
+            if (companyToEdit) {
+                setEditingCompanyId(companyToEdit.id);
+                setFormData({
+                    name: companyToEdit.name,
+                    license_status: companyToEdit.license_status,
+                    rnc: companyToEdit.rnc || '',
+                    telefono: companyToEdit.telefono || '',
+                    email: companyToEdit.email || '',
+                    direccion: companyToEdit.direccion || '',
+                    max_users: companyToEdit.max_users || 5,
+                    allowed_permissions: companyToEdit.allowed_permissions || []
+                });
+                setIsModalOpen(true);
+            }
+            // Clear state after handling
+            window.history.replaceState({}, document.title);
+        }
+    }, [location.state, companies]);
 
     useEffect(() => {
         loadCompanies();
@@ -130,9 +163,11 @@ export default function Companies() {
         }
     };
 
-    const filteredCompanies = companies.filter(c =>
-        c.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredCompanies = companies.filter(c => {
+        const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesStatus = statusFilter === 'all' || c.license_status === statusFilter;
+        return matchesSearch && matchesStatus;
+    });
 
     return (
         <div className="space-y-6 max-w-[1600px] mx-auto p-6 animate-in fade-in duration-500">

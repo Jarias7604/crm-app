@@ -71,6 +71,10 @@ export interface Company {
     time_format?: string;
     timezone?: string;
     allowed_permissions?: string[];
+    rnc?: string | null;
+    email?: string | null;
+    telefono?: string | null;
+    direccion?: string | null;
 }
 
 export interface PermissionDefinition {

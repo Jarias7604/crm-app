@@ -1,5 +1,4 @@
 import { useTranslation } from 'react-i18next';
-import toast from 'react-hot-toast';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -20,8 +19,6 @@ import { STATUS_CONFIG, PRIORITY_CONFIG, SOURCE_CONFIG, DATE_RANGE_OPTIONS, type
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
-import { Modal } from '../components/ui/Modal';
 import { logger } from '../utils/logger';
 import { useDashboardStats } from '../hooks/useDashboard';
 
@@ -130,9 +127,6 @@ export default function Dashboard() {
     });
     const [recentCompanies, setRecentCompanies] = useState<any[]>([]);
     const [companyTrend, setCompanyTrend] = useState<any[]>([]);
-    const [editingCompany, setEditingCompany] = useState<any>(null);
-    const [isCompanyModalOpen, setIsCompanyModalOpen] = useState(false);
-    const [isUpdatingCompany, setIsUpdatingCompany] = useState(false);
 
     // Refresh data when navigating to Dashboard or when filters change
     useEffect(() => {
@@ -363,31 +357,7 @@ export default function Dashboard() {
         );
     }
 
-    const handleEditCompany = (company: any) => {
-        setEditingCompany({ ...company });
-        setIsCompanyModalOpen(true);
-    };
 
-    const handleUpdateCompany = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!editingCompany) return;
-        setIsUpdatingCompany(true);
-        try {
-            await adminService.updateCompany(editingCompany.id, {
-                name: editingCompany.name,
-                license_status: editingCompany.license_status,
-                max_users: editingCompany.max_users
-            });
-            setIsCompanyModalOpen(false);
-            loadSuperAdminData();
-            toast.success('Configuración de empresa actualizada');
-        } catch (error: any) {
-            logger.error('Update company failed', error, { action: 'handleUpdateCompany', companyId: editingCompany.id });
-            toast.error(`Error: ${error.message}`);
-        } finally {
-            setIsUpdatingCompany(false);
-        }
-    };
 
 
 
@@ -446,11 +416,15 @@ export default function Dashboard() {
                 {/* KPI Cards */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     {[
-                        { name: t('dashboard.superAdmin.totalCompanies'), value: adminStats.totalCompanies, icon: Building, color: 'text-[#007BFF]', bg: 'bg-blue-50' },
-                        { name: t('dashboard.superAdmin.activeTrials'), value: adminStats.activeTrials, icon: Calendar, color: 'text-[#FFA500]', bg: 'bg-orange-50' },
-                        { name: t('dashboard.superAdmin.activeLicenses'), value: adminStats.activeLicenses, icon: CheckCircle, color: 'text-[#3DCC91]', bg: 'bg-green-50' },
+                        { name: t('dashboard.superAdmin.totalCompanies'), value: adminStats.totalCompanies, icon: Building, color: 'text-[#007BFF]', bg: 'bg-blue-50', status: 'all' },
+                        { name: t('dashboard.superAdmin.activeTrials'), value: adminStats.activeTrials, icon: Calendar, color: 'text-[#FFA500]', bg: 'bg-orange-50', status: 'trial' },
+                        { name: t('dashboard.superAdmin.activeLicenses'), value: adminStats.activeLicenses, icon: CheckCircle, color: 'text-[#3DCC91]', bg: 'bg-green-50', status: 'active' },
                     ].map((item) => (
-                        <div key={item.name} className="group relative overflow-hidden rounded-2xl bg-white p-5 shadow-sm border border-gray-50 hover:shadow-md transition-all duration-300">
+                        <div
+                            key={item.name}
+                            onClick={() => navigate('/admin/companies', { state: { status: item.status } })}
+                            className="group relative overflow-hidden rounded-2xl bg-white p-5 shadow-sm border border-gray-50 hover:shadow-md transition-all duration-300 cursor-pointer"
+                        >
                             <div className={`p-3 rounded-xl ${item.bg} w-fit mb-3 transition-transform group-hover:scale-110`}>
                                 <item.icon className={`h-6 w-6 ${item.color}`} />
                             </div>
@@ -502,9 +476,13 @@ export default function Dashboard() {
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
                                     {recentCompanies.map((comp) => (
-                                        <tr key={comp.id} className="hover:bg-gray-50 transition-colors">
+                                        <tr
+                                            key={comp.id}
+                                            onClick={() => navigate('/admin/companies', { state: { editCompanyId: comp.id } })}
+                                            className="hover:bg-gray-50 transition-colors cursor-pointer group/row"
+                                        >
                                             <td className="px-6 py-4">
-                                                <div className="text-xs font-bold text-[#4449AA]">{comp.name}</div>
+                                                <div className="text-xs font-bold text-[#4449AA] group-hover/row:text-indigo-600 transition-colors">{comp.name}</div>
                                                 <div className="text-[9px] text-gray-400">{comp.user_count || 0} usuarios</div>
                                             </td>
                                             <td className="px-6 py-4">
@@ -514,7 +492,7 @@ export default function Dashboard() {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                <button onClick={() => handleEditCompany(comp)} className="text-[#007BFF] hover:bg-blue-50 p-1.5 rounded-lg transition-all">
+                                                <button className="text-[#007BFF] hover:bg-blue-50 p-1.5 rounded-lg transition-all opacity-0 group-hover/row:opacity-100">
                                                     <Edit2 className="w-3.5 h-3.5" />
                                                 </button>
                                             </td>
@@ -526,42 +504,7 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                <Modal isOpen={isCompanyModalOpen} onClose={() => setIsCompanyModalOpen(false)} title="Configuración de Empresa" className="max-w-xl rounded-[3rem] p-0 overflow-hidden shadow-3xl">
-                    {editingCompany && (
-                        <div className="bg-white p-12 space-y-10">
-                            <form onSubmit={handleUpdateCompany} className="space-y-10">
-                                <div className="space-y-4">
-                                    <label className="text-[11px] font-black text-gray-400 uppercase tracking-[0.3em] mb-2 block pl-1">Nombre Jurídico de la Empresa</label>
-                                    <Input required value={editingCompany.name} onChange={e => setEditingCompany({ ...editingCompany, name: e.target.value })} className="h-16 rounded-2xl border-gray-100 bg-gray-50/50 shadow-inner text-lg font-bold placeholder:text-gray-300 focus:bg-white focus:border-indigo-600 transition-all" />
-                                </div>
-                                <div className="grid grid-cols-2 gap-8">
-                                    <div className="space-y-4">
-                                        <label className="text-[11px] font-black text-gray-400 uppercase tracking-[0.3em] mb-2 block pl-1">Estatus de Licencia</label>
-                                        <select
-                                            className="w-full h-16 bg-gray-50/50 border border-gray-100 rounded-2xl px-5 text-sm font-black text-[#4449AA] uppercase tracking-widest outline-none transition-all focus:bg-white focus:border-indigo-600 shadow-inner"
-                                            value={editingCompany.license_status}
-                                            onChange={e => setEditingCompany({ ...editingCompany, license_status: e.target.value })}
-                                        >
-                                            <option value="trial">MODO PRUEBA</option>
-                                            <option value="active">LICENCIA ACTIVA</option>
-                                            <option value="suspended">SUSPENDIDA</option>
-                                        </select>
-                                    </div>
-                                    <div className="space-y-4">
-                                        <label className="text-[11px] font-black text-gray-400 uppercase tracking-[0.3em] mb-2 block pl-1">Límite de Colaboradores</label>
-                                        <Input type="number" value={editingCompany.max_users || 5} onChange={e => setEditingCompany({ ...editingCompany, max_users: Number(e.target.value) })} className="h-16 rounded-2xl border-gray-100 bg-gray-50/50 shadow-inner text-lg font-bold text-center" />
-                                    </div>
-                                </div>
-                                <div className="flex justify-end gap-5 pt-6">
-                                    <button type="button" onClick={() => setIsCompanyModalOpen(false)} className="h-16 px-8 rounded-2xl font-black text-[11px] uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-all active:scale-95">Descartar</button>
-                                    <Button type="submit" disabled={isUpdatingCompany} className="h-16 bg-[#4449AA] text-white rounded-2xl px-12 font-black text-[11px] uppercase tracking-[0.1em] shadow-2xl border-0 hover:translate-y-[-2px] transition-all">
-                                        {isUpdatingCompany ? 'Actualizando...' : 'Confirmar Cambios'}
-                                    </Button>
-                                </div>
-                            </form>
-                        </div>
-                    )}
-                </Modal>
+
             </div>
         );
     }
@@ -591,7 +534,7 @@ export default function Dashboard() {
             {/* KPI Cards - Global Standard */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 {[
-                    { name: t('dashboard.crm.totalPipeline'), value: `$${stats.totalPipeline.toLocaleString()}`, icon: BadgeDollarSign, color: 'text-indigo-600', bg: 'bg-indigo-50/50', trend: '+12.5%', onClick: () => navigate('/cotizaciones') },
+                    { name: t('dashboard.crm.totalPipeline'), value: `$${stats.totalPipeline.toLocaleString()}`, icon: BadgeDollarSign, color: 'text-indigo-600', bg: 'bg-indigo-50/50', trend: '+12.5%', onClick: () => navigate('/cotizaciones', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } }) },
                     { name: t('dashboard.crm.totalLeads'), value: stats.totalLeads, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50/50', trend: '+5.2%', onClick: () => navigate('/leads', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } }) },
                     {
                         name: t('dashboard.crm.wonDeals'),
@@ -841,7 +784,7 @@ export default function Dashboard() {
                                         barSize={16}
                                         onClick={(data) => {
                                             if (data && data.key) {
-                                                navigate('/leads', { state: { priority: data.key } });
+                                                navigate('/leads', { state: { priority: data.key, startDate: dateRange.startDate, endDate: dateRange.endDate } });
                                             }
                                         }}
                                         className="cursor-pointer"
@@ -912,7 +855,22 @@ export default function Dashboard() {
                             {sourceData.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
-                                        <Pie data={sourceData} cx="50%" cy="50%" innerRadius={35} outerRadius={50} paddingAngle={8} dataKey="value" stroke="none">
+                                        <Pie
+                                            data={sourceData}
+                                            cx="50%"
+                                            cy="50%"
+                                            innerRadius={35}
+                                            outerRadius={50}
+                                            paddingAngle={8}
+                                            dataKey="value"
+                                            stroke="none"
+                                            onClick={(data) => {
+                                                if (data && data.key) {
+                                                    navigate('/leads', { state: { source: data.key, startDate: dateRange.startDate, endDate: dateRange.endDate } });
+                                                }
+                                            }}
+                                            className="cursor-pointer"
+                                        >
                                             {sourceData.map((_, index) => (
                                                 <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                                             ))}
@@ -1223,12 +1181,12 @@ export default function Dashboard() {
                                     stageLossData.map((item, index) => (
                                         <div
                                             key={index}
-                                            className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-all cursor-pointer"
-                                            onClick={() => navigate('/leads', { state: { status: 'Perdido', startDate: dateRange.startDate, endDate: dateRange.endDate } })}
+                                            className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-all cursor-pointer group/item"
+                                            onClick={() => navigate('/leads', { state: { status: 'Perdido', lostAtStage: item.stage, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
                                         >
-                                            <div className={`w-3 h-3 rounded-full ${item.color} shadow-sm`} />
+                                            <div className={`w-3 h-3 rounded-full ${item.color} shadow-sm group-hover/item:scale-125 transition-transform`} />
                                             <div className="flex-1">
-                                                <p className="text-xs font-black text-slate-700">{item.stage}</p>
+                                                <p className="text-xs font-black text-slate-700 group-hover/item:text-indigo-600 transition-colors">{item.stage}</p>
                                             </div>
                                             <div className="text-right">
                                                 <p className="text-sm font-black text-red-600">{item.count}</p>
@@ -1293,6 +1251,7 @@ export default function Dashboard() {
                         <div className="flex-grow flex flex-col gap-2">
                             {(() => {
                                 const reasonData = lossReasonData.map(r => ({
+                                    id: r.reason_id,
                                     reason: r.reason_name,
                                     count: r.loss_count,
                                     percentage: Math.round(r.percentage)
@@ -1302,12 +1261,16 @@ export default function Dashboard() {
 
                                 return totalReasonsCount > 0 ? (
                                     reasonData.filter(r => r.count > 0).map((item, index) => (
-                                        <div key={index} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-all">
+                                        <div
+                                            key={index}
+                                            onClick={() => navigate('/leads', { state: { status: 'Perdido', lossReasonId: item.id, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
+                                            className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-all cursor-pointer group/item"
+                                        >
                                             <div className="flex-1">
-                                                <p className="text-xs font-black text-slate-700">{item.reason}</p>
+                                                <p className="text-xs font-black text-slate-700 group-hover/item:text-red-500 transition-colors">{item.reason}</p>
                                                 <div className="mt-1 bg-slate-100 rounded-full h-1.5 overflow-hidden">
                                                     <div
-                                                        className="bg-red-500 h-full rounded-full transition-all duration-500"
+                                                        className="bg-red-500 h-full rounded-full transition-all duration-500 group-hover/item:bg-red-600"
                                                         style={{ width: `${item.percentage}%` }}
                                                     />
                                                 </div>
