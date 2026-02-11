@@ -167,9 +167,13 @@ export default function Team() {
         const overrides: Record<string, boolean> = {};
         let hasOverrides = false;
 
-        for (const key of Object.keys(currentPerms)) {
-            if (currentPerms[key] !== baselinePermissions[key]) {
-                overrides[key] = !!currentPerms[key];
+        // Iterate over ALL possible permissions to catch explicit disables
+        for (const key of allowedPermissions) {
+            const userVal = !!currentPerms[key];
+            const roleVal = !!baselinePermissions[key];
+
+            if (userVal !== roleVal) {
+                overrides[key] = userVal;
                 hasOverrides = true;
             }
         }
