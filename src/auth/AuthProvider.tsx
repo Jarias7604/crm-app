@@ -198,19 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                 }
                             }
 
-                            // MASTER BYPASS: For Jimmy, always ensure critical modules are visible
-                            if (isJimmy) {
-                                simPermissions = simPermissions || {};
-                                // Force core modules as they are known to be licensed for his company
-                                const coreModules = ['leads', 'quotes', 'calendar', 'marketing', 'chat'];
-                                coreModules.forEach(key => {
-                                    simPermissions[key] = true;
-                                });
-                                // Infrastructure bypass for easier testing
-                                if (!simRole || simRole === 'company_admin') {
-                                    simPermissions['team_manage'] = true;
-                                }
-                            }
+                            // MASTER BYPASS REMOVED: Now reflection of reality is prioritized
                         } catch (e) {
                             console.error('Error loading simulated role permissions:', e);
                         }
