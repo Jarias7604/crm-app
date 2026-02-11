@@ -519,39 +519,35 @@ export default function Team() {
                                             </select>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            {(allowedPermissions.includes('leads') || myProfile?.role === 'super_admin') && (
-                                                <PermissionRow title="Gestión de Leads" icon={User} mainKey="leads" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
-                                            )}
-                                            {(allowedPermissions.includes('quotes') || myProfile?.role === 'super_admin') && (
-                                                <PermissionRow title="Cotizaciones" icon={FileText} mainKey="quotes" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
-                                            )}
-                                            {(allowedPermissions.includes('calendar') || myProfile?.role === 'super_admin') && (
-                                                <PermissionRow title="Agenda Global" icon={Calendar} mainKey="calendar" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
-                                            )}
-                                            {(allowedPermissions.includes('marketing') || myProfile?.role === 'super_admin') && (
-                                                <PermissionRow title="Marketing Hub" icon={Megaphone} mainKey="marketing" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
-                                            )}
-                                            {(allowedPermissions.includes('chat') || myProfile?.role === 'super_admin') && (
-                                                <PermissionRow title="Mensajes (Chat)" icon={MessageSquare} mainKey="chat" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
-                                            )}
-                                            {(allowedPermissions.includes('branding') || myProfile?.role === 'super_admin') && (
-                                                <PermissionRow title="Marca de Empresa" icon={Building} mainKey="branding" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
-                                            )}
-                                            {(allowedPermissions.includes('pricing') || myProfile?.role === 'super_admin') && (
-                                                <PermissionRow title="Config. Precios" icon={Tag} mainKey="pricing" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
-                                            )}
-                                            {(allowedPermissions.includes('paquetes') || myProfile?.role === 'super_admin') && (
-                                                <PermissionRow title="Gestión Paquetes" icon={Package} mainKey="paquetes" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
-                                            )}
-                                            {(allowedPermissions.includes('items') || myProfile?.role === 'super_admin') && (
-                                                <PermissionRow title="Catálogo Items" icon={Layers} mainKey="items" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
-                                            )}
-                                            {(allowedPermissions.includes('financial_rules') || myProfile?.role === 'super_admin') && (
-                                                <PermissionRow title="Reglas Financ." icon={CreditCard} mainKey="financial_rules" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
-                                            )}
-                                            {(allowedPermissions.includes('loss_reasons') || myProfile?.role === 'super_admin') && (
-                                                <PermissionRow title="Motiv. Pérdida" icon={XCircle} mainKey="loss_reasons" permissions={editingMember.permissions} onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })} />
-                                            )}
+                                            {allowedPermissions.map(key => {
+                                                // Icon and Title mapping for a premium and consistent UI
+                                                const meta: Record<string, { title: string, icon: any }> = {
+                                                    leads: { title: "Gestión de Leads", icon: Users },
+                                                    quotes: { title: "Cotizaciones", icon: FileText },
+                                                    calendar: { title: "Agenda Global", icon: Calendar },
+                                                    marketing: { title: "Marketing Hub", icon: Megaphone },
+                                                    chat: { title: "Mensajes (Chat)", icon: MessageSquare },
+                                                    branding: { title: "Marca de Empresa", icon: Building },
+                                                    pricing: { title: "Config. Precios", icon: Tag },
+                                                    paquetes: { title: "Gestión Paquetes", icon: Package },
+                                                    items: { title: "Catálogo Items", icon: Layers },
+                                                    financial_rules: { title: "Reglas Financ.", icon: CreditCard },
+                                                    loss_reasons: { title: "Motiv. Pérdida", icon: XCircle }
+                                                };
+
+                                                const item = meta[key] || { title: key.charAt(0).toUpperCase() + key.slice(1), icon: Shield };
+
+                                                return (
+                                                    <PermissionRow
+                                                        key={key}
+                                                        title={item.title}
+                                                        icon={item.icon}
+                                                        mainKey={key}
+                                                        permissions={editingMember.permissions}
+                                                        onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })}
+                                                    />
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 )}
