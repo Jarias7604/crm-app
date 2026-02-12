@@ -48,6 +48,28 @@ serve(async (req) => {
                 for (const entry of body.entry) {
                     const changes = entry.changes;
                     for (const change of changes) {
+                        // A. Handle Status Updates (sent, delivered, read, failed)
+                        if (change.value && change.value.statuses) {
+                            for (const statusObj of change.value.statuses) {
+                                const waMsgId = statusObj.id;
+                                const status = statusObj.status; // 'delivered', 'read', 'sent', 'failed'
+
+                                console.log(`WhatsApp Status Update: ${waMsgId} -> ${status}`);
+
+                                // Map Meta status to our CRM status
+                                let dbStatus = 'sent';
+                                if (status === 'delivered') dbStatus = 'delivered';
+                                if (status === 'read') dbStatus = 'opened'; // Mark as opened when read
+                                if (status === 'failed') dbStatus = 'failed';
+
+                                await supabase
+                                    .from('marketing_messages')
+                                    .update({ status: dbStatus })
+                                    .eq('external_id', waMsgId); // We store Meta ID as external_id in marketing_messages
+                            }
+                        }
+
+                        // B. Handle Incoming Messages (replies)
                         if (change.value && change.value.messages) {
                             const messages = change.value.messages;
                             const phoneNumberId = change.value.metadata.phone_number_id;

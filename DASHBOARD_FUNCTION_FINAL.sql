@@ -1,6 +1,7 @@
--- Optimized Dashboard Stats Function
--- Replaces 5 separate queries with 1 aggregated query
--- Reduces database round-trips from 5 to 1
+-- ==========================================
+-- 🚀 DASHBOARD FUNCTION COMPLETA Y FUNCIONAL
+-- Incluye TODOS los datos necesarios
+-- ==========================================
 
 CREATE OR REPLACE FUNCTION get_dashboard_stats(
     p_company_id UUID,
@@ -13,6 +14,8 @@ STABLE
 AS $$
 DECLARE
     v_result JSON;
+    v_current_month INTEGER := EXTRACT(MONTH FROM COALESCE(p_start_date, now()));
+    v_current_year INTEGER := EXTRACT(YEAR FROM COALESCE(p_start_date, now()));
 BEGIN
     WITH filtered_leads AS (
         SELECT *
@@ -25,7 +28,9 @@ BEGIN
         SELECT
             COUNT(*) as total_leads,
             COALESCE(SUM(value), 0) as total_pipeline,
-            COUNT(*) FILTER (WHERE status IN ('Cerrado', 'Cliente')) as won_deals
+            COUNT(*) FILTER (WHERE status IN ('Cerrado', 'Cliente')) as won_deals,
+            COALESCE(SUM(closing_amount) FILTER (WHERE status IN ('Cerrado', 'Cliente')), 0) as total_won_amount,
+            COUNT(*) FILTER (WHERE status = 'Erróneo') as erroneous_leads
         FROM filtered_leads
     ),
     by_status AS (
@@ -169,43 +174,72 @@ BEGIN
         SELECT
             json_agg(
                 json_build_object(
-                    'name', last_stage,
+                    'name', 'Perdido',
                     'value', count
                 )
-                ORDER BY count DESC
+            ) as data
+        FROM (
+            SELECT COUNT(*) as count
+            FROM filtered_leads
+            WHERE status = 'Perdido'
+        ) ls
+    ),
+    quality_trend AS (
+        SELECT
+            json_agg(
+                json_build_object(
+                    'date', day,
+                    'count', count
+                )
             ) as data
         FROM (
             SELECT 
-                COALESCE(status, 'No registrado') as last_stage,
+                DATE_TRUNC('day', created_at)::DATE as day,
                 COUNT(*) as count
             FROM filtered_leads
-            WHERE status = 'Perdido'
-            GROUP BY status
-            ORDER BY count DESC
-            LIMIT 5
-        ) ls
+            WHERE status = 'Erróneo'
+            GROUP BY 1
+            ORDER BY 1 ASC
+        ) q
     ),
-    won_amount AS (
-        SELECT COALESCE(SUM(closing_amount), 0) as total_won_amount
-        FROM filtered_leads
-        WHERE status IN ('Cerrado', 'Cliente')
-          AND closing_amount IS NOT NULL
-    ),
-    erroneous_count AS (
-        SELECT COUNT(*) as erroneous_leads
-        FROM leads
-        WHERE company_id = p_company_id
-          AND status = 'Erróneo'
-          AND (p_start_date IS NULL OR created_at >= p_start_date)
-          AND (p_end_date IS NULL OR created_at <= p_end_date)
+    sales_kpis AS (
+        SELECT
+            json_agg(
+                json_build_object(
+                    'agent_name', p.full_name,
+                    'actual', COALESCE(s.actual_sales, 0),
+                    'target', COALESCE(g.target, 0),
+                    'percentage', CASE 
+                        WHEN COALESCE(g.target, 0) > 0 
+                        THEN ROUND((COALESCE(s.actual_sales, 0) / g.target) * 100)
+                        ELSE 0 
+                    END
+                )
+            ) as data
+        FROM public.profiles p
+        LEFT JOIN (
+            SELECT 
+                assigned_to, 
+                SUM(closing_amount) as actual_sales
+            FROM filtered_leads
+            WHERE status IN ('Cerrado', 'Cliente')
+            GROUP BY assigned_to
+        ) s ON s.assigned_to = p.id
+        LEFT JOIN public.sales_goals g ON g.agent_id = p.id 
+            AND g.company_id = p_company_id
+            AND g.month = v_current_month
+            AND g.year = v_current_year
+        WHERE p.company_id = p_company_id
+          AND p.role IN ('sales_agent', 'company_admin')
+          AND p.is_active = true
     )
     SELECT json_build_object(
         'stats', json_build_object(
             'totalLeads', (SELECT total_leads FROM stats),
             'totalPipeline', (SELECT total_pipeline FROM stats),
             'wonDeals', (SELECT won_deals FROM stats),
-            'totalWonAmount', (SELECT total_won_amount FROM won_amount),
-            'erroneousLeads', (SELECT erroneous_leads FROM erroneous_count),
+            'totalWonAmount', (SELECT total_won_amount FROM stats),
+            'erroneousLeads', (SELECT erroneous_leads FROM stats),
             'conversionRate', CASE 
                 WHEN (SELECT total_leads FROM stats) > 0 
                 THEN ROUND(((SELECT won_deals FROM stats)::NUMERIC / (SELECT total_leads FROM stats)::NUMERIC) * 100)
@@ -219,15 +253,14 @@ BEGIN
         'upcomingFollowUps', COALESCE((SELECT data FROM upcoming_followups), '[]'::json),
         'recentConversions', COALESCE((SELECT data FROM recent_conversions), '[]'::json),
         'lossReasons', COALESCE((SELECT data FROM loss_reasons), '[]'::json),
-        'lossStages', COALESCE((SELECT data FROM loss_stages), '[]'::json)
+        'lossStages', COALESCE((SELECT data FROM loss_stages), '[]'::json),
+        'qualityTrend', COALESCE((SELECT data FROM quality_trend), '[]'::json),
+        'salesKpis', COALESCE((SELECT data FROM sales_kpis), '[]'::json)
     ) INTO v_result;
 
     RETURN v_result;
 END;
 $$;
 
--- Grant execute permission to authenticated users
+-- Grant execute permission
 GRANT EXECUTE ON FUNCTION get_dashboard_stats(UUID, TIMESTAMPTZ, TIMESTAMPTZ) TO authenticated;
-
--- Add comment for documentation
-COMMENT ON FUNCTION get_dashboard_stats IS 'Optimized function to fetch all dashboard statistics in a single query. Replaces 5 separate queries with 1 aggregated query for better performance.';

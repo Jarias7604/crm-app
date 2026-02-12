@@ -149,5 +149,36 @@ export const teamService = {
         });
 
         return uniqueRoles;
+    },
+
+    // Sales Goals Management
+    async getMemberGoal(userId: string, companyId: string, month: number, year: number) {
+        const { data, error } = await supabase
+            .from('sales_goals')
+            .select('target')
+            .eq('agent_id', userId)
+            .eq('company_id', companyId)
+            .eq('month', month)
+            .eq('year', year)
+            .maybeSingle();
+
+        if (error) throw error;
+        return data?.target || 0;
+    },
+
+    async updateMemberGoal(userId: string, companyId: string, month: number, year: number, target: number) {
+        const { error } = await supabase
+            .from('sales_goals')
+            .upsert({
+                agent_id: userId,
+                company_id: companyId,
+                month,
+                year,
+                target
+            }, {
+                onConflict: 'agent_id,company_id,month,year'
+            });
+
+        if (error) throw error;
     }
 };

@@ -615,7 +615,7 @@ export default function Dashboard() {
                                                 e.stopPropagation();
                                                 setActiveCardFilter(activeCardFilter === item.name ? null : item.name);
                                             }}
-                                            className={`p-1.5 rounded-lg transition-all ${activeCardFilter === item.name ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                            className={`p-1.5 rounded-lg transition-all ${activeCardFilter === item.name ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-100/50'}`}
                                         >
                                             <Settings className="w-3.5 h-3.5" />
                                         </button>

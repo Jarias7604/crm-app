@@ -25,6 +25,7 @@ import { GripVertical } from 'lucide-react';
 export default function Leads() {
     const { profile } = useAuth();
     const isAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
+    const canDelete = isAdmin || profile?.permissions?.leads === true;
     const [leads, setLeads] = useState<Lead[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -282,11 +283,12 @@ export default function Leads() {
 
     const filteredLeads = useMemo(() => {
         return leads.filter(lead => {
+            // Priority: If a specific status is selected, it takes precedence over ID filters
             // Filter by specific lead ID if set (Direct skip)
-            if (filteredLeadId) return lead.id === filteredLeadId;
-
-            // Filter by list of lead IDs (KPI logic)
-            if (filteredLeadIds && !filteredLeadIds.includes(lead.id)) return false;
+            if (statusFilter === 'all' && searchTerm === '' && !onlyPipelineFilter) {
+                if (filteredLeadId) return lead.id === filteredLeadId;
+                if (filteredLeadIds && !filteredLeadIds.includes(lead.id)) return false;
+            }
 
             // Filter by search term
             if (searchTerm.trim()) {
@@ -295,9 +297,7 @@ export default function Leads() {
                     lead.name?.toLowerCase().includes(term) ||
                     lead.email?.toLowerCase().includes(term) ||
                     lead.company_name?.toLowerCase().includes(term) ||
-                    lead.phone?.toLowerCase().includes(term) ||
-                    lead.next_action_notes?.toLowerCase().includes(term);
-
+                    lead.phone?.includes(term);
                 if (!matchesSearch) return false;
             }
 
@@ -305,58 +305,44 @@ export default function Leads() {
             if (priorityFilter !== 'all' && lead.priority !== priorityFilter) return false;
 
             // Filter by assigned user
-            if (assignedFilter !== 'all') {
-                if (assignedFilter === 'unassigned') {
-                    if (lead.assigned_to) return false;
-                } else {
-                    if (lead.assigned_to !== assignedFilter) return false;
-                }
-            }
+            if (assignedFilter !== 'all' && lead.assigned_to !== assignedFilter) return false;
 
-            // Filter by status
-            if (statusFilter === 'all') {
-                // EXCEPTION: If we are coming from a specific dashboard link (filteredLeadIds), don't auto-hide
-                if (filteredLeadIds || filteredLeadId) {
-                    // Stay visible
-                } else {
-                    // Auto-hide Erroneous and Lost by default from general list ONLY if not explicitly filtering for them
-                    if (lead.status === 'Erróneo' || lead.status === 'Perdido') return false;
-                }
+            // Helper to normalize strings (remove accents and lowercase)
+            const normalize = (s: string) => s?.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase() || '';
+
+            // Filter by status (normalized comparison)
+            if (statusFilter !== 'all') {
+                const normalizedFilter = Array.isArray(statusFilter)
+                    ? statusFilter.map(s => normalize(s))
+                    : [normalize(statusFilter)];
+
+                if (!normalizedFilter.includes(normalize(lead.status || ''))) return false;
             } else {
-                if (Array.isArray(statusFilter)) {
-                    if (!statusFilter.includes(lead.status)) return false;
-                } else {
-                    if (lead.status !== statusFilter) return false;
+                // Default view (hide Erroneous and Lost)
+                if (!filteredLeadId && !filteredLeadIds && !searchTerm) {
+                    const statusNorm = normalize(lead.status || '');
+                    if (statusNorm === 'erroneo' || statusNorm === 'perdido') return false;
                 }
             }
 
             // Filter by source
             if (sourceFilter !== 'all' && lead.source !== sourceFilter) return false;
 
-            // Filter by loss reason
+            // Filter by Loss Reason
             if (lossReasonFilter !== 'all' && lead.lost_reason_id !== lossReasonFilter) return false;
 
-            // Filter by loss stage
+            // Filter by Lost at Stage
             if (lostAtStageFilter !== 'all' && lead.lost_at_stage !== lostAtStageFilter) return false;
-
-            // Filter by date range (if provided from dashboard)
-            if (startDateFilter || endDateFilter) {
-                // Determine which date to use for comparison
-                // If we are filtering specifically for Won/Client status, we use internal_won_date as primary source of truth
-                const isWonFilter = Array.isArray(statusFilter)
-                    ? (statusFilter.includes('Cerrado') || statusFilter.includes('Cliente'))
-                    : (statusFilter === 'Cerrado' || statusFilter === 'Cliente');
-
-                const dateToCompare = (isWonFilter && (lead.status === 'Cerrado' || lead.status === 'Cliente') && lead.internal_won_date)
-                    ? new Date(lead.internal_won_date)
-                    : new Date(lead.created_at);
-
-                if (startDateFilter && dateToCompare < new Date(startDateFilter)) return false;
-                if (endDateFilter && dateToCompare > new Date(endDateFilter)) return false;
-            }
 
             // Filter by Pipeline (only leads with value > 0)
             if (onlyPipelineFilter && (!lead.value || lead.value <= 0)) return false;
+
+            // Filter by date range (if provided from dashboard)
+            if (startDateFilter || endDateFilter) {
+                const dateToCompare = new Date(lead.created_at);
+                if (startDateFilter && dateToCompare < new Date(startDateFilter)) return false;
+                if (endDateFilter && dateToCompare > new Date(endDateFilter)) return false;
+            }
 
             return true;
         });
@@ -824,7 +810,16 @@ export default function Leads() {
             {isStatusFilterOpen && (
                 <div className="absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-50 z-50 py-2 animate-in fade-in slide-in-from-top-2">
                     <button
-                        onClick={() => { setStatusFilter('all'); setIsStatusFilterOpen(false); }}
+                        onClick={() => {
+                            setStatusFilter('all');
+                            setSearchTerm('');
+                            setFilteredLeadId(null);
+                            setFilteredLeadIds(null);
+                            setStartDateFilter(null);
+                            setEndDateFilter(null);
+                            setOnlyPipelineFilter(false);
+                            setIsStatusFilterOpen(false);
+                        }}
                         className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors ${statusFilter === 'all' ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}
                     >
                         Todos los Estados
@@ -833,7 +828,16 @@ export default function Leads() {
                     {(Object.entries(STATUS_CONFIG) as [LeadStatus, any][]).map(([key, config]) => (
                         <button
                             key={key}
-                            onClick={() => { setStatusFilter(key); setIsStatusFilterOpen(false); }}
+                            onClick={() => {
+                                setStatusFilter(key);
+                                setSearchTerm('');
+                                setFilteredLeadId(null);
+                                setFilteredLeadIds(null);
+                                setStartDateFilter(null);
+                                setEndDateFilter(null);
+                                setOnlyPipelineFilter(false);
+                                setIsStatusFilterOpen(false);
+                            }}
                             className={`w-full text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-colors flex items-center gap-2 ${statusFilter === key ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}
                         >
                             <span>{config.icon}</span>
@@ -1424,7 +1428,7 @@ export default function Leads() {
                                                             >
                                                                 <ChevronRight className="w-4 h-4" />
                                                             </button>
-                                                            {isAdmin && (
+                                                            {canDelete && (
                                                                 <button
                                                                     onClick={(e) => { e.stopPropagation(); handleDeleteLead(lead.id, lead.name); }}
                                                                     className="p-1.5 text-rose-400 hover:text-white hover:bg-rose-600 rounded-lg transition-all shadow-sm bg-rose-50/50"
@@ -1473,13 +1477,15 @@ export default function Leads() {
                                             <Send className="w-3.5 h-3.5" />
                                             Preparar Mensaje
                                         </button>
-                                        <button
-                                            onClick={handleBulkDelete}
-                                            className="flex items-center gap-2 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm"
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                            Eliminar Seleccionados
-                                        </button>
+                                        {canDelete && (
+                                            <button
+                                                onClick={handleBulkDelete}
+                                                className="flex items-center gap-2 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm"
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                                Eliminar Seleccionados
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -1617,7 +1623,7 @@ export default function Leads() {
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 relative z-10 ml-4">
-                                {isAdmin && (
+                                {canDelete && (
                                     <button
                                         onClick={() => handleDeleteLead(selectedLead.id, selectedLead.name)}
                                         className="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100 shadow-sm hover:shadow-md"
@@ -1809,28 +1815,7 @@ export default function Leads() {
                                             <Clock className="w-5 h-5 text-blue-200" /> Próximo Paso
                                         </p>
                                     </div>
-                                    {/* Active filters display */}
-                                    {(filteredLeadId || filteredLeadIds || statusFilter !== 'all' || priorityFilter !== 'all') && (
-                                        <div className="flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
-                                            <div className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border border-indigo-100">
-                                                <Filter className="w-3.5 h-3.5" />
-                                                Vista filtrada ({filteredLeads.length} resultados)
-                                                {statusFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Estado: {statusFilter}</span>}
-                                                {priorityFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Prioridad: {(PRIORITY_CONFIG as any)[priorityFilter]?.label || priorityFilter}</span>}
-                                                <button
-                                                    onClick={() => {
-                                                        setFilteredLeadId(null);
-                                                        setFilteredLeadIds(null);
-                                                        setStatusFilter('all');
-                                                        setPriorityFilter('all');
-                                                    }}
-                                                    className="bg-white/50 hover:bg-white p-0.5 rounded-md transition-colors ml-1"
-                                                >
-                                                    <X className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
+
                                     {isSavingFollowUp && (
                                         <span className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse border border-white/20">
                                             Guardando...

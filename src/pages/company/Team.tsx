@@ -4,7 +4,7 @@ import { teamService, type Invitation } from '../../services/team';
 import type { Profile, CustomRole } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, Users, Lock, FileText, Tag, Package, Layers, Building, CreditCard, XCircle } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, Users, Lock, FileText, Tag, Package, Layers, Building, CreditCard, XCircle, Target } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../auth/AuthProvider';
 import { storageService } from '../../services/storage';
@@ -27,13 +27,13 @@ export default function Team() {
 
     // Modal States
     const [editingMember, setEditingMember] = useState<Profile | null>(null);
-    const [baselinePermissions, setBaselinePermissions] = useState<Record<string, boolean>>({});
     const [activeTab, setActiveTab] = useState<TabType>('general');
 
     // Status States
     const [isCreating, setIsCreating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [isLoadingGoal, setIsLoadingGoal] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Form state for new members (Inline)
@@ -46,6 +46,45 @@ export default function Team() {
         birthDate: '',
         address: ''
     });
+
+    // Effect to fetch specialized data when a member is selected for editing
+    useEffect(() => {
+        if (!editingMember?.id) return;
+
+        // If we already initialized this editing session, don't fetch/overwrite again
+        if ((editingMember as any)._initialized) return;
+
+        const fetchExtraData = async () => {
+            try {
+                setIsLoadingGoal(true);
+                // Fetch fresh permissions from DB (merged role + overrides)
+                const { data: mergedPerms } = await supabase.rpc('get_user_permissions', { user_id: editingMember.id });
+                const perms = mergedPerms || {};
+
+                // Fetch Sales Goal
+                const currentMonth = new Date().getMonth() + 1;
+                const currentYear = new Date().getFullYear();
+                let targetValue = 0;
+                if (myProfile?.company_id) {
+                    targetValue = await teamService.getMemberGoal(editingMember.id, myProfile.company_id, currentMonth, currentYear);
+                }
+
+                // Only update if we are still editing the same member AND he hasn't been initialized yet
+                setEditingMember(prev => {
+                    if (prev && prev.id === editingMember.id && !(prev as any)._initialized) {
+                        return { ...prev, permissions: perms, monthly_target: targetValue, _initialized: true } as any;
+                    }
+                    return prev;
+                });
+            } catch (err) {
+                console.error('Error loading member extra details:', err);
+            } finally {
+                setIsLoadingGoal(false);
+            }
+        };
+
+        fetchExtraData();
+    }, [editingMember?.id, myProfile?.company_id]);
 
     useEffect(() => {
         if (myProfile?.company_id) {
@@ -172,22 +211,53 @@ export default function Team() {
 
         setIsSaving(true);
         try {
-            await teamService.updateMember(editingMember.id, {
+            // Data normalization
+            const customRoleId = (editingMember.custom_role_id && editingMember.custom_role_id.length > 5)
+                ? editingMember.custom_role_id
+                : null;
+
+            const updates: any = {
                 full_name: editingMember.full_name,
                 phone: editingMember.phone,
                 role: selectedRole?.base_role || editingMember.role,
-                custom_role_id: editingMember.custom_role_id,
+                custom_role_id: customRoleId,
                 permissions: finalPersistedPerms,
                 birth_date: editingMember.birth_date,
                 address: editingMember.address,
                 avatar_url: editingMember.avatar_url
-            });
+            };
 
-            toast.success('Cambios guardados');
+            console.log('Final updates object:', updates);
+
+            await teamService.updateMember(editingMember.id, updates);
+
+            // Save Sales Goal independently
+            if (myProfile?.company_id && (editingMember as any).monthly_target !== undefined) {
+                try {
+                    const currentMonth = new Date().getMonth() + 1;
+                    const currentYear = new Date().getFullYear();
+                    const targetVal = Number((editingMember as any).monthly_target || 0);
+
+                    await teamService.updateMemberGoal(
+                        editingMember.id,
+                        myProfile.company_id,
+                        currentMonth,
+                        currentYear,
+                        targetVal
+                    );
+                } catch (goalError: any) {
+                    console.error('Non-blocking error saving sales goal:', goalError);
+                    toast.error('Perfil actualizado, pero falló el guardado de la meta de venta.');
+                }
+            }
+
+            toast.success('Cambios guardados exitosamente');
             setEditingMember(null);
             loadData();
         } catch (error: any) {
-            toast.error('Error al guardar');
+            console.error('CRITICAL SAVE ERROR:', error);
+            const errorMsg = error.message || error.details || 'Verifique su conexión.';
+            toast.error(`ERROR AL GUARDAR: ${errorMsg}`);
         } finally {
             setIsSaving(false);
         }
@@ -370,22 +440,9 @@ export default function Team() {
                                             <RoleBadge member={member} />
                                             <div className="flex items-center gap-1.5">
                                                 <button
-                                                    onClick={async () => {
-                                                        // Get merged permissions (role + user overrides) for display
-                                                        const { data: mergedPerms } = await supabase.rpc('get_user_permissions', { user_id: member.id });
-                                                        const perms = mergedPerms || {};
-
-                                                        // Get ROLE-ONLY baseline permissions (without user overrides)
-                                                        const selectedRole = customRoles.find(r => r.id === member.custom_role_id);
-                                                        let roleOnlyPerms: Record<string, boolean> = {};
-
-                                                        if (selectedRole) {
-                                                            const { data: rolePerms } = await supabase.rpc('get_role_permissions', { role_id: selectedRole.id });
-                                                            roleOnlyPerms = rolePerms || {};
-                                                        }
-
-                                                        setBaselinePermissions(roleOnlyPerms);
-                                                        setEditingMember({ ...member, permissions: perms });
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setEditingMember({ ...member } as any);
                                                         setActiveTab('general');
                                                     }}
                                                     className="p-1.5 rounded-xl text-gray-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
@@ -495,6 +552,24 @@ export default function Team() {
                                                     onChange={e => setEditingMember({ ...editingMember, address: e.target.value })}
                                                     className="w-full p-4 rounded-xl bg-gray-50/50 border border-gray-100 focus:bg-white focus:border-indigo-100 outline-none min-h-[100px] font-bold text-sm transition-all shadow-inner"
                                                 />
+                                            </div>
+
+                                            {/* SALES GOAL INPUT */}
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em] pl-1 flex items-center gap-2">
+                                                    <Target className="w-3 h-3" />
+                                                    Meta de Venta Mensual ($)
+                                                </label>
+                                                <div className="relative">
+                                                    <Input
+                                                        type="number"
+                                                        value={(editingMember as any).monthly_target || 0}
+                                                        onChange={e => setEditingMember({ ...editingMember, monthly_target: e.target.value, _initialized: true } as any)}
+                                                        className="h-14 rounded-xl shadow-inner bg-indigo-50/20 border-indigo-100/30 font-black text-indigo-600 focus:bg-white"
+                                                        disabled={isLoadingGoal}
+                                                    />
+                                                    {isLoadingGoal && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-300 animate-spin" />}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

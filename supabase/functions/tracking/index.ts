@@ -22,40 +22,42 @@ Deno.serve(async (req) => {
         )
 
         if (msgId) {
-            // 1. Mark message as opened/clicked
-            const updateData: any = {}
-            if (type === 'open') updateData.status = 'opened'
-            if (type === 'click') updateData.status = 'clicked'
+            console.log(`Processing track event: type=${type}, mid=${msgId}`);
 
-            const { data: msg } = await supabase
+            // 1. Get message details first to find campaign_id
+            const { data: msgInfo } = await supabase
                 .from('marketing_messages')
-                .update({
-                    status: type === 'open' ? 'opened' : 'clicked',
-                    updated_at: new Date().toISOString()
-                })
+                .select('metadata, status')
                 .eq('id', msgId)
-                .select('conversation_id')
-                .single()
+                .single();
 
-            // 2. Increment campaign stats
-            if (msg) {
-                // Find the campaign id from conversation -> metadata or similar
-                // Since we don't have a direct link in marketing_messages to campaign (it's via conversation or metadata)
-                // We'll use the metadata in marketing_messages where we'll store campaign_id
-                const { data: fullMsg } = await supabase
-                    .from('marketing_messages')
-                    .select('metadata')
-                    .eq('id', msgId)
-                    .single()
+            if (msgInfo) {
+                const campaignId = msgInfo.metadata?.campaign_id;
+                const newStatus = type === 'open' ? 'opened' : 'clicked';
 
-                const campaignId = fullMsg?.metadata?.campaign_id
-                if (campaignId) {
-                    const statsKey = type === 'open' ? 'opened' : 'clicked'
-                    // Dynamic update of jsonb stats
-                    await supabase.rpc('increment_campaign_stats', {
-                        campaign_id: campaignId,
-                        stat_key: statsKey
-                    })
+                // Only update if not already at that level (prevent over-counting)
+                // Note: clicked is higher than opened
+                if (msgInfo.status !== 'clicked') {
+                    const { error: updateError } = await supabase
+                        .from('marketing_messages')
+                        .update({
+                            status: newStatus
+                        })
+                        .eq('id', msgId);
+
+                    if (updateError) {
+                        console.error('Update Status Error:', updateError);
+                    } else {
+                        console.log('Update Status Success');
+                    }
+
+                    if (campaignId) {
+                        const statsKey = type === 'open' ? 'opened' : 'clicked';
+                        await supabase.rpc('increment_campaign_stats', {
+                            campaign_id: campaignId,
+                            stat_key: statsKey
+                        });
+                    }
                 }
             }
         }
