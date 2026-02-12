@@ -4,7 +4,7 @@ import { teamService, type Invitation } from '../../services/team';
 import type { Profile, CustomRole } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, Lock, FileText, Tag, Package, Layers, Building, CreditCard, XCircle } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, Users, Lock, FileText, Tag, Package, Layers, Building, CreditCard, XCircle } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../auth/AuthProvider';
 import { storageService } from '../../services/storage';
