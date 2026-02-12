@@ -1012,7 +1012,7 @@ export default function Dashboard() {
                             </div>
                         </div>
                     </div>
-                    <div className="p-3 space-y-1.5">
+                    <div className="p-3 space-y-1.5 max-h-[300px] overflow-y-auto custom-scrollbar">
                         {upcomingFollowUps.length > 0 ? (
                             upcomingFollowUps.map((lead) => (
                                 <div
@@ -1090,7 +1090,7 @@ export default function Dashboard() {
                             </div>
                         </div>
                     </div>
-                    <div className="p-3 space-y-1.5">
+                    <div className="p-3 space-y-1.5 max-h-[300px] overflow-y-auto custom-scrollbar">
                         {recentConversions.length > 0 ? (
                             recentConversions.map((lead) => (
                                 <div

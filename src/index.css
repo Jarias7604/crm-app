@@ -38,9 +38,14 @@
 }
 
 @layer base {
+    .custom-scrollbar {
+        scrollbar-width: thin;
+        scrollbar-color: #e2e8f0 transparent;
+    }
+
     .custom-scrollbar::-webkit-scrollbar {
-        width: 4px;
-        height: 4px;
+        width: 3px;
+        height: 3px;
     }
 
     .custom-scrollbar::-webkit-scrollbar-track {
@@ -48,11 +53,11 @@
     }
 
     .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: #1e293b;
+        background: #e2e8f0;
         border-radius: 20px;
     }
 
     .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: #334155;
+        background: #cbd5e1;
     }
 }
