@@ -551,7 +551,7 @@ export default function Dashboard() {
                         bg: 'bg-indigo-50/50',
                         trend: `${stats.totalPipelineTrend > 0 ? '+' : ''}${stats.totalPipelineTrend}%`,
                         trendColor: stats.totalPipelineTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
-                        onClick: () => navigate('/cotizaciones', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } })
+                        onClick: () => navigate('/leads', { state: { onlyPipeline: true } })
                     },
                     {
                         name: t('dashboard.crm.totalLeads'),

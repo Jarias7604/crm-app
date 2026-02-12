@@ -110,6 +110,7 @@ export default function Leads() {
     const [filteredLeadIds, setFilteredLeadIds] = useState<string[] | null>(null);
     const [startDateFilter, setStartDateFilter] = useState<string | null>(null);
     const [endDateFilter, setEndDateFilter] = useState<string | null>(null);
+    const [onlyPipelineFilter, setOnlyPipelineFilter] = useState<boolean>(false);
 
     const [isUploading, setIsUploading] = useState(false);
     const location = useLocation();
@@ -148,6 +149,7 @@ export default function Leads() {
                 }
                 if (state.startDate) setStartDateFilter(state.startDate);
                 if (state.endDate) setEndDateFilter(state.endDate);
+                if (state.onlyPipeline) setOnlyPipelineFilter(true);
                 if (state.leadId) {
                     setFilteredLeadId(state.leadId);
                     if (viewMode === 'kanban') setViewMode('list');
@@ -353,9 +355,12 @@ export default function Leads() {
                 if (endDateFilter && dateToCompare > new Date(endDateFilter)) return false;
             }
 
+            // Filter by Pipeline (only leads with value > 0)
+            if (onlyPipelineFilter && (!lead.value || lead.value <= 0)) return false;
+
             return true;
         });
-    }, [leads, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter]);
+    }, [leads, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter, onlyPipelineFilter]);
 
     const sortedLeads = useMemo(() => {
         if (!sortConfig) return filteredLeads;
