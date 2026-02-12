@@ -544,8 +544,9 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 {[
                     {
+                        id: 'pipeline',
                         name: t('dashboard.crm.totalPipeline'),
-                        value: `$${stats.totalPipeline.toLocaleString()}`,
+                        value: stats.totalPipeline ? `$${stats.totalPipeline.toLocaleString()}` : '$0',
                         icon: BadgeDollarSign,
                         color: 'text-indigo-600',
                         bg: 'bg-indigo-50/50',
@@ -554,6 +555,7 @@ export default function Dashboard() {
                         onClick: () => navigate('/leads', { state: { onlyPipeline: true } })
                     },
                     {
+                        id: 'leads',
                         name: t('dashboard.crm.totalLeads'),
                         value: stats.totalLeads,
                         icon: Users,
@@ -564,9 +566,10 @@ export default function Dashboard() {
                         onClick: () => navigate('/leads', { state: {} })
                     },
                     {
+                        id: 'won',
                         name: t('dashboard.crm.wonDeals'),
                         value: stats.wonDeals,
-                        secondaryValue: `| $${(stats.totalWonAmount || 0).toLocaleString()}`,
+                        secondaryValue: stats.totalWonAmount ? `| $${stats.totalWonAmount.toLocaleString()}` : '',
                         icon: Target,
                         color: 'text-emerald-600',
                         bg: 'bg-emerald-50/50',
@@ -575,6 +578,7 @@ export default function Dashboard() {
                         onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'] } })
                     },
                     {
+                        id: 'conversion',
                         name: t('dashboard.crm.conversionRate'),
                         value: `${stats.conversionRate || 0}%`,
                         icon: TrendingUp,
@@ -585,6 +589,7 @@ export default function Dashboard() {
                         onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'] } })
                     },
                     {
+                        id: 'errors',
                         name: t('dashboard.crm.erroneousLeads'),
                         value: stats.erroneousLeads || 0,
                         icon: AlertTriangle,
@@ -595,11 +600,12 @@ export default function Dashboard() {
                         onClick: () => navigate('/leads', { state: { status: 'Erróneo' } })
                     },
                 ].map((item) => {
+                    const isActive = activeCardFilter === item.id;
                     return (
                         <div
-                            key={item.name}
+                            key={item.id}
                             onClick={item.onClick}
-                            className={`group relative rounded-2xl p-4 shadow-[0_2px_15px_rgb(0,0,0,0.03)] border transition-all duration-500 hover:-translate-y-1 cursor-pointer ${activeCardFilter === item.name ? 'z-[101]' : 'z-10'} bg-white border-slate-200/60`}
+                            className={`group relative rounded-2xl p-4 shadow-[0_2px_15px_rgb(0,0,0,0.03)] border transition-all duration-500 hover:-translate-y-1 cursor-pointer ${isActive ? 'z-[101] ring-2 ring-indigo-100 shadow-xl' : 'z-10'} bg-white border-slate-200/60`}
                         >
                             <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
                                 <div className={`absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 bg-slate-50`}></div>
@@ -609,18 +615,18 @@ export default function Dashboard() {
                                     <div className={`p-2 rounded-xl ${item.bg} transition-transform group-hover:scale-110 shadow-sm shadow-black/5`}>
                                         <item.icon className={`h-4 w-4 ${item.color}`} />
                                     </div>
-                                    <div className="relative" ref={activeCardFilter === item.name ? cardFilterRef : null}>
+                                    <div className="relative" ref={isActive ? cardFilterRef : null}>
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                setActiveCardFilter(activeCardFilter === item.name ? null : item.name);
+                                                setActiveCardFilter(isActive ? null : item.id);
                                             }}
-                                            className={`p-1.5 rounded-lg transition-all ${activeCardFilter === item.name ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-100/50'}`}
+                                            className={`p-1.5 rounded-lg transition-all ${isActive ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-50 border border-slate-100/50'}`}
                                         >
                                             <Settings className="w-3.5 h-3.5" />
                                         </button>
-                                        {activeCardFilter === item.name && (
-                                            <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-50 py-2 animate-in fade-in slide-in-from-top-2">
+                                        {isActive && (
+                                            <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-[110] py-2 animate-in fade-in slide-in-from-top-2">
                                                 {(Object.entries(DATE_RANGE_OPTIONS) as [DateRange, { label: string }][]).map(([key, option]) => (
                                                     <button
                                                         key={key}
@@ -685,7 +691,7 @@ export default function Dashboard() {
                                     e.stopPropagation();
                                     setActiveCardFilter(activeCardFilter === 'funnel' ? null : 'funnel');
                                 }}
-                                className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'funnel' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'funnel' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-50 border border-slate-100/50'}`}
                             >
                                 <Settings className="w-3.5 h-3.5" />
                             </button>
@@ -734,7 +740,7 @@ export default function Dashboard() {
                                         e.stopPropagation();
                                         setActiveCardFilter(activeCardFilter === 'priority' ? null : 'priority');
                                     }}
-                                    className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'priority' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                    className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'priority' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-50 border border-slate-100/50'}`}
                                 >
                                     <Settings className="w-3.5 h-3.5" />
                                 </button>
@@ -818,7 +824,7 @@ export default function Dashboard() {
                                     e.stopPropagation();
                                     setActiveCardFilter(activeCardFilter === 'sources' ? null : 'sources');
                                 }}
-                                className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'sources' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'sources' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-50 border border-slate-100/50'}`}
                             >
                                 <Settings className="w-3.5 h-3.5" />
                             </button>
@@ -915,7 +921,7 @@ export default function Dashboard() {
                                         e.stopPropagation();
                                         setActiveCardFilter(activeCardFilter === 'topOpp' ? null : 'topOpp');
                                     }}
-                                    className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'topOpp' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                    className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'topOpp' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-50 border border-slate-100/50'}`}
                                 >
                                     <Settings className="w-3.5 h-3.5" />
                                 </button>
@@ -984,7 +990,7 @@ export default function Dashboard() {
                                         e.stopPropagation();
                                         setActiveCardFilter(activeCardFilter === 'followups' ? null : 'followups');
                                     }}
-                                    className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'followups' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                    className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'followups' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-50 border border-slate-100/50'}`}
                                 >
                                     <Settings className="w-3.5 h-3.5" />
                                 </button>
@@ -1059,7 +1065,7 @@ export default function Dashboard() {
                                         e.stopPropagation();
                                         setActiveCardFilter(activeCardFilter === 'conversions' ? null : 'conversions');
                                     }}
-                                    className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'conversions' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                    className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'conversions' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-50 border border-slate-100/50'}`}
                                 >
                                     <Settings className="w-3.5 h-3.5" />
                                 </button>

@@ -282,7 +282,7 @@ export default function MarketingDashboard() {
                                         e.stopPropagation();
                                         setActiveCardFilter(activeCardFilter === 'heatmap' ? null : 'heatmap');
                                     }}
-                                    className={`p-2 rounded-xl transition-all ${activeCardFilter === 'heatmap' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:text-indigo-600 hover:bg-slate-50 border border-transparent hover:border-slate-100'}`}
+                                    className={`p-2 rounded-xl transition-all ${activeCardFilter === 'heatmap' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-50 border border-slate-100/50'}`}
                                 >
                                     <Settings className="w-4 h-4" />
                                 </button>
