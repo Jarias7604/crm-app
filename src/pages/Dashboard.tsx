@@ -561,7 +561,7 @@ export default function Dashboard() {
                         bg: 'bg-blue-50/50',
                         trend: `${stats.totalLeadsTrend > 0 ? '+' : ''}${stats.totalLeadsTrend}%`,
                         trendColor: stats.totalLeadsTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
-                        onClick: () => navigate('/leads', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } })
+                        onClick: () => navigate('/leads', { state: {} })
                     },
                     {
                         name: t('dashboard.crm.wonDeals'),
@@ -572,7 +572,7 @@ export default function Dashboard() {
                         bg: 'bg-emerald-50/50',
                         trend: `${stats.wonDealsTrend > 0 ? '+' : ''}${stats.wonDealsTrend}%`,
                         trendColor: stats.wonDealsTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
-                        onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'], startDate: dateRange.startDate, endDate: dateRange.endDate } })
+                        onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'] } })
                     },
                     {
                         name: t('dashboard.crm.conversionRate'),
@@ -582,7 +582,7 @@ export default function Dashboard() {
                         bg: 'bg-amber-50/50',
                         trend: `${stats.conversionRateTrend > 0 ? '+' : ''}${stats.conversionRateTrend}%`,
                         trendColor: stats.conversionRateTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
-                        onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'], startDate: dateRange.startDate, endDate: dateRange.endDate } })
+                        onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'] } })
                     },
                     {
                         name: t('dashboard.crm.erroneousLeads'),
@@ -592,7 +592,7 @@ export default function Dashboard() {
                         bg: 'bg-rose-500/10',
                         trend: `${stats.erroneousLeadsTrend > 0 ? '+' : ''}${stats.erroneousLeadsTrend}%`,
                         trendColor: stats.erroneousLeadsTrend <= 0 ? 'text-emerald-500' : 'text-rose-500', // Inverse for errors
-                        onClick: () => navigate('/leads', { state: { status: 'Erróneo', startDate: dateRange.startDate, endDate: dateRange.endDate } })
+                        onClick: () => navigate('/leads', { state: { status: 'Erróneo' } })
                     },
                 ].map((item) => {
                     return (

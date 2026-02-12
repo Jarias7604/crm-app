@@ -312,7 +312,15 @@ export default function Leads() {
             }
 
             // Filter by status
-            if (statusFilter !== 'all') {
+            if (statusFilter === 'all') {
+                // EXCEPTION: If we are coming from a specific dashboard link (filteredLeadIds), don't auto-hide
+                if (filteredLeadIds || filteredLeadId) {
+                    // Stay visible
+                } else {
+                    // Auto-hide Erroneous and Lost by default from general list ONLY if not explicitly filtering for them
+                    if (lead.status === 'Erróneo' || lead.status === 'Perdido') return false;
+                }
+            } else {
                 if (Array.isArray(statusFilter)) {
                     if (!statusFilter.includes(lead.status)) return false;
                 } else {
