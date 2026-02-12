@@ -88,6 +88,11 @@
             "columnDate": "Date",
             "leadGrowthTitle": "Lead Growth",
             "leadGrowthSubtitle": "New leads over time",
+            "salesGoalsTitle": "Team Performance",
+            "salesGoalsSubtitle": "Progress vs monthly targets",
+            "erroneousLeads": "Erroneous Leads",
+            "qualityMonitorTitle": "Quality Monitor",
+            "qualityMonitorSubtitle": "Invalid leads trend",
             "filterLast7Days": "Last 7 Days",
             "filterLastMonth": "Last Month",
             "filterLastYear": "Last Year"

@@ -1,7 +1,6 @@
 import { supabase } from './supabase';
 import { logger } from '../utils/logger';
 import { getCurrentUserCompanyId } from '../utils/auth';
-import { lossStatisticsService } from './lossStatistics';
 
 /**
  * Optimized Dashboard Service
@@ -17,119 +16,57 @@ export const dashboardService = {
     async getDashboardStats(startDate?: string, endDate?: string, companyId?: string) {
         try {
             const finalCompanyId = companyId || await getCurrentUserCompanyId();
-            console.log('🔍 FETCHING DASHBOARD STATS:', { companyId: finalCompanyId, startDate, endDate });
+            logger.debug('🔍 FETCHING OPTIMIZED DASHBOARD:', { companyId: finalCompanyId, startDate, endDate });
 
             logger.time('getDashboardStats');
 
-            // 1. Fetch main stats via RPC
+            // Single RPC call for EVERYTHING
             const { data, error } = await supabase.rpc('get_dashboard_stats', {
                 p_company_id: finalCompanyId,
                 p_start_date: startDate || null,
                 p_end_date: endDate || null
             });
 
-            console.log('✅ RPC DASHBOARD RESPONSE:', data);
-
-            // 2. Fetch upcoming follow-ups
-            // We show follow-ups that were scheduled or are relevant to the selected period
-            let followUpsQuery = supabase
-                .from('leads')
-                .select('id, name, next_followup_date, next_action_notes, priority')
-                .eq('company_id', finalCompanyId)
-                .not('next_followup_date', 'is', null);
-
-            if (startDate) {
-                followUpsQuery = followUpsQuery.gte('next_followup_date', startDate);
-            } else {
-                // If no start date, default to today or later for "Upcoming"
-                followUpsQuery = followUpsQuery.gte('next_followup_date', new Date().toISOString().split('T')[0]);
-            }
-
-            if (endDate) {
-                followUpsQuery = followUpsQuery.lte('next_followup_date', endDate);
-            }
-
-            const { data: upcomingFollowUps } = await followUpsQuery
-                .order('next_followup_date', { ascending: true })
-                .limit(5);
-
-            // 3. Fetch recent conversions within the selected period
-            // IMPORTANT: We filter by internal_won_date to match the KPI logic
-            let conversionsQuery = supabase
-                .from('leads')
-                .select('id, name, company_name, value, closing_amount, created_at, internal_won_date')
-                .eq('company_id', finalCompanyId)
-                .in('status', ['Cerrado', 'Cliente']);
-
-            if (startDate) conversionsQuery = conversionsQuery.gte('internal_won_date', startDate);
-            if (endDate) conversionsQuery = conversionsQuery.lte('internal_won_date', endDate);
-
-            const { data: recentConversions } = await conversionsQuery
-                .order('internal_won_date', { ascending: false })
-                .limit(5);
-
-            // 4. Fetch top opportunities within the selected period
-            // For general opportunities, we still use created_at, but we include won ones that happened in this period
-            let opportunitiesQuery = supabase
-                .from('leads')
-                .select('id, name, company_name, value, status, priority, source, created_at, internal_won_date')
-                .eq('company_id', finalCompanyId)
-                .gt('value', 0);
-
-            if (startDate && endDate) {
-                // Return leads created in the period OR won in the period
-                opportunitiesQuery = opportunitiesQuery.or(`created_at.gte.${startDate},and(status.in.("Cerrado","Cliente"),internal_won_date.gte.${startDate})`);
-                opportunitiesQuery = opportunitiesQuery.or(`created_at.lte.${endDate},and(status.in.("Cerrado","Cliente"),internal_won_date.lte.${endDate})`);
-            }
-
-            const { data: topOpportunitiesManual } = await opportunitiesQuery
-                .order('value', { ascending: false })
-                .limit(5);
-
-            // 5. Fetch Loss Analytics
-            const startD = startDate ? new Date(startDate) : undefined;
-            const endD = endDate ? new Date(endDate) : undefined;
-
-            const [lossReasons, lossStages] = await Promise.all([
-                lossStatisticsService.getLossStatistics(startD, endD),
-                lossStatisticsService.getLossStageStatistics(startD, endD)
-            ]);
-
             logger.timeEnd('getDashboardStats');
 
             if (error) {
-                logger.error('Failed to fetch dashboard stats', error, {
+                logger.error('Failed to fetch dashboard stats via RPC', error, {
                     action: 'getDashboardStats',
-                    companyId: finalCompanyId,
-                    startDate,
-                    endDate
+                    companyId: finalCompanyId
                 });
                 throw error;
             }
 
+            // The RPC returns a single JSONB object with all keys
             return {
                 stats: data?.stats || {
                     totalLeads: 0,
+                    totalLeadsTrend: 0,
                     totalPipeline: 0,
+                    totalPipelineTrend: 0,
                     wonDeals: 0,
-                    conversionRate: 0
+                    wonDealsTrend: 0,
+                    totalWonAmount: 0,
+                    conversionRate: 0,
+                    conversionRateTrend: 0,
+                    erroneousLeads: 0,
+                    erroneousLeadsTrend: 0
                 },
                 byStatus: data?.byStatus || [],
                 bySource: data?.bySource || [],
                 byPriority: data?.byPriority || [],
-                topOpportunities: topOpportunitiesManual || [],
-                upcomingFollowUps: upcomingFollowUps || [],
-                recentConversions: recentConversions || [],
-                lossReasons: lossReasons || [],
-                lossStages: lossStages || [],
-                qualityTrend: data?.qualityTrend || []
+                topOpportunities: data?.topOpportunities || [],
+                upcomingFollowUps: data?.upcomingFollowUps || [],
+                recentConversions: data?.recentConversions || [],
+                lossReasons: data?.lossReasons || [],
+                lossStages: data?.lossStages || [],
+                qualityTrend: data?.qualityTrend || [],
+                salesKpis: data?.salesKpis || []
             };
         } catch (error) {
-            logger.error('Unhandled error in getDashboardStats', error, {
-                startDate,
-                endDate
-            });
+            logger.error('Unhandled error in getDashboardStats', error);
             throw error;
         }
     }
+
 };

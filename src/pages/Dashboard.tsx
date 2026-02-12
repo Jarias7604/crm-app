@@ -4,7 +4,7 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
-import { BadgeDollarSign, TrendingUp, Users, Target, Building, Calendar, Clock, CheckCircle, ChevronDown, Edit2, Settings } from 'lucide-react';
+import { BadgeDollarSign, TrendingUp, Users, Target, Building, Calendar, Clock, CheckCircle, ChevronDown, Edit2, Settings, AlertTriangle } from 'lucide-react';
 import { adminService } from '../services/admin';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import {
@@ -91,7 +91,9 @@ export default function Dashboard() {
 
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const filterRef = useRef<HTMLDivElement>(null);
-    const [selectedDateRange, setSelectedDateRange] = useState<DateRange>('all');
+    const [selectedDateRange, setSelectedDateRange] = useState<DateRange>(
+        (localStorage.getItem('dashboard_selected_date_range') as DateRange) || 'all'
+    );
     const [refreshKey, setRefreshKey] = useState(Date.now());
 
     // Card-specific filter dropdown state
@@ -101,14 +103,18 @@ export default function Dashboard() {
     // Real data states
     const [stats, setStats] = useState({
         totalLeads: 0,
+        totalLeadsTrend: 0,
         totalPipeline: 0,
+        totalPipelineTrend: 0,
         wonDeals: 0,
+        wonDealsTrend: 0,
         totalWonAmount: 0,
         conversionRate: 0,
+        conversionRateTrend: 0,
         erroneousLeads: 0,
+        erroneousLeadsTrend: 0,
     });
     const [funnelData, setFunnelData] = useState<any[]>([]);
-    const [qualityTrend, setQualityTrend] = useState<any[]>([]);
     const [sourceData, setSourceData] = useState<any[]>([]);
     const [priorityData, setPriorityData] = useState<any[]>([]);
     const [upcomingFollowUps, setUpcomingFollowUps] = useState<any[]>([]);
@@ -116,6 +122,7 @@ export default function Dashboard() {
     const [topOpportunities, setTopOpportunities] = useState<any[]>([]);
     const [lossReasonData, setLossReasonData] = useState<any[]>([]);
     const [lossStageData, setLossStageData] = useState<any[]>([]);
+
 
     const navigate = useNavigate();
 
@@ -127,6 +134,11 @@ export default function Dashboard() {
     });
     const [recentCompanies, setRecentCompanies] = useState<any[]>([]);
     const [companyTrend, setCompanyTrend] = useState<any[]>([]);
+
+    // Persist date range selection
+    useEffect(() => {
+        localStorage.setItem('dashboard_selected_date_range', selectedDateRange);
+    }, [selectedDateRange]);
 
     // Refresh data when navigating to Dashboard or when filters change
     useEffect(() => {
@@ -242,14 +254,17 @@ export default function Dashboard() {
             });
             setFunnelData(mappedFunnelData);
 
-            // Calculate source percentages
-            const total = dashboardData.bySource.reduce((sum: number, s: any) => sum + s.value, 0);
-            setSourceData(dashboardData.bySource.map((s: any) => ({
+            // Calculate source percentages and sort by value DESC
+            const sDataRaw = dashboardData.bySource || [];
+            const total = sDataRaw.reduce((sum: number, s: any) => sum + s.value, 0);
+            const mappedSources = sDataRaw.map((s: any) => ({
                 key: s.name,
-                name: SOURCE_CONFIG[s.name]?.label || s.name,
-                icon: SOURCE_CONFIG[s.name]?.icon || '📊',
-                value: total > 0 ? Math.round((s.value / total) * 100) : 0
-            })));
+                name: SOURCE_CONFIG[s.name as keyof typeof SOURCE_CONFIG]?.label || s.name,
+                icon: SOURCE_CONFIG[s.name as keyof typeof SOURCE_CONFIG]?.icon || '📊',
+                value: total > 0 ? Math.round((s.value / total) * 100) : 0,
+                count: s.value
+            })).sort((a: any, b: any) => b.count - a.count);
+            setSourceData(mappedSources);
 
             // Set top opportunities
             setTopOpportunities(dashboardData.topOpportunities || []);
@@ -273,13 +288,7 @@ export default function Dashboard() {
             // Set loss analytics
             setLossReasonData(dashboardData.lossReasons || []);
             setLossStageData(dashboardData.lossStages || []);
-            // Process Quality Trend
-            if (dashboardData.qualityTrend) {
-                setQualityTrend(dashboardData.qualityTrend.map((item: any) => ({
-                    date: format(new Date(item.date), 'dd/MM'),
-                    count: item.count
-                })));
-            }
+
         }
     }, [dashboardData]);
 
@@ -534,8 +543,26 @@ export default function Dashboard() {
             {/* KPI Cards - Global Standard */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 {[
-                    { name: t('dashboard.crm.totalPipeline'), value: `$${stats.totalPipeline.toLocaleString()}`, icon: BadgeDollarSign, color: 'text-indigo-600', bg: 'bg-indigo-50/50', trend: '+12.5%', onClick: () => navigate('/cotizaciones', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } }) },
-                    { name: t('dashboard.crm.totalLeads'), value: stats.totalLeads, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50/50', trend: '+5.2%', onClick: () => navigate('/leads', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } }) },
+                    {
+                        name: t('dashboard.crm.totalPipeline'),
+                        value: `$${stats.totalPipeline.toLocaleString()}`,
+                        icon: BadgeDollarSign,
+                        color: 'text-indigo-600',
+                        bg: 'bg-indigo-50/50',
+                        trend: `${stats.totalPipelineTrend > 0 ? '+' : ''}${stats.totalPipelineTrend}%`,
+                        trendColor: stats.totalPipelineTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
+                        onClick: () => navigate('/cotizaciones', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } })
+                    },
+                    {
+                        name: t('dashboard.crm.totalLeads'),
+                        value: stats.totalLeads,
+                        icon: Users,
+                        color: 'text-blue-600',
+                        bg: 'bg-blue-50/50',
+                        trend: `${stats.totalLeadsTrend > 0 ? '+' : ''}${stats.totalLeadsTrend}%`,
+                        trendColor: stats.totalLeadsTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
+                        onClick: () => navigate('/leads', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } })
+                    },
                     {
                         name: t('dashboard.crm.wonDeals'),
                         value: stats.wonDeals,
@@ -543,135 +570,102 @@ export default function Dashboard() {
                         icon: Target,
                         color: 'text-emerald-600',
                         bg: 'bg-emerald-50/50',
-                        trend: '+8.1%',
+                        trend: `${stats.wonDealsTrend > 0 ? '+' : ''}${stats.wonDealsTrend}%`,
+                        trendColor: stats.wonDealsTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
                         onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'], startDate: dateRange.startDate, endDate: dateRange.endDate } })
                     },
-                    { name: t('dashboard.crm.conversionRate'), value: `${stats.conversionRate}%`, icon: TrendingUp, color: 'text-amber-600', bg: 'bg-amber-50/50', trend: '+2.4%', onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'], startDate: dateRange.startDate, endDate: dateRange.endDate } }) },
-                ].map((item) => (
-                    <div
-                        key={item.name}
-                        onClick={item.onClick}
-                        className={`group relative rounded-2xl bg-white p-3 shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 hover:-translate-y-1 cursor-pointer ${activeCardFilter === item.name ? 'z-[101]' : 'z-10'}`}
-                    >
-                        <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
-                            <div className="absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 bg-slate-50 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-                        </div>
-                        <div className="flex flex-col h-full relative z-10">
-                            <div className="flex justify-between items-start mb-2">
-                                <div className={`p-2.5 rounded-xl ${item.bg} transition-transform group-hover:scale-110 shadow-sm shadow-black/5`}>
-                                    <item.icon className={`h-5 w-5 ${item.color}`} />
-                                </div>
-                                <div className="relative" ref={activeCardFilter === item.name ? cardFilterRef : null}>
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setActiveCardFilter(activeCardFilter === item.name ? null : item.name);
-                                        }}
-                                        className={`p-1.5 rounded-lg transition-all ${activeCardFilter === item.name ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
-                                    >
-                                        <Settings className="w-3.5 h-3.5" />
-                                    </button>
-
-                                    {activeCardFilter === item.name && (
-                                        <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-50 py-2 animate-in fade-in slide-in-from-top-2">
-                                            {(Object.entries(DATE_RANGE_OPTIONS) as [DateRange, { label: string }][]).map(([key, option]) => (
-                                                <button
-                                                    key={key}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setSelectedDateRange(key);
-                                                        setActiveCardFilter(null);
-                                                    }}
-                                                    className={`w-full text-left px-4 py-2 text-[11px] transition-colors flex items-center justify-between ${selectedDateRange === key
-                                                        ? 'bg-indigo-50 text-indigo-600 font-black'
-                                                        : 'text-slate-600 font-bold hover:bg-gray-50'
-                                                        }`}
-                                                >
-                                                    <span className="flex items-center gap-2">
-                                                        {option.label}
-                                                        <span className="text-[9px] opacity-30 font-medium">{getDateRangeLabelDisplay(key)}</span>
-                                                    </span>
-                                                    {selectedDateRange === key && <CheckCircle className="w-4 h-4 text-indigo-600" />}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
+                    {
+                        name: t('dashboard.crm.conversionRate'),
+                        value: `${stats.conversionRate || 0}%`,
+                        icon: TrendingUp,
+                        color: 'text-amber-600',
+                        bg: 'bg-amber-50/50',
+                        trend: `${stats.conversionRateTrend > 0 ? '+' : ''}${stats.conversionRateTrend}%`,
+                        trendColor: stats.conversionRateTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
+                        onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'], startDate: dateRange.startDate, endDate: dateRange.endDate } })
+                    },
+                    {
+                        name: t('dashboard.crm.erroneousLeads'),
+                        value: stats.erroneousLeads || 0,
+                        icon: AlertTriangle,
+                        color: 'text-rose-400',
+                        bg: 'bg-rose-500/10',
+                        trend: `${stats.erroneousLeadsTrend > 0 ? '+' : ''}${stats.erroneousLeadsTrend}%`,
+                        trendColor: stats.erroneousLeadsTrend <= 0 ? 'text-emerald-500' : 'text-rose-500', // Inverse for errors
+                        onClick: () => navigate('/leads', { state: { status: 'Erróneo', startDate: dateRange.startDate, endDate: dateRange.endDate } })
+                    },
+                ].map((item) => {
+                    return (
+                        <div
+                            key={item.name}
+                            onClick={item.onClick}
+                            className={`group relative rounded-2xl p-4 shadow-[0_2px_15px_rgb(0,0,0,0.03)] border transition-all duration-500 hover:-translate-y-1 cursor-pointer ${activeCardFilter === item.name ? 'z-[101]' : 'z-10'} bg-white border-slate-200/60`}
+                        >
+                            <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
+                                <div className={`absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 bg-slate-50`}></div>
                             </div>
-                            <dt className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] mb-1">{item.name}</dt>
-                            <div className="flex items-baseline gap-1.5 flex-wrap">
-                                <dd className="text-3xl font-black text-slate-900 tracking-tighter">{item.value}</dd>
-                                {item.secondaryValue && (
-                                    <span className="text-xs font-bold text-slate-600 flex items-center">{item.secondaryValue}</span>
-                                )}
-                                <span className="text-[9px] font-black text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded-lg ml-auto">{item.trend}</span>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-
-                {/* Lead Quality Monitor - Sparkline Card */}
-                <div
-                    onClick={() => navigate('/leads', { state: { status: ['Erróneo'], startDate: dateRange.startDate, endDate: dateRange.endDate } })}
-                    className="group relative rounded-2xl bg-slate-50 p-3 border border-slate-200/60 shadow-inner hover:bg-white hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 cursor-pointer"
-                >
-                    <div className="flex flex-col h-full">
-                        <div className="flex justify-between items-start mb-1">
-                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Monitor de Calidad</span>
-                            <BadgeDollarSign className="w-3.5 h-3.5 text-slate-300" />
-                        </div>
-                        <div className="flex items-baseline gap-1 mb-2">
-                            <span className="text-xl font-black text-slate-700">{stats.erroneousLeads}</span>
-                            <span className="text-[10px] font-bold text-slate-400">Leads Erróneos</span>
-                        </div>
-                        <div className="h-10 w-full mt-auto">
-                            {qualityTrend.length > 0 && stats.erroneousLeads > 0 ? (
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart
-                                        data={qualityTrend.length === 1
-                                            ? [{ date: 'Inicio', count: 0 }, ...qualityTrend]
-                                            : qualityTrend
-                                        }
-                                        margin={{ top: 5, right: 0, left: 0, bottom: 0 }}
-                                    >
-                                        <XAxis
-                                            dataKey="date"
-                                            hide={false}
-                                            axisLine={false}
-                                            tickLine={false}
-                                            tick={{ fontSize: 7, fill: '#94a3b8', fontWeight: 'bold' }}
-                                            interval="preserveStartEnd"
-                                        />
-                                        <Tooltip
-                                            content={({ active, payload }) => {
-                                                if (active && payload && payload.length) {
-                                                    return (
-                                                        <div className="bg-white px-2 py-1 rounded shadow-sm border border-slate-100 text-[9px] font-bold text-slate-600">
-                                                            {payload[0].payload.date}: {payload[0].value} err
-                                                        </div>
-                                                    );
-                                                }
-                                                return null;
+                            <div className="flex flex-col h-full relative z-10">
+                                <div className="flex justify-between items-start mb-3">
+                                    <div className={`p-2 rounded-xl ${item.bg} transition-transform group-hover:scale-110 shadow-sm shadow-black/5`}>
+                                        <item.icon className={`h-4 w-4 ${item.color}`} />
+                                    </div>
+                                    <div className="relative" ref={activeCardFilter === item.name ? cardFilterRef : null}>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActiveCardFilter(activeCardFilter === item.name ? null : item.name);
                                             }}
-                                        />
-                                        <Area
-                                            type="monotone"
-                                            dataKey="count"
-                                            stroke={stats.erroneousLeads > 5 ? "#f43f5e" : "#94a3b8"}
-                                            fill={stats.erroneousLeads > 5 ? "#fff1f2" : "#e2e8f0"}
-                                            strokeWidth={2}
-                                            fillOpacity={0.4}
-                                        />
-                                    </AreaChart>
-                                </ResponsiveContainer>
-                            ) : (
-                                <div className="h-full flex items-center justify-center border-t border-slate-100 italic text-[9px] text-slate-300 font-medium">
-                                    {stats.erroneousLeads > 0 ? "Bajo observación" : "Sin errores detectados"}
+                                            className={`p-1.5 rounded-lg transition-all ${activeCardFilter === item.name ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                        >
+                                            <Settings className="w-3.5 h-3.5" />
+                                        </button>
+                                        {activeCardFilter === item.name && (
+                                            <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-50 py-2 animate-in fade-in slide-in-from-top-2">
+                                                {(Object.entries(DATE_RANGE_OPTIONS) as [DateRange, { label: string }][]).map(([key, option]) => (
+                                                    <button
+                                                        key={key}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedDateRange(key);
+                                                            setActiveCardFilter(null);
+                                                        }}
+                                                        className={`w-full text-left px-4 py-2 text-[11px] transition-colors flex items-center justify-between ${selectedDateRange === key ? 'bg-indigo-50 text-indigo-600 font-black' : 'text-slate-600 font-bold hover:bg-gray-50'}`}
+                                                    >
+                                                        <span className="flex items-center gap-2">
+                                                            {option.label}
+                                                            <span className="text-[9px] opacity-30 font-medium">{getDateRangeLabelDisplay(key)}</span>
+                                                        </span>
+                                                        {selectedDateRange === key && <CheckCircle className="w-4 h-4 text-indigo-600" />}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            )}
+
+                                <div className="flex-grow">
+                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] mb-1 text-slate-400">{item.name}</h3>
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="text-3xl font-black tracking-tighter text-slate-900">{item.value}</span>
+                                        {item.secondaryValue && <span className="text-[11px] font-bold text-slate-400">{item.secondaryValue}</span>}
+                                    </div>
+                                </div>
+
+                                <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5">
+                                        <div className={`w-1.5 h-1.5 rounded-full ${item.trendColor.replace('text', 'bg')}`} />
+                                        <span className={`text-[9px] font-black tracking-widest uppercase ${item.trendColor}`}>
+                                            {item.trend}
+                                        </span>
+                                    </div>
+                                    <span className="text-[9px] font-bold text-slate-300">
+                                        {getDateRangeLabelDisplay(selectedDateRange) || 'Todo el tiempo'}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                </div>
+                    );
+                })}
             </div>
 
             {/* Main Content Area: Grouped Proportions */}
@@ -724,7 +718,7 @@ export default function Dashboard() {
                             onStageClick={(status) => navigate('/leads', { state: { status, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
                         />
                     </div>
-                </div>
+                </div >
 
                 <div className={`bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 lg:col-span-4 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'priority' ? 'z-[50]' : 'z-0'}`}>
                     <div className="flex justify-between items-center mb-2">
@@ -793,9 +787,10 @@ export default function Dashboard() {
                                             <Cell
                                                 key={`cell-${index}`}
                                                 fill={
-                                                    entry.key === 'very_high' ? '#10b981' :
-                                                        entry.key === 'high' ? '#3b82f6' :
-                                                            entry.key === 'medium' ? '#f59e0b' : '#e2e8f0'
+                                                    entry.key === 'very_high' ? '#EF4444' : // Red 500
+                                                        entry.key === 'high' ? '#F97316' :      // Orange 500
+                                                            entry.key === 'medium' ? '#FACC15' :    // Yellow 400
+                                                                '#D1D5DB'                               // Gray 300
                                                 }
                                             />
                                         ))}
@@ -862,7 +857,7 @@ export default function Dashboard() {
                                             innerRadius={35}
                                             outerRadius={50}
                                             paddingAngle={8}
-                                            dataKey="value"
+                                            dataKey="count"
                                             stroke="none"
                                             onClick={(data) => {
                                                 if (data && data.key) {
@@ -1122,7 +1117,8 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* Row 3: Lost Leads Analysis */}
+
+                {/* Row 4: Lost Leads Analysis */}
                 <div className="lg:col-span-12 grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* Lost by Stage */}
                     <div className={`bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'lostByStage' ? 'z-[50]' : 'z-0'}`}>
@@ -1292,8 +1288,8 @@ export default function Dashboard() {
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 }
 

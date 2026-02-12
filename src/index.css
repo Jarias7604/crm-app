@@ -1,5 +1,42 @@
 @import "tailwindcss";
 
+@layer utilities {
+    .animate-shimmer {
+        animation: shimmer 2s infinite;
+        background: linear-gradient(to right,
+                transparent 0%,
+                rgba(255, 255, 255, 0.2) 50%,
+                transparent 100%);
+        background-size: 200% 100%;
+    }
+
+    @keyframes shimmer {
+        from {
+            background-position: -200% 0;
+        }
+
+        to {
+            background-position: 200% 0;
+        }
+    }
+
+    .animate-in {
+        animation: animate-in 0.3s ease-out;
+    }
+
+    @keyframes animate-in {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+}
+
 @layer base {
     .custom-scrollbar::-webkit-scrollbar {
         width: 4px;
