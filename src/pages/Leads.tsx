@@ -721,6 +721,10 @@ export default function Leads() {
             // Capture the stage where the lead was lost
             const lost_at_stage = selectedLead.status;
 
+            // Find loss reason text
+            const reasonObj = lossReasons.find(r => r.id === lossData.lost_reason_id);
+            const reasonText = reasonObj ? reasonObj.reason : 'No especificado';
+
             await leadsService.updateLead(selectedLead.id, {
                 status: 'Perdido',
                 lost_reason_id: lossData.lost_reason_id,
@@ -729,8 +733,17 @@ export default function Leads() {
                 lost_date: new Date().toISOString()
             });
 
+            // Create a follow-up record for the history
+            await leadsService.createFollowUp({
+                lead_id: selectedLead.id,
+                date: new Date().toISOString(),
+                notes: `🚫 LEAD MARCADO COMO PERDIDO\nMotivo: ${reasonText}${lossData.lost_notes ? `\nNotas: ${lossData.lost_notes}` : ''}`,
+                action_type: 'other'
+            });
+
             setSelectedLead({ ...selectedLead, status: 'Perdido', lost_at_stage, lost_reason_id: lossData.lost_reason_id, lost_notes: lossData.lost_notes });
             loadLeads();
+            loadFollowUps(selectedLead.id);
 
             setIsLossModalOpen(false);
             setLossData({ lost_reason_id: '', lost_notes: '' });
