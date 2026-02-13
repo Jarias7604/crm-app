@@ -199,7 +199,6 @@ Deno.serve(async (req) => {
             try {
                 const messageId = crypto.randomUUID();
                 let conversationId = null;
-                let finalContent = campaign.content || '';
 
                 // Professional Variable Substitution: {{name}}, {{first_name}}, {{greeting}}, {{phone}}
                 let localizedContent = campaign.content || '';
@@ -215,19 +214,10 @@ Deno.serve(async (req) => {
                 const greeting = getGreeting();
                 const firstName = (lead.name || '').split(' ')[0] || 'Hola';
 
-                finalContent = finalContent.replace(/{{greeting}}/g, greeting);
-                finalContent = finalContent.replace(/{{name}}/g, lead.name || '');
-                finalContent = finalContent.replace(/{{first_name}}/g, firstName);
-                finalContent = finalContent.replace(/{{phone}}/g, lead.phone || '');
-
-                // Senior Link Wrapping: Apply tracking to all URLs in the content for all channels
-                const trackingClickUrl = `${trackingBaseUrl}?type=click&mid=${messageId}&url=`;
-                finalContent = finalContent.replace(/<a\s+(?:[^>]*?\s+)?href="([^"]*)"/gi, (match, p1) => {
-                    if (p1.startsWith('mailto:') || p1.startsWith('tel:') || p1.includes('tracking?type=click')) {
-                        return match;
-                    }
-                    return match.replace(p1, `${trackingClickUrl}${encodeURIComponent(p1)}`);
-                });
+                localizedContent = localizedContent.replace(/{{greeting}}/g, greeting);
+                localizedContent = localizedContent.replace(/{{name}}/g, lead.name || '');
+                localizedContent = localizedContent.replace(/{{first_name}}/g, firstName);
+                localizedContent = localizedContent.replace(/{{phone}}/g, lead.phone || '');
 
                 // --- Media Extraction & Formatting Utility ---
                 const extractMediaAndText = (html: string) => {
@@ -272,7 +262,7 @@ Deno.serve(async (req) => {
                     return { cleanText, mediaUrl, mediaType };
                 };
 
-                const richContent = extractMediaAndText(finalContent);
+                const richContent = extractMediaAndText(localizedContent);
 
                 // A. WhatsApp Send (Meta Cloud API) - Generic Foundation
                 if (campaign.type === 'whatsapp' && phone) {
@@ -382,9 +372,9 @@ Deno.serve(async (req) => {
                             else method = 'sendDocument';
 
                             payload[richContent.mediaType === 'image' ? 'photo' : richContent.mediaType!] = richContent.mediaUrl;
-                            payload.caption = finalContent; // Telegram supports HTML in captions
+                            payload.caption = localizedContent; // Telegram supports HTML in captions
                         } else {
-                            payload.text = finalContent;
+                            payload.text = localizedContent;
                         }
 
                         // Support for Professional Buttons (Inline Keyboard)
@@ -448,9 +438,8 @@ Deno.serve(async (req) => {
                         throw new Error("Missing Resend API Key configuration");
                     }
 
-                    // Senior Link Wrapping: Already applied globally above
                     const trackedHtml = `
-                        ${finalContent}
+                        ${localizedContent}
                         <img src="${trackingBaseUrl}?type=open&mid=${messageId}" width="1" height="1" style="display:none;" />
                     `;
 
@@ -488,7 +477,7 @@ Deno.serve(async (req) => {
                 const { error: msgError } = await supabase.from("marketing_messages").insert({
                     id: messageId,
                     conversation_id: conversationId,
-                    content: finalContent,
+                    content: localizedContent,
                     direction: "outbound",
                     type: "text",
                     status: (campaign.type === 'email' && !resendToken) ? 'sent' : 'delivered',

@@ -31,33 +31,27 @@ export interface ActiveCampaign {
 }
 
 export const marketingStatsService = {
-    async getOverviewStats(startDate?: string, endDate?: string): Promise<MarketingStats> {
+    async getOverviewStats(): Promise<MarketingStats> {
         // 1. Get total impacts from campaigns
-        let campaignQuery = supabase
+        const { data: campaigns } = await supabase
             .from('marketing_campaigns')
             .select('stats, total_recipients');
-
-        if (startDate) campaignQuery = campaignQuery.gte('created_at', startDate);
-        if (endDate) campaignQuery = campaignQuery.lte('created_at', endDate);
-
-        const { data: campaigns } = await campaignQuery;
 
         const totalRecipients = campaigns?.reduce((acc, c) => acc + (c.total_recipients || 0), 0) || 0;
 
         // 2. Get Opportunities & Pipeline from cotizaciones
-        let quoteQuery = supabase
+        // In a real scenario, we would filter by leads that originated from marketing
+        // For this performance view, we show general conversion performance
+        const { data: quotes } = await supabase
             .from('cotizaciones')
             .select('id, total_anual, lead_id, estado');
-
-        if (startDate) quoteQuery = quoteQuery.gte('created_at', startDate);
-        if (endDate) quoteQuery = quoteQuery.lte('created_at', endDate);
-
-        const { data: quotes } = await quoteQuery;
 
         const totalPipeline = quotes?.reduce((acc, q) => acc + Number(q.total_anual || 0), 0) || 0;
         const opportunityLeadIds = Array.from(new Set(quotes?.map(q => q.lead_id).filter(Boolean))) as string[];
 
-        // 3. Calculate Conversion Rate
+        // 3. Calculate Conversion Rate (Leads with quotes / Total recipients)
+        // For this logic, Converted Leads are those who have an accepted quote OR just a quote in this simple case
+        // Let's refine: Converted = Accepted quote.
         const conversionLeadIds = Array.from(new Set(quotes?.filter(q => q.estado === 'aceptada').map(q => q.lead_id).filter(Boolean))) as string[];
 
         const conversionRate = totalRecipients > 0
@@ -78,80 +72,84 @@ export const marketingStatsService = {
         };
     },
 
-    async getHeatmapLeads(startDate?: string, endDate?: string): Promise<HeatmapLead[]> {
+    async getHeatmapLeads(): Promise<HeatmapLead[]> {
         try {
-            // Senior Aggregation: Get top active leads based on real message status
-            let messageQuery = supabase
+            // 1. Get real data from marketing_messages
+            const { data: realStats, error: statsError } = await supabase
                 .from('marketing_messages')
-                .select(`
-                    metadata,
-                    status
-                `)
-                .not('metadata->lead_id', 'is', null);
-
-            if (startDate) messageQuery = messageQuery.gte('created_at', startDate);
-            if (endDate) messageQuery = messageQuery.lte('created_at', endDate);
-
-            const { data, error } = await messageQuery
+                .select('metadata, status')
                 .order('created_at', { ascending: false })
-                .limit(200); // Analyze recent batch
+                .limit(1000);
 
-            if (error) throw error;
+            if (statsError) throw statsError;
 
-            // Group by lead_id to calculate real stats
-            const statsMap = new Map<string, { sent: number; opens: number; clicks: number }>();
-            const leadIds = new Set<string>();
+            // Aggregate stats in memory (since complex grouping on JSONB is easier here in this version)
+            const statsMap: Record<string, { sent: number, opens: number, clicks: number }> = {};
 
-            data.forEach(msg => {
-                const leadId = (msg.metadata as any).lead_id;
-                if (!leadId) return;
+            realStats.forEach(msg => {
+                const leadId = (msg.metadata as any)?.lead_id;
+                const status = (msg as any).status;
 
-                leadIds.add(leadId);
-                const current = statsMap.get(leadId) || { sent: 0, opens: 0, clicks: 0 };
+                if (!leadId || !statsMap[leadId]) {
+                    if (leadId) statsMap[leadId] = { sent: 0, opens: 0, clicks: 0 };
+                    else return;
+                }
 
-                current.sent++;
-                const status = (msg.status || '').toLowerCase().trim();
-                if (status === 'opened' || status === 'read' || status === 'clicked') current.opens++;
-                if (status === 'clicked') current.clicks++;
-
-                statsMap.set(leadId, current);
+                statsMap[leadId].sent++;
+                // If clicked, it implies it was also opened
+                if (status === 'opened' || status === 'read' || status === 'clicked') statsMap[leadId].opens++;
+                if (status === 'clicked') statsMap[leadId].clicks++;
             });
 
-            if (leadIds.size === 0) {
-                // Fallback to recent leads if no messages yet
-                const { data: recentLeads } = await supabase
-                    .from('leads')
-                    .select('id, name, email')
-                    .order('created_at', { ascending: false })
-                    .limit(5);
-
+            const leadIds = Object.keys(statsMap);
+            if (leadIds.length === 0) {
+                // Fallback to most recent leads
+                const { data: recentLeads } = await supabase.from('leads').select('id, name, email').limit(20);
                 return (recentLeads || []).map(l => ({
                     id: l.id,
                     name: l.name || 'Sin nombre',
-                    email: l.email || 'Sin email',
-                    sent: 0,
-                    opens: 0,
-                    clicks: 0
+                    email: l.email || '-',
+                    sent: 0, opens: 0, clicks: 0
                 }));
             }
 
-            // Fetch lead details for the top active ones
-            const { data: leads } = await supabase
+            // Get lead details
+            const { data: leads, error: leadsError } = await supabase
                 .from('leads')
                 .select('id, name, email')
-                .in('id', Array.from(leadIds).slice(0, 10));
+                .in('id', leadIds);
 
-            return (leads || []).map(l => {
-                const s = statsMap.get(l.id) || { sent: 0, opens: 0, clicks: 0 };
-                return {
+            if (leadsError) throw leadsError;
+
+            const realLeads = (leads || []).map(l => ({
+                id: l.id,
+                name: l.name || 'Cliente',
+                email: l.email || '-',
+                sent: statsMap[l.id]?.sent || 0,
+                opens: statsMap[l.id]?.opens || 0,
+                clicks: statsMap[l.id]?.clicks || 0
+            }));
+
+            // Complete with recent leads up to 20 total
+            if (realLeads.length < 20) {
+                const { data: moreLeads } = await supabase
+                    .from('leads')
+                    .select('id, name, email')
+                    .not('id', 'in', `(${leadIds.join(',')})`)
+                    .order('created_at', { ascending: false })
+                    .limit(20 - realLeads.length);
+
+                const additionalLeads = (moreLeads || []).map(l => ({
                     id: l.id,
-                    name: l.name || 'Cliente',
+                    name: l.name || 'Sin nombre',
                     email: l.email || '-',
-                    sent: s.sent,
-                    opens: s.opens,
-                    clicks: s.clicks
-                };
-            }).sort((a, b) => (b.clicks + b.opens) - (a.clicks + a.opens)).slice(0, 5);
+                    sent: 0, opens: 0, clicks: 0
+                }));
+
+                return [...realLeads, ...additionalLeads].sort((a, b) => (b.clicks + b.opens) - (a.clicks + a.opens));
+            }
+
+            return realLeads.sort((a, b) => (b.clicks + b.opens) - (a.clicks + a.opens));
         } catch (error) {
             console.error('Error fetching real heatmap data:', error);
             return [];

@@ -84,128 +84,22 @@ BEGIN
                     'company_name', company_name,
                     'value', value,
                     'status', status,
-                    'priority', priority,
-                    'source', source
+                    'priority', priority
                 )
             ) as data
         FROM (
-            SELECT id, name, company_name, value, status, priority, source
+            SELECT id, name, company_name, value, status, priority
             FROM filtered_leads
             WHERE value > 0
             ORDER BY value DESC
             LIMIT 4
         ) t
-    ),
-    upcoming_followups AS (
-        SELECT
-            json_agg(
-                json_build_object(
-                    'id', id,
-                    'name', name,
-                    'company_name', company_name,
-                    'next_followup_date', next_followup_date,
-                    'next_action_notes', next_action_notes,
-                    'status', status
-                )
-                ORDER BY next_followup_date ASC
-            ) as data
-        FROM (
-            SELECT id, name, company_name, next_followup_date, next_action_notes, status
-            FROM leads
-            WHERE company_id = p_company_id
-              AND next_followup_date IS NOT NULL
-              AND next_followup_date >= CURRENT_DATE
-              AND status NOT IN ('Cerrado', 'Cliente', 'Perdido', 'Erróneo')
-            ORDER BY next_followup_date ASC
-            LIMIT 5
-        ) f
-    ),
-    recent_conversions AS (
-        SELECT
-            json_agg(
-                json_build_object(
-                    'id', id,
-                    'name', name,
-                    'company_name', company_name,
-                    'value', value,
-                    'closing_amount', closing_amount,
-                    'status', status,
-                    'updated_at', updated_at
-                )
-                ORDER BY updated_at DESC
-            ) as data
-        FROM (
-            SELECT id, name, company_name, value, closing_amount, status, updated_at
-            FROM leads
-            WHERE company_id = p_company_id
-              AND status IN ('Cerrado', 'Cliente')
-              AND (p_start_date IS NULL OR updated_at >= p_start_date)
-              AND (p_end_date IS NULL OR updated_at <= p_end_date)
-            ORDER BY updated_at DESC
-            LIMIT 5
-        ) c
-    ),
-    loss_reasons AS (
-        SELECT
-            json_agg(
-                json_build_object(
-                    'name', loss_reason,
-                    'value', count
-                )
-                ORDER BY count DESC
-            ) as data
-        FROM (
-            SELECT 
-                COALESCE(loss_reason, 'Sin especificar') as loss_reason,
-                COUNT(*) as count
-            FROM filtered_leads
-            WHERE status = 'Perdido'
-            GROUP BY loss_reason
-            ORDER BY count DESC
-            LIMIT 5
-        ) lr
-    ),
-    loss_stages AS (
-        SELECT
-            json_agg(
-                json_build_object(
-                    'name', last_stage,
-                    'value', count
-                )
-                ORDER BY count DESC
-            ) as data
-        FROM (
-            SELECT 
-                COALESCE(status, 'No registrado') as last_stage,
-                COUNT(*) as count
-            FROM filtered_leads
-            WHERE status = 'Perdido'
-            GROUP BY status
-            ORDER BY count DESC
-            LIMIT 5
-        ) ls
-    ),
-    won_amount AS (
-        SELECT COALESCE(SUM(closing_amount), 0) as total_won_amount
-        FROM filtered_leads
-        WHERE status IN ('Cerrado', 'Cliente')
-          AND closing_amount IS NOT NULL
-    ),
-    erroneous_count AS (
-        SELECT COUNT(*) as erroneous_leads
-        FROM leads
-        WHERE company_id = p_company_id
-          AND status = 'Erróneo'
-          AND (p_start_date IS NULL OR created_at >= p_start_date)
-          AND (p_end_date IS NULL OR created_at <= p_end_date)
     )
     SELECT json_build_object(
         'stats', json_build_object(
             'totalLeads', (SELECT total_leads FROM stats),
             'totalPipeline', (SELECT total_pipeline FROM stats),
             'wonDeals', (SELECT won_deals FROM stats),
-            'totalWonAmount', (SELECT total_won_amount FROM won_amount),
-            'erroneousLeads', (SELECT erroneous_leads FROM erroneous_count),
             'conversionRate', CASE 
                 WHEN (SELECT total_leads FROM stats) > 0 
                 THEN ROUND(((SELECT won_deals FROM stats)::NUMERIC / (SELECT total_leads FROM stats)::NUMERIC) * 100)
@@ -215,11 +109,7 @@ BEGIN
         'byStatus', COALESCE((SELECT data FROM by_status), '[]'::json),
         'bySource', COALESCE((SELECT data FROM by_source), '[]'::json),
         'byPriority', COALESCE((SELECT data FROM by_priority), '[]'::json),
-        'topOpportunities', COALESCE((SELECT data FROM top_opportunities), '[]'::json),
-        'upcomingFollowUps', COALESCE((SELECT data FROM upcoming_followups), '[]'::json),
-        'recentConversions', COALESCE((SELECT data FROM recent_conversions), '[]'::json),
-        'lossReasons', COALESCE((SELECT data FROM loss_reasons), '[]'::json),
-        'lossStages', COALESCE((SELECT data FROM loss_stages), '[]'::json)
+        'topOpportunities', COALESCE((SELECT data FROM top_opportunities), '[]'::json)
     ) INTO v_result;
 
     RETURN v_result;
