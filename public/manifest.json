@@ -1,0 +1,22 @@
+{
+    "name": "Arias CRM Professional",
+    "short_name": "Arias CRM",
+    "description": "Sistema de gestión de leads y marketing omnicanal",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#4449AA",
+    "icons": [
+        {
+            "src": "/icon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/icon.svg",
+            "sizes": "512x512",
+            "type": "image/svg+xml"
+        }
+    ]
+}
