@@ -729,6 +729,7 @@ export default function Leads() {
         try {
             // Capture the stage where the lead was lost
             const lost_at_stage = selectedLead.status;
+            const reasonText = lossReasons.find(r => r.id === lossData.lost_reason_id)?.reason || 'Motivo no especificado';
 
             await leadsService.updateLead(selectedLead.id, {
                 status: 'Perdido',
@@ -738,8 +739,18 @@ export default function Leads() {
                 lost_date: new Date().toISOString()
             });
 
+            // Create history entry for traceability
+            const traceabilityNote = `LEAD PERDIDO. Motivo: ${reasonText}${lossData.lost_notes ? `. Notas: ${lossData.lost_notes}` : ''}`;
+            await leadsService.createFollowUp({
+                lead_id: selectedLead.id,
+                notes: traceabilityNote,
+                action_type: 'other',
+                date: format(new Date(), 'yyyy-MM-dd')
+            });
+
             setSelectedLead({ ...selectedLead, status: 'Perdido', lost_at_stage, lost_reason_id: lossData.lost_reason_id, lost_notes: lossData.lost_notes });
             loadLeads();
+            loadFollowUps(selectedLead.id); // Refresh history view
 
             setIsLossModalOpen(false);
             setLossData({ lost_reason_id: '', lost_notes: '' });
@@ -760,9 +771,21 @@ export default function Leads() {
                 internal_won_date: new Date(`${wonData.won_date}T12:00:00`).toISOString()
             });
 
+            // Create history entry for traceability
+            const statusLabel = STATUS_CONFIG[pendingWonStatus]?.label || pendingWonStatus;
+            const traceabilityNote = `¡TRATO GANADO! Marcado como ${statusLabel} con fecha de cierre ${wonData.won_date}.`;
+
+            await leadsService.createFollowUp({
+                lead_id: selectedLead.id,
+                notes: traceabilityNote,
+                action_type: 'other',
+                date: format(new Date(), 'yyyy-MM-dd')
+            });
+
             setIsWonModalOpen(false);
             setPendingWonStatus(null);
             loadLeads();
+            loadFollowUps(selectedLead.id); // Refresh history view
             toast.success('¡Felicitaciones! Trato cerrado con éxito.');
         } catch (error: any) {
             logger.error('Failed to mark as won', error, { action: 'handleConfirmWon', leadId: selectedLead.id });
