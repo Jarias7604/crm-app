@@ -1,12 +1,17 @@
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
   <rect width="512" height="512" rx="110" fill="url(#paint0_linear)"/>
-  <path d="M256 100L110 370H185L256 220L327 370H402L256 100Z" fill="white" fill-shadow="0 4 20 rgba(0,0,0,0.2)"/>
-  <circle cx="256" cy="285" r="35" fill="white" fill-opacity="0.4"/>
+  <path d="M256 100L110 370H185L256 220L327 370H402L256 100Z" fill="white"/>
+  
+  <!-- Colored Dots (Google/Windows Style) -->
+  <circle cx="210" cy="385" r="22" fill="#EA4335"/> <!-- Red -->
+  <circle cx="256" cy="385" r="22" fill="#FBBC05"/> <!-- Yellow -->
+  <circle cx="302" cy="385" r="22" fill="#34A853"/> <!-- Green -->
+  
   <rect x="20" y="20" width="472" height="472" rx="90" stroke="white" stroke-opacity="0.1" stroke-width="2"/>
   <defs>
     <linearGradient id="paint0_linear" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#312E81"/>
-      <stop offset="0.5" stop-color="#4338CA"/>
+      <stop stop-color="#1E1B4B"/>
+      <stop offset="0.5" stop-color="#3730A3"/>
       <stop offset="1" stop-color="#4F46E5"/>
     </linearGradient>
   </defs>
