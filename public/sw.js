@@ -1,4 +1,4 @@
-const CACHE_NAME = 'arias-crm-v4';
+const CACHE_NAME = 'arias-crm-v6';
 const ASSETS_TO_CACHE = [
     '/',
     '/index.html',
