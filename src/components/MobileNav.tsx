@@ -13,7 +13,7 @@ export default function MobileNav() {
 
     // Main tabs (max 4-5 for bottom bar)
     const mainTabs = [
-        { name: t('sidebar.dashboard'), href: '/', icon: LayoutDashboard, current: location.pathname === '/' },
+        { name: 'Inicio', href: '/', icon: LayoutDashboard, current: location.pathname === '/' },
         { name: t('sidebar.leads'), href: '/leads', icon: Users, current: location.pathname.startsWith('/leads') },
         { name: t('sidebar.calendar'), href: '/calendar', icon: Calendar, current: location.pathname.startsWith('/calendar') },
     ];

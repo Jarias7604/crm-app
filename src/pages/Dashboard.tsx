@@ -21,6 +21,7 @@ import { es } from 'date-fns/locale';
 import { Button } from '../components/ui/Button';
 import { logger } from '../utils/logger';
 import { useDashboardStats } from '../hooks/useDashboard';
+import { MobileQuickActions } from '../components/MobileQuickActions';
 
 const THEME = {
     primary: '#4F46E5',   // Indigo Moderno
@@ -134,6 +135,15 @@ export default function Dashboard() {
     });
     const [recentCompanies, setRecentCompanies] = useState<any[]>([]);
     const [companyTrend, setCompanyTrend] = useState<any[]>([]);
+
+    // Detectar móvil/tableta
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 1024);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     // Persist date range selection
     useEffect(() => {
@@ -407,7 +417,18 @@ export default function Dashboard() {
         </div>
     );
 
-    // --- SELECCIÓN DE VISTA DE DASHBOARD ---
+    // Si estamos en móvil o tableta y en la ruta raíz (/), mostrar el menú de accesos rápidos por defecto como Home
+    if (isMobile && location.pathname === '/') {
+        return (
+            <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[calc(100vh-160px)]">
+                <MobileQuickActions
+                    isHome
+                    onCreateLead={() => navigate('/leads', { state: { openCreateModal: true } })}
+                />
+            </div>
+        );
+    }
+
     // Leemos directamente de localStorage para máxima reactividad
     const localSimRole = localStorage.getItem('simulated_role');
 
@@ -1288,8 +1309,7 @@ export default function Dashboard() {
                         </div>
                     </div>
                 </div>
-            </div >
-        </div >
+            </div>
+        </div>
     );
 }
-

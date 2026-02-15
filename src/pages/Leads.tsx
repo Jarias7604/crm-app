@@ -14,7 +14,6 @@ import { storageService } from '../services/storage';
 import { useAuth } from '../auth/AuthProvider';
 import { useMemo } from 'react';
 import { CreateLeadFullscreen } from '../components/CreateLeadFullscreen';
-import { MobileQuickActions } from '../components/MobileQuickActions';
 import { LeadKanban } from '../components/LeadKanban';
 import { logger } from '../utils/logger';
 import { lossReasonsService } from '../services/lossReasons';
@@ -2224,7 +2223,6 @@ export default function Leads() {
             )}
 
             {/* Mobile Quick Actions */}
-            <MobileQuickActions onCreateLead={() => setIsModalOpen(true)} />
         </>
     );
 }

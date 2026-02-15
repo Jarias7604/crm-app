@@ -75,6 +75,7 @@ function App() {
               <Route element={<ProtectedRoute />}>
                 <Route element={<DashboardLayout />}>
                   <Route path="/" element={<Dashboard />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/leads" element={<Leads />} />
                   <Route path="/cotizaciones" element={<Cotizaciones />} />
                   <Route path="/cotizaciones/nueva" element={<NuevaCotizacion />} />

@@ -1,5 +1,5 @@
-import { Plus, Users, TrendingUp, Calendar, LayoutDashboard, Phone, FileText, UserPlus, Clock, X } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Users, TrendingUp, Calendar, LayoutDashboard, UserPlus, Clock, Phone, FileText, X } from 'lucide-react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 interface QuickAction {
@@ -11,24 +11,14 @@ interface QuickAction {
     shortcut: boolean;
 }
 
-interface MobileQuickActionsProps {
+interface MobileHomeMenuProps {
     onCreateLead: () => void;
-    isHome?: boolean;
+    onClose?: () => void;
 }
 
-export function MobileQuickActions({ onCreateLead, isHome = false }: MobileQuickActionsProps) {
-    // Auto-open on first visit from mobile
-    const hasSeenMenu = localStorage.getItem('hasSeenMobileMenu');
-    const [isOpen, setIsOpen] = useState(isHome || !hasSeenMenu);
+export function MobileHomeMenu({ onCreateLead, onClose }: MobileHomeMenuProps) {
     const [filter, setFilter] = useState<'shortcuts' | 'all'>('shortcuts');
     const navigate = useNavigate();
-
-    // Mark as seen when opened
-    useEffect(() => {
-        if (isOpen && !hasSeenMenu) {
-            localStorage.setItem('hasSeenMobileMenu', 'true');
-        }
-    }, [isOpen, hasSeenMenu]);
 
     const quickActions: QuickAction[] = [
         {
@@ -38,7 +28,6 @@ export function MobileQuickActions({ onCreateLead, isHome = false }: MobileQuick
             color: 'text-green-600',
             action: () => {
                 onCreateLead();
-                setIsOpen(false);
             },
             shortcut: true
         },
@@ -47,10 +36,7 @@ export function MobileQuickActions({ onCreateLead, isHome = false }: MobileQuick
             label: 'Leads',
             icon: <TrendingUp className="w-8 h-8" />,
             color: 'text-green-600',
-            action: () => {
-                navigate('/leads');
-                setIsOpen(false);
-            },
+            action: () => navigate('/leads'),
             shortcut: true
         },
         {
@@ -58,10 +44,7 @@ export function MobileQuickActions({ onCreateLead, isHome = false }: MobileQuick
             label: 'Calendario',
             icon: <Calendar className="w-8 h-8" />,
             color: 'text-green-600',
-            action: () => {
-                navigate('/calendar');
-                setIsOpen(false);
-            },
+            action: () => navigate('/calendar'),
             shortcut: true
         },
         {
@@ -69,10 +52,7 @@ export function MobileQuickActions({ onCreateLead, isHome = false }: MobileQuick
             label: 'Dashboard',
             icon: <LayoutDashboard className="w-8 h-8" />,
             color: 'text-green-600',
-            action: () => {
-                navigate('/dashboard');
-                setIsOpen(false);
-            },
+            action: () => navigate('/dashboard'),
             shortcut: true
         },
         {
@@ -80,32 +60,23 @@ export function MobileQuickActions({ onCreateLead, isHome = false }: MobileQuick
             label: 'Equipo',
             icon: <Users className="w-8 h-8" />,
             color: 'text-green-600',
-            action: () => {
-                navigate('/company/team');
-                setIsOpen(false);
-            },
-            shortcut: false
+            action: () => navigate('/company/team'),
+            shortcut: true
         },
         {
             id: 'follow-ups',
             label: 'Seguimientos',
             icon: <Clock className="w-8 h-8" />,
             color: 'text-green-600',
-            action: () => {
-                navigate('/leads');
-                setIsOpen(false);
-            },
-            shortcut: false
+            action: () => navigate('/leads'),
+            shortcut: true
         },
         {
             id: 'contacts',
             label: 'Contactar',
             icon: <Phone className="w-8 h-8" />,
             color: 'text-green-600',
-            action: () => {
-                navigate('/leads');
-                setIsOpen(false);
-            },
+            action: () => navigate('/leads'),
             shortcut: false
         },
         {
@@ -113,10 +84,7 @@ export function MobileQuickActions({ onCreateLead, isHome = false }: MobileQuick
             label: 'Reportes',
             icon: <FileText className="w-8 h-8" />,
             color: 'text-green-600',
-            action: () => {
-                navigate('/dashboard');
-                setIsOpen(false);
-            },
+            action: () => navigate('/dashboard'),
             shortcut: false
         }
     ];
@@ -125,26 +93,15 @@ export function MobileQuickActions({ onCreateLead, isHome = false }: MobileQuick
         ? quickActions.filter(a => a.shortcut)
         : quickActions;
 
-    if (!isOpen && !isHome) {
-        return (
-            <button
-                onClick={() => setIsOpen(true)}
-                className="md:hidden fixed bottom-6 right-6 w-14 h-14 rounded-full bg-gradient-to-br from-green-500 to-green-600 text-white shadow-xl shadow-green-500/50 flex items-center justify-center z-40 active:scale-95 transition-all"
-            >
-                <Plus className="w-7 h-7" />
-            </button>
-        );
-    }
-
     return (
-        <div className={isHome ? "flex-1 flex flex-col bg-gray-50" : "md:hidden fixed inset-0 z-50 bg-gray-50 flex flex-col"}>
+        <div className="flex flex-col h-full bg-gray-50 -mx-4 -mt-4">
             {/* Header */}
             <div className="bg-white px-4 pt-4 pb-3 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
-                    {!isHome ? (
+                    {onClose ? (
                         <button
-                            onClick={() => setIsOpen(false)}
-                            className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center"
+                            onClick={onClose}
+                            className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center active:scale-90 transition-all"
                         >
                             <X className="w-5 h-5 text-gray-600" />
                         </button>
@@ -197,28 +154,6 @@ export function MobileQuickActions({ onCreateLead, isHome = false }: MobileQuick
                     ))}
                 </div>
             </div>
-
-            {/* Bottom Navigation Placeholder (Hidden in Home to avoid double Nav) */}
-            {!isHome && (
-                <div className="h-20 bg-white border-t border-gray-200 flex items-center justify-around px-6">
-                    <button className="flex flex-col items-center gap-1">
-                        <LayoutDashboard className="w-6 h-6 text-gray-400" />
-                        <span className="text-xs text-gray-500">Dashboard</span>
-                    </button>
-                    <button className="flex flex-col items-center gap-1">
-                        <TrendingUp className="w-6 h-6 text-gray-400" />
-                        <span className="text-xs text-gray-500">Leads</span>
-                    </button>
-                    <button className="flex flex-col items-center gap-1">
-                        <Calendar className="w-6 h-6 text-gray-400" />
-                        <span className="text-xs text-gray-500">Calendar</span>
-                    </button>
-                    <button className="flex flex-col items-center gap-1">
-                        <Users className="w-6 h-6 text-gray-400" />
-                        <span className="text-xs text-gray-500">More</span>
-                    </button>
-                </div>
-            )}
         </div>
     );
 }
