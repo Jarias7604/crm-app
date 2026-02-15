@@ -2464,9 +2464,6 @@ export default function Leads() {
                     </div>
                 )}
 
-<<<<<<< HEAD
-            {/* Mobile Quick Actions */}
-=======
                 {/* Loss Modal */}
                 {isLossModalOpen && selectedLead && (
                     <div className="fixed inset-0 z-[10000] overflow-y-auto">
@@ -2551,7 +2548,6 @@ export default function Leads() {
                     </div>
                 )}
             </div>
->>>>>>> 30b17dc9fb97dd1e64651dbcfc3fe7e04a7051fb
         </>
     );
 }
