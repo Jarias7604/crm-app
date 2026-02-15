@@ -92,6 +92,7 @@ export default function MobileNav() {
             {/* Premium Action Center */}
             <MobileQuickActions
                 isOpen={isActionsOpen}
+                hideFAB
                 onClose={() => setIsActionsOpen(false)}
                 onCreateLead={() => {
                     window.dispatchEvent(new CustomEvent('open-create-lead'));

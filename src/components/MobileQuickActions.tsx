@@ -16,13 +16,15 @@ interface MobileQuickActionsProps {
     isHome?: boolean;
     isOpen?: boolean;
     onClose?: () => void;
+    hideFAB?: boolean;
 }
 
 export function MobileQuickActions({
     onCreateLead,
     isHome = false,
     isOpen: controlledIsOpen,
-    onClose
+    onClose,
+    hideFAB = false
 }: MobileQuickActionsProps) {
     // Falls back to internal state if not controlled
     const hasSeenMenu = localStorage.getItem('hasSeenMobileMenu');
@@ -141,6 +143,7 @@ export function MobileQuickActions({
         : quickActions;
 
     if (!isOpen && !isHome) {
+        if (hideFAB) return null;
         return (
             <button
                 onClick={() => toggleOpen(true)}
