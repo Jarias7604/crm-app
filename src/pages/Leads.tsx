@@ -1301,140 +1301,151 @@ export default function Leads() {
                     </div>
                 </div>
 
-                {/* VIEW SELECTOR & MAIN CONTENT */}
-                <div className="space-y-4 md:hidden">
-                    {loading ? (
-                        <div className="space-y-4">
-                            {[1, 2, 3].map(i => (
-                                <div key={i} className="bg-white rounded-[2rem] p-5 shadow-sm border border-gray-100 animate-pulse">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="flex gap-2">
-                                            <div className="w-16 h-5 bg-gray-100 rounded-full" />
-                                            <div className="w-16 h-5 bg-gray-100 rounded-full" />
-                                        </div>
-                                    </div>
-                                    <div className="h-6 bg-gray-100 rounded-lg w-3/4 mb-2" />
-                                    <div className="h-4 bg-gray-100 rounded-lg w-1/2 mb-6" />
-                                    <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-50">
-                                        <div className="w-20 h-8 bg-gray-100 rounded-lg" />
-                                        <div className="flex gap-2">
-                                            <div className="w-10 h-10 bg-gray-100 rounded-xl" />
-                                            <div className="w-10 h-10 bg-gray-100 rounded-xl" />
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : filteredLeads.length === 0 ? (
-                        <div className="bg-white rounded-3xl p-12 text-center border-2 border-dashed border-gray-100">
-                            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Search className="w-8 h-8 text-gray-300" />
-                            </div>
-                            <h3 className="text-lg font-black text-gray-900">Sin resultados</h3>
-                            <p className="text-gray-400 text-sm font-bold mt-1">Intenta con otros filtros o términos de búsqueda</p>
-                        </div>
-                    ) : (
-                        filteredLeads.map((lead) => (
-                            <div
-                                key={lead.id}
-                                className="bg-white rounded-[2rem] p-5 shadow-sm border border-gray-100 active:scale-[0.98] transition-all relative overflow-hidden"
-                            >
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="flex gap-2 items-center flex-wrap">
-                                        <StatusBadge status={lead.status} />
-                                        <PriorityBadge priority={lead.priority} />
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <div
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                toggleLeadSelection(lead.id);
-                                            }}
-                                            className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${selectedLeadIds.includes(lead.id) ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-gray-50 border-gray-200 text-transparent'}`}
-                                        >
-                                            <CheckCircle className="w-5 h-5 shadow-sm" />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div onClick={() => openLeadDetail(lead)}>
-                                    <h3 className="text-xl font-black text-gray-900 leading-tight mb-1">{lead.name}</h3>
-                                    {lead.company_name && (
-                                        <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">{lead.company_name}</p>
-                                    )}
-
-                                    <div className="mt-6 flex justify-between items-end border-b border-gray-50 pb-4">
-                                        <div>
-                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Valor Potencial</p>
-                                            <p className="text-xl font-black text-[#4449AA] tracking-tighter">${(lead.value || 0).toLocaleString()}</p>
-                                        </div>
-                                        {lead.next_followup_date && (
-                                            <div className="text-right">
-                                                <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Próximo</p>
-                                                <div className="flex items-center gap-1.5 justify-end">
-                                                    <Calendar className="w-3.5 h-3.5 text-blue-500" />
-                                                    <span className="text-xs font-black text-blue-900">
-                                                        {format(new Date(lead.next_followup_date.split('T')[0] + 'T12:00:00'), 'dd MMM', { locale: es })}
-                                                    </span>
-                                                </div>
+                {/* VIEW SELECTOR & MAIN CONTENT - Mobile Cards (only for Grid mode) */}
+                {viewMode === 'grid' && (
+                    <div className="space-y-4 md:hidden">
+                        {loading ? (
+                            <div className="space-y-4">
+                                {[1, 2, 3].map(i => (
+                                    <div key={i} className="bg-white rounded-[2rem] p-5 shadow-sm border border-gray-100 animate-pulse">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div className="flex gap-2">
+                                                <div className="w-16 h-5 bg-gray-100 rounded-full" />
+                                                <div className="w-16 h-5 bg-gray-100 rounded-full" />
                                             </div>
-                                        )}
+                                        </div>
+                                        <div className="h-6 bg-gray-100 rounded-lg w-3/4 mb-2" />
+                                        <div className="h-4 bg-gray-100 rounded-lg w-1/2 mb-6" />
+                                        <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-50">
+                                            <div className="w-20 h-8 bg-gray-100 rounded-lg" />
+                                            <div className="flex gap-2">
+                                                <div className="w-10 h-10 bg-gray-100 rounded-xl" />
+                                                <div className="w-10 h-10 bg-gray-100 rounded-xl" />
+                                            </div>
+                                        </div>
                                     </div>
-
-                                    <div className="mt-4 flex items-center justify-between">
-                                        {lead.assigned_to && (() => {
-                                            const owner = teamMembers.find(m => m.id === lead.assigned_to);
-                                            return (
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-7 h-7 rounded-full bg-indigo-50 border-2 border-white shadow-sm overflow-hidden flex items-center justify-center">
-                                                        {owner?.avatar_url ? <img src={owner.avatar_url} className="w-full h-full object-cover" /> : <User className="w-4 h-4 text-indigo-300" />}
-                                                    </div>
-                                                    <p className="text-xs font-bold text-gray-600">{owner?.full_name?.split(' ')[0] || 'Agente'}</p>
-                                                </div>
-                                            );
-                                        })()}
-
-                                        <div className="flex gap-2">
-                                            {lead.phone && (
-                                                <a
-                                                    href={`tel:${lead.phone}`}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="w-11 h-11 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center shadow-sm active:bg-indigo-100"
-                                                >
-                                                    <Phone className="w-5 h-5" />
-                                                </a>
-                                            )}
-                                            {lead.phone && (
-                                                <a
-                                                    href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="w-11 h-11 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center shadow-sm active:bg-green-100"
-                                                >
-                                                    <MessageSquare className="w-5 h-5" />
-                                                </a>
-                                            )}
-                                            <button
+                                ))}
+                            </div>
+                        ) : filteredLeads.length === 0 ? (
+                            <div className="bg-white rounded-3xl p-12 text-center border-2 border-dashed border-gray-100">
+                                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <Search className="w-8 h-8 text-gray-300" />
+                                </div>
+                                <h3 className="text-lg font-black text-gray-900">Sin resultados</h3>
+                                <p className="text-gray-400 text-sm font-bold mt-1">Intenta con otros filtros o términos de búsqueda</p>
+                            </div>
+                        ) : (
+                            filteredLeads.map((lead) => (
+                                <div
+                                    key={lead.id}
+                                    className="bg-white rounded-[2rem] p-5 shadow-sm border border-gray-100 active:scale-[0.98] transition-all relative overflow-hidden"
+                                >
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div className="flex gap-2 items-center flex-wrap">
+                                            <StatusBadge status={lead.status} />
+                                            <PriorityBadge priority={lead.priority} />
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <div
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    openLeadDetail(lead);
+                                                    toggleLeadSelection(lead.id);
                                                 }}
-                                                className="w-11 h-11 bg-gray-50 text-gray-400 rounded-2xl flex items-center justify-center shadow-sm active:bg-gray-100"
+                                                className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${selectedLeadIds.includes(lead.id) ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-gray-50 border-gray-200 text-transparent'}`}
                                             >
-                                                <ChevronRight className="w-5 h-5" />
-                                            </button>
+                                                <CheckCircle className="w-5 h-5 shadow-sm" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div onClick={() => openLeadDetail(lead)}>
+                                        <h3 className="text-xl font-black text-gray-900 leading-tight mb-1">{lead.name}</h3>
+                                        {lead.company_name && (
+                                            <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">{lead.company_name}</p>
+                                        )}
+
+                                        <div className="mt-6 flex justify-between items-end border-b border-gray-50 pb-4">
+                                            <div>
+                                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Valor Potencial</p>
+                                                <p className="text-xl font-black text-[#4449AA] tracking-tighter">${(lead.value || 0).toLocaleString()}</p>
+                                            </div>
+                                            {lead.next_followup_date && (
+                                                <div className="text-right">
+                                                    <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Próximo</p>
+                                                    <div className="flex items-center gap-1.5 justify-end">
+                                                        <Calendar className="w-3.5 h-3.5 text-blue-500" />
+                                                        <span className="text-xs font-black text-blue-900">
+                                                            {format(new Date(lead.next_followup_date.split('T')[0] + 'T12:00:00'), 'dd MMM', { locale: es })}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="mt-4 flex items-center justify-between">
+                                            {lead.assigned_to && (() => {
+                                                const owner = teamMembers.find(m => m.id === lead.assigned_to);
+                                                return (
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-7 h-7 rounded-full bg-indigo-50 border-2 border-white shadow-sm overflow-hidden flex items-center justify-center">
+                                                            {owner?.avatar_url ? <img src={owner.avatar_url} className="w-full h-full object-cover" /> : <User className="w-4 h-4 text-indigo-300" />}
+                                                        </div>
+                                                        <p className="text-xs font-bold text-gray-600">{owner?.full_name?.split(' ')[0] || 'Agente'}</p>
+                                                    </div>
+                                                );
+                                            })()}
+
+                                            <div className="flex gap-2">
+                                                {lead.phone && (
+                                                    <a
+                                                        href={`tel:${lead.phone}`}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="w-11 h-11 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center shadow-sm active:bg-indigo-100"
+                                                    >
+                                                        <Phone className="w-5 h-5" />
+                                                    </a>
+                                                )}
+                                                {lead.phone && (
+                                                    <a
+                                                        href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="w-11 h-11 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center shadow-sm active:bg-green-100"
+                                                    >
+                                                        <MessageSquare className="w-5 h-5" />
+                                                    </a>
+                                                )}
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        openLeadDetail(lead);
+                                                    }}
+                                                    className="w-11 h-11 bg-gray-50 text-gray-400 rounded-2xl flex items-center justify-center shadow-sm active:bg-gray-100"
+                                                >
+                                                    <ChevronRight className="w-5 h-5" />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))
-                    )}
-                </div>
+                            ))
+                        )}
+                    </div>
+                )}
 
                 {/* Render corresponding view based on viewMode */}
+                {/* Mobile loading indicator for List/Kanban modes */}
+                {loading && viewMode !== 'grid' && (
+                    <div className="md:hidden flex items-center justify-center py-16">
+                        <div className="flex flex-col items-center gap-3">
+                            <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Cargando...</p>
+                        </div>
+                    </div>
+                )}
                 {loading ? (
-                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="hidden md:grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                         {[1, 2, 3, 4, 5, 6].map(i => (
                             <div key={i} className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 animate-pulse">
                                 <div className="flex justify-between mb-4">
@@ -1452,7 +1463,7 @@ export default function Leads() {
                     </div>
                 ) : viewMode === 'grid' ? (
                     /* Grid View */
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-in fade-in duration-500">
+                    <div className="hidden md:grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-in fade-in duration-500">
                         {filteredLeads.map((lead) => (
                             <div
                                 key={lead.id}
@@ -1562,7 +1573,40 @@ export default function Leads() {
                 ) : viewMode === 'list' ? (
                     /* List View - Modern Premium Redesign */
                     <div className="relative animate-in fade-in duration-500">
-                        <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/80 overflow-hidden transition-all duration-300">
+                        {/* Mobile List Cards */}
+                        <div className="md:hidden space-y-2">
+                            {filteredLeads.length === 0 ? (
+                                <div className="bg-white rounded-2xl p-10 text-center border border-gray-100">
+                                    <Search className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+                                    <h3 className="text-base font-black text-gray-900">Sin resultados</h3>
+                                    <p className="text-gray-400 text-sm font-bold mt-1">Intenta con otros filtros</p>
+                                </div>
+                            ) : (
+                                sortedLeads.map((lead) => (
+                                    <div
+                                        key={lead.id}
+                                        onClick={() => openLeadDetail(lead)}
+                                        className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm active:scale-[0.98] transition-all cursor-pointer"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <h4 className="text-sm font-black text-gray-900 truncate">{lead.name}</h4>
+                                                    <StatusBadge status={lead.status} />
+                                                </div>
+                                                <p className="text-xs font-bold text-gray-400 truncate">{lead.company_name || 'Sin empresa'}</p>
+                                            </div>
+                                            <div className="text-right ml-3 shrink-0">
+                                                <p className="text-sm font-black text-[#4449AA] tracking-tight">${(lead.value || 0).toLocaleString()}</p>
+                                                <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">Valor</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                        {/* Desktop Table */}
+                        <div className="hidden md:block bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/80 overflow-hidden transition-all duration-300">
                             <div className="overflow-x-auto">
                                 <table className="min-w-full divide-y divide-gray-50">
                                     <DragDropContext onDragEnd={handleOnDragEnd}>
