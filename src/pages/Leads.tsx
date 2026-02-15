@@ -97,12 +97,12 @@ export default function Leads() {
 
     const [isImporting, setIsImporting] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [priorityFilter, setPriorityFilter] = useState<LeadPriority | 'all'>('all');
-    const [assignedFilter, setAssignedFilter] = useState<string | 'all'>('all');
+    const [priorityFilter, setPriorityFilter] = useState<LeadPriority | 'all' | LeadPriority[]>('all');
+    const [assignedFilter, setAssignedFilter] = useState<string | 'all' | string[]>('all');
     const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all' | LeadStatus[]>('all');
-    const [sourceFilter, setSourceFilter] = useState<string | 'all'>('all');
-    const [lossReasonFilter, setLossReasonFilter] = useState<string | 'all'>('all');
-    const [lostAtStageFilter, setLostAtStageFilter] = useState<string | 'all'>('all');
+    const [sourceFilter, setSourceFilter] = useState<string | 'all' | string[]>('all');
+    const [lossReasonFilter, setLossReasonFilter] = useState<string | 'all' | string[]>('all');
+    const [lostAtStageFilter, setLostAtStageFilter] = useState<string | 'all' | string[]>('all');
     const [filteredLeadId, setFilteredLeadId] = useState<string | null>(null);
     const [isAssignedFilterOpen, setIsAssignedFilterOpen] = useState(false);
     const assignedFilterRef = useRef<HTMLDivElement>(null);
@@ -313,11 +313,23 @@ export default function Leads() {
             }
 
             // Filter by priority
-            if (priorityFilter !== 'all' && lead.priority !== priorityFilter) return false;
+            if (priorityFilter !== 'all') {
+                if (Array.isArray(priorityFilter)) {
+                    if (!priorityFilter.includes(lead.priority as LeadPriority)) return false;
+                } else {
+                    if (lead.priority !== priorityFilter) return false;
+                }
+            }
 
             // Filter by assigned user
             if (assignedFilter !== 'all') {
-                if (assignedFilter === 'unassigned') {
+                if (Array.isArray(assignedFilter)) {
+                    if (assignedFilter.includes('unassigned')) {
+                        if (lead.assigned_to && !assignedFilter.includes(lead.assigned_to)) return false;
+                    } else {
+                        if (!lead.assigned_to || !assignedFilter.includes(lead.assigned_to)) return false;
+                    }
+                } else if (assignedFilter === 'unassigned') {
                     if (lead.assigned_to) return false;
                 } else {
                     if (lead.assigned_to !== assignedFilter) return false;
@@ -342,13 +354,31 @@ export default function Leads() {
             }
 
             // Filter by source
-            if (sourceFilter !== 'all' && lead.source !== sourceFilter) return false;
+            if (sourceFilter !== 'all') {
+                if (Array.isArray(sourceFilter)) {
+                    if (!lead.source || !sourceFilter.includes(lead.source)) return false;
+                } else {
+                    if (lead.source !== sourceFilter) return false;
+                }
+            }
 
             // Filter by loss reason
-            if (lossReasonFilter !== 'all' && lead.lost_reason_id !== lossReasonFilter) return false;
+            if (lossReasonFilter !== 'all') {
+                if (Array.isArray(lossReasonFilter)) {
+                    if (!lead.lost_reason_id || !lossReasonFilter.includes(lead.lost_reason_id)) return false;
+                } else {
+                    if (lead.lost_reason_id !== lossReasonFilter) return false;
+                }
+            }
 
             // Filter by loss stage
-            if (lostAtStageFilter !== 'all' && lead.lost_at_stage !== lostAtStageFilter) return false;
+            if (lostAtStageFilter !== 'all') {
+                if (Array.isArray(lostAtStageFilter)) {
+                    if (!lead.lost_at_stage || !lostAtStageFilter.includes(lead.lost_at_stage)) return false;
+                } else {
+                    if (lead.lost_at_stage !== lostAtStageFilter) return false;
+                }
+            }
 
             // Filter by date range (if provided from dashboard)
             if (startDateFilter || endDateFilter) {
@@ -505,7 +535,7 @@ export default function Leads() {
             >
                 <div className="flex items-center gap-2">
                     <Filter className="h-3.5 w-3.5 text-[#007BFF]" />
-                    <span>{priorityFilter === 'all' ? 'Todas las Prioridades' : (PRIORITY_CONFIG as any)[priorityFilter]?.label}</span>
+                    <span>{priorityFilter === 'all' ? 'Todas las Prioridades' : Array.isArray(priorityFilter) ? 'Varias' : (PRIORITY_CONFIG as any)[priorityFilter]?.label}</span>
                 </div>
                 <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition-transform duration-300 ${isPriorityFilterOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -964,16 +994,15 @@ export default function Leads() {
     const MobileFilterModal = () => {
         if (!isMobileFilterOpen) return null;
 
-        const activeFiltersCount = [
-            statusFilter !== 'all',
-            priorityFilter !== 'all',
-            assignedFilter !== 'all',
-            sourceFilter !== 'all',
-            lossReasonFilter !== 'all',
-            lostAtStageFilter !== 'all',
-            startDateFilter !== null,
-            endDateFilter !== null
-        ].filter(Boolean).length;
+        const activeFiltersCount =
+            (statusFilter === 'all' ? 0 : Array.isArray(statusFilter) ? statusFilter.length : 1) +
+            (priorityFilter === 'all' ? 0 : Array.isArray(priorityFilter) ? priorityFilter.length : 1) +
+            (assignedFilter === 'all' ? 0 : Array.isArray(assignedFilter) ? assignedFilter.length : 1) +
+            (sourceFilter === 'all' ? 0 : Array.isArray(sourceFilter) ? sourceFilter.length : 1) +
+            (lossReasonFilter === 'all' ? 0 : Array.isArray(lossReasonFilter) ? lossReasonFilter.length : 1) +
+            (lostAtStageFilter === 'all' ? 0 : Array.isArray(lostAtStageFilter) ? lostAtStageFilter.length : 1) +
+            (startDateFilter !== null ? 1 : 0) +
+            (endDateFilter !== null ? 1 : 0);
 
         return (
             <div className="fixed inset-0 z-[100] md:hidden">
@@ -998,66 +1027,224 @@ export default function Leads() {
                     </div>
 
                     <div className="space-y-6 pb-10">
+                        {/* Estado del Prospecto - Multi-select */}
                         <section>
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">Estado del Prospecto</label>
-                            <div className="grid grid-cols-1 gap-2">
-                                <StatusDropdown />
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    onClick={() => setStatusFilter('all')}
+                                    className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${statusFilter === 'all' ? 'bg-[#4449AA] text-white shadow-md' : 'bg-gray-50 text-gray-500 border border-gray-100'}`}
+                                >
+                                    Todos
+                                </button>
+                                {(Object.entries(STATUS_CONFIG) as [LeadStatus, any][]).map(([key, config]) => {
+                                    const isActive = Array.isArray(statusFilter) ? statusFilter.includes(key) : statusFilter === key;
+                                    return (
+                                        <button
+                                            key={key}
+                                            onClick={() => {
+                                                if (statusFilter === 'all') {
+                                                    setStatusFilter([key]);
+                                                } else if (Array.isArray(statusFilter)) {
+                                                    const next = statusFilter.includes(key) ? statusFilter.filter(s => s !== key) : [...statusFilter, key];
+                                                    setStatusFilter(next.length === 0 ? 'all' : next);
+                                                } else {
+                                                    setStatusFilter(statusFilter === key ? 'all' : [statusFilter, key]);
+                                                }
+                                            }}
+                                            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${isActive ? `${config.bgColor} ${config.color} shadow-md ring-2 ring-current ring-opacity-30` : 'bg-gray-50 text-gray-500 border border-gray-100'}`}
+                                        >
+                                            {isActive && <span>✓</span>}
+                                            <span>{config.icon}</span>
+                                            {config.label}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </section>
 
+                        {/* Prioridad - Multi-select */}
                         <section>
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">Prioridad</label>
-                            <PriorityDropdown />
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    onClick={() => { setPriorityFilter('all'); setFilteredLeadId(null); }}
+                                    className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${priorityFilter === 'all' ? 'bg-[#4449AA] text-white shadow-md' : 'bg-gray-50 text-gray-500 border border-gray-100'}`}
+                                >
+                                    Todas
+                                </button>
+                                {(Object.entries(PRIORITY_CONFIG) as [LeadPriority, { label: string, icon: string, color: string, textColor: string }][]).map(([key, config]) => {
+                                    const isActive = Array.isArray(priorityFilter) ? priorityFilter.includes(key) : priorityFilter === key;
+                                    return (
+                                        <button
+                                            key={key}
+                                            onClick={() => {
+                                                setFilteredLeadId(null);
+                                                if (priorityFilter === 'all') {
+                                                    setPriorityFilter([key]);
+                                                } else if (Array.isArray(priorityFilter)) {
+                                                    const next = priorityFilter.includes(key) ? priorityFilter.filter(s => s !== key) : [...priorityFilter, key];
+                                                    setPriorityFilter(next.length === 0 ? 'all' : next);
+                                                } else {
+                                                    setPriorityFilter(priorityFilter === key ? 'all' : [priorityFilter, key]);
+                                                }
+                                            }}
+                                            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${isActive ? 'bg-indigo-50 text-indigo-600 shadow-md ring-2 ring-indigo-300' : 'bg-gray-50 text-gray-500 border border-gray-100'}`}
+                                        >
+                                            {isActive && <span>✓</span>}
+                                            <span>{config.icon}</span>
+                                            {config.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </section>
 
+                        {/* Fuente - Multi-select */}
+                        <section>
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">Fuente</label>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    onClick={() => setSourceFilter('all')}
+                                    className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${sourceFilter === 'all' ? 'bg-[#4449AA] text-white shadow-md' : 'bg-gray-50 text-gray-500 border border-gray-100'}`}
+                                >
+                                    Todas
+                                </button>
+                                {Object.entries(SOURCE_CONFIG).map(([key, config]) => {
+                                    const isActive = Array.isArray(sourceFilter) ? sourceFilter.includes(key) : sourceFilter === key;
+                                    return (
+                                        <button
+                                            key={key}
+                                            onClick={() => {
+                                                if (sourceFilter === 'all') {
+                                                    setSourceFilter([key]);
+                                                } else if (Array.isArray(sourceFilter)) {
+                                                    const next = sourceFilter.includes(key) ? sourceFilter.filter(s => s !== key) : [...sourceFilter, key];
+                                                    setSourceFilter(next.length === 0 ? 'all' : next);
+                                                } else {
+                                                    setSourceFilter(sourceFilter === key ? 'all' : [sourceFilter, key]);
+                                                }
+                                            }}
+                                            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${isActive ? `${config.bgColor} ${config.color} shadow-md ring-2 ring-current ring-opacity-30` : 'bg-gray-50 text-gray-500 border border-gray-100'}`}
+                                        >
+                                            {isActive && <span>✓</span>}
+                                            {config.icon} {config.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </section>
+
+                        {/* Responsable - Multi-select */}
                         <section>
                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">Responsable</label>
-                            <div className="flex flex-col gap-2">
-                                <div className="relative" ref={assignedFilterRef}>
-                                    <button
-                                        onClick={() => setIsAssignedFilterOpen(!isAssignedFilterOpen)}
-                                        className={`flex items-center space-x-2 bg-gray-50 border px-4 py-4 rounded-2xl text-sm font-bold justify-between w-full ${assignedFilter !== 'all' ? 'border-indigo-300 text-indigo-600' : 'border-gray-100 text-gray-700'}`}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <User className="h-5 w-5" />
-                                            <span>{assignedFilter === 'all' ? 'Todos los Usuarios' : assignedFilter === 'unassigned' ? 'Sin Asignar' : teamMembers.find(m => m.id === assignedFilter)?.full_name || 'Usuario'}</span>
-                                        </div>
-                                        <ChevronDown className={`h-5 w-5 text-gray-400 transition-transform ${isAssignedFilterOpen ? 'rotate-180' : ''}`} />
-                                    </button>
-                                    {isAssignedFilterOpen && (
-                                        <div className="mt-2 bg-white rounded-2xl border border-gray-100 py-2 shadow-lg">
-                                            <button
-                                                onClick={() => { setAssignedFilter('all'); setIsAssignedFilterOpen(false); }}
-                                                className={`w-full text-left px-4 py-4 text-sm font-bold border-b border-gray-50 ${assignedFilter === 'all' ? 'text-indigo-600 bg-indigo-50/50' : 'text-gray-600'}`}
-                                            >
-                                                Todos los Usuarios
-                                            </button>
-                                            {teamMembers.map(member => (
-                                                <button
-                                                    key={member.id}
-                                                    onClick={() => { setAssignedFilter(member.id); setIsAssignedFilterOpen(false); }}
-                                                    className={`w-full text-left px-4 py-4 text-sm font-bold flex items-center gap-3 border-b border-gray-50 last:border-none ${assignedFilter === member.id ? 'text-indigo-600 bg-indigo-50/50' : 'text-gray-600'}`}
-                                                >
-                                                    <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center">
-                                                        {member.avatar_url ? <img src={member.avatar_url} alt="" className="w-full h-full object-cover" /> : <User className="w-4 h-4 text-slate-400" />}
-                                                    </div>
-                                                    {member.full_name || member.email}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    onClick={() => setAssignedFilter('all')}
+                                    className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${assignedFilter === 'all' ? 'bg-[#4449AA] text-white shadow-md' : 'bg-gray-50 text-gray-500 border border-gray-100'}`}
+                                >
+                                    Todos
+                                </button>
+                                {[{ id: 'unassigned', label: 'Sin Asignar', avatar: null }, ...teamMembers.map(m => ({ id: m.id, label: m.full_name?.split(' ')[0] || m.email, avatar: m.avatar_url }))].map(item => {
+                                    const isActive = Array.isArray(assignedFilter) ? assignedFilter.includes(item.id) : assignedFilter === item.id;
+                                    return (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => {
+                                                if (assignedFilter === 'all') {
+                                                    setAssignedFilter([item.id]);
+                                                } else if (Array.isArray(assignedFilter)) {
+                                                    const next = assignedFilter.includes(item.id) ? assignedFilter.filter(s => s !== item.id) : [...assignedFilter, item.id];
+                                                    setAssignedFilter(next.length === 0 ? 'all' : next);
+                                                } else {
+                                                    setAssignedFilter(assignedFilter === item.id ? 'all' : [assignedFilter, item.id]);
+                                                }
+                                            }}
+                                            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${isActive ? (item.id === 'unassigned' ? 'bg-amber-50 text-amber-600 shadow-md ring-2 ring-amber-300' : 'bg-indigo-50 text-indigo-600 shadow-md ring-2 ring-indigo-300') : 'bg-gray-50 text-gray-500 border border-gray-100'}`}
+                                        >
+                                            {isActive && <span>✓</span>}
+                                            {item.id !== 'unassigned' && (
+                                                <div className="w-5 h-5 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
+                                                    {item.avatar ? <img src={item.avatar} alt="" className="w-full h-full object-cover" /> : <User className="w-3 h-3 text-slate-400" />}
+                                                </div>
+                                            )}
+                                            {item.label}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </section>
 
-                        <section className="grid grid-cols-1 gap-4">
-                            <div>
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">Motivo de Pérdida</label>
-                                <LossReasonDropdown />
+                        {/* Motivo de Pérdida - Multi-select */}
+                        <section>
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">Motivo de Pérdida</label>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    onClick={() => setLossReasonFilter('all')}
+                                    className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${lossReasonFilter === 'all' ? 'bg-[#4449AA] text-white shadow-md' : 'bg-gray-50 text-gray-500 border border-gray-100'}`}
+                                >
+                                    Todos
+                                </button>
+                                {lossReasons.map(reason => {
+                                    const isActive = Array.isArray(lossReasonFilter) ? lossReasonFilter.includes(reason.id) : lossReasonFilter === reason.id;
+                                    return (
+                                        <button
+                                            key={reason.id}
+                                            onClick={() => {
+                                                if (lossReasonFilter === 'all') {
+                                                    setLossReasonFilter([reason.id]);
+                                                } else if (Array.isArray(lossReasonFilter)) {
+                                                    const next = lossReasonFilter.includes(reason.id) ? lossReasonFilter.filter(s => s !== reason.id) : [...lossReasonFilter, reason.id];
+                                                    setLossReasonFilter(next.length === 0 ? 'all' : next);
+                                                } else {
+                                                    setLossReasonFilter(lossReasonFilter === reason.id ? 'all' : [lossReasonFilter, reason.id]);
+                                                }
+                                            }}
+                                            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${isActive ? 'bg-amber-50 text-amber-600 shadow-md ring-2 ring-amber-300' : 'bg-gray-50 text-gray-500 border border-gray-100'}`}
+                                        >
+                                            {isActive && <span>✓</span>}
+                                            {reason.reason}
+                                        </button>
+                                    );
+                                })}
                             </div>
-                            <div>
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">Etapa de Pérdida</label>
-                                <LossStageDropdown />
+                        </section>
+
+                        {/* Etapa de Pérdida - Multi-select */}
+                        <section>
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-3 block">Etapa de Pérdida</label>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    onClick={() => setLostAtStageFilter('all')}
+                                    className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${lostAtStageFilter === 'all' ? 'bg-[#4449AA] text-white shadow-md' : 'bg-gray-50 text-gray-500 border border-gray-100'}`}
+                                >
+                                    Todas
+                                </button>
+                                {(Object.entries(STATUS_CONFIG) as [LeadStatus, any][])
+                                    .filter(([key]) => key !== 'Perdido')
+                                    .map(([key, config]) => {
+                                        const isActive = Array.isArray(lostAtStageFilter) ? lostAtStageFilter.includes(key) : lostAtStageFilter === key;
+                                        return (
+                                            <button
+                                                key={key}
+                                                onClick={() => {
+                                                    if (lostAtStageFilter === 'all') {
+                                                        setLostAtStageFilter([key]);
+                                                    } else if (Array.isArray(lostAtStageFilter)) {
+                                                        const next = lostAtStageFilter.includes(key) ? lostAtStageFilter.filter(s => s !== key) : [...lostAtStageFilter, key];
+                                                        setLostAtStageFilter(next.length === 0 ? 'all' : next);
+                                                    } else {
+                                                        setLostAtStageFilter(lostAtStageFilter === key ? 'all' : [lostAtStageFilter, key]);
+                                                    }
+                                                }}
+                                                className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${isActive ? 'bg-rose-50 text-rose-600 shadow-md ring-2 ring-rose-300' : 'bg-gray-50 text-gray-500 border border-gray-100'}`}
+                                            >
+                                                {isActive && <span>✓</span>}
+                                                <span>{config.icon}</span>
+                                                {config.label}
+                                            </button>
+                                        );
+                                    })}
                             </div>
                         </section>
 
@@ -1094,7 +1281,7 @@ export default function Leads() {
 
     return (
         <>
-            <MobileFilterModal />
+            {MobileFilterModal()}
             <div className="w-full max-w-[1500px] mx-auto pb-6 space-y-8">
                 {/* Header - Global Standard */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
@@ -1106,11 +1293,20 @@ export default function Leads() {
                                 className="md:hidden p-3 bg-white border border-gray-100 rounded-2xl shadow-sm text-[#4449AA] relative"
                             >
                                 <SlidersHorizontal className="w-5 h-5" />
-                                {[statusFilter !== 'all', priorityFilter !== 'all', assignedFilter !== 'all', sourceFilter !== 'all', lossReasonFilter !== 'all', lostAtStageFilter !== 'all'].filter(Boolean).length > 0 && (
-                                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-600 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white">
-                                        {[statusFilter !== 'all', priorityFilter !== 'all', assignedFilter !== 'all', sourceFilter !== 'all', lossReasonFilter !== 'all', lostAtStageFilter !== 'all'].filter(Boolean).length}
-                                    </span>
-                                )}
+                                {(() => {
+                                    const totalChips =
+                                        (statusFilter === 'all' ? 0 : Array.isArray(statusFilter) ? statusFilter.length : 1) +
+                                        (priorityFilter === 'all' ? 0 : Array.isArray(priorityFilter) ? priorityFilter.length : 1) +
+                                        (assignedFilter === 'all' ? 0 : Array.isArray(assignedFilter) ? assignedFilter.length : 1) +
+                                        (sourceFilter === 'all' ? 0 : Array.isArray(sourceFilter) ? sourceFilter.length : 1) +
+                                        (lossReasonFilter === 'all' ? 0 : Array.isArray(lossReasonFilter) ? lossReasonFilter.length : 1) +
+                                        (lostAtStageFilter === 'all' ? 0 : Array.isArray(lostAtStageFilter) ? lostAtStageFilter.length : 1);
+                                    return totalChips > 0 ? (
+                                        <span className="absolute -top-1 -right-1 w-5 h-5 bg-indigo-600 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white">
+                                            {totalChips}
+                                        </span>
+                                    ) : null;
+                                })()}
                             </button>
                         </div>
                         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-2">
@@ -1174,11 +1370,11 @@ export default function Leads() {
                                 <Filter className="w-3.5 h-3.5" />
                                 Vista filtrada ({filteredLeads.length} resultados)
                                 {statusFilter !== 'all' && <span className="bg-white/50 px-2 py-0.5 rounded text-[10px]">Estado: {Array.isArray(statusFilter) ? statusFilter.join(', ') : statusFilter}</span>}
-                                {priorityFilter !== 'all' && <span className="bg-white/50 px-2 py-0.5 rounded text-[10px]">Prioridad: {(PRIORITY_CONFIG as any)[priorityFilter]?.label || priorityFilter}</span>}
-                                {sourceFilter !== 'all' && <span className="bg-white/50 px-2 py-0.5 rounded text-[10px]">Fuente: {SOURCE_CONFIG[sourceFilter]?.label || sourceFilter}</span>}
-                                {assignedFilter !== 'all' && <span className="bg-white/50 px-2 py-0.5 rounded text-[10px]">Asignado: {assignedFilter === 'unassigned' ? 'Sin asignar' : teamMembers.find(m => m.id === assignedFilter)?.full_name || 'Agente'}</span>}
-                                {lossReasonFilter !== 'all' && <span className="bg-white/50 px-2 py-0.5 rounded text-[10px]">Motivo: {lossReasons.find(r => r.id === lossReasonFilter)?.reason || 'Motivo'}</span>}
-                                {lostAtStageFilter !== 'all' && <span className="bg-white/50 px-2 py-0.5 rounded text-[10px]">Etapa: {STATUS_CONFIG[lostAtStageFilter as LeadStatus]?.label || lostAtStageFilter}</span>}
+                                {priorityFilter !== 'all' && <span className="bg-white/50 px-2 py-0.5 rounded text-[10px]">Prioridad: {Array.isArray(priorityFilter) ? priorityFilter.join(', ') : (PRIORITY_CONFIG as any)[priorityFilter]?.label || priorityFilter}</span>}
+                                {sourceFilter !== 'all' && <span className="bg-white/50 px-2 py-0.5 rounded text-[10px]">Fuente: {Array.isArray(sourceFilter) ? sourceFilter.join(', ') : SOURCE_CONFIG[sourceFilter]?.label || sourceFilter}</span>}
+                                {assignedFilter !== 'all' && <span className="bg-white/50 px-2 py-0.5 rounded text-[10px]">Asignado: {Array.isArray(assignedFilter) ? `${assignedFilter.length} seleccionados` : assignedFilter === 'unassigned' ? 'Sin asignar' : teamMembers.find(m => m.id === assignedFilter)?.full_name || 'Agente'}</span>}
+                                {lossReasonFilter !== 'all' && <span className="bg-white/50 px-2 py-0.5 rounded text-[10px]">Motivo: {Array.isArray(lossReasonFilter) ? `${lossReasonFilter.length} seleccionados` : lossReasons.find(r => r.id === lossReasonFilter)?.reason || 'Motivo'}</span>}
+                                {lostAtStageFilter !== 'all' && <span className="bg-white/50 px-2 py-0.5 rounded text-[10px]">Etapa: {Array.isArray(lostAtStageFilter) ? `${lostAtStageFilter.length} seleccionadas` : STATUS_CONFIG[lostAtStageFilter as LeadStatus]?.label || lostAtStageFilter}</span>}
                                 {startDateFilter && <span className="bg-white/50 px-2 py-0.5 rounded text-[10px]">Desde: {format(new Date(startDateFilter), 'dd/MM/yyyy')}</span>}
                                 {endDateFilter && <span className="bg-white/50 px-2 py-0.5 rounded text-[10px]">Hasta: {format(new Date(endDateFilter), 'dd/MM/yyyy')}</span>}
                                 <button
@@ -1225,27 +1421,30 @@ export default function Leads() {
                             </div>
                         </div>
 
-                        <div className="flex bg-gray-50 rounded-xl p-1 border border-gray-100">
+                        <div className="flex bg-gray-50 rounded-xl md:rounded-xl p-1 border border-gray-100 flex-1 md:flex-none">
                             <button
                                 onClick={() => setViewMode('grid')}
-                                className={`p-2 rounded-lg transition-all ${viewMode === 'grid' ? 'bg-white shadow-md text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
+                                className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 md:p-2 rounded-lg transition-all text-[10px] md:text-xs font-black uppercase tracking-wider ${viewMode === 'grid' ? 'bg-white shadow-md text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
                                 title="Vista Cuadrícula"
                             >
-                                <LayoutGrid className="w-4 h-4" />
+                                <LayoutGrid className="w-5 h-5 md:w-4 md:h-4" />
+                                <span className="md:hidden">Cards</span>
                             </button>
                             <button
                                 onClick={() => setViewMode('list')}
-                                className={`p-2 rounded-lg transition-all ${viewMode === 'list' ? 'bg-white shadow-md text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
+                                className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 md:p-2 rounded-lg transition-all text-[10px] md:text-xs font-black uppercase tracking-wider ${viewMode === 'list' ? 'bg-white shadow-md text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
                                 title="Vista Lista"
                             >
-                                <List className="w-4 h-4" />
+                                <List className="w-5 h-5 md:w-4 md:h-4" />
+                                <span className="md:hidden">Lista</span>
                             </button>
                             <button
                                 onClick={() => setViewMode('kanban')}
-                                className={`p-2 rounded-lg transition-all ${viewMode === 'kanban' ? 'bg-white shadow-md text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
+                                className={`flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 md:p-2 rounded-lg transition-all text-[10px] md:text-xs font-black uppercase tracking-wider ${viewMode === 'kanban' ? 'bg-white shadow-md text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
                                 title="Tablero Kanban"
                             >
-                                <Layout className="w-4 h-4" />
+                                <Layout className="w-5 h-5 md:w-4 md:h-4" />
+                                <span className="md:hidden">Kanban</span>
                             </button>
                         </div>
 
@@ -2179,7 +2378,7 @@ export default function Leads() {
                                                 <Filter className="w-3.5 h-3.5" />
                                                 Vista filtrada ({filteredLeads.length} resultados)
                                                 {statusFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Estado: {statusFilter}</span>}
-                                                {priorityFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Prioridad: {(PRIORITY_CONFIG as any)[priorityFilter]?.label || priorityFilter}</span>}
+                                                {priorityFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Prioridad: {Array.isArray(priorityFilter) ? priorityFilter.join(', ') : (PRIORITY_CONFIG as any)[priorityFilter]?.label || priorityFilter}</span>}
                                                 <button
                                                     onClick={() => {
                                                         setFilteredLeadId(null);

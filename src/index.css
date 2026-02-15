@@ -1,5 +1,19 @@
 @import "tailwindcss";
 
+/* Mobile tap feedback - remove jarring flash, add subtle press */
+button,
+a,
+[role="button"] {
+    -webkit-tap-highlight-color: transparent;
+}
+
+button:active,
+a:active,
+[role="button"]:active {
+    opacity: 0.85;
+    transform: scale(0.98);
+}
+
 @layer utilities {
     .animate-shimmer {
         animation: shimmer 2s infinite;
