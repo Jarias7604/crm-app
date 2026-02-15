@@ -1,85 +1,62 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { LayoutDashboard, Users, Calendar, Plus, Menu } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Plus } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { useState } from 'react';
-import { MobileQuickActions } from './MobileQuickActions';
 
 export default function MobileNav() {
     const location = useLocation();
+    const navigate = useNavigate();
     const { t } = useTranslation();
-    const [isActionsOpen, setIsActionsOpen] = useState(false);
 
-    // Explicitly mapping labels to ensure they match premium design exactly
     const tabs = [
+        { name: 'Inicio', href: '/', icon: LayoutDashboard, current: location.pathname === '/' },
+        { name: t('sidebar.leads'), href: '/leads', icon: Users, current: location.pathname.startsWith('/leads') },
+        { name: t('sidebar.calendar'), href: '/calendar', icon: Calendar, current: location.pathname.startsWith('/calendar') },
         {
-            name: 'INICIO',
-            href: '/',
-            icon: LayoutDashboard,
-            current: location.pathname === '/'
-        },
-        {
-            name: (t('sidebar.leads') || 'LEADS').toUpperCase(),
-            href: '/leads',
-            icon: Users,
-            current: location.pathname.startsWith('/leads')
-        },
-        { isSpacer: true },
-        {
-            name: (t('sidebar.calendar') || 'CALENDARIO').toUpperCase(),
-            href: '/calendar',
-            icon: Calendar,
-            current: location.pathname.startsWith('/calendar')
-        },
-        {
-            name: 'MENÚ',
-            isMenu: true,
-            icon: Menu,
-            current: isActionsOpen || location.pathname === '/dashboard'
+            name: 'Nuevo',
+            isCreate: true,
+            icon: Plus,
+            current: false
         }
     ];
 
     return (
         <>
-            <div className="md:hidden fixed bottom-8 left-1/2 -translate-x-1/2 w-[94%] max-w-[420px] z-[100]">
-                {/* Premium Floating Bar */}
-                <div className="relative bg-white/90 backdrop-blur-2xl border border-white/40 shadow-[0_20px_40px_rgba(0,0,0,0.15)] rounded-[2.5rem] px-2 h-18 flex items-center justify-between overflow-visible py-2">
-
-                    {/* Glowing Action Button - Popping out exactly as in Image 1 */}
-                    <button
-                        onClick={() => setIsActionsOpen(true)}
-                        className="absolute left-1/2 -translate-x-1/2 -top-7 w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-600 to-blue-700 text-white shadow-[0_12px_24px_rgba(79,70,229,0.4)] flex items-center justify-center active:scale-95 hover:scale-105 transition-all duration-300 z-10 border-4 border-white"
-                    >
-                        <Plus className="w-9 h-9" />
-                    </button>
-
+            <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-[100] pb-safe shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
+                <div className="flex items-center justify-around h-18">
                     {tabs.map((tab, idx) => {
-                        if (tab.isSpacer) return <div key="spacer" className="w-16" />;
-
                         const isTabActive = tab.current;
                         const Icon = tab.icon!;
 
                         const content = (
                             <div className={cn(
-                                "flex flex-col items-center justify-center p-2 transition-all duration-300 relative",
-                                isTabActive ? "text-indigo-600 scale-105" : "text-gray-400 opacity-80"
+                                "flex flex-col items-center justify-center py-1 transition-all",
+                                isTabActive ? "text-green-600" : "text-gray-400"
                             )}>
-                                <Icon className={cn("w-6 h-6 mb-1", isTabActive ? "stroke-[2.5px]" : "stroke-[2px]")} />
-                                <span className="text-[9px] font-black uppercase tracking-tight leading-none">{tab.name}</span>
-                                {isTabActive && (
-                                    <div className="absolute -bottom-2 w-1.5 h-1.5 bg-indigo-600 rounded-full shadow-[0_0_8px_rgba(79,70,229,0.5)]" />
-                                )}
+                                <Icon className={cn("w-6 h-6 mb-1")} />
+                                <span className="text-[10px] font-bold uppercase tracking-tight">{tab.name}</span>
                             </div>
                         );
 
                         return (
                             <div key={tab.name || idx} className="flex-1 flex justify-center">
-                                {tab.isMenu ? (
-                                    <button onClick={() => setIsActionsOpen(true)}>
+                                {tab.isCreate ? (
+                                    <button
+                                        onClick={() => {
+                                            const isOnLeads = location.pathname.startsWith('/leads');
+                                            navigate('/leads', {
+                                                state: {
+                                                    ...(isOnLeads ? location.state : {}),
+                                                    openCreateModal: Date.now()
+                                                }
+                                            });
+                                        }}
+                                        className="w-full active:scale-90 transition-transform"
+                                    >
                                         {content}
                                     </button>
                                 ) : (
-                                    <Link to={tab.href!}>
+                                    <Link to={tab.href!} className="w-full text-center">
                                         {content}
                                     </Link>
                                 )}
@@ -88,17 +65,6 @@ export default function MobileNav() {
                     })}
                 </div>
             </div>
-
-            {/* Premium Action Center */}
-            <MobileQuickActions
-                isOpen={isActionsOpen}
-                hideFAB
-                onClose={() => setIsActionsOpen(false)}
-                onCreateLead={() => {
-                    window.dispatchEvent(new CustomEvent('open-create-lead'));
-                    setIsActionsOpen(false);
-                }}
-            />
         </>
     );
 }

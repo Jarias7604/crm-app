@@ -423,6 +423,7 @@ export default function Dashboard() {
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[calc(100vh-160px)]">
                 <MobileQuickActions
                     isHome
+                    hideFAB
                     onCreateLead={() => navigate('/leads', { state: { openCreateModal: true } })}
                 />
             </div>
