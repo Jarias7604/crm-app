@@ -14,12 +14,27 @@ interface QuickAction {
 interface MobileQuickActionsProps {
     onCreateLead: () => void;
     isHome?: boolean;
+    isOpen?: boolean;
+    onClose?: () => void;
 }
 
-export function MobileQuickActions({ onCreateLead, isHome = false }: MobileQuickActionsProps) {
-    // Auto-open on first visit from mobile
+export function MobileQuickActions({
+    onCreateLead,
+    isHome = false,
+    isOpen: controlledIsOpen,
+    onClose
+}: MobileQuickActionsProps) {
+    // Falls back to internal state if not controlled
     const hasSeenMenu = localStorage.getItem('hasSeenMobileMenu');
-    const [isOpen, setIsOpen] = useState(isHome || !hasSeenMenu);
+    const [internalIsOpen, setInternalIsOpen] = useState(isHome || !hasSeenMenu);
+
+    // Effective isOpen state
+    const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
+
+    const toggleOpen = (value: boolean) => {
+        if (onClose && !value) onClose();
+        setInternalIsOpen(value);
+    };
     const [filter, setFilter] = useState<'shortcuts' | 'all'>('shortcuts');
     const navigate = useNavigate();
 
@@ -38,7 +53,7 @@ export function MobileQuickActions({ onCreateLead, isHome = false }: MobileQuick
             color: 'text-green-600',
             action: () => {
                 onCreateLead();
-                setIsOpen(false);
+                toggleOpen(false);
             },
             shortcut: true
         },
@@ -49,7 +64,7 @@ export function MobileQuickActions({ onCreateLead, isHome = false }: MobileQuick
             color: 'text-green-600',
             action: () => {
                 navigate('/leads');
-                setIsOpen(false);
+                toggleOpen(false);
             },
             shortcut: true
         },
@@ -60,7 +75,7 @@ export function MobileQuickActions({ onCreateLead, isHome = false }: MobileQuick
             color: 'text-green-600',
             action: () => {
                 navigate('/calendar');
-                setIsOpen(false);
+                toggleOpen(false);
             },
             shortcut: true
         },
@@ -71,7 +86,7 @@ export function MobileQuickActions({ onCreateLead, isHome = false }: MobileQuick
             color: 'text-green-600',
             action: () => {
                 navigate('/dashboard');
-                setIsOpen(false);
+                toggleOpen(false);
             },
             shortcut: true
         },
@@ -82,7 +97,7 @@ export function MobileQuickActions({ onCreateLead, isHome = false }: MobileQuick
             color: 'text-green-600',
             action: () => {
                 navigate('/company/team');
-                setIsOpen(false);
+                toggleOpen(false);
             },
             shortcut: false
         },
@@ -93,7 +108,7 @@ export function MobileQuickActions({ onCreateLead, isHome = false }: MobileQuick
             color: 'text-green-600',
             action: () => {
                 navigate('/leads');
-                setIsOpen(false);
+                toggleOpen(false);
             },
             shortcut: false
         },
@@ -104,7 +119,7 @@ export function MobileQuickActions({ onCreateLead, isHome = false }: MobileQuick
             color: 'text-green-600',
             action: () => {
                 navigate('/leads');
-                setIsOpen(false);
+                toggleOpen(false);
             },
             shortcut: false
         },
@@ -115,7 +130,7 @@ export function MobileQuickActions({ onCreateLead, isHome = false }: MobileQuick
             color: 'text-green-600',
             action: () => {
                 navigate('/dashboard');
-                setIsOpen(false);
+                toggleOpen(false);
             },
             shortcut: false
         }
@@ -128,7 +143,7 @@ export function MobileQuickActions({ onCreateLead, isHome = false }: MobileQuick
     if (!isOpen && !isHome) {
         return (
             <button
-                onClick={() => setIsOpen(true)}
+                onClick={() => toggleOpen(true)}
                 className="md:hidden fixed bottom-6 right-6 w-14 h-14 rounded-full bg-gradient-to-br from-green-500 to-green-600 text-white shadow-xl shadow-green-500/50 flex items-center justify-center z-40 active:scale-95 transition-all"
             >
                 <Plus className="w-7 h-7" />
@@ -143,7 +158,7 @@ export function MobileQuickActions({ onCreateLead, isHome = false }: MobileQuick
                 <div className="flex items-center justify-between mb-4">
                     {!isHome ? (
                         <button
-                            onClick={() => setIsOpen(false)}
+                            onClick={() => toggleOpen(false)}
                             className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center"
                         >
                             <X className="w-5 h-5 text-gray-600" />

@@ -10,17 +10,10 @@ export default function MobileNav() {
     const { t } = useTranslation();
     const [isActionsOpen, setIsActionsOpen] = useState(false);
 
-<<<<<<< HEAD
-    // Main tabs (max 4-5 for bottom bar)
-    const mainTabs = [
-        { name: 'Inicio', href: '/', icon: LayoutDashboard, current: location.pathname === '/' },
-        { name: t('sidebar.leads'), href: '/leads', icon: Users, current: location.pathname.startsWith('/leads') },
-        { name: t('sidebar.calendar'), href: '/calendar', icon: Calendar, current: location.pathname.startsWith('/calendar') },
-=======
     // Explicitly mapping labels to ensure they match premium design exactly
     const tabs = [
         {
-            name: (t('sidebar.dashboard') || 'DASHBOARD').toUpperCase(),
+            name: 'INICIO',
             href: '/',
             icon: LayoutDashboard,
             current: location.pathname === '/'
@@ -42,9 +35,8 @@ export default function MobileNav() {
             name: 'MENÚ',
             isMenu: true,
             icon: Menu,
-            current: isActionsOpen
-        },
->>>>>>> 30b17dc9fb97dd1e64651dbcfc3fe7e04a7051fb
+            current: isActionsOpen || location.pathname === '/dashboard'
+        }
     ];
 
     return (
