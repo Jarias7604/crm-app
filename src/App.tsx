@@ -51,6 +51,8 @@ const PageLoader = () => (
   </div>
 );
 
+import { PWAInstallPrompt } from './components/PWAInstallPrompt';
+
 function App() {
   const { i18n } = useTranslation();
 
@@ -65,6 +67,7 @@ function App() {
       <BrowserRouter>
         <AuthProvider>
           <Toaster position="top-right" reverseOrder={false} />
+          <PWAInstallPrompt />
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route element={<AuthLayout />}>

@@ -1,107 +1,111 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '../auth/AuthProvider';
-import { LayoutDashboard, Users, Calendar, Menu, X, ShieldCheck, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Plus, Menu } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useState } from 'react';
+import { MobileQuickActions } from './MobileQuickActions';
 
 export default function MobileNav() {
-    const { profile, signOut } = useAuth();
     const location = useLocation();
     const { t } = useTranslation();
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isActionsOpen, setIsActionsOpen] = useState(false);
 
+<<<<<<< HEAD
     // Main tabs (max 4-5 for bottom bar)
     const mainTabs = [
         { name: 'Inicio', href: '/', icon: LayoutDashboard, current: location.pathname === '/' },
         { name: t('sidebar.leads'), href: '/leads', icon: Users, current: location.pathname.startsWith('/leads') },
         { name: t('sidebar.calendar'), href: '/calendar', icon: Calendar, current: location.pathname.startsWith('/calendar') },
+=======
+    // Explicitly mapping labels to ensure they match premium design exactly
+    const tabs = [
+        {
+            name: (t('sidebar.dashboard') || 'DASHBOARD').toUpperCase(),
+            href: '/',
+            icon: LayoutDashboard,
+            current: location.pathname === '/'
+        },
+        {
+            name: (t('sidebar.leads') || 'LEADS').toUpperCase(),
+            href: '/leads',
+            icon: Users,
+            current: location.pathname.startsWith('/leads')
+        },
+        { isSpacer: true },
+        {
+            name: (t('sidebar.calendar') || 'CALENDARIO').toUpperCase(),
+            href: '/calendar',
+            icon: Calendar,
+            current: location.pathname.startsWith('/calendar')
+        },
+        {
+            name: 'MENÚ',
+            isMenu: true,
+            icon: Menu,
+            current: isActionsOpen
+        },
+>>>>>>> 30b17dc9fb97dd1e64651dbcfc3fe7e04a7051fb
     ];
-
-    // Admin tabs for the "More" menu
-    const adminTabs = [
-        { name: t('sidebar.companies'), href: '/admin/companies', icon: Users, show: profile?.role === 'super_admin' },
-        { name: 'Equipo', href: '/company/team', icon: Users, show: profile?.role === 'super_admin' || profile?.role === 'company_admin' },
-        { name: 'Permisos', href: '/company/permissions', icon: ShieldCheck, show: profile?.role === 'super_admin' || profile?.role === 'company_admin' },
-    ].filter(tab => tab.show);
 
     return (
         <>
-            {/* Bottom Navigation Bar */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 px-4 pb-safe pt-2">
-                <div className="flex justify-between items-center h-14">
-                    {mainTabs.map((tab) => (
-                        <Link
-                            key={tab.name}
-                            to={tab.href}
-                            className={cn(
-                                "flex flex-col items-center justify-center w-full h-full space-y-1",
-                                tab.current ? "text-blue-600" : "text-gray-500 hover:text-gray-700"
-                            )}
-                        >
-                            <tab.icon className="w-6 h-6" />
-                            <span className="text-[10px] font-medium">{tab.name}</span>
-                        </Link>
-                    ))}
+            <div className="md:hidden fixed bottom-8 left-1/2 -translate-x-1/2 w-[94%] max-w-[420px] z-[100]">
+                {/* Premium Floating Bar */}
+                <div className="relative bg-white/90 backdrop-blur-2xl border border-white/40 shadow-[0_20px_40px_rgba(0,0,0,0.15)] rounded-[2.5rem] px-2 h-18 flex items-center justify-between overflow-visible py-2">
 
-                    {/* More / Menu Toggle */}
+                    {/* Glowing Action Button - Popping out exactly as in Image 1 */}
                     <button
-                        onClick={() => setIsMenuOpen(true)}
-                        className={cn(
-                            "flex flex-col items-center justify-center w-full h-full space-y-1",
-                            isMenuOpen ? "text-blue-600" : "text-gray-500 hover:text-gray-700"
-                        )}
+                        onClick={() => setIsActionsOpen(true)}
+                        className="absolute left-1/2 -translate-x-1/2 -top-7 w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-600 to-blue-700 text-white shadow-[0_12px_24px_rgba(79,70,229,0.4)] flex items-center justify-center active:scale-95 hover:scale-105 transition-all duration-300 z-10 border-4 border-white"
                     >
-                        <Menu className="w-6 h-6" />
-                        <span className="text-[10px] font-medium">Menú</span>
+                        <Plus className="w-9 h-9" />
                     </button>
+
+                    {tabs.map((tab, idx) => {
+                        if (tab.isSpacer) return <div key="spacer" className="w-16" />;
+
+                        const isTabActive = tab.current;
+                        const Icon = tab.icon!;
+
+                        const content = (
+                            <div className={cn(
+                                "flex flex-col items-center justify-center p-2 transition-all duration-300 relative",
+                                isTabActive ? "text-indigo-600 scale-105" : "text-gray-400 opacity-80"
+                            )}>
+                                <Icon className={cn("w-6 h-6 mb-1", isTabActive ? "stroke-[2.5px]" : "stroke-[2px]")} />
+                                <span className="text-[9px] font-black uppercase tracking-tight leading-none">{tab.name}</span>
+                                {isTabActive && (
+                                    <div className="absolute -bottom-2 w-1.5 h-1.5 bg-indigo-600 rounded-full shadow-[0_0_8px_rgba(79,70,229,0.5)]" />
+                                )}
+                            </div>
+                        );
+
+                        return (
+                            <div key={tab.name || idx} className="flex-1 flex justify-center">
+                                {tab.isMenu ? (
+                                    <button onClick={() => setIsActionsOpen(true)}>
+                                        {content}
+                                    </button>
+                                ) : (
+                                    <Link to={tab.href!}>
+                                        {content}
+                                    </Link>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
 
-            {/* Slide-up Menu for Extra Links & Profile */}
-            {isMenuOpen && (
-                <div className="fixed inset-0 z-[60] md:hidden">
-                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsMenuOpen(false)} />
-                    <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl p-6 shadow-xl animate-in slide-in-from-bottom duration-300">
-                        <div className="flex justify-between items-center mb-6">
-                            <div>
-                                <h3 className="text-lg font-bold text-gray-900">{profile?.email}</h3>
-                                <p className="text-xs text-gray-500 uppercase font-bold tracking-wider">{profile?.role?.replace('_', ' ')}</p>
-                            </div>
-                            <button onClick={() => setIsMenuOpen(false)} className="p-2 bg-gray-100 rounded-full">
-                                <X className="w-5 h-5 text-gray-500" />
-                            </button>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 mb-6">
-                            {adminTabs.map((tab) => (
-                                <Link
-                                    key={tab.name}
-                                    to={tab.href}
-                                    onClick={() => setIsMenuOpen(false)}
-                                    className="flex flex-col items-center justify-center p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
-                                >
-                                    <div className="p-3 bg-white rounded-full shadow-sm mb-2 text-blue-600">
-                                        <tab.icon className="w-6 h-6" />
-                                    </div>
-                                    <span className="text-sm font-medium text-gray-700">{tab.name}</span>
-                                </Link>
-                            ))}
-                        </div>
-
-                        <button
-                            onClick={() => { signOut(); setIsMenuOpen(false); }}
-                            className="w-full flex items-center justify-center gap-2 p-4 text-red-600 font-medium bg-red-50 rounded-xl hover:bg-red-100 transition-colors"
-                        >
-                            <LogOut className="w-5 h-5" />
-                            Cerrar Sesión
-                        </button>
-
-                        {/* Safe area spacer for bottom nav */}
-                        <div className="h-16" />
-                    </div>
-                </div>
-            )}
+            {/* Premium Action Center */}
+            <MobileQuickActions
+                isOpen={isActionsOpen}
+                onClose={() => setIsActionsOpen(false)}
+                onCreateLead={() => {
+                    window.dispatchEvent(new CustomEvent('open-create-lead'));
+                    setIsActionsOpen(false);
+                }}
+            />
         </>
     );
 }

@@ -25,24 +25,74 @@ export interface Campaign {
 
 export const campaignService = {
     async getCampaigns() {
-        const { data, error } = await supabase
+        const { data: campaigns, error } = await supabase
             .from('marketing_campaigns')
             .select('*')
             .order('created_at', { ascending: false });
 
         if (error) throw error;
-        return data as Campaign[];
+
+        // Fetch real-time stats from marketing_messages
+        const { data: messages } = await supabase
+            .from('marketing_messages')
+            .select('status, metadata')
+            .order('created_at', { ascending: false })
+            .limit(5000);
+
+        // Aggregate stats by campaign_id
+        const realStats: Record<string, { sent: number, opened: number, clicked: number }> = {};
+
+        messages?.forEach(msg => {
+            const campaignId = (msg.metadata as any)?.campaign_id;
+            const status = msg.status;
+            if (!campaignId) return;
+
+            if (!realStats[campaignId]) {
+                realStats[campaignId] = { sent: 0, opened: 0, clicked: 0 };
+            }
+
+            realStats[campaignId].sent++;
+            if (status === 'opened' || status === 'read' || status === 'clicked') realStats[campaignId].opened++;
+            if (status === 'clicked') realStats[campaignId].clicked++;
+        });
+
+        // Merge real stats into campaigns
+        return (campaigns as Campaign[]).map(c => ({
+            ...c,
+            stats: {
+                ...c.stats,
+                sent: realStats[c.id]?.sent || c.stats?.sent || 0,
+                opened: realStats[c.id]?.opened || c.stats?.opened || 0,
+                clicked: realStats[c.id]?.clicked || c.stats?.clicked || 0
+            }
+        }));
     },
 
     async getCampaignById(id: string) {
-        const { data, error } = await supabase
+        const { data: c, error } = await supabase
             .from('marketing_campaigns')
             .select('*')
             .eq('id', id)
             .single();
 
         if (error) throw error;
-        return data as Campaign;
+        const campaign = c as Campaign;
+
+        // Fetch real-time stats for this campaign
+        const { data: messages } = await supabase
+            .from('marketing_messages')
+            .select('status')
+            .eq('metadata->>campaign_id', id);
+
+        if (messages) {
+            campaign.stats = {
+                sent: messages.length,
+                opened: messages.filter(m => ['opened', 'read', 'clicked'].includes(m.status)).length,
+                clicked: messages.filter(m => m.status === 'clicked').length
+            };
+        }
+
+        return campaign;
     },
 
     async createCampaign(campaign: Partial<Campaign>) {
@@ -60,6 +110,15 @@ export const campaignService = {
         const { error } = await supabase
             .from('marketing_campaigns')
             .update(updates)
+            .eq('id', id);
+
+        if (error) throw error;
+    },
+
+    async deleteCampaign(id: string) {
+        const { error } = await supabase
+            .from('marketing_campaigns')
+            .delete()
             .eq('id', id);
 
         if (error) throw error;
