@@ -125,8 +125,26 @@ export default function Companies() {
                 const { admin_email, admin_password, admin_full_name, ...companyData } = formData;
                 await adminService.updateCompany(editingCompanyId, companyData);
 
-                // If admin fields provided, create new admin for this company
-                if (admin_email && admin_password) {
+                // If editing an existing member, update them via RPC
+                if (editingMemberId) {
+                    const params: any = {
+                        p_user_id: editingMemberId,
+                        p_full_name: memberEditData.full_name || null,
+                        p_email: memberEditData.email || null,
+                        p_phone: memberEditData.phone || null,
+                        p_role: memberEditData.role || null,
+                        p_address: memberEditData.address || null,
+                        p_new_password: memberEditData.new_password || null
+                    };
+                    const { error: rpcError } = await supabase.rpc('admin_update_user', params);
+                    if (rpcError) throw rpcError;
+                    // Update local state
+                    setCompanyMembers(prev => prev.map(m =>
+                        m.id === editingMemberId ? { ...m, full_name: memberEditData.full_name, email: memberEditData.email, role: memberEditData.role } : m
+                    ));
+                    toast.success('🎉 Empresa y usuario actualizados correctamente');
+                } else if (admin_email && admin_password) {
+                    // Adding a new admin to the company
                     if (admin_password.length < 6) {
                         toast.error('La contraseña debe tener al menos 6 caracteres');
                         setActiveTab('admin');
@@ -185,6 +203,7 @@ export default function Companies() {
 
     const resetForm = () => {
         setEditingCompanyId(null);
+        setEditingMemberId(null);
         setActiveTab('info');
         setFormData({
             name: '',
@@ -563,189 +582,113 @@ export default function Companies() {
                             )}
                             {activeTab === 'admin' && (
                                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                    {/* Existing members section - only when editing */}
+                                    {/* User selector - only when editing existing company */}
                                     {editingCompanyId && companyMembers.length > 0 && (
                                         <div className="space-y-3">
-                                            <div className="flex items-center gap-2 px-1">
-                                                <Users className="w-4 h-4 text-slate-400" />
-                                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Usuarios Registrados ({companyMembers.length})</h4>
+                                            <div className="flex items-center justify-between px-1">
+                                                <div className="flex items-center gap-2">
+                                                    <Users className="w-4 h-4 text-slate-400" />
+                                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Seleccionar Usuario ({companyMembers.length})</h4>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setEditingMemberId(null);
+                                                        setFormData(prev => ({ ...prev, admin_full_name: '', admin_email: '', admin_password: '' }));
+                                                        setMemberEditData({ full_name: '', email: '', phone: '', role: 'company_admin', address: '', new_password: '' });
+                                                    }}
+                                                    className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all ${!editingMemberId
+                                                        ? 'bg-emerald-100 text-emerald-600 ring-2 ring-emerald-200'
+                                                        : 'bg-slate-100 text-slate-400 hover:bg-emerald-50 hover:text-emerald-500'
+                                                        }`}
+                                                >
+                                                    + Nuevo Admin
+                                                </button>
                                             </div>
-                                            <div className="grid grid-cols-1 gap-2">
+                                            <div className="flex flex-wrap gap-2">
                                                 {companyMembers.map(member => (
-                                                    <div key={member.id}>
-                                                        <div
-                                                            onClick={() => {
-                                                                if (editingMemberId === member.id) {
-                                                                    setEditingMemberId(null);
-                                                                } else {
-                                                                    setEditingMemberId(member.id);
-                                                                    setMemberEditData({
-                                                                        full_name: member.full_name || '',
-                                                                        email: member.email || '',
-                                                                        phone: (member as any).phone || '',
-                                                                        role: member.role,
-                                                                        address: (member as any).address || '',
-                                                                        new_password: ''
-                                                                    });
-                                                                }
-                                                            }}
-                                                            className={`flex items-center gap-4 rounded-2xl p-4 border cursor-pointer transition-all duration-200 ${editingMemberId === member.id
-                                                                ? 'bg-indigo-50/80 border-indigo-200 ring-2 ring-indigo-100'
-                                                                : 'bg-slate-50/80 border-slate-100 hover:bg-white hover:border-slate-200 hover:shadow-sm'
-                                                                }`}
-                                                        >
-                                                            <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
-                                                                <span className="text-[13px] font-black text-indigo-600">{(member.full_name || member.email || '?')[0].toUpperCase()}</span>
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <p className="text-[13px] font-bold text-slate-800 truncate">{member.full_name || 'Sin nombre'}</p>
-                                                                <p className="text-[11px] text-slate-400 truncate">{member.email}</p>
-                                                            </div>
-                                                            <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg ${member.role === 'super_admin' ? 'bg-purple-100 text-purple-600' :
-                                                                member.role === 'company_admin' ? 'bg-emerald-100 text-emerald-600' :
-                                                                    'bg-slate-100 text-slate-500'
-                                                                }`}>{member.role === 'company_admin' ? 'Admin' : member.role === 'super_admin' ? 'Super Admin' : member.role}</span>
-                                                            <Pencil className="w-3.5 h-3.5 text-slate-300" />
+                                                    <button
+                                                        key={member.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setEditingMemberId(member.id);
+                                                            setFormData(prev => ({
+                                                                ...prev,
+                                                                admin_full_name: member.full_name || '',
+                                                                admin_email: member.email || '',
+                                                                admin_password: ''
+                                                            }));
+                                                            setMemberEditData({
+                                                                full_name: member.full_name || '',
+                                                                email: member.email || '',
+                                                                phone: (member as any).phone || '',
+                                                                role: member.role,
+                                                                address: (member as any).address || '',
+                                                                new_password: ''
+                                                            });
+                                                        }}
+                                                        className={`flex items-center gap-3 rounded-2xl px-4 py-3 border transition-all duration-200 ${editingMemberId === member.id
+                                                            ? 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-100 shadow-md'
+                                                            : 'bg-slate-50/80 border-slate-100 hover:bg-white hover:border-slate-200 hover:shadow-sm'
+                                                            }`}
+                                                    >
+                                                        <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                                                            <span className="text-[11px] font-black text-indigo-600">{(member.full_name || member.email || '?')[0].toUpperCase()}</span>
                                                         </div>
-                                                        {editingMemberId === member.id && (
-                                                            <div className="mt-2 p-5 bg-white rounded-2xl border border-indigo-100 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                                                                <div className="grid grid-cols-2 gap-3">
-                                                                    <div>
-                                                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Nombre Completo</label>
-                                                                        <input
-                                                                            type="text"
-                                                                            value={memberEditData.full_name}
-                                                                            onChange={(e) => setMemberEditData(prev => ({ ...prev, full_name: e.target.value }))}
-                                                                            className="w-full px-3 py-2 text-[13px] rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
-                                                                        />
-                                                                    </div>
-                                                                    <div>
-                                                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Email</label>
-                                                                        <input
-                                                                            type="email"
-                                                                            value={memberEditData.email}
-                                                                            onChange={(e) => setMemberEditData(prev => ({ ...prev, email: e.target.value }))}
-                                                                            className="w-full px-3 py-2 text-[13px] rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
-                                                                        />
-                                                                    </div>
-                                                                    <div>
-                                                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Teléfono</label>
-                                                                        <input
-                                                                            type="text"
-                                                                            value={memberEditData.phone}
-                                                                            onChange={(e) => setMemberEditData(prev => ({ ...prev, phone: e.target.value }))}
-                                                                            placeholder="+1 809-000-0000"
-                                                                            className="w-full px-3 py-2 text-[13px] rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
-                                                                        />
-                                                                    </div>
-                                                                    <div>
-                                                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Rol</label>
-                                                                        <select
-                                                                            value={memberEditData.role}
-                                                                            onChange={(e) => setMemberEditData(prev => ({ ...prev, role: e.target.value }))}
-                                                                            className="w-full px-3 py-2 text-[13px] rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all bg-white"
-                                                                        >
-                                                                            <option value="company_admin">Admin</option>
-                                                                            <option value="sales_rep">Vendedor</option>
-                                                                            <option value="viewer">Visor (Solo lectura)</option>
-                                                                        </select>
-                                                                    </div>
-                                                                </div>
-                                                                <div>
-                                                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Dirección</label>
-                                                                    <input
-                                                                        type="text"
-                                                                        value={memberEditData.address}
-                                                                        onChange={(e) => setMemberEditData(prev => ({ ...prev, address: e.target.value }))}
-                                                                        placeholder="Dirección del usuario"
-                                                                        className="w-full px-3 py-2 text-[13px] rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
-                                                                    />
-                                                                </div>
-                                                                <div className="border-t border-dashed border-slate-200 pt-3">
-                                                                    <label className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1 block">🔒 Nueva Contraseña (dejar vacío para no cambiar)</label>
-                                                                    <input
-                                                                        type="password"
-                                                                        value={memberEditData.new_password}
-                                                                        onChange={(e) => setMemberEditData(prev => ({ ...prev, new_password: e.target.value }))}
-                                                                        placeholder="••••••••"
-                                                                        className="w-full px-3 py-2 text-[13px] rounded-xl border border-amber-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-100 outline-none transition-all"
-                                                                    />
-                                                                </div>
-                                                                <div className="flex items-center gap-2 justify-end pt-1">
-                                                                    <button
-                                                                        onClick={() => setEditingMemberId(null)}
-                                                                        className="text-[10px] font-bold text-slate-400 px-4 py-2 rounded-lg hover:bg-slate-100 transition-colors"
-                                                                    >
-                                                                        Cancelar
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={async () => {
-                                                                            try {
-                                                                                const params: any = {
-                                                                                    p_user_id: member.id,
-                                                                                    p_full_name: memberEditData.full_name || null,
-                                                                                    p_email: memberEditData.email || null,
-                                                                                    p_phone: memberEditData.phone || null,
-                                                                                    p_role: memberEditData.role || null,
-                                                                                    p_address: memberEditData.address || null,
-                                                                                    p_new_password: memberEditData.new_password || null
-                                                                                };
-                                                                                const { error } = await supabase.rpc('admin_update_user', params);
-                                                                                if (error) throw error;
-                                                                                // Update local state
-                                                                                setCompanyMembers(prev => prev.map(m =>
-                                                                                    m.id === member.id ? { ...m, full_name: memberEditData.full_name, email: memberEditData.email, role: memberEditData.role } : m
-                                                                                ));
-                                                                                setEditingMemberId(null);
-                                                                                toast.success('✅ Usuario actualizado correctamente');
-                                                                            } catch (err: any) {
-                                                                                toast.error(err.message || 'Error al actualizar');
-                                                                            }
-                                                                        }}
-                                                                        className="text-[10px] font-black text-white bg-indigo-600 px-5 py-2 rounded-lg hover:bg-indigo-700 transition-colors uppercase tracking-wider"
-                                                                    >
-                                                                        Guardar Cambios
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                                        <div className="text-left">
+                                                            <p className="text-[12px] font-bold text-slate-800 truncate">{member.full_name || 'Sin nombre'}</p>
+                                                            <p className="text-[10px] text-slate-400 truncate">{member.email}</p>
+                                                        </div>
+                                                        {editingMemberId === member.id && <Pencil className="w-3 h-3 text-indigo-400" />}
+                                                    </button>
                                                 ))}
                                             </div>
-                                            <div className="border-t border-dashed border-slate-200 pt-4 mt-2"></div>
                                         </div>
                                     )}
 
-                                    <div className="bg-emerald-600 rounded-3xl p-8 text-white relative overflow-hidden shadow-2xl shadow-emerald-100 ring-1 ring-white/10 group">
+                                    {/* Title banner */}
+                                    <div className={`${editingMemberId ? 'bg-indigo-600' : 'bg-emerald-600'} rounded-3xl p-6 text-white relative overflow-hidden shadow-2xl ${editingMemberId ? 'shadow-indigo-100' : 'shadow-emerald-100'} ring-1 ring-white/10 group`}>
                                         <div className="absolute top-[-20%] right-[-10%] w-60 h-60 bg-white/10 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
-                                        <div className="relative z-10">
-                                            <div className="flex items-center gap-3 mb-3">
-                                                <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center">
-                                                    <KeyRound className="w-6 h-6 text-white" />
-                                                </div>
-                                                <h4 className="text-sm font-black uppercase tracking-[0.2em] opacity-90">
-                                                    {editingCompanyId ? 'Agregar Nuevo Administrador' : 'Administrador Inicial'}
-                                                </h4>
+                                        <div className="relative z-10 flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+                                                {editingMemberId ? <Pencil className="w-5 h-5 text-white" /> : <KeyRound className="w-5 h-5 text-white" />}
                                             </div>
-                                            <p className="text-[13px] font-bold text-emerald-100 leading-relaxed max-w-lg">
-                                                {editingCompanyId
-                                                    ? 'Agrega un nuevo administrador a esta empresa. Los usuarios existentes no serán afectados.'
-                                                    : 'Configura las credenciales del primer administrador. Esta persona podrá ingresar al CRM y crear nuevos colaboradores desde su panel de equipo.'
-                                                }
-                                            </p>
+                                            <div>
+                                                <h4 className="text-sm font-black uppercase tracking-[0.15em] opacity-90">
+                                                    {editingMemberId
+                                                        ? 'Editando Usuario Existente'
+                                                        : editingCompanyId
+                                                            ? 'Agregar Nuevo Administrador'
+                                                            : 'Administrador Inicial'}
+                                                </h4>
+                                                <p className="text-[11px] font-bold opacity-70 mt-0.5">
+                                                    {editingMemberId
+                                                        ? 'Modifica los datos y presiona Guardar abajo.'
+                                                        : editingCompanyId
+                                                            ? 'Deja vacío si no deseas agregar un nuevo admin.'
+                                                            : 'Configura las credenciales del primer administrador.'}
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
 
+                                    {/* Unified form fields */}
                                     <div className="grid grid-cols-2 gap-x-6 gap-y-5">
                                         <div className="col-span-2">
                                             <div className="flex items-center mb-2 px-1">
                                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                                    <User className="w-3.5 h-3.5" /> Nombre Completo del Admin
+                                                    <User className="w-3.5 h-3.5" /> Nombre Completo
                                                 </label>
                                             </div>
                                             <Input
-                                                value={formData.admin_full_name}
-                                                onChange={(e) => setFormData({ ...formData, admin_full_name: e.target.value })}
+                                                value={editingMemberId ? memberEditData.full_name : formData.admin_full_name}
+                                                onChange={(e) => {
+                                                    if (editingMemberId) {
+                                                        setMemberEditData(prev => ({ ...prev, full_name: e.target.value }));
+                                                    } else {
+                                                        setFormData({ ...formData, admin_full_name: e.target.value });
+                                                    }
+                                                }}
                                                 placeholder="Ej: Juan Pérez"
                                                 className="h-14 bg-slate-50 border-slate-200 rounded-2xl font-black text-slate-900 focus:bg-white transition-all shadow-sm text-lg"
                                             />
@@ -755,12 +698,18 @@ export default function Companies() {
                                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                                                     <Mail className="w-3.5 h-3.5" /> Email de Acceso
                                                 </label>
-                                                <span className="text-[9px] font-bold text-rose-400 uppercase">* Requerido</span>
+                                                {!editingMemberId && !editingCompanyId && <span className="text-[9px] font-bold text-rose-400 uppercase">* Requerido</span>}
                                             </div>
                                             <Input
                                                 type="email"
-                                                value={formData.admin_email}
-                                                onChange={(e) => setFormData({ ...formData, admin_email: e.target.value })}
+                                                value={editingMemberId ? memberEditData.email : formData.admin_email}
+                                                onChange={(e) => {
+                                                    if (editingMemberId) {
+                                                        setMemberEditData(prev => ({ ...prev, email: e.target.value }));
+                                                    } else {
+                                                        setFormData({ ...formData, admin_email: e.target.value });
+                                                    }
+                                                }}
                                                 placeholder="admin@empresa.com"
                                                 className="h-14 bg-slate-50 border-slate-200 rounded-2xl font-black text-slate-900 focus:bg-white shadow-sm"
                                             />
@@ -768,29 +717,73 @@ export default function Companies() {
                                         <div>
                                             <div className="flex items-center justify-between mb-2 px-1">
                                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                                    <Lock className="w-3.5 h-3.5" /> Contraseña Inicial
+                                                    <Lock className="w-3.5 h-3.5" /> {editingMemberId ? 'Nueva Contraseña' : 'Contraseña'}
                                                 </label>
-                                                <span className="text-[9px] font-bold text-rose-400 uppercase">* Requerido</span>
+                                                {!editingMemberId && !editingCompanyId && <span className="text-[9px] font-bold text-rose-400 uppercase">* Requerido</span>}
                                             </div>
                                             <Input
                                                 type="password"
-                                                value={formData.admin_password}
-                                                onChange={(e) => setFormData({ ...formData, admin_password: e.target.value })}
-                                                placeholder="Mínimo 6 caracteres"
+                                                value={editingMemberId ? memberEditData.new_password : formData.admin_password}
+                                                onChange={(e) => {
+                                                    if (editingMemberId) {
+                                                        setMemberEditData(prev => ({ ...prev, new_password: e.target.value }));
+                                                    } else {
+                                                        setFormData({ ...formData, admin_password: e.target.value });
+                                                    }
+                                                }}
+                                                placeholder={editingMemberId ? 'Dejar vacío para no cambiar' : 'Mínimo 6 caracteres'}
                                                 className="h-14 bg-slate-50 border-slate-200 rounded-2xl font-black text-slate-900 focus:bg-white shadow-sm"
                                             />
                                         </div>
+
+                                        {/* Extra fields visible when editing an existing user */}
+                                        {editingMemberId && (
+                                            <>
+                                                <div>
+                                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2">Teléfono</label>
+                                                    <Input
+                                                        value={memberEditData.phone}
+                                                        onChange={(e) => setMemberEditData(prev => ({ ...prev, phone: e.target.value }))}
+                                                        placeholder="+1 809-000-0000"
+                                                        className="h-14 bg-slate-50 border-slate-200 rounded-2xl font-black text-slate-900 shadow-sm"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2">Rol</label>
+                                                    <select
+                                                        value={memberEditData.role}
+                                                        onChange={(e) => setMemberEditData(prev => ({ ...prev, role: e.target.value }))}
+                                                        className="w-full h-14 px-5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-black text-sm transition-all focus:bg-white text-slate-700 shadow-sm appearance-none cursor-pointer"
+                                                    >
+                                                        <option value="company_admin">Admin</option>
+                                                        <option value="sales_rep">Vendedor</option>
+                                                        <option value="viewer">Visor (Solo lectura)</option>
+                                                    </select>
+                                                </div>
+                                                <div className="col-span-2">
+                                                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2">Dirección</label>
+                                                    <Input
+                                                        value={memberEditData.address}
+                                                        onChange={(e) => setMemberEditData(prev => ({ ...prev, address: e.target.value }))}
+                                                        placeholder="Dirección del usuario"
+                                                        className="h-14 bg-slate-50 border-slate-200 rounded-2xl font-black text-slate-900 shadow-sm"
+                                                    />
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
 
-                                    <div className="bg-amber-50 rounded-2xl p-5 border border-amber-100 flex items-start gap-3">
-                                        <Info className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                                        <p className="text-[12px] text-amber-700 font-bold leading-relaxed">
-                                            {editingCompanyId
-                                                ? <>Este nuevo administrador se vinculará a la empresa existente. Los demás usuarios conservan sus credenciales y permisos intactos. <span className="font-black">Campos opcionales</span> — deja vacío si no deseas agregar admin.</>
-                                                : <>El administrador recibirá el rol <span className="font-black">Company Admin</span> y tendrá acceso completo a todos los módulos habilitados. Podrá crear y gestionar colaboradores desde la sección de Equipo.</>
-                                            }
-                                        </p>
-                                    </div>
+                                    {!editingMemberId && (
+                                        <div className="bg-amber-50 rounded-2xl p-5 border border-amber-100 flex items-start gap-3">
+                                            <Info className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                                            <p className="text-[12px] text-amber-700 font-bold leading-relaxed">
+                                                {editingCompanyId
+                                                    ? <>Deja los campos vacíos si no necesitas agregar un nuevo admin. Los usuarios existentes no serán afectados.</>
+                                                    : <>El administrador recibirá el rol <span className="font-black">Company Admin</span> y tendrá acceso completo a todos los módulos habilitados.</>
+                                                }
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
