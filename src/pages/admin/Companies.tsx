@@ -23,7 +23,10 @@ import {
     Settings,
     CheckCircle2,
     Users,
-    Info
+    Info,
+    Lock,
+    Mail,
+    KeyRound
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -45,7 +48,7 @@ const MODULES_CONFIG = [
 export default function Companies() {
     const [companies, setCompanies] = useState<Company[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [activeTab, setActiveTab] = useState<'info' | 'license'>('info');
+    const [activeTab, setActiveTab] = useState<'info' | 'license' | 'admin'>('info');
     const [formData, setFormData] = useState({
         name: '',
         license_status: 'active' as LicenseStatus,
@@ -54,7 +57,10 @@ export default function Companies() {
         email: '',
         direccion: '',
         max_users: 5,
-        allowed_permissions: [] as string[]
+        allowed_permissions: [] as string[],
+        admin_email: '',
+        admin_password: '',
+        admin_full_name: ''
     });
     const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -82,7 +88,10 @@ export default function Companies() {
                     email: companyToEdit.email || '',
                     direccion: companyToEdit.direccion || '',
                     max_users: companyToEdit.max_users || 5,
-                    allowed_permissions: companyToEdit.allowed_permissions || []
+                    allowed_permissions: companyToEdit.allowed_permissions || [],
+                    admin_email: '',
+                    admin_password: '',
+                    admin_full_name: ''
                 });
                 setIsModalOpen(true);
             }
@@ -110,18 +119,65 @@ export default function Companies() {
         e.preventDefault();
         try {
             if (editingCompanyId) {
-                await adminService.updateCompany(editingCompanyId, formData);
-                toast.success('Empresa actualizada correctamente');
+                const { admin_email, admin_password, admin_full_name, ...companyData } = formData;
+                await adminService.updateCompany(editingCompanyId, companyData);
+
+                // If admin fields provided, create new admin for this company
+                if (admin_email && admin_password) {
+                    if (admin_password.length < 6) {
+                        toast.error('La contraseña debe tener al menos 6 caracteres');
+                        setActiveTab('admin');
+                        return;
+                    }
+                    await adminService.addCompanyAdmin({
+                        email: admin_email,
+                        password: admin_password,
+                        full_name: admin_full_name || null,
+                        company_id: editingCompanyId
+                    });
+                    toast.success('🎉 Empresa actualizada y administrador creado');
+                } else {
+                    toast.success('Empresa actualizada correctamente');
+                }
             } else {
-                await adminService.createCompany(formData);
-                toast.success('Empresa registrada correctamente');
+                // Validate admin fields for new company
+                if (!formData.admin_email || !formData.admin_password) {
+                    toast.error('Configura el administrador inicial de la empresa');
+                    setActiveTab('admin');
+                    return;
+                }
+                if (formData.admin_password.length < 6) {
+                    toast.error('La contraseña debe tener al menos 6 caracteres');
+                    setActiveTab('admin');
+                    return;
+                }
+                await adminService.provisionNewTenant({
+                    company_name: formData.name,
+                    company_license_status: formData.license_status,
+                    company_rnc: formData.rnc || null,
+                    company_telefono: formData.telefono || null,
+                    company_email: formData.email || null,
+                    company_direccion: formData.direccion || null,
+                    company_max_users: formData.max_users,
+                    company_allowed_permissions: formData.allowed_permissions,
+                    admin_email: formData.admin_email,
+                    admin_password: formData.admin_password,
+                    admin_full_name: formData.admin_full_name || null
+                });
+                toast.success('🎉 Empresa y administrador creados correctamente');
             }
             setIsModalOpen(false);
             resetForm();
             loadCompanies();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to save company', error);
-            toast.error('Error al guardar la empresa');
+            const msg = error.message || '';
+            if (msg.includes('users_email_partial_key') || msg.includes('unique constraint')) {
+                toast.error('⚠️ Ese email ya está registrado en el sistema. Usa un email diferente.');
+                setActiveTab('admin');
+            } else {
+                toast.error(msg || 'Error al guardar la empresa');
+            }
         }
     };
 
@@ -136,7 +192,10 @@ export default function Companies() {
             email: '',
             direccion: '',
             max_users: 5,
-            allowed_permissions: []
+            allowed_permissions: [],
+            admin_email: '',
+            admin_password: '',
+            admin_full_name: ''
         });
     };
 
@@ -298,7 +357,10 @@ export default function Companies() {
                                                 email: company.email || '',
                                                 direccion: company.direccion || '',
                                                 max_users: company.max_users || 5,
-                                                allowed_permissions: Array.isArray(company.allowed_permissions) ? company.allowed_permissions : []
+                                                allowed_permissions: Array.isArray(company.allowed_permissions) ? company.allowed_permissions : [],
+                                                admin_email: '',
+                                                admin_password: '',
+                                                admin_full_name: ''
                                             });
                                             setActiveTab('info');
                                             setIsModalOpen(true);
@@ -345,11 +407,21 @@ export default function Companies() {
                             <Shield className={`w-4 h-4 ${activeTab === 'license' ? 'text-white' : 'text-slate-300'}`} />
                             Licencia de Módulos
                         </button>
+                        <button
+                            onClick={() => setActiveTab('admin')}
+                            className={`flex-1 flex items-center justify-center gap-3 py-4 rounded-xl text-[11px] font-black uppercase tracking-[0.15em] transition-all duration-300 ${activeTab === 'admin'
+                                ? 'bg-emerald-600 text-white shadow-2xl shadow-emerald-200 translate-y-[-1px]'
+                                : 'text-slate-400 hover:bg-white/80'
+                                }`}
+                        >
+                            <KeyRound className={`w-4 h-4 ${activeTab === 'admin' ? 'text-white' : 'text-slate-300'}`} />
+                            {editingCompanyId ? 'Agregar Admin' : 'Admin Inicial'}
+                        </button>
                     </div>
 
                     <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
                         <div className="flex-1 overflow-y-auto px-2 space-y-8 pb-4 scroll-smooth">
-                            {activeTab === 'info' ? (
+                            {activeTab === 'info' && (
                                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="grid grid-cols-2 gap-x-6 gap-y-5">
                                         <div className="col-span-2">
@@ -431,7 +503,8 @@ export default function Companies() {
                                         </div>
                                     </div>
                                 </div>
-                            ) : (
+                            )}
+                            {activeTab === 'license' && (
                                 <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <div className="bg-indigo-600 rounded-3xl p-8 text-white relative overflow-hidden shadow-2xl shadow-indigo-100 ring-1 ring-white/10 group">
                                         <div className="absolute top-[-20%] right-[-10%] w-60 h-60 bg-white/10 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
@@ -479,6 +552,85 @@ export default function Companies() {
                                                 </button>
                                             );
                                         })}
+                                    </div>
+                                </div>
+                            )}
+                            {activeTab === 'admin' && (
+                                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    <div className="bg-emerald-600 rounded-3xl p-8 text-white relative overflow-hidden shadow-2xl shadow-emerald-100 ring-1 ring-white/10 group">
+                                        <div className="absolute top-[-20%] right-[-10%] w-60 h-60 bg-white/10 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
+                                        <div className="relative z-10">
+                                            <div className="flex items-center gap-3 mb-3">
+                                                <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center">
+                                                    <KeyRound className="w-6 h-6 text-white" />
+                                                </div>
+                                                <h4 className="text-sm font-black uppercase tracking-[0.2em] opacity-90">
+                                                    {editingCompanyId ? 'Agregar Administrador' : 'Administrador Inicial'}
+                                                </h4>
+                                            </div>
+                                            <p className="text-[13px] font-bold text-emerald-100 leading-relaxed max-w-lg">
+                                                {editingCompanyId
+                                                    ? 'Agrega un nuevo administrador a esta empresa. Los usuarios existentes no serán afectados.'
+                                                    : 'Configura las credenciales del primer administrador. Esta persona podrá ingresar al CRM y crear nuevos colaboradores desde su panel de equipo.'
+                                                }
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-x-6 gap-y-5">
+                                        <div className="col-span-2">
+                                            <div className="flex items-center mb-2 px-1">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                                    <User className="w-3.5 h-3.5" /> Nombre Completo del Admin
+                                                </label>
+                                            </div>
+                                            <Input
+                                                value={formData.admin_full_name}
+                                                onChange={(e) => setFormData({ ...formData, admin_full_name: e.target.value })}
+                                                placeholder="Ej: Juan Pérez"
+                                                className="h-14 bg-slate-50 border-slate-200 rounded-2xl font-black text-slate-900 focus:bg-white transition-all shadow-sm text-lg"
+                                            />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center justify-between mb-2 px-1">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                                    <Mail className="w-3.5 h-3.5" /> Email de Acceso
+                                                </label>
+                                                <span className="text-[9px] font-bold text-rose-400 uppercase">* Requerido</span>
+                                            </div>
+                                            <Input
+                                                type="email"
+                                                value={formData.admin_email}
+                                                onChange={(e) => setFormData({ ...formData, admin_email: e.target.value })}
+                                                placeholder="admin@empresa.com"
+                                                className="h-14 bg-slate-50 border-slate-200 rounded-2xl font-black text-slate-900 focus:bg-white shadow-sm"
+                                            />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center justify-between mb-2 px-1">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                                    <Lock className="w-3.5 h-3.5" /> Contraseña Inicial
+                                                </label>
+                                                <span className="text-[9px] font-bold text-rose-400 uppercase">* Requerido</span>
+                                            </div>
+                                            <Input
+                                                type="password"
+                                                value={formData.admin_password}
+                                                onChange={(e) => setFormData({ ...formData, admin_password: e.target.value })}
+                                                placeholder="Mínimo 6 caracteres"
+                                                className="h-14 bg-slate-50 border-slate-200 rounded-2xl font-black text-slate-900 focus:bg-white shadow-sm"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-amber-50 rounded-2xl p-5 border border-amber-100 flex items-start gap-3">
+                                        <Info className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                                        <p className="text-[12px] text-amber-700 font-bold leading-relaxed">
+                                            {editingCompanyId
+                                                ? <>Este nuevo administrador se vinculará a la empresa existente. Los demás usuarios conservan sus credenciales y permisos intactos. <span className="font-black">Campos opcionales</span> — deja vacío si no deseas agregar admin.</>
+                                                : <>El administrador recibirá el rol <span className="font-black">Company Admin</span> y tendrá acceso completo a todos los módulos habilitados. Podrá crear y gestionar colaboradores desde la sección de Equipo.</>
+                                            }
+                                        </p>
                                     </div>
                                 </div>
                             )}
