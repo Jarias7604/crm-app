@@ -125,22 +125,24 @@ export default function Companies() {
                 const { admin_email, admin_password, admin_full_name, ...companyData } = formData;
                 await adminService.updateCompany(editingCompanyId, companyData);
 
-                // If editing an existing member, update them via RPC
+                // If editing an existing member, update their profile directly
                 if (editingMemberId) {
-                    const params: any = {
-                        p_user_id: editingMemberId,
-                        p_full_name: memberEditData.full_name || null,
-                        p_email: memberEditData.email || null,
-                        p_phone: memberEditData.phone || null,
-                        p_role: memberEditData.role || null,
-                        p_address: memberEditData.address || null,
-                        p_new_password: memberEditData.new_password || null
-                    };
-                    const { error: rpcError } = await supabase.rpc('admin_update_user', params);
-                    if (rpcError) throw rpcError;
+                    const profileUpdates: any = {};
+                    if (memberEditData.full_name) profileUpdates.full_name = memberEditData.full_name;
+                    if (memberEditData.email) profileUpdates.email = memberEditData.email;
+                    if (memberEditData.phone) profileUpdates.phone = memberEditData.phone;
+                    if (memberEditData.role) profileUpdates.role = memberEditData.role;
+                    if (memberEditData.address) profileUpdates.address = memberEditData.address;
+
+                    const { error: profileError } = await supabase
+                        .from('profiles')
+                        .update(profileUpdates)
+                        .eq('id', editingMemberId);
+                    if (profileError) throw profileError;
+
                     // Update local state
                     setCompanyMembers(prev => prev.map(m =>
-                        m.id === editingMemberId ? { ...m, full_name: memberEditData.full_name, email: memberEditData.email, role: memberEditData.role } : m
+                        m.id === editingMemberId ? { ...m, ...profileUpdates } : m
                     ));
                     toast.success('🎉 Empresa y usuario actualizados correctamente');
                 } else if (admin_email && admin_password) {
