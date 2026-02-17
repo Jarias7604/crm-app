@@ -84,15 +84,12 @@ export const adminService = {
     },
 
     async updateCompany(id: string, updates: Partial<Company>) {
-        const { data, error } = await supabase
+        const { error } = await supabase
             .from('companies')
             .update(updates)
-            .eq('id', id)
-            .select()
-            .single();
+            .eq('id', id);
 
         if (error) throw error;
-        return data as Company;
     },
 
     async getPermissionDefinitions() {
