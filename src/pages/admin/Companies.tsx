@@ -67,7 +67,7 @@ export default function Companies() {
     const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
     const [companyMembers, setCompanyMembers] = useState<{ id: string; email: string; full_name: string; role: string; created_at: string }[]>([]);
     const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
-    const [memberEditData, setMemberEditData] = useState({ full_name: '', role: '' });
+    const [memberEditData, setMemberEditData] = useState({ full_name: '', email: '', phone: '', role: '', address: '', new_password: '' });
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<LicenseStatus | 'all'>('all');
     const location = useLocation();
@@ -370,7 +370,7 @@ export default function Companies() {
                                             // Load existing members for this company
                                             const { data: members } = await supabase
                                                 .from('profiles')
-                                                .select('id, email, full_name, role, created_at')
+                                                .select('id, email, full_name, role, phone, address, created_at')
                                                 .eq('company_id', company.id)
                                                 .order('created_at', { ascending: true });
                                             setCompanyMembers(members || []);
@@ -585,7 +585,14 @@ export default function Companies() {
                                                                     setEditingMemberId(null);
                                                                 } else {
                                                                     setEditingMemberId(member.id);
-                                                                    setMemberEditData({ full_name: member.full_name || '', role: member.role });
+                                                                    setMemberEditData({
+                                                                        full_name: member.full_name || '',
+                                                                        email: member.email || '',
+                                                                        phone: (member as any).phone || '',
+                                                                        role: member.role,
+                                                                        address: (member as any).address || '',
+                                                                        new_password: ''
+                                                                    });
                                                                 }
                                                             }}
                                                             className={`flex items-center gap-4 rounded-2xl p-4 border cursor-pointer transition-all duration-200 ${editingMemberId === member.id
@@ -606,9 +613,8 @@ export default function Companies() {
                                                                 }`}>{member.role === 'company_admin' ? 'Admin' : member.role === 'super_admin' ? 'Super Admin' : member.role}</span>
                                                             <Pencil className="w-3.5 h-3.5 text-slate-300" />
                                                         </div>
-                                                        {/* Inline edit form */}
                                                         {editingMemberId === member.id && (
-                                                            <div className="mt-2 p-4 bg-white rounded-2xl border border-indigo-100 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                            <div className="mt-2 p-5 bg-white rounded-2xl border border-indigo-100 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                                                                 <div className="grid grid-cols-2 gap-3">
                                                                     <div>
                                                                         <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Nombre Completo</label>
@@ -616,6 +622,25 @@ export default function Companies() {
                                                                             type="text"
                                                                             value={memberEditData.full_name}
                                                                             onChange={(e) => setMemberEditData(prev => ({ ...prev, full_name: e.target.value }))}
+                                                                            className="w-full px-3 py-2 text-[13px] rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Email</label>
+                                                                        <input
+                                                                            type="email"
+                                                                            value={memberEditData.email}
+                                                                            onChange={(e) => setMemberEditData(prev => ({ ...prev, email: e.target.value }))}
+                                                                            className="w-full px-3 py-2 text-[13px] rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Teléfono</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={memberEditData.phone}
+                                                                            onChange={(e) => setMemberEditData(prev => ({ ...prev, phone: e.target.value }))}
+                                                                            placeholder="+1 809-000-0000"
                                                                             className="w-full px-3 py-2 text-[13px] rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
                                                                         />
                                                                     </div>
@@ -632,7 +657,27 @@ export default function Companies() {
                                                                         </select>
                                                                     </div>
                                                                 </div>
-                                                                <div className="flex items-center gap-2 justify-end">
+                                                                <div>
+                                                                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Dirección</label>
+                                                                    <input
+                                                                        type="text"
+                                                                        value={memberEditData.address}
+                                                                        onChange={(e) => setMemberEditData(prev => ({ ...prev, address: e.target.value }))}
+                                                                        placeholder="Dirección del usuario"
+                                                                        className="w-full px-3 py-2 text-[13px] rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                                                                    />
+                                                                </div>
+                                                                <div className="border-t border-dashed border-slate-200 pt-3">
+                                                                    <label className="text-[9px] font-black text-amber-500 uppercase tracking-widest mb-1 block">🔒 Nueva Contraseña (dejar vacío para no cambiar)</label>
+                                                                    <input
+                                                                        type="password"
+                                                                        value={memberEditData.new_password}
+                                                                        onChange={(e) => setMemberEditData(prev => ({ ...prev, new_password: e.target.value }))}
+                                                                        placeholder="••••••••"
+                                                                        className="w-full px-3 py-2 text-[13px] rounded-xl border border-amber-200 focus:border-amber-400 focus:ring-2 focus:ring-amber-100 outline-none transition-all"
+                                                                    />
+                                                                </div>
+                                                                <div className="flex items-center gap-2 justify-end pt-1">
                                                                     <button
                                                                         onClick={() => setEditingMemberId(null)}
                                                                         className="text-[10px] font-bold text-slate-400 px-4 py-2 rounded-lg hover:bg-slate-100 transition-colors"
@@ -642,23 +687,30 @@ export default function Companies() {
                                                                     <button
                                                                         onClick={async () => {
                                                                             try {
-                                                                                await supabase.from('profiles').update({
-                                                                                    full_name: memberEditData.full_name,
-                                                                                    role: memberEditData.role
-                                                                                }).eq('id', member.id);
+                                                                                const params: any = {
+                                                                                    p_user_id: member.id,
+                                                                                    p_full_name: memberEditData.full_name || null,
+                                                                                    p_email: memberEditData.email || null,
+                                                                                    p_phone: memberEditData.phone || null,
+                                                                                    p_role: memberEditData.role || null,
+                                                                                    p_address: memberEditData.address || null,
+                                                                                    p_new_password: memberEditData.new_password || null
+                                                                                };
+                                                                                const { error } = await supabase.rpc('admin_update_user', params);
+                                                                                if (error) throw error;
                                                                                 // Update local state
                                                                                 setCompanyMembers(prev => prev.map(m =>
-                                                                                    m.id === member.id ? { ...m, full_name: memberEditData.full_name, role: memberEditData.role } : m
+                                                                                    m.id === member.id ? { ...m, full_name: memberEditData.full_name, email: memberEditData.email, role: memberEditData.role } : m
                                                                                 ));
                                                                                 setEditingMemberId(null);
-                                                                                toast.success('Usuario actualizado');
+                                                                                toast.success('✅ Usuario actualizado correctamente');
                                                                             } catch (err: any) {
                                                                                 toast.error(err.message || 'Error al actualizar');
                                                                             }
                                                                         }}
                                                                         className="text-[10px] font-black text-white bg-indigo-600 px-5 py-2 rounded-lg hover:bg-indigo-700 transition-colors uppercase tracking-wider"
                                                                     >
-                                                                        Guardar
+                                                                        Guardar Cambios
                                                                     </button>
                                                                 </div>
                                                             </div>
