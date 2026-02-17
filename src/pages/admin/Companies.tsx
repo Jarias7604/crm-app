@@ -136,7 +136,7 @@ export default function Companies() {
                         p_address: memberEditData.address || null,
                         p_new_password: memberEditData.new_password || null
                     };
-                    const { error: rpcError } = await supabase.rpc('admin_update_user', params).maybeSingle();
+                    const { error: rpcError } = await supabase.rpc('admin_update_user', params);
                     if (rpcError) throw rpcError;
                     // Update local state
                     setCompanyMembers(prev => prev.map(m =>
