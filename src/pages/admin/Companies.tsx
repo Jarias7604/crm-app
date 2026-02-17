@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { adminService } from '../../services/admin';
+import { supabase } from '../../services/supabase';
 import type { Company, LicenseStatus } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -63,6 +64,7 @@ export default function Companies() {
         admin_full_name: ''
     });
     const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
+    const [companyMembers, setCompanyMembers] = useState<{ id: string; email: string; full_name: string; role: string; created_at: string }[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<LicenseStatus | 'all'>('all');
     const location = useLocation();
@@ -347,7 +349,7 @@ export default function Companies() {
                                 </td>
                                 <td className="px-8 py-6 whitespace-nowrap text-right">
                                     <button
-                                        onClick={() => {
+                                        onClick={async () => {
                                             setEditingCompanyId(company.id);
                                             setFormData({
                                                 name: company.name,
@@ -362,6 +364,13 @@ export default function Companies() {
                                                 admin_password: '',
                                                 admin_full_name: ''
                                             });
+                                            // Load existing members for this company
+                                            const { data: members } = await supabase
+                                                .from('profiles')
+                                                .select('id, email, full_name, role, created_at')
+                                                .eq('company_id', company.id)
+                                                .order('created_at', { ascending: true });
+                                            setCompanyMembers(members || []);
                                             setActiveTab('info');
                                             setIsModalOpen(true);
                                         }}
@@ -557,6 +566,34 @@ export default function Companies() {
                             )}
                             {activeTab === 'admin' && (
                                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                    {/* Existing members section - only when editing */}
+                                    {editingCompanyId && companyMembers.length > 0 && (
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-2 px-1">
+                                                <Users className="w-4 h-4 text-slate-400" />
+                                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Usuarios Registrados ({companyMembers.length})</h4>
+                                            </div>
+                                            <div className="grid grid-cols-1 gap-2">
+                                                {companyMembers.map(member => (
+                                                    <div key={member.id} className="flex items-center gap-4 bg-slate-50/80 rounded-2xl p-4 border border-slate-100">
+                                                        <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
+                                                            <span className="text-[13px] font-black text-indigo-600">{(member.full_name || member.email || '?')[0].toUpperCase()}</span>
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-[13px] font-bold text-slate-800 truncate">{member.full_name || 'Sin nombre'}</p>
+                                                            <p className="text-[11px] text-slate-400 truncate">{member.email}</p>
+                                                        </div>
+                                                        <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg ${member.role === 'super_admin' ? 'bg-purple-100 text-purple-600' :
+                                                            member.role === 'company_admin' ? 'bg-emerald-100 text-emerald-600' :
+                                                                'bg-slate-100 text-slate-500'
+                                                            }`}>{member.role === 'company_admin' ? 'Admin' : member.role === 'super_admin' ? 'Super Admin' : member.role}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="border-t border-dashed border-slate-200 pt-4 mt-2"></div>
+                                        </div>
+                                    )}
+
                                     <div className="bg-emerald-600 rounded-3xl p-8 text-white relative overflow-hidden shadow-2xl shadow-emerald-100 ring-1 ring-white/10 group">
                                         <div className="absolute top-[-20%] right-[-10%] w-60 h-60 bg-white/10 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
                                         <div className="relative z-10">
@@ -565,7 +602,7 @@ export default function Companies() {
                                                     <KeyRound className="w-6 h-6 text-white" />
                                                 </div>
                                                 <h4 className="text-sm font-black uppercase tracking-[0.2em] opacity-90">
-                                                    {editingCompanyId ? 'Agregar Administrador' : 'Administrador Inicial'}
+                                                    {editingCompanyId ? 'Agregar Nuevo Administrador' : 'Administrador Inicial'}
                                                 </h4>
                                             </div>
                                             <p className="text-[13px] font-bold text-emerald-100 leading-relaxed max-w-lg">
