@@ -117,7 +117,7 @@ export const teamPerformanceService = {
             }
         });
 
-        // 3. Get leads with assignment info
+        // 3a. Get leads created in period (pipeline metrics: total, active, value)
         let leadsQuery = supabase
             .from('leads')
             .select('id, assigned_to, status, value, closing_amount, created_at')
@@ -131,13 +131,14 @@ export const teamPerformanceService = {
         }
 
         // Filter by team members if team_id is specified
+        let teamUserIds: string[] | null = null;
         if (filters.team_id) {
             const { data: teamMembers } = await supabase
                 .from('team_members')
                 .select('user_id')
                 .eq('team_id', filters.team_id);
 
-            const teamUserIds = (teamMembers || []).map(tm => tm.user_id);
+            teamUserIds = (teamMembers || []).map(tm => tm.user_id);
             if (teamUserIds.length === 0) return [];
             leadsQuery = leadsQuery.in('assigned_to', teamUserIds);
         }
@@ -145,33 +146,92 @@ export const teamPerformanceService = {
         const { data: leads, error: leadsError } = await leadsQuery;
         if (leadsError) throw leadsError;
 
+        // 3b. Get leads WON in the period (by internal_won_date, not created_at)
+        // This captures deals closed this month even if the lead was created months ago
+        let wonQuery = supabase
+            .from('leads')
+            .select('id, assigned_to, status, value, closing_amount, internal_won_date')
+            .eq('company_id', companyId)
+            .in('status', ['Cerrado', 'Cliente'])
+            .not('internal_won_date', 'is', null);
+
+        if (start) {
+            wonQuery = wonQuery.gte('internal_won_date', start.toISOString());
+        }
+        if (end) {
+            wonQuery = wonQuery.lte('internal_won_date', end.toISOString());
+        }
+        if (teamUserIds) {
+            wonQuery = wonQuery.in('assigned_to', teamUserIds);
+        }
+
+        const { data: wonLeads } = await wonQuery;
+
+        // 3c. Get leads LOST in the period (by lost_date)
+        let lostQuery = supabase
+            .from('leads')
+            .select('id, assigned_to, status, lost_date')
+            .eq('company_id', companyId)
+            .eq('status', 'Perdido')
+            .not('lost_date', 'is', null);
+
+        if (start) {
+            lostQuery = lostQuery.gte('lost_date', start.toISOString());
+        }
+        if (end) {
+            lostQuery = lostQuery.lte('lost_date', end.toISOString());
+        }
+        if (teamUserIds) {
+            lostQuery = lostQuery.in('assigned_to', teamUserIds);
+        }
+
+        const { data: lostLeads } = await lostQuery;
+
         // 4. Aggregate per user
         const userStats: Record<string, {
             total: number; won: number; lost: number; active: number; erroneous: number;
             totalValue: number; totalClosing: number;
         }> = {};
 
-        (leads || []).forEach(lead => {
-            const uid = lead.assigned_to;
-            if (!uid) return;
-
+        const ensureUser = (uid: string) => {
             if (!userStats[uid]) {
                 userStats[uid] = { total: 0, won: 0, lost: 0, active: 0, erroneous: 0, totalValue: 0, totalClosing: 0 };
             }
+        };
+
+        // Pipeline metrics from created_at query (total, active, erroneous, pipeline value)
+        (leads || []).forEach(lead => {
+            const uid = lead.assigned_to;
+            if (!uid) return;
+            ensureUser(uid);
 
             userStats[uid].total++;
             userStats[uid].totalValue += Number(lead.value || 0);
-            userStats[uid].totalClosing += Number(lead.closing_amount || 0);
 
-            if (lead.status === 'Cerrado' || lead.status === 'Cliente') {
-                userStats[uid].won++;
-            } else if (lead.status === 'Perdido') {
-                userStats[uid].lost++;
-            } else if (lead.status === 'Erróneo') {
+            if (lead.status === 'Erróneo') {
                 userStats[uid].erroneous++;
-            } else {
+            } else if (lead.status !== 'Cerrado' && lead.status !== 'Cliente' && lead.status !== 'Perdido') {
                 userStats[uid].active++;
             }
+        });
+
+        // Won metrics from internal_won_date query
+        (wonLeads || []).forEach(lead => {
+            const uid = lead.assigned_to;
+            if (!uid) return;
+            ensureUser(uid);
+
+            userStats[uid].won++;
+            userStats[uid].totalClosing += Number(lead.closing_amount || 0);
+        });
+
+        // Lost metrics from lost_date query
+        (lostLeads || []).forEach(lead => {
+            const uid = lead.assigned_to;
+            if (!uid) return;
+            ensureUser(uid);
+
+            userStats[uid].lost++;
         });
 
         // 5. Build results
@@ -235,10 +295,10 @@ export const teamPerformanceService = {
             teamUsers[m.team_id].push(m.user_id);
         });
 
-        // 3. Get leads
+        // 3a. Get leads created in period (pipeline metrics)
         let leadsQuery = supabase
             .from('leads')
-            .select('id, assigned_to, status, value, closing_amount, created_at')
+            .select('id, assigned_to, status, value, created_at')
             .eq('company_id', companyId);
 
         if (start) {
@@ -250,12 +310,62 @@ export const teamPerformanceService = {
 
         const { data: leads } = await leadsQuery;
 
-        // Build user -> lead stats
+        // 3b. Get leads WON in period (by internal_won_date)
+        let wonQuery = supabase
+            .from('leads')
+            .select('id, assigned_to, status, value, closing_amount, internal_won_date')
+            .eq('company_id', companyId)
+            .in('status', ['Cerrado', 'Cliente'])
+            .not('internal_won_date', 'is', null);
+
+        if (start) {
+            wonQuery = wonQuery.gte('internal_won_date', start.toISOString());
+        }
+        if (end) {
+            wonQuery = wonQuery.lte('internal_won_date', end.toISOString());
+        }
+
+        const { data: wonLeads } = await wonQuery;
+
+        // 3c. Get leads LOST in period (by lost_date)
+        let lostQuery = supabase
+            .from('leads')
+            .select('id, assigned_to, lost_date')
+            .eq('company_id', companyId)
+            .eq('status', 'Perdido')
+            .not('lost_date', 'is', null);
+
+        if (start) {
+            lostQuery = lostQuery.gte('lost_date', start.toISOString());
+        }
+        if (end) {
+            lostQuery = lostQuery.lte('lost_date', end.toISOString());
+        }
+
+        const { data: lostLeads } = await lostQuery;
+
+        // Build user -> lead stats (pipeline by created_at)
         const userLeads: Record<string, typeof leads> = {};
         (leads || []).forEach(lead => {
             if (!lead.assigned_to) return;
             if (!userLeads[lead.assigned_to]) userLeads[lead.assigned_to] = [];
             userLeads[lead.assigned_to]!.push(lead);
+        });
+
+        // Build user -> won leads (by internal_won_date)
+        const userWonLeads: Record<string, typeof wonLeads> = {};
+        (wonLeads || []).forEach(lead => {
+            if (!lead.assigned_to) return;
+            if (!userWonLeads[lead.assigned_to]) userWonLeads[lead.assigned_to] = [];
+            userWonLeads[lead.assigned_to]!.push(lead);
+        });
+
+        // Build user -> lost leads (by lost_date)
+        const userLostLeads: Record<string, typeof lostLeads> = {};
+        (lostLeads || []).forEach(lead => {
+            if (!lead.assigned_to) return;
+            if (!userLostLeads[lead.assigned_to]) userLostLeads[lead.assigned_to] = [];
+            userLostLeads[lead.assigned_to]!.push(lead);
         });
 
         // 4. Aggregate per team
@@ -265,24 +375,27 @@ export const teamPerformanceService = {
             let topPerformer = '';
             let topWins = 0;
 
-            // Per-user stats for finding top performer
-
             const userWins: Record<string, number> = {};
 
             members.forEach(userId => {
+                // Pipeline metrics from created_at
                 const uLeads = userLeads[userId] || [];
                 uLeads.forEach(lead => {
                     totalLeads++;
                     totalValue += Number(lead.value || 0);
-                    totalClosing += Number(lead.closing_amount || 0);
-
-                    if (lead.status === 'Cerrado' || lead.status === 'Cliente') {
-                        won++;
-                        userWins[userId] = (userWins[userId] || 0) + 1;
-                    } else if (lead.status === 'Perdido') {
-                        lost++;
-                    }
                 });
+
+                // Won metrics from internal_won_date
+                const uWon = userWonLeads[userId] || [];
+                uWon.forEach(lead => {
+                    won++;
+                    totalClosing += Number(lead.closing_amount || 0);
+                    userWins[userId] = (userWins[userId] || 0) + 1;
+                });
+
+                // Lost metrics from lost_date
+                const uLost = userLostLeads[userId] || [];
+                lost += uLost.length;
             });
 
             // Find top performer
