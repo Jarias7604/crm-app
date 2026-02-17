@@ -3,12 +3,17 @@ import { AuthenticationError, AuthorizationError } from './errors';
 import { logger } from './logger';
 
 /**
- * Detect if the current user is a master admin for simulation
+ * Check if the current user has master admin / simulation privileges.
+ * Uses the database role (super_admin) as the source of truth instead of hardcoded IDs.
+ * The actual role check happens in AuthProvider via the profile fetch.
  */
-function isMasterAdmin(userId: string, email?: string): boolean {
-    const jimmyIds = ['c9c01b04-4160-4e4c-9718-15298c961e9b', '292bc954-0d25-4147-9526-b7a7268be8e1'];
-    const jimmyEmails = ['jarias7604@gmail.com', 'jarias@ariasdefense.com'];
-    return jimmyIds.includes(userId) || (email ? jimmyEmails.includes(email.toLowerCase()) : false);
+async function isMasterAdmin(userId: string): Promise<boolean> {
+    const { data } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single();
+    return data?.role === 'super_admin';
 }
 
 /**
@@ -24,8 +29,8 @@ export async function getCurrentUserCompanyId(): Promise<string> {
         throw new AuthenticationError('User not authenticated');
     }
 
-    // CHECK SIMULATION FOR MASTER
-    if (isMasterAdmin(user.id, user.email)) {
+    // CHECK SIMULATION FOR MASTER (super_admin only)
+    if (await isMasterAdmin(user.id)) {
         const simCompanyId = localStorage.getItem('simulated_company_id');
         const simRole = localStorage.getItem('simulated_role');
 
@@ -66,8 +71,8 @@ export async function getCurrentUserProfile() {
         throw new AuthenticationError('User not authenticated');
     }
 
-    // CHECK SIMULATION FOR MASTER
-    if (isMasterAdmin(user.id, user.email)) {
+    // CHECK SIMULATION FOR MASTER (super_admin only)
+    if (await isMasterAdmin(user.id)) {
         const simRole = localStorage.getItem('simulated_role') || 'super_admin';
         const simCompanyId = localStorage.getItem('simulated_company_id');
         const effectiveCompanyId = simCompanyId || (simRole === 'company_admin' ? '7a582ba5-f7d0-4ae3-9985-35788deb1c30' : '00000000-0000-0000-0000-000000000000');

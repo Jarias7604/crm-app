@@ -91,17 +91,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return () => subscription.unsubscribe();
     }, []);
 
-    const fetchProfile = async (userId: string, userEmail?: string) => {
+    const fetchProfile = async (userId: string, _userEmail?: string) => {
         try {
-            const emailToUse = userEmail?.toLowerCase();
-
-            // BYPASS MAESTRO (DETERMINISMO ABSOLUTO)
-            const jimmyIds = ['c9c01b04-4160-4e4c-9718-15298c961e9b', '292bc954-0d25-4147-9526-b7a7268be8e1'];
-            const jimmyEmails = ['jarias7604@gmail.com', 'jarias@ariasdefense.com'];
-
-            const isJimmy = jimmyIds.includes(userId) || (emailToUse && jimmyEmails.includes(emailToUse));
-
-            // CARGA NORMAL (PARA TODOS)
+            // FETCH PROFILE (PARA TODOS)
             const { data, error } = await supabase
                 .from('profiles')
                 .select('id, email, role, company_id, full_name, status, created_at, custom_role_id, permissions')
@@ -117,13 +109,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const { data: mergedPerms } = await supabase.rpc('get_user_permissions', { user_id: userId });
             let finalProfile = { ...data, permissions: mergedPerms || {} } as Profile;
 
-            // APLICAR BYPASS SI ES JIMMY Y HAY SIMULACIÓN ACTIVA
-            if (isJimmy) {
+            // SIMULATION PRIVILEGE CHECK (role-based, no hardcoded IDs)
+            // Only super_admin users can use the simulation/testing feature
+            const isSimulationEligible = data?.role === 'super_admin';
+
+            // APPLY SIMULATION IF ELIGIBLE AND SIMULATION IS ACTIVE
+            if (isSimulationEligible) {
                 const simRole = localStorage.getItem('simulated_role');
                 const simCompanyId = localStorage.getItem('simulated_company_id');
 
                 if (simRole || simCompanyId) {
-                    console.warn('⚡ MASTER SIMULATION ACTIVE:', { role: simRole, company: simCompanyId });
+                    console.warn('⚡ SIMULATION ACTIVE:', { role: simRole, company: simCompanyId });
 
                     let simPermissions: any = {};
                     const effectiveCompanyId = simCompanyId || data.company_id;
@@ -142,8 +138,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             const companyLicense: string[] = Array.isArray(rawLicense)
                                 ? rawLicense.map(k => String(k).trim().toLowerCase())
                                 : [];
-
-                            console.log('📦 Company License Loaded:', companyLicense);
 
                             // 2. ADMIN LOGIC: If simulating an Admin, grant FULL license access immediately.
                             if (simRole === 'company_admin' || simRole === 'super_admin') {
@@ -197,8 +191,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                     });
                                 }
                             }
-
-                            // MASTER BYPASS REMOVED: Now reflection of reality is prioritized
                         } catch (e) {
                             console.error('Error loading simulated role permissions:', e);
                         }

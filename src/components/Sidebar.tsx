@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthProvider';
-import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft, Zap, Search, Bot, XCircle } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft, Zap, Search, Bot, XCircle, TrendingUp } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { brandingService } from '../services/branding';
@@ -120,10 +120,13 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
 
     if (profile?.role === 'super_admin') {
         navigation.push({ name: t('sidebar.companies'), href: '/admin/companies', icon: Building, current: location.pathname.startsWith('/admin/companies') });
+        navigation.push({ name: 'Auditoría', href: '/admin/audit-log', icon: ShieldCheck, current: location.pathname.startsWith('/admin/audit-log') });
     }
 
     if (profile?.role === 'super_admin' || profile?.role === 'company_admin') {
-        navigation.push({ name: 'Equipo', href: '/company/team', icon: Users, current: location.pathname.startsWith('/company/team') });
+        navigation.push({ name: 'Equipo', href: '/company/team', icon: Users, current: location.pathname.startsWith('/company/team') && !location.pathname.startsWith('/company/teams') });
+        navigation.push({ name: 'Equipos', href: '/company/teams', icon: Users, current: location.pathname.startsWith('/company/teams') });
+        navigation.push({ name: 'Rendimiento', href: '/company/performance', icon: TrendingUp, current: location.pathname.startsWith('/company/performance') });
         navigation.push({ name: 'Permisos', href: '/company/permissions', icon: ShieldCheck, current: location.pathname.startsWith('/company/permissions') });
     }
 

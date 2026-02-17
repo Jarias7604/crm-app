@@ -40,6 +40,9 @@ const AiAgentsConfig = lazy(() => import('./pages/marketing/AiAgentsConfig'));
 const MarketingSettings = lazy(() => import('./pages/marketing/MarketingSettings'));
 const ChatHub = lazy(() => import('./pages/marketing/ChatHub'));
 const PublicQuoteView = lazy(() => import('./pages/PublicQuoteView'));
+const AuditLog = lazy(() => import('./pages/admin/AuditLog'));
+const Teams = lazy(() => import('./pages/company/Teams'));
+const TeamPerformance = lazy(() => import('./pages/company/TeamPerformance'));
 
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -91,6 +94,8 @@ function App() {
                     <Route path="/company/team" element={<Team />} />
                     <Route path="/company/permissions" element={<Permissions />} />
                     <Route path="/company/branding" element={<Branding />} />
+                    <Route path="/company/teams" element={<Teams />} />
+                    <Route path="/company/performance" element={<TeamPerformance />} />
                     <Route path="/pricing" element={<PricingConfig />} />
                     <Route path="/financial-rules" element={<FinancialRules />} />
                     <Route path="/loss-reasons" element={<LossReasons />} />
@@ -101,6 +106,7 @@ function App() {
                   {/* System Admin Routes (Super Admin only) */}
                   <Route element={<RoleProtectedRoute allowedRoles={['super_admin']} />}>
                     <Route path="/admin/companies" element={<Companies />} />
+                    <Route path="/admin/audit-log" element={<AuditLog />} />
                   </Route>
 
                   {/* Marketing Routes (Protected) */}
