@@ -172,11 +172,11 @@ export default function Companies() {
         } catch (error: any) {
             console.error('Failed to save company', error);
             const msg = error.message || '';
-            if (msg.includes('users_email_partial_key') || msg.includes('unique constraint')) {
+            if (msg.includes('users_email_partial_key') || msg.includes('email') && msg.includes('unique')) {
                 toast.error('⚠️ Ese email ya está registrado en el sistema. Usa un email diferente.');
                 setActiveTab('admin');
             } else {
-                toast.error(msg || 'Error al guardar la empresa');
+                toast.error('Error: ' + (msg || 'Error al guardar la empresa'));
             }
         }
     };
