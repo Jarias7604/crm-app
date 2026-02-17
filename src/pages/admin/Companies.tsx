@@ -54,10 +54,9 @@ export default function Companies() {
     const [formData, setFormData] = useState({
         name: '',
         license_status: 'active' as LicenseStatus,
-        rnc: '',
-        telefono: '',
-        email: '',
-        direccion: '',
+        tax_id: '',
+        phone: '',
+        address: '',
         max_users: 5,
         allowed_permissions: [] as string[],
         admin_email: '',
@@ -88,10 +87,9 @@ export default function Companies() {
                 setFormData({
                     name: companyToEdit.name,
                     license_status: companyToEdit.license_status,
-                    rnc: companyToEdit.rnc || '',
-                    telefono: companyToEdit.telefono || '',
-                    email: companyToEdit.email || '',
-                    direccion: companyToEdit.direccion || '',
+                    tax_id: companyToEdit.tax_id || '',
+                    phone: companyToEdit.phone || '',
+                    address: companyToEdit.address || '',
                     max_users: companyToEdit.max_users || 5,
                     allowed_permissions: companyToEdit.allowed_permissions || [],
                     admin_email: '',
@@ -159,10 +157,9 @@ export default function Companies() {
                 await adminService.provisionNewTenant({
                     company_name: formData.name,
                     company_license_status: formData.license_status,
-                    company_rnc: formData.rnc || null,
-                    company_telefono: formData.telefono || null,
-                    company_email: formData.email || null,
-                    company_direccion: formData.direccion || null,
+                    company_tax_id: formData.tax_id || null,
+                    company_phone: formData.phone || null,
+                    company_address: formData.address || null,
                     company_max_users: formData.max_users,
                     company_allowed_permissions: formData.allowed_permissions,
                     admin_email: formData.admin_email,
@@ -192,10 +189,9 @@ export default function Companies() {
         setFormData({
             name: '',
             license_status: 'active',
-            rnc: '',
-            telefono: '',
-            email: '',
-            direccion: '',
+            tax_id: '',
+            phone: '',
+            address: '',
             max_users: 5,
             allowed_permissions: [],
             admin_email: '',
@@ -357,10 +353,9 @@ export default function Companies() {
                                             setFormData({
                                                 name: company.name,
                                                 license_status: company.license_status,
-                                                rnc: company.rnc || '',
-                                                telefono: company.telefono || '',
-                                                email: company.email || '',
-                                                direccion: company.direccion || '',
+                                                tax_id: company.tax_id || '',
+                                                phone: company.phone || '',
+                                                address: company.address || '',
                                                 max_users: company.max_users || 5,
                                                 allowed_permissions: Array.isArray(company.allowed_permissions) ? company.allowed_permissions : [],
                                                 admin_email: '',
@@ -486,8 +481,8 @@ export default function Companies() {
                                             <div>
                                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2">Tax ID / RNC</label>
                                                 <Input
-                                                    value={formData.rnc}
-                                                    onChange={(e) => setFormData({ ...formData, rnc: e.target.value })}
+                                                    value={formData.tax_id}
+                                                    onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
                                                     placeholder="001-XXXXXXX-X"
                                                     className="h-14 bg-slate-50 border-slate-200 rounded-2xl font-black text-slate-900 shadow-sm"
                                                 />
@@ -495,8 +490,8 @@ export default function Companies() {
                                             <div>
                                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2">Teléfono Corporativo</label>
                                                 <Input
-                                                    value={formData.telefono}
-                                                    onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+                                                    value={formData.phone}
+                                                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                                                     placeholder="+503 XXXX-XXXX"
                                                     className="h-14 bg-slate-50 border-slate-200 rounded-2xl font-black text-slate-900 shadow-sm"
                                                 />
@@ -504,12 +499,11 @@ export default function Companies() {
                                         </div>
 
                                         <div className="col-span-2">
-                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2">Centro de Contacto (Email)</label>
+                                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2">Dirección</label>
                                             <Input
-                                                type="email"
-                                                value={formData.email}
-                                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                                placeholder="admon@ejemplo.com"
+                                                value={formData.address}
+                                                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                                                placeholder="Dirección de la empresa"
                                                 className="h-14 bg-slate-50 border-slate-200 rounded-2xl font-black text-slate-900 shadow-sm"
                                             />
                                         </div>

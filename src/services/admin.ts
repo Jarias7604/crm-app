@@ -34,10 +34,9 @@ export const adminService = {
     async provisionNewTenant(params: {
         company_name: string;
         company_license_status: string;
-        company_rnc?: string | null;
-        company_telefono?: string | null;
-        company_email?: string | null;
-        company_direccion?: string | null;
+        company_tax_id?: string | null;
+        company_phone?: string | null;
+        company_address?: string | null;
         company_max_users: number;
         company_allowed_permissions: string[];
         admin_email?: string | null;
@@ -47,10 +46,10 @@ export const adminService = {
         const { data, error } = await supabase.rpc('provision_new_tenant', {
             p_company_name: params.company_name,
             p_license_status: params.company_license_status,
-            p_rnc: params.company_rnc,
-            p_telefono: params.company_telefono,
-            p_email: params.company_email,
-            p_direccion: params.company_direccion,
+            p_rnc: params.company_tax_id,
+            p_telefono: params.company_phone,
+            p_email: null,
+            p_direccion: params.company_address,
             p_max_users: params.company_max_users,
             p_allowed_permissions: params.company_allowed_permissions,
             p_admin_email: params.admin_email,

@@ -60,6 +60,7 @@ export interface Company {
     website?: string | null;
     address?: string | null;
     phone?: string | null;
+    tax_id?: string | null;
     terminos_condiciones?: string | null;
     license_status: LicenseStatus;
     created_at: string;
@@ -71,10 +72,6 @@ export interface Company {
     time_format?: string;
     timezone?: string;
     allowed_permissions?: string[];
-    rnc?: string | null;
-    email?: string | null;
-    telefono?: string | null;
-    direccion?: string | null;
 }
 
 export interface PermissionDefinition {
