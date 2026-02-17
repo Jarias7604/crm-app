@@ -27,7 +27,8 @@ import {
     Info,
     Lock,
     Mail,
-    KeyRound
+    KeyRound,
+    Pencil
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -65,6 +66,8 @@ export default function Companies() {
     });
     const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
     const [companyMembers, setCompanyMembers] = useState<{ id: string; email: string; full_name: string; role: string; created_at: string }[]>([]);
+    const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+    const [memberEditData, setMemberEditData] = useState({ full_name: '', role: '' });
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<LicenseStatus | 'all'>('all');
     const location = useLocation();
@@ -575,18 +578,91 @@ export default function Companies() {
                                             </div>
                                             <div className="grid grid-cols-1 gap-2">
                                                 {companyMembers.map(member => (
-                                                    <div key={member.id} className="flex items-center gap-4 bg-slate-50/80 rounded-2xl p-4 border border-slate-100">
-                                                        <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
-                                                            <span className="text-[13px] font-black text-indigo-600">{(member.full_name || member.email || '?')[0].toUpperCase()}</span>
+                                                    <div key={member.id}>
+                                                        <div
+                                                            onClick={() => {
+                                                                if (editingMemberId === member.id) {
+                                                                    setEditingMemberId(null);
+                                                                } else {
+                                                                    setEditingMemberId(member.id);
+                                                                    setMemberEditData({ full_name: member.full_name || '', role: member.role });
+                                                                }
+                                                            }}
+                                                            className={`flex items-center gap-4 rounded-2xl p-4 border cursor-pointer transition-all duration-200 ${editingMemberId === member.id
+                                                                ? 'bg-indigo-50/80 border-indigo-200 ring-2 ring-indigo-100'
+                                                                : 'bg-slate-50/80 border-slate-100 hover:bg-white hover:border-slate-200 hover:shadow-sm'
+                                                                }`}
+                                                        >
+                                                            <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
+                                                                <span className="text-[13px] font-black text-indigo-600">{(member.full_name || member.email || '?')[0].toUpperCase()}</span>
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="text-[13px] font-bold text-slate-800 truncate">{member.full_name || 'Sin nombre'}</p>
+                                                                <p className="text-[11px] text-slate-400 truncate">{member.email}</p>
+                                                            </div>
+                                                            <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg ${member.role === 'super_admin' ? 'bg-purple-100 text-purple-600' :
+                                                                member.role === 'company_admin' ? 'bg-emerald-100 text-emerald-600' :
+                                                                    'bg-slate-100 text-slate-500'
+                                                                }`}>{member.role === 'company_admin' ? 'Admin' : member.role === 'super_admin' ? 'Super Admin' : member.role}</span>
+                                                            <Pencil className="w-3.5 h-3.5 text-slate-300" />
                                                         </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <p className="text-[13px] font-bold text-slate-800 truncate">{member.full_name || 'Sin nombre'}</p>
-                                                            <p className="text-[11px] text-slate-400 truncate">{member.email}</p>
-                                                        </div>
-                                                        <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg ${member.role === 'super_admin' ? 'bg-purple-100 text-purple-600' :
-                                                            member.role === 'company_admin' ? 'bg-emerald-100 text-emerald-600' :
-                                                                'bg-slate-100 text-slate-500'
-                                                            }`}>{member.role === 'company_admin' ? 'Admin' : member.role === 'super_admin' ? 'Super Admin' : member.role}</span>
+                                                        {/* Inline edit form */}
+                                                        {editingMemberId === member.id && (
+                                                            <div className="mt-2 p-4 bg-white rounded-2xl border border-indigo-100 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                                <div className="grid grid-cols-2 gap-3">
+                                                                    <div>
+                                                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Nombre Completo</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            value={memberEditData.full_name}
+                                                                            onChange={(e) => setMemberEditData(prev => ({ ...prev, full_name: e.target.value }))}
+                                                                            className="w-full px-3 py-2 text-[13px] rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+                                                                        />
+                                                                    </div>
+                                                                    <div>
+                                                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Rol</label>
+                                                                        <select
+                                                                            value={memberEditData.role}
+                                                                            onChange={(e) => setMemberEditData(prev => ({ ...prev, role: e.target.value }))}
+                                                                            className="w-full px-3 py-2 text-[13px] rounded-xl border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all bg-white"
+                                                                        >
+                                                                            <option value="company_admin">Admin</option>
+                                                                            <option value="sales_rep">Vendedor</option>
+                                                                            <option value="viewer">Visor (Solo lectura)</option>
+                                                                        </select>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex items-center gap-2 justify-end">
+                                                                    <button
+                                                                        onClick={() => setEditingMemberId(null)}
+                                                                        className="text-[10px] font-bold text-slate-400 px-4 py-2 rounded-lg hover:bg-slate-100 transition-colors"
+                                                                    >
+                                                                        Cancelar
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            try {
+                                                                                await supabase.from('profiles').update({
+                                                                                    full_name: memberEditData.full_name,
+                                                                                    role: memberEditData.role
+                                                                                }).eq('id', member.id);
+                                                                                // Update local state
+                                                                                setCompanyMembers(prev => prev.map(m =>
+                                                                                    m.id === member.id ? { ...m, full_name: memberEditData.full_name, role: memberEditData.role } : m
+                                                                                ));
+                                                                                setEditingMemberId(null);
+                                                                                toast.success('Usuario actualizado');
+                                                                            } catch (err: any) {
+                                                                                toast.error(err.message || 'Error al actualizar');
+                                                                            }
+                                                                        }}
+                                                                        className="text-[10px] font-black text-white bg-indigo-600 px-5 py-2 rounded-lg hover:bg-indigo-700 transition-colors uppercase tracking-wider"
+                                                                    >
+                                                                        Guardar
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>
