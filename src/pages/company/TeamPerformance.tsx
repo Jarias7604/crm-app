@@ -283,12 +283,12 @@ export default function TeamPerformancePage() {
 
             {/* Global Stats Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-                <StatCard icon={Target} label="Total Leads" value={String(totalLeads)} color="bg-blue-500" />
-                <StatCard icon={Trophy} label="Ganados" value={String(totalWon)} color="bg-emerald-500" />
-                <StatCard icon={TrendingUp} label="Tasa de Cierre" value={formatPercent(overallWinRate)} color="bg-violet-500" />
-                <StatCard icon={DollarSign} label="Valor Pipeline" value={formatCurrency(totalValue)} color="bg-amber-500" />
-                <StatCard icon={Zap} label="Monto Cerrado" value={formatCurrency(totalClosing)} color="bg-rose-500" />
-                <StatCard icon={ArrowUpRight} label="Conversión Pipeline" value={totalValue > 0 ? `${Math.min(100, Math.round((totalClosing / totalValue) * 100))}%` : '0%'} color={totalValue > 0 && (totalClosing / totalValue) >= 0.6 ? 'bg-emerald-500' : totalValue > 0 && (totalClosing / totalValue) >= 0.3 ? 'bg-amber-500' : 'bg-red-500'} />
+                <StatCard icon={Target} label="Total Leads" value={String(totalLeads)} bg="bg-blue-50" iconColor="text-blue-500" />
+                <StatCard icon={Trophy} label="Ganados" value={String(totalWon)} bg="bg-emerald-50" iconColor="text-emerald-500" />
+                <StatCard icon={TrendingUp} label="Tasa de Cierre" value={formatPercent(overallWinRate)} bg="bg-violet-50" iconColor="text-violet-500" />
+                <StatCard icon={DollarSign} label="Valor Pipeline" value={formatCurrency(totalValue)} bg="bg-amber-50" iconColor="text-amber-500" />
+                <StatCard icon={Zap} label="Monto Cerrado" value={formatCurrency(totalClosing)} bg="bg-rose-50" iconColor="text-rose-500" />
+                <StatCard icon={ArrowUpRight} label="Conversión Pipeline" value={totalValue > 0 ? `${Math.min(100, Math.round((totalClosing / totalValue) * 100))}%` : '0%'} bg={totalValue > 0 && (totalClosing / totalValue) >= 0.6 ? 'bg-emerald-50' : totalValue > 0 && (totalClosing / totalValue) >= 0.3 ? 'bg-amber-50' : 'bg-red-50'} iconColor={totalValue > 0 && (totalClosing / totalValue) >= 0.6 ? 'text-emerald-500' : totalValue > 0 && (totalClosing / totalValue) >= 0.3 ? 'text-amber-500' : 'text-red-500'} />
             </div>
 
             {/* Top Performer Highlight */}
@@ -370,12 +370,12 @@ export default function TeamPerformancePage() {
 
 // === SUB-COMPONENTS ===
 
-function StatCard({ icon: Icon, label, value, color }: { icon: any; label: string; value: string; color: string }) {
+function StatCard({ icon: Icon, label, value, bg, iconColor }: { icon: any; label: string; value: string; bg: string; iconColor: string }) {
     return (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-xl ${color} flex items-center justify-center shadow-sm`}>
-                    <Icon className="w-4 h-4 text-white" />
+                <div className={`w-9 h-9 rounded-xl ${bg} flex items-center justify-center`}>
+                    <Icon className={`w-4 h-4 ${iconColor}`} />
                 </div>
                 <div className="min-w-0">
                     <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{label}</p>
