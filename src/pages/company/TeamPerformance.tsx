@@ -81,6 +81,7 @@ export default function TeamPerformancePage() {
     const [activeTab, setActiveTab] = useState<'users' | 'teams' | 'charts'>('users');
     const [filters, setFilters] = useState<PerformanceFilters>({ period: 'all' });
     const [profileNames, setProfileNames] = useState<Record<string, string>>({});
+    const [profileAvatars, setProfileAvatars] = useState<Record<string, string | null>>({});
 
     // Goals
     const [goals, setGoals] = useState<PerformanceGoal[]>([]);
@@ -122,10 +123,13 @@ export default function TeamPerformancePage() {
             setGoals(goalsData);
 
             const names: Record<string, string> = {};
+            const avatars: Record<string, string | null> = {};
             userData.forEach((u) => {
                 names[u.user_id] = u.full_name;
+                avatars[u.user_id] = u.avatar_url;
             });
             setProfileNames(names);
+            setProfileAvatars(avatars);
         } catch (err) {
             console.error('Error loading performance data:', err);
         } finally {
@@ -339,7 +343,7 @@ export default function TeamPerformancePage() {
             {activeTab === 'users' ? (
                 <UserPerformanceTable data={userPerformance} getUserGoal={getUserGoal} periodLabel={periodLabel} />
             ) : activeTab === 'teams' ? (
-                <TeamPerformanceGrid data={teamPerformance} profileNames={profileNames} getTeamGoal={getTeamGoal} periodLabel={periodLabel} />
+                <TeamPerformanceGrid data={teamPerformance} profileNames={profileNames} profileAvatars={profileAvatars} getTeamGoal={getTeamGoal} periodLabel={periodLabel} />
             ) : (
                 <PerformanceCharts
                     userPerformance={userPerformance}
@@ -511,9 +515,10 @@ function UserPerformanceTable({ data, getUserGoal, periodLabel }: {
 }
 
 // === TEAM GRID ===
-function TeamPerformanceGrid({ data, profileNames, getTeamGoal, periodLabel }: {
+function TeamPerformanceGrid({ data, profileNames, profileAvatars, getTeamGoal, periodLabel }: {
     data: TeamPerformance[];
     profileNames: Record<string, string>;
+    profileAvatars: Record<string, string | null>;
     getTeamGoal: (teamId: string) => { leads: number; value: number } | null;
     periodLabel: string;
 }) {
@@ -534,7 +539,37 @@ function TeamPerformanceGrid({ data, profileNames, getTeamGoal, periodLabel }: {
                 return (
                     <div key={team.team_id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-lg transition-all group">
                         <div className="px-6 py-4 flex items-center gap-4" style={{ backgroundColor: team.team_color + '08', borderBottom: `2px solid ${team.team_color}20` }}>
-                            <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-sm shrink-0" style={{ backgroundColor: team.team_color + '15', borderColor: team.team_color + '30', borderWidth: 1 }}>{team.team_emoji}</div>
+                            {/* Member avatars stack */}
+                            <div className="flex items-center shrink-0">
+                                <div className="flex -space-x-2.5">
+                                    {team.member_ids.slice(0, 4).map((uid) => {
+                                        const avatar = profileAvatars[uid];
+                                        const name = profileNames[uid] || '?';
+                                        const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+                                        return avatar ? (
+                                            <img
+                                                key={uid}
+                                                src={avatar}
+                                                alt={name}
+                                                className="w-9 h-9 rounded-full border-2 border-white object-cover shadow-sm"
+                                            />
+                                        ) : (
+                                            <div
+                                                key={uid}
+                                                className="w-9 h-9 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-black text-white shadow-sm"
+                                                style={{ backgroundColor: team.team_color || '#4449AA' }}
+                                            >
+                                                {initials}
+                                            </div>
+                                        );
+                                    })}
+                                    {team.member_ids.length > 4 && (
+                                        <div className="w-9 h-9 rounded-full border-2 border-white bg-gray-100 flex items-center justify-center text-[10px] font-black text-gray-500 shadow-sm">
+                                            +{team.member_ids.length - 4}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
                                     {index === 0 && data.length > 1 && <Award className="w-4 h-4 text-amber-500 shrink-0" />}

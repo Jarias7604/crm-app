@@ -26,6 +26,7 @@ export interface TeamPerformance {
     team_emoji: string;
     team_color: string;
     member_count: number;
+    member_ids: string[];
     total_leads: number;
     leads_won: number;
     leads_lost: number;
@@ -416,6 +417,7 @@ export const teamPerformanceService = {
                 team_emoji: team.emoji,
                 team_color: team.color,
                 member_count: members.length,
+                member_ids: members,
                 total_leads: totalLeads,
                 leads_won: won,
                 leads_lost: lost,
