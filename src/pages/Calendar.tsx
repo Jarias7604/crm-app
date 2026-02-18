@@ -166,7 +166,11 @@ export default function Calendar() {
 
                                     {/* Lead Count Badge */}
                                     {dayLeads.length > 0 && (
-                                        <span className="bg-blue-100 text-blue-700 text-[10px] font-black px-2 py-0.5 rounded-sm uppercase tracking-tight">
+                                        <span
+                                            className="bg-blue-100 text-blue-700 text-[10px] font-black px-2 py-0.5 rounded-sm uppercase tracking-tight cursor-pointer hover:bg-blue-600 hover:text-white transition-all"
+                                            onClick={() => navigate('/leads', { state: { leadIds: dayLeads.map(l => l.id), fromCalendar: true } })}
+                                            title={`Ver ${dayLeads.length} lead${dayLeads.length > 1 ? 's' : ''} del ${format(day, 'd MMM', { locale: es })}`}
+                                        >
                                             {dayLeads.length} {dayLeads.length === 1 ? 'LEAD' : 'LEADS'}
                                         </span>
                                     )}

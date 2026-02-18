@@ -28,10 +28,12 @@ import {
     Lock,
     Mail,
     KeyRound,
-    Pencil
+    Pencil,
+    ArrowUpDown
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import { useAriasTables } from '../../hooks/useAriasTables';
 
 const MODULES_CONFIG = [
     { key: 'leads', label: 'Leads (CRM)', icon: User, color: 'text-blue-600', bg: 'bg-blue-50' },
@@ -70,6 +72,8 @@ export default function Companies() {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<LicenseStatus | 'all'>('all');
     const location = useLocation();
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+    const { tableRef: companiesTableRef, wrapperRef: companiesWrapperRef } = useAriasTables();
 
     // Handle incoming filters from Dashboard
     useEffect(() => {
@@ -248,6 +252,14 @@ export default function Companies() {
         const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = statusFilter === 'all' || c.license_status === statusFilter;
         return matchesSearch && matchesStatus;
+    }).sort((a: any, b: any) => {
+        if (!sortConfig) return 0;
+        const { key, direction } = sortConfig;
+        const valA = a[key] ?? '';
+        const valB = b[key] ?? '';
+        if (valA < valB) return direction === 'asc' ? -1 : 1;
+        if (valA > valB) return direction === 'asc' ? 1 : -1;
+        return 0;
     });
 
     return (
@@ -295,114 +307,130 @@ export default function Companies() {
 
             {/* Main Table */}
             <div className="bg-white shadow-2xl shadow-slate-200/60 rounded-[2.5rem] overflow-hidden border border-slate-200/50">
-                <table className="min-w-full divide-y divide-slate-100 text-left">
-                    <thead className="bg-[#F8FAFC]">
-                        <tr>
-                            <th className="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Organización</th>
-                            <th className="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Suscripción</th>
-                            <th className="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Capacidad</th>
-                            <th className="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Módulos / Licencia</th>
-                            <th className="relative px-8 py-6 text-right font-black text-slate-400 text-[11px] uppercase tracking-[0.2em]">Gestionar</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-slate-50">
-                        {filteredCompanies.map((company: any) => (
-                            <tr key={company.id} className="hover:bg-slate-50/50 transition-all duration-300 group">
-                                <td className="px-8 py-6 whitespace-nowrap">
-                                    <div className="flex items-center gap-5">
-                                        <div className="flex-shrink-0 h-14 w-14 bg-indigo-50 rounded-[1.25rem] flex items-center justify-center text-[#4449AA] border border-indigo-100/50 shadow-sm transition-all group-hover:scale-110 group-hover:rotate-3 shadow-indigo-50">
-                                            <Building className="h-6 w-6" />
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <div className="text-lg font-black text-slate-900 leading-none mb-1.5">{company.name}</div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[10px] text-slate-400 font-mono tracking-tighter uppercase">ID: {company.id.slice(0, 8)}</span>
-                                                <span className="w-1 h-1 rounded-full bg-slate-200"></span>
-                                                <span className="text-[10px] text-slate-400 font-bold">Desde {format(new Date(company.created_at), 'MM/yyyy')}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="px-8 py-6 whitespace-nowrap">
-                                    <span className={`px-4 py-1.5 inline-flex text-[10px] font-black uppercase tracking-[0.1em] rounded-full border shadow-sm ${getStatusColor(company.license_status)}`}>
-                                        {company.license_status === 'active' ? '● Activa' : company.license_status}
-                                    </span>
-                                </td>
-                                <td className="px-8 py-6 whitespace-nowrap">
-                                    <div className="flex flex-col gap-2">
-                                        <div className="flex items-center justify-between gap-3 mb-1">
-                                            <span className="text-xs font-black text-slate-700">{company.user_count || 0} de {company.max_users || 5}</span>
-                                            <span className="text-[10px] font-bold text-slate-300 uppercase italic">Usuarios</span>
-                                        </div>
-                                        <div className="w-32 h-1.5 bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
+                <div ref={companiesWrapperRef} className="arias-table-wrapper">
+                    <div ref={companiesTableRef} className="arias-table">
+                        <table className="min-w-full divide-y divide-slate-100 text-left">
+                            <thead className="bg-[#F8FAFC]">
+                                <tr>
+                                    {[
+                                        { key: 'name', label: 'Organización' },
+                                        { key: 'license_status', label: 'Suscripción' },
+                                        { key: 'max_users', label: 'Capacidad' },
+                                        { key: 'allowed_permissions', label: 'Módulos / Licencia' },
+                                    ].map(col => (
+                                        <th key={col.key} className="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">
                                             <div
-                                                className={`h-full transition-all duration-700 ${(company.user_count || 0) >= (company.max_users || 5) ? 'bg-rose-500' : 'bg-indigo-600 shadow-[0_0_10px_rgba(79,70,229,0.3)]'
-                                                    }`}
-                                                style={{ width: `${Math.min(100, ((company.user_count || 0) / (company.max_users || 5)) * 100)}%` }}
-                                            />
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="px-8 py-6">
-                                    <div className="flex flex-wrap gap-1.5 max-w-[240px]">
-                                        {((company.allowed_permissions as string[]) || []).map(p => {
-                                            const config = MODULES_CONFIG.find(m => m.key === p);
-                                            return (
-                                                <div
-                                                    key={p}
-                                                    title={config?.label || p}
-                                                    className={`w-7 h-7 rounded-lg flex items-center justify-center border shadow-sm transition-transform hover:scale-110 ${config ? 'bg-white border-slate-200' : 'bg-slate-50 border-transparent'
-                                                        }`}
-                                                >
-                                                    {config ? (
-                                                        <config.icon className={`w-3.5 h-3.5 ${config.color}`} />
-                                                    ) : (
-                                                        <span className="text-[8px] font-black text-slate-300">{p.slice(0, 2)}</span>
-                                                    )}
+                                                className="cursor-pointer hover:text-[#4449AA] transition-colors group inline-flex items-center gap-1"
+                                                onClick={() => setSortConfig({ key: col.key, direction: sortConfig?.key === col.key && sortConfig.direction === 'asc' ? 'desc' : 'asc' })}
+                                            >
+                                                {col.label}
+                                                <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === col.key ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                            </div>
+                                        </th>
+                                    ))}
+                                    <th className="relative px-8 py-6 text-right font-black text-slate-400 text-[11px] uppercase tracking-[0.2em]">Gestionar</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-slate-50">
+                                {filteredCompanies.map((company: any) => (
+                                    <tr key={company.id} className="hover:bg-slate-50/50 transition-all duration-300 group">
+                                        <td className="px-8 py-6 whitespace-nowrap">
+                                            <div className="flex items-center gap-5">
+                                                <div className="flex-shrink-0 h-14 w-14 bg-indigo-50 rounded-[1.25rem] flex items-center justify-center text-[#4449AA] border border-indigo-100/50 shadow-sm transition-all group-hover:scale-110 group-hover:rotate-3 shadow-indigo-50">
+                                                    <Building className="h-6 w-6" />
                                                 </div>
-                                            );
-                                        })}
-                                        {((company.allowed_permissions as string[]) || []).length === 0 && (
-                                            <span className="text-[10px] font-bold text-slate-300 italic uppercase">Sin Licencia</span>
-                                        )}
-                                    </div>
-                                </td>
-                                <td className="px-8 py-6 whitespace-nowrap text-right">
-                                    <button
-                                        onClick={async () => {
-                                            setEditingCompanyId(company.id);
-                                            setFormData({
-                                                name: company.name,
-                                                license_status: company.license_status,
-                                                tax_id: company.tax_id || '',
-                                                phone: company.phone || '',
-                                                address: company.address || '',
-                                                max_users: company.max_users || 5,
-                                                allowed_permissions: Array.isArray(company.allowed_permissions) ? company.allowed_permissions : [],
-                                                admin_email: '',
-                                                admin_password: '',
-                                                admin_full_name: ''
-                                            });
-                                            // Load existing members for this company
-                                            const { data: members } = await supabase
-                                                .from('profiles')
-                                                .select('id, email, full_name, role, phone, address, created_at')
-                                                .eq('company_id', company.id)
-                                                .order('created_at', { ascending: true });
-                                            setCompanyMembers(members || []);
-                                            setActiveTab('info');
-                                            setIsModalOpen(true);
-                                        }}
-                                        className="h-12 px-5 group/btn inline-flex items-center justify-center gap-2 bg-slate-50 text-slate-400 hover:text-[#4449AA] hover:bg-indigo-50 rounded-2xl transition-all border border-transparent hover:border-indigo-100 font-black text-[11px] uppercase tracking-widest"
-                                    >
-                                        <Settings className="h-4.5 w-4.5 group-hover/btn:rotate-90 transition-transform duration-500" />
-                                        <span>Editar</span>
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                                                <div className="flex flex-col">
+                                                    <div className="text-lg font-black text-slate-900 leading-none mb-1.5">{company.name}</div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] text-slate-400 font-mono tracking-tighter uppercase">ID: {company.id.slice(0, 8)}</span>
+                                                        <span className="w-1 h-1 rounded-full bg-slate-200"></span>
+                                                        <span className="text-[10px] text-slate-400 font-bold">Desde {format(new Date(company.created_at), 'MM/yyyy')}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-8 py-6 whitespace-nowrap">
+                                            <span className={`px-4 py-1.5 inline-flex text-[10px] font-black uppercase tracking-[0.1em] rounded-full border shadow-sm ${getStatusColor(company.license_status)}`}>
+                                                {company.license_status === 'active' ? '● Activa' : company.license_status}
+                                            </span>
+                                        </td>
+                                        <td className="px-8 py-6 whitespace-nowrap">
+                                            <div className="flex flex-col gap-2">
+                                                <div className="flex items-center justify-between gap-3 mb-1">
+                                                    <span className="text-xs font-black text-slate-700">{company.user_count || 0} de {company.max_users || 5}</span>
+                                                    <span className="text-[10px] font-bold text-slate-300 uppercase italic">Usuarios</span>
+                                                </div>
+                                                <div className="w-32 h-1.5 bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
+                                                    <div
+                                                        className={`h-full transition-all duration-700 ${(company.user_count || 0) >= (company.max_users || 5) ? 'bg-rose-500' : 'bg-indigo-600 shadow-[0_0_10px_rgba(79,70,229,0.3)]'
+                                                            }`}
+                                                        style={{ width: `${Math.min(100, ((company.user_count || 0) / (company.max_users || 5)) * 100)}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-8 py-6">
+                                            <div className="flex flex-wrap gap-1.5 max-w-[240px]">
+                                                {((company.allowed_permissions as string[]) || []).map(p => {
+                                                    const config = MODULES_CONFIG.find(m => m.key === p);
+                                                    return (
+                                                        <div
+                                                            key={p}
+                                                            title={config?.label || p}
+                                                            className={`w-7 h-7 rounded-lg flex items-center justify-center border shadow-sm transition-transform hover:scale-110 ${config ? 'bg-white border-slate-200' : 'bg-slate-50 border-transparent'
+                                                                }`}
+                                                        >
+                                                            {config ? (
+                                                                <config.icon className={`w-3.5 h-3.5 ${config.color}`} />
+                                                            ) : (
+                                                                <span className="text-[8px] font-black text-slate-300">{p.slice(0, 2)}</span>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                                {((company.allowed_permissions as string[]) || []).length === 0 && (
+                                                    <span className="text-[10px] font-bold text-slate-300 italic uppercase">Sin Licencia</span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-8 py-6 whitespace-nowrap text-right">
+                                            <button
+                                                onClick={async () => {
+                                                    setEditingCompanyId(company.id);
+                                                    setFormData({
+                                                        name: company.name,
+                                                        license_status: company.license_status,
+                                                        tax_id: company.tax_id || '',
+                                                        phone: company.phone || '',
+                                                        address: company.address || '',
+                                                        max_users: company.max_users || 5,
+                                                        allowed_permissions: Array.isArray(company.allowed_permissions) ? company.allowed_permissions : [],
+                                                        admin_email: '',
+                                                        admin_password: '',
+                                                        admin_full_name: ''
+                                                    });
+                                                    // Load existing members for this company
+                                                    const { data: members } = await supabase
+                                                        .from('profiles')
+                                                        .select('id, email, full_name, role, phone, address, created_at')
+                                                        .eq('company_id', company.id)
+                                                        .order('created_at', { ascending: true });
+                                                    setCompanyMembers(members || []);
+                                                    setActiveTab('info');
+                                                    setIsModalOpen(true);
+                                                }}
+                                                className="h-12 px-5 group/btn inline-flex items-center justify-center gap-2 bg-slate-50 text-slate-400 hover:text-[#4449AA] hover:bg-indigo-50 rounded-2xl transition-all border border-transparent hover:border-indigo-100 font-black text-[11px] uppercase tracking-widest"
+                                            >
+                                                <Settings className="h-4.5 w-4.5 group-hover/btn:rotate-90 transition-transform duration-500" />
+                                                <span>Editar</span>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
 
             {/* Redesigned Modal */}

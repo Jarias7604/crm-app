@@ -20,10 +20,12 @@ import { lossReasonsService } from '../services/lossReasons';
 import { CustomDatePicker } from '../components/ui/CustomDatePicker';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { GripVertical } from 'lucide-react';
+import { useAriasTables } from '../hooks/useAriasTables';
 
 export default function Leads() {
     const { profile } = useAuth();
     const isAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
+    const { tableRef: leadsTableRef, wrapperRef: leadsWrapperRef } = useAriasTables();
     const [leads, setLeads] = useState<Lead[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -107,11 +109,13 @@ export default function Leads() {
     const [isAssignedFilterOpen, setIsAssignedFilterOpen] = useState(false);
     const assignedFilterRef = useRef<HTMLDivElement>(null);
     const [filteredLeadIds, setFilteredLeadIds] = useState<string[] | null>(null);
+    const cameFromRef = useRef<string | null>(null);
     const [startDateFilter, setStartDateFilter] = useState<string | null>(null);
     const [endDateFilter, setEndDateFilter] = useState<string | null>(null);
     const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
     const [isUploading, setIsUploading] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const location = useLocation();
     const navigate = useNavigate();
     const processedStateRef = useRef<string | null>(null);
@@ -145,6 +149,7 @@ export default function Leads() {
                     setFilteredLeadIds(state.leadIds);
                     if (viewMode === 'kanban') setViewMode('list');
                 }
+                if (state.fromCalendar) cameFromRef.current = 'calendar';
                 if (state.startDate) setStartDateFilter(state.startDate);
                 if (state.endDate) setEndDateFilter(state.endDate);
                 if (state.leadId) {
@@ -411,6 +416,10 @@ export default function Leads() {
             return 0;
         });
     }, [filteredLeads, sortConfig]);
+
+    const filteredPipelineTotal = useMemo(() => {
+        return filteredLeads.reduce((sum, lead) => sum + (lead.value || 0), 0);
+    }, [filteredLeads]);
 
     useEffect(() => {
         loadLeads();
@@ -696,6 +705,8 @@ export default function Leads() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSubmitting) return; // Guard against double submit
+        setIsSubmitting(true);
         try {
             // Clean data - convert empty strings to null for UUID fields
             const cleanData = {
@@ -711,6 +722,8 @@ export default function Leads() {
         } catch (error: any) {
             logger.error('Failed to create lead', error, { action: 'handleSubmit' });
             toast.error(`Error: ${error.message}`);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -1314,6 +1327,9 @@ export default function Leads() {
                                 <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
                                 <p className="text-[13px] text-gray-500 font-bold">
                                     {filteredLeads.length} de {leads.length} prospectos
+                                    {filteredPipelineTotal > 0 && (
+                                        <span className="text-emerald-600 ml-1">· ${filteredPipelineTotal.toLocaleString()}</span>
+                                    )}
                                 </p>
                             </div>
                             <div className="hidden md:block w-px h-4 bg-gray-200"></div>
@@ -1379,6 +1395,11 @@ export default function Leads() {
                                 {endDateFilter && <span className="bg-white/50 px-2 py-0.5 rounded text-[10px]">Hasta: {format(new Date(endDateFilter), 'dd/MM/yyyy')}</span>}
                                 <button
                                     onClick={() => {
+                                        if (cameFromRef.current === 'calendar') {
+                                            cameFromRef.current = null;
+                                            navigate('/calendar');
+                                            return;
+                                        }
                                         setFilteredLeadId(null);
                                         setFilteredLeadIds(null);
                                         setStatusFilter('all');
@@ -1806,202 +1827,286 @@ export default function Leads() {
                         </div>
                         {/* Desktop Table */}
                         <div className="hidden md:block bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/80 overflow-hidden transition-all duration-300">
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-50">
-                                    <DragDropContext onDragEnd={handleOnDragEnd}>
-                                        <Droppable droppableId="columns" direction="horizontal">
-                                            {(provided) => (
-                                                <thead className="bg-[#FAFAFB]">
-                                                    <tr ref={provided.innerRef} {...provided.droppableProps}>
-                                                        <th scope="col" className="px-6 py-4 text-left bg-[#FAFAFB]">
-                                                            <div className="flex items-center">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={selectedLeadIds.length === sortedLeads.length && sortedLeads.length > 0}
-                                                                    onChange={toggleSelectAll}
-                                                                    className="w-4 h-4 rounded border-gray-300 text-[#4449AA] focus:ring-[#4449AA] cursor-pointer"
-                                                                />
-                                                            </div>
-                                                        </th>
-
-                                                        {columnOrder.map((colId, index) => (
-                                                            <Draggable key={colId} draggableId={colId} index={index}>
-                                                                {(provided, snapshot) => (
-                                                                    <th
-                                                                        ref={provided.innerRef}
-                                                                        {...provided.draggableProps}
-                                                                        scope="col"
-                                                                        className={`px-4 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-widest transition-all ${snapshot.isDragging ? 'bg-indigo-50/80 shadow-sm z-50' : 'bg-[#FAFAFB]'}`}
-                                                                    >
-                                                                        <div className="flex items-center gap-2">
-                                                                            <div {...provided.dragHandleProps} className="cursor-move text-gray-300 hover:text-[#4449AA]">
-                                                                                <GripVertical className="w-3 h-3" />
-                                                                            </div>
-
-                                                                            {colId === 'name' && (
-                                                                                <div
-                                                                                    className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
-                                                                                    onClick={() => setSortConfig({
-                                                                                        key: 'name',
-                                                                                        direction: sortConfig?.key === 'name' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
-                                                                                    })}
-                                                                                >
-                                                                                    Nombre / Empresa
-                                                                                    <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'name' ? 'text-[#4449AA]' : 'opacity-0 group-hover:opacity-100'}`} />
-                                                                                </div>
-                                                                            )}
-
-                                                                            {colId === 'email' && "Email"}
-                                                                            {colId === 'phone' && "Teléfono"}
-                                                                            {colId === 'status' && "Estado"}
-                                                                            {colId === 'priority' && "Prioridad"}
-                                                                            {colId === 'source' && "Fuente"}
-                                                                            {colId === 'created_at' && "Fecha"}
-
-                                                                            {colId === 'value' && (
-                                                                                <div
-                                                                                    className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
-                                                                                    onClick={() => setSortConfig({
-                                                                                        key: 'value',
-                                                                                        direction: sortConfig?.key === 'value' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
-                                                                                    })}
-                                                                                >
-                                                                                    Valor
-                                                                                    <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'value' ? 'text-[#4449AA]' : 'opacity-0 group-hover:opacity-100'}`} />
-                                                                                </div>
-                                                                            )}
-
-                                                                            {colId === 'assigned_to' && "Asignado"}
-                                                                        </div>
-                                                                    </th>
-                                                                )}
-                                                            </Draggable>
-                                                        ))}
-
-                                                        {provided.placeholder}
-                                                        <th scope="col" className="px-6 py-4 text-right text-xs font-black text-gray-400 uppercase tracking-widest bg-[#FAFAFB]">
-                                                            Acciones
-                                                        </th>
-                                                    </tr>
-                                                </thead>
-                                            )}
-                                        </Droppable>
-                                    </DragDropContext>
-                                    <tbody className="bg-white divide-y divide-gray-50/50">
-                                        {sortedLeads.map((lead) => {
-                                            const isSelected = selectedLeadIds.includes(lead.id);
-                                            return (
-                                                <tr
-                                                    key={lead.id}
-                                                    className={`group transition-all duration-200 ${isSelected ? 'bg-indigo-50/30' : 'hover:bg-[#FDFDFE]'}`}
-                                                >
-                                                    <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={isSelected}
-                                                            onChange={() => toggleLeadSelection(lead.id)}
-                                                            className="w-4 h-4 rounded border-gray-300 text-[#4449AA] focus:ring-[#4449AA] cursor-pointer"
-                                                        />
-                                                    </td>
-                                                    {columnOrder.map((colId) => (
-                                                        <td key={colId} className="px-4 py-4 whitespace-nowrap">
-                                                            {colId === 'name' && (
-                                                                <div className="flex flex-col cursor-pointer" onClick={() => openLeadDetail(lead)}>
-                                                                    <span className="text-sm font-bold text-gray-900 group-hover:text-[#4449AA] transition-colors">{lead.name}</span>
-                                                                    <span className="text-xs text-blue-600 font-bold">{lead.company_name || 'Individual'}</span>
+                            <div ref={leadsWrapperRef} className="arias-table-wrapper">
+                                <div ref={leadsTableRef} className="arias-table">
+                                    <table className="min-w-full divide-y divide-gray-50">
+                                        <DragDropContext onDragEnd={handleOnDragEnd}>
+                                            <Droppable droppableId="columns" direction="horizontal">
+                                                {(provided) => (
+                                                    <thead className="bg-[#FAFAFB]">
+                                                        <tr ref={provided.innerRef} {...provided.droppableProps}>
+                                                            <th scope="col" className="px-6 py-4 text-left bg-[#FAFAFB]">
+                                                                <div className="flex items-center">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={selectedLeadIds.length === sortedLeads.length && sortedLeads.length > 0}
+                                                                        onChange={toggleSelectAll}
+                                                                        className="w-4 h-4 rounded border-gray-300 text-[#4449AA] focus:ring-[#4449AA] cursor-pointer"
+                                                                    />
                                                                 </div>
-                                                            )}
+                                                            </th>
 
-                                                            {colId === 'email' && (
-                                                                lead.email ? (
-                                                                    <div className="flex items-center gap-1.5 max-w-[180px]">
-                                                                        <Mail className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                                                                        <span className="text-[11px] font-semibold text-gray-700 truncate" title={lead.email}>{lead.email}</span>
-                                                                    </div>
-                                                                ) : <span className="text-xs text-gray-300">—</span>
-                                                            )}
+                                                            {columnOrder.map((colId, index) => (
+                                                                <Draggable key={colId} draggableId={colId} index={index}>
+                                                                    {(provided, snapshot) => (
+                                                                        <th
+                                                                            ref={provided.innerRef}
+                                                                            {...provided.draggableProps}
+                                                                            scope="col"
+                                                                            className={`px-4 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-widest transition-all ${snapshot.isDragging ? 'bg-indigo-50/80 shadow-sm z-50' : 'bg-[#FAFAFB]'}`}
+                                                                        >
+                                                                            <div className="flex items-center gap-2">
+                                                                                <div {...provided.dragHandleProps} className="cursor-move text-gray-300 hover:text-[#4449AA]">
+                                                                                    <GripVertical className="w-3 h-3" />
+                                                                                </div>
 
-                                                            {colId === 'phone' && (
-                                                                lead.phone ? (
-                                                                    <div className="flex items-center gap-1.5">
-                                                                        <Phone className="w-3.5 h-3.5 text-green-500 shrink-0" />
-                                                                        <span className="text-[11px] font-semibold text-gray-700">{lead.phone}</span>
-                                                                    </div>
-                                                                ) : <span className="text-xs text-gray-300">—</span>
-                                                            )}
+                                                                                {colId === 'name' && (
+                                                                                    <div
+                                                                                        className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                        onClick={() => setSortConfig({
+                                                                                            key: 'name',
+                                                                                            direction: sortConfig?.key === 'name' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                        })}
+                                                                                    >
+                                                                                        Nombre / Empresa
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'name' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                    </div>
+                                                                                )}
 
-                                                            {colId === 'status' && <StatusBadge status={lead.status} />}
+                                                                                {colId === 'email' && (
+                                                                                    <div
+                                                                                        className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                        onClick={() => setSortConfig({
+                                                                                            key: 'email',
+                                                                                            direction: sortConfig?.key === 'email' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                        })}
+                                                                                    >
+                                                                                        Email
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'email' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                    </div>
+                                                                                )}
 
-                                                            {colId === 'priority' && <PriorityBadge priority={lead.priority} />}
+                                                                                {colId === 'phone' && (
+                                                                                    <div
+                                                                                        className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                        onClick={() => setSortConfig({
+                                                                                            key: 'phone',
+                                                                                            direction: sortConfig?.key === 'phone' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                        })}
+                                                                                    >
+                                                                                        Teléfono
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'phone' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                    </div>
+                                                                                )}
 
-                                                            {colId === 'source' && (
-                                                                lead.source && SOURCE_CONFIG[lead.source] ? (
-                                                                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100 w-fit">
-                                                                        <span>{SOURCE_CONFIG[lead.source].icon}</span>
-                                                                        <span className="uppercase tracking-tight">{SOURCE_CONFIG[lead.source].label}</span>
-                                                                    </div>
-                                                                ) : <span className="text-xs text-gray-300">-</span>
-                                                            )}
+                                                                                {colId === 'status' && (
+                                                                                    <div
+                                                                                        className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                        onClick={() => setSortConfig({
+                                                                                            key: 'status',
+                                                                                            direction: sortConfig?.key === 'status' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                        })}
+                                                                                    >
+                                                                                        Estado
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'status' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                    </div>
+                                                                                )}
 
-                                                            {colId === 'value' && (
-                                                                <div>
-                                                                    <div className="text-sm font-black text-slate-900">${(lead.value || 0).toLocaleString()}</div>
-                                                                    {(lead.closing_amount || 0) > 0 && <div className="text-[10px] text-indigo-600 font-black uppercase tracking-tighter">Cierre: ${lead.closing_amount.toLocaleString()}</div>}
-                                                                </div>
-                                                            )}
+                                                                                {colId === 'priority' && (
+                                                                                    <div
+                                                                                        className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                        onClick={() => setSortConfig({
+                                                                                            key: 'priority',
+                                                                                            direction: sortConfig?.key === 'priority' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                        })}
+                                                                                    >
+                                                                                        Prioridad
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'priority' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                    </div>
+                                                                                )}
 
-                                                            {colId === 'assigned_to' && (
-                                                                lead.assigned_to ? (() => {
-                                                                    const owner = teamMembers.find(m => m.id === lead.assigned_to);
-                                                                    return (
-                                                                        <div className="flex items-center gap-2">
-                                                                            <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shadow-sm">
-                                                                                {owner?.avatar_url ? (
-                                                                                    <img src={owner.avatar_url} alt="" className="w-full h-full object-cover" />
-                                                                                ) : (
-                                                                                    <User className="w-3.5 h-3.5 text-slate-400" />
+                                                                                {colId === 'source' && (
+                                                                                    <div
+                                                                                        className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                        onClick={() => setSortConfig({
+                                                                                            key: 'source',
+                                                                                            direction: sortConfig?.key === 'source' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                        })}
+                                                                                    >
+                                                                                        Fuente
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'source' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                    </div>
+                                                                                )}
+
+                                                                                {colId === 'created_at' && (
+                                                                                    <div
+                                                                                        className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                        onClick={() => setSortConfig({
+                                                                                            key: 'created_at',
+                                                                                            direction: sortConfig?.key === 'created_at' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                        })}
+                                                                                    >
+                                                                                        Fecha
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'created_at' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                    </div>
+                                                                                )}
+
+                                                                                {colId === 'value' && (
+                                                                                    <div
+                                                                                        className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                        onClick={() => setSortConfig({
+                                                                                            key: 'value',
+                                                                                            direction: sortConfig?.key === 'value' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                        })}
+                                                                                    >
+                                                                                        Valor
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'value' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                    </div>
+                                                                                )}
+
+                                                                                {colId === 'assigned_to' && (
+                                                                                    <div
+                                                                                        className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                        onClick={() => setSortConfig({
+                                                                                            key: 'assigned_to',
+                                                                                            direction: sortConfig?.key === 'assigned_to' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                        })}
+                                                                                    >
+                                                                                        Asignado
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'assigned_to' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                    </div>
                                                                                 )}
                                                                             </div>
-                                                                            <span className="text-[11px] font-bold text-slate-600 truncate max-w-[80px]">
-                                                                                {owner?.full_name?.split(' ')[0] || owner?.email.split('@')[0]}
-                                                                            </span>
-                                                                        </div>
-                                                                    );
-                                                                })() : <span className="text-gray-300">-</span>
-                                                            )}
+                                                                        </th>
+                                                                    )}
+                                                                </Draggable>
+                                                            ))}
 
-                                                            {colId === 'created_at' && (
-                                                                <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500">
-                                                                    <Calendar className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                                                                    <span>{format(new Date(lead.created_at), 'dd/MM/yyyy')}</span>
-                                                                </div>
-                                                            )}
+                                                            {provided.placeholder}
+                                                            <th scope="col" className="px-6 py-4 text-right text-xs font-black text-gray-400 uppercase tracking-widest bg-[#FAFAFB]">
+                                                                Acciones
+                                                            </th>
+                                                        </tr>
+                                                    </thead>
+                                                )}
+                                            </Droppable>
+                                        </DragDropContext>
+                                        <tbody className="bg-white divide-y divide-gray-50/50">
+                                            {sortedLeads.map((lead) => {
+                                                const isSelected = selectedLeadIds.includes(lead.id);
+                                                return (
+                                                    <tr
+                                                        key={lead.id}
+                                                        className={`group transition-all duration-200 ${isSelected ? 'bg-indigo-50/30' : 'hover:bg-[#FDFDFE]'}`}
+                                                    >
+                                                        <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isSelected}
+                                                                onChange={() => toggleLeadSelection(lead.id)}
+                                                                className="w-4 h-4 rounded border-gray-300 text-[#4449AA] focus:ring-[#4449AA] cursor-pointer"
+                                                            />
                                                         </td>
-                                                    ))}
+                                                        {columnOrder.map((colId) => (
+                                                            <td key={colId} className="px-4 py-4 whitespace-nowrap">
+                                                                {colId === 'name' && (
+                                                                    <div className="flex flex-col cursor-pointer" onClick={() => openLeadDetail(lead)}>
+                                                                        <span className="text-sm font-bold text-gray-900 group-hover:text-[#4449AA] transition-colors">{lead.name}</span>
+                                                                        <span className="text-xs text-blue-600 font-bold">{lead.company_name || 'Individual'}</span>
+                                                                    </div>
+                                                                )}
 
-                                                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                                                        <div className="flex justify-end gap-1.5 transition-all">
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); openLeadDetail(lead); }}
-                                                                className="p-1.5 text-indigo-400 hover:text-white hover:bg-[#4449AA] rounded-lg transition-all shadow-sm bg-indigo-50/50"
-                                                            >
-                                                                <ChevronRight className="w-4 h-4" />
-                                                            </button>
-                                                            {isAdmin && (
+                                                                {colId === 'email' && (
+                                                                    lead.email ? (
+                                                                        <div className="flex items-center gap-1.5 max-w-[180px]">
+                                                                            <Mail className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                                                            <span className="text-[11px] font-semibold text-gray-700 truncate" title={lead.email}>{lead.email}</span>
+                                                                        </div>
+                                                                    ) : <span className="text-xs text-gray-300">—</span>
+                                                                )}
+
+                                                                {colId === 'phone' && (
+                                                                    lead.phone ? (
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <Phone className="w-3.5 h-3.5 text-green-500 shrink-0" />
+                                                                            <span className="text-[11px] font-semibold text-gray-700">{lead.phone}</span>
+                                                                        </div>
+                                                                    ) : <span className="text-xs text-gray-300">—</span>
+                                                                )}
+
+                                                                {colId === 'status' && <StatusBadge status={lead.status} />}
+
+                                                                {colId === 'priority' && <PriorityBadge priority={lead.priority} />}
+
+                                                                {colId === 'source' && (
+                                                                    lead.source && SOURCE_CONFIG[lead.source] ? (
+                                                                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100 w-fit">
+                                                                            <span>{SOURCE_CONFIG[lead.source].icon}</span>
+                                                                            <span className="uppercase tracking-tight">{SOURCE_CONFIG[lead.source].label}</span>
+                                                                        </div>
+                                                                    ) : <span className="text-xs text-gray-300">-</span>
+                                                                )}
+
+                                                                {colId === 'value' && (
+                                                                    <div>
+                                                                        <div className="text-sm font-black text-slate-900">${(lead.value || 0).toLocaleString()}</div>
+                                                                        {(lead.closing_amount || 0) > 0 && <div className="text-[10px] text-indigo-600 font-black uppercase tracking-tighter">Cierre: ${lead.closing_amount.toLocaleString()}</div>}
+                                                                    </div>
+                                                                )}
+
+                                                                {colId === 'assigned_to' && (
+                                                                    lead.assigned_to ? (() => {
+                                                                        const owner = teamMembers.find(m => m.id === lead.assigned_to);
+                                                                        return (
+                                                                            <div className="flex items-center gap-2">
+                                                                                <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shadow-sm">
+                                                                                    {owner?.avatar_url ? (
+                                                                                        <img src={owner.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                                                    ) : (
+                                                                                        <User className="w-3.5 h-3.5 text-slate-400" />
+                                                                                    )}
+                                                                                </div>
+                                                                                <span className="text-[11px] font-bold text-slate-600 truncate max-w-[80px]">
+                                                                                    {owner?.full_name?.split(' ')[0] || owner?.email.split('@')[0]}
+                                                                                </span>
+                                                                            </div>
+                                                                        );
+                                                                    })() : <span className="text-gray-300">-</span>
+                                                                )}
+
+                                                                {colId === 'created_at' && (
+                                                                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500">
+                                                                        <Calendar className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                                                                        <span>{format(new Date(lead.created_at), 'dd/MM/yyyy')}</span>
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                        ))}
+
+                                                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                                                            <div className="flex justify-end gap-1.5 transition-all">
                                                                 <button
-                                                                    onClick={(e) => { e.stopPropagation(); handleDeleteLead(lead.id, lead.name); }}
-                                                                    className="p-1.5 text-rose-400 hover:text-white hover:bg-rose-600 rounded-lg transition-all shadow-sm bg-rose-50/50"
+                                                                    onClick={(e) => { e.stopPropagation(); openLeadDetail(lead); }}
+                                                                    className="p-1.5 text-indigo-400 hover:text-white hover:bg-[#4449AA] rounded-lg transition-all shadow-sm bg-indigo-50/50"
                                                                 >
-                                                                    <Trash2 className="w-4 h-4" />
+                                                                    <ChevronRight className="w-4 h-4" />
                                                                 </button>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                                                                {isAdmin && (
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleDeleteLead(lead.id, lead.name); }}
+                                                                        className="p-1.5 text-rose-400 hover:text-white hover:bg-rose-600 rounded-lg transition-all shadow-sm bg-rose-50/50"
+                                                                    >
+                                                                        <Trash2 className="w-4 h-4" />
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
 
@@ -2381,6 +2486,11 @@ export default function Leads() {
                                                 {priorityFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Prioridad: {Array.isArray(priorityFilter) ? priorityFilter.join(', ') : (PRIORITY_CONFIG as any)[priorityFilter]?.label || priorityFilter}</span>}
                                                 <button
                                                     onClick={() => {
+                                                        if (cameFromRef.current === 'calendar') {
+                                                            cameFromRef.current = null;
+                                                            navigate('/calendar');
+                                                            return;
+                                                        }
                                                         setFilteredLeadId(null);
                                                         setFilteredLeadIds(null);
                                                         setStatusFilter('all');

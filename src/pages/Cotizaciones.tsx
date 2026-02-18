@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { cotizacionesService } from '../services/cotizaciones';
 import { Button } from '../components/ui/Button';
 import toast from 'react-hot-toast';
+import { useAriasTables } from '../hooks/useAriasTables';
 
 export default function Cotizaciones() {
     const { profile } = useAuth();
@@ -17,6 +18,7 @@ export default function Cotizaciones() {
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string | null>(null);
+    const { tableRef: quotesTableRef, wrapperRef: quotesWrapperRef } = useAriasTables();
 
     // Column order persistence
     const [columnOrder, setColumnOrder] = useState<string[]>(() => {
@@ -299,189 +301,225 @@ export default function Cotizaciones() {
                         <Droppable droppableId="quote-columns" direction="horizontal">
                             {(provided) => (
                                 <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/80 overflow-hidden transition-all duration-300">
-                                    <div className="overflow-x-auto">
-                                        <table className="min-w-full divide-y divide-gray-50">
-                                            <thead className="bg-[#FAFAFB]">
-                                                <tr ref={provided.innerRef} {...provided.droppableProps}>
-                                                    <th scope="col" className="px-6 py-4 text-left bg-[#FAFAFB]">
-                                                        <div className="flex items-center">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedIds.length === filteredCotizaciones.length && filteredCotizaciones.length > 0}
-                                                                onChange={toggleSelectAll}
-                                                                className="w-4 h-4 rounded border-gray-300 text-[#4449AA] focus:ring-[#4449AA] cursor-pointer"
-                                                            />
-                                                        </div>
-                                                    </th>
-
-                                                    {columnOrder.map((colId, index) => (
-                                                        <Draggable key={colId} draggableId={colId} index={index}>
-                                                            {(provided, snapshot) => (
-                                                                <th
-                                                                    ref={provided.innerRef}
-                                                                    {...provided.draggableProps}
-                                                                    scope="col"
-                                                                    className={`px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest transition-all ${snapshot.isDragging ? 'bg-indigo-50/80 shadow-sm z-50' : 'bg-[#FAFAFB]'}`}
-                                                                >
-                                                                    <div className="flex items-center gap-2">
-                                                                        <div {...provided.dragHandleProps} className="cursor-move text-gray-300 hover:text-[#4449AA]">
-                                                                            <GripVertical className="w-3 h-3" />
-                                                                        </div>
-
-                                                                        {colId === 'nombre_cliente' && (
-                                                                            <div
-                                                                                className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
-                                                                                onClick={() => setSortConfig({
-                                                                                    key: 'nombre_cliente',
-                                                                                    direction: sortConfig?.key === 'nombre_cliente' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
-                                                                                })}
-                                                                            >
-                                                                                Cliente
-                                                                                <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'nombre_cliente' ? 'text-[#4449AA]' : 'opacity-0 group-hover:opacity-100'}`} />
-                                                                            </div>
-                                                                        )}
-
-                                                                        {colId === 'plan_nombre' && "Plan / Producto"}
-                                                                        {colId === 'volumen_dtes' && "Volumen"}
-
-                                                                        {colId === 'total_anual' && (
-                                                                            <div
-                                                                                className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
-                                                                                onClick={() => setSortConfig({
-                                                                                    key: 'total_anual',
-                                                                                    direction: sortConfig?.key === 'total_anual' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
-                                                                                })}
-                                                                            >
-                                                                                Total Anual
-                                                                                <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'total_anual' ? 'text-[#4449AA]' : 'opacity-0 group-hover:opacity-100'}`} />
-                                                                            </div>
-                                                                        )}
-
-                                                                        {colId === 'estado' && "Estado"}
-
-                                                                        {colId === 'created_at' && (
-                                                                            <div
-                                                                                className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
-                                                                                onClick={() => setSortConfig({
-                                                                                    key: 'created_at',
-                                                                                    direction: sortConfig?.key === 'created_at' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
-                                                                                })}
-                                                                            >
-                                                                                Fecha
-                                                                                <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'created_at' ? 'text-[#4449AA]' : 'opacity-0 group-hover:opacity-100'}`} />
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                </th>
-                                                            )}
-                                                        </Draggable>
-                                                    ))}
-
-                                                    {provided.placeholder}
-                                                    <th scope="col" className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest text-right bg-[#FAFAFB]">Acciones</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="bg-white divide-y divide-gray-50/50">
-                                                {sortedCotizaciones.length === 0 ? (
-                                                    <tr>
-                                                        <td colSpan={columnOrder.length + 2} className="px-6 py-16 text-center">
-                                                            <div className="flex flex-col items-center justify-center text-gray-300">
-                                                                <FileText className="w-12 h-12 mb-3 opacity-20" />
-                                                                <p className="text-sm font-bold uppercase tracking-widest text-gray-400">Sin cotizaciones</p>
-                                                                <Button
-                                                                    onClick={() => navigate('/cotizaciones/nueva-pro')}
-                                                                    variant="outline"
-                                                                    className="mt-4 text-[10px] font-black border-gray-100"
-                                                                >
-                                                                    Crear Primera
-                                                                </Button>
+                                    <div ref={quotesWrapperRef} className="arias-table-wrapper">
+                                        <div ref={quotesTableRef} className="arias-table">
+                                            <table className="min-w-full divide-y divide-gray-50">
+                                                <thead className="bg-[#FAFAFB]">
+                                                    <tr ref={provided.innerRef} {...provided.droppableProps}>
+                                                        <th scope="col" className="px-6 py-4 text-left bg-[#FAFAFB]">
+                                                            <div className="flex items-center">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedIds.length === filteredCotizaciones.length && filteredCotizaciones.length > 0}
+                                                                    onChange={toggleSelectAll}
+                                                                    className="w-4 h-4 rounded border-gray-300 text-[#4449AA] focus:ring-[#4449AA] cursor-pointer"
+                                                                />
                                                             </div>
-                                                        </td>
-                                                    </tr>
-                                                ) : (
-                                                    sortedCotizaciones.map((cot) => {
-                                                        const isSelected = selectedIds.includes(cot.id);
-                                                        return (
-                                                            <tr key={cot.id} className={`group transition-all duration-200 ${isSelected ? 'bg-indigo-50/30' : 'hover:bg-[#FDFDFE]'}`}>
-                                                                <td className="px-6 py-4 whitespace-nowrap">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={isSelected}
-                                                                        onChange={() => toggleSelection(cot.id)}
-                                                                        className="w-4 h-4 rounded border-gray-300 text-[#4449AA] focus:ring-[#4449AA] cursor-pointer"
-                                                                    />
-                                                                </td>
+                                                        </th>
 
-                                                                {columnOrder.map((colId) => (
-                                                                    <td key={colId} className="px-4 py-4 whitespace-nowrap">
-                                                                        {colId === 'nombre_cliente' && (
-                                                                            <div className="flex flex-col cursor-pointer" onClick={() => navigate(`/cotizaciones/${cot.id}`)}>
-                                                                                <span className="text-sm font-bold text-gray-900 group-hover:text-[#4449AA] transition-colors">{cot.nombre_cliente}</span>
-                                                                                <span className="text-[11px] text-blue-600 font-bold">{cot.empresa_cliente || 'Individual'}</span>
+                                                        {columnOrder.map((colId, index) => (
+                                                            <Draggable key={colId} draggableId={colId} index={index}>
+                                                                {(provided, snapshot) => (
+                                                                    <th
+                                                                        ref={provided.innerRef}
+                                                                        {...provided.draggableProps}
+                                                                        scope="col"
+                                                                        className={`px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest transition-all ${snapshot.isDragging ? 'bg-indigo-50/80 shadow-sm z-50' : 'bg-[#FAFAFB]'}`}
+                                                                    >
+                                                                        <div className="flex items-center gap-2">
+                                                                            <div {...provided.dragHandleProps} className="cursor-move text-gray-300 hover:text-[#4449AA]">
+                                                                                <GripVertical className="w-3 h-3" />
                                                                             </div>
-                                                                        )}
 
-                                                                        {colId === 'plan_nombre' && (
-                                                                            <div className="flex items-center gap-2">
-                                                                                <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
-                                                                                    <FileText className="w-4 h-4 text-[#4449AA]" />
+                                                                            {colId === 'nombre_cliente' && (
+                                                                                <div
+                                                                                    className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                    onClick={() => setSortConfig({
+                                                                                        key: 'nombre_cliente',
+                                                                                        direction: sortConfig?.key === 'nombre_cliente' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                    })}
+                                                                                >
+                                                                                    Cliente
+                                                                                    <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'nombre_cliente' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
                                                                                 </div>
-                                                                                <span className="text-sm font-bold text-gray-700">{cot.plan_nombre}</span>
-                                                                            </div>
-                                                                        )}
+                                                                            )}
 
-                                                                        {colId === 'volumen_dtes' && (
-                                                                            <span className="text-xs font-black text-slate-500 bg-slate-50 px-2 py-1 rounded-md border border-slate-100 uppercase tracking-tighter">
-                                                                                {cot.volumen_dtes.toLocaleString()} DTEs
-                                                                            </span>
-                                                                        )}
+                                                                            {colId === 'plan_nombre' && (
+                                                                                <div
+                                                                                    className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                    onClick={() => setSortConfig({
+                                                                                        key: 'plan_nombre',
+                                                                                        direction: sortConfig?.key === 'plan_nombre' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                    })}
+                                                                                >
+                                                                                    Plan / Producto
+                                                                                    <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'plan_nombre' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                </div>
+                                                                            )}
 
-                                                                        {colId === 'total_anual' && (
-                                                                            <span className="text-sm font-black text-slate-900">
-                                                                                ${cot.total_anual.toLocaleString()}
-                                                                            </span>
-                                                                        )}
+                                                                            {colId === 'volumen_dtes' && (
+                                                                                <div
+                                                                                    className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                    onClick={() => setSortConfig({
+                                                                                        key: 'volumen_dtes',
+                                                                                        direction: sortConfig?.key === 'volumen_dtes' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                    })}
+                                                                                >
+                                                                                    Volumen
+                                                                                    <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'volumen_dtes' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                </div>
+                                                                            )}
 
-                                                                        {colId === 'estado' && getEstadoBadge(cot.estado)}
+                                                                            {colId === 'total_anual' && (
+                                                                                <div
+                                                                                    className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                    onClick={() => setSortConfig({
+                                                                                        key: 'total_anual',
+                                                                                        direction: sortConfig?.key === 'total_anual' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                    })}
+                                                                                >
+                                                                                    Total Anual
+                                                                                    <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'total_anual' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                </div>
+                                                                            )}
 
-                                                                        {colId === 'created_at' && (
-                                                                            <span className="text-[11px] font-bold text-gray-500 uppercase tracking-tight">
-                                                                                {new Date(cot.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                                                            </span>
-                                                                        )}
+                                                                            {colId === 'estado' && (
+                                                                                <div
+                                                                                    className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                    onClick={() => setSortConfig({
+                                                                                        key: 'estado',
+                                                                                        direction: sortConfig?.key === 'estado' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                    })}
+                                                                                >
+                                                                                    Estado
+                                                                                    <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'estado' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                </div>
+                                                                            )}
+
+                                                                            {colId === 'created_at' && (
+                                                                                <div
+                                                                                    className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                    onClick={() => setSortConfig({
+                                                                                        key: 'created_at',
+                                                                                        direction: sortConfig?.key === 'created_at' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                    })}
+                                                                                >
+                                                                                    Fecha
+                                                                                    <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'created_at' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </th>
+                                                                )}
+                                                            </Draggable>
+                                                        ))}
+
+                                                        {provided.placeholder}
+                                                        <th scope="col" className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest text-right bg-[#FAFAFB]">Acciones</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="bg-white divide-y divide-gray-50/50">
+                                                    {sortedCotizaciones.length === 0 ? (
+                                                        <tr>
+                                                            <td colSpan={columnOrder.length + 2} className="px-6 py-16 text-center">
+                                                                <div className="flex flex-col items-center justify-center text-gray-300">
+                                                                    <FileText className="w-12 h-12 mb-3 opacity-20" />
+                                                                    <p className="text-sm font-bold uppercase tracking-widest text-gray-400">Sin cotizaciones</p>
+                                                                    <Button
+                                                                        onClick={() => navigate('/cotizaciones/nueva-pro')}
+                                                                        variant="outline"
+                                                                        className="mt-4 text-[10px] font-black border-gray-100"
+                                                                    >
+                                                                        Crear Primera
+                                                                    </Button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ) : (
+                                                        sortedCotizaciones.map((cot) => {
+                                                            const isSelected = selectedIds.includes(cot.id);
+                                                            return (
+                                                                <tr key={cot.id} className={`group transition-all duration-200 ${isSelected ? 'bg-indigo-50/30' : 'hover:bg-[#FDFDFE]'}`}>
+                                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={isSelected}
+                                                                            onChange={() => toggleSelection(cot.id)}
+                                                                            className="w-4 h-4 rounded border-gray-300 text-[#4449AA] focus:ring-[#4449AA] cursor-pointer"
+                                                                        />
                                                                     </td>
-                                                                ))}
 
-                                                                <td className="px-4 py-4 whitespace-nowrap text-right">
-                                                                    <div className="flex justify-end gap-1.5 transition-all">
-                                                                        <button
-                                                                            onClick={() => navigate(`/cotizaciones/${cot.id}`)}
-                                                                            className="p-1.5 text-indigo-400 hover:text-white hover:bg-[#4449AA] rounded-lg transition-all shadow-sm bg-indigo-50/50"
-                                                                        >
-                                                                            <Eye className="w-4 h-4" />
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => navigate(`/cotizaciones/${cot.id}/editar`)}
-                                                                            className="p-1.5 text-indigo-400 hover:text-white hover:bg-[#4449AA] rounded-lg transition-all shadow-sm bg-indigo-50/50"
-                                                                        >
-                                                                            <Edit className="w-4 h-4" />
-                                                                        </button>
-                                                                        {profile?.role === 'company_admin' && (
+                                                                    {columnOrder.map((colId) => (
+                                                                        <td key={colId} className="px-4 py-4 whitespace-nowrap">
+                                                                            {colId === 'nombre_cliente' && (
+                                                                                <div className="flex flex-col cursor-pointer" onClick={() => navigate(`/cotizaciones/${cot.id}`)}>
+                                                                                    <span className="text-sm font-bold text-gray-900 group-hover:text-[#4449AA] transition-colors">{cot.nombre_cliente}</span>
+                                                                                    <span className="text-[11px] text-blue-600 font-bold">{cot.empresa_cliente || 'Individual'}</span>
+                                                                                </div>
+                                                                            )}
+
+                                                                            {colId === 'plan_nombre' && (
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                                                                                        <FileText className="w-4 h-4 text-[#4449AA]" />
+                                                                                    </div>
+                                                                                    <span className="text-sm font-bold text-gray-700">{cot.plan_nombre}</span>
+                                                                                </div>
+                                                                            )}
+
+                                                                            {colId === 'volumen_dtes' && (
+                                                                                <span className="text-xs font-black text-slate-500 bg-slate-50 px-2 py-1 rounded-md border border-slate-100 uppercase tracking-tighter">
+                                                                                    {cot.volumen_dtes.toLocaleString()} DTEs
+                                                                                </span>
+                                                                            )}
+
+                                                                            {colId === 'total_anual' && (
+                                                                                <span className="text-sm font-black text-slate-900">
+                                                                                    ${cot.total_anual.toLocaleString()}
+                                                                                </span>
+                                                                            )}
+
+                                                                            {colId === 'estado' && getEstadoBadge(cot.estado)}
+
+                                                                            {colId === 'created_at' && (
+                                                                                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-tight">
+                                                                                    {new Date(cot.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                                                </span>
+                                                                            )}
+                                                                        </td>
+                                                                    ))}
+
+                                                                    <td className="px-4 py-4 whitespace-nowrap text-right">
+                                                                        <div className="flex justify-end gap-1.5 transition-all">
                                                                             <button
-                                                                                onClick={() => handleDelete(cot.id, cot.nombre_cliente)}
-                                                                                className="p-1.5 text-rose-400 hover:text-white hover:bg-rose-600 rounded-lg transition-all shadow-sm bg-rose-50/50"
+                                                                                onClick={() => navigate(`/cotizaciones/${cot.id}`)}
+                                                                                className="p-1.5 text-indigo-400 hover:text-white hover:bg-[#4449AA] rounded-lg transition-all shadow-sm bg-indigo-50/50"
                                                                             >
-                                                                                <Trash2 className="w-4 h-4" />
+                                                                                <Eye className="w-4 h-4" />
                                                                             </button>
-                                                                        )}
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        );
-                                                    })
-                                                )}
-                                            </tbody>
-                                        </table>
+                                                                            <button
+                                                                                onClick={() => navigate(`/cotizaciones/${cot.id}/editar`)}
+                                                                                className="p-1.5 text-indigo-400 hover:text-white hover:bg-[#4449AA] rounded-lg transition-all shadow-sm bg-indigo-50/50"
+                                                                            >
+                                                                                <Edit className="w-4 h-4" />
+                                                                            </button>
+                                                                            {profile?.role === 'company_admin' && (
+                                                                                <button
+                                                                                    onClick={() => handleDelete(cot.id, cot.nombre_cliente)}
+                                                                                    className="p-1.5 text-rose-400 hover:text-white hover:bg-rose-600 rounded-lg transition-all shadow-sm bg-rose-50/50"
+                                                                                >
+                                                                                    <Trash2 className="w-4 h-4" />
+                                                                                </button>
+                                                                            )}
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </div>
                             )}

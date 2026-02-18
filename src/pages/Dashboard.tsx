@@ -43,14 +43,18 @@ const FunnelInfographic = ({ data, onStageClick }: { data: any[], onStageClick: 
         const item = data.find(d => d.key === status);
         return item ? item.value : 0;
     };
+    const amount = (status: string) => {
+        const item = data.find(d => d.key === status);
+        return item ? (item.amount || 0) : 0;
+    };
 
     const layers = [
-        { label: 'Prospecto', value: count('Prospecto'), color: '#3b82f6', key: 'Prospecto' },
-        { label: 'Calificado', value: count('Lead calificado'), color: '#6366f1', key: 'Lead calificado' },
-        { label: 'Seguimiento', value: count('En seguimiento'), color: '#8b5cf6', key: 'En seguimiento' },
-        { label: 'Negociación', value: count('Negociación'), color: '#f97316', key: 'Negociación' },
-        { label: 'Cerrado', value: count('Cerrado'), color: '#10b981', key: 'Cerrado' },
-        { label: 'Cliente', value: count('Cliente'), color: '#059669', key: 'Cliente' }
+        { label: 'Prospecto', value: count('Prospecto'), amount: amount('Prospecto'), color: '#3b82f6', key: 'Prospecto' },
+        { label: 'Calificado', value: count('Lead calificado'), amount: amount('Lead calificado'), color: '#6366f1', key: 'Lead calificado' },
+        { label: 'Seguimiento', value: count('En seguimiento'), amount: amount('En seguimiento'), color: '#8b5cf6', key: 'En seguimiento' },
+        { label: 'Negociación', value: count('Negociación'), amount: amount('Negociación'), color: '#f97316', key: 'Negociación' },
+        { label: 'Cerrado', value: count('Cerrado'), amount: amount('Cerrado'), color: '#10b981', key: 'Cerrado' },
+        { label: 'Cliente', value: count('Cliente'), amount: amount('Cliente'), color: '#059669', key: 'Cliente' }
     ];
 
     const maxVal = Math.max(...layers.map(l => l.value), 1);
@@ -65,7 +69,12 @@ const FunnelInfographic = ({ data, onStageClick }: { data: any[], onStageClick: 
                 >
                     <div className="flex justify-between items-center mb-1">
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-indigo-600 transition-colors">{layer.label}</span>
-                        <span className="text-[11px] font-black text-slate-900">{layer.value}</span>
+                        <div className="flex items-center gap-2">
+                            {layer.amount > 0 && (
+                                <span className="text-[10px] font-bold text-emerald-600">${layer.amount.toLocaleString()}</span>
+                            )}
+                            <span className="text-[11px] font-black text-slate-900">{layer.value}</span>
+                        </div>
                     </div>
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                         <div
@@ -259,7 +268,8 @@ export default function Dashboard() {
                 return {
                     key: item.name,
                     name: config?.label || item.name,
-                    value: item.value
+                    value: item.value,
+                    amount: item.amount || 0
                 };
             });
             setFunnelData(mappedFunnelData);

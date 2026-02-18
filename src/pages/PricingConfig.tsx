@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Save, X, DollarSign, Package, Settings } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, DollarSign, Package, Settings, ArrowUpDown } from 'lucide-react';
 import { pricingService } from '../services/pricing';
 import type { PricingItem } from '../types/pricing';
 import { useAuth } from '../auth/AuthProvider';
@@ -7,6 +7,7 @@ import { usePermissions } from '../hooks/usePermissions';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import toast from 'react-hot-toast';
+import { useAriasTables } from '../hooks/useAriasTables';
 
 export default function PricingConfig() {
     const { profile } = useAuth();
@@ -18,6 +19,8 @@ export default function PricingConfig() {
     const [filterTipo, setFilterTipo] = useState<string>('all');
 
     const canEdit = isAdmin();
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+    const { tableRef: priceTableRef, wrapperRef: priceWrapperRef } = useAriasTables();
 
     const [formData, setFormData] = useState<Partial<PricingItem>>({
         tipo: 'modulo',
@@ -135,6 +138,14 @@ export default function PricingConfig() {
     const filteredItems = items.filter(item => {
         if (filterTipo === 'all') return true;
         return item.tipo === filterTipo;
+    }).sort((a, b) => {
+        if (!sortConfig) return 0;
+        const { key, direction } = sortConfig;
+        const valA = (a as any)[key] ?? '';
+        const valB = (b as any)[key] ?? '';
+        if (valA < valB) return direction === 'asc' ? -1 : 1;
+        if (valA > valB) return direction === 'asc' ? 1 : -1;
+        return 0;
     });
 
     if (loading) {
@@ -281,92 +292,106 @@ export default function PricingConfig() {
             )}
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="min-w-full">
-                        <thead className="bg-[#F5F7FA]">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">Tipo</th>
-                                <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-widest">Nombre</th>
-                                <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-widest text-right">Anual</th>
-                                <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-widest text-right">Mensual</th>
-                                <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-widest text-right">Único</th>
-                                <th className="px-6 py-3 text-center text-xs font-bold text-gray-400 uppercase tracking-widest">Estado</th>
-                                <th className="px-6 py-3 text-right text-xs font-bold text-gray-400 uppercase tracking-widest">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {filteredItems.length === 0 ? (
+                <div ref={priceWrapperRef} className="arias-table-wrapper">
+                    <div ref={priceTableRef} className="arias-table">
+                        <table className="min-w-full">
+                            <thead className="bg-[#F5F7FA]">
                                 <tr>
-                                    <td colSpan={7} className="px-6 py-12 text-center text-gray-400">
-                                        No hay ítems configurados para este tipo
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredItems.map((item) => (
-                                    <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="flex items-center gap-2">
-                                                {getTipoIcon(item.tipo)}
-                                                <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ${getTipoBadge(item.tipo)}`}>
-                                                    {item.tipo}
-                                                </span>
+                                    {[
+                                        { key: 'tipo', label: 'Tipo', align: 'text-left' },
+                                        { key: 'nombre', label: 'Nombre', align: 'text-left' },
+                                        { key: 'precio_anual', label: 'Anual', align: 'text-right' },
+                                        { key: 'precio_mensual', label: 'Mensual', align: 'text-right' },
+                                        { key: 'costo_unico', label: 'Único', align: 'text-right' },
+                                        { key: 'activo', label: 'Estado', align: 'text-center' },
+                                    ].map(col => (
+                                        <th key={col.key} className={`px-6 py-3 ${col.align} text-xs font-bold text-gray-400 uppercase tracking-widest`}>
+                                            <div
+                                                className="cursor-pointer hover:text-[#4449AA] transition-colors group inline-flex items-center gap-1"
+                                                onClick={() => setSortConfig({ key: col.key, direction: sortConfig?.key === col.key && sortConfig.direction === 'asc' ? 'desc' : 'asc' })}
+                                            >
+                                                {col.label}
+                                                <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === col.key ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
                                             </div>
+                                        </th>
+                                    ))}
+                                    <th className="px-6 py-3 text-right text-xs font-bold text-gray-400 uppercase tracking-widest">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {filteredItems.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={7} className="px-6 py-12 text-center text-gray-400">
+                                            No hay ítems configurados para este tipo
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <p className="text-sm font-extrabold text-[#4449AA]">{item.nombre}</p>
-                                            <p className="text-[10px] text-gray-400 font-bold mt-0.5">{item.codigo || 'SIN CÓDIGO'}</p>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <span className="text-sm font-black text-gray-900">${(item.precio_anual || 0).toLocaleString()}</span>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <span className="text-sm font-bold text-gray-600">${(item.precio_mensual || 0).toLocaleString()}</span>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <span className="text-sm font-bold text-gray-600">${(item.costo_unico || 0).toLocaleString()}</span>
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase ${item.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                {item.activo ? 'Activo' : 'Inactivo'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            {canEdit && (
-                                                <div className="flex items-center justify-end gap-2">
-                                                    {profile?.role === 'super_admin' || profile?.role === 'company_admin' ? (
-                                                        <>
+                                    </tr>
+                                ) : (
+                                    filteredItems.map((item) => (
+                                        <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="flex items-center gap-2">
+                                                    {getTipoIcon(item.tipo)}
+                                                    <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ${getTipoBadge(item.tipo)}`}>
+                                                        {item.tipo}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <p className="text-sm font-extrabold text-[#4449AA]">{item.nombre}</p>
+                                                <p className="text-[10px] text-gray-400 font-bold mt-0.5">{item.codigo || 'SIN CÓDIGO'}</p>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <span className="text-sm font-black text-gray-900">${(item.precio_anual || 0).toLocaleString()}</span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <span className="text-sm font-bold text-gray-600">${(item.precio_mensual || 0).toLocaleString()}</span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <span className="text-sm font-bold text-gray-600">${(item.costo_unico || 0).toLocaleString()}</span>
+                                            </td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase ${item.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                    {item.activo ? 'Activo' : 'Inactivo'}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {canEdit && (
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        {profile?.role === 'super_admin' || profile?.role === 'company_admin' ? (
+                                                            <>
+                                                                <button
+                                                                    onClick={() => handleEdit(item)}
+                                                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                                    title="Editar"
+                                                                >
+                                                                    <Edit className="w-4 h-4" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDelete(item.id)}
+                                                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                                    title="Desactivar"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            </>
+                                                        ) : (
                                                             <button
-                                                                onClick={() => handleEdit(item)}
-                                                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                                title="Editar"
+                                                                disabled
+                                                                className="p-2 text-gray-300 cursor-not-allowed"
+                                                                title="Solo el administrador del sistema puede editar estos precios base"
                                                             >
                                                                 <Edit className="w-4 h-4" />
                                                             </button>
-                                                            <button
-                                                                onClick={() => handleDelete(item.id)}
-                                                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                                title="Desactivar"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
-                                                        </>
-                                                    ) : (
-                                                        <button
-                                                            disabled
-                                                            className="p-2 text-gray-300 cursor-not-allowed"
-                                                            title="Solo el administrador del sistema puede editar estos precios base"
-                                                        >
-                                                            <Edit className="w-4 h-4" />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>

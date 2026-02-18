@@ -79,3 +79,163 @@ a:active,
         background: #cbd5e1;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   ARIAS TABLES — Superior CRM Table System
+   Features:
+   - Sticky header (top) during vertical scroll  
+   - Sticky first column (left) with dynamic shadow
+   - Sticky last column (right) with dynamic shadow
+   - Fade gradient indicator for hidden content
+   - Clean scrollbar styling
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Container: enables scroll and contains the gradient */
+.arias-table {
+    position: relative;
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 75vh;
+    scrollbar-width: thin;
+    scrollbar-color: #e2e8f0 transparent;
+}
+
+.arias-table::-webkit-scrollbar {
+    width: 6px;
+    height: 8px;
+}
+
+.arias-table::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.arias-table::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 20px;
+}
+
+.arias-table::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* ── Sticky header ── */
+.arias-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: #FAFAFB;
+    /* opaque — prevents content bleed on vertical scroll */
+}
+
+/* ── First column sticky left ── */
+.arias-table tbody td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background: #ffffff;
+    /* opaque white — matches row bg */
+}
+
+.arias-table thead th:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 30;
+    /* corner: highest z, above both header row and sticky col */
+    background: #FAFAFB;
+}
+
+/* ── Last column (actions) sticky right ── */
+.arias-table tbody td:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 10;
+    background: #ffffff;
+    /* opaque white — matches row bg */
+}
+
+.arias-table thead th:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 30;
+    /* corner: highest z */
+    background: #FAFAFB;
+}
+
+/* ── Row hover: override sticky td backgrounds so they match ── */
+.arias-table tbody tr:hover td:first-child,
+.arias-table tbody tr:hover td:last-child {
+    background: #FDFDFE;
+}
+
+/* ── Dynamic shadow on first column — appears when scrolled ── */
+.arias-table thead th:first-child::after,
+.arias-table tbody td:first-child::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -8px;
+    bottom: 0;
+    width: 8px;
+    background: linear-gradient(to right, rgba(0, 0, 0, 0.04), transparent);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+/* ── Dynamic shadow on last column ── */
+.arias-table thead th:last-child::before,
+.arias-table tbody td:last-child::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -8px;
+    bottom: 0;
+    width: 8px;
+    background: linear-gradient(to left, rgba(0, 0, 0, 0.04), transparent);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+/* ── Show shadows when scrolled horizontally (JS toggles classes) ── */
+.arias-table.scrolled-left thead th:first-child::after,
+.arias-table.scrolled-left tbody td:first-child::after {
+    opacity: 1;
+}
+
+.arias-table.scrolled-right thead th:last-child::before,
+.arias-table.scrolled-right tbody td:last-child::before {
+    opacity: 1;
+}
+
+/* ── Fade gradient overlay — signals hidden content to the right ── */
+.arias-table-wrapper {
+    position: relative;
+}
+
+.arias-table-wrapper::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 40px;
+    background: linear-gradient(to left, rgba(255, 255, 255, 0.9), transparent);
+    pointer-events: none;
+    z-index: 25;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.arias-table-wrapper.has-overflow::after {
+    opacity: 1;
+}
+
+/* ── Row backgrounds — MUST be explicit for sticky cells to paint correctly ── */
+.arias-table tbody tr {
+    background: #ffffff;
+}
+
+.arias-table tbody tr:hover {
+    background: #FDFDFE;
+}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Save, Search, Copy } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, Search, Copy, ArrowUpDown } from 'lucide-react';
 import { cotizadorService, type CotizadorItem } from '../services/cotizador';
 import { useAuth } from '../auth/AuthProvider';
 import { usePermissions } from '../hooks/usePermissions';
@@ -7,6 +7,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Modal } from '../components/ui/Modal';
 import toast from 'react-hot-toast';
+import { useAriasTables } from '../hooks/useAriasTables';
 
 export default function GestionItems() {
     const { profile } = useAuth();
@@ -17,6 +18,8 @@ export default function GestionItems() {
     const [showNewForm, setShowNewForm] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterTipo, setFilterTipo] = useState<string>('all');
+    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+    const { tableRef: itemsTableRef, wrapperRef: itemsWrapperRef } = useAriasTables();
 
     const [formData, setFormData] = useState<Partial<CotizadorItem>>({
         tipo: 'modulo',
@@ -164,6 +167,14 @@ export default function GestionItems() {
         const matchFilter = filterTipo === 'all' || item.tipo === filterTipo;
 
         return matchSearch && matchFilter;
+    }).sort((a, b) => {
+        if (!sortConfig) return 0;
+        const { key, direction } = sortConfig;
+        const valA = (a as any)[key] ?? '';
+        const valB = (b as any)[key] ?? '';
+        if (valA < valB) return direction === 'asc' ? -1 : 1;
+        if (valA > valB) return direction === 'asc' ? 1 : -1;
+        return 0;
     });
 
     if (loading) {
@@ -386,214 +397,228 @@ export default function GestionItems() {
 
             {/* Tabla */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="min-w-full">
-                        <thead className="bg-[#F5F7FA]">
-                            <tr>
-                                <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase">Tipo</th>
-                                <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase">Nombre</th>
-                                <th className="px-6 py-3 text-right text-xs font-bold text-gray-400 uppercase">Precio Anual</th>
-                                <th className="px-6 py-3 text-right text-xs font-bold text-gray-400 uppercase">Precio Mensual</th>
-                                <th className="px-6 py-3 text-right text-xs font-bold text-gray-400 uppercase">Pago Único</th>
-                                <th className="px-6 py-3 text-right text-xs font-bold text-gray-400 uppercase">Precio/DTE</th>
-                                <th className="px-6 py-3 text-center text-xs font-bold text-gray-400 uppercase">Estado</th>
-                                {canEdit && (
-                                    <th className="px-6 py-3 text-right text-xs font-bold text-gray-400 uppercase">Acciones</th>
-                                )}
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {itemsFiltrados.length === 0 ? (
+                <div ref={itemsWrapperRef} className="arias-table-wrapper">
+                    <div ref={itemsTableRef} className="arias-table">
+                        <table className="min-w-full">
+                            <thead className="bg-[#F5F7FA]">
                                 <tr>
-                                    <td colSpan={canEdit ? 8 : 7} className="px-6 py-12 text-center text-gray-400">
-                                        No hay items que coincidan con tu búsqueda
-                                    </td>
+                                    {[
+                                        { key: 'tipo', label: 'Tipo', align: 'text-left' },
+                                        { key: 'nombre', label: 'Nombre', align: 'text-left' },
+                                        { key: 'precio_anual', label: 'Precio Anual', align: 'text-right' },
+                                        { key: 'precio_mensual', label: 'Precio Mensual', align: 'text-right' },
+                                        { key: 'costo_unico', label: 'Pago Único', align: 'text-right' },
+                                        { key: 'precio_por_dte', label: 'Precio/DTE', align: 'text-right' },
+                                        { key: 'activo', label: 'Estado', align: 'text-center' },
+                                    ].map(col => (
+                                        <th key={col.key} className={`px-6 py-3 ${col.align} text-xs font-bold text-gray-400 uppercase`}>
+                                            <div
+                                                className="cursor-pointer hover:text-[#4449AA] transition-colors group inline-flex items-center gap-1"
+                                                onClick={() => setSortConfig({ key: col.key, direction: sortConfig?.key === col.key && sortConfig.direction === 'asc' ? 'desc' : 'asc' })}
+                                            >
+                                                {col.label}
+                                                <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === col.key ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                            </div>
+                                        </th>
+                                    ))}
+                                    {canEdit && (
+                                        <th className="px-6 py-3 text-right text-xs font-bold text-gray-400 uppercase">Acciones</th>
+                                    )}
                                 </tr>
-                            ) : (
-                                itemsFiltrados.map((item) => (
-                                    editingId === item.id ? (
-                                        <tr key={item.id} className="bg-blue-50/50 ring-2 ring-blue-500 ring-inset">
-                                            <td className="px-6 py-4">
-                                                <select
-                                                    value={formData.tipo}
-                                                    onChange={(e) => setFormData({ ...formData, tipo: e.target.value as any })}
-                                                    className={`w-full border border-gray-300 rounded-lg px-2 py-1 text-xs font-bold ${getTipoBadge(formData.tipo || 'modulo')}`}
-                                                >
-                                                    <option value="modulo">Módulo</option>
-                                                    <option value="servicio">Servicio</option>
-                                                    <option value="otro">Otro</option>
-                                                </select>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <input
-                                                    type="text"
-                                                    value={formData.nombre}
-                                                    onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                                                    className="w-full border border-gray-300 rounded-lg px-2 py-1 text-sm font-bold text-[#4449AA]"
-                                                    placeholder="Nombre..."
-                                                />
-                                                <input
-                                                    type="text"
-                                                    value={formData.codigo}
-                                                    onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
-                                                    className="w-full mt-1 border border-gray-300 rounded-lg px-2 py-1 text-xs font-mono"
-                                                    placeholder="Código..."
-                                                />
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={formData.precio_anual}
-                                                    onChange={(e) => setFormData({ ...formData, precio_anual: Number(e.target.value) })}
-                                                    className="w-24 border border-gray-300 rounded-lg px-2 py-1 text-sm text-right"
-                                                />
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={formData.precio_mensual}
-                                                    onChange={(e) => setFormData({ ...formData, precio_mensual: Number(e.target.value) })}
-                                                    className="w-24 border border-gray-300 rounded-lg px-2 py-1 text-sm text-right"
-                                                />
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={formData.pago_unico}
-                                                    onChange={(e) => setFormData({ ...formData, pago_unico: Number(e.target.value) })}
-                                                    className="w-24 border border-gray-300 rounded-lg px-2 py-1 text-sm text-right"
-                                                />
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <input
-                                                    type="number"
-                                                    step="0.0001"
-                                                    value={formData.precio_por_dte}
-                                                    onChange={(e) => setFormData({ ...formData, precio_por_dte: Number(e.target.value) })}
-                                                    className="w-24 border border-gray-300 rounded-lg px-2 py-1 text-xs text-green-600 text-right"
-                                                />
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={formData.activo}
-                                                    onChange={(e) => setFormData({ ...formData, activo: e.target.checked })}
-                                                    className="w-4 h-4 text-blue-600 rounded"
-                                                />
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <button
-                                                        onClick={handleSave}
-                                                        className="p-2 text-green-600 hover:bg-green-100 rounded-lg shadow-sm bg-white"
-                                                        title="Guardar"
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {itemsFiltrados.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={canEdit ? 8 : 7} className="px-6 py-12 text-center text-gray-400">
+                                            No hay items que coincidan con tu búsqueda
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    itemsFiltrados.map((item) => (
+                                        editingId === item.id ? (
+                                            <tr key={item.id} className="bg-blue-50/50 ring-2 ring-blue-500 ring-inset">
+                                                <td className="px-6 py-4">
+                                                    <select
+                                                        value={formData.tipo}
+                                                        onChange={(e) => setFormData({ ...formData, tipo: e.target.value as any })}
+                                                        className={`w-full border border-gray-300 rounded-lg px-2 py-1 text-xs font-bold ${getTipoBadge(formData.tipo || 'modulo')}`}
                                                     >
-                                                        <Save className="w-5 h-5" />
-                                                    </button>
-                                                    <button
-                                                        onClick={resetForm}
-                                                        className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg bg-white"
-                                                        title="Cancelar"
-                                                    >
-                                                        <Plus className="w-5 h-5 transform rotate-45" />
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <span className={`px-2 py-1 rounded-full text-xs font-bold ${getTipoBadge(item.tipo)}`}>
-                                                    {item.tipo}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div>
-                                                    <p className="text-sm font-bold text-[#4449AA]">{item.nombre}</p>
-                                                    {item.codigo && (
-                                                        <p className="text-xs text-gray-500 font-mono">{item.codigo}</p>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <span className="text-sm font-semibold text-gray-700">
-                                                    {item.precio_anual > 0 ? `$${item.precio_anual.toFixed(2)}` : '-'}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <span className="text-sm font-semibold text-gray-700">
-                                                    {item.precio_mensual > 0 ? `$${item.precio_mensual.toFixed(2)}` : '-'}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <span className="text-sm font-semibold text-gray-700">
-                                                    {item.pago_unico > 0 ? `$${item.pago_unico.toFixed(2)}` : '-'}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <span className="text-sm font-semibold text-green-600">
-                                                    {item.precio_por_dte > 0 ? `$${item.precio_por_dte.toFixed(4)}` : '-'}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <span
-                                                    className={`px-2 py-1 rounded-full text-xs font-bold ${item.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                                                        }`}
-                                                >
-                                                    {item.activo ? 'Activo' : 'Inactivo'}
-                                                </span>
-                                            </td>
-                                            {canEdit && (
+                                                        <option value="modulo">Módulo</option>
+                                                        <option value="servicio">Servicio</option>
+                                                        <option value="otro">Otro</option>
+                                                    </select>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <input
+                                                        type="text"
+                                                        value={formData.nombre}
+                                                        onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                                                        className="w-full border border-gray-300 rounded-lg px-2 py-1 text-sm font-bold text-[#4449AA]"
+                                                        placeholder="Nombre..."
+                                                    />
+                                                    <input
+                                                        type="text"
+                                                        value={formData.codigo}
+                                                        onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
+                                                        className="w-full mt-1 border border-gray-300 rounded-lg px-2 py-1 text-xs font-mono"
+                                                        placeholder="Código..."
+                                                    />
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={formData.precio_anual}
+                                                        onChange={(e) => setFormData({ ...formData, precio_anual: Number(e.target.value) })}
+                                                        className="w-24 border border-gray-300 rounded-lg px-2 py-1 text-sm text-right"
+                                                    />
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={formData.precio_mensual}
+                                                        onChange={(e) => setFormData({ ...formData, precio_mensual: Number(e.target.value) })}
+                                                        className="w-24 border border-gray-300 rounded-lg px-2 py-1 text-sm text-right"
+                                                    />
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        value={formData.pago_unico}
+                                                        onChange={(e) => setFormData({ ...formData, pago_unico: Number(e.target.value) })}
+                                                        className="w-24 border border-gray-300 rounded-lg px-2 py-1 text-sm text-right"
+                                                    />
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <input
+                                                        type="number"
+                                                        step="0.0001"
+                                                        value={formData.precio_por_dte}
+                                                        onChange={(e) => setFormData({ ...formData, precio_por_dte: Number(e.target.value) })}
+                                                        className="w-24 border border-gray-300 rounded-lg px-2 py-1 text-xs text-green-600 text-right"
+                                                    />
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={formData.activo}
+                                                        onChange={(e) => setFormData({ ...formData, activo: e.target.checked })}
+                                                        className="w-4 h-4 text-blue-600 rounded"
+                                                    />
+                                                </td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center justify-end gap-2">
-                                                        {profile?.role === 'super_admin' || item.company_id !== null ? (
-                                                            <button
-                                                                onClick={() => handleEdit(item)}
-                                                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                                title="Editar"
-                                                            >
-                                                                <Edit className="w-4 h-4" />
-                                                            </button>
-                                                        ) : (
-                                                            <div className="flex items-center gap-1">
-                                                                <button
-                                                                    disabled
-                                                                    className="p-2 text-gray-300 cursor-not-allowed"
-                                                                    title="No tienes permisos para editar items globales"
-                                                                >
-                                                                    <Edit className="w-4 h-4" />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleClone(item)}
-                                                                    className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                                                    title="Clonar para mi empresa"
-                                                                >
-                                                                    <Copy className="w-4 h-4" />
-                                                                </button>
-                                                            </div>
-                                                        )}
-
-                                                        {(profile?.role === 'super_admin' || item.company_id !== null) && (
-                                                            <button
-                                                                onClick={() => handleDelete(item.id)}
-                                                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                                title="Desactivar"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
+                                                        <button
+                                                            onClick={handleSave}
+                                                            className="p-2 text-green-600 hover:bg-green-100 rounded-lg shadow-sm bg-white"
+                                                            title="Guardar"
+                                                        >
+                                                            <Save className="w-5 h-5" />
+                                                        </button>
+                                                        <button
+                                                            onClick={resetForm}
+                                                            className="p-2 text-gray-400 hover:bg-gray-100 rounded-lg bg-white"
+                                                            title="Cancelar"
+                                                        >
+                                                            <Plus className="w-5 h-5 transform rotate-45" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${getTipoBadge(item.tipo)}`}>
+                                                        {item.tipo}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div>
+                                                        <p className="text-sm font-bold text-[#4449AA]">{item.nombre}</p>
+                                                        {item.codigo && (
+                                                            <p className="text-xs text-gray-500 font-mono">{item.codigo}</p>
                                                         )}
                                                     </div>
                                                 </td>
-                                            )}
-                                        </tr>
-                                    )
-                                ))
-                            )}
-                        </tbody>
-                    </table>
+                                                <td className="px-6 py-4 text-right">
+                                                    <span className="text-sm font-semibold text-gray-700">
+                                                        {item.precio_anual > 0 ? `$${item.precio_anual.toFixed(2)}` : '-'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <span className="text-sm font-semibold text-gray-700">
+                                                        {item.precio_mensual > 0 ? `$${item.precio_mensual.toFixed(2)}` : '-'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <span className="text-sm font-semibold text-gray-700">
+                                                        {item.pago_unico > 0 ? `$${item.pago_unico.toFixed(2)}` : '-'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <span className="text-sm font-semibold text-green-600">
+                                                        {item.precio_por_dte > 0 ? `$${item.precio_por_dte.toFixed(4)}` : '-'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <span
+                                                        className={`px-2 py-1 rounded-full text-xs font-bold ${item.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                                            }`}
+                                                    >
+                                                        {item.activo ? 'Activo' : 'Inactivo'}
+                                                    </span>
+                                                </td>
+                                                {canEdit && (
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            {profile?.role === 'super_admin' || item.company_id !== null ? (
+                                                                <button
+                                                                    onClick={() => handleEdit(item)}
+                                                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                                    title="Editar"
+                                                                >
+                                                                    <Edit className="w-4 h-4" />
+                                                                </button>
+                                                            ) : (
+                                                                <div className="flex items-center gap-1">
+                                                                    <button
+                                                                        disabled
+                                                                        className="p-2 text-gray-300 cursor-not-allowed"
+                                                                        title="No tienes permisos para editar items globales"
+                                                                    >
+                                                                        <Edit className="w-4 h-4" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleClone(item)}
+                                                                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                                                        title="Clonar para mi empresa"
+                                                                    >
+                                                                        <Copy className="w-4 h-4" />
+                                                                    </button>
+                                                                </div>
+                                                            )}
+
+                                                            {(profile?.role === 'super_admin' || item.company_id !== null) && (
+                                                                <button
+                                                                    onClick={() => handleDelete(item.id)}
+                                                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                                    title="Desactivar"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                )}
+                                            </tr>
+                                        )
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 

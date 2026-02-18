@@ -92,10 +92,15 @@ export function CustomDatePicker({
         const startDate = startOfWeek(monthStart, { weekStartsOn: 0 });
         const endDate = endOfWeek(monthEnd, { weekStartsOn: 0 });
 
-        const calendarDays = eachDayOfInterval({
-            start: startDate,
-            end: endDate,
-        });
+        // Always render 6 rows (42 cells) for consistent height
+        const naturalDays = eachDayOfInterval({ start: startDate, end: endDate });
+        const totalCells = 42; // 6 rows × 7 cols
+        let calendarDays = naturalDays;
+        if (calendarDays.length < totalCells) {
+            const extraEnd = new Date(endDate);
+            extraEnd.setDate(extraEnd.getDate() + (totalCells - calendarDays.length));
+            calendarDays = eachDayOfInterval({ start: startDate, end: extraEnd });
+        }
 
         const weekDays = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
@@ -106,10 +111,10 @@ export function CustomDatePicker({
                         {format(currentMonth, 'MMMM yyyy', { locale: es })}
                     </h4>
                     <div className="flex gap-0.5">
-                        <button onClick={prevMonth} className="p-2 hover:bg-slate-50 rounded-xl transition-colors text-slate-400 hover:text-blue-600">
+                        <button type="button" onClick={prevMonth} className="p-2 hover:bg-slate-50 rounded-xl transition-colors text-slate-400 hover:text-blue-600">
                             <ChevronLeft className="w-4 h-4" />
                         </button>
-                        <button onClick={nextMonth} className="p-2 hover:bg-slate-50 rounded-xl transition-colors text-slate-400 hover:text-blue-600">
+                        <button type="button" onClick={nextMonth} className="p-2 hover:bg-slate-50 rounded-xl transition-colors text-slate-400 hover:text-blue-600">
                             <ChevronRight className="w-4 h-4" />
                         </button>
                     </div>
@@ -131,6 +136,7 @@ export function CustomDatePicker({
 
                         return (
                             <button
+                                type="button"
                                 key={idx}
                                 onClick={() => handleDateSelect(day)}
                                 className={`
@@ -154,6 +160,7 @@ export function CustomDatePicker({
 
                 <div className="mt-4 pt-4 border-t border-slate-50 flex justify-between items-center px-1">
                     <button
+                        type="button"
                         onClick={() => handleDateSelect(new Date())}
                         className="text-[9px] font-black text-blue-600 uppercase tracking-widest hover:text-blue-700 transition-colors"
                     >
@@ -161,6 +168,7 @@ export function CustomDatePicker({
                     </button>
                     {activeDate && (
                         <button
+                            type="button"
                             onClick={() => { onChange(''); setIsOpen(false); }}
                             className="text-[9px] font-black text-slate-300 uppercase tracking-widest hover:text-rose-500 transition-colors"
                         >
