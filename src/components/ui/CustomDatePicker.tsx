@@ -34,6 +34,7 @@ export function CustomDatePicker({
     variant = "dark"
 }: CustomDatePickerProps) {
     const [isOpen, setIsOpen] = useState(false);
+    const [openUp, setOpenUp] = useState(false);
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [company, setCompany] = useState<Company | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -64,7 +65,14 @@ export function CustomDatePicker({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const toggleCalendar = () => setIsOpen(!isOpen);
+    const toggleCalendar = () => {
+        if (!isOpen && containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            setOpenUp(spaceBelow < 400);
+        }
+        setIsOpen(!isOpen);
+    };
 
     const handleDateSelect = (date: Date) => {
         onChange(format(date, 'yyyy-MM-dd'));
@@ -92,7 +100,7 @@ export function CustomDatePicker({
         const weekDays = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
         return (
-            <div className="absolute z-[10001] mt-2 bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-slate-100 p-5 w-[310px] animate-in fade-in zoom-in duration-200 right-0 md:right-auto md:left-0 transform origin-top-left">
+            <div className={`absolute z-[10001] bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-slate-100 p-5 w-[310px] animate-in fade-in zoom-in duration-200 right-0 md:right-auto md:left-0 transform ${openUp ? 'bottom-full mb-2 origin-bottom-left' : 'top-full mt-2 origin-top-left'}`}>
                 <div className="flex items-center justify-between mb-4">
                     <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] capitalize">
                         {format(currentMonth, 'MMMM yyyy', { locale: es })}
