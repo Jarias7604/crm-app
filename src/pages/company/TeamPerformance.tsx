@@ -14,6 +14,7 @@ import {
 } from '../../services/teamPerformance';
 import { teamsService, type Team } from '../../services/teams';
 import { performanceGoalsService, type PerformanceGoal } from '../../services/performanceGoals';
+import { forecastService, type ForecastWithActual } from '../../services/forecastService';
 
 // === CONSTANTS ===
 const PERIODS = [
@@ -78,7 +79,7 @@ export default function TeamPerformancePage() {
     const [teamPerformance, setTeamPerformance] = useState<TeamPerformance[]>([]);
     const [teams, setTeams] = useState<Team[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'users' | 'teams' | 'charts'>('users');
+    const [activeTab, setActiveTab] = useState<'users' | 'teams' | 'charts' | 'forecast'>('users');
     const [filters, setFilters] = useState<PerformanceFilters>({ period: 'all' });
     const [profileNames, setProfileNames] = useState<Record<string, string>>({});
     const [profileAvatars, setProfileAvatars] = useState<Record<string, string | null>>({});
@@ -326,6 +327,7 @@ export default function TeamPerformancePage() {
                     { key: 'users' as const, icon: Users, label: 'Por Persona' },
                     { key: 'teams' as const, icon: BarChart3, label: 'Por Equipo' },
                     { key: 'charts' as const, icon: TrendingUp, label: 'Gráficas' },
+                    { key: 'forecast' as const, icon: Target, label: '📊 Forecast' },
                 ] as const).map((tab) => (
                     <button
                         key={tab.key}
@@ -344,6 +346,8 @@ export default function TeamPerformancePage() {
                 <UserPerformanceTable data={userPerformance} getUserGoal={getUserGoal} periodLabel={periodLabel} />
             ) : activeTab === 'teams' ? (
                 <TeamPerformanceGrid data={teamPerformance} profileNames={profileNames} profileAvatars={profileAvatars} getTeamGoal={getTeamGoal} periodLabel={periodLabel} />
+            ) : activeTab === 'forecast' ? (
+                <ForecastSection companyId={profile?.company_id || ''} isAdmin={isAdmin} />
             ) : (
                 <PerformanceCharts
                     userPerformance={userPerformance}
@@ -1132,5 +1136,554 @@ function WinRateBadge({ rate }: { rate: number }) {
             {rate > 0 && <Icon className="w-3 h-3" />}
             {formatPercent(rate)}
         </span>
+    );
+}
+
+// === FORECAST SECTION ===
+function ForecastSection({ companyId, isAdmin }: { companyId: string; isAdmin: boolean }) {
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth() + 1;
+    const [year, setYear] = useState(currentYear);
+    const [data, setData] = useState<ForecastWithActual[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [showModal, setShowModal] = useState(false);
+
+    const loadForecast = useCallback(async () => {
+        if (!companyId) return;
+        setLoading(true);
+        try {
+            const result = await forecastService.getForecastWithActuals(companyId, year);
+            setData(result);
+        } catch (err) {
+            console.error('Error loading forecast:', err);
+        } finally {
+            setLoading(false);
+        }
+    }, [companyId, year]);
+
+    useEffect(() => { loadForecast(); }, [loadForecast]);
+
+    const hasForecast = data.some(d => d.goal_leads > 0 || d.goal_value > 0);
+    const totalGoalLeads = data.reduce((s, d) => s + d.goal_leads, 0);
+    const totalGoalValue = data.reduce((s, d) => s + d.goal_value, 0);
+    const totalActualLeads = data.reduce((s, d) => s + d.actual_leads, 0);
+    const totalActualValue = data.reduce((s, d) => s + d.actual_value, 0);
+    const leadsProgress = totalGoalLeads > 0 ? Math.round((totalActualLeads / totalGoalLeads) * 100) : 0;
+    const valueProgress = totalGoalValue > 0 ? Math.round((totalActualValue / totalGoalValue) * 100) : 0;
+
+    // Chart calculations
+    const CHART_H = 260;
+    const maxVal = Math.max(...data.map(d => Math.max(d.goal_value, d.actual_value)), 1);
+    const maxLeads = Math.max(...data.map(d => Math.max(d.goal_leads, d.actual_leads)), 1);
+
+    const fmtCompact = (n: number) => n >= 1000 ? `$${(n / 1000).toFixed(1)}K` : `$${n}`;
+    const getSteps = (max: number) => {
+        const step = max <= 5 ? 1 : max <= 20 ? 5 : max <= 100 ? 20 : Math.ceil(max / 5 / 10) * 10;
+        const steps: number[] = [];
+        for (let i = 0; i <= max; i += step) steps.push(i);
+        if (steps[steps.length - 1] < max) steps.push(Math.ceil(max / step) * step);
+        return steps;
+    };
+
+    const valueSteps = getSteps(maxVal);
+    const leadsSteps = getSteps(maxLeads);
+    const actualMaxVal = valueSteps[valueSteps.length - 1] || 1;
+    const actualMaxLeads = leadsSteps[leadsSteps.length - 1] || 1;
+
+    // Trend line calculation (linear regression on actual values up to current month)
+    const calcTrendLine = (values: number[]) => {
+        const n = values.length;
+        if (n === 0) return values;
+        let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+        values.forEach((y, x) => { sumX += x; sumY += y; sumXY += x * y; sumX2 += x * x; });
+        const denom = n * sumX2 - sumX * sumX;
+        if (denom === 0) return values.map(() => sumY / n);
+        const slope = (n * sumXY - sumX * sumY) / denom;
+        const intercept = (sumY - slope * sumX) / n;
+        return values.map((_, x) => Math.max(0, slope * x + intercept));
+    };
+
+    const trendValues = calcTrendLine(data.map(d => d.actual_value));
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center py-20">
+                <Loader2 className="w-6 h-6 text-[#4449AA] animate-spin" />
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-6 animate-in fade-in duration-500">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <h2 className="text-lg font-black text-gray-900 tracking-tight">Forecast Anual</h2>
+                    <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-0.5">
+                        <button
+                            onClick={() => setYear(year - 1)}
+                            className="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-white transition-all flex items-center justify-center font-black text-sm"
+                        >
+                            ‹
+                        </button>
+                        <span className="px-3 py-1 text-sm font-black text-[#4449AA] min-w-[60px] text-center">{year}</span>
+                        <button
+                            onClick={() => setYear(year + 1)}
+                            className="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-white transition-all flex items-center justify-center font-black text-sm"
+                        >
+                            ›
+                        </button>
+                    </div>
+                </div>
+                {isAdmin && (
+                    <button
+                        onClick={() => setShowModal(true)}
+                        className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-indigo-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg hover:shadow-violet-200 transition-all h-10"
+                    >
+                        <Settings className="w-3.5 h-3.5" />
+                        Configurar Forecast
+                    </button>
+                )}
+            </div>
+
+            {!hasForecast ? (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-12 text-center">
+                    <div className="w-16 h-16 bg-violet-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <Target className="w-8 h-8 text-violet-400" />
+                    </div>
+                    <h3 className="text-lg font-black text-gray-800 mb-2">Sin forecast configurado</h3>
+                    <p className="text-sm text-gray-400 mb-6">Configura las metas mensuales para ver la proyección anual</p>
+                    {isAdmin && (
+                        <button
+                            onClick={() => setShowModal(true)}
+                            className="bg-gradient-to-r from-violet-500 to-indigo-600 text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:shadow-lg transition-all"
+                        >
+                            Configurar Forecast {year}
+                        </button>
+                    )}
+                </div>
+            ) : (
+                <>
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">Meta Leads Anual</p>
+                            <p className="text-2xl font-black text-gray-900">{totalGoalLeads}</p>
+                            <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all" style={{ width: `${Math.min(100, leadsProgress)}%` }} />
+                            </div>
+                            <p className="text-[9px] font-bold text-gray-400 mt-1">{totalActualLeads} cerrados ({leadsProgress}%)</p>
+                        </div>
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">Meta Valor Anual</p>
+                            <p className="text-2xl font-black text-gray-900">{formatCurrency(totalGoalValue)}</p>
+                            <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all" style={{ width: `${Math.min(100, valueProgress)}%` }} />
+                            </div>
+                            <p className="text-[9px] font-bold text-gray-400 mt-1">{formatCurrency(totalActualValue)} cerrado ({valueProgress}%)</p>
+                        </div>
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">Leads Restantes</p>
+                            <p className={`text-2xl font-black ${totalGoalLeads - totalActualLeads > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                {Math.max(0, totalGoalLeads - totalActualLeads)}
+                            </p>
+                            <p className="text-[9px] font-bold text-gray-400 mt-1">
+                                {year === currentYear ? `${12 - currentMonth} meses restantes` : year < currentYear ? 'Año completado' : '12 meses por delante'}
+                            </p>
+                        </div>
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">Valor Restante</p>
+                            <p className={`text-2xl font-black ${totalGoalValue - totalActualValue > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                {formatCurrency(Math.max(0, totalGoalValue - totalActualValue))}
+                            </p>
+                            <p className="text-[9px] font-bold text-gray-400 mt-1">
+                                {year === currentYear && currentMonth < 12
+                                    ? `Prom. necesario: ${formatCurrency(Math.max(0, (totalGoalValue - totalActualValue) / Math.max(1, 12 - currentMonth)))}/mes`
+                                    : year < currentYear ? 'Año completado' : `${formatCurrency(totalGoalValue / 12)}/mes promedio`}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* === VALUE CHART === */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-[11px] font-black text-gray-700 uppercase tracking-widest">💰 Valor Cerrado vs Meta — {year}</h3>
+                            <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-3 h-3 rounded-sm bg-gradient-to-t from-emerald-500 to-emerald-400" />
+                                    <span className="text-[8px] font-bold text-gray-400">Actual</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-3 h-3 rounded-sm bg-violet-200 border border-dashed border-violet-400" />
+                                    <span className="text-[8px] font-bold text-gray-400">Meta</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-6 h-0.5 bg-amber-400" />
+                                    <span className="text-[8px] font-bold text-gray-400">Tendencia</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex">
+                            {/* Y-Axis */}
+                            <div className="flex flex-col justify-between pr-2" style={{ height: CHART_H }}>
+                                {[...valueSteps].reverse().map((step, si) => (
+                                    <span key={`vs-${si}`} className="text-[8px] font-bold text-gray-300 text-right w-12">{fmtCompact(step)}</span>
+                                ))}
+                            </div>
+                            {/* Bars */}
+                            <div className="flex-1 flex items-end gap-1" style={{ height: CHART_H }}>
+                                {data.map((d, i) => {
+                                    const barH = (d.actual_value / actualMaxVal) * CHART_H;
+                                    const goalH = (d.goal_value / actualMaxVal) * CHART_H;
+                                    const trendH = (trendValues[i] / actualMaxVal) * CHART_H;
+                                    const isPast = year < currentYear || (year === currentYear && d.month <= currentMonth);
+                                    const isCurrent = year === currentYear && d.month === currentMonth;
+                                    return (
+                                        <div key={d.month} className="flex-1 flex flex-col items-center gap-1 group relative">
+                                            {/* Tooltip */}
+                                            <div className="absolute -top-20 left-1/2 -translate-x-1/2 bg-gray-900 text-white rounded-xl px-3 py-2 text-[9px] font-bold opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap pointer-events-none shadow-xl">
+                                                <p className="font-black">{forecastService.MONTH_NAMES[d.month - 1]}</p>
+                                                <p>Meta: {fmtCompact(d.goal_value)}</p>
+                                                <p>Actual: {fmtCompact(d.actual_value)}</p>
+                                                {d.goal_value > 0 && <p>{Math.round((d.actual_value / d.goal_value) * 100)}% cumplido</p>}
+                                            </div>
+                                            <div className="w-full relative" style={{ height: CHART_H }}>
+                                                {/* Goal bar (behind) */}
+                                                <div
+                                                    className="absolute bottom-0 left-[15%] right-[15%] bg-violet-100 border border-dashed border-violet-300 rounded-t-md transition-all"
+                                                    style={{ height: goalH }}
+                                                />
+                                                {/* Actual bar (front) */}
+                                                {isPast && (
+                                                    <div
+                                                        className={`absolute bottom-0 left-[25%] right-[25%] rounded-t-md transition-all ${isCurrent
+                                                                ? 'bg-gradient-to-t from-blue-500 to-cyan-400 shadow-md shadow-blue-200'
+                                                                : d.actual_value >= d.goal_value && d.goal_value > 0
+                                                                    ? 'bg-gradient-to-t from-emerald-500 to-emerald-400'
+                                                                    : 'bg-gradient-to-t from-amber-500 to-amber-400'
+                                                            }`}
+                                                        style={{ height: barH }}
+                                                    />
+                                                )}
+                                                {/* Trend dot */}
+                                                <div
+                                                    className="absolute left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-amber-400 border-2 border-white shadow-sm z-10"
+                                                    style={{ bottom: Math.max(0, trendH - 4) }}
+                                                />
+                                                {/* Trend line segment */}
+                                                {i < data.length - 1 && (
+                                                    <svg className="absolute top-0 left-0 w-[200%] pointer-events-none z-[5]" style={{ height: CHART_H, overflow: 'visible' }}>
+                                                        <line
+                                                            x1="50%" y1={CHART_H - trendH}
+                                                            x2="150%" y2={CHART_H - (trendValues[i + 1] / actualMaxVal) * CHART_H}
+                                                            stroke="#f59e0b" strokeWidth="2" strokeDasharray="4,3" opacity="0.7"
+                                                        />
+                                                    </svg>
+                                                )}
+                                            </div>
+                                            <span className={`text-[8px] font-black uppercase tracking-wider ${isCurrent ? 'text-blue-600' : isPast ? 'text-gray-500' : 'text-gray-300'}`}>
+                                                {forecastService.MONTH_NAMES_SHORT[d.month - 1]}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* === LEADS CHART === */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-[11px] font-black text-gray-700 uppercase tracking-widest">🏆 Leads Cerrados vs Meta — {year}</h3>
+                            <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-3 h-3 rounded-sm bg-gradient-to-t from-indigo-500 to-indigo-400" />
+                                    <span className="text-[8px] font-bold text-gray-400">Actual</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-3 h-3 rounded-sm bg-violet-200 border border-dashed border-violet-400" />
+                                    <span className="text-[8px] font-bold text-gray-400">Meta</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex">
+                            <div className="flex flex-col justify-between pr-2" style={{ height: CHART_H }}>
+                                {[...leadsSteps].reverse().map((step, si) => (
+                                    <span key={`ls-${si}`} className="text-[8px] font-bold text-gray-300 text-right w-8">{step}</span>
+                                ))}
+                            </div>
+                            <div className="flex-1 flex items-end gap-1" style={{ height: CHART_H }}>
+                                {data.map((d) => {
+                                    const barH = (d.actual_leads / actualMaxLeads) * CHART_H;
+                                    const goalH = (d.goal_leads / actualMaxLeads) * CHART_H;
+                                    const isPast = year < currentYear || (year === currentYear && d.month <= currentMonth);
+                                    const isCurrent = year === currentYear && d.month === currentMonth;
+                                    return (
+                                        <div key={d.month} className="flex-1 flex flex-col items-center gap-1 group relative">
+                                            <div className="absolute -top-16 left-1/2 -translate-x-1/2 bg-gray-900 text-white rounded-xl px-3 py-2 text-[9px] font-bold opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap pointer-events-none shadow-xl">
+                                                <p className="font-black">{forecastService.MONTH_NAMES[d.month - 1]}</p>
+                                                <p>Meta: {d.goal_leads} leads</p>
+                                                <p>Actual: {d.actual_leads} leads</p>
+                                            </div>
+                                            <div className="w-full relative" style={{ height: CHART_H }}>
+                                                <div className="absolute bottom-0 left-[15%] right-[15%] bg-violet-100 border border-dashed border-violet-300 rounded-t-md" style={{ height: goalH }} />
+                                                {isPast && (
+                                                    <div
+                                                        className={`absolute bottom-0 left-[25%] right-[25%] rounded-t-md transition-all ${isCurrent
+                                                                ? 'bg-gradient-to-t from-blue-500 to-cyan-400 shadow-md shadow-blue-200'
+                                                                : d.actual_leads >= d.goal_leads && d.goal_leads > 0
+                                                                    ? 'bg-gradient-to-t from-emerald-500 to-emerald-400'
+                                                                    : 'bg-gradient-to-t from-indigo-500 to-indigo-400'
+                                                            }`}
+                                                        style={{ height: barH }}
+                                                    />
+                                                )}
+                                            </div>
+                                            <span className={`text-[8px] font-black uppercase tracking-wider ${isCurrent ? 'text-blue-600' : isPast ? 'text-gray-500' : 'text-gray-300'}`}>
+                                                {forecastService.MONTH_NAMES_SHORT[d.month - 1]}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Monthly breakdown table */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                        <div className="px-6 py-4 border-b border-gray-100">
+                            <h3 className="text-[11px] font-black text-gray-700 uppercase tracking-widest">📋 Detalle Mensual — {year}</h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead>
+                                    <tr className="bg-gray-50">
+                                        <th className="text-left text-[9px] font-black text-gray-400 uppercase tracking-widest px-6 py-3">Mes</th>
+                                        <th className="text-right text-[9px] font-black text-gray-400 uppercase tracking-widest px-4 py-3">Meta Leads</th>
+                                        <th className="text-right text-[9px] font-black text-gray-400 uppercase tracking-widest px-4 py-3">Actual Leads</th>
+                                        <th className="text-right text-[9px] font-black text-gray-400 uppercase tracking-widest px-4 py-3">%</th>
+                                        <th className="text-right text-[9px] font-black text-gray-400 uppercase tracking-widest px-4 py-3">Meta Valor</th>
+                                        <th className="text-right text-[9px] font-black text-gray-400 uppercase tracking-widest px-4 py-3">Actual Valor</th>
+                                        <th className="text-right text-[9px] font-black text-gray-400 uppercase tracking-widest px-6 py-3">%</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {data.map((d) => {
+                                        const isPast = year < currentYear || (year === currentYear && d.month <= currentMonth);
+                                        const isCurrent = year === currentYear && d.month === currentMonth;
+                                        const leadPct = d.goal_leads > 0 ? Math.round((d.actual_leads / d.goal_leads) * 100) : 0;
+                                        const valPct = d.goal_value > 0 ? Math.round((d.actual_value / d.goal_value) * 100) : 0;
+                                        return (
+                                            <tr key={d.month} className={`border-b border-gray-50 ${isCurrent ? 'bg-blue-50/50' : ''}`}>
+                                                <td className={`px-6 py-3 text-sm font-bold ${isCurrent ? 'text-blue-600' : isPast ? 'text-gray-800' : 'text-gray-300'}`}>
+                                                    {isCurrent && <span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-2 animate-pulse" />}
+                                                    {forecastService.MONTH_NAMES[d.month - 1]}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm font-bold text-gray-500 text-right">{d.goal_leads}</td>
+                                                <td className="px-4 py-3 text-sm font-black text-gray-900 text-right">{isPast ? d.actual_leads : '—'}</td>
+                                                <td className="px-4 py-3 text-right">
+                                                    {isPast && d.goal_leads > 0 ? (
+                                                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${leadPct >= 100 ? 'bg-emerald-50 text-emerald-600' : leadPct >= 70 ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-500'}`}>
+                                                            {leadPct}%
+                                                        </span>
+                                                    ) : <span className="text-gray-300 text-sm">—</span>}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm font-bold text-gray-500 text-right">{formatCurrency(d.goal_value)}</td>
+                                                <td className="px-4 py-3 text-sm font-black text-gray-900 text-right">{isPast ? formatCurrency(d.actual_value) : '—'}</td>
+                                                <td className="px-6 py-3 text-right">
+                                                    {isPast && d.goal_value > 0 ? (
+                                                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${valPct >= 100 ? 'bg-emerald-50 text-emerald-600' : valPct >= 70 ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-500'}`}>
+                                                            {valPct}%
+                                                        </span>
+                                                    ) : <span className="text-gray-300 text-sm">—</span>}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {/* Totals row */}
+                                    <tr className="bg-gray-50 font-black">
+                                        <td className="px-6 py-3 text-sm text-gray-900">TOTAL {year}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-700 text-right">{totalGoalLeads}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-900 text-right">{totalActualLeads}</td>
+                                        <td className="px-4 py-3 text-right">
+                                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${leadsProgress >= 100 ? 'bg-emerald-50 text-emerald-600' : 'bg-violet-50 text-violet-600'}`}>
+                                                {leadsProgress}%
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-gray-700 text-right">{formatCurrency(totalGoalValue)}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-900 text-right">{formatCurrency(totalActualValue)}</td>
+                                        <td className="px-6 py-3 text-right">
+                                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${valueProgress >= 100 ? 'bg-emerald-50 text-emerald-600' : 'bg-violet-50 text-violet-600'}`}>
+                                                {valueProgress}%
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* Modal */}
+            {showModal && (
+                <ForecastConfigModal
+                    companyId={companyId}
+                    year={year}
+                    existingData={data}
+                    onClose={() => setShowModal(false)}
+                    onSaved={() => { setShowModal(false); loadForecast(); }}
+                />
+            )}
+        </div>
+    );
+}
+
+// === FORECAST CONFIG MODAL ===
+function ForecastConfigModal({ companyId, year, existingData, onClose, onSaved }: {
+    companyId: string;
+    year: number;
+    existingData: ForecastWithActual[];
+    onClose: () => void;
+    onSaved: () => void;
+}) {
+    const [months, setMonths] = useState(
+        Array.from({ length: 12 }, (_, i) => {
+            const existing = existingData.find(d => d.month === i + 1);
+            return {
+                month: i + 1,
+                goal_leads: existing?.goal_leads || 0,
+                goal_value: existing?.goal_value || 0,
+            };
+        })
+    );
+    const [saving, setSaving] = useState(false);
+
+    const totalLeads = months.reduce((s, m) => s + m.goal_leads, 0);
+    const totalValue = months.reduce((s, m) => s + m.goal_value, 0);
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            await forecastService.saveForecast(companyId, year, months);
+            toast.success(`Forecast ${year} guardado exitosamente`);
+            onSaved();
+        } catch (err) {
+            toast.error('Error al guardar forecast');
+            console.error(err);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const applyToAll = (field: 'goal_leads' | 'goal_value', value: number) => {
+        setMonths(months.map(m => ({ ...m, [field]: value })));
+    };
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-[700px] max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                {/* Header */}
+                <div className="h-14 bg-gradient-to-r from-violet-600 to-indigo-600 flex items-center justify-between px-6 shrink-0">
+                    <div className="flex items-center gap-3">
+                        <Target className="w-5 h-5 text-white" />
+                        <h2 className="text-sm font-black text-white uppercase tracking-widest">Forecast {year}</h2>
+                    </div>
+                    <button onClick={onClose} className="w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors">
+                        <X className="w-4 h-4 text-white" />
+                    </button>
+                </div>
+
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto p-6">
+                    {/* Quick fill */}
+                    <div className="flex items-center gap-3 mb-5 pb-4 border-b border-gray-100">
+                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Llenar todos:</span>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="number" min="0" placeholder="Leads" className="w-20 h-8 border border-gray-200 rounded-lg text-center text-xs font-bold text-gray-700 focus:border-violet-400 focus:ring-2 focus:ring-violet-50 outline-none"
+                                onKeyDown={(e) => { if (e.key === 'Enter') applyToAll('goal_leads', Number((e.target as HTMLInputElement).value)); }}
+                                onBlur={(e) => { if (e.target.value) applyToAll('goal_leads', Number(e.target.value)); }}
+                            />
+                            <input
+                                type="number" min="0" placeholder="Valor $" className="w-28 h-8 border border-gray-200 rounded-lg text-center text-xs font-bold text-gray-700 focus:border-violet-400 focus:ring-2 focus:ring-violet-50 outline-none"
+                                onKeyDown={(e) => { if (e.key === 'Enter') applyToAll('goal_value', Number((e.target as HTMLInputElement).value)); }}
+                                onBlur={(e) => { if (e.target.value) applyToAll('goal_value', Number(e.target.value)); }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Month rows */}
+                    <div className="space-y-2">
+                        {months.map((m, i) => (
+                            <div key={m.month} className="flex items-center gap-4 group">
+                                <span className="w-24 text-sm font-bold text-gray-600 shrink-0">
+                                    {forecastService.MONTH_NAMES[i]}
+                                </span>
+                                <div className="flex items-center gap-2 flex-1">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-[8px] font-black text-gray-300 uppercase">Leads</span>
+                                        <input
+                                            type="number" min="0"
+                                            value={m.goal_leads || ''}
+                                            onChange={(e) => {
+                                                const val = Number(e.target.value) || 0;
+                                                setMonths(months.map((mm, j) => j === i ? { ...mm, goal_leads: val } : mm));
+                                            }}
+                                            className="w-20 h-9 border border-gray-200 rounded-xl text-center text-sm font-bold text-gray-700 focus:border-violet-400 focus:ring-2 focus:ring-violet-50 outline-none transition-all"
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-[8px] font-black text-gray-300 uppercase">Valor</span>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">$</span>
+                                            <input
+                                                type="number" min="0"
+                                                value={m.goal_value || ''}
+                                                onChange={(e) => {
+                                                    const val = Number(e.target.value) || 0;
+                                                    setMonths(months.map((mm, j) => j === i ? { ...mm, goal_value: val } : mm));
+                                                }}
+                                                className="w-32 h-9 border border-gray-200 rounded-xl text-center text-sm font-bold text-gray-700 focus:border-violet-400 focus:ring-2 focus:ring-violet-50 outline-none pl-7 transition-all"
+                                                placeholder="0"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-6">
+                        <div>
+                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Total Leads</p>
+                            <p className="text-lg font-black text-gray-900">{totalLeads}</p>
+                        </div>
+                        <div>
+                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Total Valor</p>
+                            <p className="text-lg font-black text-emerald-600">{formatCurrency(totalValue)}</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button onClick={onClose} className="px-5 py-2.5 text-xs font-black text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-colors">
+                            Cancelar
+                        </button>
+                        <button
+                            onClick={handleSave}
+                            disabled={saving}
+                            className="flex items-center gap-2 bg-gradient-to-r from-violet-500 to-indigo-600 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg hover:shadow-violet-200 transition-all disabled:opacity-50"
+                        >
+                            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                            Guardar Forecast
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     );
 }
