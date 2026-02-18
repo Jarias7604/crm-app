@@ -936,7 +936,9 @@ export default function Dashboard() {
                 <div className={`lg:col-span-4 bg-white rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'topOpp' ? 'z-[50]' : 'z-0'}`}>
                     <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-white">
                         <div className="flex flex-col">
-                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('dashboard.crm.topOppTitle')}</h3>
+                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">{t('dashboard.crm.topOppTitle')}
+                                {topOpportunities.length > 0 && <span className="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full text-[9px] font-black">{topOpportunities.length}</span>}
+                            </h3>
                             <p className="text-[10px] text-gray-400 font-medium mt-0.5">Mayores contratos</p>
                         </div>
                         <div className="flex items-center gap-2">
@@ -1005,6 +1007,7 @@ export default function Dashboard() {
                         <div className="flex flex-col">
                             <h3 className="text-[11px] font-black text-blue-700 uppercase tracking-[0.2em] flex items-center gap-2">
                                 <Clock className="w-3 h-3" /> Seguimientos
+                                {upcomingFollowUps.length > 0 && <span className="bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full text-[9px] font-black">{upcomingFollowUps.length}</span>}
                             </h3>
                             <p className="text-[10px] text-blue-600/60 font-medium mt-0.5">Pendientes</p>
                         </div>
@@ -1080,6 +1083,7 @@ export default function Dashboard() {
                         <div className="flex flex-col">
                             <h3 className="text-[11px] font-black text-emerald-700 uppercase tracking-[0.2em] flex items-center gap-2">
                                 <TrendingUp className="w-3 h-3" /> Conversiones
+                                {recentConversions.length > 0 && <span className="bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full text-[9px] font-black">{recentConversions.length}</span>}
                             </h3>
                             <p className="text-[10px] text-emerald-600/60 font-medium mt-0.5">Últimos cierres</p>
                         </div>
