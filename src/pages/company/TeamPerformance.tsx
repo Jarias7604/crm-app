@@ -1304,147 +1304,139 @@ function ForecastSection({ companyId, isAdmin }: { companyId: string; isAdmin: b
                         </div>
                     </div>
 
-                    {/* === VALUE CHART === */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-[11px] font-black text-gray-700 uppercase tracking-widest">💰 Valor Cerrado vs Meta — {year}</h3>
-                            <div className="flex items-center gap-4">
-                                <div className="flex items-center gap-1.5">
-                                    <div className="w-3 h-3 rounded-sm bg-gradient-to-t from-emerald-500 to-emerald-400" />
-                                    <span className="text-[8px] font-bold text-gray-400">Actual</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <div className="w-3 h-3 rounded-sm bg-violet-200 border border-dashed border-violet-400" />
-                                    <span className="text-[8px] font-bold text-gray-400">Meta</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <div className="w-6 h-0.5 bg-amber-400" />
-                                    <span className="text-[8px] font-bold text-gray-400">Tendencia</span>
+                    {/* === CHARTS SIDE BY SIDE === */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {/* VALUE CHART */}
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-[13px] font-black text-gray-700 uppercase tracking-wide">💰 Valor vs Meta</h3>
+                                <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-3.5 h-3.5 rounded-sm bg-orange-300" />
+                                        <span className="text-[10px] font-bold text-gray-500">Actual</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-3.5 h-3.5 rounded-sm bg-violet-200 border border-dashed border-violet-400" />
+                                        <span className="text-[10px] font-bold text-gray-500">Meta</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-6 h-0.5 bg-amber-400" />
+                                        <span className="text-[10px] font-bold text-gray-500">Tendencia</span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <div className="flex">
-                            {/* Y-Axis */}
-                            <div className="flex flex-col justify-between pr-2" style={{ height: CHART_H }}>
-                                {[...valueSteps].reverse().map((step, si) => (
-                                    <span key={`vs-${si}`} className="text-[8px] font-bold text-gray-300 text-right w-12">{fmtCompact(step)}</span>
-                                ))}
-                            </div>
-                            {/* Bars */}
-                            <div className="flex-1 flex items-end gap-1" style={{ height: CHART_H }}>
-                                {data.map((d, i) => {
-                                    const barH = (d.actual_value / actualMaxVal) * CHART_H;
-                                    const goalH = (d.goal_value / actualMaxVal) * CHART_H;
-                                    const trendH = (trendValues[i] / actualMaxVal) * CHART_H;
-                                    const isPast = year < currentYear || (year === currentYear && d.month <= currentMonth);
-                                    const isCurrent = year === currentYear && d.month === currentMonth;
-                                    return (
-                                        <div key={d.month} className="flex-1 flex flex-col items-center gap-1 group relative">
-                                            {/* Tooltip */}
-                                            <div className="absolute -top-20 left-1/2 -translate-x-1/2 bg-gray-900 text-white rounded-xl px-3 py-2 text-[9px] font-bold opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap pointer-events-none shadow-xl">
-                                                <p className="font-black">{forecastService.MONTH_NAMES[d.month - 1]}</p>
-                                                <p>Meta: {fmtCompact(d.goal_value)}</p>
-                                                <p>Actual: {fmtCompact(d.actual_value)}</p>
-                                                {d.goal_value > 0 && <p>{Math.round((d.actual_value / d.goal_value) * 100)}% cumplido</p>}
-                                            </div>
-                                            <div className="w-full relative" style={{ height: CHART_H }}>
-                                                {/* Goal bar (behind) */}
-                                                <div
-                                                    className="absolute bottom-0 left-[15%] right-[15%] bg-violet-100 border border-dashed border-violet-300 rounded-t-md transition-all"
-                                                    style={{ height: goalH }}
-                                                />
-                                                {/* Actual bar (front) */}
-                                                {isPast && (
+                            <div className="flex">
+                                <div className="flex flex-col justify-between pr-2" style={{ height: CHART_H }}>
+                                    {[...valueSteps].reverse().map((step, si) => (
+                                        <span key={`vs-${si}`} className="text-[10px] font-bold text-gray-400 text-right w-14">{fmtCompact(step)}</span>
+                                    ))}
+                                </div>
+                                <div className="flex-1 flex items-end gap-0.5" style={{ height: CHART_H }}>
+                                    {data.map((d, i) => {
+                                        const barH = (d.actual_value / actualMaxVal) * CHART_H;
+                                        const goalH = (d.goal_value / actualMaxVal) * CHART_H;
+                                        const trendH = (trendValues[i] / actualMaxVal) * CHART_H;
+                                        const isPast = year < currentYear || (year === currentYear && d.month <= currentMonth);
+                                        const isCurrent = year === currentYear && d.month === currentMonth;
+                                        return (
+                                            <div key={d.month} className="flex-1 flex flex-col items-center gap-1 group relative">
+                                                <div className="absolute -top-20 left-1/2 -translate-x-1/2 bg-gray-900 text-white rounded-xl px-3 py-2 text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap pointer-events-none shadow-xl">
+                                                    <p className="font-black">{forecastService.MONTH_NAMES[d.month - 1]}</p>
+                                                    <p>Meta: {fmtCompact(d.goal_value)}</p>
+                                                    <p>Actual: {fmtCompact(d.actual_value)}</p>
+                                                    {d.goal_value > 0 && <p>{Math.round((d.actual_value / d.goal_value) * 100)}% cumplido</p>}
+                                                </div>
+                                                <div className="w-full relative" style={{ height: CHART_H }}>
                                                     <div
-                                                        className={`absolute bottom-0 left-[25%] right-[25%] rounded-t-md transition-all ${isCurrent
-                                                                ? 'bg-gradient-to-t from-blue-500 to-cyan-400 shadow-md shadow-blue-200'
-                                                                : d.actual_value >= d.goal_value && d.goal_value > 0
-                                                                    ? 'bg-gradient-to-t from-emerald-500 to-emerald-400'
-                                                                    : 'bg-gradient-to-t from-amber-500 to-amber-400'
-                                                            }`}
-                                                        style={{ height: barH }}
+                                                        className="absolute bottom-0 left-[10%] right-[10%] bg-violet-100 border border-dashed border-violet-300 rounded-t-md transition-all"
+                                                        style={{ height: goalH }}
                                                     />
-                                                )}
-                                                {/* Trend dot */}
-                                                <div
-                                                    className="absolute left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-amber-400 border-2 border-white shadow-sm z-10"
-                                                    style={{ bottom: Math.max(0, trendH - 4) }}
-                                                />
-                                                {/* Trend line segment */}
-                                                {i < data.length - 1 && (
-                                                    <svg className="absolute top-0 left-0 w-[200%] pointer-events-none z-[5]" style={{ height: CHART_H, overflow: 'visible' }}>
-                                                        <line
-                                                            x1="50%" y1={CHART_H - trendH}
-                                                            x2="150%" y2={CHART_H - (trendValues[i + 1] / actualMaxVal) * CHART_H}
-                                                            stroke="#f59e0b" strokeWidth="2" strokeDasharray="4,3" opacity="0.7"
+                                                    {isPast && (
+                                                        <div
+                                                            className={`absolute bottom-0 left-[20%] right-[20%] rounded-t-md transition-all ${isCurrent
+                                                                ? 'bg-blue-400 shadow-md shadow-blue-200'
+                                                                : 'bg-orange-300'
+                                                                }`}
+                                                            style={{ height: barH }}
                                                         />
-                                                    </svg>
-                                                )}
-                                            </div>
-                                            <span className={`text-[8px] font-black uppercase tracking-wider ${isCurrent ? 'text-blue-600' : isPast ? 'text-gray-500' : 'text-gray-300'}`}>
-                                                {forecastService.MONTH_NAMES_SHORT[d.month - 1]}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* === LEADS CHART === */}
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-[11px] font-black text-gray-700 uppercase tracking-widest">🏆 Leads Cerrados vs Meta — {year}</h3>
-                            <div className="flex items-center gap-4">
-                                <div className="flex items-center gap-1.5">
-                                    <div className="w-3 h-3 rounded-sm bg-gradient-to-t from-indigo-500 to-indigo-400" />
-                                    <span className="text-[8px] font-bold text-gray-400">Actual</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <div className="w-3 h-3 rounded-sm bg-violet-200 border border-dashed border-violet-400" />
-                                    <span className="text-[8px] font-bold text-gray-400">Meta</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="flex">
-                            <div className="flex flex-col justify-between pr-2" style={{ height: CHART_H }}>
-                                {[...leadsSteps].reverse().map((step, si) => (
-                                    <span key={`ls-${si}`} className="text-[8px] font-bold text-gray-300 text-right w-8">{step}</span>
-                                ))}
-                            </div>
-                            <div className="flex-1 flex items-end gap-1" style={{ height: CHART_H }}>
-                                {data.map((d) => {
-                                    const barH = (d.actual_leads / actualMaxLeads) * CHART_H;
-                                    const goalH = (d.goal_leads / actualMaxLeads) * CHART_H;
-                                    const isPast = year < currentYear || (year === currentYear && d.month <= currentMonth);
-                                    const isCurrent = year === currentYear && d.month === currentMonth;
-                                    return (
-                                        <div key={d.month} className="flex-1 flex flex-col items-center gap-1 group relative">
-                                            <div className="absolute -top-16 left-1/2 -translate-x-1/2 bg-gray-900 text-white rounded-xl px-3 py-2 text-[9px] font-bold opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap pointer-events-none shadow-xl">
-                                                <p className="font-black">{forecastService.MONTH_NAMES[d.month - 1]}</p>
-                                                <p>Meta: {d.goal_leads} leads</p>
-                                                <p>Actual: {d.actual_leads} leads</p>
-                                            </div>
-                                            <div className="w-full relative" style={{ height: CHART_H }}>
-                                                <div className="absolute bottom-0 left-[15%] right-[15%] bg-violet-100 border border-dashed border-violet-300 rounded-t-md" style={{ height: goalH }} />
-                                                {isPast && (
+                                                    )}
                                                     <div
-                                                        className={`absolute bottom-0 left-[25%] right-[25%] rounded-t-md transition-all ${isCurrent
-                                                                ? 'bg-gradient-to-t from-blue-500 to-cyan-400 shadow-md shadow-blue-200'
-                                                                : d.actual_leads >= d.goal_leads && d.goal_leads > 0
-                                                                    ? 'bg-gradient-to-t from-emerald-500 to-emerald-400'
-                                                                    : 'bg-gradient-to-t from-indigo-500 to-indigo-400'
-                                                            }`}
-                                                        style={{ height: barH }}
+                                                        className="absolute left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-amber-400 border-2 border-white shadow-sm z-10"
+                                                        style={{ bottom: Math.max(0, trendH - 4) }}
                                                     />
-                                                )}
+                                                    {i < data.length - 1 && (
+                                                        <svg className="absolute top-0 left-0 w-[200%] pointer-events-none z-[5]" style={{ height: CHART_H, overflow: 'visible' }}>
+                                                            <line
+                                                                x1="50%" y1={CHART_H - trendH}
+                                                                x2="150%" y2={CHART_H - (trendValues[i + 1] / actualMaxVal) * CHART_H}
+                                                                stroke="#f59e0b" strokeWidth="2" strokeDasharray="4,3" opacity="0.7"
+                                                            />
+                                                        </svg>
+                                                    )}
+                                                </div>
+                                                <span className={`text-[11px] font-black uppercase ${isCurrent ? 'text-blue-600' : isPast ? 'text-gray-600' : 'text-gray-300'}`}>
+                                                    {forecastService.MONTH_NAMES_SHORT[d.month - 1]}
+                                                </span>
                                             </div>
-                                            <span className={`text-[8px] font-black uppercase tracking-wider ${isCurrent ? 'text-blue-600' : isPast ? 'text-gray-500' : 'text-gray-300'}`}>
-                                                {forecastService.MONTH_NAMES_SHORT[d.month - 1]}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* LEADS CHART */}
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-[13px] font-black text-gray-700 uppercase tracking-wide">🏆 Leads vs Meta</h3>
+                                <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-3.5 h-3.5 rounded-sm bg-sky-400" />
+                                        <span className="text-[10px] font-bold text-gray-500">Actual</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-3.5 h-3.5 rounded-sm bg-violet-200 border border-dashed border-violet-400" />
+                                        <span className="text-[10px] font-bold text-gray-500">Meta</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex">
+                                <div className="flex flex-col justify-between pr-2" style={{ height: CHART_H }}>
+                                    {[...leadsSteps].reverse().map((step, si) => (
+                                        <span key={`ls-${si}`} className="text-[10px] font-bold text-gray-400 text-right w-8">{step}</span>
+                                    ))}
+                                </div>
+                                <div className="flex-1 flex items-end gap-0.5" style={{ height: CHART_H }}>
+                                    {data.map((d) => {
+                                        const barH = (d.actual_leads / actualMaxLeads) * CHART_H;
+                                        const goalH = (d.goal_leads / actualMaxLeads) * CHART_H;
+                                        const isPast = year < currentYear || (year === currentYear && d.month <= currentMonth);
+                                        const isCurrent = year === currentYear && d.month === currentMonth;
+                                        return (
+                                            <div key={d.month} className="flex-1 flex flex-col items-center gap-1 group relative">
+                                                <div className="absolute -top-16 left-1/2 -translate-x-1/2 bg-gray-900 text-white rounded-xl px-3 py-2 text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap pointer-events-none shadow-xl">
+                                                    <p className="font-black">{forecastService.MONTH_NAMES[d.month - 1]}</p>
+                                                    <p>Meta: {d.goal_leads} leads</p>
+                                                    <p>Actual: {d.actual_leads} leads</p>
+                                                </div>
+                                                <div className="w-full relative" style={{ height: CHART_H }}>
+                                                    <div className="absolute bottom-0 left-[10%] right-[10%] bg-violet-100 border border-dashed border-violet-300 rounded-t-md" style={{ height: goalH }} />
+                                                    {isPast && (
+                                                        <div
+                                                            className={`absolute bottom-0 left-[20%] right-[20%] rounded-t-md transition-all ${isCurrent
+                                                                ? 'bg-blue-400 shadow-md shadow-blue-200'
+                                                                : 'bg-sky-400'
+                                                                }`}
+                                                            style={{ height: barH }}
+                                                        />
+                                                    )}
+                                                </div>
+                                                <span className={`text-[11px] font-black uppercase ${isCurrent ? 'text-blue-600' : isPast ? 'text-gray-600' : 'text-gray-300'}`}>
+                                                    {forecastService.MONTH_NAMES_SHORT[d.month - 1]}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         </div>
                     </div>
