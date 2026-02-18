@@ -282,12 +282,13 @@ export default function TeamPerformancePage() {
             </header>
 
             {/* Global Stats Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
                 <StatCard icon={Target} label="Total Leads" value={String(totalLeads)} color="bg-blue-500" />
                 <StatCard icon={Trophy} label="Ganados" value={String(totalWon)} color="bg-emerald-500" />
                 <StatCard icon={TrendingUp} label="Tasa de Cierre" value={formatPercent(overallWinRate)} color="bg-violet-500" />
                 <StatCard icon={DollarSign} label="Valor Pipeline" value={formatCurrency(totalValue)} color="bg-amber-500" />
                 <StatCard icon={Zap} label="Monto Cerrado" value={formatCurrency(totalClosing)} color="bg-rose-500" />
+                <StatCard icon={ArrowUpRight} label="Conversión Pipeline" value={totalValue > 0 ? `${Math.min(100, Math.round((totalClosing / totalValue) * 100))}%` : '0%'} color={totalValue > 0 && (totalClosing / totalValue) >= 0.6 ? 'bg-emerald-500' : totalValue > 0 && (totalClosing / totalValue) >= 0.3 ? 'bg-amber-500' : 'bg-red-500'} />
             </div>
 
             {/* Top Performer Highlight */}
@@ -559,6 +560,25 @@ function TeamPerformanceGrid({ data, profileNames, getTeamGoal, periodLabel }: {
                                 <MetricItem label="Pipeline" value={formatCurrency(team.total_value)} />
                                 <MetricItem label="Cerrado" value={formatCurrency(team.total_closing_amount)} color="text-[#4449AA]" />
                             </div>
+                            {/* Conversion % Pipeline → Cerrado */}
+                            {team.total_value > 0 && (() => {
+                                const convPct = Math.min(100, Math.round((team.total_closing_amount / team.total_value) * 100));
+                                const convColor = convPct >= 60 ? '#10b981' : convPct >= 30 ? '#f59e0b' : '#ef4444';
+                                return (
+                                    <div className="bg-gray-50/80 rounded-xl px-3 py-2.5 border border-gray-100">
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest">Conversión Pipeline</span>
+                                            <span className="text-[11px] font-black" style={{ color: convColor }}>{convPct}%</span>
+                                        </div>
+                                        <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full rounded-full transition-all duration-700"
+                                                style={{ width: `${convPct}%`, backgroundColor: convColor }}
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                             {goal && goal.value > 0 && (
                                 <div>
                                     <p className="text-[7px] font-black text-gray-400 uppercase tracking-widest mb-1">Meta Valor ({periodLabel})</p>
