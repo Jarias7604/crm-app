@@ -23,8 +23,16 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     }
     const configPaths = ['/company/branding', '/pricing', '/paquetes', '/items', '/financial-rules', '/loss-reasons'];
     const marketingPaths = ['/marketing', '/marketing/email', '/marketing/lead-hunter', '/marketing/ai-agents', '/marketing/settings'];
+    const teamPaths = ['/company/team', '/company/teams', '/company/performance'];
     const [configOpen, setConfigOpen] = useState(configPaths.some(path => location.pathname === path));
-    const [marketingOpen, setMarketingOpen] = useState(marketingPaths.some(path => location.pathname.startsWith(path) && !location.pathname.startsWith('/marketing/chat')));
+
+    // Only one accordion open at a time
+    const getInitialAccordion = () => {
+        if (marketingPaths.some(path => location.pathname.startsWith(path) && !location.pathname.startsWith('/marketing/chat'))) return 'Marketing Hub';
+        if (teamPaths.some(path => location.pathname.startsWith(path))) return 'Equipo';
+        return null;
+    };
+    const [openAccordion, setOpenAccordion] = useState<string | null>(getInitialAccordion());
     const [company, setCompany] = useState<Company | null>(null);
     const [debugOpen, setDebugOpen] = useState(false);
 
@@ -294,7 +302,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                             {item.subItems && !isCollapsed ? (
                                 <>
                                     <button
-                                        onClick={() => setMarketingOpen(!marketingOpen)}
+                                        onClick={() => setOpenAccordion(openAccordion === item.name ? null : item.name)}
                                         className={cn(
                                             item.current ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40' : 'text-gray-400 hover:bg-[#1e293b] hover:text-white',
                                             'group flex items-center justify-between w-full rounded-xl transition-all duration-200 focus:outline-none p-3 px-4'
@@ -307,9 +315,9 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                                             )} aria-hidden="true" />
                                             <span className="text-sm font-semibold tracking-wide truncate">{item.name}</span>
                                         </div>
-                                        {marketingOpen ? <ChevronDown className="h-4 w-4 opacity-50" /> : <ChevronRight className="h-4 w-4 opacity-50" />}
+                                        {openAccordion === item.name ? <ChevronDown className="h-4 w-4 opacity-50" /> : <ChevronRight className="h-4 w-4 opacity-50" />}
                                     </button>
-                                    {marketingOpen && (
+                                    {openAccordion === item.name && (
                                         <div className="ml-4 pl-4 border-l border-gray-800/50 pt-1 space-y-1">
                                             {item.subItems.map((sub) => (
                                                 <Link
