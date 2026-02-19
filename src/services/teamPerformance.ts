@@ -52,7 +52,7 @@ export interface PerformanceFilters {
     date_to?: string;
 }
 
-function getDateRange(filters: PerformanceFilters): { start: Date | null; end: Date | null } {
+export function getDateRange(filters: PerformanceFilters): { start: Date | null; end: Date | null } {
     if (filters.period === 'custom') {
         return {
             start: filters.date_from ? new Date(filters.date_from) : null,

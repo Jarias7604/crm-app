@@ -3,12 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import {
     Trophy, Users, TrendingUp, DollarSign, Target, Crown,
     Loader2, ChevronDown, BarChart3, Award, Zap, ArrowUpRight,
-    ArrowDownRight, Minus, CalendarDays, CheckCircle, Settings, X, Save
+    ArrowDownRight, Minus, CalendarDays, CheckCircle, Settings, X, Save,
+    Phone, PhoneCall,
 } from 'lucide-react';
+import { ActivityDashboard } from '../../components/ActivityDashboard';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../auth/AuthProvider';
 import {
     teamPerformanceService,
+    getDateRange,
     type UserPerformance,
     type TeamPerformance,
     type PerformanceFilters,
@@ -17,6 +20,7 @@ import {
 import { teamsService, type Team } from '../../services/teams';
 import { performanceGoalsService, type PerformanceGoal } from '../../services/performanceGoals';
 import { forecastService, type ForecastWithActual } from '../../services/forecastService';
+import { callActivityService, type CallActivitySummary, type CallGoal, type ContactActivitySummary, ACTION_TYPE_CONFIG } from '../../services/callActivity';
 
 // === CONSTANTS ===
 const PERIODS = [
@@ -81,11 +85,17 @@ export default function TeamPerformancePage() {
     const [teamPerformance, setTeamPerformance] = useState<TeamPerformance[]>([]);
     const [teams, setTeams] = useState<Team[]>([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'users' | 'teams' | 'charts' | 'forecast'>('users');
+    const [activeTab, setActiveTab] = useState<'users' | 'teams' | 'charts' | 'forecast' | 'calls'>('users');
     const [filters, setFilters] = useState<PerformanceFilters>({ period: 'all' });
     const [profileNames, setProfileNames] = useState<Record<string, string>>({});
     const [profileAvatars, setProfileAvatars] = useState<Record<string, string | null>>({});
     const [companySummary, setCompanySummary] = useState<CompanySummary>({ totalLeads: 0, wonDeals: 0, lostDeals: 0, totalValue: 0, totalClosing: 0 });
+
+    // Call Activity KPIs
+    const [callSummary, setCallSummary] = useState<CallActivitySummary[]>([]);
+    const [callGoals, setCallGoals] = useState<CallGoal[]>([]);
+    const [callStatusEvolution, setCallStatusEvolution] = useState<{ from: string; to: string; count: number }[]>([]);
+    const [contactSummary, setContactSummary] = useState<ContactActivitySummary[]>([]);
 
     // Goals
     const [goals, setGoals] = useState<PerformanceGoal[]>([]);
@@ -136,6 +146,25 @@ export default function TeamPerformancePage() {
             });
             setProfileNames(names);
             setProfileAvatars(avatars);
+
+            // Load call activity data (non-blocking)
+            try {
+                const dateRange = getDateRange(filters);
+                const dateFrom = dateRange.start?.toISOString();
+                const dateTo = dateRange.end?.toISOString();
+                const [callData, callGoalsData, statusEvo, contactData] = await Promise.all([
+                    callActivityService.getCallSummary(profile.company_id, dateFrom, dateTo),
+                    callActivityService.getGoals(profile.company_id),
+                    callActivityService.getStatusEvolution(profile.company_id, dateFrom, dateTo),
+                    callActivityService.getContactSummary(profile.company_id, dateFrom, dateTo),
+                ]);
+                setCallSummary(callData);
+                setCallGoals(callGoalsData);
+                setCallStatusEvolution(statusEvo);
+                setContactSummary(contactData);
+            } catch (callErr) {
+                console.warn('Call activity data not available yet (tables may not exist):', callErr);
+            }
         } catch (err) {
             console.error('Error loading performance data:', err);
         } finally {
@@ -331,6 +360,7 @@ export default function TeamPerformancePage() {
                 {([
                     { key: 'users' as const, icon: Users, label: 'Por Persona' },
                     { key: 'teams' as const, icon: BarChart3, label: 'Por Equipo' },
+                    { key: 'calls' as const, icon: PhoneCall, label: '📊 Actividad' },
                     { key: 'charts' as const, icon: TrendingUp, label: 'Gráficas' },
                     { key: 'forecast' as const, icon: Target, label: '📊 Forecast' },
                 ] as const).map((tab) => (
@@ -351,6 +381,18 @@ export default function TeamPerformancePage() {
                 <UserPerformanceTable data={userPerformance} getUserGoal={getUserGoal} periodLabel={periodLabel} companySummary={companySummary} />
             ) : activeTab === 'teams' ? (
                 <TeamPerformanceGrid data={teamPerformance} profileNames={profileNames} profileAvatars={profileAvatars} getTeamGoal={getTeamGoal} periodLabel={periodLabel} />
+            ) : activeTab === 'calls' ? (
+                <CallActivitySection
+                    callSummary={callSummary}
+                    callGoals={callGoals}
+                    statusEvolution={callStatusEvolution}
+                    contactSummary={contactSummary}
+                    profileNames={profileNames}
+                    profileAvatars={profileAvatars}
+                    companyId={profile?.company_id || ''}
+                    isAdmin={isAdmin}
+                    onGoalsSaved={() => loadData()}
+                />
             ) : activeTab === 'forecast' ? (
                 <ForecastSection companyId={profile?.company_id || ''} isAdmin={isAdmin} />
             ) : (
@@ -1737,5 +1779,420 @@ function ForecastConfigModal({ companyId, year, existingData, onClose, onSaved }
                 </div>
             </div>
         </div>
+    );
+}
+
+// === CALL ACTIVITY SECTION ===
+function CallActivitySection({
+    callSummary,
+    callGoals,
+    statusEvolution,
+    contactSummary,
+    profileNames,
+    profileAvatars,
+    companyId,
+    isAdmin,
+    onGoalsSaved,
+}: {
+    callSummary: CallActivitySummary[];
+    callGoals: CallGoal[];
+    statusEvolution: { from: string; to: string; count: number }[];
+    contactSummary: ContactActivitySummary[];
+    profileNames: Record<string, string>;
+    profileAvatars: Record<string, string | null>;
+    companyId: string;
+    isAdmin: boolean;
+    onGoalsSaved: () => void;
+}) {
+    const [isGoalPanelOpen, setIsGoalPanelOpen] = useState(false);
+    const [editGoals, setEditGoals] = useState<Record<string, number>>({});
+    const [savingGoals, setSavingGoals] = useState(false);
+
+    // Totals from legacy summary
+    const totalCalls = callSummary.reduce((s, u) => s + u.calls_total, 0);
+    const totalConnected = callSummary.reduce((s, u) => s + u.calls_connected, 0);
+    const totalUniqueLeads = callSummary.reduce((s, u) => s + u.unique_leads_called, 0);
+    const totalStatusChanges = callSummary.reduce((s, u) => s + u.leads_with_status_change, 0);
+    const overallConnectRate = totalCalls > 0 ? (totalConnected / totalCalls) * 100 : 0;
+
+    // Multi-channel totals
+    const totalAllActions = contactSummary.reduce((s, c) => s + c.total_actions, 0);
+    const channelBreakdown = (Object.keys(ACTION_TYPE_CONFIG) as (keyof typeof ACTION_TYPE_CONFIG)[])
+        .map(type => ({
+            type,
+            ...ACTION_TYPE_CONFIG[type],
+            count: contactSummary.filter(c => c.action_type === type).reduce((s, c) => s + c.total_actions, 0),
+        }))
+        .filter(c => c.count > 0)
+        .sort((a, b) => b.count - a.count);
+
+    // Goal lookup
+    const getUserCallGoal = (userId: string) => {
+        const g = callGoals.find(g => g.user_id === userId && !g.team_id);
+        return g?.daily_call_goal || 0;
+    };
+
+    // Initialize goal editor
+    const openGoalPanel = () => {
+        const goals: Record<string, number> = {};
+        callSummary.forEach(u => {
+            goals[u.user_id] = getUserCallGoal(u.user_id);
+        });
+        setEditGoals(goals);
+        setIsGoalPanelOpen(true);
+    };
+
+    const handleSaveGoals = async () => {
+        setSavingGoals(true);
+        try {
+            const userGoals = Object.entries(editGoals)
+                .filter(([_, goal]) => goal > 0)
+                .map(([user_id, daily_call_goal]) => ({ user_id, daily_call_goal }));
+            await callActivityService.saveUserGoals(companyId, userGoals);
+            toast.success('Metas de llamadas guardadas');
+            setIsGoalPanelOpen(false);
+            onGoalsSaved();
+        } catch (err) {
+            console.error('Error saving call goals:', err);
+            toast.error('Error al guardar metas');
+        } finally {
+            setSavingGoals(false);
+        }
+    };
+
+    if (callSummary.length === 0) {
+        return (
+            <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-16 flex flex-col items-center text-center">
+                <Phone className="w-12 h-12 text-gray-200 mb-4" />
+                <p className="text-[12px] font-black text-gray-400 uppercase tracking-widest mb-1">Sin datos de llamadas</p>
+                <p className="text-[11px] text-gray-400">Registra llamadas desde la vista de leads para ver KPIs aquí</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-6">
+            {/* Multi-Channel Breakdown */}
+            {channelBreakdown.length > 0 && (
+                <div className="bg-white rounded-[2rem] border border-gray-100/50 shadow-sm p-6">
+                    <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">
+                        📊 Acciones por Canal — Total: {totalAllActions}
+                    </h3>
+                    <div className="flex gap-2 flex-wrap">
+                        {channelBreakdown.map(ch => (
+                            <div key={ch.type} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl ${ch.bgColor} border border-white/50`}>
+                                <span className="text-lg">{ch.icon}</span>
+                                <div>
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-gray-600">{ch.label}</p>
+                                    <p className="text-lg font-black text-gray-900 leading-tight">{ch.count}</p>
+                                </div>
+                                {totalAllActions > 0 && (
+                                    <span className="text-[9px] font-bold text-gray-400 ml-1">
+                                        {Math.round((ch.count / totalAllActions) * 100)}%
+                                    </span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* KPI Summary Cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
+                            <Phone className="w-4 h-4 text-blue-500" />
+                        </div>
+                        <div>
+                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Total Acciones</p>
+                            <p className="text-lg font-black text-gray-900 tracking-tight">{totalAllActions || totalCalls}</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-green-50 flex items-center justify-center">
+                            <PhoneCall className="w-4 h-4 text-green-500" />
+                        </div>
+                        <div>
+                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Conectadas</p>
+                            <p className="text-lg font-black text-emerald-600 tracking-tight">{totalConnected}</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center">
+                            <TrendingUp className="w-4 h-4 text-violet-500" />
+                        </div>
+                        <div>
+                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Tasa Conexión</p>
+                            <p className="text-lg font-black text-violet-600 tracking-tight">{overallConnectRate.toFixed(1)}%</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center">
+                            <Target className="w-4 h-4 text-amber-500" />
+                        </div>
+                        <div>
+                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Leads Contactados</p>
+                            <p className="text-lg font-black text-gray-900 tracking-tight">{totalUniqueLeads}</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-rose-50 flex items-center justify-center">
+                            <ArrowUpRight className="w-4 h-4 text-rose-500" />
+                        </div>
+                        <div>
+                            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Cambios de Estado</p>
+                            <p className="text-lg font-black text-rose-600 tracking-tight">{totalStatusChanges}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Admin: Set Call Goals */}
+            {isAdmin && (
+                <div className="flex justify-end">
+                    <button
+                        onClick={openGoalPanel}
+                        className="flex items-center gap-2 bg-gradient-to-r from-teal-500 to-cyan-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg hover:shadow-teal-200 transition-all"
+                    >
+                        <Settings className="w-3.5 h-3.5" />
+                        Metas de Actividad
+                    </button>
+                </div>
+            )}
+
+            {/* Per-User Call Table */}
+            <div className="bg-white rounded-[2rem] border border-gray-100/50 shadow-[0_8px_40px_rgb(0,0,0,0.03)] overflow-hidden">
+                <div className="px-6 py-3 bg-gradient-to-r from-teal-50 to-cyan-50 border-b border-teal-100">
+                    <p className="text-[9px] font-black text-teal-600 uppercase tracking-widest">
+                        📞 Actividad de Llamadas por Vendedor
+                    </p>
+                </div>
+
+                {/* Header */}
+                <div className="grid grid-cols-12 gap-2 px-6 py-3 bg-gray-50/80 border-b border-gray-100 text-[8px] font-black text-gray-400 uppercase tracking-widest">
+                    <div className="col-span-1 text-center">#</div>
+                    <div className="col-span-3">Vendedor</div>
+                    <div className="col-span-1 text-center">Llamadas</div>
+                    <div className="col-span-1 text-center">Conectadas</div>
+                    <div className="col-span-1 text-center">Sin Resp.</div>
+                    <div className="col-span-1 text-center">Tasa</div>
+                    <div className="col-span-2 text-center">Leads Únicos</div>
+                    <div className="col-span-2 text-center">Cambios Estado</div>
+                </div>
+
+                {/* Rows */}
+                <div className="divide-y divide-gray-50">
+                    {callSummary
+                        .sort((a, b) => b.calls_total - a.calls_total)
+                        .map((user, index) => {
+                            const goal = getUserCallGoal(user.user_id);
+                            const connectRate = user.calls_total > 0 ? (user.calls_connected / user.calls_total) * 100 : 0;
+                            const userName = profileNames[user.user_id] || 'Desconocido';
+                            const avatarUrl = profileAvatars[user.user_id];
+
+                            return (
+                                <div key={user.user_id} className="grid grid-cols-12 gap-2 px-6 py-4 items-center hover:bg-gray-50/50 transition-colors">
+                                    {/* Rank */}
+                                    <div className="col-span-1 flex justify-center">
+                                        {index === 0 ? (
+                                            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center shadow-sm">
+                                                <span className="text-[10px] font-black text-white">1</span>
+                                            </div>
+                                        ) : index === 1 ? (
+                                            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center shadow-sm">
+                                                <span className="text-[10px] font-black text-white">2</span>
+                                            </div>
+                                        ) : index === 2 ? (
+                                            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-600 to-amber-700 flex items-center justify-center shadow-sm">
+                                                <span className="text-[10px] font-black text-white">3</span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-[11px] font-bold text-gray-300">{index + 1}</span>
+                                        )}
+                                    </div>
+
+                                    {/* User Info */}
+                                    <div className="col-span-3 flex items-center gap-3 min-w-0">
+                                        <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden shrink-0">
+                                            {avatarUrl ? (
+                                                <img src={avatarUrl} className="w-full h-full object-cover" alt="" />
+                                            ) : (
+                                                <Users className="w-4 h-4 text-gray-300" />
+                                            )}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="text-[12px] font-black text-gray-800 uppercase tracking-tight truncate">{userName}</p>
+                                            {goal > 0 && (
+                                                <div className="mt-0.5">
+                                                    <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
+                                                        <div
+                                                            className={`h-full rounded-full transition-all duration-700 ${user.calls_total >= goal ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : user.calls_total >= goal * 0.5 ? 'bg-gradient-to-r from-amber-400 to-amber-500' : 'bg-gradient-to-r from-red-400 to-red-500'}`}
+                                                            style={{ width: `${Math.min((user.calls_total / goal) * 100, 100)}%` }}
+                                                        />
+                                                    </div>
+                                                    <p className="text-[7px] font-bold text-gray-400 mt-0.5">
+                                                        {user.calls_total >= goal ? '🟢' : user.calls_total >= goal * 0.5 ? '🟡' : '🔴'} {Math.round((user.calls_total / goal) * 100)}% de meta diaria ({goal})
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Total Calls */}
+                                    <div className="col-span-1 text-center">
+                                        <span className="text-[13px] font-black text-gray-700">{user.calls_total}</span>
+                                    </div>
+
+                                    {/* Connected */}
+                                    <div className="col-span-1 text-center">
+                                        <span className="text-[13px] font-black text-emerald-600">{user.calls_connected}</span>
+                                    </div>
+
+                                    {/* No Answer */}
+                                    <div className="col-span-1 text-center">
+                                        <span className="text-[13px] font-black text-red-400">{user.calls_no_answer}</span>
+                                    </div>
+
+                                    {/* Connect Rate */}
+                                    <div className="col-span-1 text-center">
+                                        <span className={`text-[11px] font-black px-2 py-1 rounded-lg ${connectRate >= 50 ? 'bg-emerald-50 text-emerald-700' :
+                                            connectRate >= 30 ? 'bg-amber-50 text-amber-700' :
+                                                'bg-red-50 text-red-600'
+                                            }`}>
+                                            {connectRate.toFixed(0)}%
+                                        </span>
+                                    </div>
+
+                                    {/* Unique Leads */}
+                                    <div className="col-span-2 text-center">
+                                        <span className="text-[13px] font-black text-gray-600">{user.unique_leads_called}</span>
+                                    </div>
+
+                                    {/* Status Changes */}
+                                    <div className="col-span-2 text-center">
+                                        <span className="text-[13px] font-black text-[#4449AA]">{user.leads_with_status_change}</span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                </div>
+            </div>
+
+            {/* Status Evolution */}
+            {statusEvolution.length > 0 && (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                    <h3 className="text-[11px] font-black text-gray-700 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 text-violet-500" />
+                        Evolución de Estados por Llamadas
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {statusEvolution.map((evo) => (
+                            <div key={`${evo.from}-${evo.to}`} className="bg-gradient-to-r from-gray-50 to-white rounded-xl border border-gray-100 p-3">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-[9px] font-black text-gray-400 px-1.5 py-0.5 bg-gray-100 rounded">
+                                        {evo.from || 'Nuevo'}
+                                    </span>
+                                    <ArrowUpRight className="w-3 h-3 text-violet-500" />
+                                    <span className="text-[9px] font-black text-violet-600 px-1.5 py-0.5 bg-violet-50 rounded">
+                                        {evo.to}
+                                    </span>
+                                </div>
+                                <p className="text-lg font-black text-gray-900">{evo.count}</p>
+                                <p className="text-[7px] font-bold text-gray-400 uppercase tracking-widest">transiciones</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Activity Intelligence Dashboard */}
+            <ActivityDashboard
+                companyId={companyId}
+                profileNames={profileNames}
+                profileAvatars={profileAvatars}
+                availableUserIds={callSummary.map(u => u.user_id)}
+            />
+
+
+            {/* Goal Configuration Modal */}
+            {
+                isGoalPanelOpen && (
+                    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center animate-in fade-in">
+                        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
+                            {/* Header */}
+                            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center">
+                                        <Phone className="w-5 h-5 text-white" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-sm font-black text-gray-900 uppercase tracking-tight">Metas de Llamadas</h2>
+                                        <p className="text-[10px] text-gray-400 font-bold">Llamadas diarias por vendedor</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setIsGoalPanelOpen(false)} className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">
+                                    <X className="w-4 h-4 text-gray-400" />
+                                </button>
+                            </div>
+
+                            {/* Body */}
+                            <div className="px-6 py-4 overflow-y-auto flex-1 space-y-3">
+                                {callSummary.map(user => (
+                                    <div key={user.user_id} className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3 border border-gray-100">
+                                        <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center overflow-hidden shrink-0">
+                                            {profileAvatars[user.user_id] ? (
+                                                <img src={profileAvatars[user.user_id]!} className="w-full h-full object-cover" alt="" />
+                                            ) : (
+                                                <Users className="w-3.5 h-3.5 text-gray-400" />
+                                            )}
+                                        </div>
+                                        <p className="text-[11px] font-black text-gray-700 uppercase tracking-tight flex-1 truncate">
+                                            {profileNames[user.user_id] || 'Desconocido'}
+                                        </p>
+                                        <div className="flex items-center gap-1.5">
+                                            <Phone className="w-3.5 h-3.5 text-gray-400" />
+                                            <input
+                                                type="number"
+                                                min={0}
+                                                max={100}
+                                                value={editGoals[user.user_id] || 0}
+                                                onChange={(e) => setEditGoals(prev => ({ ...prev, [user.user_id]: parseInt(e.target.value) || 0 }))}
+                                                className="w-16 h-8 border border-gray-200 rounded-lg text-center text-sm font-bold text-gray-700 focus:border-teal-400 focus:ring-2 focus:ring-teal-50 outline-none transition-all"
+                                                placeholder="0"
+                                            />
+                                            <span className="text-[8px] font-bold text-gray-400">/día</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Footer */}
+                            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-end gap-3 shrink-0">
+                                <button onClick={() => setIsGoalPanelOpen(false)} className="px-5 py-2.5 text-xs font-black text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-colors">
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleSaveGoals}
+                                    disabled={savingGoals}
+                                    className="flex items-center gap-2 bg-gradient-to-r from-teal-500 to-cyan-600 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:shadow-lg hover:shadow-teal-200 transition-all disabled:opacity-50"
+                                >
+                                    {savingGoals ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                                    Guardar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+        </div >
     );
 }
