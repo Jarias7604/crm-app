@@ -43,6 +43,8 @@ const PublicQuoteView = lazy(() => import('./pages/PublicQuoteView'));
 const AuditLog = lazy(() => import('./pages/admin/AuditLog'));
 const Teams = lazy(() => import('./pages/company/Teams'));
 const TeamPerformance = lazy(() => import('./pages/company/TeamPerformance'));
+const Tickets = lazy(() => import('./pages/support/Tickets'));
+const OverdueTickets = lazy(() => import('./pages/support/OverdueTickets'));
 
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -127,6 +129,10 @@ function App() {
                   <Route element={<FeatureProtectedRoute feature="chat" />}>
                     <Route path="/marketing/chat" element={<ChatHub />} />
                   </Route>
+
+                  {/* Support Routes */}
+                  <Route path="/support/tickets" element={<Tickets />} />
+                  <Route path="/support/atrasados" element={<OverdueTickets />} />
                 </Route>
               </Route>
 

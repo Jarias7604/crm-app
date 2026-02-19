@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthProvider';
-import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft, Zap, Search, Bot, XCircle, Network, BarChart3, UserCircle } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft, Zap, Search, Bot, XCircle, Network, BarChart3, UserCircle, Headset, TicketIcon, AlertTriangle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { brandingService } from '../services/branding';
@@ -29,6 +29,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     // Only one accordion open at a time
     const getInitialAccordion = () => {
         if (marketingPaths.some(path => location.pathname.startsWith(path) && !location.pathname.startsWith('/marketing/chat'))) return 'Marketing Hub';
+        if (location.pathname.startsWith('/support')) return 'Service Hub';
         if (teamPaths.some(path => location.pathname.startsWith(path))) return 'Equipo';
         return null;
     };
@@ -88,6 +89,18 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     if (canAccess('calendar')) {
         navigation.push({ name: t('sidebar.calendar'), href: '/calendar', icon: Calendar, current: location.pathname.startsWith('/calendar') });
     }
+
+    // Support Platform
+    navigation.push({
+        name: 'Service Hub',
+        href: '/support/tickets',
+        icon: Headset,
+        current: location.pathname.startsWith('/support'),
+        subItems: [
+            { name: 'Tickets', href: '/support/tickets', icon: TicketIcon },
+            { name: 'Atrasados', href: '/support/atrasados', icon: AlertTriangle },
+        ]
+    });
 
     if (canAccess('marketing')) {
         navigation.push({
