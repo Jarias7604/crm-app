@@ -347,7 +347,7 @@ export default function TeamPerformancePage() {
 
             {/* Content */}
             {activeTab === 'users' ? (
-                <UserPerformanceTable data={userPerformance} getUserGoal={getUserGoal} periodLabel={periodLabel} />
+                <UserPerformanceTable data={userPerformance} getUserGoal={getUserGoal} periodLabel={periodLabel} companySummary={companySummary} />
             ) : activeTab === 'teams' ? (
                 <TeamPerformanceGrid data={teamPerformance} profileNames={profileNames} profileAvatars={profileAvatars} getTeamGoal={getTeamGoal} periodLabel={periodLabel} />
             ) : activeTab === 'forecast' ? (
@@ -417,11 +417,11 @@ function GoalProgressBar({ actual, goal, type = 'number' }: { actual: number; go
     );
 }
 
-// === USER TABLE ===
-function UserPerformanceTable({ data, getUserGoal, periodLabel }: {
+function UserPerformanceTable({ data, getUserGoal, periodLabel, companySummary }: {
     data: UserPerformance[];
     getUserGoal: (userId: string) => { leads: number; value: number } | null;
     periodLabel: string;
+    companySummary?: CompanySummary;
 }) {
     if (data.length === 0) {
         return (
@@ -517,6 +517,42 @@ function UserPerformanceTable({ data, getUserGoal, periodLabel }: {
                         </div>
                     );
                 })}
+                {/* Unassigned row if there are leads not assigned to any user */}
+                {companySummary && (() => {
+                    const assignedLeads = data.reduce((s, u) => s + u.total_leads, 0);
+                    const assignedWon = data.reduce((s, u) => s + u.leads_won, 0);
+                    const assignedLost = data.reduce((s, u) => s + u.leads_lost, 0);
+                    const assignedValue = data.reduce((s, u) => s + u.total_value, 0);
+                    const assignedClosing = data.reduce((s, u) => s + u.total_closing_amount, 0);
+                    const unLeads = companySummary.totalLeads - assignedLeads;
+                    const unWon = companySummary.wonDeals - assignedWon;
+                    const unLost = companySummary.lostDeals - assignedLost;
+                    const unValue = companySummary.totalValue - assignedValue;
+                    const unClosing = companySummary.totalClosing - assignedClosing;
+                    if (unLeads <= 0 && unWon <= 0) return null;
+                    return (
+                        <div className="grid grid-cols-12 gap-2 px-6 py-4 items-center bg-gray-50/80 border-t border-gray-200">
+                            <div className="col-span-1 flex justify-center">
+                                <span className="text-[11px] font-bold text-gray-300">—</span>
+                            </div>
+                            <div className="col-span-3 flex items-center gap-3 min-w-0">
+                                <div className="w-9 h-9 rounded-xl bg-gray-200 flex items-center justify-center overflow-hidden shrink-0">
+                                    <Users className="w-4 h-4 text-gray-400" />
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-[12px] font-black text-gray-400 uppercase tracking-tight">Sin Asignar</p>
+                                    <span className="text-[9px] text-gray-300 font-medium">Leads sin vendedor</span>
+                                </div>
+                            </div>
+                            <div className="col-span-1 text-center"><span className="text-[13px] font-black text-gray-400">{unLeads}</span></div>
+                            <div className="col-span-1 text-center"><span className="text-[13px] font-black text-emerald-400">{unWon}</span></div>
+                            <div className="col-span-1 text-center"><span className="text-[13px] font-black text-red-300">{unLost}</span></div>
+                            <div className="col-span-1 text-center"><span className="text-[11px] font-bold text-gray-300">—</span></div>
+                            <div className="col-span-2 text-right"><span className="text-[12px] font-black text-gray-400">{formatCurrency(unValue)}</span></div>
+                            <div className="col-span-2 text-right"><span className="text-[13px] font-black text-gray-400">{formatCurrency(unClosing)}</span></div>
+                        </div>
+                    );
+                })()}
             </div>
         </div>
     );
