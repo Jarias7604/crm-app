@@ -160,9 +160,9 @@ export const campaignService = {
 
         // Filter by availability based on channel
         if (channel === 'email') {
-            query = query.not('email', 'is', null);
+            query = query.not('email', 'is', null).neq('email', '');
         } else {
-            query = query.not('phone', 'is', null);
+            query = query.not('phone', 'is', null).neq('phone', '');
         }
 
         if (filters.specificIds && filters.specificIds.length > 0) {

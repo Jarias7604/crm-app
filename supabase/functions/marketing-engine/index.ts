@@ -78,8 +78,9 @@ Deno.serve(async (req) => {
             }
         }
 
+
         if (campaign.type === 'email') {
-            query = query.not('email', 'is', null);
+            query = query.not('email', 'is', null).neq('email', '');
         }
 
         const { data: leads, error: leadError } = await query;
@@ -91,14 +92,20 @@ Deno.serve(async (req) => {
             });
         }
 
-        // 2b. Senior Idempotency: Exclude already sent leads for this campaign
+        // 2b. Smart Audience: Exclude manually deselected leads
+        const excludedIds = new Set(filters.excludedIds || []);
+        const afterExclusion = excludedIds.size > 0
+            ? leads.filter(l => !excludedIds.has(l.id))
+            : leads;
+
+        // 2c. Senior Idempotency: Exclude already sent leads for this campaign
         const { data: sentMessages } = await supabase
             .from('marketing_messages')
             .select('metadata->lead_id')
             .eq('metadata->>campaign_id', campaignId);
 
         const sentLeadIds = new Set(sentMessages?.map(m => m.lead_id) || []);
-        const filteredLeads = leads.filter(l => !sentLeadIds.has(l.id));
+        const filteredLeads = afterExclusion.filter(l => !sentLeadIds.has(l.id));
 
         if (filteredLeads.length === 0) {
             return new Response(JSON.stringify({

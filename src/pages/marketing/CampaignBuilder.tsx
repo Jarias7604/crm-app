@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
-import { Save, Send, ArrowLeft, Users, FileText, Eye, X, Zap, Mail, Smartphone, Info, ChevronLeft, ChevronRight, Smartphone as WhatsAppIcon, ExternalLink, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Save, Send, ArrowLeft, Users, FileText, Eye, X, Zap, Mail, Smartphone, Info, ChevronLeft, ChevronRight, Smartphone as WhatsAppIcon, ExternalLink, ShieldCheck, ShieldAlert, Check, Search, MailX, UserCheck, UserX } from 'lucide-react';
 import { campaignService } from '../../services/marketing/campaignService';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../auth/AuthProvider';
@@ -77,6 +77,8 @@ export default function CampaignBuilder() {
     const [showSimulator, setShowSimulator] = useState(false);
     const [showAudienceModal, setShowAudienceModal] = useState(false);
     const [currentLeadIndex, setCurrentLeadIndex] = useState(0);
+    const [excludedLeadIds, setExcludedLeadIds] = useState<Set<string>>(new Set());
+    const [audienceSearch, setAudienceSearch] = useState('');
 
     // Auto-update audience preview when filters change
     useEffect(() => {
@@ -138,9 +140,36 @@ export default function CampaignBuilder() {
         }
     };
 
-    const displayedLeads = (selectedChannel === 'telegram' && onlyConnected)
+    const filteredByChannel = (selectedChannel === 'telegram' && onlyConnected)
         ? previewLeads.filter(l => l.marketing_conversations?.[0]?.external_id)
         : previewLeads;
+
+    // Smart Audience: exclude deselected leads
+    const displayedLeads = filteredByChannel;
+    const selectedLeads = filteredByChannel.filter(l => !excludedLeadIds.has(l.id));
+    const reachCount = selectedLeads.length;
+    const totalCount = filteredByChannel.length;
+
+    // Filter audience in modal search
+    const searchedAudienceLeads = audienceSearch.trim()
+        ? filteredByChannel.filter(l =>
+            (l.name || '').toLowerCase().includes(audienceSearch.toLowerCase()) ||
+            (l.email || '').toLowerCase().includes(audienceSearch.toLowerCase()) ||
+            (l.phone || '').includes(audienceSearch)
+        )
+        : filteredByChannel;
+
+    const toggleLeadExcluded = (leadId: string) => {
+        setExcludedLeadIds(prev => {
+            const next = new Set(prev);
+            if (next.has(leadId)) next.delete(leadId);
+            else next.add(leadId);
+            return next;
+        });
+    };
+
+    const selectAllLeads = () => setExcludedLeadIds(new Set());
+    const deselectAllLeads = () => setExcludedLeadIds(new Set(filteredByChannel.map(l => l.id)));
 
     const handleSave = async (isDraft: boolean) => {
         try {
@@ -154,15 +183,21 @@ export default function CampaignBuilder() {
                 return;
             }
 
+            // Build audience filter with excluded leads
+            const audienceFilters = {
+                ...formData.audience_filter,
+                excludedIds: excludedLeadIds.size > 0 ? Array.from(excludedLeadIds) : undefined
+            };
+
             const campaignData = {
                 name: formData.name,
                 subject: selectedChannel === 'email' ? formData.subject : undefined,
                 content: formData.content,
                 type: selectedChannel === 'telegram' ? 'social' : selectedChannel,
                 status: 'draft' as 'draft',
-                total_recipients: previewLeads.length || 0,
+                total_recipients: reachCount,
                 company_id: profile?.company_id || undefined,
-                audience_filters: formData.audience_filter,
+                audience_filters: audienceFilters,
                 template_id: formData.template_id,
                 stats: { sent: 0, delivered: 0, opened: 0, clicked: 0, replied: 0, bounced: 0 }
             };
@@ -418,6 +453,16 @@ export default function CampaignBuilder() {
                             )}
                         </div>
 
+                        {/* Smart Reach Indicator */}
+                        {totalCount > 0 && excludedLeadIds.size > 0 && (
+                            <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl flex items-center gap-2 animate-in fade-in duration-300">
+                                <UserX className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                                <p className="text-[10px] font-bold text-amber-700">
+                                    {excludedLeadIds.size} excluido{excludedLeadIds.size > 1 ? 's' : ''} manualmente — se enviará a <span className="font-black">{reachCount}</span> de {totalCount}
+                                </p>
+                            </div>
+                        )}
+
                         <button
                             onClick={async () => {
                                 await handlePreviewAudience();
@@ -426,7 +471,7 @@ export default function CampaignBuilder() {
                             disabled={loadingPreview}
                             className="w-full py-4 bg-[#0f172a] hover:bg-black text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] transition-all hover:shadow-xl disabled:opacity-70 flex items-center justify-center gap-2"
                         >
-                            {loadingPreview ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Eye className="w-4 h-4" /> Validar Audiencia ({displayedLeads.length})</>}
+                            {loadingPreview ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Eye className="w-4 h-4" /> Validar Audiencia ({reachCount})</>}
                         </button>
                     </div>
 
@@ -764,72 +809,157 @@ export default function CampaignBuilder() {
             {/* Audience Preview Modal */}
             {showAudienceModal && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowAudienceModal(false)}>
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[80vh] overflow-hidden animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col" onClick={(e) => e.stopPropagation()}>
                         {/* Header */}
-                        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 flex items-center justify-between">
+                        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-6 flex items-center justify-between flex-shrink-0">
                             <div className="flex items-center gap-3">
                                 <div className="p-3 bg-white/20 rounded-2xl">
                                     <Users className="w-6 h-6 text-white" />
                                 </div>
                                 <div>
-                                    <h3 className="text-2xl font-black text-white tracking-tight">Audiencia Validada</h3>
-                                    <p className="text-white/70 text-sm font-bold">{displayedLeads.length} contactos seleccionados</p>
+                                    <h3 className="text-2xl font-black text-white tracking-tight">Audiencia Inteligente</h3>
+                                    <p className="text-white/70 text-sm font-bold">
+                                        <span className="text-white font-black">{reachCount}</span> de {totalCount} serán contactados
+                                        {selectedChannel === 'email' && <span className="ml-1">por email</span>}
+                                    </p>
                                 </div>
                             </div>
                             <button
-                                onClick={() => setShowAudienceModal(false)}
+                                onClick={() => { setShowAudienceModal(false); setAudienceSearch(''); }}
                                 className="p-2 hover:bg-white/10 rounded-xl transition-all text-white"
                             >
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
 
+                        {/* Smart Controls Bar */}
+                        <div className="px-6 py-4 bg-gray-50 border-b border-gray-100 flex items-center gap-3 flex-shrink-0">
+                            {/* Search */}
+                            <div className="flex-1 relative">
+                                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                                <input
+                                    type="text"
+                                    value={audienceSearch}
+                                    onChange={e => setAudienceSearch(e.target.value)}
+                                    placeholder="Buscar por nombre, email o teléfono..."
+                                    className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
+                                />
+                            </div>
+
+                            {/* Select All / None */}
+                            <button
+                                onClick={selectAllLeads}
+                                className="px-3 py-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-[10px] font-black uppercase tracking-wider text-emerald-700 transition-all flex items-center gap-1.5 whitespace-nowrap"
+                            >
+                                <UserCheck className="w-3.5 h-3.5" />
+                                Todos
+                            </button>
+                            <button
+                                onClick={deselectAllLeads}
+                                className="px-3 py-2.5 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl text-[10px] font-black uppercase tracking-wider text-red-600 transition-all flex items-center gap-1.5 whitespace-nowrap"
+                            >
+                                <UserX className="w-3.5 h-3.5" />
+                                Ninguno
+                            </button>
+                        </div>
+
                         {/* Leads List */}
-                        <div className="p-6 overflow-y-auto max-h-[calc(80vh-120px)]">
-                            {displayedLeads.length === 0 ? (
+                        <div className="p-6 overflow-y-auto flex-1">
+                            {searchedAudienceLeads.length === 0 ? (
                                 <div className="text-center py-12">
                                     <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                                    <p className="text-gray-500 font-bold">No se encontraron leads con los filtros seleccionados</p>
+                                    <p className="text-gray-500 font-bold">{audienceSearch ? 'No se encontraron resultados' : 'No se encontraron leads con los filtros seleccionados'}</p>
                                 </div>
                             ) : (
-                                <div className="space-y-3">
-                                    {displayedLeads.map((lead, idx) => (
-                                        <div key={lead.id || idx} className="p-4 bg-gray-50 hover:bg-gray-100 rounded-2xl border border-gray-200 transition-all group">
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-4 flex-1">
-                                                    <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl flex items-center justify-center text-white font-black text-lg shadow-lg">
-                                                        {(lead.name || 'L').charAt(0).toUpperCase()}
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <h4 className="font-black text-gray-900 text-base">{lead.name || 'Sin nombre'}</h4>
-                                                        <div className="flex items-center gap-3 mt-1">
-                                                            <span className="text-sm text-gray-600 font-medium">{lead.phone || 'Sin teléfono'}</span>
-                                                            {lead.email && (
-                                                                <span className="text-xs text-gray-400">• {lead.email}</span>
-                                                            )}
-                                                        </div>
+                                <div className="space-y-2">
+                                    {searchedAudienceLeads.map((lead, idx) => {
+                                        const isExcluded = excludedLeadIds.has(lead.id);
+
+                                        return (
+                                            <div
+                                                key={lead.id || idx}
+                                                onClick={() => toggleLeadExcluded(lead.id)}
+                                                className={`p-4 rounded-2xl border-2 transition-all cursor-pointer group flex items-center gap-4 ${isExcluded
+                                                    ? 'bg-gray-50 border-gray-100 opacity-50'
+                                                    : 'bg-white hover:bg-indigo-50/30 border-gray-200 hover:border-indigo-300'
+                                                    }`}
+                                            >
+                                                {/* Checkbox */}
+                                                <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all ${isExcluded
+                                                    ? 'border-gray-300 bg-white'
+                                                    : 'border-indigo-500 bg-indigo-600'
+                                                    }`}>
+                                                    {!isExcluded && <Check className="w-3.5 h-3.5 text-white" />}
+                                                </div>
+
+                                                {/* Avatar */}
+                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shadow-sm flex-shrink-0 ${isExcluded
+                                                    ? 'bg-gray-200 text-gray-400'
+                                                    : 'bg-gradient-to-br from-indigo-500 to-purple-500 text-white'
+                                                    }`}>
+                                                    {(lead.name || 'L').charAt(0).toUpperCase()}
+                                                </div>
+
+                                                {/* Info */}
+                                                <div className="flex-1 min-w-0">
+                                                    <h4 className={`font-black text-sm truncate ${isExcluded ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+                                                        {lead.name || 'Sin nombre'}
+                                                    </h4>
+                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                        {selectedChannel === 'email' ? (
+                                                            lead.email ? (
+                                                                <span className={`text-xs font-medium truncate ${isExcluded ? 'text-gray-300' : 'text-gray-500'}`}>
+                                                                    📧 {lead.email}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-xs font-bold text-red-400 flex items-center gap-1">
+                                                                    <MailX className="w-3 h-3" /> Sin email
+                                                                </span>
+                                                            )
+                                                        ) : (
+                                                            <span className={`text-xs font-medium ${isExcluded ? 'text-gray-300' : 'text-gray-500'}`}>
+                                                                📱 {lead.phone || 'Sin teléfono'}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase ${lead.status === 'Cliente' ? 'bg-green-100 text-green-700' :
+
+                                                {/* Status Badge */}
+                                                <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase flex-shrink-0 ${isExcluded ? 'bg-gray-100 text-gray-400' :
+                                                    lead.status === 'Cliente' ? 'bg-green-100 text-green-700' :
                                                         lead.status === 'Prospecto' ? 'bg-blue-100 text-blue-700' :
                                                             lead.status === 'Negociación' ? 'bg-amber-100 text-amber-700' :
                                                                 'bg-gray-100 text-gray-700'
-                                                        }`}>
-                                                        {lead.status || 'Sin estado'}
-                                                    </span>
-                                                    <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase ${lead.priority === 'high' ? 'bg-red-100 text-red-700' :
-                                                        lead.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                                                            'bg-gray-100 text-gray-600'
-                                                        }`}>
-                                                        {lead.priority === 'high' ? '🔥' : lead.priority === 'medium' ? '⚡' : '📋'}
-                                                    </span>
-                                                </div>
+                                                    }`}>
+                                                    {lead.status || 'Sin estado'}
+                                                </span>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
+                        </div>
+
+                        {/* Footer with Stats */}
+                        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between flex-shrink-0">
+                            <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-3 h-3 rounded bg-indigo-600" />
+                                    <span className="text-[10px] font-black text-gray-500 uppercase">{reachCount} incluidos</span>
+                                </div>
+                                {excludedLeadIds.size > 0 && (
+                                    <div className="flex items-center gap-1.5">
+                                        <div className="w-3 h-3 rounded bg-gray-300" />
+                                        <span className="text-[10px] font-black text-gray-400 uppercase">{excludedLeadIds.size} excluidos</span>
+                                    </div>
+                                )}
+                            </div>
+                            <button
+                                onClick={() => { setShowAudienceModal(false); setAudienceSearch(''); }}
+                                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-200"
+                            >
+                                Confirmar Audiencia ({reachCount})
+                            </button>
                         </div>
                     </div>
                 </div>
