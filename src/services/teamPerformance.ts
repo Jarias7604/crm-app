@@ -37,6 +37,14 @@ export interface TeamPerformance {
     top_performer: string | null;
 }
 
+export interface CompanySummary {
+    totalLeads: number;
+    wonDeals: number;
+    lostDeals: number;
+    totalValue: number;
+    totalClosing: number;
+}
+
 export interface PerformanceFilters {
     period: 'week' | 'month' | 'quarter' | 'year' | 'all' | 'custom';
     team_id?: string;
@@ -91,6 +99,58 @@ function getDateRange(filters: PerformanceFilters): { start: Date | null; end: D
 
 // === SERVICE ===
 export const teamPerformanceService = {
+
+    /**
+     * Get company-wide summary totals (ALL leads, including unassigned)
+     * Uses same logic as Dashboard RPC: COALESCE(internal_won_date, created_at)
+     */
+    async getCompanySummary(companyId: string, filters: PerformanceFilters): Promise<CompanySummary> {
+        const { start, end } = getDateRange(filters);
+
+        // Total leads (by created_at)
+        let totalQuery = supabase.from('leads').select('id, value', { count: 'exact' })
+            .eq('company_id', companyId);
+        if (start) totalQuery = totalQuery.gte('created_at', start.toISOString());
+        if (end) totalQuery = totalQuery.lte('created_at', end.toISOString());
+        const { data: totalLeads, count: totalCount } = await totalQuery;
+
+        // Won leads (by internal_won_date, matching Dashboard: COALESCE logic)
+        // We fetch all won leads for the company, then filter in JS using COALESCE
+        let wonQuery = supabase.from('leads')
+            .select('id, value, closing_amount, internal_won_date, created_at')
+            .eq('company_id', companyId)
+            .in('status', ['Cerrado', 'Cliente']);
+
+        // Apply date range using the COALESCE logic to match Dashboard
+        // Since Supabase doesn't support COALESCE in filters, we fetch broadly and filter in JS
+        const { data: allWonLeads } = await wonQuery;
+        const filteredWon = (allWonLeads || []).filter(lead => {
+            const effectiveDate = lead.internal_won_date || lead.created_at;
+            if (start && effectiveDate < start.toISOString()) return false;
+            if (end && effectiveDate > end.toISOString()) return false;
+            return true;
+        });
+
+        // Lost leads (by lost_date)
+        let lostQuery = supabase.from('leads').select('id', { count: 'exact' })
+            .eq('company_id', companyId)
+            .eq('status', 'Perdido')
+            .not('lost_date', 'is', null);
+        if (start) lostQuery = lostQuery.gte('lost_date', start.toISOString());
+        if (end) lostQuery = lostQuery.lte('lost_date', end.toISOString());
+        const { count: lostCount } = await lostQuery;
+
+        const totalValue = (totalLeads || []).reduce((sum, l) => sum + Number(l.value || 0), 0);
+        const totalClosing = filteredWon.reduce((sum, l) => sum + Number(l.closing_amount || l.value || 0), 0);
+
+        return {
+            totalLeads: totalCount || 0,
+            wonDeals: filteredWon.length,
+            lostDeals: lostCount || 0,
+            totalValue,
+            totalClosing,
+        };
+    },
 
     /**
      * Get performance metrics for all users in a company

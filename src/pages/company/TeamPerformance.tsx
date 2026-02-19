@@ -11,6 +11,7 @@ import {
     type UserPerformance,
     type TeamPerformance,
     type PerformanceFilters,
+    type CompanySummary,
 } from '../../services/teamPerformance';
 import { teamsService, type Team } from '../../services/teams';
 import { performanceGoalsService, type PerformanceGoal } from '../../services/performanceGoals';
@@ -83,6 +84,7 @@ export default function TeamPerformancePage() {
     const [filters, setFilters] = useState<PerformanceFilters>({ period: 'all' });
     const [profileNames, setProfileNames] = useState<Record<string, string>>({});
     const [profileAvatars, setProfileAvatars] = useState<Record<string, string | null>>({});
+    const [companySummary, setCompanySummary] = useState<CompanySummary>({ totalLeads: 0, wonDeals: 0, lostDeals: 0, totalValue: 0, totalClosing: 0 });
 
     // Goals
     const [goals, setGoals] = useState<PerformanceGoal[]>([]);
@@ -112,16 +114,18 @@ export default function TeamPerformancePage() {
         if (!profile?.company_id) return;
         setLoading(true);
         try {
-            const [userData, teamData, teamsData, goalsData] = await Promise.all([
+            const [userData, teamData, teamsData, goalsData, summaryData] = await Promise.all([
                 teamPerformanceService.getUserPerformance(profile.company_id, filters),
                 teamPerformanceService.getTeamPerformance(profile.company_id, filters),
                 teamsService.getTeams(profile.company_id),
                 performanceGoalsService.getGoals(profile.company_id),
+                teamPerformanceService.getCompanySummary(profile.company_id, filters),
             ]);
             setUserPerformance(userData);
             setTeamPerformance(teamData);
             setTeams(teamsData);
             setGoals(goalsData);
+            setCompanySummary(summaryData);
 
             const names: Record<string, string> = {};
             const avatars: Record<string, string | null> = {};
@@ -142,11 +146,11 @@ export default function TeamPerformancePage() {
         loadData();
     }, [loadData]);
 
-    // === COMPUTED ===
-    const totalLeads = userPerformance.reduce((s, u) => s + u.total_leads, 0);
-    const totalWon = userPerformance.reduce((s, u) => s + u.leads_won, 0);
-    const totalClosing = userPerformance.reduce((s, u) => s + u.total_closing_amount, 0);
-    const totalValue = userPerformance.reduce((s, u) => s + u.total_value, 0);
+    // === COMPUTED (company-wide totals from companySummary for KPI parity with Dashboard) ===
+    const totalLeads = companySummary.totalLeads;
+    const totalWon = companySummary.wonDeals;
+    const totalClosing = companySummary.totalClosing;
+    const totalValue = companySummary.totalValue;
     const overallWinRate = totalLeads > 0 ? (totalWon / totalLeads) * 100 : 0;
     const topUser = userPerformance.length > 0 ? userPerformance[0] : null;
 
