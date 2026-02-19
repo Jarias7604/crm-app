@@ -489,16 +489,22 @@ function UserPerformanceTable({ data, getUserGoal, periodLabel, companySummary }
                             </div>
                             {/* Leads */}
                             <div className="col-span-1 text-center">
-                                <span className="text-[13px] font-black text-gray-700">{user.total_leads}</span>
+                                {user.total_leads > 0 ? (
+                                    <span className="text-[13px] font-black text-gray-700 cursor-pointer hover:text-blue-600 hover:underline transition-colors" onClick={(e) => { e.stopPropagation(); navigate('/leads', { state: { assignedFilter: user.user_id } }); }}>{user.total_leads}</span>
+                                ) : <span className="text-[13px] font-black text-gray-700">{user.total_leads}</span>}
                             </div>
                             {/* Won */}
                             <div className="col-span-1 text-center">
-                                <span className="text-[13px] font-black text-emerald-600">{user.leads_won}</span>
+                                {user.leads_won > 0 ? (
+                                    <span className="text-[13px] font-black text-emerald-600 cursor-pointer hover:text-emerald-800 hover:underline transition-colors" onClick={(e) => { e.stopPropagation(); navigate('/leads', { state: { assignedFilter: user.user_id, status: ['Cerrado', 'Cliente'] } }); }}>{user.leads_won}</span>
+                                ) : <span className="text-[13px] font-black text-emerald-600">{user.leads_won}</span>}
                                 {goal && goal.leads > 0 && <GoalProgressBar actual={user.leads_won} goal={goal.leads} />}
                             </div>
                             {/* Lost */}
                             <div className="col-span-1 text-center">
-                                <span className="text-[13px] font-black text-red-400">{user.leads_lost}</span>
+                                {user.leads_lost > 0 ? (
+                                    <span className="text-[13px] font-black text-red-400 cursor-pointer hover:text-red-600 hover:underline transition-colors" onClick={(e) => { e.stopPropagation(); navigate('/leads', { state: { assignedFilter: user.user_id, status: 'Perdido' } }); }}>{user.leads_lost}</span>
+                                ) : <span className="text-[13px] font-black text-red-400">{user.leads_lost}</span>}
                             </div>
                             {/* Win Rate */}
                             <div className="col-span-1 text-center">
@@ -533,10 +539,7 @@ function UserPerformanceTable({ data, getUserGoal, periodLabel, companySummary }
                     const unClosing = companySummary.totalClosing - assignedClosing;
                     if (unLeads <= 0 && unWon <= 0) return null;
                     return (
-                        <div
-                            onClick={() => navigate('/leads', { state: { assignedFilter: 'unassigned' } })}
-                            className="grid grid-cols-12 gap-2 px-6 py-4 items-center bg-gray-50/80 border-t border-gray-200 cursor-pointer hover:bg-amber-50/50 transition-colors group" title="Click para ver y asignar estos leads"
-                        >
+                        <div className="grid grid-cols-12 gap-2 px-6 py-4 items-center bg-gray-50/80 border-t border-gray-200">
                             <div className="col-span-1 flex justify-center">
                                 <span className="text-[11px] font-bold text-gray-300">—</span>
                             </div>
@@ -549,9 +552,21 @@ function UserPerformanceTable({ data, getUserGoal, periodLabel, companySummary }
                                     <span className="text-[9px] text-gray-300 font-medium">Leads sin vendedor</span>
                                 </div>
                             </div>
-                            <div className="col-span-1 text-center"><span className="text-[13px] font-black text-gray-400">{unLeads}</span></div>
-                            <div className="col-span-1 text-center"><span className="text-[13px] font-black text-emerald-400">{unWon}</span></div>
-                            <div className="col-span-1 text-center"><span className="text-[13px] font-black text-red-300">{unLost}</span></div>
+                            <div className="col-span-1 text-center">
+                                {unLeads > 0 ? (
+                                    <span className="text-[13px] font-black text-gray-400 cursor-pointer hover:text-blue-600 hover:underline transition-colors" onClick={() => navigate('/leads', { state: { assignedFilter: 'unassigned' } })}>{unLeads}</span>
+                                ) : <span className="text-[13px] font-black text-gray-400">{unLeads}</span>}
+                            </div>
+                            <div className="col-span-1 text-center">
+                                {unWon > 0 ? (
+                                    <span className="text-[13px] font-black text-emerald-400 cursor-pointer hover:text-emerald-600 hover:underline transition-colors" onClick={() => navigate('/leads', { state: { assignedFilter: 'unassigned', status: ['Cerrado', 'Cliente'] } })}>{unWon}</span>
+                                ) : <span className="text-[13px] font-black text-emerald-400">{unWon}</span>}
+                            </div>
+                            <div className="col-span-1 text-center">
+                                {unLost > 0 ? (
+                                    <span className="text-[13px] font-black text-red-300 cursor-pointer hover:text-red-500 hover:underline transition-colors" onClick={() => navigate('/leads', { state: { assignedFilter: 'unassigned', status: 'Perdido' } })}>{unLost}</span>
+                                ) : <span className="text-[13px] font-black text-red-300">{unLost}</span>}
+                            </div>
                             <div className="col-span-1 text-center"><span className="text-[11px] font-bold text-gray-300">—</span></div>
                             <div className="col-span-2 text-right"><span className="text-[12px] font-black text-gray-400">{formatCurrency(unValue)}</span></div>
                             <div className="col-span-2 text-right"><span className="text-[13px] font-black text-gray-400">{formatCurrency(unClosing)}</span></div>
