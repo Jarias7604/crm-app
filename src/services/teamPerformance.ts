@@ -54,31 +54,39 @@ function getDateRange(filters: PerformanceFilters): { start: Date | null; end: D
 
     const now = new Date();
     let start: Date | null = null;
+    let end: Date | null = null;
 
     switch (filters.period) {
         case 'week': {
             start = new Date(now);
             start.setDate(start.getDate() - 7);
+            end = now;
             break;
         }
         case 'month': {
             start = new Date(now.getFullYear(), now.getMonth(), 1);
+            // Last day of current month at 23:59:59
+            end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
             break;
         }
         case 'quarter': {
             const qMonth = Math.floor(now.getMonth() / 3) * 3;
             start = new Date(now.getFullYear(), qMonth, 1);
+            // Last day of quarter
+            end = new Date(now.getFullYear(), qMonth + 3, 0, 23, 59, 59);
             break;
         }
         case 'year': {
             start = new Date(now.getFullYear(), 0, 1);
+            end = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
             break;
         }
         default:
             start = null;
+            end = null;
     }
 
-    return { start, end: null };
+    return { start, end };
 }
 
 // === SERVICE ===
