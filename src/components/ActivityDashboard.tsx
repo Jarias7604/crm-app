@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Users, Activity, X, ChevronDown, Loader2 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { Users, Activity, X, ChevronDown, Loader2, Target, TrendingUp, TrendingDown, Minus, Pencil, Check } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
 import { callActivityService, ACTION_TYPE_CONFIG, type ActionType } from '../services/callActivity';
 import { CustomDatePicker } from './ui/CustomDatePicker';
 
@@ -46,6 +46,11 @@ export function ActivityDashboard({ companyId, profileNames, profileAvatars, ava
     const [groupBy, setGroupBy] = useState<GroupBy>('day');
     const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
 
+    // ─── Goal state ───
+    const [dailyGoal, setDailyGoal] = useState(40);
+    const [isEditingGoal, setIsEditingGoal] = useState(false);
+    const [goalInput, setGoalInput] = useState('40');
+
     // ─── Data ───
     const [timeline, setTimeline] = useState<{ key: string; label: string; total: number;[k: string]: number | string }[]>([]);
     const [loading, setLoading] = useState(false);
@@ -79,7 +84,7 @@ export function ActivityDashboard({ companyId, profileNames, profileAvatars, ava
 
             // Compute KPIs
             const total = data.reduce((s, d) => s + d.total, 0);
-            const days = data.length || 1;
+            const periods = data.length || 1;
             const channelTotals: Record<string, number> = {};
             const actionTypes: ActionType[] = ['call', 'email', 'whatsapp', 'telegram', 'quote_sent', 'info_sent', 'meeting'];
             actionTypes.forEach(t => {
@@ -88,7 +93,7 @@ export function ActivityDashboard({ companyId, profileNames, profileAvatars, ava
             const topEntry = Object.entries(channelTotals).sort((a, b) => b[1] - a[1])[0];
             setKpis({
                 total,
-                avgPerDay: Math.round((total / days) * 10) / 10,
+                avgPerDay: Math.round((total / periods) * 10) / 10,
                 topChannel: topEntry?.[0] || '',
                 topCount: topEntry?.[1] || 0,
             });
@@ -149,6 +154,25 @@ export function ActivityDashboard({ companyId, profileNames, profileAvatars, ava
     );
 
     const topConfig = ACTION_TYPE_CONFIG[kpis.topChannel as ActionType];
+
+    // ─── Goal calculations ───
+    const goalForPeriod = groupBy === 'day' ? dailyGoal : groupBy === 'week' ? dailyGoal * 5 : dailyGoal * 22;
+    const goalLabel = groupBy === 'day' ? 'día' : groupBy === 'week' ? 'semana' : 'mes';
+    const achievementPct = goalForPeriod > 0 ? Math.round((kpis.avgPerDay / goalForPeriod) * 100) : 0;
+    const daysAboveGoal = timeline.filter(d => d.total >= goalForPeriod).length;
+    const daysTotal = timeline.length;
+    const achievementColor = achievementPct >= 100 ? 'text-emerald-500' : achievementPct >= 70 ? 'text-amber-500' : 'text-red-500';
+    const achievementBg = achievementPct >= 100 ? 'bg-emerald-50 border-emerald-100' : achievementPct >= 70 ? 'bg-amber-50 border-amber-100' : 'bg-red-50 border-red-100';
+    const AchievementIcon = achievementPct >= 100 ? TrendingUp : achievementPct >= 70 ? Minus : TrendingDown;
+
+    // Save goal handler
+    const saveGoal = () => {
+        const parsed = parseInt(goalInput);
+        if (!isNaN(parsed) && parsed > 0) {
+            setDailyGoal(parsed);
+        }
+        setIsEditingGoal(false);
+    };
 
     return (
         <div ref={containerRef} className="space-y-5">
@@ -307,7 +331,7 @@ export function ActivityDashboard({ companyId, profileNames, profileAvatars, ava
             </div>
 
             {/* ══════════ KPI STRIP ══════════ */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="bg-white/70 backdrop-blur-xl rounded-2xl border border-gray-100/60 shadow-[0_2px_20px_rgba(0,0,0,0.03)] px-5 py-4">
                     <p className="text-[8px] font-black uppercase tracking-[0.15em] text-gray-400 mb-1">Total Acciones</p>
                     <p className="text-2xl font-black text-gray-900 tracking-tight">{kpis.total.toLocaleString()}</p>
@@ -317,13 +341,63 @@ export function ActivityDashboard({ companyId, profileNames, profileAvatars, ava
                         Promedio / {groupBy === 'day' ? 'Día' : groupBy === 'week' ? 'Semana' : 'Mes'}
                     </p>
                     <p className="text-2xl font-black text-gray-900 tracking-tight">{kpis.avgPerDay}</p>
+                    <p className="text-[9px] font-bold text-gray-400 mt-0.5">Meta: {goalForPeriod} / {goalLabel}</p>
                 </div>
+                {/* Goal Achievement KPI */}
+                <div className={`backdrop-blur-xl rounded-2xl border shadow-[0_2px_20px_rgba(0,0,0,0.03)] px-5 py-4 ${achievementBg}`}>
+                    <p className="text-[8px] font-black uppercase tracking-[0.15em] text-gray-400 mb-1 flex items-center gap-1">
+                        <Target className="w-3 h-3" /> Cumplimiento
+                    </p>
+                    <div className="flex items-center gap-2">
+                        <p className={`text-2xl font-black tracking-tight ${achievementColor}`}>{achievementPct}%</p>
+                        <AchievementIcon className={`w-5 h-5 ${achievementColor}`} />
+                    </div>
+                    <p className="text-[9px] font-bold text-gray-400 mt-0.5">
+                        {daysAboveGoal}/{daysTotal} {groupBy === 'day' ? 'días' : groupBy === 'week' ? 'semanas' : 'meses'} alcanzados
+                    </p>
+                </div>
+                {/* Meta Configuration */}
                 <div className="bg-white/70 backdrop-blur-xl rounded-2xl border border-gray-100/60 shadow-[0_2px_20px_rgba(0,0,0,0.03)] px-5 py-4">
-                    <p className="text-[8px] font-black uppercase tracking-[0.15em] text-gray-400 mb-1">Canal Principal</p>
-                    <p className="text-2xl font-black text-gray-900 tracking-tight">
+                    <p className="text-[8px] font-black uppercase tracking-[0.15em] text-gray-400 mb-1 flex items-center gap-1">
+                        {topConfig ? `${topConfig.icon}` : '📊'} Canal Principal
+                    </p>
+                    <p className="text-lg font-black text-gray-900 tracking-tight">
                         {topConfig ? `${topConfig.icon} ${topConfig.label}` : '—'}
                     </p>
-                    <p className="text-[9px] font-bold text-gray-400 mt-0.5">{kpis.topCount} acciones</p>
+                    <div className="flex items-center gap-1.5 mt-1">
+                        <p className="text-[9px] font-bold text-gray-400">{kpis.topCount} acciones</p>
+                        <span className="text-[8px] text-gray-300">|</span>
+                        <div className="flex items-center gap-1">
+                            <span className="text-[9px] font-bold text-gray-400">Meta diaria:</span>
+                            {isEditingGoal ? (
+                                <div className="flex items-center gap-0.5">
+                                    <input
+                                        type="number"
+                                        value={goalInput}
+                                        onChange={(e) => setGoalInput(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && saveGoal()}
+                                        className="w-12 px-1 py-0 text-[10px] font-black text-indigo-600 border border-indigo-300 rounded bg-indigo-50 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                                        autoFocus
+                                        min={1}
+                                    />
+                                    <button onClick={saveGoal} className="text-emerald-500 hover:text-emerald-600">
+                                        <Check className="w-3 h-3" />
+                                    </button>
+                                    <button onClick={() => setIsEditingGoal(false)} className="text-gray-400 hover:text-red-500">
+                                        <X className="w-3 h-3" />
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => { setGoalInput(String(dailyGoal)); setIsEditingGoal(true); }}
+                                    className="flex items-center gap-0.5 text-[10px] font-black text-indigo-600 hover:text-indigo-800 transition-colors"
+                                >
+                                    {dailyGoal}
+                                    <Pencil className="w-2.5 h-2.5" />
+                                </button>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -333,7 +407,13 @@ export function ActivityDashboard({ companyId, profileNames, profileAvatars, ava
                     <h3 className="text-[11px] font-black text-gray-600 uppercase tracking-[0.12em] flex items-center gap-2">
                         📊 Línea de Tiempo
                     </h3>
-                    {loading && <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />}
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5">
+                            <div className="w-4 h-[2px] bg-red-400" style={{ borderTop: '2px dashed #F87171' }} />
+                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-wider">Meta: {goalForPeriod}/{goalLabel}</span>
+                        </div>
+                        {loading && <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />}
+                    </div>
                 </div>
 
                 {timeline.length > 0 ? (
@@ -367,8 +447,28 @@ export function ActivityDashboard({ companyId, profileNames, profileAvatars, ava
                                         const config = ACTION_TYPE_CONFIG[(name || '') as keyof typeof ACTION_TYPE_CONFIG];
                                         return [value ?? 0, config ? `${config.icon} ${config.label}` : (name || '')];
                                     }) as any}
-                                    labelFormatter={(label) => `${label}`}
+                                    labelFormatter={(label) => {
+                                        const item = timeline.find(d => d.label === label);
+                                        const total = item?.total || 0;
+                                        const diff = total - goalForPeriod;
+                                        const icon = diff >= 0 ? '✅' : '⚠️';
+                                        return `${label}  ${icon} ${total}/${goalForPeriod}`;
+                                    }}
                                     cursor={{ fill: 'rgba(99, 102, 241, 0.04)' }}
+                                />
+                                {/* ═══ GOAL REFERENCE LINE ═══ */}
+                                <ReferenceLine
+                                    y={goalForPeriod}
+                                    stroke="#F87171"
+                                    strokeDasharray="6 4"
+                                    strokeWidth={2}
+                                    label={{
+                                        value: `Meta: ${goalForPeriod}`,
+                                        position: 'right',
+                                        fill: '#F87171',
+                                        fontSize: 10,
+                                        fontWeight: 800,
+                                    }}
                                 />
                                 <Legend
                                     formatter={(value: string) => {
