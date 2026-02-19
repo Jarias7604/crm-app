@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Trophy, Users, TrendingUp, DollarSign, Target, Crown,
     Loader2, ChevronDown, BarChart3, Award, Zap, ArrowUpRight,
@@ -423,6 +424,7 @@ function UserPerformanceTable({ data, getUserGoal, periodLabel, companySummary }
     periodLabel: string;
     companySummary?: CompanySummary;
 }) {
+    const navigate = useNavigate();
     if (data.length === 0) {
         return (
             <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-16 flex flex-col items-center text-center">
@@ -531,7 +533,10 @@ function UserPerformanceTable({ data, getUserGoal, periodLabel, companySummary }
                     const unClosing = companySummary.totalClosing - assignedClosing;
                     if (unLeads <= 0 && unWon <= 0) return null;
                     return (
-                        <div className="grid grid-cols-12 gap-2 px-6 py-4 items-center bg-gray-50/80 border-t border-gray-200">
+                        <div
+                            onClick={() => navigate('/leads', { state: { assignedFilter: 'unassigned' } })}
+                            className="grid grid-cols-12 gap-2 px-6 py-4 items-center bg-gray-50/80 border-t border-gray-200 cursor-pointer hover:bg-amber-50/50 transition-colors group" title="Click para ver y asignar estos leads"
+                        >
                             <div className="col-span-1 flex justify-center">
                                 <span className="text-[11px] font-bold text-gray-300">—</span>
                             </div>

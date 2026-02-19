@@ -143,6 +143,7 @@ export default function Leads() {
                 if (state.priority) setPriorityFilter(state.priority);
                 if (state.status) setStatusFilter(state.status);
                 if (state.source) setSourceFilter(state.source);
+                if (state.assignedFilter) setAssignedFilter(state.assignedFilter);
                 if (state.lossReasonId) setLossReasonFilter(state.lossReasonId);
                 if (state.lostAtStage) setLostAtStageFilter(state.lostAtStage);
                 if (state.leadIds) {
