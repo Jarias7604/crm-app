@@ -276,13 +276,36 @@ export const pdfService = {
             if (cotizacion.servicio_whatsapp) {
                 drawRow('Comunicación WhatsApp', cotizacion.costo_whatsapp || 0);
             }
+            // ⚠️  BLOQUE CRÍTICO — NO MODIFICAR SIN LEER ESTO ⚠️
+            // ─────────────────────────────────────────────────────────────────
+            // BUG ORIGINAL (corregido 2026-02-20): Los módulos de "pago único"
+            // (Ej: "Sucursal Adicional", "Descarga masiva de JSON") aparecían
+            // como $0.00 en el PDF y sin el badge "PAGO ÚNICO".
+            //
+            // CAUSA: El código anterior usaba `m.costo_anual` para TODOS los
+            // módulos. Los ítems de pago único guardan su precio en `m.pago_unico`
+            // y tienen `m.costo_anual = 0`, por eso salían en $0.
+            //
+            // REGLA INVARIABLE:
+            //   - Si pago_unico  > 0 → es un ítem de PAGO ÚNICO (implementación, setup, etc.)
+            //     → usar m.pago_unico como precio, isOneTime = true → badge "PAGO ÚNICO"
+            //   - Si pago_unico == 0 → es un módulo RECURRENTE
+            //     → usar m.costo_anual (o m.costo como fallback)
+            //
+            // Esta misma lógica existe en:
+            //   • PublicQuoteView.tsx  (línea ~413)
+            //   • CotizacionDetalle.tsx (línea ~477)
+            //   • quoteUtils.ts → calculateQuoteFinancialsV2 (línea ~186)
+            // Cualquier cambio aquí DEBE replicarse en esos 3 archivos también.
+            // ─────────────────────────────────────────────────────────────────
             modulos.forEach((m: any) => {
                 const pagoUnicoMonto = Number(m.pago_unico) || 0;
                 const costoAnual = Number(m.costo_anual) || Number(m.costo) || 0;
-                const isOneTime = pagoUnicoMonto > 0;
-                const currentCosto = isOneTime ? pagoUnicoMonto : costoAnual;
+                const isOneTime = pagoUnicoMonto > 0;                   // ← NO CAMBIAR esta lógica
+                const currentCosto = isOneTime ? pagoUnicoMonto : costoAnual; // ← NI esta
                 drawRow(m.nombre, currentCosto, isOneTime, m.descripcion);
             });
+            // ─────────────────────────────────────────────────────────────────
 
 
             // ==========================================
