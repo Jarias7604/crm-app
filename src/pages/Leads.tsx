@@ -62,6 +62,9 @@ export default function Leads() {
     const [isLostAtStageFilterOpen, setIsLostAtStageFilterOpen] = useState(false);
     const lostAtStageFilterRef = useRef<HTMLDivElement>(null);
 
+    const [isDateRangeOpen, setIsDateRangeOpen] = useState(false);
+    const dateRangeRef = useRef<HTMLDivElement>(null);
+
     const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
     const statusFilterRef = useRef<HTMLDivElement>(null);
 
@@ -1363,6 +1366,118 @@ export default function Leads() {
                     <div className="w-px h-4 bg-gray-200 mx-1" />
                     <LossReasonDropdown />
                     <LossStageDropdown />
+
+                    {/* ── Spacer pushes date range to the right ── */}
+                    <div className="flex-1" />
+
+                    {/* ── Date Range Picker ── */}
+                    <div className="relative" ref={dateRangeRef}>
+                        <button
+                            onClick={() => setIsDateRangeOpen(!isDateRangeOpen)}
+                            className={`flex items-center gap-2 border px-3 py-2 rounded-xl text-xs font-semibold hover:bg-gray-50 transition-all shadow-sm h-9 ${(startDateFilter || endDateFilter) ? 'border-teal-300 text-teal-700 bg-teal-50/40' : 'border-gray-200 text-gray-600 bg-white'}`}
+                        >
+                            <Calendar className="h-3.5 w-3.5 opacity-60 flex-shrink-0" />
+                            <span>
+                                {startDateFilter || endDateFilter
+                                    ? `${startDateFilter ? format(new Date(startDateFilter + 'T12:00:00'), 'dd MMM', { locale: es }) : '…'} – ${endDateFilter ? format(new Date(endDateFilter + 'T12:00:00'), 'dd MMM', { locale: es }) : '…'}`
+                                    : 'Período'}
+                            </span>
+                            {(startDateFilter || endDateFilter) ? (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setStartDateFilter(null); setEndDateFilter(null); }}
+                                    className="ml-0.5 text-teal-400 hover:text-teal-700 transition-colors"
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
+                            ) : (
+                                <ChevronDown className={`h-3.5 w-3.5 opacity-40 transition-transform duration-300 ${isDateRangeOpen ? 'rotate-180' : ''}`} />
+                            )}
+                        </button>
+
+                        {isDateRangeOpen && (
+                            <div className="absolute right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 p-4 animate-in fade-in slide-in-from-top-2 duration-200" style={{ minWidth: '320px' }}>
+                                {/* Header */}
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.15em]">Rango de fechas</span>
+                                    <button onClick={() => setIsDateRangeOpen(false)} className="text-gray-300 hover:text-gray-500 transition-colors p-1 rounded-lg hover:bg-gray-50">
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
+
+                                {/* Presets */}
+                                <div className="flex flex-wrap gap-1.5 mb-3">
+                                    {[
+                                        { label: 'Hoy', days: 0 },
+                                        { label: 'Últ. 7 días', days: 7 },
+                                        { label: 'Últ. 30 días', days: 30 },
+                                        { label: 'Este mes', days: -1 },
+                                    ].map(({ label, days }) => (
+                                        <button
+                                            key={label}
+                                            onClick={() => {
+                                                const today = new Date();
+                                                const fmt = (d: Date) => format(d, 'yyyy-MM-dd');
+                                                if (days === 0) {
+                                                    setStartDateFilter(fmt(today));
+                                                    setEndDateFilter(fmt(today));
+                                                } else if (days === -1) {
+                                                    const start = new Date(today.getFullYear(), today.getMonth(), 1);
+                                                    setStartDateFilter(fmt(start));
+                                                    setEndDateFilter(fmt(today));
+                                                } else {
+                                                    const start = new Date(today);
+                                                    start.setDate(today.getDate() - days);
+                                                    setStartDateFilter(fmt(start));
+                                                    setEndDateFilter(fmt(today));
+                                                }
+                                                setIsDateRangeOpen(false);
+                                            }}
+                                            className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-gray-500 bg-gray-50 border border-gray-100 hover:bg-teal-50 hover:text-teal-700 hover:border-teal-200 transition-all"
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div className="border-t border-gray-50 my-3" />
+
+                                {/* Date pickers — forceOpenDown previene que el calendario se salga por arriba */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.15em] mb-1.5 block">Desde</label>
+                                        <CustomDatePicker
+                                            value={startDateFilter || ''}
+                                            onChange={(d) => setStartDateFilter(d || null)}
+                                            placeholder="Inicio"
+                                            variant="light"
+                                            forceOpenDown
+                                            alignRight
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.15em] mb-1.5 block">Hasta</label>
+                                        <CustomDatePicker
+                                            value={endDateFilter || ''}
+                                            onChange={(d) => setEndDateFilter(d || null)}
+                                            placeholder="Fin"
+                                            variant="light"
+                                            minDate={startDateFilter || undefined}
+                                            forceOpenDown
+                                            alignRight
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Apply button */}
+                                <button
+                                    onClick={() => setIsDateRangeOpen(false)}
+                                    className="mt-3 w-full py-2 rounded-xl text-xs font-bold bg-teal-600 text-white hover:bg-teal-700 transition-colors shadow-sm shadow-teal-100"
+                                >
+                                    Aplicar
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* ROW 3: Active filter chips */}

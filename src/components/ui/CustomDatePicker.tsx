@@ -26,8 +26,10 @@ interface CustomDatePickerProps {
     placeholder?: string;
     className?: string;
     variant?: 'light' | 'dark' | 'transparent';
-    minDate?: string; // yyyy-MM-dd format, days before this are disabled
-    forceOpenUp?: boolean; // Force calendar to open upward
+    minDate?: string;
+    forceOpenUp?: boolean;
+    forceOpenDown?: boolean;
+    alignRight?: boolean; // Open calendar rightward (extends left) — use when trigger is near right edge
 }
 
 export function CustomDatePicker({
@@ -37,7 +39,9 @@ export function CustomDatePicker({
     className = "",
     variant = "dark",
     minDate,
-    forceOpenUp
+    forceOpenUp,
+    forceOpenDown,
+    alignRight
 }: CustomDatePickerProps) {
     const parsedMinDate = minDate ? parseISO(minDate) : null;
     const [isOpen, setIsOpen] = useState(false);
@@ -83,6 +87,10 @@ export function CustomDatePicker({
                     left: Math.max(8, rect.left - 100),
                     maxWidth: Math.min(310, window.innerWidth - 16),
                 });
+            } else if (forceOpenDown) {
+                // Always open downward — used when inside a floating panel
+                setOpenUp(false);
+                setFixedPos(null);
             } else {
                 const spaceBelow = window.innerHeight - rect.bottom;
                 setOpenUp(spaceBelow < 400);
@@ -132,7 +140,7 @@ export function CustomDatePicker({
         return (
             <div
                 style={calendarStyle}
-                className={`${fixedPos ? '' : 'absolute right-0 md:right-auto md:left-0'} z-[10001] bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-slate-100 p-5 w-[310px] animate-in fade-in zoom-in duration-200 transform ${!fixedPos && openUp ? 'bottom-full mb-2 origin-bottom-left' : !fixedPos ? 'top-full mt-2 origin-top-left' : 'origin-bottom-left'}`}>
+                className={`${fixedPos ? '' : alignRight ? 'absolute right-0' : 'absolute right-0 md:right-auto md:left-0'} z-[10001] bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-slate-100 p-5 w-[310px] animate-in fade-in zoom-in duration-200 transform ${!fixedPos && openUp ? 'bottom-full mb-2 origin-bottom-left' : !fixedPos ? 'top-full mt-2 origin-top-left' : 'origin-bottom-left'}`}>
                 <div className="flex items-center justify-between mb-4">
                     <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] capitalize">
                         {format(currentMonth, 'MMMM yyyy', { locale: es })}
