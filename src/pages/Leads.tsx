@@ -1625,7 +1625,7 @@ export default function Leads() {
                                                     <div className="flex items-center gap-1.5 justify-end">
                                                         <Calendar className="w-3.5 h-3.5 text-blue-500" />
                                                         <span className="text-xs font-black text-blue-900">
-                                                            {format(new Date(lead.next_followup_date.split('T')[0] + 'T12:00:00'), 'dd MMM', { locale: es })}
+                                                            {(() => { try { return format(new Date(lead.next_followup_date.substring(0, 10) + 'T12:00:00'), 'dd MMM', { locale: es }); } catch { return '—'; } })()}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -2107,7 +2107,7 @@ export default function Leads() {
                                                                 {colId === 'created_at' && (
                                                                     <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500">
                                                                         <Calendar className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                                                                        <span>{format(new Date(lead.created_at), 'dd/MM/yyyy')}</span>
+                                                                        <span>{(() => { try { return format(new Date(lead.created_at.substring(0, 10) + 'T12:00:00'), 'dd/MM/yyyy'); } catch { return '—'; } })()}</span>
                                                                     </div>
                                                                 )}
                                                             </td>

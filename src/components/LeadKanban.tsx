@@ -39,7 +39,8 @@ const COLUMN_COLORS: Record<LeadStatus, string> = {
     'Negociación': 'bg-cyan-700',
     'Cerrado': 'bg-emerald-700',
     'Cliente': 'bg-blue-600',
-    'Perdido': 'bg-gray-500'
+    'Perdido': 'bg-gray-500',
+    'Erróneo': 'bg-red-800',
 };
 
 // ─── Auto-scroll zone width in px (how close to the edge triggers scroll)
@@ -75,7 +76,7 @@ export function LeadKanban({ leads, teamMembers, onUpdateStatus, onOpenDetail }:
         const el = scrollRef.current;
         if (!el) return;
 
-        const { left, right, width } = el.getBoundingClientRect();
+        const { left, right } = el.getBoundingClientRect();
         const mouseX = mouseXRef.current;
 
         let speed = 0;
@@ -290,7 +291,7 @@ export function LeadKanban({ leads, teamMembers, onUpdateStatus, onOpenDetail }:
                                                                 <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
                                                                     <div className="bg-slate-50 px-2 py-0.5 rounded-md flex items-center gap-1.5 border border-slate-100">
                                                                         <Calendar className="w-3 h-3 opacity-60" />
-                                                                        <span className="whitespace-nowrap font-bold">Ingreso: {format(new Date(lead.created_at), 'dd MMM', { locale: es })}</span>
+                                                                        <span className="whitespace-nowrap font-bold">Ingreso: {(() => { try { return format(new Date(lead.created_at.substring(0, 10) + 'T12:00:00'), 'dd MMM', { locale: es }); } catch { return '—'; } })()}</span>
                                                                     </div>
                                                                 </div>
                                                             </div>
