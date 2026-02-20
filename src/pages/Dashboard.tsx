@@ -4,8 +4,9 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
-import { BadgeDollarSign, TrendingUp, Users, Target, Building, Calendar, Clock, CheckCircle, ChevronDown, Edit2, Settings, AlertTriangle } from 'lucide-react';
+import { BadgeDollarSign, TrendingUp, Users, Target, Building, Building2, Calendar, Clock, CheckCircle, ChevronDown, Edit2, Settings, AlertTriangle } from 'lucide-react';
 import { adminService } from '../services/admin';
+import { supabase } from '../services/supabase';
 import { useEffect, useState, useRef, useMemo } from 'react';
 import {
     startOfToday, endOfToday,
@@ -132,6 +133,7 @@ export default function Dashboard() {
     const [topOpportunities, setTopOpportunities] = useState<any[]>([]);
     const [lossReasonData, setLossReasonData] = useState<any[]>([]);
     const [lossStageData, setLossStageData] = useState<any[]>([]);
+    const [industryData, setIndustryData] = useState<{ name: string; count: number; percentage: number }[]>([]);
 
 
     const navigate = useNavigate();
@@ -308,6 +310,30 @@ export default function Dashboard() {
             // Set loss analytics
             setLossReasonData(dashboardData.lossReasons || []);
             setLossStageData(dashboardData.lossStages || []);
+
+            // Fetch industry distribution
+            supabase
+                .from('leads')
+                .select('industry')
+                .not('industry', 'is', null)
+                .neq('industry', '')
+                .then(({ data: leadsWithIndustry }) => {
+                    if (leadsWithIndustry && leadsWithIndustry.length > 0) {
+                        const counts: Record<string, number> = {};
+                        leadsWithIndustry.forEach((l: any) => {
+                            counts[l.industry] = (counts[l.industry] || 0) + 1;
+                        });
+                        const total = leadsWithIndustry.length;
+                        const mapped = Object.entries(counts)
+                            .map(([name, count]) => ({
+                                name,
+                                count,
+                                percentage: Math.round((count / total) * 100)
+                            }))
+                            .sort((a, b) => b.count - a.count);
+                        setIndustryData(mapped);
+                    }
+                });
 
         }
     }, [dashboardData]);
@@ -1324,6 +1350,54 @@ export default function Dashboard() {
                         </div>
                     </div>
                 </div>
+
+                {/* Row 5: Industry Distribution */}
+                {industryData.length > 0 && (
+                    <div className="lg:col-span-12">
+                        <div className="bg-white rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 p-4 hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center">
+                                        <Building2 className="w-4 h-4 text-indigo-600" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Distribución por Rubro</h3>
+                                        <p className="text-[10px] text-gray-400 font-medium mt-0.5">Sectores de los prospectos</p>
+                                    </div>
+                                </div>
+                                <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">
+                                    {industryData.reduce((s, i) => s + i.count, 0)} leads
+                                </span>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                                {industryData.slice(0, 12).map((item, idx) => (
+                                    <div
+                                        key={item.name}
+                                        className="group/ind bg-slate-50 hover:bg-indigo-50 rounded-xl p-3 transition-all cursor-default border border-transparent hover:border-indigo-100"
+                                    >
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <div
+                                                className="w-2 h-2 rounded-full shrink-0"
+                                                style={{ backgroundColor: PIE_COLORS[idx % PIE_COLORS.length] }}
+                                            />
+                                            <span className="text-[10px] font-black text-slate-600 uppercase tracking-tight truncate group-hover/ind:text-indigo-700 transition-colors">{item.name}</span>
+                                        </div>
+                                        <div className="flex items-end justify-between">
+                                            <span className="text-lg font-black text-slate-900">{item.count}</span>
+                                            <span className="text-[9px] font-black text-slate-300">{item.percentage}%</span>
+                                        </div>
+                                        <div className="mt-1.5 bg-slate-200/60 rounded-full h-1 overflow-hidden">
+                                            <div
+                                                className="h-full rounded-full transition-all duration-500"
+                                                style={{ width: `${item.percentage}%`, backgroundColor: PIE_COLORS[idx % PIE_COLORS.length] }}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

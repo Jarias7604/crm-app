@@ -9,6 +9,8 @@ import {
     endOfWeek,
     isSameMonth,
     isSameDay,
+    isBefore,
+    startOfDay,
     eachDayOfInterval,
     parseISO,
     isValid
@@ -24,6 +26,8 @@ interface CustomDatePickerProps {
     placeholder?: string;
     className?: string;
     variant?: 'light' | 'dark' | 'transparent';
+    minDate?: string; // yyyy-MM-dd format, days before this are disabled
+    forceOpenUp?: boolean; // Force calendar to open upward
 }
 
 export function CustomDatePicker({
@@ -31,10 +35,14 @@ export function CustomDatePicker({
     onChange,
     placeholder = "Seleccionar fecha",
     className = "",
-    variant = "dark"
+    variant = "dark",
+    minDate,
+    forceOpenUp
 }: CustomDatePickerProps) {
+    const parsedMinDate = minDate ? parseISO(minDate) : null;
     const [isOpen, setIsOpen] = useState(false);
     const [openUp, setOpenUp] = useState(false);
+    const [fixedPos, setFixedPos] = useState<{ bottom: number; left: number; maxWidth: number } | null>(null);
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [company, setCompany] = useState<Company | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -68,8 +76,18 @@ export function CustomDatePicker({
     const toggleCalendar = () => {
         if (!isOpen && containerRef.current) {
             const rect = containerRef.current.getBoundingClientRect();
-            const spaceBelow = window.innerHeight - rect.bottom;
-            setOpenUp(spaceBelow < 400);
+            if (forceOpenUp) {
+                setOpenUp(true);
+                setFixedPos({
+                    bottom: window.innerHeight - rect.top + 8,
+                    left: Math.max(8, rect.left - 100),
+                    maxWidth: Math.min(310, window.innerWidth - 16),
+                });
+            } else {
+                const spaceBelow = window.innerHeight - rect.bottom;
+                setOpenUp(spaceBelow < 400);
+                setFixedPos(null);
+            }
         }
         setIsOpen(!isOpen);
     };
@@ -104,8 +122,17 @@ export function CustomDatePicker({
 
         const weekDays = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
+        const calendarStyle = fixedPos ? {
+            position: 'fixed' as const,
+            bottom: `${fixedPos.bottom}px`,
+            left: `${fixedPos.left}px`,
+            width: `${fixedPos.maxWidth}px`,
+        } : undefined;
+
         return (
-            <div className={`absolute z-[10001] bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-slate-100 p-5 w-[310px] animate-in fade-in zoom-in duration-200 right-0 md:right-auto md:left-0 transform ${openUp ? 'bottom-full mb-2 origin-bottom-left' : 'top-full mt-2 origin-top-left'}`}>
+            <div
+                style={calendarStyle}
+                className={`${fixedPos ? '' : 'absolute right-0 md:right-auto md:left-0'} z-[10001] bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-slate-100 p-5 w-[310px] animate-in fade-in zoom-in duration-200 transform ${!fixedPos && openUp ? 'bottom-full mb-2 origin-bottom-left' : !fixedPos ? 'top-full mt-2 origin-top-left' : 'origin-bottom-left'}`}>
                 <div className="flex items-center justify-between mb-4">
                     <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] capitalize">
                         {format(currentMonth, 'MMMM yyyy', { locale: es })}
@@ -133,19 +160,23 @@ export function CustomDatePicker({
                         const isSelected = activeDate && isSameDay(day, activeDate);
                         const isCurrentMonth = isSameMonth(day, monthStart);
                         const isTodayDate = isSameDay(day, new Date());
+                        const isDisabled = parsedMinDate ? isBefore(startOfDay(day), startOfDay(parsedMinDate)) : false;
 
                         return (
                             <button
                                 type="button"
                                 key={idx}
-                                onClick={() => handleDateSelect(day)}
+                                onClick={() => !isDisabled && handleDateSelect(day)}
+                                disabled={isDisabled}
                                 className={`
                                     h-9 w-9 flex flex-col items-center justify-center rounded-xl text-[11px] font-bold transition-all relative
-                                    ${isSelected
-                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 z-10'
-                                        : isCurrentMonth
-                                            ? 'text-slate-600 hover:bg-blue-50 hover:text-blue-600'
-                                            : 'text-slate-300 hover:bg-slate-50'
+                                    ${isDisabled
+                                        ? 'text-slate-200 cursor-not-allowed'
+                                        : isSelected
+                                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 z-10'
+                                            : isCurrentMonth
+                                                ? 'text-slate-600 hover:bg-blue-50 hover:text-blue-600'
+                                                : 'text-slate-300 hover:bg-slate-50'
                                     }
                                 `}
                             >

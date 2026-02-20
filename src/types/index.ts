@@ -104,6 +104,7 @@ export interface Lead {
     lost_notes?: string | null;
     lost_date?: string | null;
     internal_won_date?: string | null;
+    industry?: string | null;
     created_at: string;
 }
 
@@ -122,6 +123,16 @@ export interface LossReason {
     id: string;
     company_id: string | null;
     reason: string;
+    is_active: boolean;
+    display_order: number;
+    created_at: string;
+    updated_at?: string;
+}
+
+export interface Industry {
+    id: string;
+    company_id: string;
+    name: string;
     is_active: boolean;
     display_order: number;
     created_at: string;

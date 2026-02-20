@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { X, Plus, Building2, Phone, MapPin, DollarSign, Globe, UserCheck, StickyNote, ChevronDown, CheckCircle, Mail } from 'lucide-react';
-import type { Lead, LeadStatus, LeadPriority, Profile } from '../types';
+import type { Lead, LeadStatus, LeadPriority, Profile, Industry } from '../types';
 import { STATUS_CONFIG, SOURCE_CONFIG, PRIORITY_CONFIG } from '../types';
 import { CustomDatePicker } from './ui/CustomDatePicker';
 import { format } from 'date-fns';
@@ -11,6 +11,7 @@ interface CreateLeadFullscreenProps {
     formData: Partial<Lead>;
     setFormData: (data: Partial<Lead>) => void;
     teamMembers: Profile[];
+    industries?: Industry[];
     onSubmit: (e: React.FormEvent) => void;
 }
 
@@ -101,7 +102,7 @@ function PremiumSelect({
     );
 }
 
-export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, teamMembers, onSubmit }: CreateLeadFullscreenProps) {
+export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, teamMembers, industries, onSubmit }: CreateLeadFullscreenProps) {
     if (!isOpen) return null;
 
     const today = format(new Date(), 'yyyy-MM-dd');
@@ -326,6 +327,18 @@ export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, t
                                         options={sourceOptions}
                                         placeholder="Seleccionar fuente..."
                                         icon={Globe}
+                                    />
+                                </div>
+
+                                {/* Rubro / Industria — Premium Dropdown */}
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-500 uppercase tracking-[0.15em] mb-1.5">Rubro / Industria</label>
+                                    <PremiumSelect
+                                        value={formData.industry || ''}
+                                        onChange={(v) => setFormData({ ...formData, industry: v })}
+                                        options={(industries || []).map(ind => ({ value: ind.name, label: ind.name }))}
+                                        placeholder="Seleccionar rubro..."
+                                        icon={Building2}
                                     />
                                 </div>
 

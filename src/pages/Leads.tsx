@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { leadsService } from '../services/leads';
-import type { Lead, LeadStatus, LeadPriority, FollowUp, LossReason } from '../types';
+import type { Lead, LeadStatus, LeadPriority, FollowUp, LossReason, Industry } from '../types';
 import { PRIORITY_CONFIG, STATUS_CONFIG, ACTION_TYPES, SOURCE_CONFIG, SOURCE_OPTIONS } from '../types';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -18,6 +18,7 @@ import { QuickActionLogger } from '../components/QuickCallLogger';
 import { LeadKanban } from '../components/LeadKanban';
 import { logger } from '../utils/logger';
 import { lossReasonsService } from '../services/lossReasons';
+import { industriesService } from '../services/industries';
 import { CustomDatePicker } from '../components/ui/CustomDatePicker';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { GripVertical } from 'lucide-react';
@@ -64,14 +65,7 @@ export default function Leads() {
     const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
     const statusFilterRef = useRef<HTMLDivElement>(null);
 
-    // State for Next Follow Up section (manual save)
-    // State for Next Follow Up section (manual save)
-    const [nextFollowUpData, setNextFollowUpData] = useState({
-        date: '',
-        assignee: '',
-        notes: ''
-    });
-    const [isSavingFollowUp, setIsSavingFollowUp] = useState(false);
+
     const [viewMode, setViewMode] = useState<'grid' | 'list' | 'kanban'>('list');
     const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
     const [sortConfig, setSortConfig] = useState<{ key: keyof Lead | 'value'; direction: 'asc' | 'desc' } | null>(null);
@@ -122,6 +116,7 @@ export default function Leads() {
     const processedStateRef = useRef<string | null>(null);
     const processedOpenRequestRef = useRef<number | null>(null);
     const [lossReasons, setLossReasons] = useState<LossReason[]>([]);
+    const [industries, setIndustries] = useState<Industry[]>([]);
     const [isLossModalOpen, setIsLossModalOpen] = useState(false);
     const [lossData, setLossData] = useState({
         lost_reason_id: '',
@@ -201,76 +196,10 @@ export default function Leads() {
     // Update local state when lead is selected
     useEffect(() => {
         if (selectedLead) {
-            let dateStr = '';
-            if (selectedLead.next_followup_date) {
-                // Safely extract YYYY-MM-DD
-                try {
-                    dateStr = selectedLead.next_followup_date.split('T')[0];
-                } catch (e) {
-                    logger.error('Date parsing error', e, { action: 'parseFollowUpDate', leadId: selectedLead.id });
-                    dateStr = '';
-                }
-            }
-
-            setNextFollowUpData({
-                date: dateStr,
-                assignee: selectedLead.next_followup_assignee || '',
-                notes: selectedLead.next_action_notes || ''
-            });
-
             // 🔥 ROBUST FIX: Always load follow-ups when a lead is selected
             loadFollowUps(selectedLead.id);
         }
     }, [selectedLead?.id]); // Use .id to prevent re-running on every re-render
-
-    // Function to manually save Next Follow Up data
-    const handleSaveNextFollowUp = async () => {
-        if (!selectedLead) return;
-        setIsSavingFollowUp(true);
-        try {
-            // Ensure date is midnight/noon local to avoid UTC offset issues on save
-            const dateToSave = nextFollowUpData.date ? `${nextFollowUpData.date}T12:00:00` : null;
-
-            // 1. Update the Lead with the NEXT follow up info
-            await leadsService.updateLead(selectedLead.id, {
-                next_followup_date: dateToSave,
-                next_followup_assignee: nextFollowUpData.assignee || null,
-                next_action_notes: nextFollowUpData.notes
-            });
-
-            // 2. Create a history record with the assigned person
-            await leadsService.createFollowUp({
-                lead_id: selectedLead.id,
-                notes: `Programado: ${nextFollowUpData.notes || 'Seguimiento general'}`,
-                date: new Date().toISOString(), // Usar ISO completo para que la trazabilidad sea exacta
-                action_type: 'other'
-            }, nextFollowUpData.assignee || undefined); // Pass assignee to the follow-up
-
-            // Force reload to ensure UI is in sync
-            const result = await leadsService.getLeads();
-            const updatedLeads = result.data || [];
-            setLeads(updatedLeads);
-
-            // Update selected lead to reflect changes
-            const updatedSelected = updatedLeads.find(l => l.id === selectedLead.id);
-            if (updatedSelected) {
-                setSelectedLead(updatedSelected);
-            }
-
-            // Reload history
-            await loadFollowUps(selectedLead.id);
-
-            // Reset form
-            setNextFollowUpData({ date: '', assignee: '', notes: '' });
-
-            toast.success('Próximo seguimiento actualizado y registrado');
-        } catch (error: any) {
-            logger.error('Save failed', error, { action: 'handleSaveNextFollowUp', leadId: selectedLead.id });
-            toast.error(`Error al guardar: ${error.message}`);
-        } finally {
-            setIsSavingFollowUp(false);
-        }
-    };
 
     const toggleLeadSelection = (id: string) => {
         setSelectedLeadIds(prev =>
@@ -428,6 +357,7 @@ export default function Leads() {
         loadLeads();
         loadTeamMembers();
         loadLossReasons();
+        loadIndustries();
     }, []);
 
     const loadLossReasons = async () => {
@@ -436,6 +366,15 @@ export default function Leads() {
             setLossReasons(reasons);
         } catch (error) {
             logger.error('Failed to load loss reasons', error, { action: 'loadLossReasons' });
+        }
+    };
+
+    const loadIndustries = async () => {
+        try {
+            const data = await industriesService.getIndustries();
+            setIndustries(data);
+        } catch (error) {
+            logger.error('Failed to load industries', error, { action: 'loadIndustries' });
         }
     };
 
@@ -2221,6 +2160,7 @@ export default function Leads() {
                 formData={formData}
                 setFormData={(data) => setFormData(prev => ({ ...prev, ...data }))}
                 teamMembers={teamMembers}
+                industries={industries}
                 onSubmit={handleSubmit}
             />
 
@@ -2387,7 +2327,7 @@ export default function Leads() {
                                         </select>
                                     </div>
                                 </div>
-                                <div className="space-y-1.5 col-span-2">
+                                <div className="space-y-1.5">
                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Fuente del Lead</label>
                                     <div className="relative">
                                         <select
@@ -2399,6 +2339,23 @@ export default function Leads() {
                                             {SOURCE_OPTIONS.map(opt => (
                                                 <option key={opt.value} value={opt.value}>
                                                     {opt.icon} {opt.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Rubro / Industria</label>
+                                    <div className="relative">
+                                        <select
+                                            value={selectedLead.industry || ''}
+                                            onChange={(e) => handleUpdateLead({ industry: e.target.value || null })}
+                                            className="block w-full rounded-xl border-gray-200 shadow-sm text-sm font-bold text-gray-700 bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all pl-3 py-2.5"
+                                        >
+                                            <option value="">Sin especificar</option>
+                                            {industries.map(ind => (
+                                                <option key={ind.id} value={ind.name}>
+                                                    {ind.name}
                                                 </option>
                                             ))}
                                         </select>
@@ -2470,95 +2427,6 @@ export default function Leads() {
                                 </div>
                             </div>
 
-                            {/* Next Follow-up Edit Section */}
-                            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-6 text-white shadow-xl shadow-blue-100 relative group">
-                                <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-3xl group-hover:bg-white/20 transition-all duration-700"></div>
-                                <div className="flex justify-between items-start mb-5 relative z-10">
-                                    <div>
-                                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] opacity-70 mb-1">PLAN DE ACCIÓN</h4>
-                                        <p className="text-xl font-black tracking-tight flex items-center gap-2">
-                                            <Clock className="w-5 h-5 text-blue-200" /> Próximo Paso
-                                        </p>
-                                    </div>
-                                    {/* Active filters display */}
-                                    {(filteredLeadId || filteredLeadIds || statusFilter !== 'all' || priorityFilter !== 'all') && (
-                                        <div className="flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
-                                            <div className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border border-indigo-100">
-                                                <Filter className="w-3.5 h-3.5" />
-                                                Vista filtrada ({filteredLeads.length} resultados)
-                                                {statusFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Estado: {statusFilter}</span>}
-                                                {priorityFilter !== 'all' && <span className="bg-white/50 px-1.5 py-0.5 rounded text-[9px]">Prioridad: {Array.isArray(priorityFilter) ? priorityFilter.join(', ') : (PRIORITY_CONFIG as any)[priorityFilter]?.label || priorityFilter}</span>}
-                                                <button
-                                                    onClick={() => {
-                                                        if (cameFromRef.current === 'calendar') {
-                                                            cameFromRef.current = null;
-                                                            navigate('/calendar');
-                                                            return;
-                                                        }
-                                                        setFilteredLeadId(null);
-                                                        setFilteredLeadIds(null);
-                                                        setStatusFilter('all');
-                                                        setPriorityFilter('all');
-                                                    }}
-                                                    className="bg-white/50 hover:bg-white p-0.5 rounded-md transition-colors ml-1"
-                                                >
-                                                    <X className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                    {isSavingFollowUp && (
-                                        <span className="bg-white/20 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse border border-white/20">
-                                            Guardando...
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="space-y-4 relative z-10">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-1.5">
-                                            <label className="block text-[9px] font-black uppercase tracking-widest opacity-60 ml-1">Fecha de Ejecución</label>
-                                            <CustomDatePicker
-                                                value={nextFollowUpData.date}
-                                                onChange={(date) => setNextFollowUpData({ ...nextFollowUpData, date })}
-                                            />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className="block text-[9px] font-black uppercase tracking-widest opacity-60 ml-1">Ejecutivo de Seguimiento</label>
-                                            <select
-                                                value={nextFollowUpData.assignee}
-                                                onChange={(e) => setNextFollowUpData({ ...nextFollowUpData, assignee: e.target.value })}
-                                                className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2.5 text-sm font-bold focus:bg-white focus:text-gray-900 focus:ring-0 transition-all outline-none"
-                                            >
-                                                <option value="" className="text-gray-900">Sin asignar</option>
-                                                {teamMembers.map(m => (
-                                                    <option key={m.id} value={m.id} className="text-gray-900">
-                                                        {m.full_name || m.email.split('@')[0]}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="block text-[9px] font-black uppercase tracking-widest opacity-60 ml-1">Objetivo del Próximo Contacto</label>
-                                        <textarea
-                                            value={nextFollowUpData.notes}
-                                            onChange={(e) => setNextFollowUpData({ ...nextFollowUpData, notes: e.target.value })}
-                                            rows={2}
-                                            placeholder="Detalla qué planeas lograr en la siguiente interacción..."
-                                            className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-sm font-medium placeholder:text-white/40 focus:bg-white focus:text-gray-900 focus:ring-0 transition-all outline-none resize-none"
-                                        />
-                                    </div>
-                                    <div className="flex justify-end pt-2">
-                                        <Button
-                                            onClick={handleSaveNextFollowUp}
-                                            disabled={isSavingFollowUp}
-                                            className="bg-white text-blue-600 hover:bg-blue-50 font-black px-6 py-5 rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-blue-900/20 active:scale-95 transition-all"
-                                        >
-                                            Confirmar Próxima Acción
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
 
                             {/* Documents Section */}
                             <div className="bg-white rounded-lg p-4 border border-gray-200">
@@ -2637,6 +2505,7 @@ export default function Leads() {
                                     <QuickActionLogger
                                         lead={selectedLead}
                                         companyId={profile?.company_id || ''}
+                                        teamMembers={teamMembers}
                                         onCallLogged={async (statusChanged, newStatus) => {
                                             if (statusChanged && newStatus) {
                                                 await handleUpdateLead({ status: newStatus });

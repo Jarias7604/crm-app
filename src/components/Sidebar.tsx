@@ -21,7 +21,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         current: boolean;
         subItems?: { name: string; href: string; icon: any }[];
     }
-    const configPaths = ['/company/branding', '/pricing', '/paquetes', '/items', '/financial-rules', '/loss-reasons'];
+    const configPaths = ['/company/branding', '/pricing', '/paquetes', '/items', '/financial-rules', '/loss-reasons', '/industries'];
     const marketingPaths = ['/marketing', '/marketing/email', '/marketing/lead-hunter', '/marketing/ai-agents', '/marketing/settings'];
     const teamPaths = ['/company/team', '/company/teams', '/company/performance'];
     const [configOpen, setConfigOpen] = useState(configPaths.some(path => location.pathname === path));
@@ -134,6 +134,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         { name: 'Gestión Item', href: '/items', icon: Layers, current: location.pathname === '/items', permissionKey: 'items' },
         { name: 'Gestión Financiera', href: '/financial-rules', icon: CreditCard, current: location.pathname === '/financial-rules', permissionKey: 'financial_rules' },
         { name: 'Motivos de Pérdida', href: '/loss-reasons', icon: XCircle, current: location.pathname === '/loss-reasons', permissionKey: 'loss_reasons' },
+        { name: 'Rubros / Industrias', href: '/industries', icon: Building2, current: location.pathname === '/industries', permissionKey: 'loss_reasons' },
     ];
 
     const configSubItems = configSubItemsRaw.filter(item => canAccess(item.permissionKey!));

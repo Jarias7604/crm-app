@@ -26,6 +26,7 @@ const NuevaCotizacion = lazy(() => import('./pages/NuevaCotizacionDinamica'));
 const PricingConfig = lazy(() => import('./pages/PricingConfig'));
 const FinancialRules = lazy(() => import('./pages/admin/FinancialRules'));
 const LossReasons = lazy(() => import('./pages/admin/LossReasons'));
+const Industries = lazy(() => import('./pages/admin/Industries'));
 const GestionPaquetes = lazy(() => import('./pages/GestionPaquetes'));
 const GestionItems = lazy(() => import('./pages/GestionItems'));
 const CotizadorPro = lazy(() => import('./pages/CotizadorPro'));
@@ -101,6 +102,7 @@ function App() {
                     <Route path="/pricing" element={<PricingConfig />} />
                     <Route path="/financial-rules" element={<FinancialRules />} />
                     <Route path="/loss-reasons" element={<LossReasons />} />
+                    <Route path="/industries" element={<Industries />} />
                     <Route path="/paquetes" element={<GestionPaquetes />} />
                     <Route path="/items" element={<GestionItems />} />
                   </Route>

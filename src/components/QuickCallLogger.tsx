@@ -4,24 +4,26 @@ import { callActivityService, ACTION_TYPE_CONFIG, CALL_OUTCOME_CONFIG, type Call
 import { leadsService } from '../services/leads';
 import type { Lead, LeadStatus, FollowUpActionType } from '../types';
 import { STATUS_CONFIG } from '../types';
+import { CustomDatePicker } from './ui/CustomDatePicker';
 import toast from 'react-hot-toast';
 
 interface QuickActionLoggerProps {
     lead: Lead;
     companyId: string;
+    teamMembers?: { id: string; email: string; full_name?: string; avatar_url?: string }[];
     onCallLogged: (statusChanged?: boolean, newStatus?: LeadStatus) => void;
     onClose: () => void;
 }
 
-// Which outcomes make sense for each action type
+// Which outcomes make sense for each action type (scheduled removed — now independent toggle)
 const OUTCOME_BY_ACTION: Record<ActionType, CallOutcome[]> = {
-    call: ['connected', 'no_answer', 'voicemail', 'busy', 'wrong_number', 'scheduled'],
-    email: ['connected', 'no_answer', 'scheduled'],
-    whatsapp: ['connected', 'no_answer', 'scheduled'],
-    telegram: ['connected', 'no_answer', 'scheduled'],
-    quote_sent: ['connected', 'scheduled'],
-    info_sent: ['connected', 'scheduled'],
-    meeting: ['connected', 'no_answer', 'scheduled'],
+    call: ['connected', 'no_answer', 'voicemail', 'busy', 'wrong_number'],
+    email: ['connected', 'no_answer'],
+    whatsapp: ['connected', 'no_answer'],
+    telegram: ['connected', 'no_answer'],
+    quote_sent: ['connected'],
+    info_sent: ['connected'],
+    meeting: ['connected', 'no_answer'],
 };
 
 // Custom outcome labels per action type (override generic ones)
@@ -29,30 +31,24 @@ const OUTCOME_OVERRIDES: Partial<Record<ActionType, Partial<Record<CallOutcome, 
     email: {
         connected: { label: 'Enviado', icon: '✅' },
         no_answer: { label: 'Sin respuesta', icon: '📵' },
-        scheduled: { label: 'Programado', icon: '📅' },
     },
     whatsapp: {
         connected: { label: 'Respondió', icon: '✅' },
         no_answer: { label: 'No leído', icon: '📵' },
-        scheduled: { label: 'Seguimiento', icon: '📅' },
     },
     telegram: {
         connected: { label: 'Respondió', icon: '✅' },
         no_answer: { label: 'No leído', icon: '📵' },
-        scheduled: { label: 'Seguimiento', icon: '📅' },
     },
     quote_sent: {
         connected: { label: 'Enviada', icon: '✅' },
-        scheduled: { label: 'Pendiente', icon: '📅' },
     },
     info_sent: {
         connected: { label: 'Enviada', icon: '✅' },
-        scheduled: { label: 'Pendiente', icon: '📅' },
     },
     meeting: {
         connected: { label: 'Realizada', icon: '✅' },
         no_answer: { label: 'No asistió', icon: '📵' },
-        scheduled: { label: 'Agendada', icon: '📅' },
     },
 };
 
@@ -67,7 +63,32 @@ const ACTION_TO_FOLLOWUP: Record<ActionType, FollowUpActionType> = {
     meeting: 'meeting',
 };
 
-export function QuickActionLogger({ lead, companyId, onCallLogged, onClose }: QuickActionLoggerProps) {
+// 12h time slots (every 30 min)
+const TIME_SLOTS = (() => {
+    const slots: { value: string; label: string }[] = [];
+    for (let h = 6; h <= 21; h++) {
+        for (const m of [0, 30]) {
+            if (h === 21 && m === 30) continue; // stop at 9:00 PM
+            const hour24 = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+            const hour12 = h === 12 ? 12 : h > 12 ? h - 12 : h === 0 ? 12 : h;
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            const label = `${hour12}:${String(m).padStart(2, '0')} ${ampm}`;
+            slots.push({ value: hour24, label });
+        }
+    }
+    return slots;
+})();
+
+// Format date for display in Spanish
+const formatDateES = (dateStr: string) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr + 'T12:00:00');
+    return date.toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+const todayISO = new Date().toISOString().split('T')[0];
+
+export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLogged, onClose }: QuickActionLoggerProps) {
     const [actionType, setActionType] = useState<ActionType>('call');
     const [outcome, setOutcome] = useState<CallOutcome>('connected');
     const [notes, setNotes] = useState('');
@@ -77,10 +98,12 @@ export function QuickActionLogger({ lead, companyId, onCallLogged, onClose }: Qu
     const [isSaving, setIsSaving] = useState(false);
     const [isOutcomeOpen, setIsOutcomeOpen] = useState(false);
 
-    // Scheduling state (shown when outcome = 'scheduled')
+    // Independent follow-up toggle (decoupled from outcome)
+    const [wantsFollowUp, setWantsFollowUp] = useState(false);
     const [followUpDate, setFollowUpDate] = useState('');
     const [followUpTime, setFollowUpTime] = useState('09:00');
     const [followUpNote, setFollowUpNote] = useState('');
+    const [followUpAssignee, setFollowUpAssignee] = useState(lead.assigned_to || '');
 
     // When action type changes, reset outcome to first valid one
     const handleActionTypeChange = (type: ActionType) => {
@@ -105,10 +128,11 @@ export function QuickActionLogger({ lead, companyId, onCallLogged, onClose }: Qu
         return tomorrow.toISOString().split('T')[0];
     };
 
-    // When selecting "scheduled", auto-fill date
-    const handleOutcomeChange = (oc: CallOutcome) => {
-        setOutcome(oc);
-        if (oc === 'scheduled' && !followUpDate) {
+    // Toggle follow-up scheduling
+    const handleFollowUpToggle = () => {
+        const next = !wantsFollowUp;
+        setWantsFollowUp(next);
+        if (next && !followUpDate) {
             setFollowUpDate(getDefaultDate());
         }
     };
@@ -116,8 +140,8 @@ export function QuickActionLogger({ lead, companyId, onCallLogged, onClose }: Qu
     const handleSubmit = async () => {
         if (isSaving) return;
 
-        // Validate follow-up date if scheduled
-        if (outcome === 'scheduled' && !followUpDate) {
+        // Validate follow-up date if scheduling
+        if (wantsFollowUp && !followUpDate) {
             toast.error('Selecciona una fecha para el seguimiento');
             return;
         }
@@ -125,7 +149,7 @@ export function QuickActionLogger({ lead, companyId, onCallLogged, onClose }: Qu
         setIsSaving(true);
 
         try {
-            // 1. Log the contact activity
+            // 1. Log the contact activity with the REAL outcome
             await callActivityService.logCall({
                 companyId,
                 leadId: lead.id,
@@ -137,8 +161,8 @@ export function QuickActionLogger({ lead, companyId, onCallLogged, onClose }: Qu
                 durationSeconds: durationMinutes ? Number(durationMinutes) * 60 : undefined,
             });
 
-            // 2. If scheduled, create a follow-up
-            if (outcome === 'scheduled' && followUpDate) {
+            // 2. If user wants a follow-up, create it independently
+            if (wantsFollowUp && followUpDate) {
                 const followUpDateTime = `${followUpDate}T${followUpTime}:00`;
                 const followUpActionType = ACTION_TO_FOLLOWUP[actionType];
 
@@ -147,9 +171,10 @@ export function QuickActionLogger({ lead, companyId, onCallLogged, onClose }: Qu
                     date: followUpDateTime,
                     notes: followUpNote.trim() || `Seguimiento: ${ACTION_TYPE_CONFIG[actionType].label}`,
                     action_type: followUpActionType,
-                });
+                }, followUpAssignee || undefined);
 
-                toast.success(`📅 Seguimiento agendado para ${new Date(followUpDateTime).toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`);
+                const displayTime = TIME_SLOTS.find(s => s.value === followUpTime)?.label || followUpTime;
+                toast.success(`📅 Seguimiento agendado: ${formatDateES(followUpDate)} a las ${displayTime}`);
             }
 
             const actionLabel = ACTION_TYPE_CONFIG[actionType].icon + ' ' + ACTION_TYPE_CONFIG[actionType].label;
@@ -176,7 +201,6 @@ export function QuickActionLogger({ lead, companyId, onCallLogged, onClose }: Qu
     // Show duration field for calls and meetings
     const showDuration = actionType === 'call' || actionType === 'meeting';
     const validOutcomes = OUTCOME_BY_ACTION[actionType];
-    const isScheduled = outcome === 'scheduled';
 
     return (
         <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border border-emerald-200 p-5 animate-in fade-in slide-in-from-top-2 duration-300">
@@ -221,7 +245,7 @@ export function QuickActionLogger({ lead, companyId, onCallLogged, onClose }: Qu
                 </div>
             </div>
 
-            {/* Outcome Selector (adapts to action type) */}
+            {/* Outcome Selector (adapts to action type — no more "scheduled") */}
             <div className="mb-4">
                 <label className="block text-[9px] font-black uppercase tracking-widest text-gray-500 mb-2 ml-1">
                     Resultado
@@ -232,11 +256,9 @@ export function QuickActionLogger({ lead, companyId, onCallLogged, onClose }: Qu
                         return (
                             <button
                                 key={key}
-                                onClick={() => handleOutcomeChange(key)}
+                                onClick={() => setOutcome(key)}
                                 className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${outcome === key
-                                    ? key === 'scheduled'
-                                        ? 'bg-purple-50 shadow-md border-purple-300 text-purple-900 scale-[1.02]'
-                                        : 'bg-white shadow-md border-emerald-300 text-gray-900 scale-[1.02]'
+                                    ? 'bg-white shadow-md border-emerald-300 text-gray-900 scale-[1.02]'
                                     : 'bg-white/40 border-transparent text-gray-500 hover:bg-white/70 hover:border-gray-200'
                                     }`}
                             >
@@ -248,45 +270,89 @@ export function QuickActionLogger({ lead, companyId, onCallLogged, onClose }: Qu
                 </div>
             </div>
 
-            {/* Follow-Up Scheduler (appears when outcome = scheduled) */}
-            {isScheduled && (
-                <div className="mb-4 bg-purple-50 border border-purple-200 rounded-xl p-4 animate-in fade-in slide-in-from-top-1 duration-200">
-                    <div className="flex items-center gap-2 mb-3">
-                        <CalendarPlus className="w-4 h-4 text-purple-600" />
-                        <span className="text-[10px] font-black uppercase tracking-widest text-purple-700">
-                            Agendar Seguimiento
+            {/* ===== INDEPENDENT FOLLOW-UP TOGGLE ===== */}
+            <div className="mb-4">
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={handleFollowUpToggle}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${wantsFollowUp ? 'bg-purple-600' : 'bg-gray-200'
+                            }`}
+                    >
+                        <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${wantsFollowUp ? 'translate-x-6' : 'translate-x-1'
+                                }`}
+                        />
+                    </button>
+                    <div className="flex items-center gap-1.5">
+                        <CalendarPlus className={`w-3.5 h-3.5 ${wantsFollowUp ? 'text-purple-600' : 'text-gray-400'}`} />
+                        <span className={`text-xs font-bold ${wantsFollowUp ? 'text-purple-700' : 'text-gray-600'}`}>
+                            ¿Agendar seguimiento?
                         </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 mb-3">
-                        <div>
-                            <label className="block text-[8px] font-bold text-purple-500 uppercase mb-1 ml-1">Fecha</label>
-                            <input
-                                type="date"
-                                value={followUpDate}
-                                onChange={(e) => setFollowUpDate(e.target.value)}
-                                min={new Date().toISOString().split('T')[0]}
-                                className="w-full bg-white border border-purple-200 rounded-lg px-3 py-2 text-xs font-bold text-gray-700 focus:ring-2 focus:ring-purple-400/20 focus:border-purple-400 transition-all outline-none"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-[8px] font-bold text-purple-500 uppercase mb-1 ml-1">Hora</label>
-                            <input
-                                type="time"
-                                value={followUpTime}
-                                onChange={(e) => setFollowUpTime(e.target.value)}
-                                className="w-full bg-white border border-purple-200 rounded-lg px-3 py-2 text-xs font-bold text-gray-700 focus:ring-2 focus:ring-purple-400/20 focus:border-purple-400 transition-all outline-none"
-                            />
-                        </div>
-                    </div>
-                    <input
-                        type="text"
-                        value={followUpNote}
-                        onChange={(e) => setFollowUpNote(e.target.value)}
-                        placeholder={`Nota: ej. "Enviar propuesta actualizada"`}
-                        className="w-full bg-white border border-purple-200 rounded-lg px-3 py-2 text-xs font-medium placeholder:text-gray-300 focus:ring-2 focus:ring-purple-400/20 focus:border-purple-400 transition-all outline-none"
-                    />
                 </div>
-            )}
+
+                {/* Follow-Up Scheduler (independent from outcome) */}
+                {wantsFollowUp && (
+                    <div className="mt-3 bg-purple-50 border border-purple-200 rounded-xl p-4 animate-in fade-in slide-in-from-top-1 duration-200">
+                        <div className="flex items-center gap-2 mb-3">
+                            <CalendarPlus className="w-4 h-4 text-purple-600" />
+                            <span className="text-[10px] font-black uppercase tracking-widest text-purple-700">
+                                Agendar Seguimiento
+                            </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 mb-3">
+                            <div>
+                                <label className="block text-[8px] font-bold text-purple-500 uppercase mb-1 ml-1">Fecha</label>
+                                <CustomDatePicker
+                                    value={followUpDate}
+                                    onChange={(date) => setFollowUpDate(date)}
+                                    placeholder="Seleccionar fecha"
+                                    variant="light"
+                                    minDate={todayISO}
+                                    forceOpenUp
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-[8px] font-bold text-purple-500 uppercase mb-1 ml-1">Hora</label>
+                                <select
+                                    value={followUpTime}
+                                    onChange={(e) => setFollowUpTime(e.target.value)}
+                                    className="w-full bg-white border border-purple-200 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-purple-400/20 focus:border-purple-400 transition-all outline-none appearance-none cursor-pointer"
+                                >
+                                    {TIME_SLOTS.map(slot => (
+                                        <option key={slot.value} value={slot.value}>{slot.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                        {/* Assignee Selector */}
+                        {teamMembers.length > 0 && (
+                            <div className="mb-3">
+                                <label className="block text-[8px] font-bold text-purple-500 uppercase mb-1 ml-1">Ejecutivo Asignado</label>
+                                <select
+                                    value={followUpAssignee}
+                                    onChange={(e) => setFollowUpAssignee(e.target.value)}
+                                    className="w-full bg-white border border-purple-200 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-purple-400/20 focus:border-purple-400 transition-all outline-none appearance-none cursor-pointer"
+                                >
+                                    <option value="">Sin asignar</option>
+                                    {teamMembers.map(m => (
+                                        <option key={m.id} value={m.id}>
+                                            {m.full_name || m.email.split('@')[0]}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                        <input
+                            type="text"
+                            value={followUpNote}
+                            onChange={(e) => setFollowUpNote(e.target.value)}
+                            placeholder={`Nota: ej. "Enviar propuesta actualizada"`}
+                            className="w-full bg-white border border-purple-200 rounded-lg px-3 py-2 text-xs font-medium placeholder:text-gray-300 focus:ring-2 focus:ring-purple-400/20 focus:border-purple-400 transition-all outline-none"
+                        />
+                    </div>
+                )}
+            </div>
 
             {/* Quick Notes */}
             <div className="mb-4">
@@ -325,8 +391,8 @@ export function QuickActionLogger({ lead, companyId, onCallLogged, onClose }: Qu
                                     type="button"
                                     onClick={() => setDurationMinutes(min)}
                                     className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black transition-all ${durationMinutes === min
-                                            ? 'bg-emerald-600 text-white shadow-sm'
-                                            : 'bg-white border border-gray-200 text-gray-500 hover:border-emerald-300 hover:text-emerald-600'
+                                        ? 'bg-emerald-600 text-white shadow-sm'
+                                        : 'bg-white border border-gray-200 text-gray-500 hover:border-emerald-300 hover:text-emerald-600'
                                         }`}
                                 >
                                     {min}m
@@ -398,14 +464,14 @@ export function QuickActionLogger({ lead, companyId, onCallLogged, onClose }: Qu
                 <button
                     onClick={handleSubmit}
                     disabled={isSaving}
-                    className={`flex-[2] text-white font-black px-6 py-3 rounded-xl text-[10px] uppercase tracking-widest shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2 ${isScheduled
-                            ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-600/20'
-                            : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
+                    className={`flex-[2] text-white font-black px-6 py-3 rounded-xl text-[10px] uppercase tracking-widest shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2 ${wantsFollowUp
+                        ? 'bg-purple-600 hover:bg-purple-700 shadow-purple-600/20'
+                        : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
                         }`}
                 >
                     {isSaving ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : isScheduled ? (
+                    ) : wantsFollowUp ? (
                         <>
                             <CalendarPlus className="w-3.5 h-3.5" />
                             Registrar + Agendar
