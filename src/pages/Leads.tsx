@@ -1,4 +1,6 @@
 ﻿import { useEffect, useState, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { leadsService } from '../services/leads';
@@ -28,8 +30,17 @@ export default function Leads() {
     const { profile } = useAuth();
     const isAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
     const { tableRef: leadsTableRef, wrapperRef: leadsWrapperRef } = useAriasTables();
-    const [leads, setLeads] = useState<Lead[]>([]);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
+    const { data: leadsData, isLoading: loading } = useQuery({
+        queryKey: ['leads'],
+        queryFn: async () => {
+            const { data } = await leadsService.getLeads();
+            return data || [];
+        },
+        staleTime: 2 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
+    });
+    const leads = leadsData ?? [];
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -356,8 +367,16 @@ export default function Leads() {
         return filteredLeads.reduce((sum, lead) => sum + (lead.value || 0), 0);
     }, [filteredLeads]);
 
+    // Supabase Realtime — actualiza la lista cuando otro usuario crea/edita/elimina un lead
     useEffect(() => {
-        loadLeads();
+        const channel = supabase.channel('leads-live')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' },
+                () => queryClient.invalidateQueries({ queryKey: ['leads'] })
+            ).subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [queryClient]);
+
+    useEffect(() => {
         loadTeamMembers();
         loadLossReasons();
         loadIndustries();
@@ -408,7 +427,7 @@ export default function Leads() {
             const path = await storageService.uploadLeadDocument(profile.company_id, selectedLead.id, file);
             await leadsService.updateLead(selectedLead.id, { document_path: path });
             setSelectedLead({ ...selectedLead, document_path: path });
-            setLeads(leads.map(l => l.id === selectedLead.id ? { ...l, document_path: path } : l));
+            queryClient.invalidateQueries({ queryKey: ['leads'] });
             toast.success('PDF cargado correctamente');
         } catch (error: any) {
             logger.error('Upload failed', error, { action: 'handleFileUpload', leadId: selectedLead.id });
@@ -436,23 +455,15 @@ export default function Leads() {
             await storageService.deleteFile(selectedLead.document_path);
             await leadsService.updateLead(selectedLead.id, { document_path: null });
             setSelectedLead({ ...selectedLead, document_path: null });
-            setLeads(leads.map(l => l.id === selectedLead.id ? { ...l, document_path: null } : l));
+            queryClient.invalidateQueries({ queryKey: ['leads'] });
             toast.success('Documento eliminado');
         } catch (error: any) {
             toast.error('Error al eliminar: ' + error.message);
         }
     };
 
-    const loadLeads = async () => {
-        try {
-            setLoading(true);
-            const { data } = await leadsService.getLeads();
-            setLeads(data || []);
-        } catch (error) {
-            logger.error('Failed to load leads', error, { action: 'loadLeads' });
-        } finally {
-            setLoading(false);
-        }
+    const loadLeads = () => {
+        queryClient.invalidateQueries({ queryKey: ['leads'] });
     };
 
     const handleDownloadTemplate = () => {
@@ -558,13 +569,9 @@ export default function Leads() {
                 setPriorityFilter('all');
                 setFilteredLeadId(null);
 
-                // Add successfully imported leads to state
+                // Add successfully imported leads to cache and then do a full sync
                 if (results.inserted.length > 0) {
-                    setLeads(prev => {
-                        const existingIds = new Set(prev.map(l => l.id));
-                        const newLeads = results.inserted.filter(l => !existingIds.has(l.id));
-                        return [...newLeads, ...prev];
-                    });
+                    queryClient.invalidateQueries({ queryKey: ['leads'] });
                 }
 
                 // Show detailed results
@@ -607,10 +614,7 @@ export default function Leads() {
                 // Background sync to ensure consistency
                 setTimeout(async () => {
                     try {
-                        const { data: freshData } = await leadsService.getLeads();
-                        if (freshData) {
-                            setLeads(freshData);
-                        }
+                        queryClient.invalidateQueries({ queryKey: ['leads'] });
                     } catch (err) {
                         console.error('Background sync failed:', err);
                     }
@@ -2205,14 +2209,16 @@ export default function Leads() {
                             }
 
                             try {
-                                // Optimistic update
-                                setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: newStatus } : l));
+                                // Optimistic update via query cache
+                                queryClient.setQueryData(['leads'], (old: Lead[] | undefined) =>
+                                    (old ?? []).map(l => l.id === leadId ? { ...l, status: newStatus } : l)
+                                );
 
                                 await leadsService.updateLead(leadId, { status: newStatus });
                                 toast.success(`Estado actualizado a ${newStatus}`);
                             } catch (error) {
                                 // Rollback
-                                setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: lead.status } : l));
+                                queryClient.invalidateQueries({ queryKey: ['leads'] });
                                 toast.error('Error al actualizar estado');
                             }
                         }}

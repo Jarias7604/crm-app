@@ -439,15 +439,16 @@ export default function PublicQuoteView() {
                 </div>
 
                 {/* Mobile Financial Summary - Dynamic with Detailed Breakdown */}
-                <div className="flex items-center justify-between px-2 mb-4">
+                <div className="px-2 mb-4 space-y-3">
                     <p className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em]">RESUMEN DE INVERSIÓN</p>
-                    <div className="flex items-center gap-3">
-                        <CreditCard className="w-5 h-5 text-indigo-400 opacity-60 flex-shrink-0" />
-                        <div className="text-right">
-                            <p className="text-xs font-bold text-slate-600">
+                    {/* Plan Badge - Grande y legible */}
+                    <div className="flex items-center gap-3 bg-slate-100 rounded-2xl px-4 py-3">
+                        <CreditCard className="w-5 h-5 text-indigo-500 flex-shrink-0" />
+                        <div className="flex flex-col gap-1 flex-1">
+                            <p className="text-base font-black text-slate-900 leading-tight">
                                 {planTitulo}
                             </p>
-                            <p className="text-[10px] text-slate-400 leading-none">
+                            <p className="text-sm font-medium text-slate-500 leading-snug">
                                 {planDescripcion}
                             </p>
                         </div>

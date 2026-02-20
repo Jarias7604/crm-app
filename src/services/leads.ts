@@ -6,22 +6,14 @@ export const leadsService = {
     // Get all leads for the company - Optimized for performance
     async getLeads(page = 1, pageSize = 1000) {
         try {
-            console.log('🔍 Fetching ALL leads from database...');
-
-            const { data, error, count } = await supabase
+            const { data, count } = await supabase
                 .from('leads')
                 .select('*', { count: 'exact' })
                 .order('created_at', { ascending: false });
 
-            console.log('📥 Supabase getLeads response:');
-            console.log('  - Data count:', data?.length);
-            console.log('  - Total count:', count);
-            console.log('  - Error:', error);
-            console.log('  - First lead:', data?.[0]);
-
-            if (error) {
-                logger.error('Error loading leads', error, { action: 'getLeads', page, pageSize });
-                throw error;
+            if (!data) {
+                logger.error('Error loading leads', null, { action: 'getLeads', page, pageSize });
+                return { data: [], count: 0 };
             }
             return { data, count };
         } catch (err) {

@@ -277,8 +277,10 @@ export const pdfService = {
                 drawRow('Comunicación WhatsApp', cotizacion.costo_whatsapp || 0);
             }
             modulos.forEach((m: any) => {
-                const currentCosto = m.costo_anual || m.costo || 0;
-                const isOneTime = (m.costo_mensual || 0) === 0 && currentCosto > 0;
+                const pagoUnicoMonto = Number(m.pago_unico) || 0;
+                const costoAnual = Number(m.costo_anual) || Number(m.costo) || 0;
+                const isOneTime = pagoUnicoMonto > 0;
+                const currentCosto = isOneTime ? pagoUnicoMonto : costoAnual;
                 drawRow(m.nombre, currentCosto, isOneTime, m.descripcion);
             });
 
@@ -328,7 +330,9 @@ export const pdfService = {
                 ivaLicencia: ivaRecurrente,
                 totalLicencia,
                 cuotaMensual,
-                totalImplementacion: pagoInicial
+                totalImplementacion: pagoInicial,
+                planTitulo,
+                planDescripcion
             } = financialsV2;
 
             // Adaptar al formato que espera el código del PDF
@@ -520,6 +524,36 @@ export const pdfService = {
                     doc.text('* Plan de pagos consecutivos.', x + boxW / 2, highlightY + 4, { align: 'center' });
                 }
             };
+
+            // ── Plan Badge ──────────────────────────────────────────────
+            // Badge de forma de pago — más grande y legible (igual que en la vista web)
+            doc.setTextColor(99, 102, 241); // indigo-500
+            doc.setFontSize(6.5);
+            doc.setFont('helvetica', 'bold');
+            doc.text('FORMA DE PAGO', margin, by - 2);
+
+            const badgeH = 12;
+            doc.setFillColor(241, 245, 249); // slate-100
+            doc.roundedRect(margin, by + 1, pageWidth - (margin * 2), badgeH, 2, 2, 'F');
+            doc.setDrawColor(226, 232, 240);
+            doc.roundedRect(margin, by + 1, pageWidth - (margin * 2), badgeH, 2, 2, 'D');
+
+            // Título del plan (grande)
+            doc.setTextColor(15, 23, 42); // slate-900
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'bold');
+            const tituloText = planTitulo.toUpperCase();
+            doc.text(tituloText, margin + 5, by + 8);
+
+            // Descripción del plan (gris, al lado del título)
+            const tituloWidth = doc.getTextWidth(tituloText);
+            doc.setTextColor(100, 116, 139); // slate-500
+            doc.setFontSize(8.5);
+            doc.setFont('helvetica', 'normal');
+            doc.text('— ' + planDescripcion, margin + 5 + tituloWidth + 2, by + 8);
+
+            by += badgeH + 10; // Espacio debajo del badge
+            // ────────────────────────────────────────────────────────────
 
             // Drawing boxes
             drawBox(bx, by, 'PAGO INICIAL', 'Requerido para activar', pagoInicial, pagoInicial, COLORS.ORANGE);

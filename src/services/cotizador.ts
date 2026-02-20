@@ -266,7 +266,7 @@ class CotizadorService {
             subtotal_pagos_unicos += paquete.costo_implementacion;
             desglose.push({
                 es_pago_unico: true,
-                tipo: 'Pago Único',
+                tipo: 'Implementación',
                 nombre: 'Implementación y Configuración',
                 precio_anual: paquete.costo_implementacion,
                 precio_mensual: 0,
@@ -278,7 +278,7 @@ class CotizadorService {
         subtotal_recurrente_base += paquete.costo_paquete_anual;
         desglose.push({
             es_pago_unico: false,
-            tipo: 'Licencia',
+            tipo: 'Paquete',
             nombre: `${paquete.paquete} (${paquete.cantidad_dtes} DTEs)`,
             precio_anual: paquete.costo_paquete_anual,
             precio_mensual: paquete.costo_paquete_mensual,

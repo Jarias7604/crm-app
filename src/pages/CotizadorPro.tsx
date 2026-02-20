@@ -65,6 +65,7 @@ export default function CotizadorPro() {
     const [paqueteSugerido, setPaqueteSugerido] = useState<CotizadorPaquete | null>(null);
     const [overrides, setOverrides] = useState<Record<string, number>>({});
     const [implementationOverride, setImplementationOverride] = useState<number | null>(null);
+    const [paqueteOverride, setPaqueteOverride] = useState<number | null>(null);
     const [totales, setTotales] = useState<CotizacionCalculada | null>(null);
 
     // Nuevos estados para pagos dinámicos
@@ -167,6 +168,7 @@ export default function CotizadorPro() {
         formData.recargo_mensual_porcentaje,
         overrides,
         implementationOverride,
+        paqueteOverride,
         selectedPlanId,
         financingPlans
     ]);
@@ -265,21 +267,26 @@ export default function CotizadorPro() {
             ...modulos.filter(m => formData.modulos_ids.includes(m.id)),
             ...servicios.filter(s => formData.servicios_ids.includes(s.id))
         ].map(item => {
-            // Aplicar override si existe
+            // Aplicar override si existe, preservando si es pago único o recurrente
             if (overrides[item.id] !== undefined) {
+                const esPagoUnico = (item.pago_unico || 0) > 0;
                 return {
                     ...item,
-                    precio_anual: overrides[item.id],
-                    precio_por_dte: 0, // Si se sobreescribe el precio anual, asumimos que no es por DTE
-                    pago_unico: 0
+                    // Pago único: el override va a pago_unico; Recurrente: el override va a precio_anual
+                    pago_unico: esPagoUnico ? overrides[item.id] : 0,
+                    precio_anual: esPagoUnico ? 0 : overrides[item.id],
+                    precio_por_dte: 0,
                 };
             }
             return item;
         });
 
-        const packageWithOverride = implementationOverride !== null
-            ? { ...paqueteSeleccionado, costo_implementacion: implementationOverride }
-            : paqueteSeleccionado;
+        // Aplicar override de paquete (precio del plan) y/o implementación
+        const packageWithOverride = {
+            ...paqueteSeleccionado,
+            ...(paqueteOverride !== null ? { costo_paquete_anual: paqueteOverride } : {}),
+            ...(implementationOverride !== null ? { costo_implementacion: implementationOverride } : {})
+        };
 
         const selectedPlan = financingPlans.find(p => p.id === selectedPlanId);
 
@@ -435,9 +442,11 @@ export default function CotizadorPro() {
                 direccion_cliente: formData.cliente_direccion,
                 volumen_dtes: formData.volumen_dtes,
                 plan_nombre: paqueteSeleccionado.paquete,
-                costo_plan_anual: paqueteSeleccionado.costo_paquete_anual,
+                costo_plan_anual: paqueteOverride ?? paqueteSeleccionado.costo_paquete_anual,
                 costo_plan_mensual: paqueteSeleccionado.costo_paquete_mensual,
-                costo_implementacion: formData.incluir_implementacion ? paqueteSeleccionado.costo_implementacion : 0,
+                costo_implementacion: formData.incluir_implementacion
+                    ? (implementationOverride ?? paqueteSeleccionado.costo_implementacion)
+                    : 0,
                 modulos_adicionales: todosLosItems,
                 servicio_whatsapp: whatsappSeleccionado,
                 costo_whatsapp: whatsappServicio
@@ -938,6 +947,33 @@ export default function CotizadorPro() {
                                     ))}
                                 </div>
                             </div>
+
+                            {/* Toggle Implementación */}
+                            {(() => {
+                                const paqueteSeleccionado = paquetes.find(p => p.id === formData.paquete_id);
+                                const costoImp = paqueteSeleccionado?.costo_implementacion || 0;
+                                return costoImp > 0 ? (
+                                    <div className="mt-4 flex items-center justify-between p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                                        <div>
+                                            <p className="font-bold text-sm text-amber-800">🔧 Costo de Implementación</p>
+                                            <p className="text-xs text-amber-600 mt-0.5">
+                                                ${costoImp.toFixed(2)} — pago único al activar
+                                            </p>
+                                        </div>
+                                        <label className="flex items-center gap-3 cursor-pointer">
+                                            <span className={`text-xs font-bold ${formData.incluir_implementacion ? 'text-green-600' : 'text-gray-400'}`}>
+                                                {formData.incluir_implementacion ? 'INCLUIDA' : 'EXCLUIDA'}
+                                            </span>
+                                            <div
+                                                onClick={() => setFormData({ ...formData, incluir_implementacion: !formData.incluir_implementacion })}
+                                                className={`relative w-11 h-6 rounded-full transition-colors duration-200 cursor-pointer ${formData.incluir_implementacion ? 'bg-green-500' : 'bg-gray-300'}`}
+                                            >
+                                                <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${formData.incluir_implementacion ? 'translate-x-5' : 'translate-x-0'}`} />
+                                            </div>
+                                        </label>
+                                    </div>
+                                ) : null;
+                            })()}
                         </div>
                     )}
 
@@ -970,7 +1006,7 @@ export default function CotizadorPro() {
                                                 <div>
                                                     <div className="flex items-center gap-2">
                                                         <p className="font-bold text-gray-900">{item.nombre}</p>
-                                                        {item.precio_mensual === 0 && (
+                                                        {item.es_pago_unico && (
                                                             <span className="bg-gray-100 text-gray-600 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter">Pago Único</span>
                                                         )}
                                                     </div>
@@ -979,17 +1015,45 @@ export default function CotizadorPro() {
                                             </div>
 
                                             <div className="text-right flex flex-col items-end gap-1">
-                                                {item.tipo === 'Implementación' && hasPermission('cotizaciones.edit_implementation') ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xs text-gray-400 font-bold">$</span>
-                                                        <input
-                                                            type="number"
-                                                            className="w-24 text-right font-bold text-orange-600 border border-orange-100 rounded px-2 py-1 bg-orange-50/30 focus:ring-2 focus:ring-orange-500 outline-none"
-                                                            value={implementationOverride ?? item.precio_anual}
-                                                            onChange={(e) => setImplementationOverride(Number(e.target.value))}
-                                                        />
-                                                    </div>
-                                                ) : (
+                                                {(hasPermission('cotizaciones.edit_prices') || profile?.role === 'super_admin' || profile?.role === 'company_admin') ? (() => {
+                                                    const itemOriginal = (item.tipo !== 'Implementación' && item.tipo !== 'Paquete')
+                                                        ? [...modulos, ...servicios].find(i => i.nombre === item.nombre)
+                                                        : null;
+                                                    const currentValue =
+                                                        item.tipo === 'Implementación'
+                                                            ? (implementationOverride ?? item.precio_anual)
+                                                            : item.tipo === 'Paquete'
+                                                                ? (paqueteOverride ?? item.precio_anual)
+                                                                : (itemOriginal && overrides[itemOriginal.id] !== undefined
+                                                                    ? overrides[itemOriginal.id]
+                                                                    : item.precio_anual);
+                                                    return (
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-xs text-gray-400 font-bold">$</span>
+                                                            <input
+                                                                type="number"
+                                                                step="0.01"
+                                                                className={`w-28 text-right font-bold text-lg border rounded px-2 py-1 focus:ring-2 outline-none ${item.tipo === 'Implementación'
+                                                                    ? 'text-orange-600 border-orange-100 bg-orange-50/30 focus:ring-orange-400'
+                                                                    : item.tipo === 'Paquete'
+                                                                        ? 'text-blue-700 border-blue-200 bg-blue-50/30 focus:ring-blue-400'
+                                                                        : 'text-purple-700 border-purple-200 bg-purple-50/30 focus:ring-purple-400'
+                                                                    }`}
+                                                                value={currentValue}
+                                                                onChange={(e) => {
+                                                                    const val = Number(e.target.value);
+                                                                    if (item.tipo === 'Implementación') {
+                                                                        setImplementationOverride(val);
+                                                                    } else if (item.tipo === 'Paquete') {
+                                                                        setPaqueteOverride(val);
+                                                                    } else if (itemOriginal) {
+                                                                        setOverrides({ ...overrides, [itemOriginal.id]: val });
+                                                                    }
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    );
+                                                })() : (
                                                     <p className="font-black text-gray-800 text-lg">
                                                         ${(item.precio_anual).toLocaleString()}
                                                     </p>
@@ -1032,7 +1096,7 @@ export default function CotizadorPro() {
 
                                                             setFormData({
                                                                 ...formData,
-                                                                forma_pago: isDiscountPlan ? 'anual' : 'mensual',
+                                                                forma_pago: (isDiscountPlan || isAnual) ? 'anual' : 'mensual',
                                                                 meses_pago: plan.meses,
                                                                 // Reiniciamos descuento manual para evitar doble descuento accidental
                                                                 descuento_porcentaje: 0
@@ -1191,11 +1255,17 @@ export default function CotizadorPro() {
                                                     </div>
                                                 </div>
                                                 <div className="space-y-1.5">
-                                                    <div className="flex justify-between text-[11px] text-gray-500 font-medium leading-none">
-                                                        <span>Implementación + Únicos</span>
-                                                        <span>${totales.subtotal_pagos_unicos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                    </div>
-                                                    <div className="flex justify-between text-[11px] text-gray-500 font-medium leading-none">
+                                                    {/* Listar cada ítem de pago único por separado */}
+                                                    {totales.desglose
+                                                        .filter(d => d.es_pago_unico)
+                                                        .map((d, i) => (
+                                                            <div key={i} className="flex justify-between text-[11px] text-gray-600 font-medium leading-none">
+                                                                <span>{d.nombre}</span>
+                                                                <span>${d.precio_anual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                            </div>
+                                                        ))
+                                                    }
+                                                    <div className="flex justify-between text-[11px] text-gray-500 font-medium leading-none pt-1 border-t border-orange-100">
                                                         <span>IVA ({formData.iva_porcentaje}%)</span>
                                                         <span className="text-orange-600">+${totales.iva_pagos_unicos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                     </div>
@@ -1212,7 +1282,7 @@ export default function CotizadorPro() {
                                             <div className="flex justify-between items-center mb-3">
                                                 <div>
                                                     <h4 className={`text-[10px] font-black ${formData.forma_pago === 'mensual' ? 'text-blue-600' : 'text-green-600'} uppercase tracking-widest leading-none`}>
-                                                        {totales.cuotas > 1 ? `PAGO EN ${totales.cuotas} CUOTAS` : (formData.forma_pago === 'mensual' ? 'PAGO MENSUAL' : 'PAGO ANUAL')}
+                                                        {financingPlans.find(p => p.id === selectedPlanId)?.titulo?.toUpperCase() || 'FORMA DE PAGO'}
                                                     </h4>
                                                 </div>
                                                 <div className={`w-8 h-8 ${formData.forma_pago === 'mensual' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'} rounded-lg flex items-center justify-center`}>
@@ -1250,7 +1320,7 @@ export default function CotizadorPro() {
                                                 <div className={`pt-2 border-t ${formData.forma_pago === 'mensual' ? 'border-blue-200' : 'border-green-200'} mt-2 space-y-2`}>
                                                     <div className="flex justify-between items-end">
                                                         <span className="text-[10px] font-black text-gray-900 uppercase">
-                                                            {totales.cuotas > 1 ? `Cuota de ${totales.cuotas}` : (formData.forma_pago === 'mensual' ? 'Cuota mensual' : 'Total recurrente')}
+                                                            {financingPlans.find(p => p.id === selectedPlanId)?.titulo || 'Total'}
                                                         </span>
                                                         <span className={`text-xl font-black ${formData.forma_pago === 'mensual' ? 'text-blue-600' : 'text-green-600'} tracking-tighter leading-none`}>
                                                             ${(totales.cuota_mensual).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1344,25 +1414,33 @@ export default function CotizadorPro() {
                                         </button>
                                     </div>
                                     <div className="space-y-1 text-sm">
-                                        {hasPermission('cotizaciones.manage_implementation') && (
-                                            <div className="flex justify-between items-center bg-gray-50 p-2 rounded-lg border border-gray-100 mb-2">
-                                                <span className="text-[10px] font-black uppercase text-gray-400 tracking-tighter">Implementación:</span>
-                                                <label className="flex items-center gap-2 cursor-pointer">
-                                                    <span className={`text-[11px] font-bold ${formData.incluir_implementacion ? 'text-green-600' : 'text-gray-400'}`}>
-                                                        {formData.incluir_implementacion ? 'SÍ' : 'NO'}
-                                                    </span>
-                                                    <div className={`w-8 h-4 rounded-full p-0.5 transition-colors ${formData.incluir_implementacion ? 'bg-green-500' : 'bg-gray-300'}`}>
-                                                        <div className={`w-3 h-3 bg-white rounded-full transition-transform ${formData.incluir_implementacion ? 'translate-x-4' : 'translate-x-0'}`} />
+                                        {(() => {
+                                            const paqSel = paquetes.find(p => p.id === formData.paquete_id);
+                                            const costoImp = paqSel?.costo_implementacion || 0;
+                                            if (costoImp === 0) return null;
+                                            return (
+                                                <div className="flex justify-between items-center bg-amber-50 p-2 rounded-lg border border-amber-200 mb-2">
+                                                    <div>
+                                                        <span className="text-[10px] font-black uppercase text-amber-700 tracking-tighter block">Implementación</span>
+                                                        <span className="text-[10px] text-amber-500">${costoImp.toFixed(2)}</span>
                                                     </div>
-                                                    <input
-                                                        type="checkbox"
-                                                        className="hidden"
-                                                        checked={formData.incluir_implementacion}
-                                                        onChange={(e) => setFormData({ ...formData, incluir_implementacion: e.target.checked })}
-                                                    />
-                                                </label>
-                                            </div>
-                                        )}
+                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                        <span className={`text-[11px] font-bold ${formData.incluir_implementacion ? 'text-green-600' : 'text-gray-400'}`}>
+                                                            {formData.incluir_implementacion ? 'SÍ' : 'NO'}
+                                                        </span>
+                                                        <div className={`w-8 h-4 rounded-full p-0.5 transition-colors ${formData.incluir_implementacion ? 'bg-green-500' : 'bg-gray-300'}`}>
+                                                            <div className={`w-3 h-3 bg-white rounded-full transition-transform ${formData.incluir_implementacion ? 'translate-x-4' : 'translate-x-0'}`} />
+                                                        </div>
+                                                        <input
+                                                            type="checkbox"
+                                                            className="hidden"
+                                                            checked={formData.incluir_implementacion}
+                                                            onChange={(e) => setFormData({ ...formData, incluir_implementacion: e.target.checked })}
+                                                        />
+                                                    </label>
+                                                </div>
+                                            );
+                                        })()}
                                         <div className="flex justify-between">
                                             <span className="text-gray-600">Subtotal:</span>
                                             <span className="font-semibold">${(totales.subtotal_pagos_unicos + totales.subtotal_recurrente_base).toLocaleString()}</span>

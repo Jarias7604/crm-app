@@ -1,9 +1,19 @@
 import { StrictMode, Suspense, Component } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './index.css'
 import App from './App.tsx'
 import './i18n'
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+})
 
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
@@ -46,10 +56,12 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ErrorBoundary>
-      <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading Application...</div>}>
-        <App />
-      </Suspense>
-    </ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <ErrorBoundary>
+        <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading Application...</div>}>
+          <App />
+        </Suspense>
+      </ErrorBoundary>
+    </QueryClientProvider>
   </StrictMode>,
 )

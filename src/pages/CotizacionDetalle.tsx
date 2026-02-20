@@ -533,18 +533,19 @@ export default function CotizacionDetalle() {
 
                                 return (
                                     <>
-                                        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                                             <p className="text-[9px] font-black text-blue-400 uppercase tracking-[0.2em]">RESUMEN DE INVERSIÓN</p>
-                                            <div className="flex items-center gap-2">
-                                                <CreditCard className="w-4 h-4 text-slate-400" />
-                                                <div className="text-right">
-                                                    <p className="text-xs font-bold text-slate-600">
-                                                        {planTitulo}
-                                                    </p>
-                                                    <p className="text-[10px] text-slate-400 leading-none">
-                                                        {planDescripcion}
-                                                    </p>
-                                                </div>
+                                        </div>
+                                        {/* Plan Badge - Grande y legible */}
+                                        <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3">
+                                            <CreditCard className="w-5 h-5 text-indigo-500 flex-shrink-0" />
+                                            <div className="flex flex-col gap-1 flex-1">
+                                                <p className="text-base font-black text-slate-900 leading-tight">
+                                                    {planTitulo}
+                                                </p>
+                                                <p className="text-sm font-medium text-slate-500 leading-snug">
+                                                    {planDescripcion}
+                                                </p>
                                             </div>
                                         </div>
 
