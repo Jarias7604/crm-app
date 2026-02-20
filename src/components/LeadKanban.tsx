@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useRef, useEffect, useCallback } from 'react';
 
 interface LeadKanbanProps {
     leads: Lead[];
@@ -41,7 +42,16 @@ const COLUMN_COLORS: Record<LeadStatus, string> = {
     'Perdido': 'bg-gray-500'
 };
 
+// ─── Auto-scroll zone width in px (how close to the edge triggers scroll)
+const SCROLL_ZONE = 120;
+// ─── Max scroll speed in px per frame
+const MAX_SPEED = 18;
+
 export function LeadKanban({ leads, teamMembers, onUpdateStatus, onOpenDetail }: LeadKanbanProps) {
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const animFrameRef = useRef<number | null>(null);
+    const mouseXRef = useRef<number>(0);
+
     const onDragEnd = async (result: DropResult) => {
         const { destination, source, draggableId } = result;
 
@@ -60,9 +70,73 @@ export function LeadKanban({ leads, teamMembers, onUpdateStatus, onOpenDetail }:
         return getLeadsByStatus(status).reduce((sum, lead) => sum + (lead.value || 0), 0);
     };
 
+    // ── Auto-scroll logic ──────────────────────────────────────────────────
+    const autoScroll = useCallback(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+
+        const { left, right, width } = el.getBoundingClientRect();
+        const mouseX = mouseXRef.current;
+
+        let speed = 0;
+
+        if (mouseX < left + SCROLL_ZONE) {
+            // Near left edge → scroll left
+            const dist = mouseX - left;
+            speed = -MAX_SPEED * (1 - Math.max(dist, 0) / SCROLL_ZONE);
+        } else if (mouseX > right - SCROLL_ZONE) {
+            // Near right edge → scroll right
+            const dist = right - mouseX;
+            speed = MAX_SPEED * (1 - Math.max(dist, 0) / SCROLL_ZONE);
+        }
+
+        if (speed !== 0) {
+            el.scrollLeft += speed;
+        }
+
+        animFrameRef.current = requestAnimationFrame(autoScroll);
+    }, []);
+
+    const handleMouseMove = useCallback((e: MouseEvent) => {
+        mouseXRef.current = e.clientX;
+    }, []);
+
+    const handleMouseEnter = useCallback(() => {
+        if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = requestAnimationFrame(autoScroll);
+    }, [autoScroll]);
+
+    const handleMouseLeave = useCallback(() => {
+        if (animFrameRef.current) {
+            cancelAnimationFrame(animFrameRef.current);
+            animFrameRef.current = null;
+        }
+    }, []);
+
+    useEffect(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+
+        el.addEventListener('mousemove', handleMouseMove);
+        el.addEventListener('mouseenter', handleMouseEnter);
+        el.addEventListener('mouseleave', handleMouseLeave);
+
+        return () => {
+            el.removeEventListener('mousemove', handleMouseMove);
+            el.removeEventListener('mouseenter', handleMouseEnter);
+            el.removeEventListener('mouseleave', handleMouseLeave);
+            if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+        };
+    }, [handleMouseMove, handleMouseEnter, handleMouseLeave]);
+    // ──────────────────────────────────────────────────────────────────────
+
     return (
         <DragDropContext onDragEnd={onDragEnd}>
-            <div className="flex gap-1 overflow-x-auto pb-6 -mx-4 px-4 min-h-[calc(100vh-250px)]">
+            <div
+                ref={scrollRef}
+                className="flex gap-1 overflow-x-auto pb-6 -mx-4 px-4 min-h-[calc(100vh-250px)] scroll-smooth"
+                style={{ scrollbarWidth: 'thin', scrollbarColor: '#e2e8f0 transparent' }}
+            >
                 {COLUMNS.map((status, idx) => (
                     <div key={status} className="flex-shrink-0 w-80 flex flex-col group">
                         {/* Column Header - Arrow Style */}
