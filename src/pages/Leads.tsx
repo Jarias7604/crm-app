@@ -26,6 +26,7 @@ import { CustomDatePicker } from '../components/ui/CustomDatePicker';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { GripVertical } from 'lucide-react';
 import { useAriasTables } from '../hooks/useAriasTables';
+import { ResponseVelocityBadge } from '../components/ui/ResponseVelocityBadge';
 
 export default function Leads() {
     const { profile } = useAuth();
@@ -1623,6 +1624,8 @@ export default function Leads() {
                                         <div className="flex gap-2 items-center flex-wrap">
                                             <StatusBadge status={lead.status} />
                                             <PriorityBadge priority={lead.priority} />
+                                            {/* F3 — Response Velocity */}
+                                            <ResponseVelocityBadge nextFollowupDate={lead.next_followup_date} />
                                         </div>
                                         <div className="flex items-center gap-3">
                                             <div
@@ -1791,6 +1794,11 @@ export default function Leads() {
                                                 <div className="flex items-center gap-2">
                                                     <Clock className="w-3.5 h-3.5 text-blue-500" />
                                                     <span className="text-xs font-bold text-blue-700">Seguimiento:</span>
+                                                    {/* F3 — urgency inline */}
+                                                    <ResponseVelocityBadge
+                                                        nextFollowupDate={lead.next_followup_date}
+                                                        variant="inline"
+                                                    />
                                                 </div>
                                                 <span className="text-xs font-black text-blue-900 uppercase">
                                                     {(() => {
