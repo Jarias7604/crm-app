@@ -2383,6 +2383,34 @@ export default function Leads() {
                                 </p>
                             </div>
 
+                            {/* Quick Action Logger */}
+                            <div>
+                                {!isCallLoggerOpen ? (
+                                    <button
+                                        onClick={() => setIsCallLoggerOpen(true)}
+                                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-dashed border-emerald-200 text-emerald-700 hover:border-emerald-400 hover:from-emerald-100 hover:to-teal-100 font-black px-4 py-4 rounded-2xl text-[10px] uppercase tracking-widest transition-all active:scale-[0.98] group"
+                                    >
+                                        <div className="w-7 h-7 bg-emerald-600 rounded-xl flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
+                                            <Phone className="w-3.5 h-3.5 text-white" />
+                                        </div>
+                                        Registrar Acción
+                                    </button>
+                                ) : (
+                                    <QuickActionLogger
+                                        lead={selectedLead}
+                                        companyId={profile?.company_id || ''}
+                                        teamMembers={teamMembers}
+                                        onCallLogged={async (statusChanged, newStatus) => {
+                                            if (statusChanged && newStatus) {
+                                                await handleUpdateLead({ status: newStatus });
+                                            }
+                                            loadFollowUps(selectedLead.id);
+                                        }}
+                                        onClose={() => setIsCallLoggerOpen(false)}
+                                    />
+                                )}
+                            </div>
+
                             {/* Edit Status & Priority */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
@@ -2578,33 +2606,7 @@ export default function Leads() {
                                 )}
                             </div>
 
-                            {/* Quick Action Logger */}
-                            <div className="pt-4 border-t border-gray-100">
-                                {!isCallLoggerOpen ? (
-                                    <button
-                                        onClick={() => setIsCallLoggerOpen(true)}
-                                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-dashed border-emerald-200 text-emerald-700 hover:border-emerald-400 hover:from-emerald-100 hover:to-teal-100 font-black px-4 py-4 rounded-2xl text-[10px] uppercase tracking-widest transition-all active:scale-[0.98] group"
-                                    >
-                                        <div className="w-7 h-7 bg-emerald-600 rounded-xl flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
-                                            <Phone className="w-3.5 h-3.5 text-white" />
-                                        </div>
-                                        Registrar Acción
-                                    </button>
-                                ) : (
-                                    <QuickActionLogger
-                                        lead={selectedLead}
-                                        companyId={profile?.company_id || ''}
-                                        teamMembers={teamMembers}
-                                        onCallLogged={async (statusChanged, newStatus) => {
-                                            if (statusChanged && newStatus) {
-                                                await handleUpdateLead({ status: newStatus });
-                                            }
-                                            loadFollowUps(selectedLead.id);
-                                        }}
-                                        onClose={() => setIsCallLoggerOpen(false)}
-                                    />
-                                )}
-                            </div>
+
 
                             {/* Follow-up History - Always visible */}
                             <div className="pt-4 border-t border-gray-100">

@@ -17,19 +17,32 @@ import {
     isToday
 } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Clock, Plus, MapPin, Phone, Mail } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail, CalendarDays, MessageSquare } from 'lucide-react';
 import { leadsService } from '../services/leads';
-import type { Lead } from '../types';
 import { Button } from '../components/ui/Button';
+import { useAuth } from '../auth/AuthProvider';
+import { useTimezone } from '../hooks/useTimezone';
+import { formatTimeInZone, utcToLocalDate } from '../utils/timezone';
+
+type CalendarEvent = Awaited<ReturnType<typeof leadsService.getCalendarFollowUps>>[number];
+
+const ACTION_LABELS: Record<string, { label: string; color: string; bg: string }> = {
+    call: { label: 'Llamada', color: 'text-emerald-700', bg: 'bg-emerald-50' },
+    email: { label: 'Email', color: 'text-blue-700', bg: 'bg-blue-50' },
+    whatsapp: { label: 'WhatsApp', color: 'text-green-700', bg: 'bg-green-50' },
+    telegram: { label: 'Telegram', color: 'text-sky-700', bg: 'bg-sky-50' },
+    meeting: { label: 'Reunión', color: 'text-purple-700', bg: 'bg-purple-50' },
+    quote: { label: 'Cotización', color: 'text-amber-700', bg: 'bg-amber-50' },
+};
+const getActionMeta = (type: string) => ACTION_LABELS[type] ?? { label: type, color: 'text-gray-700', bg: 'bg-gray-50' };
 
 export default function Calendar() {
     const navigate = useNavigate();
-    const [currentDate, setCurrentDate] = useState(new Date()); // Shared state for both views, though they might diverge in UX usually.
-    // For simplicity, Month View uses currentDate as the month anchor.
-    // Timeline View uses currentDate as the week anchor.
-
-    const [selectedDate, setSelectedDate] = useState(new Date()); // Controls the specific day selected in Week view
-    const [leads, setLeads] = useState<Lead[]>([]);
+    const { profile } = useAuth();
+    const { timezone: companyTimezone } = useTimezone(profile?.company_id);
+    const [currentDate, setCurrentDate] = useState(new Date());
+    const [selectedDate, setSelectedDate] = useState(new Date());
+    const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -39,10 +52,10 @@ export default function Calendar() {
     const loadData = async () => {
         try {
             setLoading(true);
-            const { data } = await leadsService.getLeads(1, 1000);
-            setLeads(data || []);
+            const events = await leadsService.getCalendarFollowUps();
+            setCalendarEvents(events);
         } catch (error) {
-            console.error('Error loading leads for calendar:', error);
+            console.error('Error loading follow-ups for calendar:', error);
         } finally {
             setLoading(false);
         }
@@ -64,19 +77,17 @@ export default function Calendar() {
         setSelectedDate(subWeeks(selectedDate, 1));
     };
 
-    // Helper to parse "YYYY-MM-DD" safely in LOCAL time
-    const parseLocal = (dateStr: string | null) => {
-        if (!dateStr) return null;
-        const [year, month, day] = dateStr.split('T')[0].split('-').map(Number);
-        return new Date(year, month - 1, day, 12, 0, 0);
+    // Get follow-ups for a given day (in company timezone), sorted ascending by exact time
+    const getDailyEvents = (date: Date): CalendarEvent[] => {
+        return calendarEvents
+            .filter(ev => {
+                if (!ev.date) return false;
+                // Convert the UTC timestamp to a local date in company timezone
+                return isSameDay(utcToLocalDate(ev.date, companyTimezone), date);
+            })
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     };
 
-    const getDailyLeads = (date: Date) => {
-        return leads.filter(lead => {
-            const d = parseLocal(lead.next_followup_date);
-            return d && isSameDay(d, date);
-        });
-    };
 
     // --- RENDERERS ---
 
@@ -128,7 +139,7 @@ export default function Calendar() {
     const renderMonthView = () => {
         const monthStart = startOfMonth(currentDate);
         const monthEnd = endOfMonth(monthStart);
-        const startDate = startOfWeek(monthStart, { weekStartsOn: 0 }); // Sunday start
+        const startDate = startOfWeek(monthStart, { weekStartsOn: 0 });
         const endDate = endOfWeek(monthEnd, { weekStartsOn: 0 });
         const days = eachDayOfInterval({ start: startDate, end: endDate });
         const weekDays = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -144,7 +155,7 @@ export default function Calendar() {
 
                 <div className="grid grid-cols-7 bg-gray-200 gap-px border border-gray-200 rounded-xl overflow-hidden shadow-sm">
                     {days.map((day) => {
-                        const dayLeads = getDailyLeads(day);
+                        const dayEvents = getDailyEvents(day);
                         const isCurrent = isSameMonth(day, monthStart);
                         const isDayToday = isToday(day);
 
@@ -158,38 +169,38 @@ export default function Calendar() {
                                     <span className={`text-sm font-bold ${isDayToday ? 'bg-blue-600 text-white w-7 h-7 flex items-center justify-center rounded-full shadow-sm' : ''}`}>
                                         {format(day, 'd')}
                                     </span>
-
-                                    {/* Day Name (Faint) - Visible on larger cells */}
                                     <span className="text-[10px] font-bold text-gray-300 uppercase hidden lg:block">
                                         {format(day, 'EEEE', { locale: es })}
                                     </span>
-
-                                    {/* Lead Count Badge */}
-                                    {dayLeads.length > 0 && (
+                                    {dayEvents.length > 0 && (
                                         <span
                                             className="bg-blue-100 text-blue-700 text-[10px] font-black px-2 py-0.5 rounded-sm uppercase tracking-tight cursor-pointer hover:bg-blue-600 hover:text-white transition-all"
-                                            onClick={() => navigate('/leads', { state: { leadIds: dayLeads.map(l => l.id), fromCalendar: true } })}
-                                            title={`Ver ${dayLeads.length} lead${dayLeads.length > 1 ? 's' : ''} del ${format(day, 'd MMM', { locale: es })}`}
+                                            onClick={() => navigate('/leads', { state: { leadIds: dayEvents.map(e => e.lead?.id).filter(Boolean), fromCalendar: true } })}
                                         >
-                                            {dayLeads.length} {dayLeads.length === 1 ? 'LEAD' : 'LEADS'}
+                                            {dayEvents.length} {dayEvents.length === 1 ? 'EVENTO' : 'EVENTOS'}
                                         </span>
                                     )}
                                 </div>
 
-                                {/* Lead Cards List */}
+                                {/* Event Cards - sorted by time (already sorted) */}
                                 <div className="space-y-1 mt-1 flex-1">
-                                    {dayLeads.slice(0, 4).map(lead => (
-                                        <button
-                                            key={lead.id}
-                                            onClick={() => navigate('/leads', { state: { leadId: lead.id } })}
-                                            className="w-full text-left text-[10px] p-1.5 rounded bg-gray-50 hover:bg-white hover:shadow-md hover:text-blue-700 hover:border-blue-200 transition-all border border-gray-100 border-l-2 border-l-blue-500 overflow-hidden group"
-                                        >
-                                            <span className="font-bold block truncate">{lead.name}</span>
-                                        </button>
-                                    ))}
-                                    {dayLeads.length > 4 && (
+                                    {dayEvents.slice(0, 4).map(ev => {
+                                        const meta = getActionMeta(ev.action_type);
+                                        const timeStr = formatTimeInZone(ev.date, companyTimezone);
+                                        return (
+                                            <button
+                                                key={ev.id}
+                                                onClick={() => ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } })}
+                                                className="w-full text-left text-[10px] p-1.5 rounded bg-gray-50 hover:bg-white hover:shadow-md hover:text-blue-700 hover:border-blue-200 transition-all border border-gray-100 border-l-2 border-l-blue-500 overflow-hidden"
+                                            >
+                                                <span className="font-bold block truncate">{ev.lead?.name ?? 'Lead'}</span>
+                                                <span className="text-gray-400">{timeStr} · {meta.label}</span>
+                                            </button>
+                                        );
+                                    })}
+                                    {dayEvents.length > 4 && (
                                         <div className="text-[9px] text-center text-gray-400 font-medium pt-1">
-                                            + {dayLeads.length - 4} más
+                                            + {dayEvents.length - 4} más
                                         </div>
                                     )}
                                 </div>
@@ -204,7 +215,7 @@ export default function Calendar() {
     const renderTimelineView = () => {
         const start = startOfWeek(currentDate, { weekStartsOn: 0 });
         const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(start, i));
-        const todaysLeads = getDailyLeads(selectedDate);
+        const todaysEvents = getDailyEvents(selectedDate);
 
         return (
             <div className="md:hidden space-y-6 animate-in slide-in-from-right duration-300">
@@ -214,7 +225,7 @@ export default function Calendar() {
                         {weekDays.map((day) => {
                             const isSelected = isSameDay(day, selectedDate);
                             const isDayToday = isToday(day);
-                            const hasEvents = getDailyLeads(day).length > 0;
+                            const hasEvents = getDailyEvents(day).length > 0;
 
                             return (
                                 <button
@@ -244,55 +255,63 @@ export default function Calendar() {
                 <div className="space-y-4 pb-20">
                     <div className="flex items-center justify-between px-2">
                         <h3 className="font-bold text-gray-800">
-                            {todaysLeads.length} Eventos
+                            {todaysEvents.length} Evento{todaysEvents.length !== 1 ? 's' : ''}
                         </h3>
                         <Button size="sm" onClick={() => navigate('/leads')} className="text-xs h-8">
                             <Plus className="w-3 h-3 mr-1" /> Nuevo
                         </Button>
                     </div>
 
-                    {todaysLeads.length > 0 ? (
+                    {todaysEvents.length > 0 ? (
                         <div className="relative space-y-4 before:absolute before:left-4 before:top-2 before:bottom-0 before:w-0.5 before:bg-gray-200">
-                            {todaysLeads.map((lead) => (
-                                <div key={lead.id} className="relative pl-10">
-                                    {/* Timeline Dot */}
-                                    <span className="absolute left-[11px] top-4 w-3 h-3 bg-white border-[3px] border-blue-600 rounded-full z-10" />
+                            {todaysEvents.map((ev) => {
+                                const meta = getActionMeta(ev.action_type);
+                                const timeStr = formatTimeInZone(ev.date, companyTimezone);
 
-                                    {/* Card */}
-                                    <div
-                                        onClick={() => navigate('/leads', { state: { leadId: lead.id } })}
-                                        className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 active:scale-[0.98] transition-transform"
-                                    >
-                                        <div className="flex justify-between items-start mb-2">
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 uppercase tracking-wide">
-                                                Reunión / Llamada
-                                            </span>
-                                            <span className="text-xs font-bold text-gray-400">
-                                                {format(new Date(), 'h:00 a')} {/* Mock time, real apps would use lead.time */}
-                                            </span>
-                                        </div>
-                                        <h4 className="font-bold text-gray-900 text-base mb-1">{lead.name}</h4>
-                                        {lead.company_name && <p className="text-sm text-gray-500 mb-2">{lead.company_name}</p>}
+                                return (
+                                    <div key={ev.id} className="relative pl-10">
+                                        {/* Timeline Dot */}
+                                        <span className="absolute left-[11px] top-4 w-3 h-3 bg-white border-[3px] border-blue-600 rounded-full z-10" />
 
-                                        <div className="flex flex-wrap gap-2 mt-3">
-                                            {lead.phone && (
-                                                <a href={`tel:${lead.phone}`} onClick={(e) => e.stopPropagation()} className="p-2 bg-green-50 text-green-600 rounded-lg">
-                                                    <Phone className="w-4 h-4" />
-                                                </a>
-                                            )}
-                                            {lead.email && (
-                                                <a href={`mailto:${lead.email}`} onClick={(e) => e.stopPropagation()} className="p-2 bg-orange-50 text-orange-600 rounded-lg">
-                                                    <Mail className="w-4 h-4" />
-                                                </a>
-                                            )}
-                                            <div className="flex items-center gap-1 text-xs text-gray-400 ml-auto">
-                                                <MapPin className="w-3 h-3" />
-                                                San Salvador
+                                        {/* Card */}
+                                        <div
+                                            onClick={() => ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } })}
+                                            className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 active:scale-[0.98] transition-transform"
+                                        >
+                                            <div className="flex justify-between items-start mb-2">
+                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${meta.bg} ${meta.color}`}>
+                                                    {ev.action_type === 'call' && <Phone className="w-3 h-3" />}
+                                                    {(ev.action_type === 'whatsapp' || ev.action_type === 'telegram') && <MessageSquare className="w-3 h-3" />}
+                                                    {ev.action_type === 'email' && <Mail className="w-3 h-3" />}
+                                                    {(ev.action_type === 'meeting' || ev.action_type === 'quote') && <CalendarDays className="w-3 h-3" />}
+                                                    {meta.label}
+                                                </span>
+                                                {/* Real time - sorted ascending */}
+                                                <span className="flex items-center gap-1 text-xs font-bold text-gray-500">
+                                                    <Clock className="w-3 h-3" />
+                                                    {timeStr}
+                                                </span>
+                                            </div>
+                                            <h4 className="font-bold text-gray-900 text-base mb-1">{ev.lead?.name ?? '—'}</h4>
+                                            {ev.lead?.company_name && <p className="text-sm text-gray-500 mb-2">{ev.lead.company_name}</p>}
+                                            {ev.notes && <p className="text-xs text-gray-400 italic truncate mb-2">{ev.notes}</p>}
+
+                                            <div className="flex flex-wrap gap-2 mt-3">
+                                                {ev.lead?.phone && (
+                                                    <a href={`tel:${ev.lead.phone}`} onClick={(e) => e.stopPropagation()} className="p-2 bg-green-50 text-green-600 rounded-lg">
+                                                        <Phone className="w-4 h-4" />
+                                                    </a>
+                                                )}
+                                                {ev.lead?.email && (
+                                                    <a href={`mailto:${ev.lead.email}`} onClick={(e) => e.stopPropagation()} className="p-2 bg-orange-50 text-orange-600 rounded-lg">
+                                                        <Mail className="w-4 h-4" />
+                                                    </a>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center py-12 text-center bg-white rounded-2xl border border-dashed border-gray-200">

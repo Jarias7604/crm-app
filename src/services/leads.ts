@@ -396,6 +396,33 @@ export const leadsService = {
         return data;
     },
 
+    // Get all follow-ups with lead info for Calendar view (sorted by date/time)
+    async getCalendarFollowUps() {
+        const { data, error } = await supabase
+            .from('follow_ups')
+            .select(`
+                id, date, notes, action_type,
+                lead:leads(id, name, company_name, phone, email, status)
+            `)
+            .order('date', { ascending: true });
+
+        if (error) throw error;
+        return (data || []) as unknown as Array<{
+            id: string;
+            date: string;
+            notes: string | null;
+            action_type: string;
+            lead: {
+                id: string;
+                name: string;
+                company_name: string | null;
+                phone: string | null;
+                email: string | null;
+                status: string;
+            } | null;
+        }>;
+    },
+
     // Get chat messages for a lead
     async getLeadMessages(leadId: string) {
         // 1. Get conversations for this lead

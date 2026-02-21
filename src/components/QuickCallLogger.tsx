@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Phone, X, Loader2, ChevronDown, Clock, CalendarPlus } from 'lucide-react';
+import { Phone, X, Loader2, Clock, CalendarPlus } from 'lucide-react';
 import { callActivityService, ACTION_TYPE_CONFIG, CALL_OUTCOME_CONFIG, type CallOutcome, type ActionType } from '../services/callActivity';
 import { leadsService } from '../services/leads';
 import type { Lead, LeadStatus, FollowUpActionType } from '../types';
-import { STATUS_CONFIG } from '../types';
 import { CustomDatePicker } from './ui/CustomDatePicker';
 import toast from 'react-hot-toast';
+import { useTimezone } from '../hooks/useTimezone';
+import { localToUtcISO } from '../utils/timezone';
 
 interface QuickActionLoggerProps {
     lead: Lead;
@@ -15,7 +16,10 @@ interface QuickActionLoggerProps {
     onClose: () => void;
 }
 
-// Which outcomes make sense for each action type (scheduled removed — now independent toggle)
+// Only these action types appear in the "Tipo de Acción" selector
+const CHANNEL_ACTION_TYPES: ActionType[] = ['call', 'email', 'whatsapp', 'telegram'];
+
+// Which outcomes make sense for each channel action type
 const OUTCOME_BY_ACTION: Record<ActionType, CallOutcome[]> = {
     call: ['connected', 'no_answer', 'voicemail', 'busy', 'wrong_number'],
     email: ['connected', 'no_answer'],
@@ -25,6 +29,15 @@ const OUTCOME_BY_ACTION: Record<ActionType, CallOutcome[]> = {
     info_sent: ['connected'],
     meeting: ['connected', 'no_answer'],
 };
+
+// Additional outcome-style options always shown in the Resultado section
+type SpecialOutcome = 'quote_sent' | 'info_sent' | 'meeting';
+const SPECIAL_OUTCOME_CONFIG: Record<SpecialOutcome, { label: string; icon: string }> = {
+    quote_sent: { label: 'Cotización', icon: '📋' },
+    info_sent: { label: 'Info Enviada', icon: '📄' },
+    meeting: { label: 'Reunión', icon: '🤝' },
+};
+const SPECIAL_OUTCOMES: SpecialOutcome[] = ['quote_sent', 'info_sent', 'meeting'];
 
 // Custom outcome labels per action type (override generic ones)
 const OUTCOME_OVERRIDES: Partial<Record<ActionType, Partial<Record<CallOutcome, { label: string; icon: string }>>>> = {
@@ -91,12 +104,13 @@ const todayISO = new Date().toISOString().split('T')[0];
 export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLogged, onClose }: QuickActionLoggerProps) {
     const [actionType, setActionType] = useState<ActionType>('call');
     const [outcome, setOutcome] = useState<CallOutcome>('connected');
+    const [specialOutcome, setSpecialOutcome] = useState<SpecialOutcome | null>(null);
     const [notes, setNotes] = useState('');
-    const [changeStatus, setChangeStatus] = useState(false);
-    const [newStatus, setNewStatus] = useState<LeadStatus>(lead.status);
     const [durationMinutes, setDurationMinutes] = useState<number | ''>('');
     const [isSaving, setIsSaving] = useState(false);
-    const [isOutcomeOpen, setIsOutcomeOpen] = useState(false);
+
+    // Company timezone for correct UTC storage
+    const { timezone: companyTimezone } = useTimezone(companyId);
 
     // Independent follow-up toggle (decoupled from outcome)
     const [wantsFollowUp, setWantsFollowUp] = useState(false);
@@ -112,6 +126,11 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
         if (!validOutcomes.includes(outcome)) {
             setOutcome(validOutcomes[0]);
         }
+    };
+
+    // Toggle special outcome (Cotización / Info Enviada / Reunión)
+    const handleSpecialOutcome = (key: SpecialOutcome) => {
+        setSpecialOutcome(prev => prev === key ? null : key);
     };
 
     // Get outcome config with overrides
@@ -150,20 +169,23 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
 
         try {
             // 1. Log the contact activity with the REAL outcome
+            // If a special outcome is selected, use it as the actionType and 'connected' as outcome
+            const effectiveActionType: ActionType = specialOutcome ?? actionType;
+            const effectiveOutcome: CallOutcome = specialOutcome ? 'connected' : outcome;
             await callActivityService.logCall({
                 companyId,
                 leadId: lead.id,
-                outcome,
-                actionType,
+                outcome: effectiveOutcome,
+                actionType: effectiveActionType,
                 notes: notes.trim() || undefined,
                 statusBefore: lead.status,
-                statusAfter: changeStatus && newStatus !== lead.status ? newStatus : undefined,
                 durationSeconds: durationMinutes ? Number(durationMinutes) * 60 : undefined,
             });
 
             // 2. If user wants a follow-up, create it independently
             if (wantsFollowUp && followUpDate) {
-                const followUpDateTime = `${followUpDate}T${followUpTime}:00`;
+                // Convert local time → UTC using company timezone (e.g. America/El_Salvador)
+                const followUpDateTime = localToUtcISO(`${followUpDate}T${followUpTime}`, companyTimezone);
                 const followUpActionType = ACTION_TO_FOLLOWUP[actionType];
 
                 await leadsService.createFollowUp({
@@ -177,13 +199,13 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                 toast.success(`📅 Seguimiento agendado: ${formatDateES(followUpDate)} a las ${displayTime}`);
             }
 
-            const actionLabel = ACTION_TYPE_CONFIG[actionType].icon + ' ' + ACTION_TYPE_CONFIG[actionType].label;
+            const effectiveLabel = specialOutcome
+                ? SPECIAL_OUTCOME_CONFIG[specialOutcome].icon + ' ' + SPECIAL_OUTCOME_CONFIG[specialOutcome].label
+                : ACTION_TYPE_CONFIG[actionType].icon + ' ' + ACTION_TYPE_CONFIG[actionType].label;
+            const actionLabel = effectiveLabel;
             toast.success(`${actionLabel} registrada`);
 
-            onCallLogged(
-                changeStatus && newStatus !== lead.status,
-                changeStatus && newStatus !== lead.status ? newStatus : undefined
-            );
+            onCallLogged(false, undefined);
             onClose();
         } catch (error: any) {
             console.error('Error logging action:', error);
@@ -193,13 +215,10 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
         }
     };
 
-    // Statuses available for status change (exclude current and Erróneo)
-    const availableStatuses = Object.keys(STATUS_CONFIG).filter(
-        s => s !== lead.status && s !== 'Erróneo'
-    ) as LeadStatus[];
 
-    // Show duration field for calls and meetings
-    const showDuration = actionType === 'call' || actionType === 'meeting';
+
+    // Show duration field for calls and meetings (including meeting as special outcome)
+    const showDuration = actionType === 'call' || specialOutcome === 'meeting';
     const validOutcomes = OUTCOME_BY_ACTION[actionType];
 
     return (
@@ -229,19 +248,22 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                     Tipo de Acción
                 </label>
                 <div className="flex gap-1.5 flex-wrap">
-                    {(Object.entries(ACTION_TYPE_CONFIG) as [ActionType, typeof ACTION_TYPE_CONFIG[ActionType]][]).map(([key, config]) => (
-                        <button
-                            key={key}
-                            onClick={() => handleActionTypeChange(key)}
-                            className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border ${actionType === key
-                                ? 'bg-white shadow-md border-emerald-300 text-gray-900 scale-[1.03]'
-                                : 'bg-white/40 border-transparent text-gray-500 hover:bg-white/70 hover:border-gray-200'
-                                }`}
-                        >
-                            <span className="text-sm">{config.icon}</span>
-                            <span className="hidden sm:inline">{config.label}</span>
-                        </button>
-                    ))}
+                    {CHANNEL_ACTION_TYPES.map(key => {
+                        const config = ACTION_TYPE_CONFIG[key];
+                        return (
+                            <button
+                                key={key}
+                                onClick={() => handleActionTypeChange(key)}
+                                className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all border ${actionType === key
+                                    ? 'bg-white shadow-md border-emerald-300 text-gray-900 scale-[1.03]'
+                                    : 'bg-white/40 border-transparent text-gray-500 hover:bg-white/70 hover:border-gray-200'
+                                    }`}
+                            >
+                                <span className="text-sm">{config.icon}</span>
+                                <span className="hidden sm:inline">{config.label}</span>
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 
@@ -256,9 +278,26 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                         return (
                             <button
                                 key={key}
-                                onClick={() => setOutcome(key)}
-                                className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${outcome === key
+                                onClick={() => { setOutcome(key); setSpecialOutcome(null); }}
+                                className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${outcome === key && !specialOutcome
                                     ? 'bg-white shadow-md border-emerald-300 text-gray-900 scale-[1.02]'
+                                    : 'bg-white/40 border-transparent text-gray-500 hover:bg-white/70 hover:border-gray-200'
+                                    }`}
+                            >
+                                <span className="text-sm">{config.icon}</span>
+                                <span className="truncate">{config.label}</span>
+                            </button>
+                        );
+                    })}
+                    {/* Special outcomes: Cotización, Info Enviada, Reunión */}
+                    {SPECIAL_OUTCOMES.map(key => {
+                        const config = SPECIAL_OUTCOME_CONFIG[key];
+                        return (
+                            <button
+                                key={key}
+                                onClick={() => handleSpecialOutcome(key)}
+                                className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${specialOutcome === key
+                                    ? 'bg-white shadow-md border-amber-300 text-gray-900 scale-[1.02]'
                                     : 'bg-white/40 border-transparent text-gray-500 hover:bg-white/70 hover:border-gray-200'
                                     }`}
                             >
@@ -403,55 +442,7 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                 </div>
             )}
 
-            {/* Status Change Toggle */}
-            <div className="mb-4">
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => setChangeStatus(!changeStatus)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${changeStatus ? 'bg-emerald-600' : 'bg-gray-200'
-                            }`}
-                    >
-                        <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${changeStatus ? 'translate-x-6' : 'translate-x-1'
-                                }`}
-                        />
-                    </button>
-                    <span className="text-xs font-bold text-gray-600">
-                        ¿Cambió el estado del lead?
-                    </span>
-                </div>
 
-                {changeStatus && (
-                    <div className="mt-3 relative" onClick={() => setIsOutcomeOpen(!isOutcomeOpen)}>
-                        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-4 py-2.5 cursor-pointer hover:border-emerald-300 transition-colors">
-                            <span className="text-sm">{STATUS_CONFIG[newStatus]?.icon}</span>
-                            <span className="text-xs font-bold text-gray-700 flex-1">{STATUS_CONFIG[newStatus]?.label}</span>
-                            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isOutcomeOpen ? 'rotate-180' : ''}`} />
-                        </div>
-                        {isOutcomeOpen && (
-                            <div className="absolute left-0 right-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-100 z-50 py-1 max-h-48 overflow-y-auto">
-                                {availableStatuses.map(status => (
-                                    <button
-                                        key={status}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setNewStatus(status);
-                                            setIsOutcomeOpen(false);
-                                        }}
-                                        className={`w-full text-left px-4 py-2.5 text-xs font-bold flex items-center gap-2 transition-colors ${newStatus === status
-                                            ? 'bg-emerald-50 text-emerald-700'
-                                            : 'text-gray-600 hover:bg-gray-50'
-                                            }`}
-                                    >
-                                        <span>{STATUS_CONFIG[status]?.icon}</span>
-                                        {STATUS_CONFIG[status]?.label}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
 
             {/* Submit */}
             <div className="flex gap-3">
