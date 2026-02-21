@@ -154,7 +154,6 @@ export default function OverdueTickets() {
         const critical = filtered.filter(t => t.priority === 'urgent' || t.priority === 'high').length;
         const allHours = filtered.map(t => differenceInHours(new Date(), new Date(t.due_date!)));
         const avgHours = total ? Math.round(allHours.reduce((a, b) => a + b, 0) / total) : 0;
-        const totalActive = tickets.length; // already filtered to overdue
         const pct = tickets.length > 0 ? Math.round((total / (tickets.length + 1)) * 100) : 0; // rough
         const maxHours = allHours.length ? Math.max(...allHours) : 0;
         const oldest = filtered.find(t => differenceInHours(new Date(), new Date(t.due_date!)) === maxHours);
@@ -475,19 +474,24 @@ export default function OverdueTickets() {
                 </div>
             </div>
 
-            {/* Detail Panel */}
+            {/* Detail Panel — fixed overlay, does NOT compress main content */}
             {selected && (
-                <div className="w-[360px] shrink-0 border-l border-gray-100 overflow-hidden">
-                    <TicketPanel
-                        ticket={selected}
-                        categories={categories}
-                        agents={agents}
-                        companyId={profile?.company_id || ''}
-                        authorId={profile?.id || ''}
-                        onClose={() => setSelected(null)}
-                        onUpdate={handleUpdated}
-                    />
-                </div>
+                <>
+                    <div className="fixed inset-0 bg-black/20 backdrop-blur-[1px] z-40" onClick={() => setSelected(null)} />
+                    <div className="fixed top-0 right-0 bottom-0 w-[380px] z-50 shadow-2xl animate-in slide-in-from-right duration-300">
+                        <TicketPanel
+                            ticket={selected}
+                            categories={categories}
+                            agents={agents}
+                            leads={[]}
+                            companyId={profile?.company_id || ''}
+                            authorId={profile?.id || ''}
+                            onClose={() => setSelected(null)}
+                            onUpdate={handleUpdated}
+                            onDelete={(id) => { setTickets(p => p.filter(t => t.id !== id)); setSelected(null); }}
+                        />
+                    </div>
+                </>
             )}
         </div>
     );

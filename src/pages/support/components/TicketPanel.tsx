@@ -4,6 +4,7 @@ import { ticketService, type Ticket, type TicketCategory, type TicketStatus, typ
 import { formatDistanceToNow, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
+import { CustomDatePicker } from '../../../components/ui/CustomDatePicker';
 
 const SC: Record<TicketStatus, { label: string; color: string; bg: string; darkColor: string }> = {
     new: { label: 'Nuevo', color: 'text-blue-600', bg: 'bg-blue-50', darkColor: 'text-blue-300' },
@@ -39,8 +40,8 @@ function StatusStepper({ status }: { status: TicketStatus }) {
                     <div key={s} className="flex items-center flex-1">
                         <div className="flex flex-col items-center gap-1 flex-1">
                             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black transition-all duration-300 ${active ? 'bg-white text-indigo-700 shadow-lg shadow-white/20 scale-110 ring-2 ring-white/30' :
-                                    done ? 'bg-emerald-400/90 text-white' :
-                                        'bg-white/10 text-white/30 border border-white/10'
+                                done ? 'bg-emerald-400/90 text-white' :
+                                    'bg-white/10 text-white/30 border border-white/10'
                                 }`}>
                                 {done ? '✓' : i + 1}
                             </div>
@@ -224,8 +225,8 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
                         <h3 className="text-[15px] font-black text-white leading-tight line-clamp-2">{ticket.title}</h3>
                         {ticket.due_date && (
                             <div className={`mt-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold ${new Date(ticket.due_date) < new Date()
-                                    ? 'bg-red-500/20 text-red-300 border border-red-500/20'
-                                    : 'bg-white/10 text-white/60'
+                                ? 'bg-red-500/20 text-red-300 border border-red-500/20'
+                                : 'bg-white/10 text-white/60'
                                 }`}>
                                 <CalendarDays className="w-3 h-3" />
                                 Vence: {format(new Date(ticket.due_date), "dd MMM yyyy · HH:mm", { locale: es })}
@@ -262,8 +263,8 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
                 <div className="flex gap-1 -mb-px">
                     {tabs.map(t => (
                         <button key={t.key} onClick={() => setTab(t.key)} className={`flex items-center gap-1.5 px-3 py-2.5 text-[10px] font-black uppercase tracking-wider rounded-t-xl transition-all ${tab === t.key
-                                ? 'bg-white text-indigo-700 shadow-sm'
-                                : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+                            ? 'bg-white text-indigo-700 shadow-sm'
+                            : 'text-white/40 hover:text-white/70 hover:bg-white/5'
                             }`}>
                             {t.icon}{t.label}
                         </button>
@@ -376,16 +377,38 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
                                     </div>
                                 </button>
                             ) : (
-                                <div className="mt-1 relative">
-                                    <input
-                                        type="datetime-local"
-                                        className="w-full px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100 text-xs font-bold focus:ring-2 focus:ring-indigo-400/30 focus:border-indigo-200 transition-all"
-                                        value={form.due_date}
-                                        onChange={e => { setForm(p => ({ ...p, due_date: e.target.value })); if (e.target.value) setEditingDate(false); }}
-                                        autoFocus={editingDate}
+                                <div className="mt-1 space-y-2">
+                                    {/* Spanish custom date picker — no browser calendar */}
+                                    <CustomDatePicker
+                                        value={form.due_date ? form.due_date.substring(0, 10) : ''}
+                                        onChange={(dateStr) => {
+                                            const time = form.due_date ? form.due_date.substring(11, 16) : '09:00';
+                                            setForm(p => ({ ...p, due_date: dateStr ? `${dateStr}T${time}` : '' }));
+                                            if (dateStr) setEditingDate(false);
+                                        }}
+                                        placeholder="Seleccionar fecha"
+                                        variant="light"
+                                        forceOpenUp
+                                        alignRight
                                     />
+                                    {/* Time picker — styled, no popup calendar */}
+                                    {form.due_date && (
+                                        <div className="flex items-center gap-2 bg-indigo-50 rounded-xl border border-indigo-100 px-3 py-2.5">
+                                            <Clock className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                                            <span className="text-[9px] font-black text-indigo-400 uppercase tracking-wider">Hora:</span>
+                                            <input
+                                                type="time"
+                                                className="flex-1 bg-transparent border-none text-sm font-bold text-indigo-800 focus:outline-none focus:ring-0"
+                                                value={form.due_date.substring(11, 16)}
+                                                onChange={e => {
+                                                    const dateOnly = form.due_date.substring(0, 10);
+                                                    setForm(p => ({ ...p, due_date: `${dateOnly}T${e.target.value}` }));
+                                                }}
+                                            />
+                                        </div>
+                                    )}
                                     {!form.due_date && (
-                                        <p className="text-[9px] text-gray-300 mt-1 ml-1">Selecciona fecha y hora</p>
+                                        <p className="text-[9px] text-gray-300 ml-1">Selecciona fecha y hora</p>
                                     )}
                                 </div>
                             )}
