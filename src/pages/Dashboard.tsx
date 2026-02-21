@@ -39,6 +39,18 @@ const THEME = {
     chart3: '#EC4899',     // Pink 500
 };
 
+// Human-readable period labels for SIA widgets (F4 + F5)
+const SIA_PERIOD_LABELS: Record<string, string> = {
+    today: 'Hoy',
+    this_week: 'Esta semana',
+    this_month: 'Este mes',
+    last_3_months: 'Últimos 3 meses',
+    last_6_months: 'Últimos 6 meses',
+    this_year: 'Este año',
+    all: 'Todo el tiempo',
+};
+
+
 const PIE_COLORS = [THEME.primary, THEME.success, THEME.accent, THEME.chart2, THEME.chart3, '#94A3B8'];
 
 const FunnelInfographic = ({ data, onStageClick }: { data: any[], onStageClick: (status: string) => void }) => {
@@ -728,26 +740,9 @@ export default function Dashboard() {
                 })}
             </div>
 
-            {/* F4 + F5 — SIA Row: Live Pulse (admin) + Weekly Leaderboard (all) */}
-            {profile?.company_id && (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
-                    {/* F4 — Manager Live Pulse: only for company_admin */}
-                    {profile?.role === 'company_admin' && (
-                        <div className="lg:col-span-8">
-                            <ManagerLivePulse companyId={profile.company_id} />
-                        </div>
-                    )}
-                    {/* F5 — Weekly Leaderboard: all roles */}
-                    <div className={profile?.role === 'company_admin' ? 'lg:col-span-4' : 'lg:col-span-12'}>
-                        <WeeklyLeaderboard
-                            companyId={profile.company_id}
-                            currentUserId={profile?.id}
-                        />
-                    </div>
-                </div>
-            )}
 
             {/* Main Content Area: Grouped Proportions */}
+
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch relative z-0">
 
                 {/* Row 1: Funnel + Strategic Priority + Sources */}
@@ -1420,6 +1415,34 @@ export default function Dashboard() {
                     </div>
                 )}
             </div>
+
+            {/* F4 + F5 — SIA Intelligence Panel (at the bottom, date-filter aware) */}
+            {profile?.company_id && (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
+                    {/* F4 — Manager Live Pulse: admin + simulation mode */}
+                    {isActuallySimulatingAdmin && (
+                        <div className="lg:col-span-8">
+                            <ManagerLivePulse
+                                companyId={profile.company_id}
+                                startDate={dateRange.startDate}
+                                endDate={dateRange.endDate}
+                                periodLabel={SIA_PERIOD_LABELS[selectedDateRange] || 'este período'}
+                            />
+                        </div>
+                    )}
+                    {/* F5 — Agent Ranking: all roles */}
+                    <div className={isActuallySimulatingAdmin ? 'lg:col-span-4' : 'lg:col-span-12'}>
+                        <WeeklyLeaderboard
+                            companyId={profile.company_id}
+                            currentUserId={profile?.id}
+                            startDate={dateRange.startDate}
+                            endDate={dateRange.endDate}
+                            periodLabel={SIA_PERIOD_LABELS[selectedDateRange] || 'este período'}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
+
     );
 }
