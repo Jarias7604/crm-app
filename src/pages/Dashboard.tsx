@@ -23,6 +23,8 @@ import { Button } from '../components/ui/Button';
 import { logger } from '../utils/logger';
 import { useDashboardStats } from '../hooks/useDashboard';
 import { MobileQuickActions } from '../components/MobileQuickActions';
+import { ManagerLivePulse } from '../components/ManagerLivePulse';
+import { WeeklyLeaderboard } from '../components/WeeklyLeaderboard';
 
 const THEME = {
     primary: '#4F46E5',   // Indigo Moderno
@@ -725,6 +727,25 @@ export default function Dashboard() {
                     );
                 })}
             </div>
+
+            {/* F4 + F5 — SIA Row: Live Pulse (admin) + Weekly Leaderboard (all) */}
+            {profile?.company_id && (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
+                    {/* F4 — Manager Live Pulse: only for company_admin */}
+                    {profile?.role === 'company_admin' && (
+                        <div className="lg:col-span-8">
+                            <ManagerLivePulse companyId={profile.company_id} />
+                        </div>
+                    )}
+                    {/* F5 — Weekly Leaderboard: all roles */}
+                    <div className={profile?.role === 'company_admin' ? 'lg:col-span-4' : 'lg:col-span-12'}>
+                        <WeeklyLeaderboard
+                            companyId={profile.company_id}
+                            currentUserId={profile?.id}
+                        />
+                    </div>
+                </div>
+            )}
 
             {/* Main Content Area: Grouped Proportions */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch relative z-0">

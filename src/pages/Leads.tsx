@@ -19,12 +19,14 @@ import { CreateLeadFullscreen } from '../components/CreateLeadFullscreen';
 import { QuickActionLogger } from '../components/QuickCallLogger';
 import { LeadKanban } from '../components/LeadKanban';
 import { logger } from '../utils/logger';
+import { callTracker } from '../utils/callTracker';
 import { lossReasonsService } from '../services/lossReasons';
 import { industriesService } from '../services/industries';
 import { CustomDatePicker } from '../components/ui/CustomDatePicker';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { GripVertical } from 'lucide-react';
 import { useAriasTables } from '../hooks/useAriasTables';
+import { ResponseVelocityBadge } from '../components/ui/ResponseVelocityBadge';
 
 export default function Leads() {
     const { profile } = useAuth();
@@ -143,6 +145,8 @@ export default function Leads() {
     });
     const [pendingWonStatus, setPendingWonStatus] = useState<LeadStatus | null>(null);
     const [isCallLoggerOpen, setIsCallLoggerOpen] = useState(false);
+    // callStartedAt: set when user taps tel:// on mobile — carries the real call start time
+    const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
     // Handle incoming state from Dashboard or Calendar
     useEffect(() => {
         if (location.state) {
@@ -192,6 +196,32 @@ export default function Leads() {
             }
         }
     }, [location.state, leads.length]);
+    // ── Click-to-Call mobile: detect return from dialer and auto-open logger ──
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState !== 'visible') return;
+            const pending = callTracker.getPending();
+            if (!pending) return;
+
+            const callLead = leads.find(l => l.id === pending.leadId);
+            if (!callLead) {
+                callTracker.clear();
+                return;
+            }
+
+            const startedAt = pending.startedAt;
+            callTracker.clear(); // clear before opening
+
+            // Open the lead detail + logger with the real call start time
+            openLeadDetail(callLead);
+            setCallStartedAt(startedAt);
+            // Small delay to let the panel animate in
+            setTimeout(() => setIsCallLoggerOpen(true), 300);
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, [leads]);
 
     // Listen for global "Open Create Lead" events (from MobileNav)
     useEffect(() => {
@@ -1594,6 +1624,8 @@ export default function Leads() {
                                         <div className="flex gap-2 items-center flex-wrap">
                                             <StatusBadge status={lead.status} />
                                             <PriorityBadge priority={lead.priority} />
+                                            {/* F3 — Response Velocity */}
+                                            <ResponseVelocityBadge nextFollowupDate={lead.next_followup_date} />
                                         </div>
                                         <div className="flex items-center gap-3">
                                             <div
@@ -1649,7 +1681,11 @@ export default function Leads() {
                                                 {lead.phone && (
                                                     <a
                                                         href={`tel:${lead.phone}`}
-                                                        onClick={(e) => e.stopPropagation()}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            // 📱 Mobile click-to-call: record exact start time
+                                                            callTracker.start(lead.id);
+                                                        }}
                                                         className="w-11 h-11 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center shadow-sm active:bg-indigo-100"
                                                     >
                                                         <Phone className="w-5 h-5" />
@@ -1758,6 +1794,11 @@ export default function Leads() {
                                                 <div className="flex items-center gap-2">
                                                     <Clock className="w-3.5 h-3.5 text-blue-500" />
                                                     <span className="text-xs font-bold text-blue-700">Seguimiento:</span>
+                                                    {/* F3 — urgency inline */}
+                                                    <ResponseVelocityBadge
+                                                        nextFollowupDate={lead.next_followup_date}
+                                                        variant="inline"
+                                                    />
                                                 </div>
                                                 <span className="text-xs font-black text-blue-900 uppercase">
                                                     {(() => {
@@ -2400,13 +2441,17 @@ export default function Leads() {
                                         lead={selectedLead}
                                         companyId={profile?.company_id || ''}
                                         teamMembers={teamMembers}
+                                        callStartedAt={callStartedAt ?? undefined}
                                         onCallLogged={async (statusChanged, newStatus) => {
                                             if (statusChanged && newStatus) {
                                                 await handleUpdateLead({ status: newStatus });
                                             }
                                             loadFollowUps(selectedLead.id);
                                         }}
-                                        onClose={() => setIsCallLoggerOpen(false)}
+                                        onClose={() => {
+                                            setIsCallLoggerOpen(false);
+                                            setCallStartedAt(null); // reset mobile call start
+                                        }}
                                     />
                                 )}
                             </div>

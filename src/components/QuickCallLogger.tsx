@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Phone, X, Loader2, Clock, CalendarPlus } from 'lucide-react';
+import { SessionTimer } from './ui/SessionTimer';
 import { callActivityService, ACTION_TYPE_CONFIG, CALL_OUTCOME_CONFIG, type CallOutcome, type ActionType } from '../services/callActivity';
 import { leadsService } from '../services/leads';
 import type { Lead, LeadStatus, FollowUpActionType } from '../types';
@@ -14,6 +15,9 @@ interface QuickActionLoggerProps {
     teamMembers?: { id: string; email: string; full_name?: string; avatar_url?: string }[];
     onCallLogged: (statusChanged?: boolean, newStatus?: LeadStatus) => void;
     onClose: () => void;
+    /** Optional: timestamp (ms) when the call physically started — set from callTracker
+     *  for mobile click-to-call flows. Overrides the form-open time. */
+    callStartedAt?: number;
 }
 
 // Only these action types appear in the "Tipo de Acción" selector
@@ -101,13 +105,46 @@ const formatDateES = (dateStr: string) => {
 
 const todayISO = new Date().toISOString().split('T')[0];
 
-export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLogged, onClose }: QuickActionLoggerProps) {
+export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLogged, onClose, callStartedAt }: QuickActionLoggerProps) {
     const [actionType, setActionType] = useState<ActionType>('call');
     const [outcome, setOutcome] = useState<CallOutcome>('connected');
     const [specialOutcome, setSpecialOutcome] = useState<SpecialOutcome | null>(null);
     const [notes, setNotes] = useState('');
     const [durationMinutes, setDurationMinutes] = useState<number | ''>('');
     const [isSaving, setIsSaving] = useState(false);
+
+    // Track when this form was opened — used for timer + quality score.
+    // If callStartedAt is provided (mobile click-to-call), use that as the real start time.
+    const openedAtRef = useRef(callStartedAt ?? Date.now());
+
+    // ── Quality Score: live calculation based on form state ──────────────────
+    const calcQualityScore = () => {
+        let score = 0;
+        const effectiveOutcome = specialOutcome ? 'connected' : outcome;
+        const sessionSecs = (Date.now() - openedAtRef.current) / 1000;
+
+        // +20  Connected or special outcome (real conversation/action)
+        if (effectiveOutcome === 'connected') score += 20;
+
+        // +10  Notes written (> 15 chars)
+        if (notes.trim().length > 15) score += 10;
+        // +5   Bonus: detailed notes (> 60 chars)
+        if (notes.trim().length > 60) score += 5;
+
+        // +20  Follow-up scheduled
+        if (wantsFollowUp && followUpDate) score += 20;
+
+        // +15  Real session time > 90 seconds (conversation actually happened)
+        if (sessionSecs > 90) score += 15;
+
+        // +30  Timely response: registered within 2h of scheduled follow-up
+        if (lead.next_followup_date) {
+            const diffH = Math.abs(Date.now() - new Date(lead.next_followup_date).getTime()) / 3_600_000;
+            if (diffH < 2) score += 30;
+        }
+
+        return Math.min(score, 100);
+    };
 
     // Company timezone for correct UTC storage
     const { timezone: companyTimezone } = useTimezone(companyId);
@@ -410,39 +447,79 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
             {/* Call Duration (only for calls & meetings) */}
             {showDuration && (
                 <div className="mb-4">
-                    <label className="block text-[9px] font-black uppercase tracking-widest text-gray-500 mb-2 ml-1">
-                        <Clock className="w-3 h-3 inline mr-1" />Duración (minutos)
-                    </label>
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="number"
-                            min={0}
-                            max={999}
-                            value={durationMinutes}
-                            onChange={(e) => setDurationMinutes(e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
-                            placeholder="0"
-                            className="w-20 bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold text-center placeholder:text-gray-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 transition-all outline-none"
-                        />
-                        <div className="flex gap-1 flex-wrap flex-1">
-                            {[1, 5, 10, 15, 30].map(min => (
+                    {/* Duration label + live session timer side by side */}
+                    <div className="flex items-center justify-between mb-2">
+                        <label className="text-[9px] font-black uppercase tracking-widest text-gray-500 flex items-center gap-1 ml-1">
+                            <Clock className="w-3 h-3" />Duración (minutos)
+                        </label>
+                        <SessionTimer openedAt={openedAtRef.current} />
+                    </div>
+                    <div className="flex gap-1 flex-wrap">
+                        {/* Auto chip — session time suggestion */}
+                        {(() => {
+                            const autoMin = Math.max(1, Math.round((Date.now() - openedAtRef.current) / 60000));
+                            return (
                                 <button
-                                    key={min}
                                     type="button"
-                                    onClick={() => setDurationMinutes(min)}
-                                    className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black transition-all ${durationMinutes === min
+                                    onClick={() => setDurationMinutes(autoMin)}
+                                    className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black transition-all flex items-center gap-1 ${durationMinutes === autoMin
                                         ? 'bg-emerald-600 text-white shadow-sm'
-                                        : 'bg-white border border-gray-200 text-gray-500 hover:border-emerald-300 hover:text-emerald-600'
+                                        : 'bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100'
                                         }`}
+                                    title="Basado en tiempo de sesión"
                                 >
-                                    {min}m
+                                    ⏱️ {autoMin}m
                                 </button>
-                            ))}
-                        </div>
+                            );
+                        })()}
+                        {[1, 5, 10, 15, 30].map(min => (
+                            <button
+                                key={min}
+                                type="button"
+                                onClick={() => setDurationMinutes(min)}
+                                className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black transition-all ${durationMinutes === min
+                                    ? 'bg-emerald-600 text-white shadow-sm'
+                                    : 'bg-white border border-gray-200 text-gray-500 hover:border-emerald-300 hover:text-emerald-600'
+                                    }`}
+                            >
+                                {min}m
+                            </button>
+                        ))}
                     </div>
                 </div>
             )}
 
-
+            {/* ── F2: Live Quality Score ─────────────────────────────────── */}
+            {(() => {
+                const score = calcQualityScore();
+                const isGreat = score >= 80;
+                const isOk = score >= 50;
+                const barColor = isGreat ? 'bg-green-500' : isOk ? 'bg-yellow-400' : 'bg-orange-400';
+                const textColor = isGreat ? 'text-green-600' : isOk ? 'text-yellow-600' : 'text-orange-500';
+                const label = isGreat ? 'Excelente' : isOk ? 'Buena' : 'Básica';
+                const sessionSecs = (Date.now() - openedAtRef.current) / 1000;
+                return (
+                    <div className="mb-4 bg-white/80 rounded-xl px-3 py-2.5 border border-gray-100">
+                        <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">Calidad</span>
+                            <span className={`text-[10px] font-black ${textColor}`}>{score}/100 · {label}</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mb-2">
+                            <div
+                                className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                                style={{ width: `${score}%` }}
+                            />
+                        </div>
+                        <div className="flex gap-2 flex-wrap">
+                            {(specialOutcome ? 'connected' : outcome) === 'connected' && <span className="text-[8px] font-bold text-green-600">✓ Conectado</span>}
+                            {notes.trim().length > 15 && <span className="text-[8px] font-bold text-blue-600">✓ Notas</span>}
+                            {wantsFollowUp && followUpDate && <span className="text-[8px] font-bold text-purple-600">✓ Seguimiento</span>}
+                            {sessionSecs > 90 && <span className="text-[8px] font-bold text-teal-600">✓ Sesión activa</span>}
+                            {score < 50 && <span className="text-[8px] text-gray-400">Agrega notas y agenda seguimiento</span>}
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* Submit */}
             <div className="flex gap-3">
