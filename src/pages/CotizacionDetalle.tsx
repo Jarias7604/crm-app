@@ -200,35 +200,35 @@ export default function CotizacionDetalle() {
         <div className="min-h-screen bg-gray-50/50 pb-20">
             {/* Action Bar - Immersive, Edge-to-Edge, Zero Gaps */}
             <div className="sticky top-0 z-40 bg-white border-b border-gray-200 w-full transition-all overflow-hidden shadow-sm">
-                <div className="h-20 px-12 flex justify-between items-center w-full">
-                    <div className="flex items-center gap-6">
+                <div className="h-16 sm:h-20 px-4 sm:px-12 flex justify-between items-center w-full">
+                    <div className="flex items-center gap-2 sm:gap-6">
                         <Button
                             variant="ghost"
                             onClick={() => navigate('/cotizaciones')}
-                            className="text-gray-400 hover:text-gray-900 group flex items-center gap-2 px-0 hover:bg-transparent"
+                            className="text-gray-400 hover:text-gray-900 group flex items-center gap-1 sm:gap-2 px-0 hover:bg-transparent"
                         >
                             <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-                            <span className="text-sm font-bold uppercase tracking-widest">Volver</span>
+                            <span className="text-sm font-bold uppercase tracking-widest hidden sm:inline">Volver</span>
                         </Button>
 
-                        <div className="h-8 w-px bg-gray-100"></div>
+                        <div className="h-8 w-px bg-gray-100 hidden sm:block"></div>
 
                         <div className="flex flex-col">
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] leading-none mb-1.5">ID Propuesta</span>
-                            <div className="flex items-center gap-2">
-                                <span className="text-base font-black text-slate-900 leading-none">#{cotizacion.id.slice(0, 8).toUpperCase()}</span>
-                                <span className="px-2 py-0.5 rounded-md bg-blue-50 text-[9px] font-black text-blue-600 uppercase tracking-tighter">Oficial</span>
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] leading-none mb-1">ID Propuesta</span>
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-sm sm:text-base font-black text-slate-900 leading-none">#{cotizacion.id.slice(0, 8).toUpperCase()}</span>
+                                <span className="px-1.5 py-0.5 rounded-md bg-blue-50 text-[9px] font-black text-blue-600 uppercase tracking-tighter">Oficial</span>
                             </div>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 sm:gap-4">
                         <Button
                             variant="default"
                             onClick={handleDownloadPDF}
                             disabled={isGeneratingPDF}
                             className={`
-                                h-12 px-8 rounded-xl transition-all duration-300
+                                h-10 sm:h-12 px-3 sm:px-8 rounded-xl transition-all duration-300
                                 bg-[#4449AA] hover:bg-[#383d8f] text-white shadow-lg shadow-[#4449AA]/20
                                 font-black text-[11px] uppercase tracking-widest
                             `}
@@ -236,12 +236,12 @@ export default function CotizacionDetalle() {
                             {isGeneratingPDF ? (
                                 <div className="flex items-center gap-2">
                                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    <span>Generando...</span>
+                                    <span className="hidden sm:inline">Generando...</span>
                                 </div>
                             ) : (
                                 <div className="flex items-center gap-2">
                                     <Download className="w-4 h-4" />
-                                    <span>Descargar PDF</span>
+                                    <span className="hidden sm:inline">Descargar PDF</span>
                                 </div>
                             )}
                         </Button>
@@ -350,7 +350,7 @@ export default function CotizacionDetalle() {
                         </div>
                     </div>
 
-                    <div className="p-8 md:p-14 space-y-12 bg-white text-slate-900">
+                    <div className="p-4 sm:p-8 md:p-14 space-y-12 bg-white text-slate-900">
                         {/* Section 2: Prepared For & Executive Summary */}
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-12">
                             <div className="md:col-span-7 space-y-6 text-slate-900">
@@ -414,102 +414,88 @@ export default function CotizacionDetalle() {
                                 <p className="text-[8px] font-bold text-slate-400 uppercase">Valores en USD</p>
                             </div>
 
-                            <div className="overflow-hidden border border-slate-200 rounded-2xl shadow-sm bg-slate-50/20">
-                                <table className="w-full text-left border-collapse">
-                                    <thead>
-                                        <tr className="bg-slate-100/80 border-b border-slate-200">
-                                            <th className="px-6 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest">Descripción</th>
-                                            <th className="px-6 py-3 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Inversión</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100 bg-white">
-                                        <tr className="hover:bg-slate-50/50 transition-colors">
-                                            <td className="px-6 py-6 transition-all">
-                                                <div className="flex items-start gap-4">
-                                                    <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center flex-shrink-0 text-indigo-600">
-                                                        <FileText className="w-5 h-5" />
-                                                    </div>
-                                                    <div className="flex flex-col gap-1">
-                                                        <span className="font-black text-slate-900">Licencia Anual {cotizacion.plan_nombre}</span>
-                                                        {planDescripcion && (
-                                                            <p className="text-xs text-slate-500 leading-relaxed">{planDescripcion}</p>
+                            <div className="overflow-hidden border border-slate-200 rounded-2xl shadow-sm bg-white">
+                                {/* iOS-style list header */}
+                                <div className="flex justify-between items-center px-3 sm:px-6 py-2.5 bg-slate-100/80 border-b border-slate-200">
+                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Descripción</span>
+                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Inversión</span>
+                                </div>
+                                {/* iOS-style items — price uses flex-shrink-0 → always visible */}
+                                <div className="divide-y divide-slate-100">
+                                    {/* Licencia Anual */}
+                                    <div className="flex items-start gap-3 sm:gap-4 px-3 sm:px-6 py-4 sm:py-5 hover:bg-slate-50/50 transition-colors">
+                                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center flex-shrink-0 text-indigo-600 mt-0.5">
+                                            <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
+                                        </div>
+                                        <div className="flex flex-col gap-1 flex-1 min-w-0">
+                                            <span className="font-black text-slate-900 text-sm sm:text-base">Licencia Anual {cotizacion.plan_nombre}</span>
+                                            {planDescripcion && (
+                                                <p className="text-xs text-slate-500 leading-relaxed">{planDescripcion}</p>
+                                            )}
+                                        </div>
+                                        <span className="font-black text-slate-900 text-sm sm:text-lg tabular-nums flex-shrink-0 pt-0.5 pl-2">
+                                            ${(Number(cotizacion.costo_plan_anual) || 0).toLocaleString()}
+                                        </span>
+                                    </div>
+                                    {/* Implementación */}
+                                    {cotizacion.incluir_implementacion && (
+                                        <div className="flex items-center gap-3 sm:gap-4 px-3 sm:px-6 py-4 sm:py-5 hover:bg-slate-50/50 transition-colors">
+                                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center flex-shrink-0 text-orange-600">
+                                                <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
+                                            </div>
+                                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                <span className="font-black text-slate-900 text-sm sm:text-base">Implementación</span>
+                                                <span className="bg-orange-100 text-orange-700 text-[8px] font-black px-1.5 py-0.5 rounded tracking-tighter flex-shrink-0">PAGO ÚNICO</span>
+                                            </div>
+                                            <span className="font-black text-slate-900 text-sm sm:text-lg tabular-nums flex-shrink-0 pl-2">
+                                                ${(Number(cotizacion.costo_implementacion) || 0).toLocaleString()}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {/* WhatsApp */}
+                                    {cotizacion.servicio_whatsapp && (
+                                        <div className="flex items-center gap-3 sm:gap-4 px-3 sm:px-6 py-4 sm:py-5 hover:bg-slate-50/50 transition-colors">
+                                            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-green-50 border border-green-100 flex items-center justify-center flex-shrink-0 text-green-600">
+                                                <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
+                                            </div>
+                                            <span className="font-black text-slate-900 text-sm sm:text-base flex-1 min-w-0">Servicio WhatsApp</span>
+                                            <span className="font-black text-slate-900 text-sm sm:text-lg tabular-nums flex-shrink-0 pl-2">
+                                                ${(cotizacion.costo_whatsapp || 0).toLocaleString()}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {/* Módulos adicionales */}
+                                    {(Array.isArray(cotizacion.modulos_adicionales) ? cotizacion.modulos_adicionales : [])?.map((mod: any, idx: number) => {
+                                        const esPagoUnico = (Number(mod.pago_unico) || 0) > 0;
+                                        const monto = esPagoUnico ? Number(mod.pago_unico) : (Number(mod.costo_anual || mod.costo) || 0);
+                                        return (
+                                            <div key={idx} className="flex items-start gap-3 sm:gap-4 px-3 sm:px-6 py-4 sm:py-5 hover:bg-slate-50/50 transition-colors">
+                                                <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl ${esPagoUnico ? 'bg-orange-50 border-orange-100 text-orange-600' : 'bg-purple-50 border-purple-100 text-purple-600'} border flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                                                    <Package className="w-4 h-4 sm:w-5 sm:h-5" />
+                                                </div>
+                                                <div className="flex flex-col gap-1 flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="font-black text-slate-900 text-sm sm:text-base">{mod.nombre}</span>
+                                                        {esPagoUnico && (
+                                                            <span className="bg-orange-100 text-orange-700 text-[8px] font-black px-1.5 py-0.5 rounded tracking-tighter flex-shrink-0">PAGO ÚNICO</span>
                                                         )}
                                                     </div>
+                                                    {mod.descripcion && (
+                                                        <p className="text-xs text-slate-500 leading-relaxed">{mod.descripcion}</p>
+                                                    )}
                                                 </div>
-                                            </td>
-                                            <td className="px-6 py-6 text-right font-black text-slate-900 text-lg align-top">
-                                                ${(Number(cotizacion.costo_plan_anual) || 0).toLocaleString()}
-                                            </td>
-                                        </tr>
-                                        {cotizacion.incluir_implementacion && (
-                                            <tr className="hover:bg-slate-50/50 transition-colors">
-                                                <td className="px-6 py-6">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center flex-shrink-0 text-orange-600">
-                                                            <Settings className="w-5 h-5" />
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-black text-slate-900">Implementación</span>
-                                                            <span className="bg-orange-100 text-orange-700 text-[8px] font-black px-1.5 py-0.5 rounded tracking-tighter">PAGO ÚNICO</span>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-6 text-right font-black text-slate-900 text-lg">
-                                                    ${(Number(cotizacion.costo_implementacion) || 0).toLocaleString()}
-                                                </td>
-                                            </tr>
-                                        )}
-                                        {cotizacion.servicio_whatsapp && (
-                                            <tr className="hover:bg-slate-50/50 transition-colors">
-                                                <td className="px-6 py-6">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-10 h-10 rounded-xl bg-green-50 border border-green-100 flex items-center justify-center flex-shrink-0 text-green-600">
-                                                            <MessageSquare className="w-5 h-5" />
-                                                        </div>
-                                                        <span className="font-black text-slate-900">Servicio WhatsApp</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-6 text-right font-black text-slate-900 text-lg">
-                                                    ${(cotizacion.costo_whatsapp || 0).toLocaleString()}
-                                                </td>
-                                            </tr>
-                                        )}
-                                        {(Array.isArray(cotizacion.modulos_adicionales) ? cotizacion.modulos_adicionales : [])?.map((mod: any, idx: number) => {
-                                            const esPagoUnico = (Number(mod.pago_unico) || 0) > 0;
-                                            const monto = esPagoUnico ? Number(mod.pago_unico) : (Number(mod.costo_anual || mod.costo) || 0);
-                                            return (
-                                                <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                                                    <td className="px-6 py-6">
-                                                        <div className="flex items-start gap-4">
-                                                            <div className={`w-10 h-10 rounded-xl ${esPagoUnico ? 'bg-orange-50 border-orange-100 text-orange-600' : 'bg-purple-50 border-purple-100 text-purple-600'} border flex items-center justify-center flex-shrink-0`}>
-                                                                <Package className="w-5 h-5" />
-                                                            </div>
-                                                            <div className="flex flex-col gap-1">
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="font-black text-slate-900">{mod.nombre}</span>
-                                                                    {esPagoUnico && (
-                                                                        <span className="bg-orange-100 text-orange-700 text-[8px] font-black px-1.5 py-0.5 rounded tracking-tighter">PAGO ÚNICO</span>
-                                                                    )}
-                                                                </div>
-                                                                {mod.descripcion && (
-                                                                    <p className="text-xs text-slate-500 leading-relaxed">{mod.descripcion}</p>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-6 text-right font-black text-slate-900 text-lg align-top">
-                                                        ${monto.toLocaleString()}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                                                <span className="font-black text-slate-900 text-sm sm:text-lg tabular-nums flex-shrink-0 pt-0.5 pl-2">
+                                                    ${monto.toLocaleString()}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         </div>
 
                         {/* Section 4: Summary & Financials - Dynamic Layout */}
-                        <div className="pt-8 space-y-8 px-8 md:px-12">
+                        <div className="pt-8 space-y-8 px-0 sm:px-8 md:px-12">
                             {/* RESUMEN DE INVERSIÓN - USANDO FUNCIÓN CENTRALIZADA */}
                             {(() => {
                                 // 🎯 USAR FUNCIÓN CENTRALIZADA PARA CÁLCULOS
@@ -567,7 +553,7 @@ export default function CotizacionDetalle() {
                                                 const subtotalUnicos = implementacionBase + serviciosUnicos.reduce((sum: number, s: any) => sum + s.monto, 0);
 
                                                 return (
-                                                    <div className={`bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl p-6 shadow-sm border-2 border-orange-200 flex flex-col justify-between ${implementacion === 0 ? 'opacity-50' : ''}`}>
+                                                    <div className={`bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl p-4 sm:p-6 shadow-sm border-2 border-orange-200 flex flex-col justify-between ${implementacion === 0 ? 'opacity-50' : ''}`}>
                                                         <div className="flex justify-between items-start mb-4">
                                                             <div>
                                                                 <h4 className="text-lg font-black uppercase tracking-tight leading-none text-slate-800">PAGO INICIAL</h4>
@@ -634,7 +620,7 @@ export default function CotizacionDetalle() {
 
 
                                                 return (
-                                                    <div className={`bg-gradient-to-br ${isPagoUnico ? 'from-emerald-50 to-green-50 border-emerald-200' : 'from-blue-50 to-indigo-50 border-blue-200'} rounded-2xl p-6 shadow-sm border-2 flex flex-col justify-between`}>
+                                                    <div className={`bg-gradient-to-br ${isPagoUnico ? 'from-emerald-50 to-green-50 border-emerald-200' : 'from-blue-50 to-indigo-50 border-blue-200'} rounded-2xl p-4 sm:p-6 shadow-sm border-2 flex flex-col justify-between`}>
                                                         <div className="flex justify-between items-start mb-4">
                                                             <div>
                                                                 <h4 className="text-lg font-black uppercase tracking-tight leading-none text-slate-800">
@@ -727,14 +713,14 @@ export default function CotizacionDetalle() {
                             })()}
 
                             {/* Terms & Conditions Section - Dedicated Page Area */}
-                            <div className="mt-16 pt-12 border-t border-gray-100 flex flex-col">
+                            <div className="mt-8 sm:mt-16 pt-8 sm:pt-12 border-t border-gray-100 flex flex-col">
                                 <div className="flex items-center gap-3 mb-8">
                                     <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400">
                                         <FileText className="w-5 h-5" />
                                     </div>
-                                    <h2 className="text-2xl font-black text-slate-800 tracking-tight uppercase">Términos y Condiciones</h2>
+                                    <h2 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight uppercase">Términos y Condiciones</h2>
                                 </div>
-                                <div className="w-full bg-slate-50/50 rounded-3xl p-6 md:p-8 border border-slate-100">
+                                <div className="w-full bg-slate-50/50 rounded-3xl p-3 sm:p-6 md:p-8 border border-slate-100">
                                     <div className="flex flex-col gap-6">
                                         {(cotizacion.company?.terminos_condiciones || '').split('\n\n').filter((p: string) => p.trim()).map((para: string, idx: number) => (
                                             <div key={idx} className="flex gap-4 items-start">

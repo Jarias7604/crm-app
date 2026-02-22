@@ -956,7 +956,14 @@ export default function CotizadorPro() {
                                                 {formData.incluir_implementacion ? 'INCLUIDA' : 'EXCLUIDA'}
                                             </span>
                                             <div
-                                                onClick={() => setFormData({ ...formData, incluir_implementacion: !formData.incluir_implementacion })}
+                                                onClick={() => {
+                                                    const turningOn = !formData.incluir_implementacion;
+                                                    // Auto-reset to original price if turning ON with price at 0
+                                                    if (turningOn && implementationOverride === 0) {
+                                                        setImplementationOverride(costoImp);
+                                                    }
+                                                    setFormData({ ...formData, incluir_implementacion: turningOn });
+                                                }}
                                                 className={`relative w-11 h-6 rounded-full transition-colors duration-200 cursor-pointer ${formData.incluir_implementacion ? 'bg-green-500' : 'bg-gray-300'}`}
                                             >
                                                 <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${formData.incluir_implementacion ? 'translate-x-5' : 'translate-x-0'}`} />
@@ -1019,29 +1026,45 @@ export default function CotizadorPro() {
                                                                     ? overrides[itemOriginal.id]
                                                                     : item.precio_anual);
                                                     return (
-                                                        <div className="flex items-center gap-1">
-                                                            <span className="text-xs text-gray-400 font-bold">$</span>
-                                                            <input
-                                                                type="number"
-                                                                step="0.01"
-                                                                className={`w-20 sm:w-28 text-right font-bold text-base border rounded px-2 py-1 focus:ring-2 outline-none ${item.tipo === 'Implementación'
-                                                                    ? 'text-orange-600 border-orange-100 bg-orange-50/30 focus:ring-orange-400'
-                                                                    : item.tipo === 'Paquete'
-                                                                        ? 'text-blue-700 border-blue-200 bg-blue-50/30 focus:ring-blue-400'
-                                                                        : 'text-purple-700 border-purple-200 bg-purple-50/30 focus:ring-purple-400'
-                                                                    }`}
-                                                                value={currentValue}
-                                                                onChange={(e) => {
-                                                                    const val = Number(e.target.value);
-                                                                    if (item.tipo === 'Implementación') {
-                                                                        setImplementationOverride(val);
-                                                                    } else if (item.tipo === 'Paquete') {
-                                                                        setPaqueteOverride(val);
-                                                                    } else if (itemOriginal) {
-                                                                        setOverrides({ ...overrides, [itemOriginal.id]: val });
-                                                                    }
-                                                                }}
-                                                            />
+                                                        <div className="flex flex-col items-end gap-1">
+                                                            <div className="flex items-center gap-1">
+                                                                <span className="text-xs text-gray-400 font-bold">$</span>
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    className={`w-20 sm:w-28 text-right font-bold text-base border rounded px-2 py-1 focus:ring-2 outline-none ${item.tipo === 'Implementación'
+                                                                        ? 'text-orange-600 border-orange-100 bg-orange-50/30 focus:ring-orange-400'
+                                                                        : item.tipo === 'Paquete'
+                                                                            ? 'text-blue-700 border-blue-200 bg-blue-50/30 focus:ring-blue-400'
+                                                                            : 'text-purple-700 border-purple-200 bg-purple-50/30 focus:ring-purple-400'
+                                                                        }`}
+                                                                    value={currentValue}
+                                                                    onChange={(e) => {
+                                                                        const val = Number(e.target.value);
+                                                                        if (item.tipo === 'Implementación') {
+                                                                            setImplementationOverride(val);
+                                                                        } else if (item.tipo === 'Paquete') {
+                                                                            setPaqueteOverride(val);
+                                                                        } else if (itemOriginal) {
+                                                                            setOverrides({ ...overrides, [itemOriginal.id]: val });
+                                                                        }
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                            {/* Restore link — only for Implementación when price is 0 */}
+                                                            {item.tipo === 'Implementación' && currentValue === 0 && (() => {
+                                                                const origPrice = paquetes.find(p => p.id === formData.paquete_id)?.costo_implementacion || 0;
+                                                                return origPrice > 0 ? (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setImplementationOverride(origPrice)}
+                                                                        className="text-[10px] text-orange-500 hover:text-orange-700 font-bold flex items-center gap-0.5 transition-colors"
+                                                                        title={`Restaurar precio original: $${origPrice.toFixed(2)}`}
+                                                                    >
+                                                                        <span>↺</span> Restaurar ${origPrice.toFixed(2)}
+                                                                    </button>
+                                                                ) : null;
+                                                            })()}
                                                         </div>
                                                     );
                                                 })() : (
@@ -1426,7 +1449,14 @@ export default function CotizadorPro() {
                                                             type="checkbox"
                                                             className="hidden"
                                                             checked={formData.incluir_implementacion}
-                                                            onChange={(e) => setFormData({ ...formData, incluir_implementacion: e.target.checked })}
+                                                            onChange={(e) => {
+                                                                const turningOn = e.target.checked;
+                                                                // Auto-reset to original price if turning ON with price at 0
+                                                                if (turningOn && implementationOverride === 0) {
+                                                                    setImplementationOverride(costoImp);
+                                                                }
+                                                                setFormData({ ...formData, incluir_implementacion: turningOn });
+                                                            }}
                                                         />
                                                     </label>
                                                 </div>
