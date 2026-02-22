@@ -1,4 +1,4 @@
-import { Users, TrendingUp, Calendar, LayoutDashboard, UserPlus, Clock, Phone, FileText, DollarSign, X } from 'lucide-react';
+import { Users, TrendingUp, Calendar, LayoutDashboard, UserPlus, Clock, Phone, FileText, Receipt, X } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -59,9 +59,9 @@ export function MobileHomeMenu({ onCreateLead, onClose }: MobileHomeMenuProps) {
         {
             id: 'cotizaciones',
             label: 'Cotizaciones',
-            icon: <DollarSign className="w-8 h-8" />,
-            color: 'text-indigo-600',
-            bgColor: 'bg-indigo-50',
+            icon: <Receipt className="w-8 h-8" />,
+            color: 'text-green-600',
+            bgColor: 'bg-green-50',
             action: () => navigate('/cotizaciones'),
             shortcut: true
         },
