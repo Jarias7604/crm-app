@@ -2575,10 +2575,10 @@ export default function Leads() {
                                             onChange={(e) => handleUpdateLead({ priority: e.target.value as LeadPriority })}
                                             className="block w-full rounded-xl border-gray-200 shadow-sm text-sm font-bold text-gray-700 bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all pl-3 py-2.5"
                                         >
-                                            <option value="very_high">?? Altísima (Hot)</option>
-                                            <option value="high">?? Alta (Warm)</option>
-                                            <option value="medium">?? Media</option>
-                                            <option value="low">?? Baja (Cold)</option>
+                                            <option value="very_high">🔥 Altísima (Hot)</option>
+                                            <option value="high">⚡ Alta (Warm)</option>
+                                            <option value="medium">🕑 Media</option>
+                                            <option value="low">💤 Baja (Cold)</option>
                                         </select>
                                     </div>
                                 </div>

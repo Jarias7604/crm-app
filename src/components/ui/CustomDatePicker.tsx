@@ -46,7 +46,7 @@ export function CustomDatePicker({
     const parsedMinDate = minDate ? parseISO(minDate) : null;
     const [isOpen, setIsOpen] = useState(false);
     const [openUp, setOpenUp] = useState(false);
-    const [fixedPos, setFixedPos] = useState<{ bottom: number; left: number; maxWidth: number } | null>(null);
+    const [fixedPos, setFixedPos] = useState<{ top?: number; bottom?: number; left: number; maxWidth: number } | null>(null);
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [company, setCompany] = useState<Company | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -80,21 +80,31 @@ export function CustomDatePicker({
     const toggleCalendar = () => {
         if (!isOpen && containerRef.current) {
             const rect = containerRef.current.getBoundingClientRect();
-            if (forceOpenUp) {
-                setOpenUp(true);
-                setFixedPos({
-                    bottom: window.innerHeight - rect.top + 8,
-                    left: Math.max(8, rect.left - 100),
-                    maxWidth: Math.min(310, window.innerWidth - 16),
-                });
-            } else if (forceOpenDown) {
-                // Always open downward — used when inside a floating panel
+            const calWidth = Math.min(310, window.innerWidth - 16);
+            const calLeft = Math.max(8, Math.min(rect.left, window.innerWidth - calWidth - 8));
+
+            if (forceOpenDown) {
+                // Explicit downward — uses absolute positioning (legacy mode)
                 setOpenUp(false);
                 setFixedPos(null);
             } else {
+                // Always use fixed positioning to escape overflow:hidden containers
                 const spaceBelow = window.innerHeight - rect.bottom;
-                setOpenUp(spaceBelow < 400);
-                setFixedPos(null);
+                const shouldOpenUp = forceOpenUp || spaceBelow < 350;
+                setOpenUp(shouldOpenUp);
+                if (shouldOpenUp) {
+                    setFixedPos({
+                        bottom: window.innerHeight - rect.top + 8,
+                        left: calLeft,
+                        maxWidth: calWidth,
+                    });
+                } else {
+                    setFixedPos({
+                        top: rect.bottom + 8,
+                        left: calLeft,
+                        maxWidth: calWidth,
+                    });
+                }
             }
         }
         setIsOpen(!isOpen);
@@ -132,7 +142,9 @@ export function CustomDatePicker({
 
         const calendarStyle = fixedPos ? {
             position: 'fixed' as const,
-            bottom: `${fixedPos.bottom}px`,
+            ...(fixedPos.top !== undefined
+                ? { top: `${fixedPos.top}px` }
+                : { bottom: `${fixedPos.bottom}px` }),
             left: `${fixedPos.left}px`,
             width: `${fixedPos.maxWidth}px`,
         } : undefined;
