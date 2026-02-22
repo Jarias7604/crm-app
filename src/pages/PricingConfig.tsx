@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Plus, Edit, Trash2, Save, X, DollarSign, Package, Settings, ArrowUpDown } from 'lucide-react';
 import { pricingService } from '../services/pricing';
 import type { PricingItem } from '../types/pricing';
@@ -21,6 +21,28 @@ export default function PricingConfig() {
     const canEdit = isAdmin();
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
     const { tableRef: priceTableRef, wrapperRef: priceWrapperRef } = useAriasTables();
+
+    // Column resize
+    const DEFAULT_COL_WIDTHS: Record<string, number> = {
+        tipo: 120, nombre: 200, precio_anual: 120, precio_mensual: 120, costo_unico: 110, activo: 100,
+    };
+    const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
+        try { const s = localStorage.getItem('pricing_col_widths'); return s ? { ...DEFAULT_COL_WIDTHS, ...JSON.parse(s) } : { ...DEFAULT_COL_WIDTHS }; }
+        catch { return { ...DEFAULT_COL_WIDTHS }; }
+    });
+    const resizingCol = useRef<string | null>(null);
+    const resizeStartX = useRef<number>(0);
+    const resizeStartWidth = useRef<number>(0);
+    const handleColResizeStart = (e: React.MouseEvent, colId: string) => {
+        e.preventDefault(); e.stopPropagation();
+        const th = (e.currentTarget as HTMLElement).closest('th');
+        const w = th ? th.getBoundingClientRect().width : (columnWidths[colId] ?? DEFAULT_COL_WIDTHS[colId] ?? 120);
+        resizingCol.current = colId; resizeStartX.current = e.clientX; resizeStartWidth.current = w;
+        document.body.classList.add('arias-table-resizing');
+        const onMove = (ev: MouseEvent) => { if (!resizingCol.current) return; setColumnWidths(prev => ({ ...prev, [resizingCol.current!]: Math.max(70, resizeStartWidth.current + ev.clientX - resizeStartX.current) })); };
+        const onUp = () => { document.body.classList.remove('arias-table-resizing'); if (resizingCol.current) { setColumnWidths(prev => { localStorage.setItem('pricing_col_widths', JSON.stringify(prev)); return prev; }); resizingCol.current = null; } window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+        window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
+    };
 
     const [formData, setFormData] = useState<Partial<PricingItem>>({
         tipo: 'modulo',
@@ -294,7 +316,7 @@ export default function PricingConfig() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 <div ref={priceWrapperRef} className="arias-table-wrapper">
                     <div ref={priceTableRef} className="arias-table">
-                        <table className="min-w-full">
+                        <table style={{ tableLayout: 'fixed', width: Object.keys(DEFAULT_COL_WIDTHS).reduce((s, k) => s + (columnWidths[k] ?? DEFAULT_COL_WIDTHS[k]), 110) }}>
                             <thead className="bg-[#F5F7FA]">
                                 <tr>
                                     {[
@@ -305,7 +327,7 @@ export default function PricingConfig() {
                                         { key: 'costo_unico', label: 'Único', align: 'text-right' },
                                         { key: 'activo', label: 'Estado', align: 'text-center' },
                                     ].map(col => (
-                                        <th key={col.key} className={`px-6 py-3 ${col.align} text-xs font-bold text-gray-400 uppercase tracking-widest`}>
+                                        <th key={col.key} style={{ width: columnWidths[col.key] ?? DEFAULT_COL_WIDTHS[col.key] ?? 120, minWidth: 70 }} className={`px-6 py-3 ${col.align} text-xs font-bold text-gray-400 uppercase tracking-widest`}>
                                             <div
                                                 className="cursor-pointer hover:text-[#4449AA] transition-colors group inline-flex items-center gap-1"
                                                 onClick={() => setSortConfig({ key: col.key, direction: sortConfig?.key === col.key && sortConfig.direction === 'asc' ? 'desc' : 'asc' })}
@@ -313,9 +335,10 @@ export default function PricingConfig() {
                                                 {col.label}
                                                 <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === col.key ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
                                             </div>
+                                            <div onMouseDown={(e) => handleColResizeStart(e, col.key)} onMouseEnter={(e) => { const b = e.currentTarget.querySelector('div') as HTMLElement | null; if (b) b.style.background = '#a5b4fc'; }} onMouseLeave={(e) => { const b = e.currentTarget.querySelector('div') as HTMLElement | null; if (b) b.style.background = 'rgba(203,213,225,0.2)'; }} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 10, cursor: 'col-resize', zIndex: 10, userSelect: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ width: 1, height: '50%', borderRadius: 2, background: 'rgba(203,213,225,0.2)', transition: 'background 0.15s' }} /></div>
                                         </th>
                                     ))}
-                                    <th className="px-6 py-3 text-right text-xs font-bold text-gray-400 uppercase tracking-widest">Acciones</th>
+                                    <th style={{ width: 110, minWidth: 90 }} className="px-6 py-3 text-center text-xs font-bold text-gray-400 uppercase tracking-widest">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
@@ -356,7 +379,7 @@ export default function PricingConfig() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 {canEdit && (
-                                                    <div className="flex items-center justify-end gap-2">
+                                                    <div className="flex items-center justify-center gap-2">
                                                         {profile?.role === 'super_admin' || profile?.role === 'company_admin' ? (
                                                             <>
                                                                 <button

@@ -99,6 +99,57 @@ export default function Leads() {
         return defaultCols;
     });
 
+    // Column width persistence
+    const DEFAULT_COL_WIDTHS: Record<string, number> = {
+        name: 200, email: 180, phone: 140, status: 140,
+        priority: 120, source: 130, value: 110, assigned_to: 140, created_at: 120,
+    };
+    const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
+        try {
+            const saved = localStorage.getItem('lead_column_widths');
+            return saved ? { ...DEFAULT_COL_WIDTHS, ...JSON.parse(saved) } : { ...DEFAULT_COL_WIDTHS };
+        } catch { return { ...DEFAULT_COL_WIDTHS }; }
+    });
+    const resizingCol = useRef<string | null>(null);
+    const resizeStartX = useRef<number>(0);
+    const resizeStartWidth = useRef<number>(0);
+
+    const handleColResizeStart = (e: React.MouseEvent, colId: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        // Read the ACTUAL rendered width of the <th> — not the stored value,
+        // which may differ from what the browser painted.
+        const th = (e.currentTarget as HTMLElement).closest('th');
+        const actualWidth = th ? th.getBoundingClientRect().width : (columnWidths[colId] ?? DEFAULT_COL_WIDTHS[colId] ?? 140);
+        resizingCol.current = colId;
+        resizeStartX.current = e.clientX;
+        resizeStartWidth.current = actualWidth;
+        document.body.classList.add('arias-table-resizing');
+
+        const onMouseMove = (ev: MouseEvent) => {
+            if (!resizingCol.current) return;
+            const delta = ev.clientX - resizeStartX.current;
+            const newWidth = Math.max(80, resizeStartWidth.current + delta);
+            setColumnWidths(prev => ({ ...prev, [resizingCol.current!]: newWidth }));
+        };
+        const onMouseUp = () => {
+            document.body.classList.remove('arias-table-resizing');
+            if (resizingCol.current) {
+                setColumnWidths(prev => {
+                    const next = { ...prev };
+                    localStorage.setItem('lead_column_widths', JSON.stringify(next));
+                    return next;
+                });
+                resizingCol.current = null;
+            }
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+        };
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+    };
+
+
     const handleOnDragEnd = (result: any) => {
         if (!result.destination) return;
         const items = Array.from(columnOrder);
@@ -1900,7 +1951,13 @@ export default function Leads() {
                         <div className="hidden md:block bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/80 overflow-hidden transition-all duration-300">
                             <div ref={leadsWrapperRef} className="arias-table-wrapper">
                                 <div ref={leadsTableRef} className="arias-table">
-                                    <table className="min-w-full divide-y divide-gray-50">
+                                    <table
+                                        className="divide-y divide-gray-50"
+                                        style={{
+                                            tableLayout: 'fixed',
+                                            width: columnOrder.reduce((sum, id) => sum + (columnWidths[id] ?? DEFAULT_COL_WIDTHS[id] ?? 140), 48 + 100),
+                                        }}
+                                    >
                                         <DragDropContext onDragEnd={handleOnDragEnd}>
                                             <Droppable droppableId="columns" direction="horizontal">
                                                 {(provided) => (
@@ -1924,7 +1981,15 @@ export default function Leads() {
                                                                             ref={provided.innerRef}
                                                                             {...provided.draggableProps}
                                                                             scope="col"
-                                                                            className={`px-4 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-widest transition-all ${snapshot.isDragging ? 'bg-indigo-50/80 shadow-sm z-50' : 'bg-[#FAFAFB]'}`}
+                                                                            style={{
+                                                                                ...provided.draggableProps.style,
+                                                                                width: columnWidths[colId] ?? DEFAULT_COL_WIDTHS[colId] ?? 140,
+                                                                                minWidth: 80,
+                                                                                // NOTE: do NOT override position here — the CSS sticky from
+                                                                                // .arias-table thead th already acts as positioning ancestor
+                                                                                // for our absolute resize handle.
+                                                                            }}
+                                                                            className={`px-4 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-widest transition-colors ${snapshot.isDragging ? 'bg-indigo-50/80 shadow-sm z-50' : 'bg-[#FAFAFB]'}`}
                                                                         >
                                                                             <div className="flex items-center gap-2">
                                                                                 <div {...provided.dragHandleProps} className="cursor-move text-gray-300 hover:text-[#4449AA]">
@@ -2048,13 +2113,37 @@ export default function Leads() {
                                                                                     </div>
                                                                                 )}
                                                                             </div>
+                                                                            {/* Resize handle — always a thin visible line, indigo on hover */}
+                                                                            <div
+                                                                                onMouseDown={(e) => handleColResizeStart(e, colId)}
+                                                                                onMouseEnter={(e) => {
+                                                                                    const bar = e.currentTarget.querySelector('div') as HTMLElement | null;
+                                                                                    if (bar) bar.style.background = '#a5b4fc';
+                                                                                }}
+                                                                                onMouseLeave={(e) => {
+                                                                                    const bar = e.currentTarget.querySelector('div') as HTMLElement | null;
+                                                                                    if (bar) bar.style.background = 'rgba(203,213,225,0.2)';
+                                                                                }}
+                                                                                style={{
+                                                                                    position: 'absolute', right: 0, top: 0, bottom: 0,
+                                                                                    width: 10, cursor: 'col-resize', zIndex: 10,
+                                                                                    userSelect: 'none',
+                                                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                                }}
+                                                                            >
+                                                                                <div style={{
+                                                                                    width: 1, height: '50%', borderRadius: 2,
+                                                                                    background: 'rgba(203,213,225,0.2)',
+                                                                                    transition: 'background 0.15s',
+                                                                                }} />
+                                                                            </div>
                                                                         </th>
                                                                     )}
                                                                 </Draggable>
                                                             ))}
 
                                                             {provided.placeholder}
-                                                            <th scope="col" className="px-6 py-4 text-right text-xs font-black text-gray-400 uppercase tracking-widest bg-[#FAFAFB]">
+                                                            <th scope="col" style={{ width: 100, minWidth: 100 }} className="px-4 py-4 text-center text-xs font-black text-gray-400 uppercase tracking-widest bg-[#FAFAFB]">
                                                                 Acciones
                                                             </th>
                                                         </tr>
@@ -2154,8 +2243,8 @@ export default function Leads() {
                                                             </td>
                                                         ))}
 
-                                                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                                                            <div className="flex justify-end gap-1.5 transition-all">
+                                                        <td className="px-4 py-4 whitespace-nowrap">
+                                                            <div className="flex justify-center items-center gap-1.5 transition-all">
                                                                 <button
                                                                     onClick={(e) => { e.stopPropagation(); openLeadDetail(lead); }}
                                                                     className="p-1.5 text-indigo-400 hover:text-white hover:bg-[#4449AA] rounded-lg transition-all shadow-sm bg-indigo-50/50"

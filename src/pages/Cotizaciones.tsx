@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, FileText, CheckCircle, XCircle, Clock, Edit, Trash2, Eye, ArrowUpDown, GripVertical, Search } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
@@ -33,6 +33,48 @@ export default function Cotizaciones() {
         items.splice(result.destination.index, 0, reorderedItem);
         setColumnOrder(items);
         localStorage.setItem('quote_column_order', JSON.stringify(items));
+    };
+
+    // Column width persistence
+    const DEFAULT_COL_WIDTHS: Record<string, number> = {
+        nombre_cliente: 190, plan_nombre: 160, volumen_dtes: 120,
+        total_anual: 130, estado: 130, created_at: 120,
+    };
+    const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
+        try {
+            const saved = localStorage.getItem('quote_column_widths');
+            return saved ? { ...DEFAULT_COL_WIDTHS, ...JSON.parse(saved) } : { ...DEFAULT_COL_WIDTHS };
+        } catch { return { ...DEFAULT_COL_WIDTHS }; }
+    });
+    const resizingCol = useRef<string | null>(null);
+    const resizeStartX = useRef<number>(0);
+    const resizeStartWidth = useRef<number>(0);
+
+    const handleColResizeStart = (e: React.MouseEvent, colId: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const th = (e.currentTarget as HTMLElement).closest('th');
+        const actualWidth = th ? th.getBoundingClientRect().width : (columnWidths[colId] ?? DEFAULT_COL_WIDTHS[colId] ?? 140);
+        resizingCol.current = colId;
+        resizeStartX.current = e.clientX;
+        resizeStartWidth.current = actualWidth;
+        document.body.classList.add('arias-table-resizing');
+        const onMouseMove = (ev: MouseEvent) => {
+            if (!resizingCol.current) return;
+            const delta = ev.clientX - resizeStartX.current;
+            setColumnWidths(prev => ({ ...prev, [resizingCol.current!]: Math.max(80, resizeStartWidth.current + delta) }));
+        };
+        const onMouseUp = () => {
+            document.body.classList.remove('arias-table-resizing');
+            if (resizingCol.current) {
+                setColumnWidths(prev => { localStorage.setItem('quote_column_widths', JSON.stringify(prev)); return prev; });
+                resizingCol.current = null;
+            }
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+        };
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
     };
     const [stats, setStats] = useState({
         total: 0,
@@ -303,7 +345,13 @@ export default function Cotizaciones() {
                                 <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/80 overflow-hidden transition-all duration-300">
                                     <div ref={quotesWrapperRef} className="arias-table-wrapper">
                                         <div ref={quotesTableRef} className="arias-table">
-                                            <table className="min-w-full divide-y divide-gray-50">
+                                            <table
+                                                className="divide-y divide-gray-50"
+                                                style={{
+                                                    tableLayout: 'fixed',
+                                                    width: columnOrder.reduce((sum, id) => sum + (columnWidths[id] ?? DEFAULT_COL_WIDTHS[id] ?? 140), 48 + 110),
+                                                }}
+                                            >
                                                 <thead className="bg-[#FAFAFB]">
                                                     <tr ref={provided.innerRef} {...provided.droppableProps}>
                                                         <th scope="col" className="px-6 py-4 text-left bg-[#FAFAFB]">
@@ -324,7 +372,12 @@ export default function Cotizaciones() {
                                                                         ref={provided.innerRef}
                                                                         {...provided.draggableProps}
                                                                         scope="col"
-                                                                        className={`px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest transition-all ${snapshot.isDragging ? 'bg-indigo-50/80 shadow-sm z-50' : 'bg-[#FAFAFB]'}`}
+                                                                        style={{
+                                                                            ...provided.draggableProps.style,
+                                                                            width: columnWidths[colId] ?? DEFAULT_COL_WIDTHS[colId] ?? 140,
+                                                                            minWidth: 80,
+                                                                        }}
+                                                                        className={`px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest transition-colors ${snapshot.isDragging ? 'bg-indigo-50/80 shadow-sm z-50' : 'bg-[#FAFAFB]'}`}
                                                                     >
                                                                         <div className="flex items-center gap-2">
                                                                             <div {...provided.dragHandleProps} className="cursor-move text-gray-300 hover:text-[#4449AA]">
@@ -409,13 +462,22 @@ export default function Cotizaciones() {
                                                                                 </div>
                                                                             )}
                                                                         </div>
+                                                                        {/* Resize handle */}
+                                                                        <div
+                                                                            onMouseDown={(e) => handleColResizeStart(e, colId)}
+                                                                            onMouseEnter={(e) => { const b = e.currentTarget.querySelector('div') as HTMLElement | null; if (b) b.style.background = '#6366f1'; }}
+                                                                            onMouseLeave={(e) => { const b = e.currentTarget.querySelector('div') as HTMLElement | null; if (b) b.style.background = 'rgba(203,213,225,0.7)'; }}
+                                                                            style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 10, cursor: 'col-resize', zIndex: 10, userSelect: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                                        >
+                                                                            <div style={{ width: 1, height: '50%', borderRadius: 2, background: 'rgba(203,213,225,0.2)', transition: 'background 0.15s' }} />
+                                                                        </div>
                                                                     </th>
                                                                 )}
                                                             </Draggable>
                                                         ))}
 
                                                         {provided.placeholder}
-                                                        <th scope="col" className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest text-right bg-[#FAFAFB]">Acciones</th>
+                                                        <th scope="col" style={{ width: 110, minWidth: 110 }} className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest bg-[#FAFAFB]">Acciones</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="bg-white divide-y divide-gray-50/50">
@@ -489,8 +551,8 @@ export default function Cotizaciones() {
                                                                         </td>
                                                                     ))}
 
-                                                                    <td className="px-4 py-4 whitespace-nowrap text-right">
-                                                                        <div className="flex justify-end gap-1.5 transition-all">
+                                                                    <td className="px-4 py-4 whitespace-nowrap">
+                                                                        <div className="flex justify-center items-center gap-1.5 transition-all">
                                                                             <button
                                                                                 onClick={() => navigate(`/cotizaciones/${cot.id}`)}
                                                                                 className="p-1.5 text-indigo-400 hover:text-white hover:bg-[#4449AA] rounded-lg transition-all shadow-sm bg-indigo-50/50"

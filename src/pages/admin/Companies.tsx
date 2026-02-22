@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { adminService } from '../../services/admin';
 import { supabase } from '../../services/supabase';
@@ -74,6 +74,28 @@ export default function Companies() {
     const location = useLocation();
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
     const { tableRef: companiesTableRef, wrapperRef: companiesWrapperRef } = useAriasTables();
+
+    // Column resize
+    const DEFAULT_COL_WIDTHS: Record<string, number> = {
+        name: 260, license_status: 140, max_users: 160, allowed_permissions: 260,
+    };
+    const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
+        try { const s = localStorage.getItem('companies_col_widths'); return s ? { ...DEFAULT_COL_WIDTHS, ...JSON.parse(s) } : { ...DEFAULT_COL_WIDTHS }; }
+        catch { return { ...DEFAULT_COL_WIDTHS }; }
+    });
+    const resizingCol = useRef<string | null>(null);
+    const resizeStartX = useRef<number>(0);
+    const resizeStartWidth = useRef<number>(0);
+    const handleColResizeStart = (e: React.MouseEvent, colId: string) => {
+        e.preventDefault(); e.stopPropagation();
+        const th = (e.currentTarget as HTMLElement).closest('th');
+        const w = th ? th.getBoundingClientRect().width : (columnWidths[colId] ?? DEFAULT_COL_WIDTHS[colId] ?? 160);
+        resizingCol.current = colId; resizeStartX.current = e.clientX; resizeStartWidth.current = w;
+        document.body.classList.add('arias-table-resizing');
+        const onMove = (ev: MouseEvent) => { if (!resizingCol.current) return; setColumnWidths(prev => ({ ...prev, [resizingCol.current!]: Math.max(80, resizeStartWidth.current + ev.clientX - resizeStartX.current) })); };
+        const onUp = () => { document.body.classList.remove('arias-table-resizing'); if (resizingCol.current) { setColumnWidths(prev => { localStorage.setItem('companies_col_widths', JSON.stringify(prev)); return prev; }); resizingCol.current = null; } window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+        window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
+    };
 
     // Handle incoming filters from Dashboard
     useEffect(() => {
@@ -309,7 +331,7 @@ export default function Companies() {
             <div className="bg-white shadow-2xl shadow-slate-200/60 rounded-[2.5rem] overflow-hidden border border-slate-200/50">
                 <div ref={companiesWrapperRef} className="arias-table-wrapper">
                     <div ref={companiesTableRef} className="arias-table">
-                        <table className="min-w-full divide-y divide-slate-100 text-left">
+                        <table className="divide-y divide-slate-100 text-left" style={{ tableLayout: 'fixed', width: Object.keys(DEFAULT_COL_WIDTHS).reduce((s, k) => s + (columnWidths[k] ?? DEFAULT_COL_WIDTHS[k]), 160) }}>
                             <thead className="bg-[#F8FAFC]">
                                 <tr>
                                     {[
@@ -318,7 +340,7 @@ export default function Companies() {
                                         { key: 'max_users', label: 'Capacidad' },
                                         { key: 'allowed_permissions', label: 'Módulos / Licencia' },
                                     ].map(col => (
-                                        <th key={col.key} className="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                                        <th key={col.key} style={{ width: columnWidths[col.key] ?? DEFAULT_COL_WIDTHS[col.key] ?? 160, minWidth: 80 }} className="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">
                                             <div
                                                 className="cursor-pointer hover:text-[#4449AA] transition-colors group inline-flex items-center gap-1"
                                                 onClick={() => setSortConfig({ key: col.key, direction: sortConfig?.key === col.key && sortConfig.direction === 'asc' ? 'desc' : 'asc' })}
@@ -326,9 +348,10 @@ export default function Companies() {
                                                 {col.label}
                                                 <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === col.key ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
                                             </div>
+                                            <div onMouseDown={(e) => handleColResizeStart(e, col.key)} onMouseEnter={(e) => { const b = e.currentTarget.querySelector('div') as HTMLElement | null; if (b) b.style.background = '#a5b4fc'; }} onMouseLeave={(e) => { const b = e.currentTarget.querySelector('div') as HTMLElement | null; if (b) b.style.background = 'rgba(203,213,225,0.2)'; }} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 10, cursor: 'col-resize', zIndex: 10, userSelect: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ width: 1, height: '50%', borderRadius: 2, background: 'rgba(203,213,225,0.2)', transition: 'background 0.15s' }} /></div>
                                         </th>
                                     ))}
-                                    <th className="relative px-8 py-6 text-right font-black text-slate-400 text-[11px] uppercase tracking-[0.2em]">Gestionar</th>
+                                    <th style={{ width: 160, minWidth: 130 }} className="relative px-8 py-6 text-center font-black text-slate-400 text-[11px] uppercase tracking-[0.2em]">Gestionar</th>
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-slate-50">
@@ -393,7 +416,7 @@ export default function Companies() {
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-8 py-6 whitespace-nowrap text-right">
+                                        <td className="px-8 py-6 whitespace-nowrap text-center">
                                             <button
                                                 onClick={async () => {
                                                     setEditingCompanyId(company.id);
