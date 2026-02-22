@@ -35,6 +35,12 @@ export default function PublicQuoteView() {
         fetchCotizacion();
     }, [id]);
 
+    // Track client view via SECURITY DEFINER (no auth required)
+    useEffect(() => {
+        if (!id) return;
+        supabase.rpc('track_quote_view', { quote_id: id }).then(() => { });
+    }, [id]);
+
     async function fetchCotizacion() {
         try {
             // 1. Fetch main quote data WITHOUT joins to avoid coercion errors
@@ -127,19 +133,13 @@ export default function PublicQuoteView() {
             toast.error('Por favor ingresa tu nombre para firmar');
             return;
         }
-
         setIsAccepting(true);
         try {
-            const { error } = await supabase
-                .from('cotizaciones')
-                .update({
-                    estado: 'aceptada',
-                    descripcion_pago: `Firmada digitalmente por: ${signerName} el ${new Date().toLocaleString()}`
-                })
-                .eq('id', id);
-
+            const { error } = await supabase.rpc('accept_quote_public', {
+                quote_id: id,
+                acceptor_name: signerName.trim()
+            });
             if (error) throw error;
-
             toast.success('¡Propuesta Aceptada Exitosamente!');
             setShowSignatureModal(false);
             fetchCotizacion();

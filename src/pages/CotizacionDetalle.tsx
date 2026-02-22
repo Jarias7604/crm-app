@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { format } from 'date-fns';
-import { Building2, Mail, Phone, Package, Globe, Trash2, Send, Download, ArrowLeft, Settings, FileText, MessageSquare, CreditCard, CheckCircle2 } from 'lucide-react';
+import { Building2, Mail, Phone, Package, Globe, Trash2, Send, Download, ArrowLeft, Settings, FileText, MessageSquare, CreditCard, CheckCircle2, Share2, Copy, Check, Eye, X } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { pdfService } from '../services/pdfService';
 import { parseModules, calculateQuoteFinancialsV2, type CotizacionData } from '../utils/quoteUtils';
@@ -28,9 +28,24 @@ export default function CotizacionDetalle() {
     const [loading, setLoading] = useState(true);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
     const [isAccepting, setIsAccepting] = useState(false);
+    const [showShareModal, setShowShareModal] = useState(false);
+    const [showAcceptModal, setShowAcceptModal] = useState(false);
+    const [acceptorName, setAcceptorName] = useState('');
+    const [agreedToTerms, setAgreedToTerms] = useState(false);
+    const [copied, setCopied] = useState(false);
 
     useEffect(() => {
         fetchCotizacion();
+    }, [id]);
+
+    // Track client views only (admin sessions ignored)
+    useEffect(() => {
+        if (!id) return;
+        supabase.auth.getSession().then(({ data }) => {
+            if (!data.session) {
+                supabase.rpc('track_quote_view', { quote_id: id }).then(() => { });
+            }
+        });
     }, [id]);
 
     async function fetchCotizacion() {
@@ -148,8 +163,52 @@ export default function CotizacionDetalle() {
 
     const handleShareTelegram = () => {
         if (!cotizacion) return;
-        const text = `Hola ${cotizacion.nombre_cliente}, adjunto la cotización ${cotizacion.id.slice(0, 8)} para el plan ${cotizacion.plan_nombre}. Puedes verla aquí: ${window.location.href}`;
-        window.open(`https://t.me/share/url?url=${encodeURIComponent(window.location.href)}&text=${encodeURIComponent(text)}`, '_blank');
+        const text = `Hola ${cotizacion.nombre_cliente}! Te comparto la propuesta #${cotizacion.id.slice(0, 8).toUpperCase()} para ${cotizacion.plan_nombre}.`;
+        window.open(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(text)}`, '_blank');
+        setShowShareModal(false);
+    };
+
+    const shareUrl = cotizacion ? `${window.location.origin}/propuesta/${cotizacion.id}` : '';
+
+    const handleShareWhatsApp = () => {
+        if (!cotizacion) return;
+        const text = `Hola ${cotizacion.nombre_cliente}! 👋\n\nTe comparto la propuesta comercial *#${cotizacion.id.slice(0, 8).toUpperCase()}* para el plan *${cotizacion.plan_nombre}*.\n\nPuedes revisarla y aprobarla aquí:\n${shareUrl}`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+        setShowShareModal(false);
+    };
+
+    const handleShareEmail = () => {
+        if (!cotizacion) return;
+        const subject = `Propuesta Comercial #${cotizacion.id.slice(0, 8).toUpperCase()} — ${cotizacion.plan_nombre}`;
+        const body = `Hola ${cotizacion.nombre_cliente},\n\nLe comparto la propuesta comercial para el plan ${cotizacion.plan_nombre}.\n\nPuede revisarla y aprobarla en:\n${shareUrl}\n\nSaludos,\n${cotizacion.creator?.full_name || 'El equipo'}`;
+        window.open(`mailto:${cotizacion.email_cliente || ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
+        setShowShareModal(false);
+    };
+
+    const handleCopyLink = async () => {
+        await navigator.clipboard.writeText(shareUrl);
+        setCopied(true);
+        toast.success('Link copiado al portapapeles');
+        setTimeout(() => setCopied(false), 2500);
+    };
+
+    const handleAcceptPublic = async () => {
+        if (!cotizacion || !acceptorName.trim() || !agreedToTerms) return;
+        setIsAccepting(true);
+        try {
+            const { error } = await supabase.rpc('accept_quote_public', {
+                quote_id: cotizacion.id,
+                acceptor_name: acceptorName.trim()
+            });
+            if (error) throw error;
+            toast.success('¡Propuesta aceptada exitosamente!');
+            setShowAcceptModal(false);
+            fetchCotizacion();
+        } catch (error) {
+            toast.error('Error al aceptar la propuesta');
+        } finally {
+            setIsAccepting(false);
+        }
     };
 
     const handleDelete = async () => {
@@ -248,11 +307,17 @@ export default function CotizacionDetalle() {
 
                         <Button
                             variant="default"
-                            onClick={handleShareTelegram}
-                            className="h-12 px-6 bg-white border border-gray-200 text-slate-800 hover:bg-gray-50 hover:border-gray-300 font-bold text-[11px] uppercase tracking-widest rounded-xl shadow-sm hidden md:flex items-center gap-2"
+                            onClick={() => setShowShareModal(true)}
+                            className="h-10 sm:h-12 px-3 sm:px-5 bg-white border border-gray-200 text-slate-800 hover:bg-gray-50 hover:border-[#4449AA]/30 font-bold text-[11px] uppercase tracking-widest rounded-xl shadow-sm flex items-center gap-2 transition-all"
                         >
-                            <Send className="w-4 h-4 text-[#0088cc]" />
-                            Compartir
+                            <Share2 className="w-4 h-4 text-[#4449AA]" />
+                            <span className="hidden sm:inline">Compartir</span>
+                            {((cotizacion as any).viewed_count || 0) > 0 && (
+                                <span className="flex items-center gap-0.5 bg-indigo-50 text-[#4449AA] text-[9px] font-black px-1.5 py-0.5 rounded-full">
+                                    <Eye className="w-2.5 h-2.5" />
+                                    {(cotizacion as any).viewed_count}
+                                </span>
+                            )}
                         </Button>
 
                         {/* Botón Aceptar Propuesta - Solo visible si no está aceptada */}
@@ -774,8 +839,151 @@ export default function CotizacionDetalle() {
                             </div>
                         </div>
                     </div>
+
+                    {/* ── CLIENT APPROVAL CTA ── */}
+                    <div className={`px-4 sm:px-8 py-8 border-t-2 ${cotizacion.estado === 'aceptada' ? 'border-green-100 bg-green-50/30' : 'border-[#4449AA]/10 bg-gradient-to-br from-indigo-50/50 to-white'}`}>
+                        {cotizacion.estado === 'aceptada' ? (
+                            <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+                                <div className="w-14 h-14 rounded-2xl bg-green-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-green-500/25">
+                                    <CheckCircle2 className="w-7 h-7 text-white" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-green-700">Propuesta Aceptada Digitalmente</h3>
+                                    <p className="text-sm text-green-600 mt-0.5">
+                                        {(cotizacion as any).accepted_by_name && `Por ${(cotizacion as any).accepted_by_name} · `}
+                                        {(cotizacion as any).accepted_at && format(new Date((cotizacion as any).accepted_at), 'dd/MM/yyyy HH:mm')}
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center text-center gap-4 max-w-sm mx-auto">
+                                <div>
+                                    <h3 className="text-lg font-black text-slate-800">¿Listo para comenzar?</h3>
+                                    <p className="text-sm text-slate-500 mt-1">Al aceptar confirmas que leíste y apruebas los términos de esta propuesta.</p>
+                                </div>
+                                <button
+                                    onClick={() => setShowAcceptModal(true)}
+                                    className="w-full flex items-center justify-center gap-2.5 bg-[#4449AA] hover:bg-[#383d8f] active:scale-[0.98] text-white font-black text-sm py-4 px-8 rounded-2xl shadow-xl shadow-[#4449AA]/25 transition-all duration-200"
+                                >
+                                    <CheckCircle2 className="w-5 h-5" />
+                                    Aceptar Propuesta
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
+
+            {/* ── SHARE MODAL ── */}
+            {showShareModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4" onClick={() => setShowShareModal(false)}>
+                    <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-5">
+                            <h3 className="text-lg font-black text-slate-900">Compartir Propuesta</h3>
+                            <button onClick={() => setShowShareModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors">
+                                <X className="w-4 h-4 text-gray-600" />
+                            </button>
+                        </div>
+
+                        {/* Analytics row */}
+                        <div className="flex items-center gap-3 bg-slate-50 rounded-2xl p-3.5 mb-5 border border-slate-100">
+                            <Eye className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                                <p className="text-xs font-black text-slate-700">Vista {(cotizacion as any).viewed_count || 0} {((cotizacion as any).viewed_count || 0) === 1 ? 'vez' : 'veces'}</p>
+                                <p className="text-[10px] text-slate-400">{(cotizacion as any).viewed_at ? `Última vez ${format(new Date((cotizacion as any).viewed_at), 'dd/MM HH:mm')}` : 'Aún no abierta por el cliente'}</p>
+                            </div>
+                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase flex-shrink-0 ${cotizacion.estado === 'aceptada' ? 'bg-green-100 text-green-700' :
+                                cotizacion.estado === 'enviada' ? 'bg-blue-100 text-blue-700' :
+                                    'bg-amber-100 text-amber-700'
+                                }`}>{cotizacion.estado}</span>
+                        </div>
+
+                        {/* URL copy row */}
+                        <div className="flex gap-2 mb-5">
+                            <input readOnly value={shareUrl} className="flex-1 text-xs bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-slate-500 truncate min-w-0" />
+                            <button onClick={handleCopyLink} className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm font-bold text-slate-700 transition-colors flex items-center gap-1.5 flex-shrink-0">
+                                {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                                {copied ? 'Copiado' : 'Copiar'}
+                            </button>
+                        </div>
+
+                        {/* Channel buttons */}
+                        <div className="grid grid-cols-3 gap-3">
+                            <button onClick={handleShareWhatsApp} className="flex flex-col items-center gap-2 bg-green-50 hover:bg-green-100 border border-green-200 rounded-2xl p-4 transition-colors">
+                                <div className="w-10 h-10 bg-[#25D366] rounded-xl flex items-center justify-center shadow-sm">
+                                    <MessageSquare className="w-5 h-5 text-white" />
+                                </div>
+                                <span className="text-[11px] font-black text-green-700">WhatsApp</span>
+                            </button>
+                            <button onClick={handleShareTelegram} className="flex flex-col items-center gap-2 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-2xl p-4 transition-colors">
+                                <div className="w-10 h-10 bg-[#0088cc] rounded-xl flex items-center justify-center shadow-sm">
+                                    <Send className="w-5 h-5 text-white" />
+                                </div>
+                                <span className="text-[11px] font-black text-sky-700">Telegram</span>
+                            </button>
+                            <button onClick={handleShareEmail} className="flex flex-col items-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl p-4 transition-colors">
+                                <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center shadow-sm">
+                                    <Mail className="w-5 h-5 text-white" />
+                                </div>
+                                <span className="text-[11px] font-black text-slate-700">Email</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── ACCEPT MODAL ── */}
+            {showAcceptModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4" onClick={() => setShowAcceptModal(false)}>
+                    <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-5">
+                            <h3 className="text-lg font-black text-slate-900">Confirmar Aceptación</h3>
+                            <button onClick={() => setShowAcceptModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors">
+                                <X className="w-4 h-4 text-gray-600" />
+                            </button>
+                        </div>
+
+                        <div className="bg-slate-50 rounded-2xl p-3.5 mb-5 border border-slate-100">
+                            <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Propuesta</p>
+                            <p className="text-sm font-black text-slate-900">#{cotizacion.id.slice(0, 8).toUpperCase()} — {cotizacion.plan_nombre}</p>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-sm font-black text-slate-700 block mb-1.5">Tu nombre completo *</label>
+                                <input
+                                    type="text"
+                                    value={acceptorName}
+                                    onChange={e => setAcceptorName(e.target.value)}
+                                    placeholder="Ej: Juan García"
+                                    className="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-[#4449AA]/30 focus:border-[#4449AA]/50 outline-none transition-all"
+                                />
+                            </div>
+                            <label className="flex items-start gap-3 cursor-pointer group">
+                                <div
+                                    onClick={() => setAgreedToTerms(!agreedToTerms)}
+                                    className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${agreedToTerms ? 'bg-[#4449AA] border-[#4449AA]' : 'border-slate-300 bg-white group-hover:border-[#4449AA]/50'
+                                        }`}
+                                >
+                                    {agreedToTerms && <Check className="w-3 h-3 text-white" />}
+                                </div>
+                                <span className="text-sm text-slate-600 leading-relaxed">He leído y acepto los términos y condiciones de esta propuesta comercial.</span>
+                            </label>
+                            <button
+                                onClick={handleAcceptPublic}
+                                disabled={!acceptorName.trim() || !agreedToTerms || isAccepting}
+                                className="w-full bg-[#4449AA] hover:bg-[#383d8f] disabled:opacity-40 disabled:cursor-not-allowed text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-[#4449AA]/20 flex items-center justify-center gap-2"
+                            >
+                                {isAccepting ? (
+                                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /><span>Procesando...</span></>
+                                ) : (
+                                    <><CheckCircle2 className="w-5 h-5" /><span>Confirmar Aceptación</span></>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Print Styling */}
             <style dangerouslySetInnerHTML={{
