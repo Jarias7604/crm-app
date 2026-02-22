@@ -2386,8 +2386,12 @@ export default function Leads() {
             {/* Lead Detail Slide-Over */}
             {isDetailOpen && selectedLead && (
                 <div className="fixed inset-0 z-[9999] overflow-hidden">
-                    <div className="absolute inset-0 bg-black/30" onClick={() => setIsDetailOpen(false)} />
-                    <div className="absolute inset-y-0 right-0 max-w-lg w-full bg-white shadow-xl flex flex-col">
+                    <div className="absolute inset-0 bg-black/40 lead-sheet-backdrop" onClick={() => setIsDetailOpen(false)} />
+                    <div className="absolute inset-x-0 bottom-0 max-h-[93vh] rounded-t-[28px] sm:inset-y-0 sm:bottom-auto sm:left-auto sm:right-0 sm:max-h-full sm:w-[480px] sm:max-w-lg sm:rounded-none bg-white shadow-2xl flex flex-col overflow-hidden lead-sheet">
+                        {/* Mobile drag handle pill */}
+                        <div className="flex justify-center pt-3 pb-0 flex-shrink-0 sm:hidden">
+                            <div className="w-10 h-1 bg-gray-200 rounded-full" />
+                        </div>
                         {/* Header */}
                         <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-white to-gray-50 flex justify-between items-center relative z-30">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-16 -mt-16 opacity-50 blur-2xl"></div>
@@ -2466,20 +2470,20 @@ export default function Leads() {
                         </div>
 
                         {/* Content */}
-                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-4 sm:p-6 space-y-6">
                             {/* Quick Stats */}
-                            <div className="flex gap-4">
-                                <div className="flex-1 bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-xl border border-green-100/50 shadow-sm text-center group transition-transform hover:scale-[1.02]">
-                                    <p className="text-2xl font-black text-green-600 tracking-tighter">${(selectedLead.value || 0).toLocaleString()}</p>
-                                    <p className="text-[10px] font-black text-green-800/40 uppercase tracking-[0.2em] mt-2">Inversión Potencial</p>
+                            <div className="flex gap-2 sm:gap-4 min-w-0">
+                                <div className="flex-1 min-w-0 overflow-hidden bg-gradient-to-br from-green-50 to-emerald-50 p-3 sm:p-4 rounded-xl border border-green-100/50 shadow-sm text-center group transition-transform hover:scale-[1.02]">
+                                    <p className="text-xl sm:text-2xl font-black text-green-600 tracking-tighter truncate">${(selectedLead.value || 0).toLocaleString()}</p>
+                                    <p className="text-[9px] font-black text-green-800/40 uppercase tracking-widest mt-2">Inversión</p>
                                 </div>
-                                <div className="flex-1 bg-gradient-to-br from-orange-50 to-red-50 p-4 rounded-xl border border-orange-100/50 shadow-sm text-center group transition-transform hover:scale-[1.02]">
-                                    <PriorityBadge priority={selectedLead.priority || 'medium'} />
-                                    <p className="text-[10px] font-black text-orange-800/40 uppercase tracking-[0.2em] mt-2">Temperatura</p>
+                                <div className="flex-1 min-w-0 overflow-hidden bg-gradient-to-br from-orange-50 to-red-50 p-3 sm:p-4 rounded-xl border border-orange-100/50 shadow-sm text-center group transition-transform hover:scale-[1.02]">
+                                    <div className="flex justify-center"><PriorityBadge priority={selectedLead.priority || 'medium'} /></div>
+                                    <p className="text-[9px] font-black text-orange-800/40 uppercase tracking-widest mt-2">Temperatura</p>
                                 </div>
-                                <div className="flex-1 bg-gradient-to-br from-indigo-50 to-blue-50 p-4 rounded-xl border border-blue-100/50 shadow-sm text-center group transition-transform hover:scale-[1.02]">
-                                    <StatusBadge status={selectedLead.status} />
-                                    <p className="text-[10px] font-black text-blue-800/40 uppercase tracking-[0.2em] mt-2">Estado Actual</p>
+                                <div className="flex-1 min-w-0 overflow-hidden bg-gradient-to-br from-indigo-50 to-blue-50 p-3 sm:p-4 rounded-xl border border-blue-100/50 shadow-sm text-center group transition-transform hover:scale-[1.02]">
+                                    <div className="flex justify-center"><StatusBadge status={selectedLead.status} /></div>
+                                    <p className="text-[9px] font-black text-blue-800/40 uppercase tracking-widest mt-2">Estado</p>
                                 </div>
                             </div>
 
@@ -2571,10 +2575,10 @@ export default function Leads() {
                                             onChange={(e) => handleUpdateLead({ priority: e.target.value as LeadPriority })}
                                             className="block w-full rounded-xl border-gray-200 shadow-sm text-sm font-bold text-gray-700 bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all pl-3 py-2.5"
                                         >
-                                            <option value="very_high">?? Altísima (Hot)</option>
-                                            <option value="high">?? Alta (Warm)</option>
-                                            <option value="medium">?? Media</option>
-                                            <option value="low">?? Baja (Cold)</option>
+                                            <option value="very_high">🔥 Altísima (Hot)</option>
+                                            <option value="high">⚡ Alta (Warm)</option>
+                                            <option value="medium">🕑 Media</option>
+                                            <option value="low">💤 Baja (Cold)</option>
                                         </select>
                                     </div>
                                 </div>
