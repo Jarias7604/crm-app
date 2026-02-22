@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, FileText, DollarSign, Search, X, Package, Globe } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FileText, Receipt, Search, X, Package, Globe, Link2, ChevronRight } from 'lucide-react';
 import { cotizadorService, type CotizadorPaquete, type CotizadorItem, type CotizacionCalculada } from '../services/cotizador';
 import { pricingService } from '../services/pricing';
 import type { FinancingPlan, PaymentSettings } from '../types/pricing';
@@ -546,11 +546,11 @@ export default function CotizadorPro() {
 
     return (
         <>
-            <div className="max-w-5xl mx-auto space-y-6">
-                {/* Header */}
+            <div className="max-w-5xl mx-auto space-y-4 sm:space-y-6 pb-32 sm:pb-6">
+                {/* Header — compact on mobile */}
                 <div>
-                    <h1 className="text-2xl font-extrabold text-[#4449AA]">📋 Nueva Cotización Profesional</h1>
-                    <p className="text-sm text-gray-500 mt-1">Sistema dinámico de cotización basado en paquetes</p>
+                    <h1 className="text-lg sm:text-2xl font-extrabold text-[#4449AA]">📋 Nueva Cotización</h1>
+                    <p className="text-xs sm:text-sm text-gray-400 mt-0.5">Sistema dinámico basado en paquetes</p>
                 </div>
 
                 {/* ── Indicador de Pasos: Progressive Compact ── */}
@@ -602,70 +602,53 @@ export default function CotizadorPro() {
                 </div>
 
                 {/* Contenido */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 sm:p-6">
                     {/* PASO 1: Cliente */}
                     {pasoActual === 1 && (
                         <div className="space-y-6">
                             <div>
-                                <h2 className="text-2xl font-extrabold text-[#4449AA] mb-2">Información del Cliente</h2>
-                                <p className="text-sm text-gray-500">Configure los detalles del cliente para esta cotización</p>
+                                <h2 className="text-lg sm:text-2xl font-extrabold text-[#4449AA] mb-1">Información del Cliente</h2>
+                                <p className="text-xs sm:text-sm text-gray-400">Configure los detalles del cliente para esta cotización</p>
                             </div>
 
-                            {/* Selector de Lead Ultra Profesional */}
+                            {/* ── Inline Lead Link chip ── */}
                             {!formData.usar_lead ? (
-                                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl p-8 hover:shadow-lg transition-all duration-300">
-                                    <div className="flex items-start gap-6">
-                                        <div className="flex-shrink-0">
-                                            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg">
-                                                <FileText className="w-8 h-8 text-white" />
-                                            </div>
-                                        </div>
-                                        <div className="flex-1">
-                                            <h3 className="text-lg font-bold text-gray-900 mb-2">¿Trabajar con un Lead existente?</h3>
-                                            <p className="text-sm text-gray-600 mb-4">
-                                                Seleccione un Lead de su pipeline para auto-completar la información del cliente de forma inmediata.
-                                            </p>
-                                            <button
-                                                onClick={() => setShowLeadSelector(true)}
-                                                className="inline-flex items-center gap-2 bg-white border-2 border-blue-600 text-blue-600 px-6 py-3 rounded-xl font-bold hover:bg-blue-600 hover:text-white transition-all duration-200 shadow-sm hover:shadow-md"
-                                            >
-                                                <Search className="w-5 h-5" />
-                                                Seleccionar Lead Existente
-                                            </button>
-                                        </div>
+                                // Empty state — compact tappable row
+                                <button
+                                    onClick={() => setShowLeadSelector(true)}
+                                    className="w-full flex items-center gap-3 px-4 py-3.5 bg-gray-50 hover:bg-[#4449AA]/5 border border-dashed border-gray-200 hover:border-[#4449AA]/40 rounded-2xl transition-all duration-200 active:scale-[0.98] group"
+                                >
+                                    <div className="w-9 h-9 rounded-xl bg-[#4449AA]/10 flex items-center justify-center flex-shrink-0 group-hover:bg-[#4449AA]/15 transition-colors">
+                                        <Link2 className="w-4 h-4 text-[#4449AA]" />
                                     </div>
-                                </div>
+                                    <div className="flex-1 text-left">
+                                        <p className="text-sm font-semibold text-gray-700">Vincular a Lead existente</p>
+                                        <p className="text-[11px] text-gray-400 leading-tight">Auto-completa nombre, email y empresa</p>
+                                    </div>
+                                    <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-[#4449AA] group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                                </button>
                             ) : (
-                                <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center">
-                                                <FileText className="w-6 h-6 text-white" />
-                                            </div>
-                                            <div>
-                                                <p className="text-xs font-semibold text-green-700 uppercase tracking-wide">Lead Seleccionado</p>
-                                                <p className="text-lg font-bold text-gray-900">{formData.cliente_nombre}</p>
-                                                {formData.cliente_email && (
-                                                    <p className="text-sm text-gray-600">{formData.cliente_email}</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={() => {
-                                                setFormData({
-                                                    ...formData,
-                                                    usar_lead: false,
-                                                    lead_id: null,
-                                                    cliente_nombre: '',
-                                                    cliente_email: ''
-                                                });
-                                            }}
-                                            className="p-2 hover:bg-red-100 rounded-lg transition-colors text-red-600"
-                                            title="Remover Lead"
-                                        >
-                                            <X className="w-5 h-5" />
-                                        </button>
+                                // Linked state — avatar + info chip
+                                <div className="w-full flex items-center gap-3 px-4 py-3 bg-[#4449AA]/5 border border-[#4449AA]/20 rounded-2xl">
+                                    <div className="w-9 h-9 rounded-full bg-[#4449AA] flex items-center justify-center flex-shrink-0 text-white font-black text-sm shadow-sm">
+                                        {(formData.cliente_nombre || 'L')[0].toUpperCase()}
                                     </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-bold text-gray-900 truncate leading-tight">{formData.cliente_nombre}</p>
+                                        {formData.cliente_email && (
+                                            <p className="text-[11px] text-gray-400 truncate leading-tight">{formData.cliente_email}</p>
+                                        )}
+                                    </div>
+                                    <span className="text-[9px] font-black text-[#4449AA] bg-[#4449AA]/10 px-2 py-0.5 rounded-full uppercase tracking-widest flex-shrink-0">Lead</span>
+                                    <button
+                                        onClick={() => {
+                                            setFormData({ ...formData, usar_lead: false, lead_id: null, cliente_nombre: '', cliente_email: '' });
+                                        }}
+                                        className="w-7 h-7 rounded-lg hover:bg-red-50 flex items-center justify-center text-gray-300 hover:text-red-400 transition-colors flex-shrink-0"
+                                        title="Desvincular Lead"
+                                    >
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
                                 </div>
                             )}
 
@@ -1377,8 +1360,8 @@ export default function CotizadorPro() {
                         </div>
                     )}
 
-                    {/* Botones de Navegación */}
-                    <div className="flex justify-between mt-8">
+                    {/* ── Navigation Buttons — Desktop ── */}
+                    <div className="hidden sm:flex justify-between mt-8">
                         <Button
                             onClick={handleAnterior}
                             variant="outline"
@@ -1389,7 +1372,7 @@ export default function CotizadorPro() {
                         </Button>
 
                         {pasoActual < 4 ? (
-                            <Button onClick={handleSiguiente} className="bg-blue-600 hover:bg-blue-700 text-white">
+                            <Button onClick={handleSiguiente} className="bg-[#4449AA] hover:bg-[#3a3f95] text-white">
                                 Siguiente
                                 <ArrowRight className="w-4 h-4 ml-2" />
                             </Button>
@@ -1402,7 +1385,7 @@ export default function CotizadorPro() {
                     </div>
                 </div>
 
-                {/* Widget Flotante de Precio - Colapsable */}
+                {/* ── Widget Flotante de Precio — Desktop / tablet ── */}
                 {
                     pasoActual > 1 && totales && (
                         <>
@@ -1410,7 +1393,7 @@ export default function CotizadorPro() {
                                 <div className="fixed top-24 right-6 bg-white border-2 border-green-500 rounded-xl shadow-2xl p-4 w-72 z-50">
                                     <div className="flex items-center justify-between mb-2">
                                         <h4 className="font-bold text-sm text-[#4449AA] flex items-center gap-2">
-                                            <DollarSign className="w-4 h-4" />
+                                            <Receipt className="w-4 h-4" />
                                             Precio en Tiempo Real
                                         </h4>
                                         <button
@@ -1499,12 +1482,46 @@ export default function CotizadorPro() {
                                     className="fixed top-24 right-6 bg-green-500 hover:bg-green-600 text-white rounded-full p-3 shadow-2xl z-50 transition-all"
                                     title="Ver precios"
                                 >
-                                    <DollarSign className="w-5 h-5" />
+                                    <Receipt className="w-5 h-5" />
                                 </button>
                             )}
                         </>
                     )
                 }
+            </div>
+            {/* ── Mobile Sticky Action Bar ── */}
+            <div className="sm:hidden fixed bottom-16 left-0 right-0 px-4 z-40">
+                <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-2xl shadow-xl shadow-black/10 p-3 flex gap-3">
+                    {/* Back button — hidden on step 1 */}
+                    {pasoActual > 1 && (
+                        <button
+                            onClick={handleAnterior}
+                            className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl border-2 border-gray-200 bg-white text-gray-700 font-bold text-sm active:scale-95 transition-transform hover:border-gray-300"
+                        >
+                            <ArrowLeft className="w-4 h-4 flex-shrink-0" />
+                            Atrás
+                        </button>
+                    )}
+
+                    {/* Primary CTA */}
+                    {pasoActual < 4 ? (
+                        <button
+                            onClick={handleSiguiente}
+                            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-[#4449AA] text-white font-bold text-sm shadow-md shadow-[#4449AA]/30 active:scale-95 transition-all"
+                        >
+                            Siguiente
+                            <ArrowRight className="w-4 h-4 flex-shrink-0" />
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleGenerar}
+                            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-green-600 text-white font-bold text-sm shadow-md shadow-green-600/30 active:scale-95 transition-all"
+                        >
+                            <Receipt className="w-4 h-4 flex-shrink-0" />
+                            Generar Cotización
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Modal Selector de Leads - Cobertura Total Garantizada (Fuera de contenedores padres para evitar stacking context issues) */}
