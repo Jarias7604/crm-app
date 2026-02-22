@@ -901,10 +901,10 @@ export default function Leads() {
     const PriorityBadge = ({ priority }: { priority: LeadPriority }) => {
         const config = PRIORITY_CONFIG[priority] || PRIORITY_CONFIG.medium;
         const icons = {
-            very_high: '??',
-            high: '??',
-            medium: '??',
-            low: '??'
+            very_high: '🔥',
+            high: '⚡',
+            medium: '🕑',
+            low: '💤'
         };
         return (
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-md ${config.color} ${config.textColor} shadow-sm`}>
