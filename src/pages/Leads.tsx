@@ -2182,7 +2182,7 @@ export default function Leads() {
                                                                             <Mail className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                                                                             <span className="text-[11px] font-semibold text-gray-700 truncate" title={lead.email}>{lead.email}</span>
                                                                         </div>
-                                                                    ) : <span className="text-xs text-gray-300">—</span>
+                                                                    ) : null
                                                                 )}
 
                                                                 {colId === 'phone' && (
@@ -2191,7 +2191,7 @@ export default function Leads() {
                                                                             <Phone className="w-3.5 h-3.5 text-green-500 shrink-0" />
                                                                             <span className="text-[11px] font-semibold text-gray-700">{lead.phone}</span>
                                                                         </div>
-                                                                    ) : <span className="text-xs text-gray-300">—</span>
+                                                                    ) : null
                                                                 )}
 
                                                                 {colId === 'status' && <StatusBadge status={lead.status} />}
@@ -2204,7 +2204,7 @@ export default function Leads() {
                                                                             <span>{SOURCE_CONFIG[lead.source].icon}</span>
                                                                             <span className="uppercase tracking-tight">{SOURCE_CONFIG[lead.source].label}</span>
                                                                         </div>
-                                                                    ) : <span className="text-xs text-gray-300">-</span>
+                                                                    ) : null
                                                                 )}
 
                                                                 {colId === 'value' && (
@@ -3029,5 +3029,6 @@ export default function Leads() {
         </>
     );
 }
+
 
 
