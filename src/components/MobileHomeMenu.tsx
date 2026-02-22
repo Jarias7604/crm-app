@@ -1,4 +1,4 @@
-import { Users, TrendingUp, Calendar, LayoutDashboard, UserPlus, Clock, Phone, FileText, X } from 'lucide-react';
+import { Users, TrendingUp, Calendar, LayoutDashboard, UserPlus, Clock, Phone, FileText, DollarSign, X } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -7,6 +7,7 @@ interface QuickAction {
     label: string;
     icon: React.ReactNode;
     color: string;
+    bgColor?: string;
     action: () => void;
     shortcut: boolean;
 }
@@ -53,6 +54,15 @@ export function MobileHomeMenu({ onCreateLead, onClose }: MobileHomeMenuProps) {
             icon: <LayoutDashboard className="w-8 h-8" />,
             color: 'text-green-600',
             action: () => navigate('/dashboard'),
+            shortcut: true
+        },
+        {
+            id: 'cotizaciones',
+            label: 'Cotizaciones',
+            icon: <DollarSign className="w-8 h-8" />,
+            color: 'text-indigo-600',
+            bgColor: 'bg-indigo-50',
+            action: () => navigate('/cotizaciones'),
             shortcut: true
         },
         {
@@ -144,7 +154,7 @@ export function MobileHomeMenu({ onCreateLead, onClose }: MobileHomeMenuProps) {
                             onClick={action.action}
                             className="bg-white rounded-2xl p-6 flex flex-col items-center gap-3 active:scale-95 transition-all shadow-sm border border-gray-100"
                         >
-                            <div className={`w-16 h-16 rounded-2xl bg-green-50 flex items-center justify-center ${action.color}`}>
+                            <div className={`w-16 h-16 rounded-2xl ${action.bgColor || 'bg-green-50'} flex items-center justify-center ${action.color}`}>
                                 {action.icon}
                             </div>
                             <span className="text-sm font-semibold text-gray-800 text-center">

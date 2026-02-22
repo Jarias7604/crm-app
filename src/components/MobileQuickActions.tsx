@@ -1,4 +1,4 @@
-import { Plus, Users, TrendingUp, Calendar, LayoutDashboard, Phone, FileText, UserPlus, Clock, X } from 'lucide-react';
+import { Plus, Users, TrendingUp, Calendar, LayoutDashboard, Phone, FileText, UserPlus, Clock, DollarSign, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -88,6 +88,17 @@ export function MobileQuickActions({
             color: 'text-green-600',
             action: () => {
                 navigate('/dashboard');
+                toggleOpen(false);
+            },
+            shortcut: true
+        },
+        {
+            id: 'cotizaciones',
+            label: 'Cotizaciones',
+            icon: <DollarSign className="w-8 h-8" />,
+            color: 'text-indigo-600',
+            action: () => {
+                navigate('/cotizaciones');
                 toggleOpen(false);
             },
             shortcut: true
