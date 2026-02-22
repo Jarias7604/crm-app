@@ -247,7 +247,7 @@ export default function Leads() {
             }
         }
     }, [location.state, leads.length]);
-    // ── Click-to-Call mobile: detect return from dialer and auto-open logger ──
+    // -- Click-to-Call mobile: detect return from dialer and auto-open logger --
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (document.visibilityState !== 'visible') return;
@@ -291,7 +291,7 @@ export default function Leads() {
     // Update local state when lead is selected
     useEffect(() => {
         if (selectedLead) {
-            // 🔥 ROBUST FIX: Always load follow-ups when a lead is selected
+            // ?? ROBUST FIX: Always load follow-ups when a lead is selected
             loadFollowUps(selectedLead.id);
         }
     }, [selectedLead?.id]); // Use .id to prevent re-running on every re-render
@@ -659,20 +659,20 @@ export default function Leads() {
                 if (results.inserted.length > 0 && results.skipped.length === 0 && results.errors.length === 0) {
                     // Perfect import - all leads inserted
                     const leadText = results.inserted.length === 1 ? 'lead importado' : 'leads importados';
-                    toast.success(`✅ ${results.inserted.length} ${leadText} correctamente`);
+                    toast.success(`? ${results.inserted.length} ${leadText} correctamente`);
                 } else if (results.inserted.length > 0 && (results.skipped.length > 0 || results.errors.length > 0)) {
                     // Partial import - some succeeded, some failed/skipped
                     const messages = [
-                        `✅ ${results.inserted.length} importado(s)`,
-                        results.skipped.length > 0 ? `⏭️ ${results.skipped.length} omitido(s) (duplicados)` : '',
-                        results.errors.length > 0 ? `❌ ${results.errors.length} error(es)` : ''
+                        `? ${results.inserted.length} importado(s)`,
+                        results.skipped.length > 0 ? `?? ${results.skipped.length} omitido(s) (duplicados)` : '',
+                        results.errors.length > 0 ? `? ${results.errors.length} error(es)` : ''
                     ].filter(Boolean).join('\n');
 
                     toast.success(messages, { duration: 5000 });
 
                     // Log details for debugging
                     if (results.skipped.length > 0) {
-                        console.log('🔍 Duplicados omitidos:');
+                        console.log('?? Duplicados omitidos:');
                         results.skipped.forEach(({ lead, reason }) => {
                             console.log(`  - ${lead.name}: ${reason}`);
                         });
@@ -683,13 +683,13 @@ export default function Leads() {
                     const leadName = results.skipped[0]?.lead?.name || 'Sin nombre';
 
                     let message = results.skipped.length === 1
-                        ? `⚠️ ${duplicateText}: ${leadName}`
-                        : `⚠️ ${duplicateText}`;
+                        ? `?? ${duplicateText}: ${leadName}`
+                        : `?? ${duplicateText}`;
 
-                    toast(message, { duration: 6000, icon: '⚠️' });
+                    toast(message, { duration: 6000, icon: '??' });
                 } else {
                     // All failed
-                    toast.error('❌ No se pudo importar ningún lead. Revisa el formato del archivo.');
+                    toast.error('? No se pudo importar ningún lead. Revisa el formato del archivo.');
                 }
 
                 // Background sync to ensure consistency
@@ -901,10 +901,10 @@ export default function Leads() {
     const PriorityBadge = ({ priority }: { priority: LeadPriority }) => {
         const config = PRIORITY_CONFIG[priority] || PRIORITY_CONFIG.medium;
         const icons = {
-            very_high: '🔥',
-            high: '🟠',
-            medium: '🟡',
-            low: '❄️'
+            very_high: '??',
+            high: '??',
+            medium: '??',
+            low: '??'
         };
         return (
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-md ${config.color} ${config.textColor} shadow-sm`}>
@@ -1099,7 +1099,7 @@ export default function Leads() {
                                             }}
                                             className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${isActive ? `${config.bgColor} ${config.color} shadow-md ring-2 ring-current ring-opacity-30` : 'bg-gray-50 text-gray-500 border border-gray-100'}`}
                                         >
-                                            {isActive && <span>✓</span>}
+                                            {isActive && <span>?</span>}
                                             <span>{config.icon}</span>
                                             {config.label}
                                         </button>
@@ -1136,7 +1136,7 @@ export default function Leads() {
                                             }}
                                             className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${isActive ? 'bg-indigo-50 text-indigo-600 shadow-md ring-2 ring-indigo-300' : 'bg-gray-50 text-gray-500 border border-gray-100'}`}
                                         >
-                                            {isActive && <span>✓</span>}
+                                            {isActive && <span>?</span>}
                                             <span>{config.icon}</span>
                                             {config.label}
                                         </button>
@@ -1172,7 +1172,7 @@ export default function Leads() {
                                             }}
                                             className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${isActive ? `${config.bgColor} ${config.color} shadow-md ring-2 ring-current ring-opacity-30` : 'bg-gray-50 text-gray-500 border border-gray-100'}`}
                                         >
-                                            {isActive && <span>✓</span>}
+                                            {isActive && <span>?</span>}
                                             {config.icon} {config.label}
                                         </button>
                                     );
@@ -1207,7 +1207,7 @@ export default function Leads() {
                                             }}
                                             className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${isActive ? (item.id === 'unassigned' ? 'bg-amber-50 text-amber-600 shadow-md ring-2 ring-amber-300' : 'bg-indigo-50 text-indigo-600 shadow-md ring-2 ring-indigo-300') : 'bg-gray-50 text-gray-500 border border-gray-100'}`}
                                         >
-                                            {isActive && <span>✓</span>}
+                                            {isActive && <span>?</span>}
                                             {item.id !== 'unassigned' && (
                                                 <div className="w-5 h-5 rounded-full bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center shrink-0">
                                                     {item.avatar ? <img src={item.avatar} alt="" className="w-full h-full object-cover" /> : <User className="w-3 h-3 text-slate-400" />}
@@ -1247,7 +1247,7 @@ export default function Leads() {
                                             }}
                                             className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${isActive ? 'bg-amber-50 text-amber-600 shadow-md ring-2 ring-amber-300' : 'bg-gray-50 text-gray-500 border border-gray-100'}`}
                                         >
-                                            {isActive && <span>✓</span>}
+                                            {isActive && <span>?</span>}
                                             {reason.reason}
                                         </button>
                                     );
@@ -1284,7 +1284,7 @@ export default function Leads() {
                                                 }}
                                                 className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${isActive ? 'bg-rose-50 text-rose-600 shadow-md ring-2 ring-rose-300' : 'bg-gray-50 text-gray-500 border border-gray-100'}`}
                                             >
-                                                {isActive && <span>✓</span>}
+                                                {isActive && <span>?</span>}
                                                 <span>{config.icon}</span>
                                                 {config.label}
                                             </button>
@@ -1328,7 +1328,7 @@ export default function Leads() {
         <>
             {MobileFilterModal()}
             <div className="w-full max-w-[1500px] mx-auto pb-6 space-y-3">
-                {/* ── ROW 1: Title + Stats · Search + Actions ── */}
+                {/* -- ROW 1: Title + Stats · Search + Actions -- */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
                     {/* Left: Title + Stats */}
                     <div className="flex items-center justify-between md:justify-start gap-4 w-full md:w-auto">
@@ -1452,10 +1452,10 @@ export default function Leads() {
                     <LossReasonDropdown />
                     <LossStageDropdown />
 
-                    {/* ── Spacer pushes date range to the right ── */}
+                    {/* -- Spacer pushes date range to the right -- */}
                     <div className="flex-1" />
 
-                    {/* ── Date Range Picker ── */}
+                    {/* -- Date Range Picker -- */}
                     <div className="relative" ref={dateRangeRef}>
                         <button
                             onClick={() => setIsDateRangeOpen(!isDateRangeOpen)}
@@ -1734,7 +1734,7 @@ export default function Leads() {
                                                         href={`tel:${lead.phone}`}
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            // 📱 Mobile click-to-call: record exact start time
+                                                            // ?? Mobile click-to-call: record exact start time
                                                             callTracker.start(lead.id);
                                                         }}
                                                         className="w-11 h-11 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center shadow-sm active:bg-indigo-100"
@@ -2168,11 +2168,11 @@ export default function Leads() {
                                                             />
                                                         </td>
                                                         {columnOrder.map((colId) => (
-                                                            <td key={colId} className="px-4 py-4 whitespace-nowrap">
+                                                            <td key={colId} className="px-4 py-4 overflow-hidden">
                                                                 {colId === 'name' && (
-                                                                    <div className="flex flex-col cursor-pointer" onClick={() => openLeadDetail(lead)}>
-                                                                        <span className="text-sm font-bold text-gray-900 group-hover:text-[#4449AA] transition-colors">{lead.name}</span>
-                                                                        <span className="text-xs text-blue-600 font-bold">{lead.company_name || 'Individual'}</span>
+                                                                    <div className="flex flex-col cursor-pointer min-w-0" onClick={() => openLeadDetail(lead)}>
+                                                                        <span className="text-sm font-bold text-gray-900 group-hover:text-[#4449AA] transition-colors truncate" title={lead.name}>{lead.name}</span>
+                                                                        <span className="text-xs text-blue-600 font-bold truncate" title={lead.company_name || 'Individual'}>{lead.company_name || 'Individual'}</span>
                                                                     </div>
                                                                 )}
 
@@ -2243,7 +2243,7 @@ export default function Leads() {
                                                             </td>
                                                         ))}
 
-                                                        <td className="px-4 py-4 whitespace-nowrap">
+                                                        <td className="px-4 py-4 overflow-hidden">
                                                             <div className="flex justify-center items-center gap-1.5 transition-all">
                                                                 <button
                                                                     onClick={(e) => { e.stopPropagation(); openLeadDetail(lead); }}
@@ -2571,10 +2571,10 @@ export default function Leads() {
                                             onChange={(e) => handleUpdateLead({ priority: e.target.value as LeadPriority })}
                                             className="block w-full rounded-xl border-gray-200 shadow-sm text-sm font-bold text-gray-700 bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all pl-3 py-2.5"
                                         >
-                                            <option value="very_high">🔥 Altísima (Hot)</option>
-                                            <option value="high">🟠 Alta (Warm)</option>
-                                            <option value="medium">🟡 Media</option>
-                                            <option value="low">❄️ Baja (Cold)</option>
+                                            <option value="very_high">?? Altísima (Hot)</option>
+                                            <option value="high">?? Alta (Warm)</option>
+                                            <option value="medium">?? Media</option>
+                                            <option value="low">?? Baja (Cold)</option>
                                         </select>
                                     </div>
                                 </div>
@@ -2806,7 +2806,7 @@ export default function Leads() {
                                                         {/* Timeline Node */}
                                                         <div className="absolute -left-[30px] top-1 w-6 h-6 rounded-lg bg-white border-2 border-gray-100 flex items-center justify-center shadow-sm z-10 group-hover:border-indigo-400 group-hover:scale-110 transition-all">
                                                             <span className="text-xs">
-                                                                {ACTION_TYPES.find(t => t.value === item.action_type)?.icon || '📝'}
+                                                                {ACTION_TYPES.find(t => t.value === item.action_type)?.icon || '??'}
                                                             </span>
                                                         </div>
 
