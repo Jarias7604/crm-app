@@ -239,3 +239,22 @@ a:active,
 .arias-table tbody tr:hover {
     background: #FDFDFE;
 }
+
+/* ── Column resizing: prevent text selection while dragging ── */
+.arias-table-resizing,
+.arias-table-resizing * {
+    user-select: none !important;
+    cursor: col-resize !important;
+}
+
+/* ── Resizable th: ensure handle is always positioned correctly ── */
+.arias-table thead th {
+    position: sticky;
+    /* already set above — reinforced here for specificity */
+}
+
+/* Draggable th from DnD gets position:fixed during drag via inline style.
+   When not dragging, fall back to relative so the resize handle works. */
+.arias-table thead th:not([style*="position: fixed"]) {
+    position: relative !important;
+}
