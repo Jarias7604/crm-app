@@ -1,4 +1,4 @@
-import { useTranslation } from 'react-i18next';
+﻿import { useTranslation } from 'react-i18next';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -44,9 +44,9 @@ const SIA_PERIOD_LABELS: Record<string, string> = {
     today: 'Hoy',
     this_week: 'Esta semana',
     this_month: 'Este mes',
-    last_3_months: 'Últimos 3 meses',
-    last_6_months: 'Últimos 6 meses',
-    this_year: 'Este año',
+    last_3_months: 'Ãšltimos 3 meses',
+    last_6_months: 'Ãšltimos 6 meses',
+    this_year: 'Este aÃ±o',
     all: 'Todo el tiempo',
 };
 
@@ -67,7 +67,7 @@ const FunnelInfographic = ({ data, onStageClick }: { data: any[], onStageClick: 
         { label: 'Prospecto', value: count('Prospecto'), amount: amount('Prospecto'), color: '#3b82f6', key: 'Prospecto' },
         { label: 'Calificado', value: count('Lead calificado'), amount: amount('Lead calificado'), color: '#6366f1', key: 'Lead calificado' },
         { label: 'Seguimiento', value: count('En seguimiento'), amount: amount('En seguimiento'), color: '#8b5cf6', key: 'En seguimiento' },
-        { label: 'Negociación', value: count('Negociación'), amount: amount('Negociación'), color: '#f97316', key: 'Negociación' },
+        { label: 'NegociaciÃ³n', value: count('NegociaciÃ³n'), amount: amount('NegociaciÃ³n'), color: '#f97316', key: 'NegociaciÃ³n' },
         { label: 'Cerrado', value: count('Cerrado'), amount: amount('Cerrado'), color: '#10b981', key: 'Cerrado' },
         { label: 'Cliente', value: count('Cliente'), amount: amount('Cliente'), color: '#059669', key: 'Cliente' }
     ];
@@ -161,7 +161,7 @@ export default function Dashboard() {
     const [recentCompanies, setRecentCompanies] = useState<any[]>([]);
     const [companyTrend, setCompanyTrend] = useState<any[]>([]);
 
-    // Detectar móvil/tableta
+    // Detectar mÃ³vil/tableta
     const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
 
     useEffect(() => {
@@ -193,8 +193,8 @@ export default function Dashboard() {
                 end = endOfToday();
                 break;
             case 'this_week':
-                start = startOfWeek(now, { weekStartsOn: 0 });
-                end = endOfWeek(now, { weekStartsOn: 0 });
+                start = startOfWeek(now, { weekStartsOn: 1 });
+                end = endOfWeek(now, { weekStartsOn: 1 });
                 break;
             case 'this_month':
                 start = startOfMonth(now);
@@ -237,8 +237,8 @@ export default function Dashboard() {
                 endDate = endOfToday().toISOString();
                 break;
             case 'this_week':
-                startDate = startOfWeek(now, { weekStartsOn: 0 }).toISOString();
-                endDate = endOfWeek(now, { weekStartsOn: 0 }).toISOString();
+                startDate = startOfWeek(now, { weekStartsOn: 1 }).toISOString();
+                endDate = endOfWeek(now, { weekStartsOn: 1 }).toISOString();
                 break;
             case 'this_month':
                 startDate = startOfMonth(now).toISOString();
@@ -296,7 +296,7 @@ export default function Dashboard() {
             const mappedSources = sDataRaw.map((s: any) => ({
                 key: s.name,
                 name: SOURCE_CONFIG[s.name as keyof typeof SOURCE_CONFIG]?.label || s.name,
-                icon: SOURCE_CONFIG[s.name as keyof typeof SOURCE_CONFIG]?.icon || '📊',
+                icon: SOURCE_CONFIG[s.name as keyof typeof SOURCE_CONFIG]?.icon || 'ðŸ“Š',
                 value: total > 0 ? Math.round((s.value / total) * 100) : 0,
                 count: s.value
             })).sort((a: any, b: any) => b.count - a.count);
@@ -401,7 +401,7 @@ export default function Dashboard() {
                 <div className="flex flex-col items-center gap-6">
                     <div className="w-16 h-16 border-4 border-slate-100 border-t-indigo-600 rounded-full animate-spin shadow-lg"></div>
                     <div className="text-center">
-                        <p className="text-slate-900 font-black text-xs uppercase tracking-[0.3em] mb-1">Optimizando Métricas</p>
+                        <p className="text-slate-900 font-black text-xs uppercase tracking-[0.3em] mb-1">Optimizando MÃ©tricas</p>
                         <p className="text-slate-400 font-medium text-[10px] animate-pulse">Cargando inteligencia de negocio...</p>
                     </div>
                 </div>
@@ -416,10 +416,10 @@ export default function Dashboard() {
                     <div className="w-16 h-16 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
                         <XAxis className="w-8 h-8" />
                     </div>
-                    <h3 className="text-xl font-black text-slate-900 tracking-tight mb-2">Error de Conexión</h3>
+                    <h3 className="text-xl font-black text-slate-900 tracking-tight mb-2">Error de ConexiÃ³n</h3>
                     <p className="text-slate-500 text-sm mb-8 leading-relaxed">Hubo un problema al sincronizar tus datos. Por favor, intenta de nuevo.</p>
                     <Button onClick={() => setRefreshKey(Date.now())} className="h-14 bg-indigo-600 hover:bg-indigo-700 text-white font-black px-10 rounded-2xl shadow-xl shadow-indigo-600/20 transition-all">
-                        Reintentar Sincronización
+                        Reintentar SincronizaciÃ³n
                     </Button>
                 </div>
             </div>
@@ -467,7 +467,7 @@ export default function Dashboard() {
         </div>
     );
 
-    // Si estamos en móvil o tableta y en la ruta raíz (/), mostrar el menú de accesos rápidos por defecto como Home
+    // Si estamos en mÃ³vil o tableta y en la ruta raÃ­z (/), mostrar el menÃº de accesos rÃ¡pidos por defecto como Home
     if (isMobile && location.pathname === '/') {
         return (
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 min-h-[calc(100vh-160px)]">
@@ -480,13 +480,13 @@ export default function Dashboard() {
         );
     }
 
-    // Leemos directamente de localStorage para máxima reactividad
+    // Leemos directamente de localStorage para mÃ¡xima reactividad
     const localSimRole = localStorage.getItem('simulated_role');
 
-    // Si somos super_admin, comprobamos si hay una simulación de administrador de empresa activa
+    // Si somos super_admin, comprobamos si hay una simulaciÃ³n de administrador de empresa activa
     const isActuallySimulatingAdmin = profile?.role === 'company_admin' || localSimRole === 'company_admin';
 
-    // CRITICAL OVERRIDE: Si estamos en modo simulación de empresa, SALTAMOS la vista de Super Admin
+    // CRITICAL OVERRIDE: Si estamos en modo simulaciÃ³n de empresa, SALTAMOS la vista de Super Admin
     if (profile?.role === 'super_admin' && !isActuallySimulatingAdmin) {
         return (
             <div className="space-y-6 pb-6">
@@ -552,7 +552,7 @@ export default function Dashboard() {
                                     <tr>
                                         <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">{t('dashboard.superAdmin.columnName')}</th>
                                         <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase tracking-wider">Plan</th>
-                                        <th className="px-6 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">Acción</th>
+                                        <th className="px-6 py-3 text-right text-[10px] font-bold text-gray-400 uppercase tracking-wider">AcciÃ³n</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
@@ -596,7 +596,7 @@ export default function Dashboard() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h2 className="text-2xl font-extrabold text-[#4449AA] leading-tight tracking-tight">{t('dashboard.crm.title')}</h2>
-                    <p className="text-[13px] text-gray-400 font-medium font-inter transition-all">Análisis de rendimiento y prospección en tiempo real</p>
+                    <p className="text-[13px] text-gray-400 font-medium font-inter transition-all">AnÃ¡lisis de rendimiento y prospecciÃ³n en tiempo real</p>
                 </div>
                 <div className="flex items-center gap-3">
                     <Button
@@ -664,7 +664,7 @@ export default function Dashboard() {
                         bg: 'bg-rose-500/10',
                         trend: `${stats.erroneousLeadsTrend > 0 ? '+' : ''}${stats.erroneousLeadsTrend}%`,
                         trendColor: stats.erroneousLeadsTrend <= 0 ? 'text-emerald-500' : 'text-rose-500', // Inverse for errors
-                        onClick: () => navigate('/leads', { state: { status: 'Erróneo' } })
+                        onClick: () => navigate('/leads', { state: { status: 'ErrÃ³neo' } })
                     },
                 ].map((item) => {
                     return (
@@ -750,7 +750,7 @@ export default function Dashboard() {
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex flex-col">
                             <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('dashboard.crm.funnelTitle')}</h3>
-                            <p className="text-[10px] text-gray-400 font-medium">Conversión por etapa</p>
+                            <p className="text-[10px] text-gray-400 font-medium">ConversiÃ³n por etapa</p>
                         </div>
                         <div className="bg-indigo-50 px-2 py-0.5 rounded-full text-[8px] font-black text-indigo-600 tracking-wider">KPI</div>
                         <div className="relative" ref={activeCardFilter === 'funnel' ? cardFilterRef : null}>
@@ -797,8 +797,8 @@ export default function Dashboard() {
                 <div className={`bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 lg:col-span-4 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'priority' ? 'z-[50]' : 'z-0'}`}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex flex-col">
-                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Priorización</h3>
-                            <p className="text-[10px] text-gray-400 font-medium">Enfoque estratégico</p>
+                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">PriorizaciÃ³n</h3>
+                            <p className="text-[10px] text-gray-400 font-medium">Enfoque estratÃ©gico</p>
                         </div>
                         <div className="flex items-center gap-2">
                             <Target className="w-5 h-5 text-amber-500 opacity-30" />
@@ -1114,7 +1114,7 @@ export default function Dashboard() {
                         ) : (
                             <div className="h-full flex flex-col items-center justify-center py-20 opacity-30">
                                 <CheckCircle className="w-8 h-8 mb-2 text-emerald-500" />
-                                <p className="text-[10px] font-black uppercase tracking-[0.1em]">Al día</p>
+                                <p className="text-[10px] font-black uppercase tracking-[0.1em]">Al dÃ­a</p>
                             </div>
                         )}
                     </div>
@@ -1127,7 +1127,7 @@ export default function Dashboard() {
                                 <TrendingUp className="w-3 h-3" /> Conversiones
                                 {recentConversions.length > 0 && <span className="bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full text-[9px] font-black">{recentConversions.length}</span>}
                             </h3>
-                            <p className="text-[10px] text-emerald-600/60 font-medium mt-0.5">Últimos cierres</p>
+                            <p className="text-[10px] text-emerald-600/60 font-medium mt-0.5">Ãšltimos cierres</p>
                         </div>
                         <div className="flex items-center gap-2">
                             <div className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[8px] font-black tracking-widest uppercase">Winning</div>
@@ -1203,7 +1203,7 @@ export default function Dashboard() {
                         <div className="flex justify-between items-start mb-4">
                             <div className="flex flex-col">
                                 <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Leads Perdidos por Etapa</h3>
-                                <p className="text-[10px] text-gray-400 font-medium mt-0.5">Dónde se están perdiendo las oportunidades</p>
+                                <p className="text-[10px] text-gray-400 font-medium mt-0.5">DÃ³nde se estÃ¡n perdiendo las oportunidades</p>
                             </div>
                             <div className="relative" ref={activeCardFilter === 'lostByStage' ? cardFilterRef : null}>
                                 <button
@@ -1271,8 +1271,8 @@ export default function Dashboard() {
                                 ) : (
                                     <div className="h-full flex flex-col items-center justify-center py-12 opacity-30">
                                         <CheckCircle className="w-10 h-10 mb-2 text-green-400" />
-                                        <p className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">Sin pérdidas registradas</p>
-                                        <p className="text-[9px] font-medium text-slate-300 mt-1">¡Excelente trabajo!</p>
+                                        <p className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">Sin pÃ©rdidas registradas</p>
+                                        <p className="text-[9px] font-medium text-slate-300 mt-1">Â¡Excelente trabajo!</p>
                                     </div>
                                 );
                             })()}
@@ -1283,8 +1283,8 @@ export default function Dashboard() {
                     <div className={`bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'lostByReason' ? 'z-[50]' : 'z-0'}`}>
                         <div className="flex justify-between items-start mb-4">
                             <div className="flex flex-col">
-                                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Motivos de Pérdida</h3>
-                                <p className="text-[10px] text-gray-400 font-medium mt-0.5">Por qué se están perdiendo</p>
+                                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Motivos de PÃ©rdida</h3>
+                                <p className="text-[10px] text-gray-400 font-medium mt-0.5">Por quÃ© se estÃ¡n perdiendo</p>
                             </div>
                             <div className="relative" ref={activeCardFilter === 'lostByReason' ? cardFilterRef : null}>
                                 <button
@@ -1358,8 +1358,8 @@ export default function Dashboard() {
                                 ) : (
                                     <div className="h-full flex flex-col items-center justify-center py-12 opacity-30">
                                         <CheckCircle className="w-10 h-10 mb-2 text-green-400" />
-                                        <p className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">Sin pérdidas registradas</p>
-                                        <p className="text-[9px] font-medium text-slate-300 mt-1">¡Sigue así!</p>
+                                        <p className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">Sin pÃ©rdidas registradas</p>
+                                        <p className="text-[9px] font-medium text-slate-300 mt-1">Â¡Sigue asÃ­!</p>
                                     </div>
                                 );
                             })()}
@@ -1377,7 +1377,7 @@ export default function Dashboard() {
                                         <Building2 className="w-4 h-4 text-indigo-600" />
                                     </div>
                                     <div>
-                                        <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Distribución por Rubro</h3>
+                                        <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">DistribuciÃ³n por Rubro</h3>
                                         <p className="text-[10px] text-gray-400 font-medium mt-0.5">Sectores de los prospectos</p>
                                     </div>
                                 </div>
@@ -1416,28 +1416,28 @@ export default function Dashboard() {
                 )}
             </div>
 
-            {/* F4 + F5 — SIA Intelligence Panel (at the bottom, date-filter aware) */}
+            {/* F4 + F5 â€” SIA Intelligence Panel (at the bottom, date-filter aware) */}
             {profile?.company_id && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
-                    {/* F4 — Manager Live Pulse: admin + simulation mode */}
+                    {/* F4 â€” Manager Live Pulse: admin + simulation mode */}
                     {isActuallySimulatingAdmin && (
                         <div className="lg:col-span-8">
                             <ManagerLivePulse
                                 companyId={profile.company_id}
                                 startDate={dateRange.startDate}
                                 endDate={dateRange.endDate}
-                                periodLabel={SIA_PERIOD_LABELS[selectedDateRange] || 'este período'}
+                                periodLabel={SIA_PERIOD_LABELS[selectedDateRange] || 'este perÃ­odo'}
                             />
                         </div>
                     )}
-                    {/* F5 — Agent Ranking: all roles */}
+                    {/* F5 â€” Agent Ranking: all roles */}
                     <div className={isActuallySimulatingAdmin ? 'lg:col-span-4' : 'lg:col-span-12'}>
                         <WeeklyLeaderboard
                             companyId={profile.company_id}
                             currentUserId={profile?.id}
                             startDate={dateRange.startDate}
                             endDate={dateRange.endDate}
-                            periodLabel={SIA_PERIOD_LABELS[selectedDateRange] || 'este período'}
+                            periodLabel={SIA_PERIOD_LABELS[selectedDateRange] || 'este perÃ­odo'}
                         />
                     </div>
                 </div>
@@ -1446,3 +1446,4 @@ export default function Dashboard() {
 
     );
 }
+
