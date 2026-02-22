@@ -553,43 +553,51 @@ export default function CotizadorPro() {
                     <p className="text-sm text-gray-500 mt-1">Sistema dinámico de cotización basado en paquetes</p>
                 </div>
 
-                {/* Indicador de Pasos Rediseñado y Uniforme */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                    <div className="flex items-center justify-between w-full max-w-4xl mx-auto">
-                        {[1, 2, 3, 4].map((paso) => (
-                            <div key={paso} className={`flex items-center ${paso < 4 ? 'flex-1' : ''}`}>
-                                {/* Círculo del Número */}
-                                <div className="flex flex-col items-center gap-2">
-                                    <div className="flex items-center gap-3">
-                                        <div
-                                            className={`w-10 h-10 rounded-full flex items-center justify-center font-black shadow-sm transition-all duration-300 ${paso <= pasoActual
-                                                ? 'bg-blue-600 text-white ring-4 ring-blue-50'
-                                                : 'bg-gray-100 text-gray-400 border border-gray-200'
-                                                }`}
-                                            style={{ fontSize: '15px' }}
-                                        >
-                                            {paso}
-                                        </div>
-                                        <span className={`text-sm font-bold whitespace-nowrap ${paso <= pasoActual ? 'text-blue-600' : 'text-gray-400'}`}>
-                                            {paso === 1 && 'Cliente'}
-                                            {paso === 2 && 'Paquete'}
-                                            {paso === 3 && 'Módulos/Servicios'}
-                                            {paso === 4 && 'Resumen'}
-                                        </span>
-                                    </div>
-                                </div>
+                {/* ── Indicador de Pasos: Progressive Compact ── */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-4 py-5">
+                    <div className="flex items-center w-full">
+                        {[1, 2, 3, 4].map((paso) => {
+                            const LABELS: Record<number, string> = { 1: 'Cliente', 2: 'Paquete', 3: 'Módulos', 4: 'Resumen' };
+                            const isCompleted = paso < pasoActual;
+                            const isActive = paso === pasoActual;
 
-                                {/* Línea de Conexión */}
-                                {paso < 4 && (
-                                    <div className="flex-1 mx-4 h-0.5 bg-gray-100 relative overflow-hidden rounded-full">
-                                        <div
-                                            className="absolute inset-y-0 left-0 bg-blue-600 transition-all duration-500 ease-out"
-                                            style={{ width: paso < pasoActual ? '100%' : '0%' }}
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                            return (
+                                <div key={paso} className={`flex items-center ${paso < 4 ? 'flex-1' : ''}`}>
+                                    {/* ── Step node ── */}
+                                    {isCompleted ? (
+                                        // Completed → micro checkmark
+                                        <div className="w-6 h-6 rounded-full bg-[#4449AA] flex-shrink-0 flex items-center justify-center shadow-sm ring-2 ring-[#4449AA]/10 transition-all duration-500">
+                                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        </div>
+                                    ) : isActive ? (
+                                        // Active → branded pill with label
+                                        <div className="flex-shrink-0 flex items-center gap-1.5 bg-[#4449AA] text-white px-3 py-1.5 rounded-full shadow-md shadow-[#4449AA]/25 transition-all duration-500">
+                                            <span className="text-[11px] font-black w-4 h-4 bg-white/20 rounded-full flex items-center justify-center leading-none">{paso}</span>
+                                            <span className="text-[11px] font-black tracking-wide">{LABELS[paso]}</span>
+                                        </div>
+                                    ) : (
+                                        // Future → small circle + mini label
+                                        <div className="flex-shrink-0 flex flex-col items-center gap-0.5">
+                                            <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center transition-all duration-300">
+                                                <span className="text-xs font-bold text-gray-400">{paso}</span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* ── Connecting line ── */}
+                                    {paso < 4 && (
+                                        <div className="flex-1 mx-2 h-[2px] bg-gray-100 relative overflow-hidden rounded-full">
+                                            <div
+                                                className="absolute inset-y-0 left-0 bg-[#4449AA] rounded-full transition-all duration-700 ease-out"
+                                                style={{ width: isCompleted ? '100%' : '0%' }}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
 
@@ -980,9 +988,9 @@ export default function CotizadorPro() {
                     {/* PASO 4: Resumen */}
                     {pasoActual === 4 && (
                         <div className="space-y-6">
-                            <div className="flex justify-between items-center">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                                 <h2 className="text-lg font-bold text-[#4449AA]">💰 Resumen de Cotización</h2>
-                                <div className="text-right">
+                                <div className="sm:text-right">
                                     <p className="text-xs text-gray-500 font-bold uppercase">Volumen Contratado</p>
                                     <p className="text-sm font-black text-blue-600">
                                         {formData.volumen_dtes.toLocaleString()} DTEs/año
@@ -995,17 +1003,17 @@ export default function CotizadorPro() {
                             <div className="space-y-3">
                                 {totales?.desglose.map((item, idx) => (
                                     <div key={idx} className="group relative bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
-                                        <div className="flex justify-between items-start gap-4">
-                                            <div className="flex gap-4">
+                                        <div className="flex justify-between items-start gap-2">
+                                            <div className="flex gap-3 flex-1 min-w-0">
                                                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${item.tipo === 'Paquete' ? 'bg-blue-50 text-blue-600' :
                                                     item.tipo === 'Implementación' ? 'bg-orange-50 text-orange-600' :
                                                         'bg-purple-50 text-purple-600'
                                                     }`}>
                                                     <FileText className="w-5 h-5" />
                                                 </div>
-                                                <div>
+                                                <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2">
-                                                        <p className="font-bold text-gray-900">{item.nombre}</p>
+                                                        <p className="font-bold text-gray-900 text-sm sm:text-base truncate">{item.nombre}</p>
                                                         {item.es_pago_unico && (
                                                             <span className="bg-gray-100 text-gray-600 text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter">Pago Único</span>
                                                         )}
@@ -1014,7 +1022,7 @@ export default function CotizadorPro() {
                                                 </div>
                                             </div>
 
-                                            <div className="text-right flex flex-col items-end gap-1">
+                                            <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">
                                                 {(hasPermission('cotizaciones.edit_prices') || profile?.role === 'super_admin' || profile?.role === 'company_admin') ? (() => {
                                                     const itemOriginal = (item.tipo !== 'Implementación' && item.tipo !== 'Paquete')
                                                         ? [...modulos, ...servicios].find(i => i.nombre === item.nombre)
@@ -1028,12 +1036,12 @@ export default function CotizadorPro() {
                                                                     ? overrides[itemOriginal.id]
                                                                     : item.precio_anual);
                                                     return (
-                                                        <div className="flex items-center gap-2">
+                                                        <div className="flex items-center gap-1">
                                                             <span className="text-xs text-gray-400 font-bold">$</span>
                                                             <input
                                                                 type="number"
                                                                 step="0.01"
-                                                                className={`w-28 text-right font-bold text-lg border rounded px-2 py-1 focus:ring-2 outline-none ${item.tipo === 'Implementación'
+                                                                className={`w-20 sm:w-28 text-right font-bold text-base border rounded px-2 py-1 focus:ring-2 outline-none ${item.tipo === 'Implementación'
                                                                     ? 'text-orange-600 border-orange-100 bg-orange-50/30 focus:ring-orange-400'
                                                                     : item.tipo === 'Paquete'
                                                                         ? 'text-blue-700 border-blue-200 bg-blue-50/30 focus:ring-blue-400'

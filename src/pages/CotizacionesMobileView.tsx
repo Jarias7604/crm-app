@@ -96,12 +96,6 @@ export function CotizacionesMobileView({ cotizaciones, stats, loading, onDelete 
                         <h1 className="text-xl font-black text-[#4449AA] tracking-tight">💰 Cotizaciones</h1>
                         <p className="text-[10px] text-gray-400 font-medium mt-0.5">{stats.total} cotizaciones en total</p>
                     </div>
-                    <button
-                        onClick={() => navigate('/cotizaciones/nueva-pro')}
-                        className="w-10 h-10 rounded-2xl bg-[#4449AA] flex items-center justify-center active:scale-90 transition-transform shadow-lg shadow-[#4449AA]/30"
-                    >
-                        <Plus className="w-5 h-5 text-white" />
-                    </button>
                 </div>
 
                 {/* Search */}
