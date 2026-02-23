@@ -43,82 +43,26 @@ export default function PublicQuoteView() {
 
     async function fetchCotizacion() {
         try {
-            // 1. Fetch main quote data WITHOUT joins to avoid coercion errors
-            const { data: quotes, error: quoteError } = await supabase
-                .from('cotizaciones')
-                .select('*')
-                .eq('id', id)
-                .limit(1);
+            // ── SECURITY DEFINER RPC: bypasses RLS for anon users ──────────────
+            // One call returns quote + company + creator + financing_plan + pricing desc.
+            // Replaces 4 separate queries that were blocked for unauthenticated mobile clients.
+            const { data, error } = await supabase
+                .rpc('get_public_proposal', { quote_id: id });
 
-            const quote = quotes?.[0];
+            if (error) throw error;
+            if (!data || data.error) return; // quote not found — handled below
 
-            if (quoteError) throw quoteError;
-            if (!quote) return; // Will be handled by the check below
-
-            // 2. Fetch related data manually (simulates the join but safer)
-            const [companyRes, creatorRes] = await Promise.all([
-                quote.company_id
-                    ? supabase.from('companies').select('*').eq('id', quote.company_id).single()
-                    : Promise.resolve({ data: null }),
-                quote.created_by
-                    ? supabase.from('profiles').select('*').eq('id', quote.created_by).single()
-                    : Promise.resolve({ data: null })
-            ]);
+            const { quote, company, creator, financing_plan, pricing_item_descripcion } = data;
 
             setCotizacion({
                 ...quote,
-                company: companyRes.data,
-                creator: creatorRes.data,
+                company,
+                creator,
                 modulos_adicionales: parseModules(quote.modulos_adicionales)
             } as CotizacionData);
 
-            // Cargar el plan de financiamiento correspondiente
-            if (quote?.cuotas && quote?.company_id) {
-                const { data: planData } = await supabase
-                    .from('financing_plans')
-                    .select('*')
-                    .or(`company_id.eq.${quote.company_id},company_id.is.null`)
-                    .eq('cuotas', quote.cuotas)
-                    .eq('activo', true)
-                    .order('company_id', { ascending: false, nullsFirst: false })
-                    .limit(1)
-                    .maybeSingle();
-
-                if (planData) {
-                    setFinancingPlan(planData as FinancingPlan);
-                }
-            }
-
-            // Cargar la descripción del plan desde cotizador_paquetes
-            if (quote?.plan_nombre) {
-                // Intento 1: Coincidencia exacta (Nombre + DTEs)
-                let { data: planItem } = await supabase
-                    .from('cotizador_paquetes')
-                    .select('descripcion')
-                    .eq('paquete', quote.plan_nombre)
-                    .eq('cantidad_dtes', quote.volumen_dtes)
-                    .not('descripcion', 'is', null)
-                    .neq('descripcion', '')
-                    .maybeSingle();
-
-                // Intento 2: Fallback - Solo por nombre (buscar cualquier variante que tenga descripción)
-                if (!planItem?.descripcion) {
-                    const { data: fallbackItem } = await supabase
-                        .from('cotizador_paquetes')
-                        .select('descripcion')
-                        .eq('paquete', quote.plan_nombre)
-                        .not('descripcion', 'is', null)
-                        .neq('descripcion', '')
-                        .limit(1)
-                        .maybeSingle();
-
-                    if (fallbackItem) planItem = fallbackItem;
-                }
-
-                if (planItem?.descripcion) {
-                    setPricingItemDescripcion(planItem.descripcion);
-                }
-            }
+            if (financing_plan) setFinancingPlan(financing_plan as FinancingPlan);
+            if (pricing_item_descripcion) setPricingItemDescripcion(pricing_item_descripcion);
         } catch (error: any) {
             console.error('Error fetching quote:', error);
             setError(error.message || 'Error desconocido');
