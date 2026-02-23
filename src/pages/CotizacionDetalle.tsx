@@ -341,18 +341,26 @@ export default function CotizacionDetalle() {
                                 )}
                             </Button>
                         ) : (
-                            <div className="h-12 px-6 flex items-center gap-2 bg-green-50 text-green-600 font-black text-[11px] uppercase tracking-widest rounded-xl border border-green-200">
-                                <CheckCircle2 className="w-4 h-4" />
-                                Aceptada
-                            </div>
+                            <>
+                                {/* Mobile: compact circle icon only */}
+                                <div className="md:hidden w-10 h-10 rounded-full bg-green-50 text-green-600 flex items-center justify-center border border-green-200 flex-shrink-0">
+                                    <CheckCircle2 className="w-5 h-5" />
+                                </div>
+                                {/* Desktop: full badge with text */}
+                                <div className="hidden md:flex h-12 px-6 items-center gap-2 bg-green-50 text-green-600 font-black text-[11px] uppercase tracking-widest rounded-xl border border-green-200">
+                                    <CheckCircle2 className="w-4 h-4" />
+                                    Aceptada
+                                </div>
+                            </>
                         )}
 
                         <div className="h-8 w-px bg-gray-100 hidden md:block mx-1"></div>
 
+                        {/* Delete: hidden on mobile to prevent overflow */}
                         <Button
                             variant="ghost"
                             onClick={handleDelete}
-                            className="h-12 w-12 p-0 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                            className="hidden md:flex h-12 w-12 p-0 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors"
                         >
                             <Trash2 className="w-5 h-5" />
                         </Button>
