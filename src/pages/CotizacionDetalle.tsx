@@ -877,7 +877,7 @@ export default function CotizacionDetalle() {
             {/* ── SHARE MODAL — iOS Bottom Sheet ── */}
             {showShareModal && (
                 <div
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end justify-center"
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-end justify-center"
                     onClick={() => setShowShareModal(false)}
                 >
                     <div
@@ -982,7 +982,7 @@ export default function CotizacionDetalle() {
 
             {/* ── ACCEPT MODAL ── */}
             {showAcceptModal && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4" onClick={() => setShowAcceptModal(false)}>
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-end sm:items-center justify-center p-4" onClick={() => setShowAcceptModal(false)}>
                     <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
                         <div className="flex justify-between items-center mb-5">
                             <h3 className="text-lg font-black text-slate-900">Confirmar Aceptación</h3>
