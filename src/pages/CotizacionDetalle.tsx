@@ -886,12 +886,12 @@ export default function CotizacionDetalle() {
                         onClick={e => e.stopPropagation()}
                     >
                         {/* Drag handle */}
-                        <div className="flex justify-center pt-3 pb-2">
+                        <div className="flex justify-center pt-2 pb-1">
                             <div className="w-10 h-1 bg-slate-200 rounded-full" />
                         </div>
 
                         {/* Header */}
-                        <div className="flex justify-between items-center px-5 py-3 border-b border-slate-100">
+                        <div className="flex justify-between items-center px-5 py-2 border-b border-slate-100">
                             <div>
                                 <h3 className="text-base font-black text-slate-900">Compartir Propuesta</h3>
                                 <p className="text-[10px] text-slate-400 font-medium mt-0.5">
@@ -902,8 +902,8 @@ export default function CotizacionDetalle() {
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className={`px-2 py-1 rounded-full text-[9px] font-black uppercase ${cotizacion.estado === 'aceptada' ? 'bg-green-100 text-green-700' :
-                                        cotizacion.estado === 'enviada' ? 'bg-blue-100 text-blue-700' :
-                                            'bg-amber-100 text-amber-700'
+                                    cotizacion.estado === 'enviada' ? 'bg-blue-100 text-blue-700' :
+                                        'bg-amber-100 text-amber-700'
                                     }`}>{cotizacion.estado}</span>
                                 <button
                                     onClick={() => setShowShareModal(false)}
@@ -915,7 +915,7 @@ export default function CotizacionDetalle() {
                         </div>
 
                         {/* URL copy */}
-                        <div className="flex gap-2 px-5 py-3 border-b border-slate-100">
+                        <div className="flex gap-2 px-4 py-2 border-b border-slate-100">
                             <div className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
                                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Link del cliente</p>
                                 <p className="text-xs text-slate-600 truncate font-mono">{shareUrl}</p>
@@ -933,12 +933,12 @@ export default function CotizacionDetalle() {
                         </div>
 
                         {/* Channel list — vertical iOS rows */}
-                        <div className="px-4 py-3 space-y-2">
+                        <div className="px-4 py-2 space-y-1.5">
                             <button
                                 onClick={handleShareWhatsApp}
-                                className="w-full flex items-center gap-4 p-4 bg-green-50 active:bg-green-100 border border-green-100 rounded-2xl transition-all active:scale-[0.98]"
+                                className="w-full flex items-center gap-3 p-3 bg-green-50 active:bg-green-100 border border-green-100 rounded-2xl transition-all active:scale-[0.98]"
                             >
-                                <div className="w-12 h-12 bg-[#25D366] rounded-2xl flex items-center justify-center shadow-md shadow-green-400/20 flex-shrink-0">
+                                <div className="w-11 h-11 bg-[#25D366] rounded-2xl flex items-center justify-center shadow-md shadow-green-400/20 flex-shrink-0">
                                     <MessageSquare className="w-6 h-6 text-white" />
                                 </div>
                                 <div className="flex-1 text-left">
@@ -950,9 +950,9 @@ export default function CotizacionDetalle() {
 
                             <button
                                 onClick={handleShareTelegram}
-                                className="w-full flex items-center gap-4 p-4 bg-sky-50 active:bg-sky-100 border border-sky-100 rounded-2xl transition-all active:scale-[0.98]"
+                                className="w-full flex items-center gap-3 p-3 bg-sky-50 active:bg-sky-100 border border-sky-100 rounded-2xl transition-all active:scale-[0.98]"
                             >
-                                <div className="w-12 h-12 bg-[#0088cc] rounded-2xl flex items-center justify-center shadow-md shadow-sky-400/20 flex-shrink-0">
+                                <div className="w-11 h-11 bg-[#0088cc] rounded-2xl flex items-center justify-center shadow-md shadow-sky-400/20 flex-shrink-0">
                                     <Send className="w-6 h-6 text-white" />
                                 </div>
                                 <div className="flex-1 text-left">
@@ -964,9 +964,9 @@ export default function CotizacionDetalle() {
 
                             <button
                                 onClick={handleShareEmail}
-                                className="w-full flex items-center gap-4 p-4 bg-slate-50 active:bg-slate-100 border border-slate-100 rounded-2xl transition-all active:scale-[0.98]"
+                                className="w-full flex items-center gap-3 p-3 bg-slate-50 active:bg-slate-100 border border-slate-100 rounded-2xl transition-all active:scale-[0.98]"
                             >
-                                <div className="w-12 h-12 bg-slate-800 rounded-2xl flex items-center justify-center shadow-md shadow-slate-400/20 flex-shrink-0">
+                                <div className="w-11 h-11 bg-slate-800 rounded-2xl flex items-center justify-center shadow-md shadow-slate-400/20 flex-shrink-0">
                                     <Mail className="w-6 h-6 text-white" />
                                 </div>
                                 <div className="flex-1 text-left">
