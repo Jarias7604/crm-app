@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
     format,
     addMonths,
@@ -50,6 +51,7 @@ export function CustomDatePicker({
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [company, setCompany] = useState<Company | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const calendarPortalRef = useRef<HTMLDivElement>(null);
 
     // Initial date parsing
     const selectedDate = value ? parseISO(value) : null;
@@ -69,7 +71,9 @@ export function CustomDatePicker({
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+            const inContainer = containerRef.current?.contains(event.target as Node);
+            const inPortal = calendarPortalRef.current?.contains(event.target as Node);
+            if (!inContainer && !inPortal) {
                 setIsOpen(false);
             }
         };
@@ -82,25 +86,39 @@ export function CustomDatePicker({
             const rect = containerRef.current.getBoundingClientRect();
             const calWidth = Math.min(310, window.innerWidth - 16);
             const calLeft = Math.max(8, Math.min(rect.left, window.innerWidth - calWidth - 8));
+            const CAL_HEIGHT = 460; // approx calendar height in px (p-5 padding + header + 6 rows + footer)
+            const MARGIN = 8;
 
             if (forceOpenDown) {
                 // Explicit downward — uses absolute positioning (legacy mode)
                 setOpenUp(false);
                 setFixedPos(null);
             } else {
-                // Always use fixed positioning to escape overflow:hidden containers
                 const spaceBelow = window.innerHeight - rect.bottom;
-                const shouldOpenUp = forceOpenUp || spaceBelow < 350;
+                const spaceAbove = rect.top;
+                const shouldOpenUp = forceOpenUp || (spaceBelow < CAL_HEIGHT + MARGIN && spaceAbove > spaceBelow);
                 setOpenUp(shouldOpenUp);
+
                 if (shouldOpenUp) {
+                    // Open above: bottom edge of calendar aligns above the trigger
+                    // Clamp so calendar doesn't go above the viewport
+                    const idealBottom = window.innerHeight - rect.top + MARGIN;
+                    const calTop = window.innerHeight - idealBottom - CAL_HEIGHT;
+                    const clampedBottom = calTop < MARGIN
+                        ? window.innerHeight - MARGIN - CAL_HEIGHT  // clamp to top edge
+                        : idealBottom;
                     setFixedPos({
-                        bottom: window.innerHeight - rect.top + 8,
+                        bottom: Math.max(MARGIN, clampedBottom),
                         left: calLeft,
                         maxWidth: calWidth,
                     });
                 } else {
+                    // Open below: top edge of calendar aligns below the trigger
+                    // Clamp so calendar doesn't go below the viewport
+                    const idealTop = rect.bottom + MARGIN;
+                    const clampedTop = Math.min(idealTop, window.innerHeight - CAL_HEIGHT - MARGIN);
                     setFixedPos({
-                        top: rect.bottom + 8,
+                        top: Math.max(MARGIN, clampedTop),
                         left: calLeft,
                         maxWidth: calWidth,
                     });
@@ -151,6 +169,7 @@ export function CustomDatePicker({
 
         return (
             <div
+                ref={calendarPortalRef}
                 style={calendarStyle}
                 className={`${fixedPos ? '' : alignRight ? 'absolute right-0' : 'absolute right-0 md:right-auto md:left-0'} z-[10001] bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-slate-100 p-5 w-[310px] animate-in fade-in zoom-in duration-200 transform ${!fixedPos && openUp ? 'bottom-full mb-2 origin-bottom-left' : !fixedPos ? 'top-full mt-2 origin-top-left' : 'origin-bottom-left'}`}>
                 <div className="flex items-center justify-between mb-4">
@@ -270,7 +289,8 @@ export function CustomDatePicker({
                     </button>
                 )}
             </div>
-            {isOpen && renderCalendar()}
+            {isOpen && !fixedPos && renderCalendar()}
+            {isOpen && fixedPos && createPortal(renderCalendar(), document.body)}
         </div>
     );
 }

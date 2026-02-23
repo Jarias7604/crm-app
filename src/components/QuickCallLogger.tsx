@@ -7,7 +7,7 @@ import type { Lead, LeadStatus, FollowUpActionType } from '../types';
 import { CustomDatePicker } from './ui/CustomDatePicker';
 import toast from 'react-hot-toast';
 import { useTimezone } from '../hooks/useTimezone';
-import { localToUtcISO } from '../utils/timezone';
+import { localToUtcISO, DEFAULT_TIMEZONE } from '../utils/timezone';
 
 interface QuickActionLoggerProps {
     lead: Lead;
@@ -146,8 +146,9 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
         return Math.min(score, 100);
     };
 
-    // Company timezone for correct UTC storage
-    const { timezone: companyTimezone } = useTimezone(companyId);
+    // Company timezone for correct UTC storage (fallback to El Salvador if not yet loaded)
+    const { timezone: rawTimezone } = useTimezone(companyId);
+    const companyTimezone = rawTimezone || DEFAULT_TIMEZONE;
 
     // Independent follow-up toggle (decoupled from outcome)
     const [wantsFollowUp, setWantsFollowUp] = useState(false);
@@ -259,7 +260,7 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
     const validOutcomes = OUTCOME_BY_ACTION[actionType];
 
     return (
-        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border border-emerald-200 p-5 animate-in fade-in slide-in-from-top-2 duration-300">
+        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl border border-emerald-200 p-5 animate-in fade-in duration-300">
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">

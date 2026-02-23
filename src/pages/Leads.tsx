@@ -2385,7 +2385,7 @@ export default function Leads() {
 
             {/* Lead Detail Slide-Over */}
             {isDetailOpen && selectedLead && (
-                <div className="fixed inset-0 z-[9999] overflow-hidden">
+                <div className="fixed inset-0 z-[9999]">
                     <div className="absolute inset-0 bg-black/40 lead-sheet-backdrop" onClick={() => setIsDetailOpen(false)} />
                     <div className="absolute inset-x-0 bottom-0 max-h-[93vh] rounded-t-[28px] sm:inset-y-0 sm:bottom-auto sm:left-auto sm:right-0 sm:max-h-full sm:w-[480px] sm:max-w-lg sm:rounded-none bg-white shadow-2xl flex flex-col overflow-hidden lead-sheet">
                         {/* Mobile drag handle pill */}

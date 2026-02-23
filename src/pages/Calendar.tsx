@@ -22,7 +22,7 @@ import { leadsService } from '../services/leads';
 import { Button } from '../components/ui/Button';
 import { useAuth } from '../auth/AuthProvider';
 import { useTimezone } from '../hooks/useTimezone';
-import { formatTimeInZone, utcToLocalDate } from '../utils/timezone';
+import { formatTimeInZone, utcToLocalDate, DEFAULT_TIMEZONE } from '../utils/timezone';
 
 type CalendarEvent = Awaited<ReturnType<typeof leadsService.getCalendarFollowUps>>[number];
 
@@ -39,15 +39,17 @@ const getActionMeta = (type: string) => ACTION_LABELS[type] ?? { label: type, co
 export default function Calendar() {
     const navigate = useNavigate();
     const { profile } = useAuth();
-    const { timezone: companyTimezone } = useTimezone(profile?.company_id);
+    const { timezone: rawTimezone } = useTimezone(profile?.company_id);
+    const companyTimezone = rawTimezone || DEFAULT_TIMEZONE;
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
     const [loading, setLoading] = useState(true);
 
+    // Load data on mount AND whenever timezone becomes available
     useEffect(() => {
         loadData();
-    }, []);
+    }, [rawTimezone]);
 
     const loadData = async () => {
         try {
