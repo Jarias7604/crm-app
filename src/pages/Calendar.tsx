@@ -25,16 +25,16 @@ const ACTION_CONFIG: Record<string, {
     badgeText: string;  // classes for badge count text
     dotColor: string;   // dot color for mobile
     Icon: React.ElementType;
-} = {
-    call: { label: 'Llamada', pill: 'bg-emerald-50 text-emerald-800 border-l-[3px] border-emerald-400 hover:bg-emerald-100', badge: 'bg-emerald-50 border border-emerald-200', badgeText: 'text-emerald-700', dotColor: 'bg-emerald-500', Icon: Phone },
-    email: { label: 'Email', pill: 'bg-blue-50 text-blue-800 border-l-[3px] border-blue-400 hover:bg-blue-100', badge: 'bg-blue-50 border border-blue-200', badgeText: 'text-blue-700', dotColor: 'bg-blue-500', Icon: Mail },
-    whatsapp: { label: 'WhatsApp', pill: 'bg-teal-50 text-teal-800 border-l-[3px] border-teal-400 hover:bg-teal-100', badge: 'bg-teal-50 border border-teal-200', badgeText: 'text-teal-700', dotColor: 'bg-teal-500', Icon: MessageSquare },
-    telegram: { label: 'Telegram', pill: 'bg-sky-50 text-sky-800 border-l-[3px] border-sky-400 hover:bg-sky-100', badge: 'bg-sky-50 border border-sky-200', badgeText: 'text-sky-700', dotColor: 'bg-sky-500', Icon: MessageSquare },
-    meeting: { label: 'Reunión', pill: 'bg-violet-50 text-violet-800 border-l-[3px] border-violet-400 hover:bg-violet-100', badge: 'bg-violet-50 border border-violet-200', badgeText: 'text-violet-700', dotColor: 'bg-violet-500', Icon: Video },
-    quote: { label: 'Cotización', pill: 'bg-amber-50 text-amber-800 border-l-[3px] border-amber-400 hover:bg-amber-100', badge: 'bg-amber-50 border border-amber-200', badgeText: 'text-amber-700', dotColor: 'bg-amber-500', Icon: FileText },
+}> = {
+    call: { label: 'Llamada', pill: 'bg-emerald-50 text-emerald-800 border-l-2 border-emerald-400 hover:bg-emerald-100', badge: 'bg-emerald-50 border border-emerald-200', badgeText: 'text-emerald-700', dotColor: 'bg-emerald-500', Icon: Phone },
+    email: { label: 'Email', pill: 'bg-blue-50 text-blue-800 border-l-2 border-blue-400 hover:bg-blue-100', badge: 'bg-blue-50 border border-blue-200', badgeText: 'text-blue-700', dotColor: 'bg-blue-500', Icon: Mail },
+    whatsapp: { label: 'WhatsApp', pill: 'bg-teal-50 text-teal-800 border-l-2 border-teal-400 hover:bg-teal-100', badge: 'bg-teal-50 border border-teal-200', badgeText: 'text-teal-700', dotColor: 'bg-teal-500', Icon: MessageSquare },
+    telegram: { label: 'Telegram', pill: 'bg-sky-50 text-sky-800 border-l-2 border-sky-400 hover:bg-sky-100', badge: 'bg-sky-50 border border-sky-200', badgeText: 'text-sky-700', dotColor: 'bg-sky-500', Icon: MessageSquare },
+    meeting: { label: 'Reunión', pill: 'bg-violet-50 text-violet-800 border-l-2 border-violet-400 hover:bg-violet-100', badge: 'bg-violet-50 border border-violet-200', badgeText: 'text-violet-700', dotColor: 'bg-violet-500', Icon: Video },
+    quote: { label: 'Cotización', pill: 'bg-amber-50 text-amber-800 border-l-2 border-amber-400 hover:bg-amber-100', badge: 'bg-amber-50 border border-amber-200', badgeText: 'text-amber-700', dotColor: 'bg-amber-500', Icon: FileText },
 };
 const getActionCfg = (type: string) => ACTION_CONFIG[type] ?? {
-    label: type, pill: 'bg-gray-50 text-gray-700 border-l-[3px] border-gray-300 hover:bg-gray-100',
+    label: type, pill: 'bg-gray-50 text-gray-700 border-l-2 border-gray-300 hover:bg-gray-100',
     badge: 'bg-gray-50 border border-gray-200', badgeText: 'text-gray-700',
     dotColor: 'bg-gray-400', Icon: CalendarDays,
 };
