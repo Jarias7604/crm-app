@@ -539,7 +539,7 @@ export default function Calendar() {
                                         className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm active:scale-[0.98] transition-transform cursor-pointer"
                                     >
                                         {/* Top row */}
-                                        <div className="flex items-start justify-between mb-2">
+                                        <div className="flex items-center justify-between mb-2">
                                             <span className={`
                                                 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide
                                                 ${cfg.badge} ${cfg.badgeText}
@@ -547,10 +547,29 @@ export default function Calendar() {
                                                 <Icon className="w-2.5 h-2.5" />
                                                 {cfg.label}
                                             </span>
-                                            <span className="flex items-center gap-1 text-xs font-bold text-gray-400">
-                                                <Clock className="w-3 h-3" />
-                                                {timeStr}
-                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="flex items-center gap-1 text-xs font-bold text-gray-400">
+                                                    <Clock className="w-3 h-3" />
+                                                    {timeStr}
+                                                </span>
+                                                {ev.assigned_profile ? (
+                                                    ev.assigned_profile.avatar_url ? (
+                                                        <img
+                                                            src={ev.assigned_profile.avatar_url}
+                                                            alt={ev.assigned_profile.full_name ?? ''}
+                                                            title={ev.assigned_profile.full_name ?? ''}
+                                                            className="w-8 h-8 rounded-full object-cover ring-2 ring-white shadow-sm shrink-0"
+                                                        />
+                                                    ) : (
+                                                        <div
+                                                            title={ev.assigned_profile.full_name ?? ''}
+                                                            className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-black ring-2 ring-white shadow-sm shrink-0"
+                                                        >
+                                                            {(ev.assigned_profile.full_name ?? '?').charAt(0).toUpperCase()}
+                                                        </div>
+                                                    )
+                                                ) : null}
+                                            </div>
                                         </div>
 
                                         {/* Lead info */}
