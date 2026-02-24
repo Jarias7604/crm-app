@@ -209,46 +209,57 @@ export default function Calendar() {
                 <MiniCalendar currentDate={currentDate} onSelect={handleMiniSelect} />
             </div>
 
-            {/* Mis Seguimientos */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">
-                    Mis Seguimientos
-                </p>
-                {Object.keys(ACTION_CONFIG).map(type => {
-                    const cfg = getActionCfg(type);
-                    const events = actionSummary[type] || [];
-                    if (events.length === 0) return null;
-                    const Icon = cfg.Icon;
-                    const leadIds = events.map(e => e.lead?.id).filter(Boolean);
-                    return (
-                        <button
-                            key={type}
-                            onClick={() => navigate('/leads', { state: { leadIds, fromCalendar: true } })}
-                            className={`
-                                w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl mb-1.5
-                                ${cfg.badge} hover:shadow-md transition-all group
-                            `}
-                        >
-                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${cfg.dotColor} text-white shadow-sm`}>
-                                <Icon className="w-3.5 h-3.5" />
+            {/* Resumen del Día Seleccionado */}
+            {(() => {
+                const dayEvts = getDailyEvents(selectedDate);
+                // Group by action type
+                const grouped: Record<string, CalendarEvent[]> = {};
+                dayEvts.forEach(ev => {
+                    const t = ev.action_type || 'call';
+                    if (!grouped[t]) grouped[t] = [];
+                    grouped[t].push(ev);
+                });
+                return (
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
+                            Resumen del Día
+                        </p>
+                        <p className="text-xs font-bold text-indigo-600 capitalize mb-3">
+                            {format(selectedDate, "EEEE d 'de' MMMM", { locale: es })}
+                        </p>
+                        {dayEvts.length === 0 ? (
+                            <p className="text-xs text-gray-400 text-center py-4">Sin seguimientos para este día</p>
+                        ) : (
+                            <div className="space-y-1.5">
+                                {Object.keys(ACTION_CONFIG).map(type => {
+                                    const cfg = getActionCfg(type);
+                                    const evs = grouped[type] || [];
+                                    if (evs.length === 0) return null;
+                                    const Icon = cfg.Icon;
+                                    const leadIds = evs.map(e => e.lead?.id).filter(Boolean);
+                                    return (
+                                        <button
+                                            key={type}
+                                            onClick={() => navigate('/leads', { state: { leadIds, fromCalendar: true } })}
+                                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl ${cfg.badge} hover:shadow-md transition-all group`}
+                                        >
+                                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${cfg.dotColor} text-white shadow-sm`}>
+                                                <Icon className="w-3.5 h-3.5" />
+                                            </div>
+                                            <span className={`flex-1 text-xs font-bold ${cfg.badgeText} text-left`}>{cfg.label}</span>
+                                            <span className={`min-w-[22px] h-[22px] rounded-full flex items-center justify-center text-[11px] font-black ${cfg.dotColor} text-white shadow-sm group-hover:scale-110 transition-transform`}>
+                                                {evs.length}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
                             </div>
-                            <span className={`flex-1 text-xs font-bold ${cfg.badgeText} text-left`}>{cfg.label}</span>
-                            <span className={`
-                                min-w-[22px] h-[22px] rounded-full flex items-center justify-center
-                                text-[11px] font-black ${cfg.dotColor} text-white shadow-sm
-                                group-hover:scale-110 transition-transform
-                            `}>
-                                {events.length}
-                            </span>
-                        </button>
-                    );
-                })}
-                {Object.values(actionSummary).every(v => v.length === 0) && (
-                    <p className="text-xs text-gray-400 text-center py-3">Sin seguimientos pendientes 🎉</p>
-                )}
-            </div>
+                        )}
+                    </div>
+                );
+            })()}
 
-            {/* Legend */}
+            {/* Leyenda */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Leyenda</p>
                 <div className="space-y-1.5">
@@ -292,21 +303,36 @@ export default function Calendar() {
                         const isDayToday = isToday(day);
                         const MAX_VISIBLE = 3;
 
+                        const isDaySelected = isSameDay(day, selectedDate);
                         return (
                             <div
                                 key={day.toISOString()}
-                                className={`min-h-[130px] p-2 flex flex-col transition-colors ${!inMonth ? 'bg-gray-50/60' : 'bg-white hover:bg-indigo-50/20'
-                                    } ${isDayToday ? 'bg-indigo-50/30' : ''}`}
+                                onClick={() => setSelectedDate(day)}
+                                className={`min-h-[130px] p-2 flex flex-col transition-colors cursor-pointer
+                                    ${!inMonth ? 'bg-gray-50/60' : 'bg-white'}
+                                    ${isDayToday && !isDaySelected ? 'bg-indigo-50/30' : ''}
+                                    ${isDaySelected ? 'ring-2 ring-inset ring-indigo-500 bg-indigo-50/40' : 'hover:bg-indigo-50/20'}
+                                `}
                             >
-                                {/* Date number */}
+                                {/* Date number + total badge */}
                                 <div className="flex justify-between items-start mb-1.5">
                                     <span className={`
                                         text-sm font-bold w-7 h-7 flex items-center justify-center rounded-full transition-all
                                         ${isDayToday ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : ''}
-                                        ${!inMonth ? 'text-gray-300' : !isDayToday ? 'text-gray-700' : ''}
+                                        ${isDaySelected && !isDayToday ? 'ring-2 ring-indigo-500 text-indigo-700' : ''}
+                                        ${!inMonth ? 'text-gray-300' : !isDayToday && !isDaySelected ? 'text-gray-700' : ''}
                                     `}>
                                         {format(day, 'd')}
                                     </span>
+                                    {dayEvents.length > 0 && (
+                                        <button
+                                            onClick={() => navigate('/leads', { state: { leadIds: dayEvents.map(e => e.lead?.id).filter(Boolean), fromCalendar: true } })}
+                                            title={`Ver ${dayEvents.length} seguimiento${dayEvents.length !== 1 ? 's' : ''} del día`}
+                                            className="min-w-[20px] h-5 px-1.5 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black shadow-sm shadow-indigo-200 transition-all hover:scale-110 flex items-center justify-center"
+                                        >
+                                            {dayEvents.length}
+                                        </button>
+                                    )}
                                 </div>
 
                                 {/* Event pills */}
@@ -416,8 +442,8 @@ export default function Calendar() {
                                     key={day.toISOString()}
                                     onClick={() => setSelectedDate(day)}
                                     className={`flex flex-col items-center gap-1 px-2 py-2 rounded-2xl transition-all ${isSelected
-                                            ? 'bg-indigo-600 shadow-lg shadow-indigo-200 scale-105'
-                                            : 'hover:bg-gray-50'
+                                        ? 'bg-indigo-600 shadow-lg shadow-indigo-200 scale-105'
+                                        : 'hover:bg-gray-50'
                                         }`}
                                 >
                                     <span className={`text-[10px] font-black uppercase ${isSelected ? 'text-indigo-200' : 'text-gray-400'}`}>
