@@ -314,7 +314,7 @@ export default function Calendar() {
                                         <button
                                             onClick={() => navigate('/leads', { state: { leadIds: dayEvents.map(e => e.lead?.id).filter(Boolean), fromCalendar: true } })}
                                             title={`Ver ${dayEvents.length} seguimiento${dayEvents.length !== 1 ? 's' : ''} del día`}
-                                            className="min-w-[20px] h-5 px-1.5 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black shadow-sm shadow-indigo-200 transition-all hover:scale-110 flex items-center justify-center"
+                                            className="min-w-[20px] h-5 px-1.5 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-[10px] font-semibold transition-all hover:scale-110 flex items-center justify-center"
                                         >
                                             {dayEvents.length}
                                         </button>
