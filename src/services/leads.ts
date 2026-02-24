@@ -402,7 +402,8 @@ export const leadsService = {
             .from('follow_ups')
             .select(`
                 id, date, notes, action_type,
-                lead:leads(id, name, company_name, phone, email, status)
+                lead:leads(id, name, company_name, phone, email, status),
+                assigned_profile:assigned_to(id, full_name, avatar_url)
             `)
             .order('date', { ascending: true });
 
@@ -419,6 +420,11 @@ export const leadsService = {
                 phone: string | null;
                 email: string | null;
                 status: string;
+            } | null;
+            assigned_profile: {
+                id: string;
+                full_name: string | null;
+                avatar_url: string | null;
             } | null;
         }>;
     },

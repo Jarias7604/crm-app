@@ -257,6 +257,71 @@ export default function Calendar() {
                     </div>
                 );
             })()}
+            {/* Asignados del día */}
+            {(() => {
+                const dayEvts = getDailyEvents(selectedDate);
+                // Group by assigned profile
+                const assignedMap: Record<string, {
+                    id: string;
+                    full_name: string;
+                    avatar_url: string | null;
+                    count: number;
+                    leadIds: string[];
+                }> = {};
+
+                dayEvts.forEach(ev => {
+                    const p = ev.assigned_profile;
+                    if (!p) return;
+                    if (!assignedMap[p.id]) {
+                        assignedMap[p.id] = {
+                            id: p.id,
+                            full_name: p.full_name || 'Sin nombre',
+                            avatar_url: p.avatar_url,
+                            count: 0,
+                            leadIds: [],
+                        };
+                    }
+                    assignedMap[p.id]!.count += 1;
+                    if (ev.lead?.id) assignedMap[p.id]!.leadIds.push(ev.lead.id);
+                });
+
+                const assignees = Object.values(assignedMap);
+                if (assignees.length === 0) return null;
+
+                return (
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Asignados</p>
+                        <div className="space-y-2 overflow-y-auto max-h-48 pr-0.5">
+                            {assignees.map(a => (
+                                <button
+                                    key={a.id}
+                                    onClick={() => navigate('/leads', { state: { leadIds: a.leadIds, fromCalendar: true } })}
+                                    className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-gray-50 hover:shadow-sm transition-all group cursor-pointer"
+                                    title={`Ver ${a.count} seguimiento${a.count !== 1 ? 's' : ''} de ${a.full_name}`}
+                                >
+                                    {a.avatar_url ? (
+                                        <img
+                                            src={a.avatar_url}
+                                            alt={a.full_name}
+                                            className="w-7 h-7 rounded-full object-cover shrink-0 ring-2 ring-gray-100"
+                                        />
+                                    ) : (
+                                        <div className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 text-[10px] font-black">
+                                            {a.full_name.charAt(0).toUpperCase()}
+                                        </div>
+                                    )}
+                                    <span className="flex-1 text-xs font-medium text-gray-700 text-left truncate group-hover:text-indigo-700 transition-colors">
+                                        {a.full_name}
+                                    </span>
+                                    <span className="min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center text-[10px] font-semibold bg-indigo-100 text-indigo-700">
+                                        {a.count}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 
