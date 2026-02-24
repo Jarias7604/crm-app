@@ -547,29 +547,10 @@ export default function Calendar() {
                                                 <Icon className="w-2.5 h-2.5" />
                                                 {cfg.label}
                                             </span>
-                                            <div className="flex items-center gap-2">
-                                                <span className="flex items-center gap-1 text-xs font-bold text-gray-400">
-                                                    <Clock className="w-3 h-3" />
-                                                    {timeStr}
-                                                </span>
-                                                {ev.assigned_profile ? (
-                                                    ev.assigned_profile.avatar_url ? (
-                                                        <img
-                                                            src={ev.assigned_profile.avatar_url}
-                                                            alt={ev.assigned_profile.full_name ?? ''}
-                                                            title={ev.assigned_profile.full_name ?? ''}
-                                                            className="w-8 h-8 rounded-full object-cover ring-2 ring-white shadow-sm shrink-0"
-                                                        />
-                                                    ) : (
-                                                        <div
-                                                            title={ev.assigned_profile.full_name ?? ''}
-                                                            className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-black ring-2 ring-white shadow-sm shrink-0"
-                                                        >
-                                                            {(ev.assigned_profile.full_name ?? '?').charAt(0).toUpperCase()}
-                                                        </div>
-                                                    )
-                                                ) : null}
-                                            </div>
+                                            <span className="flex items-center gap-1 text-xs font-bold text-gray-400">
+                                                <Clock className="w-3 h-3" />
+                                                {timeStr}
+                                            </span>
                                         </div>
 
                                         {/* Lead info */}
