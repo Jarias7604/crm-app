@@ -209,10 +209,9 @@ export default function Calendar() {
                 <MiniCalendar currentDate={currentDate} onSelect={handleMiniSelect} />
             </div>
 
-            {/* Resumen del Día Seleccionado */}
+            {/* Leyenda + Resumen del día seleccionado */}
             {(() => {
                 const dayEvts = getDailyEvents(selectedDate);
-                // Group by action type
                 const grouped: Record<string, CalendarEvent[]> = {};
                 dayEvts.forEach(ev => {
                     const t = ev.action_type || 'call';
@@ -221,56 +220,43 @@ export default function Calendar() {
                 });
                 return (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
-                            Resumen del Día
-                        </p>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Leyenda</p>
                         <p className="text-xs font-bold text-indigo-600 capitalize mb-3">
                             {format(selectedDate, "EEEE d 'de' MMMM", { locale: es })}
                         </p>
-                        {dayEvts.length === 0 ? (
-                            <p className="text-xs text-gray-400 text-center py-4">Sin seguimientos para este día</p>
-                        ) : (
-                            <div className="space-y-1.5">
-                                {Object.keys(ACTION_CONFIG).map(type => {
-                                    const cfg = getActionCfg(type);
-                                    const evs = grouped[type] || [];
-                                    if (evs.length === 0) return null;
-                                    const Icon = cfg.Icon;
-                                    const leadIds = evs.map(e => e.lead?.id).filter(Boolean);
-                                    return (
-                                        <button
-                                            key={type}
-                                            onClick={() => navigate('/leads', { state: { leadIds, fromCalendar: true } })}
-                                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl ${cfg.badge} hover:shadow-md transition-all group`}
-                                        >
-                                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${cfg.dotColor} text-white shadow-sm`}>
-                                                <Icon className="w-3.5 h-3.5" />
-                                            </div>
-                                            <span className={`flex-1 text-xs font-bold ${cfg.badgeText} text-left`}>{cfg.label}</span>
+                        <div className="space-y-2">
+                            {Object.entries(ACTION_CONFIG).map(([type, cfg]) => {
+                                const evs = grouped[type] || [];
+                                const leadIds = evs.map(e => e.lead?.id).filter(Boolean);
+                                const hasEvents = evs.length > 0;
+                                const Wrapper = hasEvents ? 'button' : 'div';
+                                return (
+                                    <Wrapper
+                                        key={type}
+                                        {...(hasEvents ? {
+                                            onClick: () => navigate('/leads', { state: { leadIds, fromCalendar: true } }),
+                                            title: `Ver ${evs.length} ${cfg.label}(s) del día`
+                                        } : {})}
+                                        className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-xl transition-all
+                                            ${hasEvents ? 'hover:bg-gray-50 hover:shadow-sm cursor-pointer group' : 'opacity-50'}
+                                        `}
+                                    >
+                                        <span className={`w-2.5 h-2.5 rounded-full ${cfg.dotColor} shrink-0`} />
+                                        <span className={`flex-1 text-xs font-medium text-left ${hasEvents ? 'text-gray-700 font-bold' : 'text-gray-400'}`}>
+                                            {cfg.label}
+                                        </span>
+                                        {hasEvents && (
                                             <span className={`min-w-[22px] h-[22px] rounded-full flex items-center justify-center text-[11px] font-black ${cfg.dotColor} text-white shadow-sm group-hover:scale-110 transition-transform`}>
                                                 {evs.length}
                                             </span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        )}
+                                        )}
+                                    </Wrapper>
+                                );
+                            })}
+                        </div>
                     </div>
                 );
             })()}
-
-            {/* Leyenda */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Leyenda</p>
-                <div className="space-y-1.5">
-                    {Object.entries(ACTION_CONFIG).map(([type, cfg]) => (
-                        <div key={type} className="flex items-center gap-2">
-                            <span className={`w-2.5 h-2.5 rounded-full ${cfg.dotColor} shrink-0`} />
-                            <span className="text-xs text-gray-500 font-medium">{cfg.label}</span>
-                        </div>
-                    ))}
-                </div>
-            </div>
         </div>
     );
 
