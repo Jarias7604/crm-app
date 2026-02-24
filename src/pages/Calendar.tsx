@@ -224,35 +224,29 @@ export default function Calendar() {
                         <p className="text-xs font-bold text-indigo-600 capitalize mb-3">
                             {format(selectedDate, "EEEE d 'de' MMMM", { locale: es })}
                         </p>
-                        <div className="space-y-2">
-                            {Object.entries(ACTION_CONFIG).map(([type, cfg]) => {
-                                const evs = grouped[type] || [];
-                                const leadIds = evs.map(e => e.lead?.id).filter(Boolean);
-                                const hasEvents = evs.length > 0;
-                                const Wrapper = hasEvents ? 'button' : 'div';
-                                return (
-                                    <Wrapper
-                                        key={type}
-                                        {...(hasEvents ? {
-                                            onClick: () => navigate('/leads', { state: { leadIds, fromCalendar: true } }),
-                                            title: `Ver ${evs.length} ${cfg.label}(s) del día`
-                                        } : {})}
-                                        className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-xl transition-all
-                                            ${hasEvents ? 'hover:bg-gray-50 hover:shadow-sm cursor-pointer group' : 'opacity-50'}
-                                        `}
-                                    >
-                                        <span className={`w-2.5 h-2.5 rounded-full ${cfg.dotColor} shrink-0`} />
-                                        <span className={`flex-1 text-xs font-medium text-left ${hasEvents ? 'text-gray-700 font-bold' : 'text-gray-400'}`}>
-                                            {cfg.label}
-                                        </span>
-                                        {hasEvents && (
-                                            <span className={`min-w-[22px] h-[22px] rounded-full flex items-center justify-center text-[11px] font-black ${cfg.dotColor} text-white shadow-sm group-hover:scale-110 transition-transform`}>
+                        <div className="space-y-1.5 overflow-y-auto max-h-[128px] pr-0.5">
+                            {Object.entries(ACTION_CONFIG)
+                                .filter(([type]) => (grouped[type] || []).length > 0)
+                                .map(([type, cfg]) => {
+                                    const evs = grouped[type] || [];
+                                    const leadIds = evs.map(e => e.lead?.id).filter(Boolean);
+                                    return (
+                                        <button
+                                            key={type}
+                                            onClick={() => navigate('/leads', { state: { leadIds, fromCalendar: true } })}
+                                            title={`Ver ${evs.length} ${cfg.label}(s) del d\u00eda`}
+                                            className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-gray-50 hover:shadow-sm cursor-pointer group transition-all"
+                                        >
+                                            <span className={`w-2.5 h-2.5 rounded-full ${cfg.dotColor} shrink-0`} />
+                                            <span className="flex-1 text-xs font-medium text-gray-700 text-left">
+                                                {cfg.label}
+                                            </span>
+                                            <span className="min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center text-[10px] font-semibold bg-indigo-100 text-indigo-700 group-hover:scale-110 transition-transform">
                                                 {evs.length}
                                             </span>
-                                        )}
-                                    </Wrapper>
-                                );
-                            })}
+                                        </button>
+                                    );
+                                })}
                         </div>
                     </div>
                 );
@@ -291,7 +285,7 @@ export default function Calendar() {
                 return (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Asignados</p>
-                        <div className="space-y-2 overflow-y-auto max-h-48 pr-0.5">
+                        <div className="space-y-1.5 overflow-y-auto max-h-[104px] pr-0.5">
                             {assignees.map(a => (
                                 <button
                                     key={a.id}
