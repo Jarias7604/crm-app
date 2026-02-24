@@ -297,7 +297,7 @@ export default function Calendar() {
                                 className={`min-h-[130px] p-2 flex flex-col transition-colors cursor-pointer
                                     ${!inMonth ? 'bg-gray-50/60' : 'bg-white'}
                                     ${isDayToday && !isDaySelected ? 'bg-indigo-50/30' : ''}
-                                    ${isDaySelected ? 'ring-2 ring-inset ring-indigo-500 bg-indigo-50/40' : 'hover:bg-indigo-50/20'}
+                                    ${isDaySelected ? 'ring-1 ring-inset ring-indigo-200 bg-indigo-50/20' : 'hover:bg-indigo-50/10'}
                                 `}
                             >
                                 {/* Date number + total badge */}
@@ -305,7 +305,7 @@ export default function Calendar() {
                                     <span className={`
                                         text-sm font-bold w-7 h-7 flex items-center justify-center rounded-full transition-all
                                         ${isDayToday ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : ''}
-                                        ${isDaySelected && !isDayToday ? 'ring-2 ring-indigo-500 text-indigo-700' : ''}
+                                        ${isDaySelected && !isDayToday ? 'text-indigo-600' : ''}
                                         ${!inMonth ? 'text-gray-300' : !isDayToday && !isDaySelected ? 'text-gray-700' : ''}
                                     `}>
                                         {format(day, 'd')}
