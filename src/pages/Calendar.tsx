@@ -8,7 +8,7 @@ import {
 import { es } from 'date-fns/locale';
 import {
     ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail,
-    CalendarDays, MessageSquare, Video, FileText
+    CalendarDays, MessageSquare, Video, FileText, SlidersHorizontal
 } from 'lucide-react';
 import { leadsService } from '../services/leads';
 import { useAuth } from '../auth/AuthProvider';
@@ -105,6 +105,8 @@ export default function Calendar() {
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
     const [loading, setLoading] = useState(true);
+    const [selectedAssigneeId, setSelectedAssigneeId] = useState<string | null>(null);
+    const [showAssigneeFilter, setShowAssigneeFilter] = useState(false);
 
     useEffect(() => { loadData(); }, [rawTimezone]);
 
@@ -139,6 +141,25 @@ export default function Calendar() {
             });
         return counts;
     }, [calendarEvents, companyTimezone]);
+
+    /* Unique assignees for the selected day — used by mobile filter */
+    const dayAssignees = useMemo(() => {
+        const map = new Map<string, { id: string; full_name: string | null; avatar_url: string | null; count: number }>();
+        getDailyEvents(selectedDate).forEach(ev => {
+            if (ev.assigned_profile?.id) {
+                const id = ev.assigned_profile.id;
+                if (!map.has(id)) map.set(id, { id, full_name: ev.assigned_profile.full_name ?? null, avatar_url: ev.assigned_profile.avatar_url ?? null, count: 0 });
+                map.get(id)!.count++;
+            }
+        });
+        return Array.from(map.values());
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [calendarEvents, selectedDate, companyTimezone]);
+
+    const dayEventsTotal = useMemo(() => getDailyEvents(selectedDate).length,
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [calendarEvents, selectedDate, companyTimezone]);
+    const activeAssignee = selectedAssigneeId ? dayAssignees.find(a => a.id === selectedAssigneeId) ?? null : null;
 
     const handleMiniSelect = (d: Date) => {
         setCurrentDate(d);
@@ -192,12 +213,45 @@ export default function Calendar() {
                     {format(selectedDate, "EEEE d 'de' MMMM", { locale: es })}
                 </p>
             </div>
-            <button
-                onClick={() => navigate('/leads')}
-                className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center shadow-md shadow-indigo-200"
-            >
-                <Plus className="w-4 h-4 text-white" />
-            </button>
+            <div className="flex items-center gap-3">
+                {dayAssignees.length > 0 && (
+                    <>
+                        <button
+                            onClick={() => setShowAssigneeFilter(true)}
+                            className="relative w-9 h-9 rounded-xl flex items-center justify-center transition-all"
+                            style={activeAssignee ? {} : { background: 'rgb(238 242 255)' }}
+                        >
+                            {activeAssignee ? (
+                                <>
+                                    {activeAssignee.avatar_url ? (
+                                        <img
+                                            src={activeAssignee.avatar_url}
+                                            alt={activeAssignee.full_name ?? ''}
+                                            className="w-9 h-9 rounded-xl object-cover ring-2 ring-indigo-300"
+                                        />
+                                    ) : (
+                                        <div className="w-9 h-9 rounded-xl bg-indigo-200 text-indigo-800 flex items-center justify-center text-sm font-black ring-2 ring-indigo-300">
+                                            {(activeAssignee.full_name ?? '?').charAt(0).toUpperCase()}
+                                        </div>
+                                    )}
+                                    <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-indigo-600 text-white text-[10px] font-black flex items-center justify-center shadow-sm">
+                                        {activeAssignee.count}
+                                    </span>
+                                </>
+                            ) : (
+                                <SlidersHorizontal className="w-4 h-4 text-indigo-500" strokeWidth={2.5} />
+                            )}
+                        </button>
+                        <span className="text-gray-300 font-light text-lg select-none">|</span>
+                    </>
+                )}
+                <button
+                    onClick={() => navigate('/leads')}
+                    className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center shadow-md shadow-indigo-200"
+                >
+                    <Plus className="w-4 h-4 text-white" />
+                </button>
+            </div>
         </div>
     );
 
@@ -455,7 +509,8 @@ export default function Calendar() {
     const renderTimelineView = () => {
         const start = startOfWeek(currentDate, { weekStartsOn: 0 });
         const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(start, i));
-        const todaysEvents = getDailyEvents(selectedDate);
+        const todaysEvents = getDailyEvents(selectedDate)
+            .filter(ev => !selectedAssigneeId || ev.assigned_profile?.id === selectedAssigneeId);
 
         return (
             <div className="md:hidden space-y-4 animate-in slide-in-from-right duration-300">
@@ -633,8 +688,111 @@ export default function Calendar() {
             {/* Mobile header */}
             {renderMobileHeader()}
 
+            {/* Assignee filter — premium iOS sheet */}
+            {showAssigneeFilter && (
+                <div
+                    className="fixed inset-0 z-[9999] flex items-end"
+                    style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', background: 'rgba(0,0,0,0.45)' }}
+                    onClick={() => setShowAssigneeFilter(false)}
+                >
+                    <div
+                        className="w-full rounded-t-[32px] overflow-hidden"
+                        style={{ background: 'rgba(255,255,255,0.97)', boxShadow: '0 -8px 40px rgba(0,0,0,0.18)' }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Handle */}
+                        <div className="flex justify-center pt-3 pb-1">
+                            <div className="w-12 h-1.5 rounded-full bg-gray-300/80" />
+                        </div>
+
+                        {/* Title */}
+                        <div className="px-6 pt-3 pb-4">
+                            <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.12em] text-center">Asignado</p>
+                        </div>
+
+                        {/* Items */}
+                        <div className="px-4 pb-2 space-y-1">
+                            {/* Todos */}
+                            <button
+                                onClick={() => { setSelectedAssigneeId(null); setShowAssigneeFilter(false); }}
+                                className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all active:scale-[0.98]"
+                                style={!selectedAssigneeId ? { background: 'rgb(239 246 255)' } : {}}
+                            >
+                                <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center shrink-0 shadow-sm">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                        <circle cx="9" cy="7" r="3" /><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
+                                        <circle cx="17" cy="7" r="3" opacity=".5" /><path d="M21 21v-2a4 4 0 0 0-3-3.87" opacity=".5" />
+                                    </svg>
+                                </div>
+                                <div className="flex-1 text-left">
+                                    <p className="text-[15px] font-semibold text-gray-900 leading-tight">Todos</p>
+                                    <p className="text-[12px] text-gray-400 mt-0.5">{dayEventsTotal} seguimiento{dayEventsTotal !== 1 ? 's' : ''}</p>
+                                </div>
+                                {!selectedAssigneeId && (
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-blue-500 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                                        <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
+                                    </svg>
+                                )}
+                            </button>
+
+                            {/* Thin separator */}
+                            <div className="mx-4 h-px bg-gray-100" />
+
+                            {dayAssignees.map((a, idx) => (
+                                <div key={a.id}>
+                                    <button
+                                        onClick={() => { setSelectedAssigneeId(a.id); setShowAssigneeFilter(false); }}
+                                        className="w-full flex items-center gap-4 px-4 py-3.5 rounded-2xl transition-all active:scale-[0.98]"
+                                        style={selectedAssigneeId === a.id ? { background: 'rgb(239 246 255)' } : {}}
+                                    >
+                                        {a.avatar_url ? (
+                                            <img
+                                                src={a.avatar_url}
+                                                alt={a.full_name ?? ''}
+                                                className="w-12 h-12 rounded-full object-cover shrink-0 shadow-sm ring-2 ring-gray-100"
+                                            />
+                                        ) : (
+                                            <div
+                                                className="w-12 h-12 rounded-full flex items-center justify-center shrink-0 shadow-sm text-lg font-bold text-white"
+                                                style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)' }}
+                                            >
+                                                {(a.full_name ?? '?').charAt(0).toUpperCase()}
+                                            </div>
+                                        )}
+                                        <div className="flex-1 text-left">
+                                            <p className="text-[15px] font-semibold text-gray-900 leading-tight">{a.full_name ?? 'Sin nombre'}</p>
+                                            <p className="text-[12px] text-gray-400 mt-0.5">{a.count} seguimiento{a.count !== 1 ? 's' : ''}</p>
+                                        </div>
+                                        {selectedAssigneeId === a.id ? (
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-blue-500 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                                                <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z" clipRule="evenodd" />
+                                            </svg>
+                                        ) : (
+                                            <div className="w-5 h-5 rounded-full border-2 border-gray-300 shrink-0" />
+                                        )}
+                                    </button>
+                                    {idx < dayAssignees.length - 1 && <div className="mx-4 h-px bg-gray-100" />}
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Safe area bottom + cancel */}
+                        <div className="px-4 pt-2 pb-8">
+                            <button
+                                onClick={() => setShowAssigneeFilter(false)}
+                                className="w-full py-3.5 rounded-2xl bg-gray-100 text-gray-700 font-semibold text-[15px] active:scale-[0.98] transition-all"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+
             {/* Desktop header */}
             {renderHeader()}
+
 
             {loading ? (
                 <div className="flex justify-center p-20">
