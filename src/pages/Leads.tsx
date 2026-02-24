@@ -27,10 +27,13 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { GripVertical } from 'lucide-react';
 import { useAriasTables } from '../hooks/useAriasTables';
 import { ResponseVelocityBadge } from '../components/ui/ResponseVelocityBadge';
+import { useTimezone } from '../hooks/useTimezone';
+import { localToUtcISO, DEFAULT_TIMEZONE } from '../utils/timezone';
 
 export default function Leads() {
     const { profile } = useAuth();
     const isAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
+    const { timezone: rawTimezone } = useTimezone(profile?.company_id);
     const { tableRef: leadsTableRef, wrapperRef: leadsWrapperRef } = useAriasTables();
     const queryClient = useQueryClient();
     const { data: leadsData, isLoading: loading } = useQuery({
@@ -65,6 +68,9 @@ export default function Leads() {
         next_action_notes: '' as string | null,
         assigned_to: '' as string | null, // Permanent owner
     });
+
+    // Time for the scheduled follow-up (independent from formData - not stored in lead columns)
+    const [followUpTime, setFollowUpTime] = useState('09:00');
 
     const [isPriorityFilterOpen, setIsPriorityFilterOpen] = useState(false);
     const priorityFilterRef = useRef<HTMLDivElement>(null);
@@ -745,7 +751,23 @@ export default function Leads() {
                 next_followup_assignee: formData.next_followup_assignee || null,
                 next_followup_date: formData.next_followup_date || null,
             };
-            await leadsService.createLead(cleanData);
+            const newLead = await leadsService.createLead(cleanData);
+
+            // If a follow-up date was set, create a real follow_up record so it appears in the Calendar
+            if (cleanData.next_followup_date && newLead?.id) {
+                const companyTimezone = rawTimezone || DEFAULT_TIMEZONE;
+                const followUpDateTime = localToUtcISO(
+                    `${cleanData.next_followup_date}T${followUpTime}`,
+                    companyTimezone
+                );
+                await leadsService.createFollowUp({
+                    lead_id: newLead.id,
+                    date: followUpDateTime,
+                    notes: formData.next_action_notes?.trim() || 'Seguimiento programado',
+                    action_type: 'call',
+                }, cleanData.next_followup_assignee || undefined);
+            }
+
             setIsModalOpen(false);
             resetForm();
             loadLeads();
@@ -896,6 +918,7 @@ export default function Leads() {
             next_followup_date: '', next_followup_assignee: '', next_action_notes: '',
             assigned_to: ''
         });
+        setFollowUpTime('09:00'); // Reset hour to default
     };
 
     const PriorityBadge = ({ priority }: { priority: LeadPriority }) => {
@@ -2381,6 +2404,8 @@ export default function Leads() {
                 teamMembers={teamMembers}
                 industries={industries}
                 onSubmit={handleSubmit}
+                followUpTime={followUpTime}
+                setFollowUpTime={setFollowUpTime}
             />
 
             {/* Lead Detail Slide-Over */}

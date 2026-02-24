@@ -1,9 +1,25 @@
 import { useState, useRef, useEffect } from 'react';
-import { X, Plus, Building2, Phone, MapPin, DollarSign, Globe, UserCheck, StickyNote, ChevronDown, CheckCircle, Mail } from 'lucide-react';
+import { X, Plus, Building2, Phone, MapPin, DollarSign, Globe, UserCheck, StickyNote, ChevronDown, CheckCircle, Mail, Clock } from 'lucide-react';
 import type { Lead, LeadStatus, LeadPriority, Profile, Industry } from '../types';
 import { STATUS_CONFIG, SOURCE_CONFIG, PRIORITY_CONFIG } from '../types';
 import { CustomDatePicker } from './ui/CustomDatePicker';
 import { format } from 'date-fns';
+
+// 12h time slots (every 30 min) — 6:00 AM to 9:00 PM
+const TIME_SLOTS = (() => {
+    const slots: { value: string; label: string }[] = [];
+    for (let h = 6; h <= 21; h++) {
+        for (const m of [0, 30]) {
+            if (h === 21 && m === 30) continue;
+            const hour24 = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+            const hour12 = h === 12 ? 12 : h > 12 ? h - 12 : h === 0 ? 12 : h;
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            const label = `${hour12}:${String(m).padStart(2, '0')} ${ampm}`;
+            slots.push({ value: hour24, label });
+        }
+    }
+    return slots;
+})();
 
 interface CreateLeadFullscreenProps {
     isOpen: boolean;
@@ -13,6 +29,8 @@ interface CreateLeadFullscreenProps {
     teamMembers: Profile[];
     industries?: Industry[];
     onSubmit: (e: React.FormEvent) => void;
+    followUpTime: string;
+    setFollowUpTime: (time: string) => void;
 }
 
 /* ─── Premium Dropdown ─── */
@@ -102,7 +120,7 @@ function PremiumSelect({
     );
 }
 
-export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, teamMembers, industries, onSubmit }: CreateLeadFullscreenProps) {
+export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, teamMembers, industries, onSubmit, followUpTime, setFollowUpTime }: CreateLeadFullscreenProps) {
     if (!isOpen) return null;
 
     const today = format(new Date(), 'yyyy-MM-dd');
@@ -390,6 +408,23 @@ export function CreateLeadFullscreen({ isOpen, onClose, formData, setFormData, t
                                         variant="light"
                                         className="w-full"
                                     />
+                                </div>
+
+                                {/* Hora */}
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-500 uppercase tracking-[0.15em] mb-1.5">
+                                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" />Hora</span>
+                                    </label>
+                                    <select
+                                        value={followUpTime}
+                                        onChange={(e) => setFollowUpTime(e.target.value)}
+                                        disabled={!formData.next_followup_date}
+                                        className="w-full h-12 rounded-xl border-2 border-gray-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 font-medium text-gray-700 bg-white px-3 shadow-sm outline-none transition-all text-sm disabled:opacity-40 disabled:cursor-not-allowed appearance-none cursor-pointer"
+                                    >
+                                        {TIME_SLOTS.map(slot => (
+                                            <option key={slot.value} value={slot.value}>{slot.label}</option>
+                                        ))}
+                                    </select>
                                 </div>
 
                                 {/* Asignado */}
