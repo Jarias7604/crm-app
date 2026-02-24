@@ -536,7 +536,7 @@ export default function Calendar() {
                                     {/* Card */}
                                     <div
                                         onClick={() => ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } })}
-                                        className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm active:scale-[0.98] transition-transform cursor-pointer"
+                                        className="relative bg-white p-4 rounded-2xl border border-gray-100 shadow-sm active:scale-[0.98] transition-transform cursor-pointer"
                                     >
                                         {/* Top row */}
                                         <div className="flex items-center justify-between mb-2">
@@ -609,6 +609,24 @@ export default function Calendar() {
                                                     </a>
                                                 )}
                                             </div>
+                                        )}
+                                        {/* Avatar asignado — esquina inferior derecha */}
+                                        {ev.assigned_profile && (
+                                            ev.assigned_profile.avatar_url ? (
+                                                <img
+                                                    src={ev.assigned_profile.avatar_url}
+                                                    alt={ev.assigned_profile.full_name ?? ''}
+                                                    title={ev.assigned_profile.full_name ?? ''}
+                                                    className="absolute bottom-3 right-3 w-9 h-9 rounded-full object-cover ring-2 ring-white shadow-md"
+                                                />
+                                            ) : (
+                                                <div
+                                                    title={ev.assigned_profile.full_name ?? ''}
+                                                    className="absolute bottom-3 right-3 w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-black ring-2 ring-white shadow-md"
+                                                >
+                                                    {(ev.assigned_profile.full_name ?? '?').charAt(0).toUpperCase()}
+                                                </div>
+                                            )
                                         )}
                                     </div>
                                 </div>
