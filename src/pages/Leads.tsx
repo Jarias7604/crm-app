@@ -236,6 +236,22 @@ export default function Leads() {
                         processedOpenRequestRef.current = openReq;
                     }
                 }
+                // Filter leads by activity type (from Rendimiento → channel cards)
+                if (state.actionTypeFilter) {
+                    supabase
+                        .from('call_activities')
+                        .select('lead_id')
+                        .eq('action_type', state.actionTypeFilter)
+                        .then(({ data: rows }) => {
+                            if (rows && rows.length > 0) {
+                                const ids = [...new Set(rows.map((r: any) => r.lead_id as string))];
+                                setFilteredLeadIds(ids);
+                                if (viewMode === 'kanban') setViewMode('list');
+                            } else {
+                                setFilteredLeadIds([]);
+                            }
+                        });
+                }
                 processedStateRef.current = stateKey;
             }
 
