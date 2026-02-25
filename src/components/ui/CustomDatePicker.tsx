@@ -86,7 +86,7 @@ export function CustomDatePicker({
             const rect = containerRef.current.getBoundingClientRect();
             const calWidth = Math.min(310, window.innerWidth - 16);
             const calLeft = Math.max(8, Math.min(rect.left, window.innerWidth - calWidth - 8));
-            const CAL_HEIGHT = 460; // approx calendar height in px (p-5 padding + header + 6 rows + footer)
+            const CAL_HEIGHT = 400; // approx calendar height in px (p-5 padding + header + 5 rows + footer)
             const MARGIN = 8;
 
             if (forceOpenDown) {
@@ -146,9 +146,9 @@ export function CustomDatePicker({
         const startDate = startOfWeek(monthStart, { weekStartsOn: 0 });
         const endDate = endOfWeek(monthEnd, { weekStartsOn: 0 });
 
-        // Always render 6 rows (42 cells) for consistent height
+        // Render minimum rows needed, capped at 5 rows (35 cells)
         const naturalDays = eachDayOfInterval({ start: startDate, end: endDate });
-        const totalCells = 42; // 6 rows × 7 cols
+        const totalCells = 35; // 5 rows × 7 cols
         let calendarDays = naturalDays;
         if (calendarDays.length < totalCells) {
             const extraEnd = new Date(endDate);

@@ -20,6 +20,8 @@ import { QuickActionLogger } from '../components/QuickCallLogger';
 import { LeadKanban } from '../components/LeadKanban';
 import { logger } from '../utils/logger';
 import { callTracker } from '../utils/callTracker';
+import { callActivityService, ACTION_TYPE_CONFIG, CALL_OUTCOME_CONFIG } from '../services/callActivity';
+import type { CallActivity } from '../services/callActivity';
 import { lossReasonsService } from '../services/lossReasons';
 import { industriesService } from '../services/industries';
 import { CustomDatePicker } from '../components/ui/CustomDatePicker';
@@ -51,6 +53,7 @@ export default function Leads() {
     const [isDetailOpen, setIsDetailOpen] = useState(false);
     const [followUps, setFollowUps] = useState<FollowUp[]>([]);
     const [messages, setMessages] = useState<any[]>([]);
+    const [callActivities, setCallActivities] = useState<CallActivity[]>([]);
     const [teamMembers, setTeamMembers] = useState<any[]>([]);
 
     const [formData, setFormData] = useState({
@@ -745,12 +748,14 @@ export default function Leads() {
 
     const loadFollowUps = async (leadId: string) => {
         try {
-            const [followUpsData, messagesData] = await Promise.all([
+            const [followUpsData, messagesData, activitiesData] = await Promise.all([
                 leadsService.getFollowUps(leadId),
-                leadsService.getLeadMessages(leadId)
+                leadsService.getLeadMessages(leadId),
+                callActivityService.getLeadCalls(leadId),
             ]);
             setFollowUps(followUpsData || []);
             setMessages(messagesData || []);
+            setCallActivities(activitiesData || []);
         } catch (error) {
             logger.error('Failed to load history', error, { action: 'loadFollowUps', leadId });
         }
@@ -2789,107 +2794,147 @@ export default function Leads() {
 
                             {/* Follow-up History - Always visible */}
                             <div className="pt-4 border-t border-gray-100">
-                                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
-                                    <Clock className="w-4 h-4 text-indigo-500" /> Trazabilidad del Prospecto
-                                </h4>
-                                {(followUps.length > 0 || messages.length > 0) ? (
-                                    <div className="relative pl-8 space-y-8 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-100">
+                                <div className="flex items-center justify-between mb-6">
+                                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                                        <Clock className="w-4 h-4 text-indigo-500" /> Trazabilidad del Prospecto
+                                    </h4>
+                                    {(followUps.length + messages.length + callActivities.length > 0) && (
+                                        <span className="text-[10px] font-black px-2.5 py-1 bg-indigo-50 text-indigo-500 rounded-full">
+                                            {followUps.length + messages.length + callActivities.length} actividades
+                                        </span>
+                                    )}
+                                </div>
+                                {(followUps.length > 0 || messages.length > 0 || callActivities.length > 0) ? (
+                                    <div className="relative pl-8 space-y-3 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-0.5 before:bg-gradient-to-b before:from-indigo-100 before:via-gray-100 before:to-transparent">
                                         {[
-                                            ...followUps.map(f => ({ ...f, itemType: 'follow_up' })),
-                                            ...messages.map(m => ({ ...m, itemType: 'message', date: m.created_at }))
-                                        ].sort((a, b) => new Date(b.created_at || b.date).getTime() - new Date(a.created_at || a.date).getTime()).map((item: any) => (
-                                            <div key={item.id} className="relative group">
-                                                {item.itemType === 'message' ? (
-                                                    <>
-                                                        {/* Message Icon */}
-                                                        <div className={`absolute -left-[30px] top-1 w-6 h-6 rounded-lg border-2 flex items-center justify-center shadow-sm z-10 group-hover:scale-110 transition-all ${item.channel === 'whatsapp' ? 'bg-green-100 border-green-200 text-green-600' :
-                                                            item.channel === 'telegram' ? 'bg-sky-100 border-sky-200 text-sky-600' :
-                                                                item.channel === 'email' ? 'bg-amber-100 border-amber-200 text-amber-600' :
-                                                                    'bg-gray-100 border-gray-200 text-gray-600'
-                                                            }`}>
-                                                            {item.channel === 'whatsapp' ? <Smartphone className="w-3 h-3" /> :
-                                                                item.channel === 'telegram' ? <Send className="w-3 h-3" /> :
-                                                                    item.channel === 'email' ? <Mail className="w-3 h-3" /> :
-                                                                        <MessageSquare className="w-3 h-3" />}
+                                            ...followUps.map(f => ({ ...f, _type: 'follow_up' as const })),
+                                            ...messages.map(m => ({ ...m, _type: 'message' as const, date: m.created_at })),
+                                            ...callActivities.map(a => ({ ...a, _type: 'call_activity' as const })),
+                                        ].sort((a: any, b: any) => {
+                                            const getDate = (x: any) => x._type === 'call_activity'
+                                                ? new Date(x.call_date || x.created_at)
+                                                : new Date(x.created_at || x.date);
+                                            return getDate(b).getTime() - getDate(a).getTime();
+                                        }).map((item: any) => {
+                                            // --- Unified card logic ---
+                                            const isActivity = item._type === 'call_activity';
+                                            const isMessage = item._type === 'message';
+                                            const isFollowUp = item._type === 'follow_up';
+
+                                            // Resolve icon, label, colors for the card
+                                            const actCfg = isActivity ? ACTION_TYPE_CONFIG[item.action_type as keyof typeof ACTION_TYPE_CONFIG] : null;
+                                            const outCfg = isActivity ? CALL_OUTCOME_CONFIG[item.outcome as keyof typeof CALL_OUTCOME_CONFIG] : null;
+                                            const followUpAction = isFollowUp ? ACTION_TYPES.find(t => t.value === item.action_type) : null;
+
+                                            // Channel config for messages
+                                            const channelCfg: Record<string, { icon: string; color: string; bg: string; border: string; label: string }> = {
+                                                whatsapp: { icon: '💬', color: 'text-green-700', bg: 'bg-green-50', border: 'border-l-green-400', label: 'WhatsApp' },
+                                                telegram: { icon: '✈️', color: 'text-sky-700', bg: 'bg-sky-50', border: 'border-l-sky-400', label: 'Telegram' },
+                                                email: { icon: '📧', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-l-amber-400', label: 'Email' },
+                                            };
+                                            const msgCh = isMessage ? (channelCfg[item.channel] || { icon: '💬', color: 'text-gray-700', bg: 'bg-gray-50', border: 'border-l-gray-300', label: item.channel }) : null;
+
+                                            // Dot color
+                                            const dotBg = isActivity ? (actCfg?.bgColor || 'bg-gray-100') :
+                                                isMessage ? (msgCh?.bg || 'bg-gray-100') :
+                                                    'bg-indigo-50';
+                                            const dotIcon = isActivity ? (actCfg?.icon || '📋') :
+                                                isMessage ? (msgCh?.icon || '💬') :
+                                                    (followUpAction?.icon || '📌');
+
+                                            // Left border
+                                            const borderColorMap: Record<string, string> = {
+                                                call: 'border-l-blue-400', email: 'border-l-amber-400', whatsapp: 'border-l-green-400',
+                                                telegram: 'border-l-sky-400', quote_sent: 'border-l-indigo-400', info_sent: 'border-l-purple-400', meeting: 'border-l-rose-400',
+                                            };
+                                            const leftBorder = isActivity ? (borderColorMap[item.action_type] || 'border-l-gray-300') :
+                                                isMessage ? (msgCh?.border || 'border-l-gray-300') :
+                                                    'border-l-indigo-300';
+
+                                            // Type pill
+                                            const typePill = isActivity ? { icon: actCfg?.icon, label: actCfg?.label || item.action_type, bg: actCfg?.bgColor || 'bg-gray-100', color: actCfg?.color || 'text-gray-600' } :
+                                                isMessage ? { icon: msgCh?.icon, label: `${msgCh?.label} · ${item.direction === 'inbound' ? 'Recibido' : 'Enviado'}`, bg: msgCh?.bg || 'bg-gray-100', color: msgCh?.color || 'text-gray-600' } :
+                                                    { icon: followUpAction?.icon || '📌', label: 'Seguimiento', bg: 'bg-indigo-50', color: 'text-indigo-700' };
+
+                                            // Date
+                                            const itemDate = (() => {
+                                                try {
+                                                    if (isActivity) return format(new Date(item.call_date || item.created_at), 'dd MMM, HH:mm', { locale: es });
+                                                    if (isMessage) return format(new Date(item.created_at), 'dd MMM, HH:mm', { locale: es });
+                                                    if (!item.date) return 'Sin fecha';
+                                                    return format(new Date(`${item.date.split('T')[0]}T12:00:00`), 'dd MMM, yyyy', { locale: es });
+                                                } catch { return 'Sin fecha'; }
+                                            })();
+
+                                            // Content / note
+                                            const noteText = isActivity ? item.notes :
+                                                isMessage ? (item.channel === 'email' && item.metadata?.campaign_id ? 'Email de campaña enviado' : item.content) :
+                                                    item.notes;
+
+                                            // Assignee
+                                            const assignee = isFollowUp
+                                                ? (item.assigned_profile?.full_name || item.assigned_profile?.email?.split('@')[0] || item.profiles?.full_name || item.profiles?.email?.split('@')[0] || null)
+                                                : null;
+
+                                            return (
+                                                <div key={`${item._type}-${item.id}`} className="relative group">
+                                                    {/* Timeline dot */}
+                                                    <div className={`absolute -left-[30px] top-1.5 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center shadow-sm z-10 group-hover:scale-110 transition-transform ${dotBg}`}>
+                                                        <span className="text-[10px] leading-none">{dotIcon}</span>
+                                                    </div>
+                                                    {/* Unified Card */}
+                                                    <div className={`bg-white rounded-xl p-4 border border-gray-100 border-l-4 ${leftBorder} shadow-[0_1px_6px_rgba(0,0,0,0.04)] group-hover:shadow-[0_4px_16px_rgba(0,0,0,0.07)] group-hover:-translate-y-0.5 transition-all`}>
+                                                        {/* Row 1: Type pill + Date */}
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <span className={`inline-flex items-center gap-1.5 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider ${typePill.bg} ${typePill.color}`}>
+                                                                {typePill.icon} {typePill.label}
+                                                            </span>
+                                                            <span className="text-[10px] font-bold text-gray-400">{itemDate}</span>
                                                         </div>
-                                                        <div className={`rounded-xl p-4 border shadow-sm transition-all ${item.direction === 'inbound' ? 'bg-white border-gray-100' : 'bg-blue-50/50 border-blue-100'}`}>
-                                                            <div className="flex justify-between items-start mb-2">
-                                                                <div className="flex flex-col gap-0.5">
-                                                                    <p className="text-xs font-black text-gray-400 uppercase tracking-widest">
-                                                                        {(() => {
-                                                                            try {
-                                                                                const dateObj = new Date(item.created_at);
-                                                                                return format(dateObj, 'dd MMM, HH:mm', { locale: es });
-                                                                            } catch (e) { return 'Fecha error'; }
-                                                                        })()}
-                                                                    </p>
-                                                                    {item.metadata?.campaign_id && (
-                                                                        <span className="text-[8px] font-black text-indigo-500 uppercase tracking-tighter flex items-center gap-1">
-                                                                            <TrendingUp className="w-2 h-2" /> Campaña de Marketing
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider ${item.direction === 'inbound' ? 'bg-gray-100 text-gray-500' : 'bg-blue-100 text-blue-600'}`}>
-                                                                    {item.direction === 'inbound' ? 'Recibido' : 'Enviado'}
+                                                        {/* Row 2: Outcome badge (only call_activity) */}
+                                                        {outCfg && (
+                                                            <div className="mb-2">
+                                                                <span className={`inline-flex items-center gap-1.5 text-[11px] font-black px-2.5 py-1 rounded-full ${outCfg.bgColor} ${outCfg.color}`}>
+                                                                    {outCfg.icon} {outCfg.label}
                                                                 </span>
                                                             </div>
-                                                            <p className="text-sm font-medium text-gray-700 leading-relaxed whitespace-pre-wrap">
-                                                                {item.channel === 'email' && item.metadata?.campaign_id
-                                                                    ? 'Email de campaña enviado'
-                                                                    : item.content}
+                                                        )}
+                                                        {/* Row 3: Campaign badge (only messages from campaigns) */}
+                                                        {isMessage && item.metadata?.campaign_id && (
+                                                            <div className="mb-2">
+                                                                <span className="inline-flex items-center gap-1 text-[9px] font-black px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-500 uppercase tracking-wider">
+                                                                    <TrendingUp className="w-2.5 h-2.5" /> Campaña
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {/* Row 4: Note / Content */}
+                                                        {noteText && (
+                                                            <p className="text-[13px] text-gray-600 leading-relaxed mt-1 whitespace-pre-wrap">
+                                                                {noteText}
                                                             </p>
-                                                            <div className="mt-2 pt-2 border-t border-gray-50/50 flex items-center justify-between">
-                                                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Canal: {item.channel}</span>
-                                                                {item.status && (
-                                                                    <span className="text-[10px] font-black text-gray-300 uppercase italic">{item.status}</span>
+                                                        )}
+                                                        {!noteText && isFollowUp && (
+                                                            <p className="text-[13px] text-gray-300 italic mt-1">Sin comentarios</p>
+                                                        )}
+                                                        {/* Row 5: Footer — duration / assignee */}
+                                                        {(assignee || (isActivity && item.duration_seconds > 0)) && (
+                                                            <div className="mt-2.5 pt-2 border-t border-gray-50 flex items-center gap-3 flex-wrap">
+                                                                {isActivity && item.duration_seconds > 0 && (
+                                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-400">
+                                                                        <Clock className="w-3 h-3" /> {Math.round(item.duration_seconds / 60)} min
+                                                                    </span>
+                                                                )}
+                                                                {assignee && (
+                                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-400">
+                                                                        <User className="w-3 h-3" /> <span className="font-black text-indigo-600 uppercase tracking-wider">{assignee}</span>
+                                                                    </span>
                                                                 )}
                                                             </div>
-                                                        </div>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        {/* Timeline Node */}
-                                                        <div className="absolute -left-[30px] top-1 w-6 h-6 rounded-lg bg-white border-2 border-gray-100 flex items-center justify-center shadow-sm z-10 group-hover:border-indigo-400 group-hover:scale-110 transition-all">
-                                                            <span className="text-xs">
-                                                                {ACTION_TYPES.find(t => t.value === item.action_type)?.icon || '??'}
-                                                            </span>
-                                                        </div>
-
-                                                        <div className="bg-white rounded-xl p-4 border border-gray-50 shadow-sm group-hover:border-indigo-100 group-hover:shadow-md transition-all">
-                                                            <div className="flex justify-between items-start mb-2">
-                                                                <p className="text-xs font-black text-gray-400 uppercase tracking-widest">
-                                                                    {(() => {
-                                                                        try {
-                                                                            if (!item.date) return 'Sin fecha';
-                                                                            const pureDate = item.date.split('T')[0];
-                                                                            const dateObj = new Date(`${pureDate}T12:00:00`);
-                                                                            return format(dateObj, 'dd MMM, yyyy', { locale: es });
-                                                                        } catch (e) { return 'Fecha error'; }
-                                                                    })()}
-                                                                </p>
-                                                                {item.profiles?.avatar_url ? (
-                                                                    <img src={item.profiles.avatar_url} alt="" className="w-6 h-6 rounded-full border border-gray-100 shadow-sm" />
-                                                                ) : (
-                                                                    <div className="w-6 h-6 rounded-full bg-indigo-50 flex items-center justify-center border border-indigo-100">
-                                                                        <User className="w-3 h-3 text-indigo-400" />
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            <p className="text-sm font-medium text-gray-700 leading-relaxed">
-                                                                {item.notes || 'Registro de actividad sin comentarios.'}
-                                                            </p>
-                                                            <div className="mt-3 pt-3 border-t border-gray-50 flex items-center gap-2">
-                                                                <p className="text-[10px] font-bold text-gray-400">Asignado a:</p>
-                                                                <p className="text-[10px] font-black text-indigo-600 uppercase tracking-wider">
-                                                                    {item.assigned_profile?.full_name || item.assigned_profile?.email?.split('@')[0] || item.profiles?.full_name || item.profiles?.email?.split('@')[0] || 'Sin asignar'}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                    </>
-                                                )}
-
-                                            </div>
-                                        ))}
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 ) : (
                                     <div className="text-center py-10 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
