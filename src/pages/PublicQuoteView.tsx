@@ -17,6 +17,7 @@ interface FinancingPlan {
     interes_porcentaje: number;
     tipo_ajuste: 'discount' | 'recharge' | 'none';
     es_popular: boolean;
+    show_breakdown: boolean;
 }
 
 export default function PublicQuoteView() {
@@ -489,7 +490,7 @@ export default function PublicQuoteView() {
                                             <span className="font-bold text-slate-800 whitespace-nowrap">${costoWhatsApp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                         </div>
                                     )}
-                                    {!isPagoUnico && recargoMonto > 0 && (
+                                    {!isPagoUnico && recargoMonto > 0 && (financingPlan?.show_breakdown ?? true) && (
                                         <div className="flex justify-between items-center text-[11px] text-slate-500 font-medium gap-2">
                                             <span className="truncate flex-1">{ajusteLabel}</span>
                                             <span className="font-bold text-orange-500 whitespace-nowrap">+${recargoMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>

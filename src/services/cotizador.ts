@@ -249,7 +249,7 @@ class CotizadorService {
             meses: number;
             tipo_ajuste: 'discount' | 'recharge' | 'none';  // Nuevo V2
             tasa_ajuste: number; // Porcentaje (interes o descuento)
-
+            descuento_manual?: number; // Descuento adicional manual (campo UI)
 
             iva_porcentaje: number;
             incluir_implementacion: boolean;
@@ -334,18 +334,26 @@ class CotizadorService {
         // Si hay descuento, el ahorro es tangible.
 
         if (config.tipo_ajuste === 'discount') {
-            // APLICA DESCUENTO
+            // APLICA DESCUENTO DEL PLAN
             descuento_monto = subtotal_recurrente_base * (config.tasa_ajuste / 100);
             precio_recurrente_final = subtotal_recurrente_base - descuento_monto;
             ahorro_total = descuento_monto;
         } else if (config.tipo_ajuste === 'recharge') {
-            // APLICA RECARGO
+            // APLICA RECARGO DEL PLAN
             recargo_monto = subtotal_recurrente_base * (config.tasa_ajuste / 100);
             precio_recurrente_final = subtotal_recurrente_base + recargo_monto;
             // No hay ahorro real, es un costo extra
         } else {
             // NEUTRO ('none') o cualquier otro
             // Precio de lista.
+        }
+
+        // DESCUENTO MANUAL (campo UI — se aplica sobre el precio ya ajustado por el plan)
+        if (config.descuento_manual && config.descuento_manual > 0) {
+            const descuento_manual_monto = precio_recurrente_final * (config.descuento_manual / 100);
+            descuento_monto += descuento_manual_monto;
+            precio_recurrente_final -= descuento_manual_monto;
+            ahorro_total += descuento_manual_monto;
         }
 
         // 5. CÁLCULO DE CUOTAS

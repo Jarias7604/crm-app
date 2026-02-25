@@ -3,18 +3,39 @@ import type { PricingItem, PricingConfig, PaymentSettings, FinancingPlan } from 
 
 class PricingService {
     // Obtener configuración de pagos (IVA, descuentos base, etc)
+    // Si no existe fila, la crea con valores por defecto (upsert)
     async getPaymentSettings(companyId?: string): Promise<PaymentSettings | null> {
-        let query = supabase.from('payment_settings').select('*');
-
-        if (companyId) {
-            query = query.eq('company_id', companyId);
-        } else {
-            query = query.is('company_id', null);
+        if (!companyId) {
+            // Sin empresa: solo lectura, sin auto-crear
+            const { data } = await supabase.from('payment_settings').select('*').is('company_id', null).maybeSingle();
+            return data;
         }
 
-        const { data, error } = await query.maybeSingle();
+        // Intentar obtener la fila existente
+        const { data: existing } = await supabase
+            .from('payment_settings')
+            .select('*')
+            .eq('company_id', companyId)
+            .maybeSingle();
+
+        if (existing) return existing;
+
+        // No existe → crear fila con defaults
+        const { data, error } = await supabase
+            .from('payment_settings')
+            .upsert({
+                company_id: companyId,
+                iva_defecto: 13,
+                descuento_pago_unico_defecto: 0,
+                recargo_financiamiento_base: 20,
+                nota_mejor_precio: 'MEJOR PRECIO',
+                show_financing_breakdown: true,
+            }, { onConflict: 'company_id' })
+            .select()
+            .single();
+
         if (error) {
-            console.error('Error fetching payment settings:', error);
+            console.error('Error creating default payment settings:', error);
             return null;
         }
         return data;
