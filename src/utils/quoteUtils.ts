@@ -145,6 +145,10 @@ export interface QuoteFinancialsV2 {
     // Display
     planTitulo: string;                // Título del plan (ej: "12 CUOTAS CONSECUTIVAS")
     planDescripcion: string;           // Descripción del plan
+
+    // Descuento manual del agente
+    descuentoManualPct: number;        // Porcentaje (ej: 10)
+    descuentoManualMonto: number;      // Monto en $ del descuento manual
 }
 
 export const calculateQuoteFinancialsV2 = (
@@ -225,9 +229,16 @@ export const calculateQuoteFinancialsV2 = (
         ajusteLabel = `Financiamiento (${Math.round(ajustePct * 100)}%)`;
     }
 
+    // 3b. DESCUENTO MANUAL DEL AGENTE (aplicado sobre licenciaAjustada)
+    const descuentoManualPct = Number(cotizacion.descuento_porcentaje || 0);
+    const descuentoManualMonto = descuentoManualPct > 0
+        ? licenciaAjustada * (descuentoManualPct / 100)
+        : 0;
+    const licenciaConDescuento = licenciaAjustada - descuentoManualMonto;
+
     // 4. CÁLCULOS DE LICENCIA
-    const ivaLicencia = licenciaAjustada * ivaPct;
-    const totalLicencia = licenciaAjustada + ivaLicencia;
+    const ivaLicencia = licenciaConDescuento * ivaPct;
+    const totalLicencia = licenciaConDescuento + ivaLicencia;
     const cuotaMensual = cuotas > 1 ? totalLicencia / cuotas : totalLicencia;
 
     // 5. CÁLCULOS DE IMPLEMENTACIÓN
@@ -255,7 +266,9 @@ export const calculateQuoteFinancialsV2 = (
         ivaImplementacion,
         totalImplementacion,
         planTitulo,
-        planDescripcion
+        planDescripcion,
+        descuentoManualPct,
+        descuentoManualMonto
     };
 };
 

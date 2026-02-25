@@ -71,6 +71,7 @@ export interface CotizacionCalculada {
     // Descuentos e impuestos
     descuento_porcentaje: number;
     descuento_monto: number;
+    descuento_manual_monto: number; // Solo el descuento manual (campo UI), sin contar el del plan
     iva_porcentaje: number;
     iva_monto_recurrente: number;
 
@@ -349,11 +350,12 @@ class CotizadorService {
         }
 
         // DESCUENTO MANUAL (campo UI — se aplica sobre el precio ya ajustado por el plan)
+        let descuento_manual_monto_val = 0;
         if (config.descuento_manual && config.descuento_manual > 0) {
-            const descuento_manual_monto = precio_recurrente_final * (config.descuento_manual / 100);
-            descuento_monto += descuento_manual_monto;
-            precio_recurrente_final -= descuento_manual_monto;
-            ahorro_total += descuento_manual_monto;
+            descuento_manual_monto_val = precio_recurrente_final * (config.descuento_manual / 100);
+            descuento_monto += descuento_manual_monto_val;
+            precio_recurrente_final -= descuento_manual_monto_val;
+            ahorro_total += descuento_manual_monto_val;
         }
 
         // 5. CÁLCULO DE CUOTAS
@@ -427,6 +429,7 @@ class CotizadorService {
 
             descuento_porcentaje: config.tipo_ajuste === 'discount' ? config.tasa_ajuste : 0,
             descuento_monto: Number(descuento_monto.toFixed(2)),
+            descuento_manual_monto: Number(descuento_manual_monto_val.toFixed(2)),
 
             iva_porcentaje: config.iva_porcentaje,
             iva_monto_recurrente: Number(iva_recurrente.toFixed(2)),

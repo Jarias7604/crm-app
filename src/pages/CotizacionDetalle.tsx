@@ -691,7 +691,8 @@ export default function CotizacionDetalle() {
                                                         monto: Number(mod.costo_anual) || Number(mod.costo) || 0
                                                     }));
 
-
+                                                // Descuento manual del agente
+                                                const { descuentoManualMonto, descuentoManualPct } = financials;
 
                                                 return (
                                                     <div className={`bg-gradient-to-br ${isPagoUnico ? 'from-emerald-50 to-green-50 border-emerald-200' : 'from-blue-50 to-indigo-50 border-blue-200'} rounded-2xl p-4 sm:p-6 shadow-sm border-2 flex flex-col justify-between`}>
@@ -733,6 +734,13 @@ export default function CotizacionDetalle() {
                                                                 <div className="flex justify-between items-center text-[11px] text-slate-500 font-medium gap-2">
                                                                     <span className="truncate flex-1">{ajusteLabel}</span>
                                                                     <span className="font-bold text-orange-500 whitespace-nowrap">+${recargoMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                </div>
+                                                            )}
+                                                            {/* Descuento manual del agente */}
+                                                            {descuentoManualMonto > 0 && (
+                                                                <div className="flex justify-between items-center text-[11px] text-emerald-600 font-medium gap-2">
+                                                                    <span className="truncate flex-1">- Descuento ({descuentoManualPct}%)</span>
+                                                                    <span className="font-bold whitespace-nowrap">-${descuentoManualMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                                 </div>
                                                             )}
                                                             {/* Descuento (solo si aplica) */}
