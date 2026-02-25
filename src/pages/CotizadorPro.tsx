@@ -73,8 +73,9 @@ export default function CotizadorPro() {
     const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null);
     const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
 
-    // Permisos con fallback para admin
-    const canChangePaymentMethod = hasPermission('cotizaciones.change_payment_method') || profile?.role === 'super_admin' || profile?.role === 'company_admin';
+    // Permisos: super_admin ya está cubierto dentro de hasPermission(); company_admin necesita fallback
+    // explícito porque no tiene entradas en role_permissions.
+    const canChangePaymentMethod = hasPermission('cotizaciones.change_payment_method') || profile?.role === 'company_admin';
 
     // Estado para widget de precio
     const [isWidgetOpen, setIsWidgetOpen] = useState(true);
