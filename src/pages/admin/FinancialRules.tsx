@@ -31,6 +31,7 @@ export default function FinancialRules() {
         tipo_ajuste: 'none',
         descripcion: '',
         es_popular: false,
+        show_breakdown: true,
         activo: true,
         orden: 10
     });
@@ -286,10 +287,16 @@ export default function FinancialRules() {
                                             </div>
                                         </div>
 
-                                        {/* Botones */}
-                                        <div className="flex gap-2 justify-end">
-                                            <Button type="button" onClick={() => setIsCreatingPlan(false)} className="bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 h-10 px-6">Cancelar</Button>
-                                            <Button type="submit" className="bg-[#4449AA] text-white h-10 px-8 shadow-lg shadow-indigo-200 hover:shadow-indigo-300 transition-all">Crear Plan</Button>
+                                        {/* Opciones y Botones */}
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-3">
+                                                <Switch checked={newPlan.show_breakdown ?? true} onChange={() => setNewPlan({ ...newPlan, show_breakdown: !(newPlan.show_breakdown ?? true) })} size="sm" />
+                                                <label className="text-xs font-bold text-gray-500">Mostrar desglose del % en la cotización</label>
+                                            </div>
+                                            <div className="flex gap-2 justify-end">
+                                                <Button type="button" onClick={() => setIsCreatingPlan(false)} className="bg-white border border-gray-200 text-gray-500 hover:bg-gray-50 h-10 px-6">Cancelar</Button>
+                                                <Button type="submit" className="bg-[#4449AA] text-white h-10 px-8 shadow-lg shadow-indigo-200 hover:shadow-indigo-300 transition-all">Crear Plan</Button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -377,12 +384,18 @@ export default function FinancialRules() {
                                                                     <Input value={editingPlan.descripcion || ''} onChange={e => setEditingPlan({ ...editingPlan, descripcion: e.target.value })} className="h-8 text-xs" />
                                                                 </div>
 
-                                                                <div className="pt-2 flex justify-between items-center">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <label className="text-[10px] font-bold text-gray-500">Popular</label>
-                                                                        <Switch checked={editingPlan.es_popular} onChange={() => setEditingPlan({ ...editingPlan, es_popular: !editingPlan.es_popular })} size="sm" />
+                                                                <div className="pt-2 space-y-2">
+                                                                    <div className="flex items-center justify-between">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <label className="text-[10px] font-bold text-gray-500">Popular</label>
+                                                                            <Switch checked={editingPlan.es_popular} onChange={() => setEditingPlan({ ...editingPlan, es_popular: !editingPlan.es_popular })} size="sm" />
+                                                                        </div>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <label className="text-[10px] font-bold text-gray-500">Desglosar %</label>
+                                                                            <Switch checked={editingPlan.show_breakdown ?? true} onChange={() => setEditingPlan({ ...editingPlan, show_breakdown: !(editingPlan.show_breakdown ?? true) })} size="sm" />
+                                                                        </div>
                                                                     </div>
-                                                                    <Button type="submit" size="sm" className="bg-indigo-600 text-white text-[10px] uppercase font-bold h-7 px-3 rounded-lg">Guardar</Button>
+                                                                    <Button type="submit" size="sm" className="w-full bg-indigo-600 text-white text-[10px] uppercase font-bold h-7 px-3 rounded-lg">Guardar</Button>
                                                                 </div>
                                                             </div>
                                                         </form>
@@ -518,6 +531,29 @@ export default function FinancialRules() {
                                         placeholder="Ej: MEJOR OFERTA"
                                     />
                                     <p className="text-[10px] text-gray-400 pl-1">Texto que aparece en el badge verde del plan anual.</p>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest pl-1">Desglose de Financiamiento</label>
+                                    <div className={`flex items-center justify-between p-4 rounded-xl border transition-colors ${isEditingSettings ? 'bg-white border-gray-200' : 'bg-gray-50/50 border-gray-100'}`}>
+                                        <div>
+                                            <p className="text-sm font-bold text-gray-800">Mostrar desglose de financiamiento</p>
+                                            <p className="text-[10px] text-gray-400 mt-0.5">
+                                                {settings.show_financing_breakdown
+                                                    ? 'El cliente verá "Base Recurrente + Financiamiento X%" por separado.'
+                                                    : 'El monto de financiamiento se suma al base. El cliente solo ve un precio consolidado.'}
+                                            </p>
+                                        </div>
+                                        <Switch
+                                            checked={settings.show_financing_breakdown ?? true}
+                                            onChange={() => {
+                                                if (isEditingSettings) {
+                                                    setSettings({ ...settings, show_financing_breakdown: !(settings.show_financing_breakdown ?? true) });
+                                                }
+                                            }}
+                                            size="sm"
+                                        />
+                                    </div>
                                 </div>
 
                                 <div className="pt-6 flex gap-4 border-t border-gray-50">

@@ -56,6 +56,7 @@ export interface PaymentSettings {
     descuento_pago_unico_defecto: number;
     recargo_financiamiento_base: number;
     nota_mejor_precio: string;
+    show_financing_breakdown: boolean;
     created_at: string;
     updated_at: string;
 }
@@ -74,6 +75,7 @@ export interface FinancingPlan {
     es_popular: boolean;
     activo: boolean;
     orden: number;
+    show_breakdown: boolean;
     created_at: string;
     updated_at: string;
 }

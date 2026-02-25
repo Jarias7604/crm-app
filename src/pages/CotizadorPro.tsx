@@ -298,6 +298,7 @@ export default function CotizadorPro() {
             cuotas: selectedPlan?.cuotas, // V3: Inyectamos cuotas explícitas si existen
             tipo_ajuste: selectedPlan?.tipo_ajuste || 'none',
             tasa_ajuste: selectedPlan?.interes_porcentaje || 0,
+            descuento_manual: formData.descuento_porcentaje || 0, // Descuento manual del campo UI
             iva_porcentaje: formData.iva_porcentaje,
             incluir_implementacion: formData.incluir_implementacion
         };
@@ -1307,15 +1308,26 @@ export default function CotizadorPro() {
                                             <div className="space-y-1.5">
                                                 <div className="flex justify-between text-[11px] text-gray-500 font-medium leading-none">
                                                     <span>Base Recurrente</span>
-                                                    <span>${totales.subtotal_recurrente_base.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                    <span>${(() => {
+                                                        const selectedPlan = financingPlans.find(p => p.id === selectedPlanId);
+                                                        const showBreakdown = selectedPlan?.show_breakdown ?? true;
+                                                        return (showBreakdown
+                                                            ? totales.subtotal_recurrente_base
+                                                            : totales.subtotal_recurrente_base + (totales.recargo_mensual_monto || 0)
+                                                        ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                                    })()}</span>
                                                 </div>
 
-                                                {totales.recargo_mensual_monto > 0 && (
-                                                    <div className="flex justify-between text-[11px] text-blue-600 font-medium leading-none">
-                                                        <span>+ Financiamiento ({totales.recargo_aplicado_porcentaje}%)</span>
-                                                        <span className="font-bold">+${totales.recargo_mensual_monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                    </div>
-                                                )}
+                                                {(() => {
+                                                    const selectedPlan = financingPlans.find(p => p.id === selectedPlanId);
+                                                    const showBreakdown = selectedPlan?.show_breakdown ?? true;
+                                                    return totales.recargo_mensual_monto > 0 && showBreakdown && (
+                                                        <div className="flex justify-between text-[11px] text-blue-600 font-medium leading-none">
+                                                            <span>+ Financiamiento ({totales.recargo_aplicado_porcentaje}%)</span>
+                                                            <span className="font-bold">+${totales.recargo_mensual_monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                        </div>
+                                                    );
+                                                })()}
 
                                                 {/* Mostrar descuento del plan si existe */}
                                                 {financingPlans.find(p => p.id === selectedPlanId)?.tipo_ajuste === 'discount' && totales.ahorro_pago_anual > 0 && (
