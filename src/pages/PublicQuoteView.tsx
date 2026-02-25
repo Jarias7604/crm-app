@@ -455,7 +455,7 @@ export default function PublicQuoteView() {
                         const serviciosRecurrentes = modulos.filter((m: any) => (Number(m.pago_unico) || 0) === 0 && ((Number(m.costo_anual) || Number(m.costo) || 0) > 0));
 
                         // ✅ USAR valores del servicio centralizado
-                        const { ivaPct, recargoMonto, ivaLicencia: ivaRecurrente, ajustePct, tipoAjuste } = financials;
+                        const { ivaPct, recargoMonto, ivaLicencia: ivaRecurrente, ajustePct, tipoAjuste, descuentoManualMonto, descuentoManualPct } = financials;
                         const ajusteLabel = tipoAjuste === 'recharge' ? `Financiamiento (${Math.round((ajustePct || 0) * 100)}%)` : '';
 
                         return (
@@ -494,6 +494,13 @@ export default function PublicQuoteView() {
                                         <div className="flex justify-between items-center text-[11px] text-slate-500 font-medium gap-2">
                                             <span className="truncate flex-1">{ajusteLabel}</span>
                                             <span className="font-bold text-orange-500 whitespace-nowrap">+${recargoMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        </div>
+                                    )}
+                                    {/* Descuento manual del agente */}
+                                    {descuentoManualMonto > 0 && (
+                                        <div className="flex justify-between items-center text-[11px] text-emerald-600 font-medium gap-2">
+                                            <span className="truncate flex-1">- Descuento ({descuentoManualPct}%)</span>
+                                            <span className="font-bold whitespace-nowrap">-${descuentoManualMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                         </div>
                                     )}
                                     <div className="flex justify-between items-center text-[11px] text-slate-500 font-medium gap-2">

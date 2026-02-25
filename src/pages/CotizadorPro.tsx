@@ -271,11 +271,16 @@ export default function CotizadorPro() {
             // Aplicar override si existe, preservando si es pago único o recurrente
             if (overrides[item.id] !== undefined) {
                 const esPagoUnico = (item.pago_unico || 0) > 0;
+                const overrideVal = overrides[item.id];
                 return {
                     ...item,
                     // Pago único: el override va a pago_unico; Recurrente: el override va a precio_anual
-                    pago_unico: esPagoUnico ? overrides[item.id] : 0,
-                    precio_anual: esPagoUnico ? 0 : overrides[item.id],
+                    pago_unico: esPagoUnico ? overrideVal : 0,
+                    precio_anual: esPagoUnico ? 0 : overrideVal,
+                    // CRÍTICO: sincronizar precio_mensual para evitar el fallback incorrecto en el motor
+                    // cotizador.ts usa `precio_anual || precio_mensual*12` — si precio_anual=0 (falsy en JS)
+                    // sin este fix usaría precio_mensual original ignorando el 0 del usuario
+                    precio_mensual: esPagoUnico ? item.precio_mensual : overrideVal / 12,
                     precio_por_dte: 0,
                 };
             }
@@ -1334,6 +1339,14 @@ export default function CotizadorPro() {
                                                     <div className="flex justify-between text-[11px] text-green-600 font-medium leading-none">
                                                         <span>- Descuento Pago Anticipado</span>
                                                         <span className="font-bold">-${totales.ahorro_pago_anual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                    </div>
+                                                )}
+
+                                                {/* Descuento manual del agente */}
+                                                {totales.descuento_manual_monto > 0 && (
+                                                    <div className="flex justify-between text-[11px] text-emerald-600 font-medium leading-none">
+                                                        <span>- Descuento ({formData.descuento_porcentaje}%)</span>
+                                                        <span className="font-bold">-${totales.descuento_manual_monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                     </div>
                                                 )}
 

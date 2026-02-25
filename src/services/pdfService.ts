@@ -355,7 +355,9 @@ export const pdfService = {
                 cuotaMensual,
                 totalImplementacion: pagoInicial,
                 planTitulo,
-                planDescripcion
+                planDescripcion,
+                descuentoManualPct,
+                descuentoManualMonto
             } = financialsV2;
 
             // Adaptar al formato que espera el código del PDF
@@ -393,7 +395,7 @@ export const pdfService = {
 
                 // Calcular número de líneas que se van a dibujar
                 let numLineasInicial = (implementacionBase > 0 ? 1 : 0) + serviciosUnicos.length + 1; // +1 para IVA
-                let numLineasRecurrente = 1 + serviciosRec.length + (costoWhatsApp > 0 ? 1 : 0) + (financials.recargoFinanciamiento > 0 ? 1 : 0) + 1 + 1; // Licencia + módulos + WhatsApp + Financiamiento + IVA + Total Plan
+                let numLineasRecurrente = 1 + serviciosRec.length + (costoWhatsApp > 0 ? 1 : 0) + (financials.recargoFinanciamiento > 0 ? 1 : 0) + (descuentoManualMonto > 0 ? 1 : 0) + 1 + 1; // Licencia + módulos + WhatsApp + Financiamiento + Descuento + IVA + Total Plan
 
                 const numLineas = isRecurrent ? numLineasRecurrente : numLineasInicial;
                 const lineHeight = 4;
@@ -499,6 +501,15 @@ export const pdfService = {
                         const pctLabel = financials.ajustePct ? ` (${Math.round(financials.ajustePct * 100)}%)` : '';
                         doc.text(`Financiamiento${pctLabel}`, x + 7, lineY);
                         doc.text(`+$ ${recargoFinanciamiento.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, lineY, { align: 'right' });
+                        lineY += lineHeight;
+                    }
+
+                    // Descuento manual del agente
+                    if (descuentoManualMonto > 0) {
+                        doc.setTextColor(22, 163, 74); // green-600
+                        doc.text(`Descuento (${descuentoManualPct}%)`, x + 7, lineY);
+                        doc.text(`-$ ${descuentoManualMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, lineY, { align: 'right' });
+                        doc.setTextColor(148, 163, 184); // volver a gris
                         lineY += lineHeight;
                     }
 
