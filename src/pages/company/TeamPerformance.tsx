@@ -1804,6 +1804,7 @@ function CallActivitySection({
     isAdmin: boolean;
     onGoalsSaved: () => void;
 }) {
+    const navigate = useNavigate();
     const [isGoalPanelOpen, setIsGoalPanelOpen] = useState(false);
     const [editGoals, setEditGoals] = useState<Record<string, number>>({});
     const [savingGoals, setSavingGoals] = useState(false);
@@ -1880,7 +1881,11 @@ function CallActivitySection({
                     </h3>
                     <div className="flex gap-2 flex-wrap">
                         {channelBreakdown.map(ch => (
-                            <div key={ch.type} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl ${ch.bgColor} border border-white/50`}>
+                            <button
+                                key={ch.type}
+                                onClick={() => navigate('/leads', { state: { actionTypeFilter: ch.type } })}
+                                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl ${ch.bgColor} border border-white/50 hover:scale-105 hover:shadow-md transition-all duration-150 cursor-pointer`}
+                            >
                                 <span className="text-lg">{ch.icon}</span>
                                 <div>
                                     <p className="text-[9px] font-black uppercase tracking-widest text-gray-600">{ch.label}</p>
@@ -1891,7 +1896,7 @@ function CallActivitySection({
                                         {Math.round((ch.count / totalAllActions) * 100)}%
                                     </span>
                                 )}
-                            </div>
+                            </button>
                         ))}
                     </div>
                 </div>
