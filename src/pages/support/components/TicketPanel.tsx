@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Edit2, Save, RefreshCw, ChevronRight, UserCheck, MessageSquare, Lock, CalendarDays, Activity, ShieldCheck, CheckCircle2, Send, Search, Trash2, AlertTriangle, Clock } from 'lucide-react';
+import { X, Edit2, Save, RefreshCw, ChevronRight, UserCheck, MessageSquare, Lock, CalendarDays, Activity, ShieldCheck, CheckCircle2, Send, Search, Trash2, AlertTriangle, Clock, Paperclip, Image, FileVideo, ExternalLink } from 'lucide-react';
 import { ticketService, type Ticket, type TicketCategory, type TicketStatus, type TicketPriority, type CompanyAgent, type TicketComment, type TicketLead } from '../../../services/tickets';
 import { formatDistanceToNow, format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -308,6 +308,42 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
                             </div>
                         )}
                         {ticket.description && <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100"><p className="text-[9px] font-black text-gray-400 uppercase mb-1.5">Descripción</p><p className="text-xs text-gray-600 leading-relaxed">{ticket.description}</p></div>}
+                        {/* ── Attachments Gallery ── */}
+                        {(ticket.metadata as any)?.attachments?.length > 0 && (
+                            <div className="space-y-2">
+                                <p className="text-[9px] font-black text-gray-400 uppercase flex items-center gap-1"><Paperclip className="w-3 h-3" />Archivos Adjuntos ({(ticket.metadata as any).attachments.length})</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {((ticket.metadata as any).attachments as { url: string; name: string; type: string; size: number }[]).map((att, idx) => {
+                                        const isImage = att.type?.startsWith('image/');
+                                        const isVideo = att.type?.startsWith('video/');
+                                        const sizeKB = Math.round((att.size || 0) / 1024);
+                                        const sizeLabel = sizeKB > 1024 ? `${(sizeKB / 1024).toFixed(1)} MB` : `${sizeKB} KB`;
+                                        return (
+                                            <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer" className="group relative bg-gray-50 border border-gray-100 rounded-xl overflow-hidden hover:border-indigo-200 hover:shadow-md transition-all">
+                                                {isImage ? (
+                                                    <img src={att.url} alt={att.name} className="w-full h-24 object-cover" />
+                                                ) : isVideo ? (
+                                                    <div className="w-full h-24 bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center">
+                                                        <FileVideo className="w-8 h-8 text-gray-300" />
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-full h-24 bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center">
+                                                        <Image className="w-8 h-8 text-gray-300" />
+                                                    </div>
+                                                )}
+                                                <div className="px-2.5 py-2">
+                                                    <p className="text-[9px] font-bold text-gray-600 truncate">{att.name}</p>
+                                                    <p className="text-[8px] text-gray-300">{sizeLabel}</p>
+                                                </div>
+                                                <div className="absolute inset-0 bg-indigo-600/0 group-hover:bg-indigo-600/10 transition-colors flex items-center justify-center">
+                                                    <ExternalLink className="w-5 h-5 text-white opacity-0 group-hover:opacity-80 drop-shadow-lg transition-opacity" />
+                                                </div>
+                                            </a>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
                         <div className="text-[10px] text-gray-400 pt-3 border-t border-gray-100 space-y-1">
                             <p className="flex items-center gap-1.5"><Clock className="w-3 h-3" />Creado: <span className="font-bold text-gray-600">{format(new Date(ticket.created_at), "dd MMM yyyy · HH:mm", { locale: es })}</span></p>
                             {ticket.resolved_at && <p className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-emerald-400" />Resuelto: <span className="font-bold text-emerald-600">{format(new Date(ticket.resolved_at), "dd MMM yyyy · HH:mm", { locale: es })}</span></p>}

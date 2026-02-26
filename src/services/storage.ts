@@ -104,6 +104,30 @@ export const storageService = {
     /**
      * Upload company logo to avatars bucket
      */
+    /**
+     * Upload a ticket attachment (photos, videos, documents)
+     */
+    async uploadTicketAttachment(companyId: string, file: File) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${fileExt}`;
+        const filePath = `tickets/${companyId}/${fileName}`;
+
+        const { error } = await supabase.storage
+            .from('lead-documents')
+            .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: true
+            });
+
+        if (error) throw error;
+
+        const { data: { publicUrl } } = supabase.storage
+            .from('lead-documents')
+            .getPublicUrl(filePath);
+
+        return { url: publicUrl, name: file.name, type: file.type, size: file.size };
+    },
+
     async uploadLogo(companyId: string, file: File) {
         const fileExt = file.name.split('.').pop();
         const fileName = `${companyId}-logo-${Date.now()}.${fileExt}`;

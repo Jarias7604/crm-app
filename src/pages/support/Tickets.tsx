@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
-import { TicketIcon, AlertCircle, CheckCircle2, Filter, Plus, Search, ChevronDown, Timer, ShieldCheck, X, Zap, TrendingUp, RefreshCw, AlertTriangle, UserCheck, Edit2, MoreHorizontal, CalendarDays, Tag, Send, ArrowUpDown, CalendarRange, Trophy, CalendarClock, Settings, Users } from 'lucide-react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { TicketIcon, AlertCircle, CheckCircle2, Filter, Plus, Search, ChevronDown, Timer, ShieldCheck, X, TrendingUp, RefreshCw, AlertTriangle, UserCheck, Edit2, MoreHorizontal, CalendarDays, Tag, Send, ArrowUpDown, CalendarRange, Trophy, CalendarClock, Settings, Users, Paperclip, Image, FileVideo, Trash2 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { ticketService, type Ticket, type TicketCategory, type TicketStatus, type TicketPriority, type TicketStats, type CompanyAgent, type TicketLead } from '../../services/tickets';
 import { Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
@@ -8,6 +8,7 @@ import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import { CategoryManager } from './components/CategoryManager';
 import { TicketPanel } from './components/TicketPanel';
+import { storageService } from '../../services/storage';
 
 const SC: Record<TicketStatus, { label: string; color: string; bg: string }> = {
     new: { label: 'Nuevo', color: 'text-blue-600', bg: 'bg-blue-50' },
@@ -144,6 +145,8 @@ export default function Tickets() {
     const [statusFilter, setStatusFilter] = useState<TicketStatus[]>(['new', 'open', 'pending']);
     const [search, setSearch] = useState('');
     const [newT, setNewT] = useState({ title: '', description: '', category_id: '', priority: 'medium' as TicketPriority, due_date: '', lead_id: '' });
+    const [attachFiles, setAttachFiles] = useState<File[]>([]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     // Advanced filters
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
@@ -193,15 +196,26 @@ export default function Tickets() {
         if (!profile) return;
         const tid = toast.loading('Creando...');
         try {
+            // Upload attachments first
+            let attachments: { url: string; name: string; type: string; size: number }[] = [];
+            if (attachFiles.length > 0) {
+                toast.loading('Subiendo archivos...', { id: tid });
+                attachments = await Promise.all(
+                    attachFiles.map(f => storageService.uploadTicketAttachment(profile.company_id!, f))
+                );
+            }
             await ticketService.createTicket({
                 company_id: profile.company_id!, title: newT.title, description: newT.description,
                 category_id: newT.category_id || null, priority: newT.priority, status: 'new',
-                lead_id: newT.lead_id || null, assigned_to: null, metadata: {}, created_by: profile.id,
+                lead_id: newT.lead_id || null, assigned_to: null,
+                metadata: attachments.length > 0 ? { attachments } : {},
+                created_by: profile.id,
                 due_date: newT.due_date ? new Date(newT.due_date).toISOString() : null,
             });
             toast.success('Ticket creado', { id: tid });
             setIsCreateOpen(false);
             setNewT({ title: '', description: '', category_id: '', priority: 'medium', due_date: '', lead_id: '' });
+            setAttachFiles([]);
             setLeadSearch('');
             load();
         } catch { toast.error('Error', { id: tid }); }
@@ -590,82 +604,179 @@ export default function Tickets() {
                 <CategoryManager categories={categories} companyId={profile?.company_id || ''} onClose={() => setIsCategoryOpen(false)} onChanged={setCategories} />
             )}
 
-            {/* Create Modal */}
+            {/* Create Modal — Wide Premium Design */}
             {isCreateOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={() => setIsCreateOpen(false)} />
-                    <div className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-gray-100 overflow-hidden">
-                        <form onSubmit={handleCreate}>
-                            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-indigo-50 to-purple-50">
+                    <div className="relative bg-white w-full max-w-2xl max-h-[90vh] rounded-3xl shadow-2xl border border-gray-100 overflow-hidden flex flex-col">
+                        <form onSubmit={handleCreate} className="flex flex-col max-h-[90vh]">
+                            {/* Header */}
+                            <div className="px-7 py-5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-indigo-600 to-purple-600 shrink-0">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-200"><Zap className="w-5 h-5 text-white" /></div>
-                                    <div><h3 className="text-lg font-black text-gray-900">Nuevo Ticket</h3><p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Caso de soporte</p></div>
+                                    <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center"><Plus className="w-5 h-5 text-white" /></div>
+                                    <div><h3 className="text-lg font-black text-white">Nuevo Ticket</h3><p className="text-[10px] font-bold text-white/60 uppercase tracking-widest">Caso de soporte</p></div>
                                 </div>
-                                <button type="button" onClick={() => setIsCreateOpen(false)} className="p-2 hover:bg-white/80 rounded-xl text-gray-400"><X className="w-5 h-5" /></button>
+                                <button type="button" onClick={() => setIsCreateOpen(false)} className="p-2 hover:bg-white/10 rounded-xl text-white/70 hover:text-white transition"><X className="w-5 h-5" /></button>
                             </div>
-                            <div className="p-6 space-y-4">
+
+                            {/* Body */}
+                            <div className="p-7 space-y-6 overflow-y-auto flex-1">
+                                {/* Section 1: Info del ticket */}
                                 <div>
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Título *</label>
-                                    <input required type="text" placeholder="Ej: Error al acceder al dashboard" className="mt-1.5 w-full px-4 py-3 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20" value={newT.title} onChange={e => setNewT(p => ({ ...p, title: e.target.value }))} />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Categoría</label>
-                                        <select className="mt-1.5 w-full px-4 py-3 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20" value={newT.category_id} onChange={e => setNewT(p => ({ ...p, category_id: e.target.value }))}>
-                                            <option value="">Sin categoría</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                                        </select>
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <span className="w-6 h-6 rounded-lg bg-indigo-100 flex items-center justify-center text-xs font-black text-indigo-600">1</span>
+                                        <span className="text-sm font-black text-gray-900 uppercase tracking-wide">Información del Ticket</span>
                                     </div>
-                                    <div>
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Prioridad</label>
-                                        <select className="mt-1.5 w-full px-4 py-3 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20" value={newT.priority} onChange={e => setNewT(p => ({ ...p, priority: e.target.value as TicketPriority }))}>
-                                            <option value="low">Baja</option><option value="medium">Media</option><option value="high">Alta</option><option value="urgent">Urgente</option>
-                                        </select>
+
+                                    {/* Title */}
+                                    <div className="mb-4">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Título *</label>
+                                        <input required type="text" placeholder="Ej: Error al acceder al dashboard"
+                                            className="mt-1.5 w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition"
+                                            value={newT.title} onChange={e => setNewT(p => ({ ...p, title: e.target.value }))} />
                                     </div>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><CalendarDays className="w-3 h-3" />Fecha de Vencimiento</label>
-                                    <input type="datetime-local" className="mt-1.5 w-full px-4 py-3 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20" value={newT.due_date} onChange={e => setNewT(p => ({ ...p, due_date: e.target.value }))} />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><UserCheck className="w-3 h-3" />Cliente / Lead</label>
-                                    <div className="mt-1.5 bg-gray-50 rounded-2xl overflow-hidden">
-                                        <div className="relative">
-                                            <Search className="w-3.5 h-3.5 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2" />
-                                            <input type="text" placeholder="Buscar cliente..." value={leadSearch} onChange={e => setLeadSearch(e.target.value)}
-                                                className="w-full pl-8 pr-3 py-2.5 bg-transparent border-none text-sm focus:ring-0 font-medium" />
+
+                                    {/* 3 columns: Category, Priority, Due Date */}
+                                    <div className="grid grid-cols-3 gap-4 mb-4">
+                                        <div>
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Categoría</label>
+                                            <select className="mt-1.5 w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition appearance-none"
+                                                value={newT.category_id} onChange={e => setNewT(p => ({ ...p, category_id: e.target.value }))}>
+                                                <option value="">Sin categoría</option>{categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                            </select>
                                         </div>
-                                        {newT.lead_id && (
-                                            <div className="flex items-center gap-2 px-3 pb-2">
-                                                <span className="flex items-center gap-1.5 bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-lg text-xs font-bold">
-                                                    {leads.find(l => l.id === newT.lead_id)?.name}
-                                                    <button type="button" onClick={() => { setNewT(p => ({ ...p, lead_id: '' })); setLeadSearch(''); }} className="ml-1 hover:text-red-500"><X className="w-3 h-3" /></button>
-                                                </span>
+                                        <div>
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Prioridad</label>
+                                            <select className="mt-1.5 w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition appearance-none"
+                                                value={newT.priority} onChange={e => setNewT(p => ({ ...p, priority: e.target.value as TicketPriority }))}>
+                                                <option value="low">↓ Baja</option><option value="medium">→ Media</option><option value="high">↑ Alta</option><option value="urgent">⚡ Urgente</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><CalendarDays className="w-3 h-3" />Vencimiento</label>
+                                            <input type="datetime-local" className="mt-1.5 w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition"
+                                                value={newT.due_date} onChange={e => setNewT(p => ({ ...p, due_date: e.target.value }))} />
+                                        </div>
+                                    </div>
+
+                                    {/* Client / Lead */}
+                                    <div>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1"><UserCheck className="w-3 h-3" />Cliente / Lead</label>
+                                        <div className="mt-1.5 bg-gray-50 border border-gray-100 rounded-2xl overflow-hidden">
+                                            <div className="relative">
+                                                <Search className="w-3.5 h-3.5 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2" />
+                                                <input type="text" placeholder="Buscar cliente..." value={leadSearch} onChange={e => setLeadSearch(e.target.value)}
+                                                    className="w-full pl-8 pr-3 py-2.5 bg-transparent border-none text-sm focus:ring-0 font-medium" />
                                             </div>
-                                        )}
-                                        {!newT.lead_id && (
-                                            <div className="max-h-36 overflow-y-auto border-t border-gray-100">
-                                                {leads.filter(l => l.name.toLowerCase().includes(leadSearch.toLowerCase()) || l.email?.toLowerCase().includes(leadSearch.toLowerCase())).slice(0, 8).map(l => (
-                                                    <button key={l.id} type="button" onClick={() => { setNewT(p => ({ ...p, lead_id: l.id })); setLeadSearch(''); }}
-                                                        className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-indigo-50 transition-colors text-left">
-                                                        <div className="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center text-[10px] font-black text-indigo-600 shrink-0">{l.name.charAt(0).toUpperCase()}</div>
-                                                        <div><p className="text-xs font-bold text-gray-800">{l.name}</p><p className="text-[9px] text-gray-400">{l.email || l.phone || '—'}</p></div>
-                                                    </button>
-                                                ))}
-                                                {leads.filter(l => l.name.toLowerCase().includes(leadSearch.toLowerCase())).length === 0 && (
-                                                    <p className="text-[10px] text-gray-300 text-center py-3 font-bold">Sin resultados</p>
-                                                )}
+                                            {newT.lead_id && (
+                                                <div className="flex items-center gap-2 px-3 pb-2">
+                                                    <span className="flex items-center gap-1.5 bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-lg text-xs font-bold">
+                                                        {leads.find(l => l.id === newT.lead_id)?.name}
+                                                        <button type="button" onClick={() => { setNewT(p => ({ ...p, lead_id: '' })); setLeadSearch(''); }} className="ml-1 hover:text-red-500"><X className="w-3 h-3" /></button>
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {!newT.lead_id && (
+                                                <div className="max-h-32 overflow-y-auto border-t border-gray-100">
+                                                    {leads.filter(l => l.name.toLowerCase().includes(leadSearch.toLowerCase()) || l.email?.toLowerCase().includes(leadSearch.toLowerCase())).slice(0, 6).map(l => (
+                                                        <button key={l.id} type="button" onClick={() => { setNewT(p => ({ ...p, lead_id: l.id })); setLeadSearch(''); }}
+                                                            className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-indigo-50 transition-colors text-left">
+                                                            <div className="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center text-[10px] font-black text-indigo-600 shrink-0">{l.name.charAt(0).toUpperCase()}</div>
+                                                            <div><p className="text-xs font-bold text-gray-800">{l.name}</p><p className="text-[9px] text-gray-400">{l.email || l.phone || ''}</p></div>
+                                                        </button>
+                                                    ))}
+                                                    {leads.filter(l => l.name.toLowerCase().includes(leadSearch.toLowerCase())).length === 0 && (
+                                                        <p className="text-[10px] text-gray-300 text-center py-3 font-bold">Sin resultados</p>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Section 2: Descripción + Archivos */}
+                                <div>
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <span className="w-6 h-6 rounded-lg bg-purple-100 flex items-center justify-center text-xs font-black text-purple-600">2</span>
+                                        <span className="text-sm font-black text-gray-900 uppercase tracking-wide">Descripción y Archivos</span>
+                                    </div>
+
+                                    {/* Description */}
+                                    <div className="mb-4">
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Descripción</label>
+                                        <textarea rows={4} placeholder="Detalla el problema, incluye pasos para reproducir..."
+                                            className="mt-1.5 w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 resize-none transition"
+                                            value={newT.description} onChange={e => setNewT(p => ({ ...p, description: e.target.value }))} />
+                                    </div>
+
+                                    {/* File upload zone */}
+                                    <div>
+                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1 mb-1.5"><Paperclip className="w-3 h-3" />Adjuntar Archivos</label>
+                                        <input ref={fileInputRef} type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xlsx" className="hidden"
+                                            onChange={e => { if (e.target.files) { setAttachFiles(prev => [...prev, ...Array.from(e.target.files!)]); e.target.value = ''; } }} />
+                                        <div
+                                            onClick={() => fileInputRef.current?.click()}
+                                            onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('border-indigo-400', 'bg-indigo-50/50'); }}
+                                            onDragLeave={e => { e.currentTarget.classList.remove('border-indigo-400', 'bg-indigo-50/50'); }}
+                                            onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove('border-indigo-400', 'bg-indigo-50/50'); if (e.dataTransfer.files) setAttachFiles(prev => [...prev, ...Array.from(e.dataTransfer.files)]); }}
+                                            className="border-2 border-dashed border-gray-200 rounded-2xl p-5 text-center cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/30 transition-all group"
+                                        >
+                                            <div className="flex flex-col items-center gap-1.5">
+                                                <div className="w-10 h-10 rounded-xl bg-gray-100 group-hover:bg-indigo-100 flex items-center justify-center transition-colors">
+                                                    <Image className="w-5 h-5 text-gray-300 group-hover:text-indigo-500 transition-colors" />
+                                                </div>
+                                                <p className="text-xs font-bold text-gray-400">Arrastra archivos aquí o <span className="text-indigo-500">selecciona</span></p>
+                                                <p className="text-[9px] text-gray-300">Fotos, videos, PDF, documentos</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Attached files preview */}
+                                        {attachFiles.length > 0 && (
+                                            <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                                {attachFiles.map((file, idx) => {
+                                                    const isImage = file.type.startsWith('image/');
+                                                    const isVideo = file.type.startsWith('video/');
+                                                    const sizeKB = Math.round(file.size / 1024);
+                                                    const sizeLabel = sizeKB > 1024 ? `${(sizeKB / 1024).toFixed(1)} MB` : `${sizeKB} KB`;
+                                                    return (
+                                                        <div key={idx} className="relative group/file bg-gray-50 border border-gray-100 rounded-xl overflow-hidden">
+                                                            {isImage ? (
+                                                                <img src={URL.createObjectURL(file)} alt="" className="w-full h-20 object-cover" />
+                                                            ) : isVideo ? (
+                                                                <div className="w-full h-20 bg-gray-100 flex items-center justify-center">
+                                                                    <FileVideo className="w-6 h-6 text-gray-300" />
+                                                                </div>
+                                                            ) : (
+                                                                <div className="w-full h-20 bg-gray-100 flex items-center justify-center">
+                                                                    <Paperclip className="w-6 h-6 text-gray-300" />
+                                                                </div>
+                                                            )}
+                                                            <div className="px-2 py-1.5">
+                                                                <p className="text-[9px] font-bold text-gray-600 truncate">{file.name}</p>
+                                                                <p className="text-[8px] text-gray-300">{sizeLabel}</p>
+                                                            </div>
+                                                            <button type="button" onClick={() => setAttachFiles(prev => prev.filter((_, i) => i !== idx))}
+                                                                className="absolute top-1 right-1 w-5 h-5 bg-red-500/80 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover/file:opacity-100 transition-opacity">
+                                                                <Trash2 className="w-3 h-3" />
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         )}
                                     </div>
                                 </div>
-                                <div>
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Descripción</label>
-                                    <textarea rows={3} placeholder="Detalla el problema..." className="mt-1.5 w-full px-4 py-3 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 resize-none" value={newT.description} onChange={e => setNewT(p => ({ ...p, description: e.target.value }))} />
-                                </div>
                             </div>
-                            <div className="px-6 py-4 bg-gray-50/60 border-t border-gray-100 flex items-center justify-end gap-3">
-                                <button type="button" onClick={() => setIsCreateOpen(false)} className="px-5 py-2.5 text-sm font-black text-gray-400 hover:text-gray-600">Cancelar</button>
-                                <button type="submit" className="bg-indigo-600 text-white px-8 py-2.5 rounded-2xl text-sm font-bold flex items-center gap-2 hover:bg-indigo-700 shadow-lg shadow-indigo-200"><Send className="w-4 h-4" />Crear Ticket</button>
+
+                            {/* Footer */}
+                            <div className="px-7 py-4 bg-gray-50/80 border-t border-gray-100 flex items-center justify-between shrink-0">
+                                <p className="text-[9px] text-gray-300 font-bold">{attachFiles.length > 0 ? `${attachFiles.length} archivo${attachFiles.length > 1 ? 's' : ''} adjunto${attachFiles.length > 1 ? 's' : ''}` : ''}</p>
+                                <div className="flex items-center gap-3">
+                                    <button type="button" onClick={() => { setIsCreateOpen(false); setAttachFiles([]); }} className="px-5 py-2.5 text-sm font-black text-gray-400 hover:text-gray-600 transition">Cancelar</button>
+                                    <button type="submit" className="bg-indigo-600 text-white px-8 py-2.5 rounded-2xl text-sm font-bold flex items-center gap-2 hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all">
+                                        <Send className="w-4 h-4" />Crear Ticket
+                                    </button>
+                                </div>
                             </div>
                         </form>
                     </div>
