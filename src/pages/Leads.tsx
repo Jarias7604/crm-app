@@ -1400,6 +1400,36 @@ export default function Leads() {
                                         <span className="text-emerald-600 ml-1">· ${filteredPipelineTotal.toLocaleString()}</span>
                                     )}
                                 </p>
+                                {/* Badge Legend Tooltip */}
+                                <div className="relative group/legend ml-1">
+                                    <button className="w-4 h-4 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors" type="button">
+                                        <span className="text-[8px] font-black text-gray-400 leading-none">?</span>
+                                    </button>
+                                    <div className="absolute left-0 top-full mt-1.5 w-56 bg-white rounded-xl shadow-xl border border-gray-100 p-3 opacity-0 invisible group-hover/legend:opacity-100 group-hover/legend:visible transition-all duration-200 z-50">
+                                        <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2">Indicadores</p>
+                                        <div className="space-y-2">
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-[10px] shrink-0">📞</span>
+                                                <div>
+                                                    <p className="text-[10px] font-bold text-gray-700">Intentos de contacto</p>
+                                                    <p className="text-[9px] text-gray-400">Verde &lt;4 · Ámbar 4-5 · Rojo 6+</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-start gap-2">
+                                                <span className="text-[10px] shrink-0">🔥</span>
+                                                <div>
+                                                    <p className="text-[10px] font-bold text-gray-700">Engagement Score</p>
+                                                    <p className="text-[9px] text-gray-400">Enviado=1pt · Abierto=5 · Click=10</p>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-sky-500"></span><span className="text-[8px] text-gray-400">1-4</span></span>
+                                                        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span><span className="text-[8px] text-gray-400">5-9</span></span>
+                                                        <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span><span className="text-[8px] text-gray-400">10+</span></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         {/* Mobile filter trigger */}

@@ -268,7 +268,28 @@ export default function MarketingDashboard() {
                                 </tbody>
                             </table>
                         </div>
-                        <p className="text-[10px] text-gray-400 italic text-center">Los datos se actualizan automáticamente al detectar aperturas.</p>
+                        {/* Score Legend */}
+                        <div className="flex items-center justify-between pt-2 px-1">
+                            <div className="flex items-center gap-4 flex-wrap">
+                                <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Score:</span>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-sky-500"></div>
+                                    <span className="text-[9px] text-gray-400 font-bold">1-4 Contacto</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
+                                    <span className="text-[9px] text-gray-400 font-bold">5-9 Warm</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-rose-500"></div>
+                                    <span className="text-[9px] text-gray-400 font-bold">10+ Hot</span>
+                                </div>
+                                <div className="h-3 w-px bg-gray-200 mx-1"></div>
+                                <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Pts:</span>
+                                <span className="text-[9px] text-gray-400 font-medium">Enviado=1 · Abierto=5 · Click=10</span>
+                            </div>
+                            <p className="text-[9px] text-gray-300 italic shrink-0">Auto-actualización</p>
+                        </div>
                     </div>
                 </div>
 
