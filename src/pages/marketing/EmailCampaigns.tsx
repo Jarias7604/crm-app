@@ -183,52 +183,55 @@ export default function EmailCampaigns() {
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button
-                                        onClick={() => navigate(`/marketing/campaign/${campaign.id}/edit`)}
-                                        className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
-                                        title="Editar"
-                                    >
-                                        <Edit className="w-5 h-5" />
-                                    </button>
-
-                                    {/* Enviar - solo para drafts */}
-                                    {campaign.status === 'draft' && (
-                                        <button
-                                            onClick={() => handleQuickSend(campaign.id)}
-                                            className="p-2 text-gray-400 hover:text-green-600 transition-colors"
-                                            title="Enviar Ahora"
-                                        >
-                                            <Play className="w-5 h-5" />
-                                        </button>
-                                    )}
-
-                                    {/* Duplicar - para completed (reenviar como nueva) */}
+                                <div className="flex items-center gap-2">
+                                    {/* Duplicar - siempre visible para completed */}
                                     {campaign.status === 'completed' && (
                                         <button
                                             onClick={() => handleDuplicate(campaign)}
-                                            className="p-2 text-gray-400 hover:text-orange-600 transition-colors"
+                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 text-orange-600 hover:bg-orange-100 rounded-lg text-xs font-bold transition-all border border-orange-200 hover:border-orange-300"
                                             title="Duplicar como nuevo borrador"
                                         >
-                                            <Copy className="w-5 h-5" />
+                                            <Copy className="w-3.5 h-3.5" />
+                                            Clonar y Reenviar
                                         </button>
                                     )}
 
-                                    <button
-                                        onClick={() => navigate(`/marketing/campaign/${campaign.id}/edit`)}
-                                        className="p-2 text-gray-400 hover:text-purple-600 transition-colors"
-                                        title="Ver Reporte"
-                                    >
-                                        <BarChart2 className="w-5 h-5" />
-                                    </button>
+                                    {/* Acciones hover */}
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button
+                                            onClick={() => navigate(`/marketing/campaign/${campaign.id}/edit`)}
+                                            className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                                            title="Editar"
+                                        >
+                                            <Edit className="w-4 h-4" />
+                                        </button>
 
-                                    <button
-                                        onClick={() => handleDelete(campaign.id)}
-                                        className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                                        title="Eliminar Proyecto"
-                                    >
-                                        <Trash2 className="w-5 h-5" />
-                                    </button>
+                                        {campaign.status === 'draft' && (
+                                            <button
+                                                onClick={() => handleQuickSend(campaign.id)}
+                                                className="p-2 text-gray-400 hover:text-green-600 transition-colors"
+                                                title="Enviar Ahora"
+                                            >
+                                                <Play className="w-4 h-4" />
+                                            </button>
+                                        )}
+
+                                        <button
+                                            onClick={() => navigate(`/marketing/campaign/${campaign.id}/edit`)}
+                                            className="p-2 text-gray-400 hover:text-purple-600 transition-colors"
+                                            title="Ver Reporte"
+                                        >
+                                            <BarChart2 className="w-4 h-4" />
+                                        </button>
+
+                                        <button
+                                            onClick={() => handleDelete(campaign.id)}
+                                            className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                                            title="Eliminar"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         ))
