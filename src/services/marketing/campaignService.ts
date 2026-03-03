@@ -142,6 +142,7 @@ export const campaignService = {
     // NEW: Get audience preview based on advanced filters
     async getAudiencePreview(filters: {
         status?: string[],
+        industry?: string[],
         priority?: string,
         dateRange?: 'all' | 'new',
         specificIds?: string[],
@@ -181,6 +182,10 @@ export const campaignService = {
 
             if (filters.priority && filters.priority !== 'all') {
                 query = query.eq('priority', filters.priority);
+            }
+
+            if (filters.industry && filters.industry.length > 0) {
+                query = query.in('industry', filters.industry);
             }
         }
 

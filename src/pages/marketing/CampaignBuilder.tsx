@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Save, Send, ArrowLeft, Users, FileText, Eye, X, Zap, Mail, Smartphone, Info, ChevronLeft, ChevronRight, Smartphone as WhatsAppIcon, ExternalLink, ShieldCheck, ShieldAlert, Check, Search, MailX, UserCheck, UserX } from 'lucide-react';
 import { campaignService } from '../../services/marketing/campaignService';
+import { supabase } from '../../services/supabase';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../auth/AuthProvider';
 import RichTextEditor from '../../components/marketing/RichTextEditor';
@@ -23,6 +24,7 @@ export default function CampaignBuilder() {
         template_id: '' as string | null,
         audience_filter: {
             status: [] as string[],
+            industry: [] as string[],
             dateRange: 'all' as 'all' | 'new',
             priority: 'all' as string,
             specificIds: [] as string[],
@@ -43,6 +45,7 @@ export default function CampaignBuilder() {
                     template_id: (campaign as any).template_id || null,
                     audience_filter: {
                         status: campaign.audience_filters?.status || [],
+                        industry: campaign.audience_filters?.industry || [],
                         dateRange: campaign.audience_filters?.dateRange || 'all',
                         priority: campaign.audience_filters?.priority || 'all',
                         specificIds: campaign.audience_filters?.specificIds || [],
@@ -71,6 +74,7 @@ export default function CampaignBuilder() {
     }, [campaignId, location.state]);
 
     const possibleStatuses = ["Prospecto", "Llamada fría", "En Nutrición", "Lead calificado", "En seguimiento", "Negociación", "Cerrado", "Cliente"];
+    const [availableIndustries, setAvailableIndustries] = useState<string[]>([]);
 
     const [previewLeads, setPreviewLeads] = useState<any[]>([]);
     const [loadingPreview, setLoadingPreview] = useState(false);
@@ -85,7 +89,17 @@ export default function CampaignBuilder() {
         if (profile?.company_id && formData.audience_filter) {
             handlePreviewAudience();
         }
-    }, [formData.audience_filter.status, formData.audience_filter.priority, formData.audience_filter.dateRange, selectedChannel]);
+    }, [formData.audience_filter.status, formData.audience_filter.priority, formData.audience_filter.dateRange, formData.audience_filter.industry, selectedChannel]);
+
+    // Load available industries
+    useEffect(() => {
+        if (profile?.company_id) {
+            supabase.from('leads').select('industry').eq('company_id', profile.company_id).not('industry', 'is', null).not('industry', 'eq', '').then(({ data }) => {
+                const unique = Array.from(new Set((data || []).map(l => l.industry).filter(Boolean))) as string[];
+                setAvailableIndustries(unique.sort());
+            });
+        }
+    }, [profile?.company_id]);
 
     const getGreeting = () => {
         const hour = new Date().getHours();
@@ -425,6 +439,31 @@ export default function CampaignBuilder() {
                                     })}
                                 </div>
                             </div>
+
+                            {/* Industry / Rubro */}
+                            {availableIndustries.length > 0 && (
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Rubro / Industria</label>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {availableIndustries.map(ind => {
+                                            const isSelected = formData.audience_filter.industry?.includes(ind);
+                                            return (
+                                                <button
+                                                    key={ind}
+                                                    onClick={() => {
+                                                        const current = formData.audience_filter?.industry || [];
+                                                        const newIndustry = isSelected ? current.filter(i => i !== ind) : [...current, ind];
+                                                        setFormData({ ...formData, audience_filter: { ...formData.audience_filter, industry: newIndustry } });
+                                                    }}
+                                                    className={`px-2.5 py-1 rounded-lg text-[9px] font-bold transition-all border ${isSelected ? 'bg-teal-600 text-white border-transparent shadow-md' : 'bg-white border-gray-100 text-gray-500 hover:bg-gray-50'}`}
+                                                >
+                                                    {ind}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Connectivity Filter (Telegram Only) */}
                             {selectedChannel === 'telegram' && (
