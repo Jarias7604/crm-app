@@ -26,6 +26,7 @@ interface LeadKanbanProps {
 const COLUMNS: LeadStatus[] = [
     'Prospecto',
     'Llamada fría',
+    'En Nutrición',
     'Lead calificado',
     'En seguimiento',
     'Negociación',
@@ -36,6 +37,7 @@ const COLUMNS: LeadStatus[] = [
 const COLUMN_COLORS: Record<LeadStatus, string> = {
     'Prospecto': 'bg-slate-700',
     'Llamada fría': 'bg-orange-700',
+    'En Nutrición': 'bg-teal-600',
     'Lead calificado': 'bg-blue-800',
     'En seguimiento': 'bg-indigo-700',
     'Negociación': 'bg-cyan-700',
@@ -233,6 +235,16 @@ export function LeadKanban({ leads, teamMembers, onUpdateStatus, onOpenDetail }:
                                                                 <div className="flex items-center gap-1.5 mt-1">
                                                                     <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded-md border ${SOURCE_CONFIG[lead.source].bgColor} ${SOURCE_CONFIG[lead.source].color} border-current opacity-80`}>
                                                                         {SOURCE_CONFIG[lead.source].icon} {SOURCE_CONFIG[lead.source].label}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                            {(lead.contact_count || 0) > 0 && (
+                                                                <div className="flex items-center gap-1.5 mt-1">
+                                                                    <span className={`px-2 py-0.5 text-[9px] font-black rounded-md border ${(lead.contact_count || 0) >= 6 ? 'bg-red-50 text-red-600 border-red-200' :
+                                                                        (lead.contact_count || 0) >= 4 ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                                                                            'bg-emerald-50 text-emerald-600 border-emerald-200'
+                                                                        }`}>
+                                                                        📞 {lead.contact_count} intentos
                                                                     </span>
                                                                 </div>
                                                             )}

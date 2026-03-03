@@ -67,7 +67,7 @@ export default function EmailBuilder() {
         }
     }, [campaignId, location.state]);
 
-    const possibleStatuses = ["Prospecto", "Cerrado", "En seguimiento", "Cliente", "Negociación", "Lead calificado"];
+    const possibleStatuses = ["Prospecto", "Llamada fría", "En Nutrición", "Lead calificado", "En seguimiento", "Negociación", "Cerrado", "Cliente"];
 
     const [previewLeads, setPreviewLeads] = useState<any[]>([]);
     const [showPreview, setShowPreview] = useState(false);

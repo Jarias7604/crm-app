@@ -3,6 +3,7 @@ import { Phone, X, Loader2, Clock, CalendarPlus } from 'lucide-react';
 import { SessionTimer } from './ui/SessionTimer';
 import { callActivityService, ACTION_TYPE_CONFIG, CALL_OUTCOME_CONFIG, type CallOutcome, type ActionType } from '../services/callActivity';
 import { leadsService } from '../services/leads';
+import { supabase } from '../services/supabase';
 import type { Lead, LeadStatus, FollowUpActionType } from '../types';
 import { CustomDatePicker } from './ui/CustomDatePicker';
 import toast from 'react-hot-toast';
@@ -219,6 +220,10 @@ export function QuickActionLogger({ lead, companyId, teamMembers = [], onCallLog
                 statusBefore: lead.status,
                 durationSeconds: durationMinutes ? Number(durationMinutes) * 60 : undefined,
             });
+
+            // Increment contact_count atomically
+            const { data: currentLead } = await supabase.from('leads').select('contact_count').eq('id', lead.id).single();
+            await supabase.from('leads').update({ contact_count: ((currentLead?.contact_count as number) || 0) + 1 }).eq('id', lead.id);
 
             // 2. If user wants a follow-up, create it independently
             if (wantsFollowUp && followUpDate) {

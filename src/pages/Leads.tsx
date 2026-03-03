@@ -183,6 +183,7 @@ export default function Leads() {
     const cameFromRef = useRef<string | null>(null);
     const [startDateFilter, setStartDateFilter] = useState<string | null>(null);
     const [endDateFilter, setEndDateFilter] = useState<string | null>(null);
+    const [minContactCountFilter, setMinContactCountFilter] = useState<number | null>(null);
     const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
     const [isUploading, setIsUploading] = useState(false);
@@ -238,6 +239,9 @@ export default function Leads() {
                 if (state.leadId) {
                     setFilteredLeadId(state.leadId);
                     if (viewMode === 'kanban') setViewMode('list');
+                }
+                if (state.minContactCount) {
+                    setMinContactCountFilter(state.minContactCount);
                 }
                 if (state.openCreateModal) {
                     const openReq = typeof state.openCreateModal === 'number' ? state.openCreateModal : 1;
@@ -406,8 +410,8 @@ export default function Leads() {
                 if (filteredLeadIds || filteredLeadId) {
                     // Stay visible
                 } else {
-                    // Auto-hide Erroneous and Lost by default from general list ONLY if not explicitly filtering for them
-                    if (lead.status === 'Erróneo' || lead.status === 'Perdido') return false;
+                    // Auto-hide Erroneous, Lost, and Nurturing by default from general list ONLY if not explicitly filtering for them
+                    if (lead.status === 'Erróneo' || lead.status === 'Perdido' || lead.status === 'En Nutrición') return false;
                 }
             } else {
                 if (Array.isArray(statusFilter)) {
@@ -460,9 +464,12 @@ export default function Leads() {
                 if (endDateFilter && dateToCompare > new Date(endDateFilter)) return false;
             }
 
+            // Filter by minimum contact count (from escalation widget)
+            if (minContactCountFilter && (lead.contact_count || 0) < minContactCountFilter) return false;
+
             return true;
         });
-    }, [leads, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter]);
+    }, [leads, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter, minContactCountFilter]);
 
     const sortedLeads = useMemo(() => {
         if (!sortConfig) return filteredLeads;
@@ -1674,7 +1681,7 @@ export default function Leads() {
                                 setFilteredLeadId(null); setFilteredLeadIds(null);
                                 setStatusFilter('all'); setPriorityFilter('all'); setAssignedFilter('all');
                                 setSourceFilter('all'); setLossReasonFilter('all'); setLostAtStageFilter('all');
-                                setStartDateFilter(null); setEndDateFilter(null);
+                                setStartDateFilter(null); setEndDateFilter(null); setMinContactCountFilter(null);
                             }}
                             className="text-xs font-semibold text-gray-400 hover:text-red-500 transition-colors ml-1 flex items-center gap-1"
                         >
@@ -1986,6 +1993,12 @@ export default function Leads() {
                                                 <div className="flex items-center gap-2 mb-1">
                                                     <h4 className="text-sm font-black text-gray-900 truncate">{lead.name}</h4>
                                                     <StatusBadge status={lead.status} />
+                                                    {(lead.contact_count || 0) > 0 && (
+                                                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${(lead.contact_count || 0) >= 6 ? 'bg-red-50 text-red-600' :
+                                                            (lead.contact_count || 0) >= 4 ? 'bg-amber-50 text-amber-600' :
+                                                                'bg-emerald-50 text-emerald-600'
+                                                            }`}>📞{lead.contact_count}</span>
+                                                    )}
                                                 </div>
                                                 <p className="text-xs font-bold text-gray-400 truncate">{lead.company_name || 'Sin empresa'}</p>
                                             </div>
@@ -2245,7 +2258,19 @@ export default function Leads() {
                                                                     ) : null
                                                                 )}
 
-                                                                {colId === 'status' && <StatusBadge status={lead.status} />}
+                                                                {colId === 'status' && (
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <StatusBadge status={lead.status} />
+                                                                        {(lead.contact_count || 0) > 0 && (
+                                                                            <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-black rounded-full border ${(lead.contact_count || 0) >= 6 ? 'bg-red-50 text-red-600 border-red-200' :
+                                                                                (lead.contact_count || 0) >= 4 ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                                                                                    'bg-emerald-50 text-emerald-600 border-emerald-200'
+                                                                                }`} title={`${lead.contact_count} intentos de contacto`}>
+                                                                                📞{lead.contact_count}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                )}
 
                                                                 {colId === 'priority' && <PriorityBadge priority={lead.priority} />}
 
@@ -2619,6 +2644,14 @@ export default function Leads() {
                                             ))}
                                         </select>
                                     </div>
+                                    {(selectedLead.contact_count || 0) > 0 && (
+                                        <div className={`flex items-center gap-1.5 mt-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black ${(selectedLead.contact_count || 0) >= 6 ? 'bg-red-50 text-red-600' :
+                                            (selectedLead.contact_count || 0) >= 4 ? 'bg-amber-50 text-amber-600' :
+                                                'bg-emerald-50 text-emerald-600'
+                                            }`}>
+                                            📞 {selectedLead.contact_count} intentos
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Temperatura</label>

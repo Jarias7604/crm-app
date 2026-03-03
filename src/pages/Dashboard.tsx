@@ -4,7 +4,7 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
-import { BadgeDollarSign, TrendingUp, Users, Target, Building, Building2, Calendar, Clock, CheckCircle, ChevronDown, Edit2, Settings, AlertTriangle } from 'lucide-react';
+import { BadgeDollarSign, TrendingUp, Users, Target, Building, Building2, Calendar, Clock, CheckCircle, ChevronDown, Edit2, Settings, AlertTriangle, PhoneOff, ArrowRight, Sprout } from 'lucide-react';
 import { adminService } from '../services/admin';
 import { supabase } from '../services/supabase';
 import { useEffect, useState, useRef, useMemo } from 'react';
@@ -25,6 +25,7 @@ import { useDashboardStats } from '../hooks/useDashboard';
 import { MobileQuickActions } from '../components/MobileQuickActions';
 import { ManagerLivePulse } from '../components/ManagerLivePulse';
 import { WeeklyLeaderboard } from '../components/WeeklyLeaderboard';
+import toast from 'react-hot-toast';
 
 const THEME = {
     primary: '#4F46E5',   // Indigo Moderno
@@ -71,6 +72,7 @@ const FunnelInfographic = ({ data, onStageClick }: { data: any[], onStageClick: 
     const layers = [
         { label: 'Prospecto', value: count('Prospecto'), amount: amount('Prospecto'), color: '#3b82f6', key: 'Prospecto' },
         { label: 'Llamada fría', value: count('Llamada fría'), amount: amount('Llamada fría'), color: '#ea580c', key: 'Llamada fría' },
+        { label: 'Nutrición', value: count('En Nutrición'), amount: amount('En Nutrición'), color: '#0d9488', key: 'En Nutrición' },
         { label: 'Calificado', value: count('Lead calificado'), amount: amount('Lead calificado'), color: '#6366f1', key: 'Lead calificado' },
         { label: 'Seguimiento', value: count('En seguimiento'), amount: amount('En seguimiento'), color: '#8b5cf6', key: 'En seguimiento' },
         { label: 'Negociación', value: count('Negociación'), amount: amount('Negociación'), color: '#f97316', key: 'Negociación' },
@@ -130,6 +132,7 @@ export default function Dashboard() {
     // Card-specific filter dropdown state
     const [activeCardFilter, setActiveCardFilter] = useState<string | null>(null);
     const cardFilterRef = useRef<HTMLDivElement>(null);
+    const escalationRef = useRef<HTMLDivElement>(null);
 
     // Real data states
     const [stats, setStats] = useState({
@@ -154,6 +157,8 @@ export default function Dashboard() {
     const [lossReasonData, setLossReasonData] = useState<any[]>([]);
     const [lossStageData, setLossStageData] = useState<any[]>([]);
     const [industryData, setIndustryData] = useState<{ name: string; count: number; percentage: number }[]>([]);
+    const [escalationLeads, setEscalationLeads] = useState<any[]>([]);
+    const [showEscalation, setShowEscalation] = useState<boolean | 'expanded'>(true);
 
 
     const navigate = useNavigate();
@@ -357,6 +362,18 @@ export default function Dashboard() {
                 });
 
         }
+
+        // Load escalation leads (Llamada fría with 6+ contact attempts)
+        supabase
+            .from('leads')
+            .select('id, name, company_name, phone, email, contact_count, created_at, assigned_to')
+            .eq('status', 'Llamada fría')
+            .gte('contact_count', 6)
+            .order('contact_count', { ascending: false })
+            .limit(10)
+            .then(({ data }) => {
+                setEscalationLeads(data || []);
+            });
     }, [dashboardData]);
 
     useEffect(() => {
@@ -372,6 +389,9 @@ export default function Dashboard() {
             }
             if (cardFilterRef.current && !cardFilterRef.current.contains(event.target as Node)) {
                 setActiveCardFilter(null);
+            }
+            if (escalationRef.current && !escalationRef.current.contains(event.target as Node)) {
+                setShowEscalation(prev => prev === 'expanded' ? true : prev);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -606,6 +626,79 @@ export default function Dashboard() {
                     <p className="text-[13px] text-gray-400 font-medium font-inter transition-all">Análisis de rendimiento y prospección en tiempo real</p>
                 </div>
                 <div className="flex items-center gap-3">
+                    {/* Escalation Pill Notification */}
+                    {escalationLeads.length > 0 && (
+                        <div className="relative" ref={escalationRef}>
+                            <button
+                                onClick={() => setShowEscalation(prev => prev === 'expanded' ? true : 'expanded')}
+                                className={`flex items-center gap-2 h-10 px-4 rounded-xl border transition-all text-xs font-black ${showEscalation === 'expanded'
+                                    ? 'bg-red-500 border-red-500 text-white shadow-lg shadow-red-200'
+                                    : 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100 hover:border-red-300'
+                                    }`}
+                            >
+                                <PhoneOff className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Escalación</span>
+                                <span className="bg-white/20 backdrop-blur-sm text-[10px] font-black px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                                    {escalationLeads.length}
+                                </span>
+                            </button>
+
+                            {/* Floating Dropdown Panel */}
+                            {showEscalation === 'expanded' && (
+                                <div className="absolute right-0 top-full mt-2 w-[380px] bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                    <div className="bg-gradient-to-r from-red-500 to-orange-500 px-4 py-3">
+                                        <p className="text-white font-black text-xs">⚠️ Leads que requieren escalación</p>
+                                        <p className="text-white/60 text-[9px] font-bold">6+ intentos de contacto sin respuesta</p>
+                                    </div>
+                                    <div className="max-h-[280px] overflow-y-auto divide-y divide-gray-50">
+                                        {escalationLeads.slice(0, 8).map((lead) => {
+                                            const daysSince = Math.floor((Date.now() - new Date(lead.created_at).getTime()) / 86400000);
+                                            return (
+                                                <div
+                                                    key={lead.id}
+                                                    className="px-4 py-2.5 flex items-center justify-between hover:bg-red-50/40 transition-colors cursor-pointer group/row"
+                                                    onClick={() => { setShowEscalation(true); navigate('/leads', { state: { leadId: lead.id } }); }}
+                                                >
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-xs font-bold text-gray-900 truncate group-hover/row:text-red-600 transition-colors">{lead.name}</p>
+                                                        <p className="text-[10px] text-gray-400 font-medium truncate">{lead.company_name || lead.phone || 'Sin datos'}</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 shrink-0 ml-3">
+                                                        <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-black ${(lead.contact_count || 0) >= 10 ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
+                                                            }`}>
+                                                            📞{lead.contact_count}
+                                                        </span>
+                                                        <span className="text-[9px] font-bold text-gray-300">{daysSince}d</span>
+                                                        <button
+                                                            onClick={async (e) => {
+                                                                e.stopPropagation();
+                                                                await supabase.from('leads').update({ status: 'En Nutrición' }).eq('id', lead.id);
+                                                                setEscalationLeads(prev => prev.filter(l => l.id !== lead.id));
+                                                                toast.success(`${lead.name} → Nutrición`);
+                                                            }}
+                                                            className="flex items-center gap-1 bg-teal-50 hover:bg-teal-100 text-teal-700 text-[9px] font-black px-2 py-1 rounded-lg transition-all border border-teal-200"
+                                                            title="Mover a En Nutrición"
+                                                        >
+                                                            <Sprout className="w-3 h-3" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/50">
+                                        <button
+                                            onClick={() => { setShowEscalation(true); navigate('/leads', { state: { status: 'Llamada fría', minContactCount: 6 } }); }}
+                                            className="w-full flex items-center justify-center gap-1.5 bg-red-500 hover:bg-red-600 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl transition-all"
+                                        >
+                                            Ver todos en Leads
+                                            <ArrowRight className="w-3 h-3" />
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                     <Button
                         onClick={() => setRefreshKey(Date.now())}
                         variant="outline"
@@ -746,6 +839,7 @@ export default function Dashboard() {
                     );
                 })}
             </div>
+
 
 
             {/* Main Content Area: Grouped Proportions */}
