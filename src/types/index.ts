@@ -13,6 +13,7 @@ export type CompanyStatus = 'active' | 'trial' | 'suspended';
 export type LicenseStatus = 'active' | 'trial' | 'suspended' | 'expired' | 'manual_hold';
 export type LeadStatus =
     | 'Prospecto'
+    | 'Llamada fría'
     | 'Lead calificado'
     | 'En seguimiento'
     | 'Negociación'
@@ -149,6 +150,7 @@ export const PRIORITY_CONFIG = {
 
 export const STATUS_CONFIG: Record<LeadStatus, { label: string; color: string; bgColor: string; icon: string }> = {
     'Prospecto': { label: 'Prospecto', color: 'text-blue-700', bgColor: 'bg-blue-100', icon: '🎯' },
+    'Llamada fría': { label: 'Llamada fría', color: 'text-orange-700', bgColor: 'bg-orange-100', icon: '📲' },
     'Lead calificado': { label: 'Lead calificado', color: 'text-indigo-700', bgColor: 'bg-indigo-100', icon: '⭐' },
     'En seguimiento': { label: 'En seguimiento', color: 'text-teal-700', bgColor: 'bg-teal-100', icon: '📞' },
     'Negociación': { label: 'Negociación', color: 'text-yellow-700', bgColor: 'bg-yellow-100', icon: '💼' },

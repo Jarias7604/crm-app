@@ -226,8 +226,15 @@ export default function Leads() {
                     if (viewMode === 'kanban') setViewMode('list');
                 }
                 if (state.fromCalendar) cameFromRef.current = 'calendar';
-                if (state.startDate) setStartDateFilter(state.startDate);
-                if (state.endDate) setEndDateFilter(state.endDate);
+                // Dashboard sends full ISO timestamps — normalize to yyyy-MM-dd
+                if (state.startDate) {
+                    const sd = String(state.startDate);
+                    setStartDateFilter(sd.length > 10 ? sd.substring(0, 10) : sd);
+                }
+                if (state.endDate) {
+                    const ed = String(state.endDate);
+                    setEndDateFilter(ed.length > 10 ? ed.substring(0, 10) : ed);
+                }
                 if (state.leadId) {
                     setFilteredLeadId(state.leadId);
                     if (viewMode === 'kanban') setViewMode('list');

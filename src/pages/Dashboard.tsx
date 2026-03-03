@@ -70,6 +70,7 @@ const FunnelInfographic = ({ data, onStageClick }: { data: any[], onStageClick: 
 
     const layers = [
         { label: 'Prospecto', value: count('Prospecto'), amount: amount('Prospecto'), color: '#3b82f6', key: 'Prospecto' },
+        { label: 'Llamada fría', value: count('Llamada fría'), amount: amount('Llamada fría'), color: '#ea580c', key: 'Llamada fría' },
         { label: 'Calificado', value: count('Lead calificado'), amount: amount('Lead calificado'), color: '#6366f1', key: 'Lead calificado' },
         { label: 'Seguimiento', value: count('En seguimiento'), amount: amount('En seguimiento'), color: '#8b5cf6', key: 'En seguimiento' },
         { label: 'Negociación', value: count('Negociación'), amount: amount('Negociación'), color: '#f97316', key: 'Negociación' },

@@ -25,6 +25,7 @@ interface LeadKanbanProps {
 
 const COLUMNS: LeadStatus[] = [
     'Prospecto',
+    'Llamada fría',
     'Lead calificado',
     'En seguimiento',
     'Negociación',
@@ -34,6 +35,7 @@ const COLUMNS: LeadStatus[] = [
 
 const COLUMN_COLORS: Record<LeadStatus, string> = {
     'Prospecto': 'bg-slate-700',
+    'Llamada fría': 'bg-orange-700',
     'Lead calificado': 'bg-blue-800',
     'En seguimiento': 'bg-indigo-700',
     'Negociación': 'bg-cyan-700',
