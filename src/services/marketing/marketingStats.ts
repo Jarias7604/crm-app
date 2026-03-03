@@ -20,6 +20,7 @@ export interface HeatmapLead {
     sent: number;
     opens: number;
     clicks: number;
+    engagementScore: number;
 }
 
 export interface ActiveCampaign {
@@ -109,14 +110,14 @@ export const marketingStatsService = {
                     id: l.id,
                     name: l.name || 'Sin nombre',
                     email: l.email || '-',
-                    sent: 0, opens: 0, clicks: 0
+                    sent: 0, opens: 0, clicks: 0, engagementScore: 0
                 }));
             }
 
             // Get lead details
             const { data: leads, error: leadsError } = await supabase
                 .from('leads')
-                .select('id, name, email')
+                .select('id, name, email, engagement_score')
                 .in('id', leadIds);
 
             if (leadsError) throw leadsError;
@@ -127,7 +128,8 @@ export const marketingStatsService = {
                 email: l.email || '-',
                 sent: statsMap[l.id]?.sent || 0,
                 opens: statsMap[l.id]?.opens || 0,
-                clicks: statsMap[l.id]?.clicks || 0
+                clicks: statsMap[l.id]?.clicks || 0,
+                engagementScore: (l as any).engagement_score || 0
             }));
 
             // Complete with recent leads up to 20 total
@@ -143,7 +145,7 @@ export const marketingStatsService = {
                     id: l.id,
                     name: l.name || 'Sin nombre',
                     email: l.email || '-',
-                    sent: 0, opens: 0, clicks: 0
+                    sent: 0, opens: 0, clicks: 0, engagementScore: 0
                 }));
 
                 return [...realLeads, ...additionalLeads].sort((a, b) => (b.clicks + b.opens) - (a.clicks + a.opens));

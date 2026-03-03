@@ -248,6 +248,16 @@ export function LeadKanban({ leads, teamMembers, onUpdateStatus, onOpenDetail }:
                                                                     </span>
                                                                 </div>
                                                             )}
+                                                            {(lead.engagement_score || 0) > 0 && (
+                                                                <div className="flex items-center gap-1.5 mt-1">
+                                                                    <span className={`px-2 py-0.5 text-[9px] font-black rounded-md border ${(lead.engagement_score || 0) >= 10 ? 'bg-rose-50 text-rose-600 border-rose-200' :
+                                                                        (lead.engagement_score || 0) >= 5 ? 'bg-orange-50 text-orange-600 border-orange-200' :
+                                                                            'bg-sky-50 text-sky-600 border-sky-200'
+                                                                        }`}>
+                                                                        🔥 Engagement: {lead.engagement_score}
+                                                                    </span>
+                                                                </div>
+                                                            )}
                                                         </div>
 
                                                         <div className="flex items-center justify-between py-3 border-y border-slate-50">

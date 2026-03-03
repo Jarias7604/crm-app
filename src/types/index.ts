@@ -108,6 +108,7 @@ export interface Lead {
     internal_won_date?: string | null;
     industry?: string | null;
     contact_count?: number;
+    engagement_score?: number;
     created_at: string;
 }
 

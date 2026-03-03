@@ -188,6 +188,7 @@ export default function MarketingDashboard() {
                                         <th className="px-6 py-4">Envíos</th>
                                         <th className="px-6 py-4">Aperturas</th>
                                         <th className="px-6 py-4">Clicks</th>
+                                        <th className="px-4 py-4">Score</th>
                                         <th className="px-6 py-4 text-right">Acción</th>
                                     </tr>
                                 </thead>
@@ -229,6 +230,29 @@ export default function MarketingDashboard() {
                                                 )}>
                                                     {lead.clicks} CLICKS
                                                 </span>
+                                            </td>
+                                            <td className="px-4 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                                        <div
+                                                            className={cn(
+                                                                "h-full rounded-full transition-all",
+                                                                lead.engagementScore >= 10 ? "bg-gradient-to-r from-orange-400 to-rose-500" :
+                                                                    lead.engagementScore >= 5 ? "bg-gradient-to-r from-amber-400 to-orange-500" :
+                                                                        "bg-gradient-to-r from-sky-400 to-blue-500"
+                                                            )}
+                                                            style={{ width: `${Math.min(100, (lead.engagementScore / 50) * 100)}%` }}
+                                                        ></div>
+                                                    </div>
+                                                    <span className={cn(
+                                                        "text-[10px] font-black",
+                                                        lead.engagementScore >= 10 ? "text-rose-600" :
+                                                            lead.engagementScore >= 5 ? "text-orange-600" :
+                                                                lead.engagementScore > 0 ? "text-sky-600" : "text-gray-300"
+                                                    )}>
+                                                        {lead.engagementScore > 0 ? `🔥${lead.engagementScore}` : '—'}
+                                                    </span>
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <button

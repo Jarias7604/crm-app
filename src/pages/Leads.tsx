@@ -1999,6 +1999,12 @@ export default function Leads() {
                                                                 'bg-emerald-50 text-emerald-600'
                                                             }`}>📞{lead.contact_count}</span>
                                                     )}
+                                                    {(lead.engagement_score || 0) > 0 && (
+                                                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${(lead.engagement_score || 0) >= 10 ? 'bg-rose-50 text-rose-600' :
+                                                            (lead.engagement_score || 0) >= 5 ? 'bg-orange-50 text-orange-600' :
+                                                                'bg-sky-50 text-sky-600'
+                                                            }`} title={`Engagement Score: ${lead.engagement_score}`}>🔥{lead.engagement_score}</span>
+                                                    )}
                                                 </div>
                                                 <p className="text-xs font-bold text-gray-400 truncate">{lead.company_name || 'Sin empresa'}</p>
                                             </div>
@@ -2267,6 +2273,14 @@ export default function Leads() {
                                                                                     'bg-emerald-50 text-emerald-600 border-emerald-200'
                                                                                 }`} title={`${lead.contact_count} intentos de contacto`}>
                                                                                 📞{lead.contact_count}
+                                                                            </span>
+                                                                        )}
+                                                                        {(lead.engagement_score || 0) > 0 && (
+                                                                            <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[9px] font-black rounded-full border ${(lead.engagement_score || 0) >= 10 ? 'bg-rose-50 text-rose-600 border-rose-200' :
+                                                                                (lead.engagement_score || 0) >= 5 ? 'bg-orange-50 text-orange-600 border-orange-200' :
+                                                                                    'bg-sky-50 text-sky-600 border-sky-200'
+                                                                                }`} title={`Engagement Score: ${lead.engagement_score}`}>
+                                                                                🔥{lead.engagement_score}
                                                                             </span>
                                                                         )}
                                                                     </div>
@@ -2650,6 +2664,14 @@ export default function Leads() {
                                                 'bg-emerald-50 text-emerald-600'
                                             }`}>
                                             📞 {selectedLead.contact_count} intentos
+                                        </div>
+                                    )}
+                                    {(selectedLead.engagement_score || 0) > 0 && (
+                                        <div className={`flex items-center gap-1.5 mt-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black ${(selectedLead.engagement_score || 0) >= 10 ? 'bg-rose-50 text-rose-600' :
+                                            (selectedLead.engagement_score || 0) >= 5 ? 'bg-orange-50 text-orange-600' :
+                                                'bg-sky-50 text-sky-600'
+                                            }`}>
+                                            🔥 Engagement: {selectedLead.engagement_score} pts
                                         </div>
                                     )}
                                 </div>
