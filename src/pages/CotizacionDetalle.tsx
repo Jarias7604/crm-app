@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { format } from 'date-fns';
-import { Building2, Mail, Phone, Package, Globe, Trash2, Send, Download, ArrowLeft, Settings, FileText, MessageSquare, CreditCard, CheckCircle2, Share2, Copy, Check, Eye, X, ChevronRight } from 'lucide-react';
+import { Building2, Mail, Phone, Package, Trash2, Send, Download, ArrowLeft, Settings, FileText, MessageSquare, CheckCircle2, Share2, Copy, Check, Eye, X, ChevronRight } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { pdfService } from '../services/pdfService';
 import { parseModules, calculateQuoteFinancialsV2, type CotizacionData } from '../utils/quoteUtils';
@@ -25,6 +25,7 @@ export default function CotizacionDetalle() {
     const navigate = useNavigate();
     const [cotizacion, setCotizacion] = useState<CotizacionData | null>(null);
     const [financingPlan, setFinancingPlan] = useState<FinancingPlan | null>(null);
+    const [allPlans, setAllPlans] = useState<FinancingPlan[]>([]);
     const [planDescripcion, setPlanDescripcion] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -103,6 +104,22 @@ export default function CotizacionDetalle() {
                 }
             }
 
+            // Load comparison plans
+            const planesComparativaIds = ((data as any)?.planes_comparativa || null) as string[] | null;
+            if (planesComparativaIds && planesComparativaIds.length >= 1) {
+                const { data: plansData } = await supabase
+                    .from('financing_plans')
+                    .select('id, titulo, descripcion, cuotas, meses, interes_porcentaje, tipo_ajuste, es_popular, show_breakdown')
+                    .in('id', planesComparativaIds)
+                    .eq('activo', true);
+                if (plansData && plansData.length > 0) {
+                    const ordered = planesComparativaIds
+                        .map((pid) => plansData.find((p) => p.id === pid))
+                        .filter(Boolean);
+                    setAllPlans(ordered as any);
+                }
+            }
+
             // Cargar la descripción del plan desde cotizador_paquetes
             if (data?.plan_nombre) {
                 console.log('[CotizacionDetalle] Buscando descripción para plan:', data.plan_nombre, 'DTEs:', data.volumen_dtes);
@@ -151,7 +168,7 @@ export default function CotizacionDetalle() {
         if (!cotizacion) return;
         setIsGeneratingPDF(true);
         try {
-            const pdfUrl = await pdfService.generateAndUploadQuotePDF(cotizacion);
+            const pdfUrl = await pdfService.generateAndUploadQuotePDF(cotizacion, financingPlan || undefined, allPlans.length > 0 ? allPlans : undefined);
             window.open(pdfUrl, '_blank');
             toast.success('PDF generado correctamente');
         } catch (error) {
@@ -570,226 +587,137 @@ export default function CotizacionDetalle() {
 
                         {/* Section 4: Summary & Financials - Dynamic Layout */}
                         <div className="pt-8 space-y-8 px-0 sm:px-8 md:px-12">
-                            {/* RESUMEN DE INVERSIÓN - USANDO FUNCIÓN CENTRALIZADA */}
+                            {/* RESUMEN DE INVERSIÓN */}
+                            {/* Section 4: Plan Comparison Cards */}
                             {(() => {
-                                // 🎯 USAR FUNCIÓN CENTRALIZADA PARA CÁLCULOS
                                 const financials = calculateQuoteFinancialsV2(cotizacion, financingPlan || undefined);
-                                const {
-                                    cuotas,
-                                    isPagoUnico,
-                                    implementacion,
-                                    ivaPct,
-                                    recargoMonto,
-                                    ajusteLabel,
-                                    ivaLicencia,
-                                    totalLicencia,
-                                    cuotaMensual,
-                                    ivaImplementacion,
-                                    totalImplementacion,
-                                    planTitulo,
-                                    planDescripcion,
-                                    tipoAjuste
-                                } = financials;
-
+                                const { ivaPct, ivaImplementacion, totalImplementacion } = financials;
+                                const planesComparativa = ((cotizacion as any).planes_comparativa || null) as string[] | null;
+                                const plansToShow: FinancingPlan[] = (() => {
+                                    if (planesComparativa && planesComparativa.length >= 1 && allPlans.length > 0) return allPlans;
+                                    if (financingPlan) return [financingPlan];
+                                    return [];
+                                })();
+                                const implementacionBase = Number(cotizacion.costo_implementacion) || 0;
+                                const modulosArr = Array.isArray(cotizacion.modulos_adicionales) ? cotizacion.modulos_adicionales : [];
+                                const serviciosUnicos = modulosArr
+                                    .filter((mod: any) => (Number(mod.pago_unico) || 0) > 0)
+                                    .map((mod: any) => ({ nombre: mod.nombre, monto: Number(mod.pago_unico) || 0 }));
                                 return (
                                     <>
                                         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                                             <p className="text-[9px] font-black text-blue-400 uppercase tracking-[0.2em]">RESUMEN DE INVERSIÓN</p>
                                         </div>
-                                        {/* Plan Badge - Grande y legible */}
-                                        <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3">
-                                            <CreditCard className="w-5 h-5 text-indigo-500 flex-shrink-0" />
-                                            <div className="flex flex-col gap-1 flex-1">
-                                                <p className="text-base font-black text-slate-900 leading-tight">
-                                                    {planTitulo}
-                                                </p>
-                                                <p className="text-sm font-medium text-slate-500 leading-snug">
-                                                    {planDescripcion}
-                                                </p>
-                                            </div>
-                                        </div>
 
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                            {/* CUADRO PAGO INICIAL - Estilo claro con borde naranja con DESGLOSE */}
-                                            {(() => {
-                                                // Calcular desglose de pagos únicos
-                                                const implementacionBase = Number(cotizacion.costo_implementacion) || 0;
-
-                                                // Servicios únicos de modulos_adicionales (incluye cualquier servicio con pago_unico > 0)
-                                                const modulosArr = Array.isArray(cotizacion.modulos_adicionales) ? cotizacion.modulos_adicionales : [];
-                                                const serviciosUnicos = modulosArr
-                                                    .filter((mod: any) => (Number(mod.pago_unico) || 0) > 0)
-                                                    .map((mod: any) => ({
-                                                        nombre: mod.nombre,
-                                                        monto: Number(mod.pago_unico) || 0
-                                                    }));
-
-                                                const subtotalUnicos = implementacionBase + serviciosUnicos.reduce((sum: number, s: any) => sum + s.monto, 0);
-
-                                                return (
-                                                    <div className={`bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl p-4 sm:p-6 shadow-sm border-2 border-orange-200 flex flex-col justify-between ${implementacion === 0 ? 'opacity-50' : ''}`}>
-                                                        <div className="flex justify-between items-start mb-4">
-                                                            <div>
-                                                                <h4 className="text-lg font-black uppercase tracking-tight leading-none text-slate-800">PAGO INICIAL</h4>
-                                                                <p className="text-[11px] text-orange-500 font-bold mt-1">Requerido antes de activar</p>
-                                                            </div>
-                                                            <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
-                                                                <Package className="w-5 h-5 text-orange-500" />
-                                                            </div>
-                                                        </div>
-                                                        <div className="space-y-1.5">
-                                                            {/* Implementación */}
-                                                            {implementacionBase > 0 && (
-                                                                <div className="flex justify-between items-center text-[11px] text-slate-600 font-medium gap-2">
-                                                                    <span className="truncate flex-1">Implementación</span>
-                                                                    <span className="font-bold text-slate-800 whitespace-nowrap">${implementacionBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        {plansToShow.length > 0 && (
+                                            <>
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">OPCIONES DE PAGO</p>
+                                                <div className={`grid gap-4 ${plansToShow.length === 1 ? 'grid-cols-1 max-w-sm' : 'grid-cols-1 md:grid-cols-2'}`}>
+                                                    {plansToShow.map((plan, idx) => {
+                                                        // Override cuotas from the plan itself so isPagoUnico is correct per-plan
+                                                        const planCuotas = Number((plan as any).cuotas) || Number((plan as any).meses) || 1;
+                                                        const cotizacionForPlan = { ...cotizacion, cuotas: planCuotas, plazo_meses: planCuotas };
+                                                        const pf = calculateQuoteFinancialsV2(cotizacionForPlan, plan);
+                                                        const isMainPlan = plan.id === financingPlan?.id || idx === 0;
+                                                        const displayAmt = pf.isPagoUnico ? pf.totalLicencia : pf.cuotaMensual;
+                                                        return (
+                                                            <div key={plan.id} className={`rounded-2xl p-5 border-2 relative transition-all ${isMainPlan ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg shadow-blue-500/10' : 'border-slate-200 bg-white shadow-sm'}`}>
+                                                                <div className="flex flex-wrap gap-1.5 mb-3 min-h-[22px]">
+                                                                    {idx === 0 && planesComparativa && planesComparativa.length >= 2 && (
+                                                                        <span className="text-[8px] font-black bg-orange-400 text-white px-2.5 py-1 rounded-full uppercase tracking-widest">LO QUE PIDIÓ</span>
+                                                                    )}
+                                                                    {idx === 1 && (
+                                                                        <span className="text-[8px] font-black bg-indigo-500 text-white px-2.5 py-1 rounded-full uppercase tracking-widest">★ RECOMENDADO</span>
+                                                                    )}
+                                                                    {plan.es_popular && idx !== 1 && (
+                                                                        <span className="text-[8px] font-black bg-indigo-500 text-white px-2.5 py-1 rounded-full uppercase tracking-widest">MÁS POPULAR</span>
+                                                                    )}
+                                                                    {plan.tipo_ajuste === 'discount' && (
+                                                                        <span className="text-[8px] font-black bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full uppercase">MEJOR PRECIO</span>
+                                                                    )}
                                                                 </div>
-                                                            )}
-                                                            {/* Servicios únicos (incluye personalización, sucursal, etc) */}
-                                                            {serviciosUnicos.map((serv: any, idx: number) => (
-                                                                <div key={idx} className="flex justify-between items-center text-[11px] text-slate-600 font-medium gap-2">
-                                                                    <span className="truncate flex-1">{serv.nombre}</span>
-                                                                    <span className="font-bold text-slate-800 whitespace-nowrap">${serv.monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                <h3 className={`text-base font-black uppercase tracking-tight leading-none mb-1 ${isMainPlan ? 'text-blue-700' : 'text-slate-900'}`}>{plan.titulo}</h3>
+                                                                <p className="text-[10px] text-slate-400 font-medium mb-4 leading-relaxed">{plan.descripcion}</p>
+                                                                <div className={`text-3xl font-black tracking-tighter leading-none mb-1 ${isMainPlan ? 'text-blue-700' : 'text-slate-900'}`}>
+                                                                    ${displayAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                    {!pf.isPagoUnico && <span className="text-[11px] font-bold text-slate-400 ml-1">/cuota</span>}
                                                                 </div>
-                                                            ))}
-                                                            {/* Subtotal si hay más de un item */}
-                                                            {(implementacionBase > 0 ? 1 : 0) + serviciosUnicos.length > 1 && (
-                                                                <div className="flex justify-between items-center text-[11px] text-slate-500 font-medium pt-1 border-t border-orange-100 gap-2">
-                                                                    <span className="truncate flex-1">Subtotal</span>
-                                                                    <span className="font-bold text-slate-700 whitespace-nowrap">${subtotalUnicos.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                                </div>
-                                                            )}
-                                                            {/* IVA */}
-                                                            <div className="flex justify-between items-center text-[11px] text-slate-500 font-medium gap-2">
-                                                                <span className="truncate flex-1">IVA ({Math.round(ivaPct * 100)}%)</span>
-                                                                <span className="font-bold text-orange-500 whitespace-nowrap">+$ {ivaImplementacion.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                            </div>
-                                                            {/* Total */}
-                                                            <div className="pt-3 border-t border-orange-200 mt-2">
-                                                                <div className="flex justify-between items-center">
-                                                                    <span className="text-[11px] font-black uppercase tracking-wide text-slate-700">TOTAL A PAGAR HOY</span>
-                                                                    <span className="text-2xl font-black tracking-tighter leading-none text-orange-600">${totalImplementacion.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })()}
-
-                                            {/* CUADRO PAGO RECURRENTE - Estilo claro con borde azul con DESGLOSE */}
-                                            {(() => {
-                                                // Calcular desglose de recurrentes
-                                                const licenciaBase = Number(cotizacion.costo_plan_anual) || 0;
-                                                const costoWhatsApp = cotizacion.servicio_whatsapp ? (Number(cotizacion.costo_whatsapp) || 0) : 0;
-
-                                                // Módulos recurrentes de modulos_adicionales
-                                                const modulosArr = Array.isArray(cotizacion.modulos_adicionales) ? cotizacion.modulos_adicionales : [];
-                                                const serviciosRecurrentes = modulosArr
-                                                    .filter((mod: any) => (Number(mod.pago_unico) || 0) === 0 && ((Number(mod.costo_anual) || Number(mod.costo) || 0) > 0))
-                                                    .map((mod: any) => ({
-                                                        nombre: mod.nombre,
-                                                        monto: Number(mod.costo_anual) || Number(mod.costo) || 0
-                                                    }));
-
-                                                // Descuento manual del agente
-                                                const { descuentoManualMonto, descuentoManualPct } = financials;
-
-                                                return (
-                                                    <div className={`bg-gradient-to-br ${isPagoUnico ? 'from-emerald-50 to-green-50 border-emerald-200' : 'from-blue-50 to-indigo-50 border-blue-200'} rounded-2xl p-4 sm:p-6 shadow-sm border-2 flex flex-col justify-between`}>
-                                                        <div className="flex justify-between items-start mb-4">
-                                                            <div>
-                                                                <h4 className="text-lg font-black uppercase tracking-tight leading-none text-slate-800">
-                                                                    {isPagoUnico ? 'LICENCIA ANUAL' : 'PAGO RECURRENTE'}
-                                                                </h4>
-                                                                <p className={`text-[11px] ${isPagoUnico ? 'text-emerald-500' : 'text-blue-500'} font-bold mt-1`}>
-                                                                    {isPagoUnico ? 'Pago único adelantado' : `Pago en ${cuotas} cuotas`}
+                                                                <p className={`text-[10px] font-bold mb-4 ${pf.isPagoUnico ? 'text-emerald-500' : 'text-blue-500'}`}>
+                                                                    {pf.isPagoUnico ? 'Pago único adelantado' : pf.cuotas + ' pagos consecutivos'}
                                                                 </p>
+                                                                <div className="space-y-1.5 mb-4 border-t border-slate-100 pt-3">
+                                                                    <div className="flex justify-between text-[10px] text-slate-500 font-medium">
+                                                                        <span className="truncate">Licencia {cotizacion.plan_nombre}</span>
+                                                                        <span className="font-bold text-slate-700 ml-2 flex-shrink-0">${Number(cotizacion.costo_plan_anual).toLocaleString()}</span>
+                                                                    </div>
+                                                                    {!pf.isPagoUnico && pf.recargoMonto > 0 && (plan.show_breakdown ?? true) && (
+                                                                        <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                                                                            <span>Financiamiento {plan.interes_porcentaje}%</span>
+                                                                            <span className="text-orange-500">+${pf.recargoMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {pf.descuentoManualMonto > 0 && (
+                                                                        <div className="flex justify-between text-[10px] text-emerald-600 font-medium">
+                                                                            <span>Descuento ({pf.descuentoManualPct}%)</span>
+                                                                            <span>-${pf.descuentoManualMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                        </div>
+                                                                    )}
+                                                                    <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                                                                        <span>IVA ({Math.round(pf.ivaPct * 100)}%)</span>
+                                                                        <span className={pf.isPagoUnico ? 'text-emerald-500' : 'text-blue-500'}>+${pf.ivaLicencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                    </div>
+                                                                    <div className="pt-2 border-t border-slate-100 flex justify-between text-[11px] font-bold text-slate-700">
+                                                                        <span>Total ({pf.cuotas} {pf.cuotas === 1 ? 'cuota' : 'cuotas'})</span>
+                                                                        <span>${pf.totalLicencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                    </div>
+                                                                </div>
+                                                                <div className={`w-full h-9 rounded-xl flex items-center justify-center text-[10px] font-black uppercase tracking-widest ${isMainPlan ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25' : 'bg-slate-100 text-slate-600'}`}>
+                                                                    {isMainPlan ? <><CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />PLAN ACTIVO</> : 'ALTERNATIVA'}
+                                                                </div>
                                                             </div>
-                                                            <div className={`w-10 h-10 rounded-xl ${isPagoUnico ? 'bg-emerald-100' : 'bg-blue-100'} flex items-center justify-center`}>
-                                                                <Globe className={`w-5 h-5 ${isPagoUnico ? 'text-emerald-500' : 'text-blue-500'}`} />
-                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </>
+                                        )}
+
+                                        {(implementacionBase > 0 || serviciosUnicos.length > 0) && (
+                                            <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl p-5 sm:p-6 shadow-sm border-2 border-orange-200">
+                                                <div className="flex justify-between items-start mb-4">
+                                                    <div>
+                                                        <h4 className="text-lg font-black uppercase tracking-tight leading-none text-slate-800">PAGO INICIAL</h4>
+                                                        <p className="text-[11px] text-orange-500 font-bold mt-1">Requerido antes de activar</p>
+                                                    </div>
+                                                    <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
+                                                        <Package className="w-5 h-5 text-orange-500" />
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    {implementacionBase > 0 && (
+                                                        <div className="flex justify-between items-center text-[11px] text-slate-600 font-medium gap-2">
+                                                            <span className="truncate flex-1">Implementación</span>
+                                                            <span className="font-bold text-slate-800 whitespace-nowrap">${implementacionBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                         </div>
-                                                        <div className="space-y-1.5">
-                                                            {/* Licencia base */}
-                                                            <div className="flex justify-between items-center text-[11px] text-slate-600 font-medium gap-2">
-                                                                <span className="truncate flex-1">Licencia {cotizacion.plan_nombre}</span>
-                                                                <span className="font-bold text-slate-800 whitespace-nowrap">${licenciaBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                            </div>
-                                                            {/* Módulos recurrentes */}
-                                                            {serviciosRecurrentes.map((serv: any, idx: number) => (
-                                                                <div key={idx} className="flex justify-between items-center text-[11px] text-slate-600 font-medium gap-2">
-                                                                    <span className="truncate flex-1">{serv.nombre}</span>
-                                                                    <span className="font-bold text-slate-800 whitespace-nowrap">${serv.monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                                </div>
-                                                            ))}
-                                                            {/* WhatsApp */}
-                                                            {costoWhatsApp > 0 && (
-                                                                <div className="flex justify-between items-center text-[11px] text-slate-600 font-medium gap-2">
-                                                                    <span className="truncate flex-1">WhatsApp</span>
-                                                                    <span className="font-bold text-slate-800 whitespace-nowrap">${costoWhatsApp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                                </div>
-                                                            )}
-                                                            {/* Financiamiento (solo si hay recargo y show_breakdown habilitado) */}
-                                                            {!isPagoUnico && recargoMonto > 0 && (financingPlan?.show_breakdown ?? true) && (
-                                                                <div className="flex justify-between items-center text-[11px] text-slate-500 font-medium gap-2">
-                                                                    <span className="truncate flex-1">{ajusteLabel}</span>
-                                                                    <span className="font-bold text-orange-500 whitespace-nowrap">+${recargoMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                                </div>
-                                                            )}
-                                                            {/* Descuento manual del agente */}
-                                                            {descuentoManualMonto > 0 && (
-                                                                <div className="flex justify-between items-center text-[11px] text-emerald-600 font-medium gap-2">
-                                                                    <span className="truncate flex-1">- Descuento ({descuentoManualPct}%)</span>
-                                                                    <span className="font-bold whitespace-nowrap">-${descuentoManualMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                                </div>
-                                                            )}
-                                                            {/* Descuento (solo si aplica) */}
-                                                            {isPagoUnico && tipoAjuste === 'discount' && ajusteLabel && (
-                                                                <div className="flex justify-between items-center text-[11px] text-emerald-600 font-medium gap-2">
-                                                                    <span className="truncate flex-1">🎉 {ajusteLabel}</span>
-                                                                    <span className="font-bold whitespace-nowrap">Aplicado</span>
-                                                                </div>
-                                                            )}
-                                                            {/* IVA */}
-                                                            <div className="flex justify-between items-center text-[11px] text-slate-500 font-medium gap-2">
-                                                                <span className="truncate flex-1">IVA ({Math.round(ivaPct * 100)}%)</span>
-                                                                <span className={`font-bold whitespace-nowrap ${isPagoUnico ? 'text-emerald-500' : 'text-blue-500'}`}>+$ {ivaLicencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                            </div>
-
-                                                            {/* Total Plan (solo para financiado) */}
-                                                            {!isPagoUnico && (
-                                                                <div className="pt-2 mt-1">
-                                                                    <div className="flex justify-between items-center text-[11px] text-slate-700 font-bold gap-2">
-                                                                        <span className="truncate flex-1">Total Plan ({cuotas} Cuotas)</span>
-                                                                        <span className="whitespace-nowrap">${totalLicencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-
-                                                            {/* Cuota Final */}
-                                                            <div className="pt-3 border-t border-slate-200 mt-2">
-                                                                <div className="flex justify-between items-end">
-                                                                    <div>
-                                                                        <span className="text-[11px] font-black uppercase tracking-wide block text-slate-700">
-                                                                            {isPagoUnico ? 'Total Licencia Anual' : `Cuota de ${cuotas}`}
-                                                                        </span>
-                                                                        {!isPagoUnico && (
-                                                                            <span className="text-[9px] text-slate-400 italic">* Plan de pagos consecutivos.</span>
-                                                                        )}
-                                                                    </div>
-                                                                    <div className="text-right">
-                                                                        <span className={`text-2xl font-black tracking-tighter leading-none ${isPagoUnico ? 'text-emerald-600' : 'text-blue-600'}`}>
-                                                                            ${(isPagoUnico ? totalLicencia : cuotaMensual).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                                        </span>
-                                                                        {!isPagoUnico && <span className="text-sm text-slate-400">/cuota</span>}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
+                                                    )}
+                                                    {serviciosUnicos.map((serv: any, sidx: number) => (
+                                                        <div key={sidx} className="flex justify-between items-center text-[11px] text-slate-600 font-medium gap-2">
+                                                            <span className="truncate flex-1">{serv.nombre}</span>
+                                                            <span className="font-bold text-slate-800 whitespace-nowrap">${serv.monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                        </div>
+                                                    ))}
+                                                    <div className="flex justify-between items-center text-[11px] text-slate-500 font-medium gap-2">
+                                                        <span className="truncate flex-1">IVA ({Math.round(ivaPct * 100)}%)</span>
+                                                        <span className="font-bold text-orange-500 whitespace-nowrap">+$ {ivaImplementacion.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                    </div>
+                                                    <div className="pt-3 border-t border-orange-200 mt-2">
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-[11px] font-black uppercase tracking-wide text-slate-700">TOTAL A PAGAR HOY</span>
+                                                            <span className="text-2xl font-black tracking-tighter leading-none text-orange-600">${totalImplementacion.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                         </div>
                                                     </div>
-                                                );
-                                            })()}
-                                        </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </>
                                 );
                             })()}

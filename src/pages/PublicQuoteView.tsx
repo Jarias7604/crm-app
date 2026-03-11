@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../services/supabase';
-import { Building2, Package, Globe, Download, FileText, CheckCircle2, PencilLine, Mail, Phone, Settings, MessageSquare, CreditCard } from 'lucide-react';
+import { Building2, Package, Download, FileText, CheckCircle2, PencilLine, Mail, Phone, Settings, MessageSquare, CreditCard } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { parseModules, calculateQuoteFinancialsV2, type CotizacionData } from '../utils/quoteUtils';
 import { pdfService } from '../services/pdfService';
@@ -31,6 +31,8 @@ export default function PublicQuoteView() {
     const [isAccepting, setIsAccepting] = useState(false);
     const [signerName, setSignerName] = useState('');
     const [showSignatureModal, setShowSignatureModal] = useState(false);
+    const [allPlans, setAllPlans] = useState<FinancingPlan[]>([]);
+    const [clientSelectedPlanId, setClientSelectedPlanId] = useState<string | null>(null);
 
     useEffect(() => {
         fetchCotizacion();
@@ -53,7 +55,7 @@ export default function PublicQuoteView() {
             if (error) throw error;
             if (!data || data.error) return; // quote not found — handled below
 
-            const { quote, company, creator, financing_plan, pricing_item_descripcion } = data;
+            const { quote, company, creator, financing_plan, pricing_item_descripcion, comparison_plans } = data;
 
             setCotizacion({
                 ...quote,
@@ -62,8 +64,21 @@ export default function PublicQuoteView() {
                 modulos_adicionales: parseModules(quote.modulos_adicionales)
             } as CotizacionData);
 
-            if (financing_plan) setFinancingPlan(financing_plan as FinancingPlan);
+            if (financing_plan) {
+                setFinancingPlan(financing_plan as FinancingPlan);
+                setClientSelectedPlanId(financing_plan.id);
+            }
             if (pricing_item_descripcion) setPricingItemDescripcion(pricing_item_descripcion);
+
+            // ✅ Planes vienen directamente del RPC (SECURITY DEFINER → sin bloqueo RLS)
+            // El RPC ya respeta el orden de planes_comparativa guardado por el agente
+            if (comparison_plans && comparison_plans.length > 0) {
+                setAllPlans(comparison_plans as FinancingPlan[]);
+                // Pre-seleccionar el primer plan (el que pidió el prospecto)
+                if (!financing_plan && comparison_plans[0]?.id) {
+                    setClientSelectedPlanId(comparison_plans[0].id);
+                }
+            }
         } catch (error: any) {
             console.error('Error fetching quote:', error);
             setError(error.message || 'Error desconocido');
@@ -99,7 +114,12 @@ export default function PublicQuoteView() {
         if (!cotizacion) return;
         setIsGeneratingPDF(true);
         try {
-            const pdfUrl = await pdfService.generateAndUploadQuotePDF(cotizacion);
+            const selectedPlan = allPlans.find(p => p.id === clientSelectedPlanId) || financingPlan || undefined;
+            const pdfUrl = await pdfService.generateAndUploadQuotePDF(
+                cotizacion,
+                selectedPlan,
+                allPlans.length > 0 ? allPlans : undefined
+            );
             window.open(pdfUrl, '_blank');
         } catch (error) {
             toast.error('Error al descargar PDF');
@@ -130,18 +150,11 @@ export default function PublicQuoteView() {
         </div>
     );
 
-    // 🎯 USAR FUNCIÓN CENTRALIZADA PARA CÁLCULOS
-    const financials = calculateQuoteFinancialsV2(cotizacion, financingPlan || undefined);
-    const {
-        cuotas,
-        isPagoUnico,
-        totalLicencia,
-        cuotaMensual,
-        totalImplementacion,
-        implementacion,
-        planTitulo,
-        planDescripcion
-    } = financials;
+    // 🎯 CÁLCULOS CENTRALIZADOS — usa el plan elegido por el prospecto
+    const clientSelectedPlan = allPlans.find(p => p.id === clientSelectedPlanId) || financingPlan || undefined;
+    const plansToShow = allPlans.length > 0 ? allPlans : (financingPlan ? [financingPlan] : []);
+    const financials = calculateQuoteFinancialsV2(cotizacion, clientSelectedPlan);
+    const { totalImplementacion } = financials;
 
     return (
         <div className="min-h-screen bg-[#F8FAFC] font-sans pb-32 md:pb-20 overflow-x-hidden">
@@ -383,33 +396,119 @@ export default function PublicQuoteView() {
                     </div>
                 </div>
 
-                {/* Mobile Financial Summary - Dynamic with Detailed Breakdown */}
-                <div className="px-2 mb-4 space-y-3">
-                    <p className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em]">RESUMEN DE INVERSIÓN</p>
-                    {/* Plan Badge - Grande y legible */}
-                    <div className="flex items-center gap-3 bg-slate-100 rounded-2xl px-4 py-3">
-                        <CreditCard className="w-5 h-5 text-indigo-500 flex-shrink-0" />
-                        <div className="flex flex-col gap-1 flex-1">
-                            <p className="text-base font-black text-slate-900 leading-tight">
-                                {planTitulo}
-                            </p>
-                            <p className="text-sm font-medium text-slate-500 leading-snug">
-                                {planDescripcion}
-                            </p>
-                        </div>
+                {/* ── PLAN DE PAGO COMPARATIVO ───────────────────────────────── */}
+                <div className="mb-12">
+                    <div className="flex items-center gap-2 px-2 mb-5"
+                    >
+                        <CreditCard className="w-4 h-4 text-indigo-500" />
+                        <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-[0.3em]">ELIGE TU PLAN DE PAGO</h4>
                     </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
-                    {/* CUADRO PAGO INICIAL con DESGLOSE */}
+
+                    {/* Cards — scroll horizontal en móvil, grid en desktop */}
+                    {plansToShow.length > 0 && (
+                        <div className={`flex gap-3 overflow-x-auto pb-4 -mx-4 px-4 snap-x snap-mandatory md:mx-0 md:px-0 md:overflow-visible md:pb-0 ${plansToShow.length === 1 ? 'md:grid md:grid-cols-1' :
+                            plansToShow.length === 2 ? 'md:grid md:grid-cols-2' :
+                                'md:grid md:grid-cols-3'
+                            }`}>
+                            {plansToShow.map((plan) => {
+                                const planCuotas = Number((plan as any).cuotas) || Number((plan as any).meses) || 1;
+                                const cotizacionForPlan = { ...cotizacion, cuotas: planCuotas, plazo_meses: planCuotas };
+                                const pf = calculateQuoteFinancialsV2(cotizacionForPlan, plan);
+                                const isSelected = clientSelectedPlanId === plan.id;
+                                const isAgentPick = plan.id === financingPlan?.id;
+                                const isDiscount = plan.tipo_ajuste === 'discount';
+                                const displayAmt = pf.isPagoUnico ? pf.totalLicencia : pf.cuotaMensual;
+                                return (
+                                    <button
+                                        key={plan.id}
+                                        onClick={() => setClientSelectedPlanId(plan.id)}
+                                        className={`flex-shrink-0 w-[260px] md:w-auto snap-center text-left rounded-[2rem] p-6 border-2 transition-all duration-200 active:scale-[0.98] focus:outline-none ${isSelected
+                                            ? 'border-indigo-500 bg-indigo-50 shadow-xl shadow-indigo-500/10'
+                                            : 'bg-white border-slate-200/60 hover:border-indigo-300 hover:shadow-md'
+                                            }`}
+                                    >
+                                        {/* Badges */}
+                                        <div className="flex flex-wrap gap-1.5 mb-4 min-h-[22px]">
+                                            {plan.es_popular && (
+                                                <span className="text-[8px] font-black bg-indigo-500 text-white px-2.5 py-1 rounded-full uppercase tracking-widest">★ Más Popular</span>
+                                            )}
+                                            {isDiscount && (
+                                                <span className="text-[8px] font-black bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full uppercase">Mejor Precio</span>
+                                            )}
+                                            {isAgentPick && !plan.es_popular && (
+                                                <span className="text-[8px] font-black bg-slate-100 text-slate-500 px-2.5 py-1 rounded-full uppercase">Recomendado</span>
+                                            )}
+                                        </div>
+
+                                        {/* Título */}
+                                        <h3 className={`text-base font-black uppercase tracking-tight leading-none mb-1 ${isSelected ? 'text-indigo-600' : 'text-slate-900'
+                                            }`}>{plan.titulo}</h3>
+                                        <p className="text-[10px] text-slate-400 font-medium mb-5 leading-relaxed">{plan.descripcion}</p>
+
+                                        {/* Monto principal */}
+                                        <div className={`text-3xl font-black tracking-tighter leading-none mb-1 ${isSelected ? 'text-indigo-600' : 'text-slate-900'
+                                            }`}>
+                                            ${displayAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            {!pf.isPagoUnico && <span className="text-[11px] font-bold text-slate-400 ml-1">/cuota</span>}
+                                        </div>
+                                        <p className={`text-[10px] font-bold mb-5 ${pf.isPagoUnico ? 'text-emerald-500' : 'text-blue-500'
+                                            }`}>
+                                            {pf.isPagoUnico ? 'Pago único adelantado' : `${pf.cuotas} cuotas consecutivas`}
+                                        </p>
+
+                                        {/* Desglose */}
+                                        <div className="space-y-1.5 mb-5">
+                                            <div className="flex justify-between text-[10px] text-slate-500 font-medium">
+                                                <span className="truncate">Licencia {cotizacion.plan_nombre}</span>
+                                                <span className="font-bold text-slate-700 ml-2 flex-shrink-0">${Number(cotizacion.costo_plan_anual).toLocaleString()}</span>
+                                            </div>
+                                            {!pf.isPagoUnico && pf.recargoMonto > 0 && (plan.show_breakdown ?? true) && (
+                                                <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                                                    <span>Financiamiento</span>
+                                                    <span className="text-orange-500">+${pf.recargoMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                </div>
+                                            )}
+                                            {pf.descuentoManualMonto > 0 && (
+                                                <div className="flex justify-between text-[10px] text-emerald-600 font-medium">
+                                                    <span>Descuento ({pf.descuentoManualPct}%)</span>
+                                                    <span>-${pf.descuentoManualMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                </div>
+                                            )}
+                                            <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                                                <span>IVA ({Math.round(pf.ivaPct * 100)}%)</span>
+                                                <span className={pf.isPagoUnico ? 'text-emerald-500' : 'text-blue-500'}>+${pf.ivaLicencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                            </div>
+                                            <div className="pt-2 border-t border-slate-100 flex justify-between text-[11px] font-bold text-slate-700">
+                                                <span>Total Plan</span>
+                                                <span>${pf.totalLicencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                            </div>
+                                        </div>
+
+                                        {/* CTA */}
+                                        <div className={`w-full h-10 rounded-xl flex items-center justify-center text-[10px] font-black uppercase tracking-widest transition-all ${isSelected
+                                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/25'
+                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                            }`}>
+                                            {isSelected
+                                                ? <><CheckCircle2 className="w-3.5 h-3.5 mr-1.5" /> Plan Seleccionado</>
+                                                : 'Seleccionar →'
+                                            }
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* PAGO INICIAL — siempre independiente, nunca cambia */}
                     {(() => {
                         const implementacionBase = Number(cotizacion.costo_implementacion) || 0;
                         const modulos = cotizacion.modulos_adicionales || [];
                         const serviciosUnicos = modulos.filter((m: any) => (Number(m.pago_unico) || 0) > 0);
-                        // ✅ USAR financials.ivaPct del servicio centralizado
                         const { ivaPct, ivaImplementacion } = financials;
-
+                        if (implementacionBase === 0 && serviciosUnicos.length === 0) return null;
                         return (
-                            <div className={`bg-gradient-to-br from-orange-50 to-amber-50 rounded-[2rem] p-6 shadow-sm border-2 border-orange-200 ${implementacion === 0 ? 'opacity-50' : ''}`}>
+                            <div className="mt-6 bg-gradient-to-br from-orange-50 to-amber-50 rounded-[2rem] p-6 shadow-sm border-2 border-orange-200">
                                 <div className="flex justify-between items-start mb-4">
                                     <div>
                                         <h4 className="text-base font-black uppercase tracking-tight leading-none text-slate-800">PAGO INICIAL</h4>
@@ -446,144 +545,54 @@ export default function PublicQuoteView() {
                             </div>
                         );
                     })()}
-
-                    {/* CUADRO PAGO RECURRENTE con DESGLOSE */}
-                    {(() => {
-                        const licenciaBase = Number(cotizacion.costo_plan_anual) || 0;
-                        const costoWhatsApp = cotizacion.servicio_whatsapp ? (Number(cotizacion.costo_whatsapp) || 0) : 0;
-                        const modulos = cotizacion.modulos_adicionales || [];
-                        const serviciosRecurrentes = modulos.filter((m: any) => (Number(m.pago_unico) || 0) === 0 && ((Number(m.costo_anual) || Number(m.costo) || 0) > 0));
-
-                        // ✅ USAR valores del servicio centralizado
-                        const { ivaPct, recargoMonto, ivaLicencia: ivaRecurrente, ajustePct, tipoAjuste, descuentoManualMonto, descuentoManualPct } = financials;
-                        const ajusteLabel = tipoAjuste === 'recharge' ? `Financiamiento (${Math.round((ajustePct || 0) * 100)}%)` : '';
-
-                        return (
-                            <div className={`bg-gradient-to-br ${isPagoUnico ? 'from-emerald-50 to-green-50 border-emerald-200' : 'from-blue-50 to-indigo-50 border-blue-200'} rounded-[2rem] p-6 shadow-sm border-2`}>
-                                <div className="flex justify-between items-start mb-4">
-                                    <div>
-                                        <h4 className="text-base font-black uppercase tracking-tight leading-none text-slate-800">
-                                            {isPagoUnico ? 'LICENCIA ANUAL' : 'PAGO RECURRENTE'}
-                                        </h4>
-                                        <p className={`text-[10px] ${isPagoUnico ? 'text-emerald-500' : 'text-blue-500'} font-bold mt-1`}>
-                                            {isPagoUnico ? 'Pago único adelantado' : `Pago en ${cuotas} cuotas`}
-                                        </p>
-                                    </div>
-                                    <div className={`w-10 h-10 rounded-xl ${isPagoUnico ? 'bg-emerald-100' : 'bg-blue-100'} flex items-center justify-center`}>
-                                        <Globe className={`w-5 h-5 ${isPagoUnico ? 'text-emerald-500' : 'text-blue-500'}`} />
-                                    </div>
+                </div>
+            </div>
+            {/* Terms of Service Accordion-style Area */}
+            <div className="mb-20">
+                <div className="flex items-center gap-3 px-2 mb-6">
+                    <FileText className="w-5 h-5 text-indigo-500" />
+                    <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-[0.3em]">TÉRMINOS DEL SERVICIO</h4>
+                </div>
+                <div className="bg-white rounded-[2rem] border border-slate-200/60 p-6 md:p-10 space-y-6">
+                    <div className="max-h-80 overflow-y-auto pr-4 custom-scrollbar space-y-8">
+                        {(cotizacion.company?.terminos_condiciones || '').split('\n\n').filter((p: string) => p.trim()).map((para: string, idx: number) => (
+                            <div key={idx} className="flex gap-4 items-start group">
+                                <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-[10px] font-black text-indigo-600 shrink-0 group-hover:bg-indigo-50 transition-colors">
+                                    {idx + 1}
                                 </div>
-                                <div className="space-y-1.5">
-                                    <div className="flex justify-between items-center text-[11px] text-slate-600 font-medium gap-2">
-                                        <span className="truncate flex-1">Licencia {cotizacion.plan_nombre}</span>
-                                        <span className="font-bold text-slate-800 whitespace-nowrap">${licenciaBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                    </div>
-                                    {serviciosRecurrentes.map((serv: any, idx: number) => (
-                                        <div key={idx} className="flex justify-between items-center text-[11px] text-slate-600 font-medium gap-2">
-                                            <span className="truncate flex-1">{serv.nombre}</span>
-                                            <span className="font-bold text-slate-800 whitespace-nowrap">${(Number(serv.costo_anual) || Number(serv.costo) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                        </div>
-                                    ))}
-                                    {costoWhatsApp > 0 && (
-                                        <div className="flex justify-between items-center text-[11px] text-slate-600 font-medium gap-2">
-                                            <span className="truncate flex-1">WhatsApp</span>
-                                            <span className="font-bold text-slate-800 whitespace-nowrap">${costoWhatsApp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                        </div>
+                                <p className="text-xs text-slate-600 leading-relaxed font-semibold">
+                                    {para.trim().split(/(\*\*.*?\*\*)/).map((part, i) =>
+                                        part.startsWith('**') && part.endsWith('**')
+                                            ? <strong key={i} className="text-slate-900 font-extrabold">{part.slice(2, -2)}</strong>
+                                            : part
                                     )}
-                                    {!isPagoUnico && recargoMonto > 0 && (financingPlan?.show_breakdown ?? true) && (
-                                        <div className="flex justify-between items-center text-[11px] text-slate-500 font-medium gap-2">
-                                            <span className="truncate flex-1">{ajusteLabel}</span>
-                                            <span className="font-bold text-orange-500 whitespace-nowrap">+${recargoMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                        </div>
-                                    )}
-                                    {/* Descuento manual del agente */}
-                                    {descuentoManualMonto > 0 && (
-                                        <div className="flex justify-between items-center text-[11px] text-emerald-600 font-medium gap-2">
-                                            <span className="truncate flex-1">- Descuento ({descuentoManualPct}%)</span>
-                                            <span className="font-bold whitespace-nowrap">-${descuentoManualMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                        </div>
-                                    )}
-                                    <div className="flex justify-between items-center text-[11px] text-slate-500 font-medium gap-2">
-                                        <span className="truncate flex-1">IVA ({Math.round(ivaPct * 100)}%)</span>
-                                        <span className={`font-bold whitespace-nowrap ${isPagoUnico ? 'text-emerald-500' : 'text-blue-500'}`}>+$ {ivaRecurrente.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                    </div>
-                                    {!isPagoUnico && (
-                                        <div className="pt-2 mt-1">
-                                            <div className="flex justify-between items-center text-[11px] text-slate-700 font-bold gap-2">
-                                                <span className="truncate flex-1">Total Plan ({cuotas} Cuotas)</span>
-                                                <span className="whitespace-nowrap">${totalLicencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                            </div>
-                                        </div>
-                                    )}
-                                    <div className="pt-3 border-t border-slate-200 mt-2">
-                                        <div className="flex justify-between items-end">
-                                            <div>
-                                                <span className="text-[11px] font-black uppercase tracking-wide block text-slate-700">
-                                                    {isPagoUnico ? 'Total Licencia Anual' : `Cuota de ${cuotas}`}
-                                                </span>
-                                                {!isPagoUnico && (
-                                                    <span className="text-[9px] text-slate-400 italic">* Plan de pagos consecutivos.</span>
-                                                )}
-                                            </div>
-                                            <span className={`text-2xl font-black tracking-tighter leading-none ${isPagoUnico ? 'text-emerald-600' : 'text-blue-600'}`}>
-                                                ${(isPagoUnico ? totalLicencia : cuotaMensual).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                {!isPagoUnico && <span className="text-[10px] font-bold opacity-60">/cuota</span>}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
+                                </p>
                             </div>
-                        );
-                    })()}
-                </div>
-
-                {/* Terms of Service Accordion-style Area */}
-                <div className="mb-20">
-                    <div className="flex items-center gap-3 px-2 mb-6">
-                        <FileText className="w-5 h-5 text-indigo-500" />
-                        <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-[0.3em]">TÉRMINOS DEL SERVICIO</h4>
-                    </div>
-                    <div className="bg-white rounded-[2rem] border border-slate-200/60 p-6 md:p-10 space-y-6">
-                        <div className="max-h-80 overflow-y-auto pr-4 custom-scrollbar space-y-8">
-                            {(cotizacion.company?.terminos_condiciones || '').split('\n\n').filter((p: string) => p.trim()).map((para: string, idx: number) => (
-                                <div key={idx} className="flex gap-4 items-start group">
-                                    <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-[10px] font-black text-indigo-600 shrink-0 group-hover:bg-indigo-50 transition-colors">
-                                        {idx + 1}
-                                    </div>
-                                    <p className="text-xs text-slate-600 leading-relaxed font-semibold">
-                                        {para.trim().split(/(\*\*.*?\*\*)/).map((part, i) =>
-                                            part.startsWith('**') && part.endsWith('**')
-                                                ? <strong key={i} className="text-slate-900 font-extrabold">{part.slice(2, -2)}</strong>
-                                                : part
-                                        )}
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
+                        ))}
                     </div>
                 </div>
+            </div>
 
-                {/* Creator Footer Mobile Optimized */}
-                <div className="bg-slate-900 rounded-[2.5rem] p-8 md:p-12 mb-12 flex flex-col md:flex-row items-center md:items-center justify-between gap-10">
-                    <div className="flex flex-col md:flex-row items-center md:items-center gap-6 w-full md:w-auto">
-                        <div className="w-20 h-20 rounded-3xl bg-white/10 flex items-center justify-center p-1 relative overflow-hidden ring-4 ring-indigo-500/20 shrink-0">
-                            {cotizacion.creator?.avatar_url ? (
-                                <img src={cotizacion.creator.avatar_url} alt="" className="w-full h-full object-cover rounded-2xl" />
-                            ) : (
-                                <span className="text-white font-black text-3xl">
-                                    {(cotizacion.creator?.full_name || cotizacion.creator?.email || 'A').charAt(0).toUpperCase()}
-                                </span>
-                            )}
-                        </div>
-                        <div className="text-center md:text-left">
-                            <p className="text-[8px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-1">ASESOR COMERCIAL</p>
-                            <h4 className="text-xl font-black text-white leading-none uppercase tracking-tight">{cotizacion.creator?.full_name || 'AGENTE OFICIAL'}</h4>
-                            <p className="text-[10px] font-bold text-slate-500 mt-2 lowercase">{cotizacion.creator?.email}</p>
-                        </div>
+            {/* Creator Footer Mobile Optimized */}
+            <div className="bg-slate-900 rounded-[2.5rem] p-8 md:p-12 mb-12 flex flex-col md:flex-row items-center md:items-center justify-between gap-10">
+                <div className="flex flex-col md:flex-row items-center md:items-center gap-6 w-full md:w-auto">
+                    <div className="w-20 h-20 rounded-3xl bg-white/10 flex items-center justify-center p-1 relative overflow-hidden ring-4 ring-indigo-500/20 shrink-0">
+                        {cotizacion.creator?.avatar_url ? (
+                            <img src={cotizacion.creator.avatar_url} alt="" className="w-full h-full object-cover rounded-2xl" />
+                        ) : (
+                            <span className="text-white font-black text-3xl">
+                                {(cotizacion.creator?.full_name || cotizacion.creator?.email || 'A').charAt(0).toUpperCase()}
+                            </span>
+                        )}
                     </div>
-                    <div className="w-24 h-24 bg-white p-3 rounded-2xl shadow-2xl self-center md:self-auto">
-                        <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${window.location.href}`} alt="QR" className="w-full h-full grayscale opacity-70" />
+                    <div className="text-center md:text-left">
+                        <p className="text-[8px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-1">ASESOR COMERCIAL</p>
+                        <h4 className="text-xl font-black text-white leading-none uppercase tracking-tight">{cotizacion.creator?.full_name || 'AGENTE OFICIAL'}</h4>
+                        <p className="text-[10px] font-bold text-slate-500 mt-2 lowercase">{cotizacion.creator?.email}</p>
                     </div>
+                </div>
+                <div className="w-24 h-24 bg-white p-3 rounded-2xl shadow-2xl self-center md:self-auto">
+                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${window.location.href}`} alt="QR" className="w-full h-full grayscale opacity-70" />
                 </div>
             </div>
 
@@ -591,9 +600,7 @@ export default function PublicQuoteView() {
             {showSignatureModal && (
                 <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300">
                     <div className="bg-white w-full max-w-lg rounded-t-[3rem] md:rounded-[3rem] p-8 md:p-10 shadow-2xl space-y-8 animate-in slide-in-from-bottom-10 md:zoom-in-95 duration-300">
-                        {/* Mobile Handle */}
                         <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto md:hidden -mt-2 mb-6"></div>
-
                         <div className="text-center space-y-3">
                             <div className="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
                                 <PencilLine className="w-8 h-8" />
@@ -601,7 +608,6 @@ export default function PublicQuoteView() {
                             <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase m-0">FIRMA DIGITAL</h2>
                             <p className="text-[11px] text-slate-500 font-bold leading-relaxed max-w-[240px] mx-auto uppercase tracking-wide">Ingresa tu nombre para formalizar la aceptación.</p>
                         </div>
-
                         <div className="space-y-6">
                             <div className="space-y-2">
                                 <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">NOMBRE COMPLETO</label>
@@ -614,7 +620,6 @@ export default function PublicQuoteView() {
                                     autoFocus
                                 />
                             </div>
-
                             <div className="flex flex-col gap-3">
                                 <Button
                                     variant="default"

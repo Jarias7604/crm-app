@@ -72,6 +72,8 @@ export default function CotizadorPro() {
     const [financingPlans, setFinancingPlans] = useState<FinancingPlan[]>([]);
     const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null);
     const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+    // 🆕 Planes para comparativa: el agente selecciona hasta 2 para mostrar al prospecto
+    const [selectedPlanIds, setSelectedPlanIds] = useState<string[]>([]);
 
     // Permisos: super_admin ya está cubierto dentro de hasPermission(); company_admin necesita fallback
     // explícito porque no tiene entradas en role_permissions.
@@ -490,6 +492,7 @@ export default function CotizadorPro() {
                 cuotas: totales.cuotas,
                 descripcion_pago: financingPlans.find(p => p.id === selectedPlanId)?.titulo ||
                     (totales.cuotas > 1 ? `${totales.cuotas} Cuotas` : '1 Solo pago'),
+                planes_comparativa: selectedPlanIds.length >= 2 ? selectedPlanIds : (selectedPlanId ? [selectedPlanId] : undefined),
 
                 incluir_implementacion: formData.incluir_implementacion,
                 estado: 'borrador' as const
@@ -1103,8 +1106,8 @@ export default function CotizadorPro() {
                                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                                     {financingPlans.length > 0 ? (
                                         financingPlans.map((plan) => {
-                                            const isSelected = selectedPlanId === plan.id;
                                             const isAnual = plan.meses === 12 && plan.interes_porcentaje === 0 && plan.titulo.toLowerCase().includes('pago');
+
 
                                             return (
                                                 <button
@@ -1112,24 +1115,59 @@ export default function CotizadorPro() {
                                                     type="button"
                                                     onClick={() => {
                                                         if (canChangePaymentMethod) {
-                                                            setSelectedPlanId(plan.id);
+                                                            const isAnual = plan.meses === 12 && plan.interes_porcentaje === 0 && plan.titulo.toLowerCase().includes('pago');
                                                             const isDiscountPlan = plan.tipo_ajuste === 'discount';
 
-                                                            setFormData({
-                                                                ...formData,
-                                                                forma_pago: (isDiscountPlan || isAnual) ? 'anual' : 'mensual',
-                                                                meses_pago: plan.meses,
-                                                                // Reiniciamos descuento manual para evitar doble descuento accidental
-                                                                descuento_porcentaje: 0
+                                                            // Toggle en el array de comparativa (max 2)
+                                                            setSelectedPlanIds(prev => {
+                                                                if (prev.includes(plan.id)) {
+                                                                    // Si lo deseleccionamos y era el primario, el primario pasa al otro
+                                                                    const next = prev.filter(id => id !== plan.id);
+                                                                    if (selectedPlanId === plan.id && next.length > 0) {
+                                                                        setSelectedPlanId(next[0]);
+                                                                        const altPlan = financingPlans.find(p => p.id === next[0]);
+                                                                        if (altPlan) {
+                                                                            const altAnual = altPlan.meses === 12 && altPlan.interes_porcentaje === 0 && altPlan.titulo.toLowerCase().includes('pago');
+                                                                            setFormData(f => ({ ...f, forma_pago: (altPlan.tipo_ajuste === 'discount' || altAnual) ? 'anual' : 'mensual', meses_pago: altPlan.meses, descuento_porcentaje: 0 }));
+                                                                        }
+                                                                    } else if (next.length === 0) {
+                                                                        setSelectedPlanId(null);
+                                                                    }
+                                                                    return next;
+                                                                } else if (prev.length >= 2) {
+                                                                    // Max 2: reemplazar el último
+                                                                    return [prev[0], plan.id];
+                                                                } else {
+                                                                    return [...prev, plan.id];
+                                                                }
                                                             });
+
+                                                            // El primero siempre dirige los cálculos
+                                                            if (!selectedPlanIds.includes(plan.id) && selectedPlanIds.length === 0) {
+                                                                setSelectedPlanId(plan.id);
+                                                            } else if (!selectedPlanIds.includes(plan.id) && selectedPlanIds.length > 0 && selectedPlanId === null) {
+                                                                setSelectedPlanId(plan.id);
+                                                            } else if (!selectedPlanIds.includes(plan.id) && selectedPlanIds.length === 0) {
+                                                                setSelectedPlanId(plan.id);
+                                                            }
+                                                            // Si es nuevo y es el primer seleccionado, setear como primario
+                                                            if (!selectedPlanIds.includes(plan.id)) {
+                                                                if (selectedPlanIds.length === 0) {
+                                                                    setSelectedPlanId(plan.id);
+                                                                    setFormData(f => ({ ...f, forma_pago: (isDiscountPlan || isAnual) ? 'anual' : 'mensual', meses_pago: plan.meses, descuento_porcentaje: 0 }));
+                                                                }
+                                                                // Si es el 2do, NO cambia los cálculos (el 1ro manda)
+                                                            }
                                                         }
                                                     }}
                                                     disabled={!canChangePaymentMethod}
-                                                    className={`relative p-4 rounded-xl border-2 transition-all group ${isSelected
+                                                    className={`relative p-4 rounded-xl border-2 transition-all group ${selectedPlanId === plan.id
                                                         ? isAnual
                                                             ? 'border-green-600 bg-gradient-to-br from-green-50 to-green-100 shadow-lg scale-[1.02]'
                                                             : 'border-blue-600 bg-gradient-to-br from-blue-50 to-blue-100 shadow-lg scale-[1.02]'
-                                                        : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
+                                                        : selectedPlanIds.includes(plan.id)
+                                                            ? 'border-indigo-400 bg-gradient-to-br from-indigo-50 to-purple-50 shadow-md scale-[1.01]'
+                                                            : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
                                                         } ${!canChangePaymentMethod ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
                                                 >
                                                     <div className="text-center">
@@ -1153,9 +1191,25 @@ export default function CotizadorPro() {
                                                             </p>
                                                         </div>
                                                     </div>
-                                                    {isSelected && (
+                                                    {selectedPlanId === plan.id && (
                                                         <div className={`absolute -top-2 -right-2 w-6 h-6 ${isAnual ? 'bg-green-600' : 'bg-blue-600'} rounded-full flex items-center justify-center shadow-lg`}>
                                                             <span className="text-white text-xs">✓</span>
+                                                        </div>
+                                                    )}
+                                                    {selectedPlanIds.includes(plan.id) && selectedPlanId !== plan.id && (
+                                                        <div className="absolute -top-2 -right-2 w-6 h-6 bg-indigo-500 rounded-full flex items-center justify-center shadow-lg">
+                                                            <span className="text-white text-[9px] font-black">2</span>
+                                                        </div>
+                                                    )}
+                                                    {/* Indicador de orden de selección */}
+                                                    {selectedPlanIds.length >= 1 && selectedPlanIds[0] === plan.id && (
+                                                        <div className="absolute top-1 left-1">
+                                                            <span className="bg-orange-400 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full">PEDIDO</span>
+                                                        </div>
+                                                    )}
+                                                    {selectedPlanIds.length >= 2 && selectedPlanIds[1] === plan.id && (
+                                                        <div className="absolute top-1 left-1">
+                                                            <span className="bg-indigo-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full">REC.</span>
                                                         </div>
                                                     )}
                                                     {plan.es_popular && !isAnual && (

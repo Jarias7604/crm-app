@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Plus, Search, FileText, CheckCircle, XCircle,
-    Clock, Eye, Edit, Trash2, X, ChevronRight, DollarSign
+    Clock, Eye, Edit, Trash2, X, ChevronRight, DollarSign, Package, CheckCircle2
 } from 'lucide-react';
+import { supabase } from '../services/supabase';
+import { calculateQuoteFinancialsV2, parseModules } from '../utils/quoteUtils';
+import type { FinancingPlan } from '../types/pricing';
 
 /* ─── Status config ──────────────────────────────────────────── */
 const STATUS: Record<string, {
@@ -70,6 +73,8 @@ export function CotizacionesMobileView({ cotizaciones, stats, loading, onDelete 
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<string | null>(null);
     const [sheet, setSheet] = useState<any | null>(null);
+    const [sheetPlans, setSheetPlans] = useState<FinancingPlan[]>([]);
+    const [loadingPlans, setLoadingPlans] = useState(false);
 
     const STATUS_KEYS = ['borrador', 'enviada', 'aceptada', 'rechazada', 'expirada'];
 
@@ -82,6 +87,38 @@ export function CotizacionesMobileView({ cotizaciones, stats, loading, onDelete 
         const matchStatus = !statusFilter || c.estado === statusFilter;
         return matchSearch && matchStatus;
     });
+
+    // Fetch plans when sheet opens
+    useEffect(() => {
+        if (!sheet) { setSheetPlans([]); return; }
+
+        const planesIds = (sheet.planes_comparativa || null) as string[] | null;
+        if (!planesIds || planesIds.length === 0) { setSheetPlans([]); return; }
+
+        setLoadingPlans(true);
+        (async () => {
+            try {
+                const { data } = await supabase
+                    .from('financing_plans')
+                    .select('id, titulo, descripcion, cuotas, meses, interes_porcentaje, tipo_ajuste, es_popular, show_breakdown')
+                    .in('id', planesIds)
+                    .eq('activo', true);
+
+                if (data && data.length > 0) {
+                    const ordered = planesIds
+                        .map((pid: string) => data.find(p => p.id === pid))
+                        .filter(Boolean) as FinancingPlan[];
+                    setSheetPlans(ordered);
+                } else {
+                    setSheetPlans([]);
+                }
+            } catch {
+                setSheetPlans([]);
+            } finally {
+                setLoadingPlans(false);
+            }
+        })();
+    }, [sheet?.id]);
 
     const closeSheet = () => setSheet(null);
 
@@ -115,7 +152,7 @@ export function CotizacionesMobileView({ cotizaciones, stats, loading, onDelete 
                     )}
                 </div>
 
-                {/* Filter chips — horizontal scroll */}
+                {/* Filter chips */}
                 <div className="flex gap-2 px-4 pb-3 overflow-x-auto scrollbar-none">
                     <button
                         onClick={() => setStatusFilter(null)}
@@ -140,24 +177,20 @@ export function CotizacionesMobileView({ cotizaciones, stats, loading, onDelete 
                 </div>
             </div>
 
-            {/* ── Mini Stats Row ────────────────────────────────── */}
+            {/* ── Mini Stats Row ─────────────────────────────────── */}
             <div className="flex gap-3 px-4 py-3 overflow-x-auto scrollbar-none">
-                {/* Total */}
                 <div className="flex-shrink-0 bg-white rounded-2xl px-4 py-3 shadow-sm border border-gray-100 min-w-[90px]">
                     <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Total</p>
                     <p className="text-2xl font-black text-slate-900 leading-none">{stats.total}</p>
                 </div>
-                {/* Enviadas */}
                 <div className="flex-shrink-0 bg-white rounded-2xl px-4 py-3 shadow-sm border border-gray-100 min-w-[90px]">
                     <p className="text-[9px] font-black text-blue-400 uppercase tracking-widest mb-1">Enviadas</p>
                     <p className="text-2xl font-black text-blue-600 leading-none">{stats.enviadas}</p>
                 </div>
-                {/* Aceptadas */}
                 <div className="flex-shrink-0 bg-white rounded-2xl px-4 py-3 shadow-sm border border-gray-100 min-w-[100px]">
                     <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-1">Cerradas</p>
                     <p className="text-2xl font-black text-emerald-600 leading-none">{stats.aceptadas}</p>
                 </div>
-                {/* Valor cerrado */}
                 <div className="flex-shrink-0 bg-gradient-to-br from-[#4449AA] to-indigo-700 rounded-2xl px-4 py-3 shadow-lg shadow-[#4449AA]/20 min-w-[120px]">
                     <p className="text-[9px] font-black text-indigo-200 uppercase tracking-widest mb-1">Cerrado $</p>
                     <p className="text-xl font-black text-white leading-none">${(stats.valor_aceptadas || 0).toLocaleString()}</p>
@@ -167,7 +200,6 @@ export function CotizacionesMobileView({ cotizaciones, stats, loading, onDelete 
             {/* ── Quotes List ───────────────────────────────────── */}
             <div className="flex-1 px-4 pb-32 space-y-3">
 
-                {/* Loading */}
                 {loading && (
                     <div className="space-y-3 pt-2">
                         {[1, 2, 3].map(i => (
@@ -184,7 +216,6 @@ export function CotizacionesMobileView({ cotizaciones, stats, loading, onDelete 
                     </div>
                 )}
 
-                {/* Empty state */}
                 {!loading && filtered.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-20 text-center">
                         <div className="w-20 h-20 rounded-3xl bg-indigo-50 flex items-center justify-center mb-5">
@@ -205,9 +236,9 @@ export function CotizacionesMobileView({ cotizaciones, stats, loading, onDelete 
                     </div>
                 )}
 
-                {/* Cards */}
                 {!loading && filtered.map(cot => {
                     const cfg = STATUS[cot.estado] || STATUS.borrador;
+                    const hasComparativa = Array.isArray(cot.planes_comparativa) && cot.planes_comparativa.length >= 2;
                     return (
                         <button
                             key={cot.id}
@@ -216,12 +247,10 @@ export function CotizacionesMobileView({ cotizaciones, stats, loading, onDelete 
                             style={{ borderLeftWidth: 4, borderLeftColor: cfg.borderColor }}
                         >
                             <div className="flex items-center gap-3">
-                                {/* Icon */}
                                 <div className="w-11 h-11 rounded-xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
                                     <FileText className="w-5 h-5 text-[#4449AA]" />
                                 </div>
 
-                                {/* Info */}
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-start justify-between gap-2 mb-0.5">
                                         <p className="text-sm font-black text-gray-900 truncate leading-snug">{cot.nombre_cliente}</p>
@@ -235,14 +264,15 @@ export function CotizacionesMobileView({ cotizaciones, stats, loading, onDelete 
                                         <span className="text-sm font-black text-gray-900">${(cot.total_anual || 0).toLocaleString()}</span>
                                         <span className="text-gray-200 text-xs">•</span>
                                         <span className="text-[11px] text-gray-400 truncate">{cot.plan_nombre}</span>
+                                        {hasComparativa && (
+                                            <span className="text-[9px] font-black bg-indigo-50 text-indigo-500 px-1.5 py-0.5 rounded-full flex-shrink-0">2 PLANES</span>
+                                        )}
                                     </div>
                                 </div>
 
-                                {/* Arrow */}
                                 <ChevronRight className="w-4 h-4 text-gray-300 flex-shrink-0" />
                             </div>
 
-                            {/* Date */}
                             <p className="text-[10px] text-gray-400 mt-2.5 ml-14">
                                 {new Date(cot.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
                             </p>
@@ -272,14 +302,14 @@ export function CotizacionesMobileView({ cotizaciones, stats, loading, onDelete 
                     />
 
                     {/* Sheet panel */}
-                    <div className="absolute inset-x-0 bottom-0 bg-white rounded-t-[28px] lead-sheet overflow-hidden">
+                    <div className="absolute inset-x-0 bottom-0 bg-white rounded-t-[28px] lead-sheet overflow-hidden max-h-[92vh] flex flex-col">
                         {/* Drag handle */}
-                        <div className="flex justify-center pt-3 pb-1">
+                        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
                             <div className="w-10 h-1 bg-gray-200 rounded-full" />
                         </div>
 
                         {/* Sheet header */}
-                        <div className="px-6 pt-3 pb-4 border-b border-gray-100">
+                        <div className="px-6 pt-3 pb-4 border-b border-gray-100 flex-shrink-0">
                             <div className="flex items-start justify-between gap-3">
                                 <div className="flex-1 min-w-0">
                                     <h2 className="text-xl font-black text-gray-900 truncate">{sheet.nombre_cliente}</h2>
@@ -293,7 +323,6 @@ export function CotizacionesMobileView({ cotizaciones, stats, loading, onDelete 
                                 </button>
                             </div>
 
-                            {/* Status pill */}
                             {(() => {
                                 const cfg = STATUS[sheet.estado] || STATUS.borrador;
                                 return (
@@ -305,60 +334,206 @@ export function CotizacionesMobileView({ cotizaciones, stats, loading, onDelete 
                             })()}
                         </div>
 
-                        {/* Sheet data grid */}
-                        <div className="px-6 py-4 space-y-3">
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-3.5 border border-indigo-100/50">
-                                    <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1.5">Total Anual</p>
-                                    <p className="text-xl font-black text-gray-900">${(sheet.total_anual || 0).toLocaleString()}</p>
+                        {/* Scrollable content */}
+                        <div className="overflow-y-auto flex-1">
+                            {/* Basic stats grid */}
+                            <div className="px-6 py-4 space-y-3">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-3.5 border border-indigo-100/50">
+                                        <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1.5">Total Anual</p>
+                                        <p className="text-xl font-black text-gray-900">${(sheet.total_anual || 0).toLocaleString()}</p>
+                                    </div>
+                                    <div className="bg-gray-50 rounded-2xl p-3.5 border border-gray-100">
+                                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Volumen DTEs</p>
+                                        <p className="text-xl font-black text-gray-900">{(sheet.volumen_dtes || 0).toLocaleString()}</p>
+                                    </div>
                                 </div>
+
                                 <div className="bg-gray-50 rounded-2xl p-3.5 border border-gray-100">
-                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Volumen DTEs</p>
-                                    <p className="text-xl font-black text-gray-900">{(sheet.volumen_dtes || 0).toLocaleString()}</p>
+                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Plan</p>
+                                    <p className="text-sm font-bold text-gray-900">{sheet.plan_nombre || '—'}</p>
+                                </div>
+
+                                <div className="bg-gray-50 rounded-2xl p-3.5 border border-gray-100">
+                                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Fecha de creación</p>
+                                    <p className="text-sm font-bold text-gray-900">
+                                        {new Date(sheet.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}
+                                    </p>
                                 </div>
                             </div>
 
-                            <div className="bg-gray-50 rounded-2xl p-3.5 border border-gray-100">
-                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Plan</p>
-                                <p className="text-sm font-bold text-gray-900">{sheet.plan_nombre || '—'}</p>
-                            </div>
+                            {/* ── Comparative Plan Cards ──────────────────────── */}
+                            {loadingPlans && (
+                                <div className="px-6 pb-4">
+                                    <div className="h-32 bg-gray-100 rounded-2xl animate-pulse" />
+                                </div>
+                            )}
 
-                            <div className="bg-gray-50 rounded-2xl p-3.5 border border-gray-100">
-                                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Fecha de creación</p>
-                                <p className="text-sm font-bold text-gray-900">
-                                    {new Date(sheet.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}
-                                </p>
-                            </div>
-                        </div>
+                            {!loadingPlans && sheetPlans.length > 0 && (() => {
+                                const cotizacionObj = {
+                                    ...sheet,
+                                    modulos_adicionales: parseModules(sheet.modulos_adicionales)
+                                };
+                                const implementacionBase = Number(sheet.costo_implementacion) || 0;
+                                const modulosArr = Array.isArray(cotizacionObj.modulos_adicionales) ? cotizacionObj.modulos_adicionales : [];
+                                const serviciosUnicos = modulosArr.filter((m: any) => (Number(m.pago_unico) || 0) > 0);
 
-                        {/* Sheet actions */}
-                        <div className="px-6 pb-10 space-y-3">
-                            {/* Primary actions */}
-                            <div className="flex gap-3">
+                                return (
+                                    <div className="px-6 pb-4 space-y-3">
+                                        <p className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em]">OPCIONES DE PAGO</p>
+
+                                        {/* Plan cards — horizontal scroll on mobile */}
+                                        <div className={`grid gap-3 ${sheetPlans.length === 1 ? 'grid-cols-1' : 'grid-cols-1'}`}>
+                                            {sheetPlans.map((plan, idx) => {
+                                                const planCuotas = Number((plan as any).cuotas) || Number((plan as any).meses) || 1;
+                                                const cotizacionForPlan = { ...cotizacionObj, cuotas: planCuotas, plazo_meses: planCuotas };
+                                                const pf = calculateQuoteFinancialsV2(cotizacionForPlan, plan);
+                                                const isMainPlan = idx === 0;
+                                                const displayAmt = pf.isPagoUnico ? pf.totalLicencia : pf.cuotaMensual;
+
+                                                return (
+                                                    <div
+                                                        key={plan.id}
+                                                        className={`rounded-2xl p-4 border-2 transition-all ${isMainPlan
+                                                            ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg shadow-blue-500/10'
+                                                            : 'border-slate-200 bg-white shadow-sm'
+                                                            }`}
+                                                    >
+                                                        {/* Badges */}
+                                                        <div className="flex flex-wrap gap-1.5 mb-2 min-h-[20px]">
+                                                            {idx === 0 && sheetPlans.length >= 2 && (
+                                                                <span className="text-[8px] font-black bg-orange-400 text-white px-2 py-0.5 rounded-full uppercase tracking-widest">LO QUE PIDIÓ</span>
+                                                            )}
+                                                            {idx === 1 && (
+                                                                <span className="text-[8px] font-black bg-indigo-500 text-white px-2 py-0.5 rounded-full uppercase tracking-widest">★ RECOMENDADO</span>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Title */}
+                                                        <h4 className={`text-sm font-black uppercase tracking-tight leading-none mb-0.5 ${isMainPlan ? 'text-blue-700' : 'text-slate-900'}`}>
+                                                            {plan.titulo}
+                                                        </h4>
+                                                        <p className="text-[10px] text-slate-400 font-medium mb-3 leading-relaxed">{plan.descripcion}</p>
+
+                                                        {/* Amount */}
+                                                        <div className={`text-2xl font-black tracking-tighter leading-none mb-0.5 ${isMainPlan ? 'text-blue-700' : 'text-slate-900'}`}>
+                                                            ${displayAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                            {!pf.isPagoUnico && <span className="text-[10px] font-bold text-slate-400 ml-1">/cuota</span>}
+                                                        </div>
+                                                        <p className={`text-[10px] font-bold mb-3 ${pf.isPagoUnico ? 'text-emerald-500' : 'text-blue-500'}`}>
+                                                            {pf.isPagoUnico ? 'Pago único adelantado' : pf.cuotas + ' pagos consecutivos'}
+                                                        </p>
+
+                                                        {/* Breakdown */}
+                                                        <div className="space-y-1 border-t border-slate-100 pt-2.5">
+                                                            <div className="flex justify-between text-[10px] text-slate-500 font-medium">
+                                                                <span>Licencia {sheet.plan_nombre}</span>
+                                                                <span className="font-bold text-slate-700">${Number(sheet.costo_plan_anual).toLocaleString()}</span>
+                                                            </div>
+                                                            {!pf.isPagoUnico && pf.recargoMonto > 0 && (plan as any).show_breakdown !== false && (
+                                                                <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                                                                    <span>Financiamiento {(plan as any).interes_porcentaje}%</span>
+                                                                    <span className="text-orange-500">+${pf.recargoMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                </div>
+                                                            )}
+                                                            {pf.descuentoManualMonto > 0 && (
+                                                                <div className="flex justify-between text-[10px] text-emerald-600 font-medium">
+                                                                    <span>Descuento ({pf.descuentoManualPct}%)</span>
+                                                                    <span>-${pf.descuentoManualMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                </div>
+                                                            )}
+                                                            <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                                                                <span>IVA ({Math.round(pf.ivaPct * 100)}%)</span>
+                                                                <span className={pf.isPagoUnico ? 'text-emerald-500' : 'text-blue-500'}>+${pf.ivaLicencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                            </div>
+                                                            <div className="pt-1.5 border-t border-slate-100 flex justify-between text-[11px] font-bold text-slate-700">
+                                                                <span>Total ({pf.cuotas} {pf.cuotas === 1 ? 'cuota' : 'cuotas'})</span>
+                                                                <span>${pf.totalLicencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Status bar */}
+                                                        <div className={`mt-3 w-full h-8 rounded-xl flex items-center justify-center text-[9px] font-black uppercase tracking-widest ${isMainPlan ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                                                            {isMainPlan ? <><CheckCircle2 className="w-3 h-3 mr-1" />PLAN ACTIVO</> : 'ALTERNATIVA'}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* PAGO INICIAL */}
+                                        {(implementacionBase > 0 || serviciosUnicos.length > 0) && (() => {
+                                            const firstPlanFin = calculateQuoteFinancialsV2(
+                                                { ...cotizacionObj, cuotas: Number((sheetPlans[0] as any).cuotas) || 1 },
+                                                sheetPlans[0]
+                                            );
+                                            return (
+                                                <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl p-4 border-2 border-orange-200">
+                                                    <div className="flex justify-between items-start mb-3">
+                                                        <div>
+                                                            <h4 className="text-sm font-black uppercase tracking-tight text-slate-800">PAGO INICIAL</h4>
+                                                            <p className="text-[10px] text-orange-500 font-bold mt-0.5">Requerido antes de activar</p>
+                                                        </div>
+                                                        <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center">
+                                                            <Package className="w-4 h-4 text-orange-500" />
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        {implementacionBase > 0 && (
+                                                            <div className="flex justify-between text-[10px] text-slate-600 font-medium">
+                                                                <span>Implementación</span>
+                                                                <span className="font-bold text-slate-800">${implementacionBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                            </div>
+                                                        )}
+                                                        {serviciosUnicos.map((serv: any, si: number) => (
+                                                            <div key={si} className="flex justify-between text-[10px] text-slate-600 font-medium">
+                                                                <span>{serv.nombre}</span>
+                                                                <span className="font-bold text-slate-800">${(Number(serv.pago_unico) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                            </div>
+                                                        ))}
+                                                        <div className="flex justify-between text-[10px] text-slate-500 font-medium">
+                                                            <span>IVA ({Math.round(firstPlanFin.ivaPct * 100)}%)</span>
+                                                            <span className="text-orange-500">+${firstPlanFin.ivaImplementacion.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                        </div>
+                                                        <div className="pt-2 border-t border-orange-200 flex justify-between items-center">
+                                                            <span className="text-[10px] font-black uppercase text-slate-700">TOTAL A PAGAR HOY</span>
+                                                            <span className="text-xl font-black text-orange-600">${firstPlanFin.totalImplementacion.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                );
+                            })()}
+
+                            {/* Sheet actions */}
+                            <div className="px-6 pb-10 space-y-3">
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => { navigate(`/cotizaciones/${sheet.id}`); closeSheet(); }}
+                                        className="flex-1 flex items-center justify-center gap-2 bg-[#4449AA] text-white py-3.5 rounded-2xl text-sm font-black active:scale-[0.97] transition-transform shadow-lg shadow-[#4449AA]/25"
+                                    >
+                                        <Eye className="w-4 h-4" />
+                                        Ver Detalles
+                                    </button>
+                                    <button
+                                        onClick={() => { navigate(`/cotizaciones/${sheet.id}/editar`); closeSheet(); }}
+                                        className="flex-1 flex items-center justify-center gap-2 bg-indigo-50 text-[#4449AA] py-3.5 rounded-2xl text-sm font-black active:scale-[0.97] transition-transform border border-indigo-100"
+                                    >
+                                        <Edit className="w-4 h-4" />
+                                        Editar
+                                    </button>
+                                </div>
+
                                 <button
-                                    onClick={() => { navigate(`/cotizaciones/${sheet.id}`); closeSheet(); }}
-                                    className="flex-1 flex items-center justify-center gap-2 bg-[#4449AA] text-white py-3.5 rounded-2xl text-sm font-black active:scale-[0.97] transition-transform shadow-lg shadow-[#4449AA]/25"
+                                    onClick={() => { onDelete(sheet.id, sheet.nombre_cliente); closeSheet(); }}
+                                    className="w-full flex items-center justify-center gap-2 bg-red-50 text-red-500 py-3.5 rounded-2xl text-sm font-black active:scale-[0.97] transition-transform border border-red-100"
                                 >
-                                    <Eye className="w-4 h-4" />
-                                    Ver Detalles
-                                </button>
-                                <button
-                                    onClick={() => { navigate(`/cotizaciones/${sheet.id}/editar`); closeSheet(); }}
-                                    className="flex-1 flex items-center justify-center gap-2 bg-indigo-50 text-[#4449AA] py-3.5 rounded-2xl text-sm font-black active:scale-[0.97] transition-transform border border-indigo-100"
-                                >
-                                    <Edit className="w-4 h-4" />
-                                    Editar
+                                    <Trash2 className="w-4 h-4" />
+                                    Eliminar Cotización
                                 </button>
                             </div>
-
-                            {/* Delete */}
-                            <button
-                                onClick={() => { onDelete(sheet.id, sheet.nombre_cliente); closeSheet(); }}
-                                className="w-full flex items-center justify-center gap-2 bg-red-50 text-red-500 py-3.5 rounded-2xl text-sm font-black active:scale-[0.97] transition-transform border border-red-100"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                                Eliminar Cotización
-                            </button>
                         </div>
                     </div>
                 </div>

@@ -9,8 +9,23 @@ import { imageCache } from '../utils/imageCache';
  * -----------------------------------------
  * Optimized for speed, horizontal layout, and dedicated T&C page.
  */
+type PlanForPDF = {
+    titulo?: string;
+    descripcion?: string;
+    cuotas?: number;
+    meses?: number;
+    interes_porcentaje?: number;
+    tipo_ajuste?: 'discount' | 'recharge' | 'none';
+    es_popular?: boolean;
+    show_breakdown?: boolean;
+};
+
 export const pdfService = {
-    async generateAndUploadQuotePDF(cotizacion: CotizacionData): Promise<string> {
+    async generateAndUploadQuotePDF(
+        cotizacion: CotizacionData,
+        clientSelectedPlan?: PlanForPDF | null,
+        allPlansForComparison?: PlanForPDF[]
+    ): Promise<string> {
         try {
             console.log('Generating Optimized Premium PDF...');
 
@@ -321,10 +336,16 @@ export const pdfService = {
                 numCuotas = plazoVal;
             }
 
-            // Buscar el plan de financiamiento correspondiente
+            // 🎯 PLAN DE FINANCIAMIENTO — usar el elegido por el prospecto si está disponible
             const companyId = (cotizacion as any).company_id || (cotizacion.company as any)?.id;
             let financingPlan: { titulo?: string; descripcion?: string; interes_porcentaje?: number; tipo_ajuste?: 'discount' | 'recharge' | 'none' } | undefined;
-            if (numCuotas && companyId) {
+
+            if (clientSelectedPlan) {
+                // Usar el plan que el prospecto eligió en la vista web
+                financingPlan = clientSelectedPlan;
+                console.log('[PDF] Plan elegido por prospecto:', clientSelectedPlan.titulo);
+            } else if (numCuotas && companyId) {
+                // Fallback: buscar en BD el plan que corresponde al plan guardado
                 const { data: planData } = await supabase
                     .from('financing_plans')
                     .select('titulo, descripcion, interes_porcentaje, tipo_ajuste')
@@ -339,6 +360,18 @@ export const pdfService = {
                     financingPlan = planData;
                     console.log('[PDF] Plan de financiamiento encontrado:', planData.titulo, 'Interés:', planData.interes_porcentaje);
                 }
+            }
+
+            // 🎯 CARGAR TODOS LOS PLANES para comparativa si no se pasaron
+            let allPlans = allPlansForComparison || [];
+            if (allPlans.length === 0 && companyId) {
+                const { data: plansData } = await supabase
+                    .from('financing_plans')
+                    .select('titulo, descripcion, cuotas, interes_porcentaje, tipo_ajuste, es_popular')
+                    .eq('company_id', companyId)
+                    .eq('activo', true)
+                    .order('meses', { ascending: true });
+                if (plansData && plansData.length > 0) allPlans = plansData;
             }
 
             // 🎯 USAR FUNCIÓN CENTRALIZADA PARA CÁLCULOS CON EL PLAN
@@ -559,42 +592,275 @@ export const pdfService = {
                 }
             };
 
-            // ── Plan Badge ──────────────────────────────────────────────
-            // Badge de forma de pago — más grande y legible (igual que en la vista web)
-            doc.setTextColor(99, 102, 241); // indigo-500
+            // ── COMPARATIVA DE PLANES DE PAGO ────────────────────────────────────
+            doc.setTextColor(99, 102, 241);
             doc.setFontSize(6.5);
             doc.setFont('helvetica', 'bold');
-            doc.text('FORMA DE PAGO', margin, by - 2);
+            doc.text('PLANES DE PAGO', margin, by - 2);
 
-            const badgeH = 12;
-            doc.setFillColor(241, 245, 249); // slate-100
-            doc.roundedRect(margin, by + 1, pageWidth - (margin * 2), badgeH, 2, 2, 'F');
-            doc.setDrawColor(226, 232, 240);
-            doc.roundedRect(margin, by + 1, pageWidth - (margin * 2), badgeH, 2, 2, 'D');
+            if (allPlans.length >= 2) {
+                // ── MODO COMPARATIVO: 2 columnas, tarjetas completas ─────────────
+                const numCols = Math.min(allPlans.length, 2);
+                const totalW = pageWidth - (margin * 2);
+                const colW = (totalW - 4) / numCols;
+                const colH = 82; // Taller card for full breakdown
 
-            // Título del plan (grande)
-            doc.setTextColor(15, 23, 42); // slate-900
-            doc.setFontSize(11);
-            doc.setFont('helvetica', 'bold');
-            const tituloText = planTitulo.toUpperCase();
-            doc.text(tituloText, margin + 5, by + 8);
+                allPlans.slice(0, numCols).forEach((plan: PlanForPDF, idx: number) => {
+                    const colX = margin + idx * (colW + 4);
+                    const colY = by + 1;
 
-            // Descripción del plan (gris, al lado del título)
-            const tituloWidth = doc.getTextWidth(tituloText);
-            doc.setTextColor(100, 116, 139); // slate-500
-            doc.setFontSize(8.5);
-            doc.setFont('helvetica', 'normal');
-            doc.text('— ' + planDescripcion, margin + 5 + tituloWidth + 2, by + 8);
+                    const planCuotas = Number(plan.cuotas) || 1;
+                    const cotizacionForPlan = { ...cotizacion, cuotas: planCuotas, plazo_meses: planCuotas };
+                    const pf = calculateQuoteFinancialsV2(cotizacionForPlan, plan);
+                    const isMainPlan = idx === 0; // First plan = LO QUE PIDIÓ (active)
+                    const displayAmt = pf.isPagoUnico ? pf.totalLicencia : pf.cuotaMensual;
+                    const licenciaBase = Number(cotizacion.costo_plan_anual) || 0;
 
-            by += badgeH + 10; // Espacio debajo del badge
-            // ────────────────────────────────────────────────────────────
+                    // ── Box background & border ──
+                    if (isMainPlan) {
+                        doc.setFillColor(238, 242, 255); // indigo-50
+                        doc.setDrawColor(99, 102, 241);  // indigo-500
+                        doc.setLineWidth(0.5);
+                    } else {
+                        doc.setFillColor(248, 250, 252); // slate-50
+                        doc.setDrawColor(226, 232, 240);
+                        doc.setLineWidth(0.3);
+                    }
+                    doc.roundedRect(colX, colY, colW, colH, 3, 3, 'FD');
 
-            // Drawing boxes
-            drawBox(bx, by, 'PAGO INICIAL', 'Requerido para activar', pagoInicial, pagoInicial, COLORS.ORANGE);
-            const cColor = financials.isMonthly ? COLORS.BLUE : COLORS.GREEN;
-            const cTitle = financials.isMonthly ? 'PAGO RECURRENTE' : 'RECURRENTE ANUAL';
-            const cSubtitle = divisor > 1 ? `Pago en ${divisor} cuotas` : 'Pago único acumulado';
-            drawBox(bx + boxW + gap, by, cTitle, cSubtitle, financials.isMonthly ? cuotaMensual : financials.totalAnual, financials.isMonthly ? financials.montoPeriodo : financials.totalAnual, cColor, true);
+                    // ── Left accent bar ──
+                    doc.setFillColor(isMainPlan ? 99 : 148, isMainPlan ? 102 : 163, isMainPlan ? 241 : 184);
+                    doc.roundedRect(colX, colY, 2, colH, 1, 1, 'F');
+
+                    // ── Badge ──────────────────────────────────────────────────────
+                    let textY = colY + 8;
+                    if (numCols >= 2 && idx === 0) {
+                        doc.setFillColor(249, 115, 22); // orange
+                        doc.roundedRect(colX + 5, colY + 3, 24, 5, 1.5, 1.5, 'F');
+                        doc.setTextColor(255, 255, 255);
+                        doc.setFontSize(4.5);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text('LO QUE PIDI\u00d3', colX + 17, colY + 6.5, { align: 'center' });
+                        textY = colY + 13;
+                    } else if (idx === 1) {
+                        doc.setFillColor(99, 102, 241); // indigo
+                        doc.roundedRect(colX + 5, colY + 3, 28, 5, 1.5, 1.5, 'F');
+                        doc.setTextColor(255, 255, 255);
+                        doc.setFontSize(4.5);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text('\u2605 RECOMENDADO', colX + 19, colY + 6.5, { align: 'center' });
+                        textY = colY + 13;
+                    }
+
+                    // ── Plan title ──────────────────────────────────────────────────
+                    doc.setTextColor(isMainPlan ? 67 : 30, isMainPlan ? 56 : 30, isMainPlan ? 202 : 30);
+                    doc.setFontSize(9);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text((plan.titulo || '').toUpperCase(), colX + 5, textY);
+
+                    // ── Description ─────────────────────────────────────────────────
+                    doc.setTextColor(148, 163, 184);
+                    doc.setFontSize(5.5);
+                    doc.setFont('helvetica', 'normal');
+                    const descLines = doc.splitTextToSize(plan.descripcion || '', colW - 10);
+                    doc.text(descLines[0] || '', colX + 5, textY + 5);
+
+                    // ── Main Amount (large) ─────────────────────────────────────────
+                    doc.setTextColor(isMainPlan ? 67 : 15, isMainPlan ? 56 : 23, isMainPlan ? 202 : 42);
+                    doc.setFontSize(16);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text(`$${displayAmt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, colX + 5, textY + 15);
+
+                    // /cuota & subtitle
+                    doc.setFontSize(6);
+                    doc.setFont('helvetica', 'normal');
+                    if (!pf.isPagoUnico) {
+                        doc.setTextColor(148, 163, 184);
+                        doc.text('/cuota', colX + 5, textY + 20);
+                    }
+                    doc.setTextColor(pf.isPagoUnico ? 22 : 37, pf.isPagoUnico ? 163 : 99, pf.isPagoUnico ? 74 : 235);
+                    doc.setFontSize(6);
+                    doc.text(pf.isPagoUnico ? 'Pago \u00fanico adelantado' : pf.cuotas + ' pagos consecutivos', colX + 5, textY + 25);
+
+                    // ── Separator ───────────────────────────────────────────────────
+                    doc.setDrawColor(226, 232, 240);
+                    doc.setLineWidth(0.1);
+                    doc.line(colX + 5, textY + 28, colX + colW - 5, textY + 28);
+
+                    // ── Breakdown lines ─────────────────────────────────────────────
+                    let lineY = textY + 33;
+                    const lineH = 5;
+                    doc.setFontSize(6);
+
+                    // Licencia
+                    doc.setTextColor(100, 116, 139);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text('Licencia ' + (cotizacion.plan_nombre || ''), colX + 5, lineY);
+                    doc.setTextColor(51, 65, 85);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text(`$${licenciaBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, colX + colW - 5, lineY, { align: 'right' });
+                    lineY += lineH;
+
+                    // Financiamiento (solo si aplica)
+                    if (!pf.isPagoUnico && pf.recargoMonto > 0 && (plan.show_breakdown ?? true)) {
+                        doc.setTextColor(100, 116, 139);
+                        doc.setFont('helvetica', 'normal');
+                        doc.text(`Financiamiento ${plan.interes_porcentaje || 0}%`, colX + 5, lineY);
+                        doc.setTextColor(249, 115, 22);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text(`+$${pf.recargoMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, colX + colW - 5, lineY, { align: 'right' });
+                        lineY += lineH;
+                    }
+
+                    // Descuento
+                    if (pf.descuentoManualMonto > 0) {
+                        doc.setTextColor(22, 163, 74);
+                        doc.setFont('helvetica', 'normal');
+                        doc.text(`Descuento (${pf.descuentoManualPct}%)`, colX + 5, lineY);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text(`-$${pf.descuentoManualMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, colX + colW - 5, lineY, { align: 'right' });
+                        lineY += lineH;
+                    }
+
+                    // IVA
+                    doc.setTextColor(100, 116, 139);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(`IVA (${Math.round(pf.ivaPct * 100)}%)`, colX + 5, lineY);
+                    doc.setTextColor(isMainPlan ? 67 : 22, isMainPlan ? 56 : 163, isMainPlan ? 202 : 74);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text(`+$${pf.ivaLicencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, colX + colW - 5, lineY, { align: 'right' });
+                    lineY += lineH;
+
+                    // Total separator
+                    doc.setDrawColor(isMainPlan ? 199 : 226, isMainPlan ? 202 : 232, isMainPlan ? 254 : 240);
+                    doc.setLineWidth(0.1);
+                    doc.line(colX + 5, lineY - 1, colX + colW - 5, lineY - 1);
+
+                    // Total
+                    doc.setTextColor(51, 65, 85);
+                    doc.setFontSize(6.5);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text(`Total (${pf.cuotas} ${pf.cuotas === 1 ? 'cuota' : 'cuotas'})`, colX + 5, lineY + 3);
+                    doc.text(`$${pf.totalLicencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, colX + colW - 5, lineY + 3, { align: 'right' });
+
+                    // ── Bottom status bar ───────────────────────────────────────────
+                    const btnY = colY + colH - 9;
+                    doc.setFillColor(isMainPlan ? 99 : 241, isMainPlan ? 102 : 245, isMainPlan ? 241 : 249);
+                    doc.roundedRect(colX + 5, btnY, colW - 10, 7, 1.5, 1.5, 'F');
+                    doc.setTextColor(isMainPlan ? 255 : 100, isMainPlan ? 255 : 116, isMainPlan ? 255 : 139);
+                    doc.setFontSize(5.5);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text(isMainPlan ? '\u2713 PLAN ACTIVO' : 'ALTERNATIVA', colX + colW / 2, btnY + 4.5, { align: 'center' });
+                });
+
+                by += colH + 4;
+
+                // ── PAGO INICIAL — full-width, itemized ──────────────────────────
+                if (pagoInicial > 0) {
+                    const implementacionBase = Number(cotizacion.costo_implementacion) || 0;
+                    const modulosArr = Array.isArray(cotizacion.modulos_adicionales) ? cotizacion.modulos_adicionales : [];
+                    const serviciosUnicos = modulosArr.filter((m: any) => (Number(m.pago_unico) || 0) > 0);
+                    const subtotalBase = implementacionBase + serviciosUnicos.reduce((s: number, m: any) => s + (Number(m.pago_unico) || 0), 0);
+                    const ivaInit = pagoInicial - subtotalBase;
+                    const initRowCount = 1 + serviciosUnicos.length + 1; // impl + servicios + IVA
+                    const initH = 14 + (initRowCount * 5) + 12;
+
+                    if (by + initH > pageHeight - 40) { drawFooter(1); doc.addPage(); by = 20; }
+
+                    const totalW2 = pageWidth - (margin * 2);
+                    doc.setFillColor(255, 247, 237);
+                    doc.setDrawColor(253, 186, 116);
+                    doc.setLineWidth(0.4);
+                    doc.roundedRect(margin, by, totalW2, initH, 3, 3, 'FD');
+                    doc.setFillColor(249, 115, 22);
+                    doc.roundedRect(margin, by, 2, initH, 1, 1, 'F');
+
+                    doc.setTextColor(249, 115, 22);
+                    doc.setFontSize(9);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('PAGO INICIAL', margin + 6, by + 8);
+                    doc.setTextColor(148, 163, 184);
+                    doc.setFontSize(5.5);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text('Requerido antes de activar', margin + 6, by + 13);
+
+                    let iy = by + 19;
+                    const iFontSize = 6.5;
+
+                    if (implementacionBase > 0) {
+                        doc.setTextColor(71, 85, 105);
+                        doc.setFontSize(iFontSize);
+                        doc.setFont('helvetica', 'normal');
+                        doc.text('Implementaci\u00f3n', margin + 6, iy);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text(`$${implementacionBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, margin + totalW2 - 6, iy, { align: 'right' });
+                        iy += 5;
+                    }
+
+                    serviciosUnicos.forEach((serv: any) => {
+                        doc.setTextColor(71, 85, 105);
+                        doc.setFontSize(iFontSize);
+                        doc.setFont('helvetica', 'normal');
+                        doc.text((serv.nombre || '').substring(0, 30), margin + 6, iy);
+                        doc.setFont('helvetica', 'bold');
+                        const monto = Number(serv.pago_unico) || 0;
+                        doc.text(`$${monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, margin + totalW2 - 6, iy, { align: 'right' });
+                        iy += 5;
+                    });
+
+                    doc.setTextColor(100, 116, 139);
+                    doc.setFontSize(iFontSize);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(`IVA (${Math.round(financials.ivaPct * 100)}%)`, margin + 6, iy);
+                    doc.setTextColor(249, 115, 22);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text(`+$ ${ivaInit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, margin + totalW2 - 6, iy, { align: 'right' });
+                    iy += 2;
+
+                    doc.setDrawColor(253, 186, 116);
+                    doc.setLineWidth(0.1);
+                    doc.line(margin + 6, iy + 1, margin + totalW2 - 6, iy + 1);
+                    iy += 5;
+
+                    doc.setTextColor(71, 85, 105);
+                    doc.setFontSize(7);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('TOTAL A PAGAR HOY', margin + 6, iy);
+                    doc.setTextColor(249, 115, 22);
+                    doc.setFontSize(14);
+                    doc.text(`$${pagoInicial.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, margin + totalW2 - 6, iy + 1, { align: 'right' });
+
+                    by += initH + 4;
+                }
+
+            } else {
+                // ── MODO CLÁSICO: 2 boxes (cuando hay 1 plan o ninguno) ───────────
+                const badgeH = 12;
+                doc.setFillColor(241, 245, 249);
+                doc.roundedRect(margin, by + 1, pageWidth - (margin * 2), badgeH, 2, 2, 'F');
+                doc.setDrawColor(226, 232, 240);
+                doc.roundedRect(margin, by + 1, pageWidth - (margin * 2), badgeH, 2, 2, 'D');
+
+                doc.setTextColor(15, 23, 42);
+                doc.setFontSize(11);
+                doc.setFont('helvetica', 'bold');
+                const tituloText = planTitulo.toUpperCase();
+                doc.text(tituloText, margin + 5, by + 8);
+
+                const tituloWidth = doc.getTextWidth(tituloText);
+                doc.setTextColor(100, 116, 139);
+                doc.setFontSize(8.5);
+                doc.setFont('helvetica', 'normal');
+                doc.text('— ' + planDescripcion, margin + 5 + tituloWidth + 2, by + 8);
+
+                by += badgeH + 10;
+
+                drawBox(bx, by, 'PAGO INICIAL', 'Requerido para activar', pagoInicial, pagoInicial, COLORS.ORANGE);
+                const cColor = financials.isMonthly ? COLORS.BLUE : COLORS.GREEN;
+                const cTitle = financials.isMonthly ? 'PAGO RECURRENTE' : 'RECURRENTE ANUAL';
+                const cSubtitle = divisor > 1 ? `Pago en ${divisor} cuotas` : 'Pago único acumulado';
+                drawBox(bx + boxW + gap, by, cTitle, cSubtitle, financials.isMonthly ? cuotaMensual : financials.totalAnual, financials.isMonthly ? financials.montoPeriodo : financials.totalAnual, cColor, true);
+            }
 
             drawFooter(1);
 
