@@ -35,6 +35,7 @@ export default function Team() {
     const [isSaving, setIsSaving] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [isResettingPassword, setIsResettingPassword] = useState(false);
+    const [confirmingReset, setConfirmingReset] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Form state for new members (Inline)
@@ -196,12 +197,16 @@ export default function Team() {
 
     const handlePasswordReset = async () => {
         if (!editingMember) return;
-        
-        const confirmReset = confirm(
-            `¿Resetear la contraseña de ${editingMember.full_name || editingMember.email}?\n\nSe generará una contraseña temporal que deberás compartir con el usuario.`
-        );
-        if (!confirmReset) return;
 
+        // Two-step confirmation (avoids blocked browser confirm() dialogs)
+        if (!confirmingReset) {
+            setConfirmingReset(true);
+            // Auto-cancel after 4 seconds if user doesn't confirm
+            setTimeout(() => setConfirmingReset(false), 4000);
+            return;
+        }
+
+        setConfirmingReset(false);
         setIsResettingPassword(true);
         try {
             // Generate a secure temporary password
@@ -625,14 +630,18 @@ export default function Team() {
                                 type="button"
                                 onClick={handlePasswordReset}
                                 disabled={isResettingPassword}
-                                className="h-14 px-6 rounded-2xl font-black text-[11px] uppercase tracking-widest border border-orange-200 text-orange-500 hover:bg-orange-50 transition-all flex items-center gap-2 disabled:opacity-50"
+                                className={`h-14 px-6 rounded-2xl font-black text-[11px] uppercase tracking-widest border transition-all flex items-center gap-2 disabled:opacity-50 ${
+                                    confirmingReset
+                                        ? 'border-red-300 bg-red-50 text-red-600 animate-pulse'
+                                        : 'border-orange-200 text-orange-500 hover:bg-orange-50'
+                                }`}
                             >
                                 {isResettingPassword ? (
                                     <Loader2 className="w-4 h-4 animate-spin" />
                                 ) : (
                                     <KeyRound className="w-4 h-4" />
                                 )}
-                                {isResettingPassword ? 'Reseteando...' : 'Resetear Contraseña'}
+                                {isResettingPassword ? 'Reseteando...' : confirmingReset ? '¿Confirmar? (clic de nuevo)' : 'Resetear Contraseña'}
                             </button>
                             <Button
                                 form="edit-form-master"
