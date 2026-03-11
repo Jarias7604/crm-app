@@ -213,15 +213,33 @@ export default function Team() {
         }
         setIsResettingPassword(true);
         try {
-            const { error } = await supabase.rpc('admin_reset_user_password', {
-                target_user_id: editingMember.id,
-                new_password: newPassword
-            });
-            if (error) {
-                toast.error(`❌ ${error.message}`, { duration: 10000 });
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error('No hay sesión activa');
+
+            const response = await fetch(
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-reset-password`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session.access_token}`,
+                        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                    },
+                    body: JSON.stringify({
+                        target_user_id: editingMember.id,
+                        new_password: newPassword
+                    })
+                }
+            );
+
+            const result = await response.json();
+
+            if (!response.ok || result.error) {
+                toast.error(`❌ ${result.error || 'Error al resetear contraseña'}`, { duration: 10000 });
                 return;
             }
-            toast.success(`✅ Contraseña actualizada. ¡${editingMember.full_name?.split(' ')[0]} ya puede ingresar!`, { duration: 6000 });
+
+            toast.success(`✅ ¡${editingMember.full_name?.split(' ')[0]} ya puede ingresar con la nueva contraseña!`, { duration: 6000 });
             setShowPasswordPanel(false);
             setNewPassword('');
         } catch (error: any) {
