@@ -35,7 +35,8 @@ export default function Team() {
     const [isSaving, setIsSaving] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [isResettingPassword, setIsResettingPassword] = useState(false);
-    const [confirmingReset, setConfirmingReset] = useState(false);
+    const [showPasswordPanel, setShowPasswordPanel] = useState(false);
+    const [newPassword, setNewPassword] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Form state for new members (Inline)
@@ -195,63 +196,34 @@ export default function Team() {
         }
     };
 
-    const handlePasswordReset = async () => {
-        if (!editingMember) return;
+    const generatePassword = () => {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$';
+        return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    };
 
-        // Two-step confirmation (avoids blocked browser confirm() dialogs)
-        if (!confirmingReset) {
-            setConfirmingReset(true);
-            // Auto-cancel after 4 seconds if user doesn't confirm
-            setTimeout(() => setConfirmingReset(false), 4000);
+    const handleOpenPasswordPanel = () => {
+        setNewPassword(generatePassword());
+        setShowPasswordPanel(true);
+    };
+
+    const handleSaveNewPassword = async () => {
+        if (!editingMember || !newPassword || newPassword.length < 6) {
+            toast.error('La contraseña debe tener al menos 6 caracteres.');
             return;
         }
-
-        setConfirmingReset(false);
         setIsResettingPassword(true);
         try {
-            // Generate a secure temporary password
-            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$';
-            const tempPassword = Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-
-            // Use Supabase admin function to update password
             const { error } = await supabase.rpc('admin_reset_user_password', {
                 target_user_id: editingMember.id,
-                new_password: tempPassword
+                new_password: newPassword
             });
-
             if (error) throw error;
-
-            // Show the temp password in a styled toast with copy option
-            toast.custom((t) => (
-                <div className={`${
-                    t.visible ? 'animate-enter' : 'animate-leave'
-                } max-w-md w-full bg-white shadow-2xl rounded-2xl pointer-events-auto flex flex-col ring-1 ring-black/5 p-5 gap-3`}>
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-green-100 flex items-center justify-center shrink-0">
-                            <KeyRound className="w-4 h-4 text-green-600" />
-                        </div>
-                        <div>
-                            <p className="font-black text-sm text-gray-900">Contraseña reseteada</p>
-                            <p className="text-[11px] text-gray-400">{editingMember.full_name}</p>
-                        </div>
-                    </div>
-                    <div className="bg-gray-50 rounded-xl p-3 flex items-center justify-between gap-3 border border-gray-200">
-                        <code className="font-mono font-bold text-sm text-indigo-700 tracking-widest select-all">{tempPassword}</code>
-                        <button 
-                            onClick={() => { navigator.clipboard.writeText(tempPassword); toast.success('¡Copiado!'); }}
-                            className="shrink-0 p-1.5 hover:bg-gray-200 rounded-lg transition-colors"
-                        >
-                            <Copy className="w-3.5 h-3.5 text-gray-500" />
-                        </button>
-                    </div>
-                    <p className="text-[10px] text-gray-400 font-medium">Comparte esta contraseña con el usuario. Recomiéndale cambiarla al ingresar.</p>
-                </div>
-            ), { duration: 30000 });
-
+            toast.success(`✅ Contraseña actualizada para ${editingMember.full_name}`);
+            setShowPasswordPanel(false);
+            setNewPassword('');
         } catch (error: any) {
-            // Fallback: use Supabase dashboard link if RPC doesn't exist
             if (error?.message?.includes('function') || error?.message?.includes('does not exist')) {
-                toast.error('Función no disponible. Usa el Dashboard de Supabase → Authentication → Users para resetear la contraseña.', { duration: 8000 });
+                toast.error('Error de configuración. Contacta al soporte.', { duration: 8000 });
             } else {
                 toast.error(`Error: ${error.message}`);
             }
@@ -619,29 +591,77 @@ export default function Team() {
                                     </div>
                                 )}
                             </form>
+
+                            {/* Password Reset Panel - slides in below the form */}
+                            {showPasswordPanel && (
+                                <div className="mt-6 border border-orange-200 bg-orange-50/50 rounded-2xl p-6 animate-in slide-in-from-bottom-2 duration-200">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center">
+                                            <KeyRound className="w-4 h-4 text-orange-500" />
+                                        </div>
+                                        <div>
+                                            <p className="font-black text-sm text-gray-900 uppercase tracking-tight">Nueva Contraseña</p>
+                                            <p className="text-[10px] text-gray-400 font-medium">Escribe una contraseña o usa la generada automáticamente</p>
+                                        </div>
+                                        <button onClick={() => { setShowPasswordPanel(false); setNewPassword(''); }} className="ml-auto p-1.5 hover:bg-orange-100 rounded-lg transition-colors">
+                                            <X className="w-4 h-4 text-gray-400" />
+                                        </button>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <div className="relative flex-1">
+                                            <input
+                                                type="text"
+                                                value={newPassword}
+                                                onChange={e => setNewPassword(e.target.value)}
+                                                placeholder="Mínimo 6 caracteres..."
+                                                className="w-full h-12 px-4 rounded-xl bg-white border border-orange-200 font-mono font-bold text-sm text-indigo-700 tracking-widest outline-none focus:border-orange-400 transition-all"
+                                            />
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setNewPassword(generatePassword())}
+                                            title="Generar nueva contraseña"
+                                            className="h-12 px-4 rounded-xl border border-orange-200 bg-white text-orange-500 hover:bg-orange-100 transition-all flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest shrink-0"
+                                        >
+                                            <KeyRound className="w-3.5 h-3.5" />
+                                            Auto
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { navigator.clipboard.writeText(newPassword); toast.success('¡Copiado al portapapeles!'); }}
+                                            title="Copiar contraseña"
+                                            className="h-12 px-4 rounded-xl border border-orange-200 bg-white text-gray-500 hover:bg-orange-100 transition-all flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest shrink-0"
+                                        >
+                                            <Copy className="w-3.5 h-3.5" />
+                                            Copiar
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleSaveNewPassword}
+                                            disabled={isResettingPassword || newPassword.length < 6}
+                                            className="h-12 px-5 rounded-xl bg-[#4449AA] text-white font-black text-[10px] uppercase tracking-widest hover:translate-y-[-1px] transition-all disabled:opacity-50 flex items-center gap-2 shrink-0"
+                                        >
+                                            {isResettingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                            {isResettingPassword ? 'Guardando...' : 'Guardar'}
+                                        </button>
+                                    </div>
+                                    <p className="text-[10px] text-orange-400 font-medium mt-3">⚠️ Comparte esta contraseña con {editingMember.full_name?.split(' ')[0]} para que pueda ingresar.</p>
+                                </div>
+                            )}
                         </div>
 
                         <div className="px-12 py-8 bg-gray-50 border-t border-gray-100 flex flex-wrap gap-3">
                             <button
-                                onClick={() => setEditingMember(null)}
+                                onClick={() => { setEditingMember(null); setShowPasswordPanel(false); setNewPassword(''); }}
                                 className="h-14 px-6 rounded-2xl font-black text-[11px] text-gray-400 hover:text-gray-900 transition-all uppercase tracking-widest"
                             >Cancelar</button>
                             <button
                                 type="button"
-                                onClick={handlePasswordReset}
-                                disabled={isResettingPassword}
-                                className={`h-14 px-6 rounded-2xl font-black text-[11px] uppercase tracking-widest border transition-all flex items-center gap-2 disabled:opacity-50 ${
-                                    confirmingReset
-                                        ? 'border-red-300 bg-red-50 text-red-600 animate-pulse'
-                                        : 'border-orange-200 text-orange-500 hover:bg-orange-50'
-                                }`}
+                                onClick={handleOpenPasswordPanel}
+                                className="h-14 px-6 rounded-2xl font-black text-[11px] uppercase tracking-widest border border-orange-200 text-orange-500 hover:bg-orange-50 transition-all flex items-center gap-2"
                             >
-                                {isResettingPassword ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                    <KeyRound className="w-4 h-4" />
-                                )}
-                                {isResettingPassword ? 'Reseteando...' : confirmingReset ? '¿Confirmar? (clic de nuevo)' : 'Resetear Contraseña'}
+                                <KeyRound className="w-4 h-4" />
+                                Cambiar Contraseña
                             </button>
                             <Button
                                 form="edit-form-master"
