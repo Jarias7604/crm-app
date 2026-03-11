@@ -822,11 +822,11 @@ export default function CotizacionDetalle() {
             {/* ── SHARE MODAL — iOS Bottom Sheet ── */}
             {showShareModal && (
                 <div
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-end justify-center"
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-end md:items-center justify-center md:p-4"
                     onClick={() => setShowShareModal(false)}
                 >
                     <div
-                        className="bg-white w-full rounded-t-3xl shadow-2xl overflow-hidden"
+                        className="bg-white w-full md:w-auto md:max-w-md md:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden"
                         style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}
                         onClick={e => e.stopPropagation()}
                     >
