@@ -4,7 +4,7 @@ import { teamService, type Invitation } from '../../services/team';
 import type { Profile, CustomRole } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, Users, Lock, FileText, Tag, Package, Layers, Building, CreditCard, XCircle } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, Users, Lock, FileText, Tag, Package, Layers, Building, CreditCard, XCircle, KeyRound, Copy } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../auth/AuthProvider';
 import { storageService } from '../../services/storage';
@@ -34,6 +34,7 @@ export default function Team() {
     const [isCreating, setIsCreating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [isResettingPassword, setIsResettingPassword] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Form state for new members (Inline)
@@ -190,6 +191,67 @@ export default function Team() {
             toast.error('Error al guardar');
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handlePasswordReset = async () => {
+        if (!editingMember) return;
+        
+        const confirmReset = confirm(
+            `¿Resetear la contraseña de ${editingMember.full_name || editingMember.email}?\n\nSe generará una contraseña temporal que deberás compartir con el usuario.`
+        );
+        if (!confirmReset) return;
+
+        setIsResettingPassword(true);
+        try {
+            // Generate a secure temporary password
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$';
+            const tempPassword = Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+
+            // Use Supabase admin function to update password
+            const { error } = await supabase.rpc('admin_reset_user_password', {
+                target_user_id: editingMember.id,
+                new_password: tempPassword
+            });
+
+            if (error) throw error;
+
+            // Show the temp password in a styled toast with copy option
+            toast.custom((t) => (
+                <div className={`${
+                    t.visible ? 'animate-enter' : 'animate-leave'
+                } max-w-md w-full bg-white shadow-2xl rounded-2xl pointer-events-auto flex flex-col ring-1 ring-black/5 p-5 gap-3`}>
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-green-100 flex items-center justify-center shrink-0">
+                            <KeyRound className="w-4 h-4 text-green-600" />
+                        </div>
+                        <div>
+                            <p className="font-black text-sm text-gray-900">Contraseña reseteada</p>
+                            <p className="text-[11px] text-gray-400">{editingMember.full_name}</p>
+                        </div>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl p-3 flex items-center justify-between gap-3 border border-gray-200">
+                        <code className="font-mono font-bold text-sm text-indigo-700 tracking-widest select-all">{tempPassword}</code>
+                        <button 
+                            onClick={() => { navigator.clipboard.writeText(tempPassword); toast.success('¡Copiado!'); }}
+                            className="shrink-0 p-1.5 hover:bg-gray-200 rounded-lg transition-colors"
+                        >
+                            <Copy className="w-3.5 h-3.5 text-gray-500" />
+                        </button>
+                    </div>
+                    <p className="text-[10px] text-gray-400 font-medium">Comparte esta contraseña con el usuario. Recomiéndale cambiarla al ingresar.</p>
+                </div>
+            ), { duration: 30000 });
+
+        } catch (error: any) {
+            // Fallback: use Supabase dashboard link if RPC doesn't exist
+            if (error?.message?.includes('function') || error?.message?.includes('does not exist')) {
+                toast.error('Función no disponible. Usa el Dashboard de Supabase → Authentication → Users para resetear la contraseña.', { duration: 8000 });
+            } else {
+                toast.error(`Error: ${error.message}`);
+            }
+        } finally {
+            setIsResettingPassword(false);
         }
     };
 
@@ -554,16 +616,29 @@ export default function Team() {
                             </form>
                         </div>
 
-                        <div className="px-12 py-8 bg-gray-50 border-t border-gray-100 flex gap-6">
+                        <div className="px-12 py-8 bg-gray-50 border-t border-gray-100 flex flex-wrap gap-3">
                             <button
                                 onClick={() => setEditingMember(null)}
-                                className="flex-1 h-14 rounded-2xl font-black text-[11px] text-gray-400 hover:text-gray-900 transition-all uppercase tracking-widest"
+                                className="h-14 px-6 rounded-2xl font-black text-[11px] text-gray-400 hover:text-gray-900 transition-all uppercase tracking-widest"
                             >Cancelar</button>
+                            <button
+                                type="button"
+                                onClick={handlePasswordReset}
+                                disabled={isResettingPassword}
+                                className="h-14 px-6 rounded-2xl font-black text-[11px] uppercase tracking-widest border border-orange-200 text-orange-500 hover:bg-orange-50 transition-all flex items-center gap-2 disabled:opacity-50"
+                            >
+                                {isResettingPassword ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <KeyRound className="w-4 h-4" />
+                                )}
+                                {isResettingPassword ? 'Reseteando...' : 'Resetear Contraseña'}
+                            </button>
                             <Button
                                 form="edit-form-master"
                                 type="submit"
                                 disabled={isSaving}
-                                className="flex-[2] h-14 rounded-2xl bg-[#4449AA] text-white font-black text-[11px] uppercase tracking-widest shadow-2xl border-0 hover:translate-y-[-2px] transition-all"
+                                className="flex-1 h-14 rounded-2xl bg-[#4449AA] text-white font-black text-[11px] uppercase tracking-widest shadow-2xl border-0 hover:translate-y-[-2px] transition-all"
                             >
                                 {isSaving ? 'Actualizando...' : 'Guardar Cambios permanentemente'}
                             </Button>
