@@ -217,16 +217,15 @@ export default function Team() {
                 target_user_id: editingMember.id,
                 new_password: newPassword
             });
-            if (error) throw error;
-            toast.success(`✅ Contraseña actualizada para ${editingMember.full_name}`);
+            if (error) {
+                toast.error(`❌ ${error.message}`, { duration: 10000 });
+                return;
+            }
+            toast.success(`✅ Contraseña actualizada. ¡${editingMember.full_name?.split(' ')[0]} ya puede ingresar!`, { duration: 6000 });
             setShowPasswordPanel(false);
             setNewPassword('');
         } catch (error: any) {
-            if (error?.message?.includes('function') || error?.message?.includes('does not exist')) {
-                toast.error('Error de configuración. Contacta al soporte.', { duration: 8000 });
-            } else {
-                toast.error(`Error: ${error.message}`);
-            }
+            toast.error(`Error: ${error.message}`, { duration: 10000 });
         } finally {
             setIsResettingPassword(false);
         }
