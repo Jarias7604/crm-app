@@ -157,7 +157,7 @@ export default function PublicQuoteView() {
     const { totalImplementacion } = financials;
 
     return (
-        <div className="min-h-screen bg-[#F8FAFC] font-sans pb-32 md:pb-20 overflow-x-hidden">
+        <div className="min-h-screen bg-[#F8FAFC] font-sans pb-32 md:pb-8 overflow-x-hidden">
             {/* Header Mobile App Style - Sticky */}
             <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 w-full transition-all">
                 <div className="h-16 md:h-20 px-4 md:px-12 flex justify-between items-center w-full max-w-7xl mx-auto">
@@ -546,9 +546,9 @@ export default function PublicQuoteView() {
                         );
                     })()}
                 </div>
-            </div>
-            {/* Terms of Service Accordion-style Area */}
-            <div className="mb-20">
+
+            {/* Terms of Service */}
+            <div className="mb-8">
                 <div className="flex items-center gap-3 px-2 mb-6">
                     <FileText className="w-5 h-5 text-indigo-500" />
                     <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-[0.3em]">TÉRMINOS DEL SERVICIO</h4>
@@ -573,28 +573,39 @@ export default function PublicQuoteView() {
                 </div>
             </div>
 
-            {/* Creator Footer Mobile Optimized */}
-            <div className="bg-slate-900 rounded-[2.5rem] p-8 md:p-12 mb-12 flex flex-col md:flex-row items-center md:items-center justify-between gap-10">
-                <div className="flex flex-col md:flex-row items-center md:items-center gap-6 w-full md:w-auto">
-                    <div className="w-20 h-20 rounded-3xl bg-white/10 flex items-center justify-center p-1 relative overflow-hidden ring-4 ring-indigo-500/20 shrink-0">
-                        {cotizacion.creator?.avatar_url ? (
-                            <img src={cotizacion.creator.avatar_url} alt="" className="w-full h-full object-cover rounded-2xl" />
-                        ) : (
-                            <span className="text-white font-black text-3xl">
-                                {(cotizacion.creator?.full_name || cotizacion.creator?.email || 'A').charAt(0).toUpperCase()}
-                            </span>
-                        )}
+            {/* Creator Footer — same dark shape as the hero header */}
+            <div className="bg-[#0f172a] rounded-[2.5rem] p-8 md:p-10 text-white relative overflow-hidden shadow-2xl shadow-slate-900/20">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-[80px] -mr-20 -mt-20 pointer-events-none" />
+                <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+                    <div className="flex flex-col md:flex-row items-center gap-5 w-full md:w-auto">
+                        <div className="w-16 h-16 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center relative overflow-hidden shrink-0">
+                            {cotizacion.creator?.avatar_url ? (
+                                <img src={cotizacion.creator.avatar_url} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                                <span className="text-white font-black text-2xl">
+                                    {(cotizacion.creator?.full_name || cotizacion.creator?.email || 'A').charAt(0).toUpperCase()}
+                                </span>
+                            )}
+                        </div>
+                        <div className="text-center md:text-left">
+                            <p className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-1">ASESOR COMERCIAL</p>
+                            <h4 className="text-xl font-black text-white leading-none uppercase tracking-tight">{cotizacion.creator?.full_name || 'AGENTE OFICIAL'}</h4>
+                            <p className="text-[10px] font-bold text-slate-400 mt-1.5 lowercase">{cotizacion.creator?.email}</p>
+                        </div>
                     </div>
-                    <div className="text-center md:text-left">
-                        <p className="text-[8px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-1">ASESOR COMERCIAL</p>
-                        <h4 className="text-xl font-black text-white leading-none uppercase tracking-tight">{cotizacion.creator?.full_name || 'AGENTE OFICIAL'}</h4>
-                        <p className="text-[10px] font-bold text-slate-500 mt-2 lowercase">{cotizacion.creator?.email}</p>
+                    <div className="flex items-center gap-4">
+                        <div className="text-right hidden md:block">
+                            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Escanea para compartir</p>
+                            <p className="text-[9px] text-slate-600 mt-0.5">#{cotizacion.id.slice(0, 8).toUpperCase()}</p>
+                        </div>
+                        <div className="w-20 h-20 bg-white p-2.5 rounded-2xl shadow-lg">
+                            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${window.location.href}`} alt="QR" className="w-full h-full opacity-80" />
+                        </div>
                     </div>
-                </div>
-                <div className="w-24 h-24 bg-white p-3 rounded-2xl shadow-2xl self-center md:self-auto">
-                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${window.location.href}`} alt="QR" className="w-full h-full grayscale opacity-70" />
                 </div>
             </div>
+
+            </div> {/* END max-w-4xl container */}
 
             {/* Signature Bottom Sheet Style Modal */}
             {showSignatureModal && (
