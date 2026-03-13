@@ -4,7 +4,7 @@ import { teamService, type Invitation } from '../../services/team';
 import type { Profile, CustomRole } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, Users, Lock, FileText, Tag, Package, Layers, Building, CreditCard, XCircle, KeyRound, Copy } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, Users, Lock, FileText, Tag, Package, Layers, Building, CreditCard, XCircle, KeyRound, Copy, History, AlertCircle } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../auth/AuthProvider';
 import { storageService } from '../../services/storage';
@@ -37,6 +37,8 @@ export default function Team() {
     const [isResettingPassword, setIsResettingPassword] = useState(false);
     const [showPasswordPanel, setShowPasswordPanel] = useState(false);
     const [newPassword, setNewPassword] = useState('');
+    const [passwordResetLog, setPasswordResetLog] = useState<any[]>([]);
+    const [isLoadingLog, setIsLoadingLog] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Form state for new members (Inline)
@@ -204,6 +206,23 @@ export default function Team() {
     const handleOpenPasswordPanel = () => {
         setNewPassword(generatePassword());
         setShowPasswordPanel(true);
+    };
+
+    const loadPasswordResetLog = async (userId: string) => {
+        setIsLoadingLog(true);
+        try {
+            const { data, error } = await supabase
+                .from('password_reset_log')
+                .select('*')
+                .eq('target_user_id', userId)
+                .order('created_at', { ascending: false })
+                .limit(10);
+            if (!error) setPasswordResetLog(data || []);
+        } catch (e) {
+            setPasswordResetLog([]);
+        } finally {
+            setIsLoadingLog(false);
+        }
     };
 
     const handleSaveNewPassword = async () => {
@@ -443,6 +462,9 @@ export default function Team() {
                                                         setBaselinePermissions(roleOnlyPerms);
                                                         setEditingMember({ ...member, permissions: perms });
                                                         setActiveTab('general');
+                                                        setShowPasswordPanel(false);
+                                                        setPasswordResetLog([]);
+                                                        loadPasswordResetLog(member.id);
                                                     }}
                                                     className="p-1.5 rounded-xl text-gray-300 hover:text-indigo-600 hover:bg-indigo-50 transition-all"
                                                 >
@@ -604,6 +626,43 @@ export default function Team() {
                                                     />
                                                 );
                                             })}
+                                        </div>
+
+                                        {/* Password Reset History */}
+                                        <div className="mt-6 bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                                            <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+                                                <History className="w-4 h-4 text-gray-400" />
+                                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Historial de Cambios de Contraseña</span>
+                                            </div>
+                                            {isLoadingLog ? (
+                                                <div className="py-6 flex justify-center">
+                                                    <Loader2 className="w-5 h-5 text-gray-300 animate-spin" />
+                                                </div>
+                                            ) : passwordResetLog.length === 0 ? (
+                                                <div className="py-6 flex flex-col items-center gap-2 text-gray-300">
+                                                    <AlertCircle className="w-5 h-5" />
+                                                    <p className="text-[10px] font-black uppercase tracking-widest">Sin registros previos</p>
+                                                </div>
+                                            ) : (
+                                                <div className="divide-y divide-gray-50">
+                                                    {passwordResetLog.map((log: any) => (
+                                                        <div key={log.id} className="px-5 py-3 flex items-center justify-between gap-4">
+                                                            <div className="flex flex-col gap-0.5">
+                                                                <p className="text-[11px] font-black text-gray-700">
+                                                                    Cambiado por: <span className="text-indigo-600">{log.performed_by_email}</span>
+                                                                </p>
+                                                                <p className="text-[10px] text-gray-400 font-medium">
+                                                                    Rol: {log.performed_by_role === 'super_admin' ? 'Super Admin' : 'Administrador'}
+                                                                    {log.ip_address && log.ip_address !== 'unknown' ? ` · IP: ${log.ip_address}` : ''}
+                                                                </p>
+                                                            </div>
+                                                            <span className="text-[9px] font-black text-gray-300 shrink-0">
+                                                                {new Date(log.created_at).toLocaleString('es-SV', { dateStyle: 'short', timeStyle: 'short' })}
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}

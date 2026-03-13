@@ -4,9 +4,10 @@ import {
     Clock, User, FileText, Users, Megaphone, Building,
     ArrowUpDown, Eye, RefreshCw, Activity, Loader2,
     AlertTriangle, CheckCircle2, Edit3, Trash2,
-    LogIn, Upload, Download, Lock, Zap, ChevronDown
+    LogIn, Upload, Download, Lock, Zap, ChevronDown, KeyRound, AlertCircle
 } from 'lucide-react';
 import { auditLogService, type AuditLogEntry, type AuditLogFilters } from '../../services/auditLog';
+import { supabase } from '../../services/supabase';
 
 // === ACTION METADATA ===
 const ACTION_META: Record<string, { label: string; color: string; icon: any; bg: string }> = {
@@ -72,6 +73,24 @@ export default function AuditLog() {
     const [filters, setFilters] = useState<AuditLogFilters>({});
     const [showFilters, setShowFilters] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+
+    // Password Reset Log
+    const [resetLogs, setResetLogs] = useState<any[]>([]);
+    const [resetLoading, setResetLoading] = useState(true);
+
+    useEffect(() => {
+        const loadResetLogs = async () => {
+            setResetLoading(true);
+            const { data } = await supabase
+                .from('password_reset_log')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(20);
+            setResetLogs(data || []);
+            setResetLoading(false);
+        };
+        loadResetLogs();
+    }, []);
 
     const pageSize = 50;
     const totalPages = Math.ceil(totalCount / pageSize);
@@ -156,6 +175,74 @@ export default function AuditLog() {
                     Actualizar
                 </button>
             </header>
+
+            {/* === PASSWORD RESET SECURITY LOG === */}
+            <div className="bg-white rounded-[2rem] shadow-[0_8px_40px_rgb(0,0,0,0.03)] border border-orange-100/80 overflow-hidden">
+                <div className="px-8 py-5 bg-orange-50/50 border-b border-orange-100 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-orange-100 flex items-center justify-center">
+                            <KeyRound className="w-4 h-4 text-orange-500" />
+                        </div>
+                        <div>
+                            <h2 className="text-[11px] font-black text-orange-600 uppercase tracking-[0.2em]">Historial de Cambios de Contraseña</h2>
+                            <p className="text-[10px] text-gray-400 font-medium">Registro completo de quién cambió la contraseña de cada usuario</p>
+                        </div>
+                    </div>
+                    {resetLogs.length > 0 && (
+                        <span className="px-3 py-1 rounded-full bg-orange-100 text-orange-600 text-[10px] font-black uppercase tracking-widest">
+                            {resetLogs.length} registros
+                        </span>
+                    )}
+                </div>
+
+                {resetLoading ? (
+                    <div className="py-10 flex justify-center">
+                        <Loader2 className="w-6 h-6 text-orange-300 animate-spin" />
+                    </div>
+                ) : resetLogs.length === 0 ? (
+                    <div className="py-10 flex flex-col items-center gap-2 text-gray-300">
+                        <AlertCircle className="w-8 h-8" />
+                        <p className="text-[10px] font-black uppercase tracking-widest">Sin cambios de contraseña registrados</p>
+                        <p className="text-[10px] text-gray-400">Los próximos resets quedarán registrados aquí automáticamente</p>
+                    </div>
+                ) : (
+                    <div className="divide-y divide-gray-50/80 max-h-[320px] overflow-y-auto scrollbar-thin scrollbar-thumb-orange-100 scrollbar-track-transparent">
+                        {resetLogs.map((log: any) => (
+                            <div key={log.id} className="px-8 py-4 flex items-center justify-between gap-6 hover:bg-orange-50/30 transition-colors group">
+                                <div className="flex items-center gap-4 min-w-0">
+                                    <div className="w-9 h-9 shrink-0 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center">
+                                        <KeyRound className="w-4 h-4 text-orange-400" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-[12px] font-black text-gray-800">
+                                            <span className="text-orange-500">{log.performed_by_email}</span>
+                                            <span className="text-gray-400 font-medium mx-1">cambió la contraseña de</span>
+                                            <span className="text-indigo-600">{log.target_email}</span>
+                                        </p>
+                                        <div className="flex items-center gap-3 mt-0.5">
+                                            <span className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-orange-50 text-orange-400 border border-orange-100">
+                                                {log.performed_by_role === 'super_admin' ? 'Super Admin' : 'Administrador'}
+                                            </span>
+                                            {log.target_full_name && (
+                                                <span className="text-[10px] text-gray-400 font-medium">{log.target_full_name}</span>
+                                            )}
+                                            {log.ip_address && log.ip_address !== 'unknown' && (
+                                                <span className="text-[10px] text-gray-400 font-mono">IP: {log.ip_address}</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col items-end gap-0.5 shrink-0">
+                                    <span className="text-[11px] font-bold text-gray-500">{timeAgo(log.created_at)}</span>
+                                    <span className="text-[9px] text-gray-400 font-mono">
+                                        {new Date(log.created_at).toLocaleString('es-SV', { dateStyle: 'short', timeStyle: 'short' })}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

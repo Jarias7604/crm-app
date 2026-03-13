@@ -1,54 +1,44 @@
 ---
-description: Revisar y aplicar estructura HubSpot al CRM - pendiente para próxima sesión
+description: Pendientes priorizados del CRM — retomar en próxima sesión
 ---
 
-# 🔶 PENDIENTE: Reestructurar Admin Panel estilo HubSpot
+# 📋 Pendientes CRM — Próxima Sesión
 
-## Contexto (2026-02-17)
-El usuario quiere que la Administración Comercial & Licencias siga el modelo de HubSpot.
+## ✅ Resuelto (11 Mar 2026)
+- ✅ Footer `PublicQuoteView` — dark card `bg-[#0f172a]` premium, sin espacio blanco abajo
+- ✅ Planes comparativos en link móvil — funcionando
+- ✅ Share Modal `CotizacionDetalle` — modal centrado en desktop, bottom sheet en móvil intacto
 
-## Cambios realizados hoy:
-1. ✅ Formulario unificado de admin (crear/editar en un solo form)
-2. ✅ Super Admin puede actualizar CUALQUIER empresa (RLS fix)
-3. ✅ Update directo a profiles sin RPC problemático
-4. ✅ Esquemas DEV y PROD alineados (columna tax_id)
-5. ✅ Función duplicada admin_update_user eliminada
+---
 
-## Fase 4: HubSpot Features — Implementadas:
+## 🟠 Prioridad Alta
 
-### ✅ Feature 4.1: Audit Log (Registro de Actividad)
-- Tabla `audit_logs` con RLS, indexes, triggers automáticos
-- Triggers en: leads, profiles, cotizaciones, teams
-- Función `log_audit_event()` para logging manual
-- Servicio: `src/services/auditLog.ts`
-- Página: `src/pages/admin/AuditLog.tsx`
-- Ruta: `/admin/audit-log` (Super Admin only)
+### 1. Invitación por email para nuevos admins (HubSpot style)
+- **Problema:** Actualmente el admin crea la contraseña manualmente
+- **Solución:** Flujo de invitación: Super Admin ingresa email → Supabase envía invite → Admin configura su propia contraseña
+- **Referencia:** HubSpot Settings > Users & Teams > Create User (invitation by email)
+- **Archivos involucrados:** `src/pages/admin/Companies.tsx`, `src/pages/company/Team.tsx`
 
-### ✅ Feature 4.4: Equipos/Teams & Departamentos
-- Tablas `teams` + `team_members` con RLS completo
-- Emoji + color customization (mejor que HubSpot)
-- Leader assignment con roles (leader/member)
-- Audit triggers integrados con audit_logs
-- Servicio: `src/services/teams.ts`
-- Página: `src/pages/company/Teams.tsx`
-- Ruta: `/company/teams` (Admin only)
+---
 
-## Lo que falta implementar (estilo HubSpot):
+## 🟡 Prioridad Media
 
-### Prioridad Alta:
-- [ ] **Invitación por email** — En vez de crear contraseña manualmente, enviar invitación al admin para que configure su propia contraseña
-- [ ] **Permisos granulares por módulo** — No solo activar/desactivar módulos, sino controlar acciones dentro de cada módulo (ver, crear, editar, eliminar)
+### 2. Verificar migraciones en producción
+- **Tablas a verificar:** `teams`, `team_members`, `call_goals`, `call_activities`
+- **Archivo SQL:** `sql/migrations/phase4_create_teams_system.sql`
+- **Riesgo:** Si no existen en prod, Teams y Activity Tracking están rotos silenciosamente
+- **Acción:** Correr `list_tables` en Supabase prod y aplicar migraciones faltantes
 
-### Prioridad Media:
-- [ ] **Self-service onboarding** — Permitir que empresas se registren solas (como HubSpot free)
-- [ ] **Roles predefinidos** — Templates de permisos (Admin, Sales Rep, Manager, Viewer)
+### 3. Permisos granulares por módulo
+- **Problema:** Solo se puede activar/desactivar módulos completos
+- **Solución:** Control de acciones dentro de cada módulo (ver, crear, editar, eliminar)
+- **Referencia:** HubSpot permissions por Hub (Marketing, Sales, Service)
+- **Archivos:** `src/pages/company/Permissions.tsx`, `src/services/permissions.ts`
 
-### Prioridad Baja:
-- [ ] **Business Units** — Manejar múltiples marcas dentro de una misma cuenta
-- [ ] **Two-Factor Authentication** — Seguridad adicional para admins
+---
 
-## Referencia HubSpot:
-- Settings > Users & Teams > Create User (invitación por email)
-- Permisos por Hub (Marketing, Sales, Service, CMS)
-- Principio de mínimo privilegio
-- Super Admin limitado a pocos usuarios por seguridad
+## 🔵 Prioridad Baja (Backlog HubSpot)
+- [ ] Self-service onboarding — empresas se registran solas
+- [ ] Roles predefinidos — templates (Admin, Sales Rep, Manager, Viewer)
+- [ ] Business Units — múltiples marcas dentro de una cuenta
+- [ ] Two-Factor Authentication para admins
