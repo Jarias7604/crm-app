@@ -13,6 +13,7 @@ import { Toaster } from 'react-hot-toast';
 // Auth pages (not lazy loaded - needed immediately)
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
+import UpdatePassword from './pages/UpdatePassword';
 
 // Lazy loaded pages for better performance
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -140,6 +141,9 @@ function App() {
 
               {/* Public Proposal Page (No Auth Required) */}
               <Route path="/propuesta/:id" element={<PublicQuoteView />} />
+
+              {/* Password Reset from Email Link (No Auth Required) */}
+              <Route path="/update-password" element={<UpdatePassword />} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
