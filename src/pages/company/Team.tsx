@@ -35,6 +35,7 @@ export default function Team() {
     const [isSaving, setIsSaving] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [isResettingPassword, setIsResettingPassword] = useState(false);
+    const [isSendingEmailLink, setIsSendingEmailLink] = useState(false);
     const [showPasswordPanel, setShowPasswordPanel] = useState(false);
     const [newPassword, setNewPassword] = useState('');
     const [passwordResetLog, setPasswordResetLog] = useState<any[]>([]);
@@ -225,6 +226,43 @@ export default function Team() {
         }
     };
 
+    const callResetFunction = async (body: object) => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('No hay sesión activa');
+        const response = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-reset-password`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                },
+                body: JSON.stringify(body)
+            }
+        );
+        const result = await response.json();
+        if (!response.ok || result.error) throw new Error(result.error || 'Error desconocido');
+        return result;
+    };
+
+    // Opción A: Enviar link de reset por email (recomendado si tiene correo)
+    const handleSendEmailLink = async () => {
+        if (!editingMember) return;
+        setIsSendingEmailLink(true);
+        try {
+            await callResetFunction({ target_user_id: editingMember.id, mode: 'email_link' });
+            toast.success(`📧 Enlace enviado al correo de ${editingMember.full_name?.split(' ')[0]}. El usuario puede crear su propia contraseña.`, { duration: 8000 });
+            setShowPasswordPanel(false);
+            loadPasswordResetLog(editingMember.id);
+        } catch (error: any) {
+            toast.error(`❌ ${error.message}`, { duration: 10000 });
+        } finally {
+            setIsSendingEmailLink(false);
+        }
+    };
+
+    // Opción B: Establecer contraseña directamente (para usuarios sin correo)
     const handleSaveNewPassword = async () => {
         if (!editingMember || !newPassword || newPassword.length < 6) {
             toast.error('La contraseña debe tener al menos 6 caracteres.');
@@ -232,37 +270,13 @@ export default function Team() {
         }
         setIsResettingPassword(true);
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) throw new Error('No hay sesión activa');
-
-            const response = await fetch(
-                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-reset-password`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${session.access_token}`,
-                        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-                    },
-                    body: JSON.stringify({
-                        target_user_id: editingMember.id,
-                        new_password: newPassword
-                    })
-                }
-            );
-
-            const result = await response.json();
-
-            if (!response.ok || result.error) {
-                toast.error(`❌ ${result.error || 'Error al resetear contraseña'}`, { duration: 10000 });
-                return;
-            }
-
+            await callResetFunction({ target_user_id: editingMember.id, new_password: newPassword, mode: 'direct' });
             toast.success(`✅ ¡${editingMember.full_name?.split(' ')[0]} ya puede ingresar con la nueva contraseña!`, { duration: 6000 });
             setShowPasswordPanel(false);
             setNewPassword('');
+            loadPasswordResetLog(editingMember.id);
         } catch (error: any) {
-            toast.error(`Error: ${error.message}`, { duration: 10000 });
+            toast.error(`❌ ${error.message}`, { duration: 10000 });
         } finally {
             setIsResettingPassword(false);
         }
@@ -670,20 +684,57 @@ export default function Team() {
 
                             {/* Password Reset Panel - slides in below the form */}
                             {showPasswordPanel && (
-                                <div className="mt-6 border border-orange-200 bg-orange-50/50 rounded-2xl p-6 animate-in slide-in-from-bottom-2 duration-200">
-                                    <div className="flex items-center gap-3 mb-4">
+                                <div className="mt-6 border border-orange-200 bg-orange-50/50 rounded-2xl p-6 animate-in slide-in-from-bottom-2 duration-200 space-y-5">
+                                    <div className="flex items-center gap-3">
                                         <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center">
                                             <KeyRound className="w-4 h-4 text-orange-500" />
                                         </div>
                                         <div>
-                                            <p className="font-black text-sm text-gray-900 uppercase tracking-tight">Nueva Contraseña</p>
-                                            <p className="text-[10px] text-gray-400 font-medium">Escribe una contraseña o usa la generada automáticamente</p>
+                                            <p className="font-black text-sm text-gray-900 uppercase tracking-tight">Restablecer Acceso</p>
+                                            <p className="text-[10px] text-gray-400 font-medium">Elige el método según si el colaborador tiene correo electrónico</p>
                                         </div>
                                         <button onClick={() => { setShowPasswordPanel(false); setNewPassword(''); }} className="ml-auto p-1.5 hover:bg-orange-100 rounded-lg transition-colors">
                                             <X className="w-4 h-4 text-gray-400" />
                                         </button>
                                     </div>
-                                    <div className="flex gap-2">
+
+                                    {/* OPCIÓN A: Email link */}
+                                    <div className="bg-white rounded-xl border border-green-100 p-4">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="flex-1">
+                                                <p className="text-[11px] font-black text-green-700 uppercase tracking-widest flex items-center gap-1.5 mb-1">
+                                                    <span className="w-4 h-4 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-[9px] font-black">A</span>
+                                                    Enviar enlace por correo <span className="text-[9px] text-green-500 font-bold normal-case tracking-normal">(Recomendado)</span>
+                                                </p>
+                                                <p className="text-[10px] text-gray-400">El colaborador recibe un email y crea su propia contraseña. Más seguro — nadie más la conoce.</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={handleSendEmailLink}
+                                                disabled={isSendingEmailLink}
+                                                className="h-10 px-5 rounded-xl bg-green-600 text-white font-black text-[10px] uppercase tracking-widest hover:bg-green-700 transition-all disabled:opacity-50 flex items-center gap-2 shrink-0"
+                                            >
+                                                {isSendingEmailLink ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                                Enviar Link
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Divider */}
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex-1 h-px bg-orange-100" />
+                                        <span className="text-[9px] font-black text-orange-300 uppercase tracking-widest">o si no tiene correo</span>
+                                        <div className="flex-1 h-px bg-orange-100" />
+                                    </div>
+
+                                    {/* OPCIÓN B: Direct */}
+                                    <div className="bg-white rounded-xl border border-orange-100 p-4 space-y-3">
+                                        <p className="text-[11px] font-black text-orange-600 uppercase tracking-widest flex items-center gap-1.5">
+                                            <span className="w-4 h-4 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-[9px] font-black">B</span>
+                                            Establecer contraseña manualmente
+                                        </p>
+                                        <p className="text-[10px] text-gray-400">Para colaboradores sin correo electrónico. Comparte la contraseña de forma segura (en persona o por WhatsApp).</p>
+                                        <div className="flex gap-2">
                                         <div className="relative flex-1">
                                             <input
                                                 type="text"
@@ -720,8 +771,9 @@ export default function Team() {
                                             {isResettingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                                             {isResettingPassword ? 'Guardando...' : 'Guardar'}
                                         </button>
+                                        </div>
+                                        <p className="text-[10px] text-orange-400 font-medium mt-3">⚠️ Comparte esta contraseña con {editingMember.full_name?.split(' ')[0]} para que pueda ingresar.</p>
                                     </div>
-                                    <p className="text-[10px] text-orange-400 font-medium mt-3">⚠️ Comparte esta contraseña con {editingMember.full_name?.split(' ')[0]} para que pueda ingresar.</p>
                                 </div>
                             )}
                         </div>
