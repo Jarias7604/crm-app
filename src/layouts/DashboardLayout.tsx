@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import MobileNav from '../components/MobileNav';
+import NotificationBell from '../components/NotificationBell';
 import { cn } from '../lib/utils';
 import { useAuth } from '../auth/AuthProvider';
 import { useTranslation } from 'react-i18next';
@@ -37,7 +38,7 @@ export default function DashboardLayout() {
                 {/* Optimized Global Header - Hidden on Quote Detail for immersion */}
                 {!isQuoteDetail && (
                     <header className="w-full px-4 md:px-8 pt-4 pb-6">
-                        <div className="max-w-[1580px] mx-auto flex items-center justify-start">
+                        <div className="max-w-[1580px] mx-auto flex items-center justify-between">
                             <div className="flex flex-col items-start gap-0 group cursor-default">
                                 <h2 className="text-[13px] md:text-[14px] font-black text-gray-800 tracking-tight flex items-center gap-1.5 transition-all group-hover:text-indigo-600">
                                     {t('common.greeting', { name: profile?.full_name?.split(' ')[0] || profile?.email?.split('@')[0] })}
@@ -47,6 +48,8 @@ export default function DashboardLayout() {
                                     {new Date().toLocaleDateString(i18n.language === 'es' ? 'es-ES' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                                 </p>
                             </div>
+                            {/* Notification Bell — visible for all roles */}
+                            <NotificationBell />
                         </div>
                     </header>
                 )}
