@@ -203,16 +203,25 @@ export default function CampaignBuilder() {
                 excludedIds: excludedLeadIds.size > 0 ? Array.from(excludedLeadIds) : undefined
             };
 
+            // Fix: template_id must be null (not '') for UUID column
+            const templateId = formData.template_id && formData.template_id.trim() !== ''
+                ? formData.template_id
+                : null;
+
             const campaignData = {
                 name: formData.name,
-                subject: selectedChannel === 'email' ? formData.subject : undefined,
+                subject: selectedChannel === 'email' ? formData.subject : null,
                 content: formData.content,
-                type: selectedChannel === 'telegram' ? 'social' : selectedChannel,
+                // 'telegram' is now allowed in DB check constraint
+                // 'email' | 'whatsapp' | 'telegram' | 'social' | 'sms'
+                type: selectedChannel,
                 status: 'draft' as 'draft',
                 total_recipients: reachCount,
                 company_id: profile?.company_id || undefined,
+                // Note: created_by omitted — FK references auth.users which
+                // causes violation in simulation mode (simulated profile id ≠ auth user)
                 audience_filters: audienceFilters,
-                template_id: formData.template_id,
+                template_id: templateId,
                 stats: { sent: 0, delivered: 0, opened: 0, clicked: 0, replied: 0, bounced: 0 }
             };
 
@@ -237,9 +246,10 @@ export default function CampaignBuilder() {
             }
 
             navigate('/marketing/email');
-        } catch (error) {
-            console.error(error);
-            toast.error('Error al procesar campaña');
+        } catch (error: any) {
+            console.error('Campaign save error:', error);
+            const msg = error?.message || error?.error_description || 'Error al procesar campaña';
+            toast.error(msg);
         }
     };
 
