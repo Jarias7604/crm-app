@@ -110,8 +110,10 @@ export default function CampaignBuilder() {
         } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-    const possibleStatuses = ["Prospecto", "Llamada fría", "En Nutrición", "Lead calificado", "En seguimiento", "Negociación", "Cerrado", "Cliente"];
+    const possibleStatuses = ["Prospecto", "Llamada fría", "En Nutrición", "Lead calificado", "En seguimiento", "Negociación", "Cerrado", "Cliente", "Perdido"];
     const [availableIndustries, setAvailableIndustries] = useState<string[]>([]);
+    const [showIndustryModal, setShowIndustryModal] = useState(false);
+    const [industrySearch, setIndustrySearch] = useState('');
 
     const [previewLeads, setPreviewLeads] = useState<any[]>([]);
     const [loadingPreview, setLoadingPreview] = useState(false);
@@ -489,28 +491,45 @@ export default function CampaignBuilder() {
                                 </div>
                             </div>
 
-                            {/* Industry / Rubro */}
+                            {/* Industry / Rubro — Modal Picker */}
                             {availableIndustries.length > 0 && (
                                 <div>
-                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 ml-1">Rubro / Industria</label>
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {availableIndustries.map(ind => {
-                                            const isSelected = formData.audience_filter.industry?.includes(ind);
-                                            return (
-                                                <button
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Rubro / Industria</label>
+                                    <button
+                                        onClick={() => setShowIndustryModal(true)}
+                                        className="w-full flex items-center justify-between px-3 py-2.5 bg-white border border-gray-100 rounded-xl text-[10px] font-black text-gray-500 hover:bg-gray-50 hover:border-gray-200 transition-all"
+                                    >
+                                        <span className="flex items-center gap-2">
+                                            <Search className="w-3 h-3 text-gray-400" />
+                                            {(formData.audience_filter.industry?.length || 0) === 0
+                                                ? 'Todos los rubros'
+                                                : `${formData.audience_filter.industry!.length} rubro${formData.audience_filter.industry!.length > 1 ? 's' : ''} seleccionado${formData.audience_filter.industry!.length > 1 ? 's' : ''}`
+                                            }
+                                        </span>
+                                        <ChevronRight className="w-3 h-3 text-gray-300" />
+                                    </button>
+                                    {(formData.audience_filter.industry?.length || 0) > 0 && (
+                                        <div className="flex flex-wrap gap-1.5 mt-2">
+                                            {formData.audience_filter.industry!.map((ind: string) => (
+                                                <span
                                                     key={ind}
-                                                    onClick={() => {
-                                                        const current = formData.audience_filter?.industry || [];
-                                                        const newIndustry = isSelected ? current.filter(i => i !== ind) : [...current, ind];
-                                                        setFormData({ ...formData, audience_filter: { ...formData.audience_filter, industry: newIndustry } });
-                                                    }}
-                                                    className={`px-2.5 py-1 rounded-lg text-[9px] font-bold transition-all border ${isSelected ? 'bg-teal-600 text-white border-transparent shadow-md' : 'bg-white border-gray-100 text-gray-500 hover:bg-gray-50'}`}
+                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-bold border"
+                                                    style={{ backgroundColor: '#E0F7FA', borderColor: '#80DEEA', color: '#007B88' }}
                                                 >
                                                     {ind}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
+                                                    <button
+                                                        onClick={() => {
+                                                            const newIndustry = formData.audience_filter.industry!.filter((i: string) => i !== ind);
+                                                            setFormData({ ...formData, audience_filter: { ...formData.audience_filter, industry: newIndustry } });
+                                                        }}
+                                                        className="ml-0.5 hover:opacity-70 transition-opacity"
+                                                    >
+                                                        <X className="w-2.5 h-2.5" />
+                                                    </button>
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -1047,6 +1066,118 @@ export default function CampaignBuilder() {
                                 className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-200"
                             >
                                 Confirmar Audiencia ({reachCount})
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Industry Picker Modal */}
+            {showIndustryModal && (
+                <div
+                    className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4"
+                    onClick={() => { setShowIndustryModal(false); setIndustrySearch(''); }}
+                >
+                    <div
+                        className="bg-white rounded-3xl shadow-2xl w-full max-w-lg animate-in zoom-in-95 duration-200 flex flex-col max-h-[80vh]"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+                            <div>
+                                <h3 className="text-lg font-black text-gray-900">Rubro / Industria</h3>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">
+                                    {(formData.audience_filter.industry?.length || 0)} de {availableIndustries.length} seleccionados
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => { setShowIndustryModal(false); setIndustrySearch(''); }}
+                                className="p-2 bg-gray-50 hover:bg-gray-100 rounded-xl transition-all text-gray-400"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Search */}
+                        <div className="px-6 pt-4">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar rubro..."
+                                    value={industrySearch}
+                                    onChange={e => setIndustrySearch(e.target.value)}
+                                    className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm font-medium text-gray-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:border-transparent transition-all"
+                                    style={{ '--tw-ring-color': '#0097A7' } as React.CSSProperties}
+                                    autoFocus
+                                />
+                            </div>
+                        </div>
+
+                        {/* Quick actions */}
+                        <div className="px-6 pt-3 flex gap-2">
+                            <button
+                                onClick={() => setFormData({ ...formData, audience_filter: { ...formData.audience_filter, industry: [...availableIndustries] } })}
+                                className="text-[10px] font-black uppercase tracking-widest transition-colors"
+                                style={{ color: '#0097A7' }}
+                            >
+                                Seleccionar todos
+                            </button>
+                            <span className="text-gray-200">•</span>
+                            <button
+                                onClick={() => setFormData({ ...formData, audience_filter: { ...formData.audience_filter, industry: [] } })}
+                                className="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                                Limpiar
+                            </button>
+                        </div>
+
+                        {/* Industry grid */}
+                        <div className="flex-1 overflow-y-auto px-6 py-4">
+                            <div className="grid grid-cols-2 gap-2">
+                                {availableIndustries
+                                    .filter(ind => ind.toLowerCase().includes(industrySearch.toLowerCase()))
+                                    .map(ind => {
+                                        const isSelected = formData.audience_filter.industry?.includes(ind);
+                                        return (
+                                            <button
+                                                key={ind}
+                                                onClick={() => {
+                                                    const current = formData.audience_filter?.industry || [];
+                                                    const newIndustry = isSelected
+                                                        ? current.filter((i: string) => i !== ind)
+                                                        : [...current, ind];
+                                                    setFormData({ ...formData, audience_filter: { ...formData.audience_filter, industry: newIndustry } });
+                                                }}
+                                                className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-left text-[11px] font-bold transition-all border"
+                                                style={isSelected ? { backgroundColor: '#E0F7FA', borderColor: '#4DD0E1', color: '#005F6B' } : {}}
+                                            >
+                                                <div
+                                                    className="w-4 h-4 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all"
+                                                    style={isSelected ? { backgroundColor: '#0097A7', borderColor: '#0097A7' } : { borderColor: '#e5e7eb' }}
+                                                >
+                                                    {isSelected && <Check className="w-2.5 h-2.5 text-white" />}
+                                                </div>
+                                                <span className="truncate">{ind}</span>
+                                            </button>
+                                        );
+                                    })
+                                }
+                            </div>
+                            {availableIndustries.filter(ind => ind.toLowerCase().includes(industrySearch.toLowerCase())).length === 0 && (
+                                <p className="text-center text-sm text-gray-400 font-medium py-8">
+                                    Sin resultados para "{industrySearch}"
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-6 py-4 border-t border-gray-100">
+                            <button
+                                onClick={() => { setShowIndustryModal(false); setIndustrySearch(''); }}
+                                className="w-full py-3 text-white font-black text-[11px] uppercase tracking-widest rounded-2xl transition-all shadow-lg"
+                                style={{ backgroundColor: '#0097A7' }}
+                            >
+                                Confirmar{(formData.audience_filter.industry?.length || 0) > 0 && ` (${formData.audience_filter.industry!.length})`}
                             </button>
                         </div>
                     </div>
