@@ -17,19 +17,36 @@ export default function CampaignBuilder() {
     const [selectedChannel, setSelectedChannel] = useState<'email' | 'whatsapp' | 'telegram'>('email');
     const [onlyConnected, setOnlyConnected] = useState(false);
 
-    const [formData, setFormData] = useState({
-        name: '',
-        subject: '',
-        content: '',
-        template_id: '' as string | null,
-        audience_filter: {
-            status: [] as string[],
-            industry: [] as string[],
-            dateRange: 'all' as 'all' | 'new',
-            priority: 'all' as string,
-            specificIds: [] as string[],
-            idType: 'id' as 'id' | 'google_place_id'
+    const DRAFT_KEY = 'crm_campaign_draft';
+
+    const [formData, setFormData] = useState(() => {
+        // Restore draft from localStorage on first render (new campaigns only)
+        if (!window.location.pathname.includes('/campaign/') || window.location.pathname.endsWith('/new')) {
+            try {
+                const saved = localStorage.getItem(DRAFT_KEY);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    return parsed.formData || {
+                        name: '', subject: '', content: '', template_id: '' as string | null,
+                        audience_filter: { status: [] as string[], industry: [] as string[], dateRange: 'all' as 'all' | 'new', priority: 'all' as string, specificIds: [] as string[], idType: 'id' as 'id' | 'google_place_id' }
+                    };
+                }
+            } catch { /* ignore */ }
         }
+        return {
+            name: '',
+            subject: '',
+            content: '',
+            template_id: '' as string | null,
+            audience_filter: {
+                status: [] as string[],
+                industry: [] as string[],
+                dateRange: 'all' as 'all' | 'new',
+                priority: 'all' as string,
+                specificIds: [] as string[],
+                idType: 'id' as 'id' | 'google_place_id'
+            }
+        };
     });
 
     const [isDirectConnect, setIsDirectConnect] = useState(false);
@@ -73,6 +90,26 @@ export default function CampaignBuilder() {
         }
     }, [campaignId, location.state]);
 
+    // Auto-save draft to localStorage every time form changes (new campaigns only)
+    useEffect(() => {
+        if (isEditMode) return; // Don't overwrite draft in edit mode
+        try {
+            localStorage.setItem(DRAFT_KEY, JSON.stringify({ formData, selectedChannel }));
+        } catch { /* ignore quota errors */ }
+    }, [formData, selectedChannel, isEditMode]);
+
+    // Restore channel from draft
+    useEffect(() => {
+        if (isEditMode) return;
+        try {
+            const saved = localStorage.getItem(DRAFT_KEY);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (parsed.selectedChannel) setSelectedChannel(parsed.selectedChannel);
+            }
+        } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
     const possibleStatuses = ["Prospecto", "Llamada fría", "En Nutrición", "Lead calificado", "En seguimiento", "Negociación", "Cerrado", "Cliente"];
     const [availableIndustries, setAvailableIndustries] = useState<string[]>([]);
 
@@ -245,6 +282,8 @@ export default function CampaignBuilder() {
                 toast.success(isEditMode ? 'Campaña actualizada' : 'Borrador guardado');
             }
 
+            // Clear draft from localStorage after successful save
+            localStorage.removeItem(DRAFT_KEY);
             navigate('/marketing/email');
         } catch (error: any) {
             console.error('Campaign save error:', error);
