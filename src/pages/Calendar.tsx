@@ -506,8 +506,20 @@ export default function Calendar() {
                                         const bgColor = pct === 100 ? 'bg-emerald-100 text-emerald-700' : isPast && pct < 100 ? 'bg-red-100 text-red-700' : 'bg-indigo-100 text-indigo-700';
                                         return (
                                             <button
-                                                onClick={(e) => { e.stopPropagation(); setDayDetailDate(day); }}
-                                                title={`${completed}/${total} completados — click para ver detalle`}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const allLeadIds = dayEvents.map(e => e.lead?.id).filter(Boolean) as string[];
+                                                    const completedLeadIds = dayEvents.filter(e => e.completed).map(e => e.lead?.id).filter(Boolean) as string[];
+                                                    navigate('/leads', {
+                                                        state: {
+                                                            leadIds: allLeadIds,
+                                                            completedLeadIds,
+                                                            fromCalendar: true,
+                                                            calendarDate: format(day, "EEEE d 'de' MMMM", { locale: es })
+                                                        }
+                                                    });
+                                                }}
+                                                title={`${completed}/${total} completados — click para ver en Leads`}
                                                 className={`min-w-[28px] h-5 px-1.5 rounded-full ${bgColor} text-[9px] font-black transition-all hover:scale-110 flex items-center justify-center gap-0.5`}
                                             >
                                                 {pct === 100 && <CheckCircle2 className="w-2.5 h-2.5" />}

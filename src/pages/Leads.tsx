@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
@@ -180,6 +180,8 @@ export default function Leads() {
     const [isAssignedFilterOpen, setIsAssignedFilterOpen] = useState(false);
     const assignedFilterRef = useRef<HTMLDivElement>(null);
     const [filteredLeadIds, setFilteredLeadIds] = useState<string[] | null>(null);
+    const [completedLeadIds, setCompletedLeadIds] = useState<string[] | null>(null);
+    const [calendarDateLabel, setCalendarDateLabel] = useState<string | null>(null);
     const cameFromRef = useRef<string | null>(null);
     const [startDateFilter, setStartDateFilter] = useState<string | null>(null);
     const [endDateFilter, setEndDateFilter] = useState<string | null>(null);
@@ -226,6 +228,8 @@ export default function Leads() {
                     setFilteredLeadIds(state.leadIds);
                     if (viewMode === 'kanban') setViewMode('list');
                 }
+                if (state.completedLeadIds) setCompletedLeadIds(state.completedLeadIds);
+                if (state.calendarDate) setCalendarDateLabel(state.calendarDate);
                 if (state.fromCalendar) cameFromRef.current = 'calendar';
                 // Dashboard sends full ISO timestamps — normalize to yyyy-MM-dd
                 if (state.startDate) {
@@ -1355,6 +1359,8 @@ export default function Leads() {
                             onClick={() => {
                                 setFilteredLeadId(null);
                                 setFilteredLeadIds(null);
+                                setCompletedLeadIds(null);
+                                setCalendarDateLabel(null);
                                 setStatusFilter('all');
                                 setPriorityFilter('all');
                                 setAssignedFilter('all');
@@ -1654,9 +1660,15 @@ export default function Leads() {
                 </div>
 
                 {/* ROW 3: Active filter chips */}
-                {(filteredLeadId || filteredLeadIds || statusFilter !== 'all' || priorityFilter !== 'all' || assignedFilter !== 'all' || sourceFilter !== 'all' || lossReasonFilter !== 'all' || lostAtStageFilter !== 'all' || startDateFilter || endDateFilter) && (
+                {(filteredLeadId || filteredLeadIds || calendarDateLabel || statusFilter !== 'all' || priorityFilter !== 'all' || assignedFilter !== 'all' || sourceFilter !== 'all' || lossReasonFilter !== 'all' || lostAtStageFilter !== 'all' || startDateFilter || endDateFilter) && (
                     <div className="hidden md:flex items-center gap-2 flex-wrap animate-in fade-in slide-in-from-top-1 duration-200">
                         <span className="text-[11px] text-gray-400 font-medium">Activos:</span>
+                        {calendarDateLabel && (
+                            <span className="inline-flex items-center gap-1.5 bg-teal-50 text-teal-700 border border-teal-200 px-2.5 py-1 rounded-lg text-xs font-semibold capitalize">
+                                📅 {calendarDateLabel} · {completedLeadIds?.length ?? 0}/{filteredLeadIds?.length ?? 0} hechos
+                                <button onClick={() => { setFilteredLeadIds(null); setCompletedLeadIds(null); setCalendarDateLabel(null); }} className="hover:text-teal-900 ml-0.5"><X className="w-3 h-3" /></button>
+                            </span>
+                        )}
                         {statusFilter !== 'all' && (
                             <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-lg text-xs font-semibold">
                                 Estado: {Array.isArray(statusFilter) ? `${statusFilter.length} sel.` : STATUS_CONFIG[statusFilter as LeadStatus]?.label || statusFilter}
@@ -2270,9 +2282,18 @@ export default function Leads() {
                                                         {columnOrder.map((colId) => (
                                                             <td key={colId} className="px-4 py-4 overflow-hidden">
                                                                 {colId === 'name' && (
-                                                                    <div className="flex flex-col cursor-pointer min-w-0" onClick={() => openLeadDetail(lead)}>
-                                                                        <span className="text-sm font-bold text-gray-900 group-hover:text-[#4449AA] transition-colors truncate" title={lead.name}>{lead.name}</span>
-                                                                        <span className="text-xs text-blue-600 font-bold truncate" title={lead.company_name || 'Individual'}>{lead.company_name || 'Individual'}</span>
+                                                                    <div className="flex items-center gap-2 cursor-pointer min-w-0" onClick={() => openLeadDetail(lead)}>
+                                                                        {completedLeadIds && (
+                                                                            completedLeadIds.includes(lead.id) ? (
+                                                                                <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+                                                                            ) : (
+                                                                                <Target className="w-4 h-4 text-red-400 shrink-0" />
+                                                                            )
+                                                                        )}
+                                                                        <div className="flex flex-col min-w-0">
+                                                                            <span className="text-sm font-bold text-gray-900 group-hover:text-[#4449AA] transition-colors truncate" title={lead.name}>{lead.name}</span>
+                                                                            <span className="text-xs text-blue-600 font-bold truncate" title={lead.company_name || 'Individual'}>{lead.company_name || 'Individual'}</span>
+                                                                        </div>
                                                                     </div>
                                                                 )}
 
