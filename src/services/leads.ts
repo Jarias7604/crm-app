@@ -401,7 +401,8 @@ export const leadsService = {
         const { data, error } = await supabase
             .from('follow_ups')
             .select(`
-                id, date, notes, action_type,
+                id, date, notes, action_type, assigned_to,
+                completed, completed_at,
                 lead:leads(id, name, company_name, phone, email, status),
                 assigned_profile:assigned_to(id, full_name, avatar_url)
             `)
@@ -413,6 +414,9 @@ export const leadsService = {
             date: string;
             notes: string | null;
             action_type: string;
+            assigned_to: string | null;
+            completed: boolean;
+            completed_at: string | null;
             lead: {
                 id: string;
                 name: string;
@@ -427,6 +431,21 @@ export const leadsService = {
                 avatar_url: string | null;
             } | null;
         }>;
+    },
+
+    // Mark a follow-up as completed (quick action from Calendar)
+    async markFollowUpCompleted(followUpId: string, completed: boolean) {
+        const { data: { user } } = await supabase.auth.getUser();
+        const updates: any = {
+            completed,
+            completed_at: completed ? new Date().toISOString() : null,
+            completed_by: completed ? user?.id : null,
+        };
+        const { error } = await supabase
+            .from('follow_ups')
+            .update(updates)
+            .eq('id', followUpId);
+        if (error) throw error;
     },
 
     // Get chat messages for a lead

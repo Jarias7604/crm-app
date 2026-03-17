@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     format, addMonths, subMonths, startOfMonth, endOfMonth,
@@ -8,12 +8,14 @@ import {
 import { es } from 'date-fns/locale';
 import {
     ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail,
-    CalendarDays, MessageSquare, Video, FileText, SlidersHorizontal
+    CalendarDays, MessageSquare, Video, FileText, SlidersHorizontal,
+    CheckCircle2, Circle, RotateCcw
 } from 'lucide-react';
 import { leadsService } from '../services/leads';
 import { useAuth } from '../auth/AuthProvider';
 import { useTimezone } from '../hooks/useTimezone';
 import { formatTimeInZone, utcToLocalDate, DEFAULT_TIMEZONE } from '../utils/timezone';
+import toast from 'react-hot-toast';
 
 type CalendarEvent = Awaited<ReturnType<typeof leadsService.getCalendarFollowUps>>[number];
 
@@ -100,6 +102,7 @@ export default function Calendar() {
     const { profile } = useAuth();
     const { timezone: rawTimezone } = useTimezone(profile?.company_id);
     const companyTimezone = rawTimezone || DEFAULT_TIMEZONE;
+    const isAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
 
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date());
@@ -118,13 +121,32 @@ export default function Calendar() {
         finally { setLoading(false); }
     };
 
+    // Role-based filtering: collaborators see only their own
+    const filteredEvents = useMemo(() => {
+        if (isAdmin) return calendarEvents;
+        return calendarEvents.filter(ev => ev.assigned_to === profile?.id);
+    }, [calendarEvents, isAdmin, profile?.id]);
+
     const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
     const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
     const nextWeek = () => { setCurrentDate(addWeeks(currentDate, 1)); setSelectedDate(addWeeks(selectedDate, 1)); };
     const prevWeek = () => { setCurrentDate(subWeeks(currentDate, 1)); setSelectedDate(subWeeks(selectedDate, 1)); };
 
+    // Toggle completion on a follow-up
+    const handleToggleComplete = useCallback(async (evId: string, currentCompleted: boolean) => {
+        try {
+            await leadsService.markFollowUpCompleted(evId, !currentCompleted);
+            setCalendarEvents(prev => prev.map(ev =>
+                ev.id === evId ? { ...ev, completed: !currentCompleted, completed_at: !currentCompleted ? new Date().toISOString() : null } : ev
+            ));
+            toast.success(!currentCompleted ? '✅ Seguimiento completado' : '↩️ Marcado como pendiente');
+        } catch (err) {
+            toast.error('Error al actualizar seguimiento');
+        }
+    }, []);
+
     const getDailyEvents = (date: Date): CalendarEvent[] =>
-        calendarEvents
+        filteredEvents
             .filter(ev => ev.date && isSameDay(utcToLocalDate(ev.date, companyTimezone), date))
             .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
@@ -132,7 +154,7 @@ export default function Calendar() {
     const actionSummary = useMemo(() => {
         const today = new Date();
         const counts: Record<string, CalendarEvent[]> = {};
-        calendarEvents
+        filteredEvents
             .filter(ev => ev.date && !isBefore(utcToLocalDate(ev.date, companyTimezone), today))
             .forEach(ev => {
                 const t = ev.action_type || 'call';
@@ -140,7 +162,16 @@ export default function Calendar() {
                 counts[t].push(ev);
             });
         return counts;
-    }, [calendarEvents, companyTimezone]);
+    }, [filteredEvents, companyTimezone]);
+
+    /* Helper: get completion stats for a day */
+    const getDayProgress = (date: Date) => {
+        const dayEvts = getDailyEvents(date);
+        const total = dayEvts.length;
+        const completed = dayEvts.filter(ev => ev.completed).length;
+        const isPast = isBefore(date, new Date()) && !isToday(date);
+        return { total, completed, isPast };
+    };
 
     /* Unique assignees for the selected day — used by mobile filter */
     const dayAssignees = useMemo(() => {
@@ -272,31 +303,59 @@ export default function Calendar() {
                     if (!grouped[t]) grouped[t] = [];
                     grouped[t].push(ev);
                 });
+                const completedCount = dayEvts.filter(ev => ev.completed).length;
+                const totalCount = dayEvts.length;
+                const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+                const barColor = pct === 100 ? 'bg-emerald-500' : pct > 50 ? 'bg-amber-500' : pct > 0 ? 'bg-red-500' : 'bg-gray-200';
+                const textColor = pct === 100 ? 'text-emerald-600' : pct > 50 ? 'text-amber-600' : pct > 0 ? 'text-red-600' : 'text-gray-400';
+
                 return (
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
                         <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Leyenda</p>
                         <p className="text-xs font-bold text-indigo-600 capitalize mb-3">
                             {format(selectedDate, "EEEE d 'de' MMMM", { locale: es })}
                         </p>
+
+                        {/* Progress bar */}
+                        {totalCount > 0 && (
+                            <div className="mb-3">
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <span className="text-[10px] font-black text-gray-500 uppercase">Cumplimiento</span>
+                                    <span className={`text-xs font-black ${textColor}`}>
+                                        {completedCount}/{totalCount} ({pct}%)
+                                    </span>
+                                </div>
+                                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                                    <div
+                                        className={`h-full rounded-full ${barColor} transition-all duration-500`}
+                                        style={{ width: `${pct}%` }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
                         <div className="space-y-1.5 overflow-y-auto max-h-[128px] pr-0.5">
                             {Object.entries(ACTION_CONFIG)
                                 .filter(([type]) => (grouped[type] || []).length > 0)
                                 .map(([type, cfg]) => {
                                     const evs = grouped[type] || [];
+                                    const doneCount = evs.filter(e => e.completed).length;
                                     const leadIds = evs.map(e => e.lead?.id).filter(Boolean);
                                     return (
                                         <button
                                             key={type}
                                             onClick={() => navigate('/leads', { state: { leadIds, fromCalendar: true } })}
-                                            title={`Ver ${evs.length} ${cfg.label}(s) del d\u00eda`}
+                                            title={`${doneCount}/${evs.length} ${cfg.label}(s) completados`}
                                             className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-gray-50 hover:shadow-sm cursor-pointer group transition-all"
                                         >
                                             <span className={`w-2.5 h-2.5 rounded-full ${cfg.dotColor} shrink-0`} />
                                             <span className="flex-1 text-xs font-medium text-gray-700 text-left">
                                                 {cfg.label}
                                             </span>
-                                            <span className="min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center text-[10px] font-semibold bg-indigo-100 text-indigo-700 group-hover:scale-110 transition-transform">
-                                                {evs.length}
+                                            <span className={`min-w-[28px] h-5 px-1.5 rounded-full flex items-center justify-center text-[9px] font-black group-hover:scale-110 transition-transform ${
+                                                doneCount === evs.length ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700'
+                                            }`}>
+                                                {doneCount}/{evs.length}
                                             </span>
                                         </button>
                                     );
@@ -413,7 +472,7 @@ export default function Calendar() {
                                     ${isDaySelected ? 'ring-1 ring-inset ring-indigo-200 bg-indigo-50/20' : 'hover:bg-indigo-50/10'}
                                 `}
                             >
-                                {/* Date number + total badge */}
+                                {/* Date number + progress badge */}
                                 <div className="flex justify-between items-start mb-1.5">
                                     <span className={`
                                         text-sm font-bold w-7 h-7 flex items-center justify-center rounded-full transition-all
@@ -423,15 +482,21 @@ export default function Calendar() {
                                     `}>
                                         {format(day, 'd')}
                                     </span>
-                                    {dayEvents.length > 0 && (
-                                        <button
-                                            onClick={() => navigate('/leads', { state: { leadIds: dayEvents.map(e => e.lead?.id).filter(Boolean), fromCalendar: true } })}
-                                            title={`Ver ${dayEvents.length} seguimiento${dayEvents.length !== 1 ? 's' : ''} del día`}
-                                            className="min-w-[20px] h-5 px-1.5 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-[10px] font-semibold transition-all hover:scale-110 flex items-center justify-center"
-                                        >
-                                            {dayEvents.length}
-                                        </button>
-                                    )}
+                                    {dayEvents.length > 0 && (() => {
+                                        const { total, completed, isPast } = getDayProgress(day);
+                                        const pct = total > 0 ? (completed / total) * 100 : 0;
+                                        const bgColor = pct === 100 ? 'bg-emerald-100 text-emerald-700' : isPast && pct < 100 ? 'bg-red-100 text-red-700' : 'bg-indigo-100 text-indigo-700';
+                                        return (
+                                            <button
+                                                onClick={() => navigate('/leads', { state: { leadIds: dayEvents.map(e => e.lead?.id).filter(Boolean), fromCalendar: true } })}
+                                                title={`${completed}/${total} completados`}
+                                                className={`min-w-[28px] h-5 px-1.5 rounded-full ${bgColor} text-[9px] font-black transition-all hover:scale-110 flex items-center justify-center gap-0.5`}
+                                            >
+                                                {pct === 100 && <CheckCircle2 className="w-2.5 h-2.5" />}
+                                                {completed}/{total}
+                                            </button>
+                                        );
+                                    })()}
                                 </div>
 
                                 {/* Event pills */}
@@ -439,14 +504,26 @@ export default function Calendar() {
                                     {dayEvents.slice(0, MAX_VISIBLE).map(ev => {
                                         const cfg = getActionCfg(ev.action_type);
                                         const timeStr = formatTimeInZone(ev.date, companyTimezone);
+                                        const isOverdue = !ev.completed && isBefore(utcToLocalDate(ev.date, companyTimezone), new Date()) && !isToday(utcToLocalDate(ev.date, companyTimezone));
                                         return (
                                             <button
                                                 key={ev.id}
                                                 onClick={(e) => { e.stopPropagation(); ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } }); }}
-                                                title={`${ev.lead?.name ?? 'Lead'} · ${timeStr}`}
-                                                className={`w-full text-left px-1.5 py-1 rounded-md transition-all ${cfg.pill} flex items-center gap-1`}
+                                                title={`${ev.lead?.name ?? 'Lead'} · ${timeStr}${ev.completed ? ' ✅' : isOverdue ? ' ⚠️ Vencido' : ''}`}
+                                                className={`w-full text-left px-1.5 py-1 rounded-md transition-all flex items-center gap-1 ${
+                                                    ev.completed
+                                                        ? 'bg-emerald-50 text-emerald-600 border-l-2 border-emerald-400 opacity-70'
+                                                        : isOverdue
+                                                            ? 'bg-red-50 text-red-700 border-l-2 border-red-400'
+                                                            : cfg.pill
+                                                }`}
                                             >
-                                                <span className="text-[10px] font-medium leading-tight flex-1 truncate">
+                                                {ev.completed ? (
+                                                    <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                                                ) : isOverdue ? (
+                                                    <Circle className="w-3 h-3 text-red-400 shrink-0" />
+                                                ) : null}
+                                                <span className={`text-[10px] font-medium leading-tight flex-1 truncate ${ev.completed ? 'line-through' : ''}`}>
                                                     {ev.lead?.name ?? 'Lead'}
                                                 </span>
                                                 <span className="text-[9px] opacity-60 shrink-0 leading-tight">
@@ -561,13 +638,26 @@ export default function Calendar() {
                     </div>
                 </div>
 
-                {/* Events count header */}
+                {/* Events count header with progress */}
                 <div className="flex items-center justify-between px-1">
                     <h3 className="font-black text-gray-800 text-sm">
                         {todaysEvents.length > 0
                             ? `${todaysEvents.length} Evento${todaysEvents.length !== 1 ? 's' : ''}`
                             : 'Sin eventos'}
                     </h3>
+                    {todaysEvents.length > 0 && (() => {
+                        const completed = todaysEvents.filter(ev => ev.completed).length;
+                        const total = todaysEvents.length;
+                        const pct = Math.round((completed / total) * 100);
+                        const color = pct === 100 ? 'text-emerald-600 bg-emerald-50' : pct > 50 ? 'text-amber-600 bg-amber-50' : 'text-red-600 bg-red-50';
+                        return (
+                            <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-black ${color}`}>
+                                {pct === 100 && <CheckCircle2 className="w-3.5 h-3.5" />}
+                                {completed}/{total}
+                                <span className="font-semibold opacity-70">({pct}%)</span>
+                            </span>
+                        );
+                    })()}
                 </div>
 
                 {/* Timeline */}
@@ -580,28 +670,43 @@ export default function Calendar() {
                             const cfg = getActionCfg(ev.action_type);
                             const timeStr = formatTimeInZone(ev.date, companyTimezone);
                             const Icon = cfg.Icon;
+                            const isOverdue = !ev.completed && isBefore(utcToLocalDate(ev.date, companyTimezone), new Date()) && !isToday(utcToLocalDate(ev.date, companyTimezone));
 
                             return (
                                 <div key={ev.id} className="relative pl-10">
-                                    {/* Timeline dot */}
-                                    <div className={`absolute left-2 top-4 w-4 h-4 rounded-full ${cfg.dotColor} shadow-md ring-2 ring-white z-10 flex items-center justify-center`}>
-                                        <Icon className="w-2.5 h-2.5 text-white" />
+                                    {/* Timeline dot — green if completed, red if overdue */}
+                                    <div className={`absolute left-2 top-4 w-4 h-4 rounded-full shadow-md ring-2 ring-white z-10 flex items-center justify-center ${
+                                        ev.completed ? 'bg-emerald-500' : isOverdue ? 'bg-red-500' : cfg.dotColor
+                                    }`}>
+                                        {ev.completed ? (
+                                            <CheckCircle2 className="w-2.5 h-2.5 text-white" />
+                                        ) : (
+                                            <Icon className="w-2.5 h-2.5 text-white" />
+                                        )}
                                     </div>
 
                                     {/* Card */}
                                     <div
                                         onClick={() => ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } })}
-                                        className="relative bg-white p-4 rounded-2xl border border-gray-100 shadow-sm active:scale-[0.98] transition-transform cursor-pointer"
+                                        className={`relative p-4 rounded-2xl border shadow-sm active:scale-[0.98] transition-transform cursor-pointer ${
+                                            ev.completed
+                                                ? 'bg-emerald-50/50 border-emerald-200'
+                                                : isOverdue
+                                                    ? 'bg-red-50/30 border-red-200'
+                                                    : 'bg-white border-gray-100'
+                                        }`}
                                     >
                                         {/* Top row */}
                                         <div className="flex items-center justify-between mb-2">
-                                            <span className={`
-                                                inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide
-                                                ${cfg.badge} ${cfg.badgeText}
-                                            `}>
-                                                <Icon className="w-2.5 h-2.5" />
-                                                {cfg.label}
-                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <span className={`
+                                                    inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wide
+                                                    ${ev.completed ? 'bg-emerald-100 border border-emerald-200 text-emerald-700' : cfg.badge + ' ' + cfg.badgeText}
+                                                `}>
+                                                    {ev.completed ? <CheckCircle2 className="w-2.5 h-2.5" /> : <Icon className="w-2.5 h-2.5" />}
+                                                    {ev.completed ? 'Hecho' : isOverdue ? '⚠ Vencido' : cfg.label}
+                                                </span>
+                                            </div>
                                             <span className="flex items-center gap-1 text-xs font-bold text-gray-400">
                                                 <Clock className="w-3 h-3" />
                                                 {timeStr}
@@ -609,7 +714,7 @@ export default function Calendar() {
                                         </div>
 
                                         {/* Lead info */}
-                                        <h4 className="font-black text-gray-900 text-base leading-tight mb-0.5">
+                                        <h4 className={`font-black text-base leading-tight mb-0.5 ${ev.completed ? 'text-emerald-800 line-through opacity-70' : 'text-gray-900'}`}>
                                             {ev.lead?.name ?? '—'}
                                         </h4>
                                         {ev.lead?.company_name && (
@@ -621,31 +726,44 @@ export default function Calendar() {
                                             </p>
                                         )}
 
-                                        {/* Quick actions */}
-                                        {(ev.lead?.phone || ev.lead?.email) && (
-                                            <div className="flex gap-2 mt-3">
-                                                {ev.lead.phone && (
-                                                    <a
-                                                        href={`tel:${ev.lead.phone}`}
-                                                        onClick={e => e.stopPropagation()}
-                                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-colors"
-                                                    >
-                                                        <Phone className="w-3 h-3" />
-                                                        Llamar
-                                                    </a>
+                                        {/* Quick actions row */}
+                                        <div className="flex items-center gap-2 mt-3">
+                                            {/* Complete / Undo button */}
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleToggleComplete(ev.id, ev.completed); }}
+                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all active:scale-95 ${
+                                                    ev.completed
+                                                        ? 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                                        : 'bg-emerald-500 text-white shadow-md shadow-emerald-200 hover:bg-emerald-600'
+                                                }`}
+                                            >
+                                                {ev.completed ? (
+                                                    <><RotateCcw className="w-3 h-3" /> Deshacer</>
+                                                ) : (
+                                                    <><CheckCircle2 className="w-3 h-3" /> Completar</>
                                                 )}
-                                                {ev.lead.email && (
-                                                    <a
-                                                        href={`mailto:${ev.lead.email}`}
-                                                        onClick={e => e.stopPropagation()}
-                                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 text-orange-600 rounded-xl text-xs font-bold hover:bg-orange-100 transition-colors"
-                                                    >
-                                                        <Mail className="w-3 h-3" />
-                                                        Email
-                                                    </a>
-                                                )}
-                                            </div>
-                                        )}
+                                            </button>
+                                            {!ev.completed && ev.lead?.phone && (
+                                                <a
+                                                    href={`tel:${ev.lead.phone}`}
+                                                    onClick={e => e.stopPropagation()}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl text-xs font-bold hover:bg-emerald-100 transition-colors"
+                                                >
+                                                    <Phone className="w-3 h-3" />
+                                                    Llamar
+                                                </a>
+                                            )}
+                                            {!ev.completed && ev.lead?.email && (
+                                                <a
+                                                    href={`mailto:${ev.lead.email}`}
+                                                    onClick={e => e.stopPropagation()}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 text-orange-600 rounded-xl text-xs font-bold hover:bg-orange-100 transition-colors"
+                                                >
+                                                    <Mail className="w-3 h-3" />
+                                                    Email
+                                                </a>
+                                            )}
+                                        </div>
                                         {/* Avatar asignado — esquina inferior derecha */}
                                         {ev.assigned_profile && (
                                             ev.assigned_profile.avatar_url ? (
@@ -653,12 +771,12 @@ export default function Calendar() {
                                                     src={ev.assigned_profile.avatar_url}
                                                     alt={ev.assigned_profile.full_name ?? ''}
                                                     title={ev.assigned_profile.full_name ?? ''}
-                                                    className="absolute bottom-3 right-3 w-9 h-9 rounded-full object-cover ring-2 ring-white shadow-md"
+                                                    className="absolute top-3 right-3 w-8 h-8 rounded-full object-cover ring-2 ring-white shadow-md"
                                                 />
                                             ) : (
                                                 <div
                                                     title={ev.assigned_profile.full_name ?? ''}
-                                                    className="absolute bottom-3 right-3 w-9 h-9 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-black ring-2 ring-white shadow-md"
+                                                    className="absolute top-3 right-3 w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-black ring-2 ring-white shadow-md"
                                                 >
                                                     {(ev.assigned_profile.full_name ?? '?').charAt(0).toUpperCase()}
                                                 </div>
