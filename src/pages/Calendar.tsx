@@ -9,7 +9,7 @@ import { es } from 'date-fns/locale';
 import {
     ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail,
     CalendarDays, MessageSquare, Video, FileText, SlidersHorizontal,
-    CheckCircle2, Circle, RotateCcw
+    CheckCircle2, Circle, RotateCcw, X
 } from 'lucide-react';
 import { leadsService } from '../services/leads';
 import { useAuth } from '../auth/AuthProvider';
@@ -110,6 +110,7 @@ export default function Calendar() {
     const [loading, setLoading] = useState(true);
     const [selectedAssigneeId, setSelectedAssigneeId] = useState<string | null>(null);
     const [showAssigneeFilter, setShowAssigneeFilter] = useState(false);
+    const [dayDetailDate, setDayDetailDate] = useState<Date | null>(null);
 
     useEffect(() => { loadData(); }, [rawTimezone]);
 
@@ -505,8 +506,8 @@ export default function Calendar() {
                                         const bgColor = pct === 100 ? 'bg-emerald-100 text-emerald-700' : isPast && pct < 100 ? 'bg-red-100 text-red-700' : 'bg-indigo-100 text-indigo-700';
                                         return (
                                             <button
-                                                onClick={() => navigate('/leads', { state: { leadIds: dayEvents.map(e => e.lead?.id).filter(Boolean), fromCalendar: true } })}
-                                                title={`${completed}/${total} completados`}
+                                                onClick={(e) => { e.stopPropagation(); setDayDetailDate(day); }}
+                                                title={`${completed}/${total} completados — click para ver detalle`}
                                                 className={`min-w-[28px] h-5 px-1.5 rounded-full ${bgColor} text-[9px] font-black transition-all hover:scale-110 flex items-center justify-center gap-0.5`}
                                             >
                                                 {pct === 100 && <CheckCircle2 className="w-2.5 h-2.5" />}
@@ -951,6 +952,112 @@ export default function Calendar() {
                     {renderTimelineView()}
                 </>
             )}
+
+            {/* Day Detail Modal */}
+            {dayDetailDate && (() => {
+                const dayEvts = getDailyEvents(dayDetailDate);
+                const doneCount = dayEvts.filter(e => e.completed).length;
+                const totalCount = dayEvts.length;
+                const pct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+                const pctColor = pct === 100 ? 'text-emerald-600' : pct > 50 ? 'text-amber-600' : 'text-red-600';
+                const barColor = pct === 100 ? 'bg-emerald-500' : pct > 50 ? 'bg-amber-500' : 'bg-red-500';
+
+                return (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setDayDetailDate(null)}>
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+                            {/* Header */}
+                            <div className="p-5 border-b border-gray-100">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h2 className="text-lg font-black text-gray-900 capitalize">
+                                            {format(dayDetailDate, "EEEE d 'de' MMMM", { locale: es })}
+                                        </h2>
+                                        <p className="text-sm text-gray-400 mt-0.5">
+                                            Seguimientos del día
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <span className={`text-lg font-black ${pctColor}`}>{doneCount}/{totalCount}</span>
+                                        <button onClick={() => setDayDetailDate(null)} className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-colors">
+                                            <X className="w-4 h-4 text-gray-500" />
+                                        </button>
+                                    </div>
+                                </div>
+                                {/* Progress bar */}
+                                <div className="mt-3 w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                                    <div className={`h-full rounded-full ${barColor} transition-all duration-500`} style={{ width: `${pct}%` }} />
+                                </div>
+                            </div>
+
+                            {/* List */}
+                            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                                {dayEvts.map(ev => {
+                                    const cfg = getActionCfg(ev.action_type);
+                                    const Icon = cfg.Icon;
+                                    const timeStr = formatTimeInZone(ev.date, companyTimezone);
+                                    const isOverdue = !ev.completed && isBefore(utcToLocalDate(ev.date, companyTimezone), new Date()) && !isToday(utcToLocalDate(ev.date, companyTimezone));
+
+                                    return (
+                                        <div key={ev.id} className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                                            ev.completed
+                                                ? 'bg-emerald-50/50 border-emerald-200'
+                                                : isOverdue
+                                                    ? 'bg-red-50/30 border-red-200'
+                                                    : 'bg-white border-gray-100'
+                                        }`}>
+                                            {/* Status icon */}
+                                            <button
+                                                onClick={() => handleToggleComplete(ev.id, ev.completed)}
+                                                className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                                                    ev.completed
+                                                        ? 'bg-emerald-500 text-white'
+                                                        : isOverdue
+                                                            ? 'bg-red-100 text-red-500 hover:bg-red-200'
+                                                            : 'bg-gray-100 text-gray-400 hover:bg-emerald-100 hover:text-emerald-500'
+                                                }`}
+                                                title={ev.completed ? 'Desmarcar' : 'Marcar como completado'}
+                                            >
+                                                {ev.completed ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
+                                            </button>
+
+                                            {/* Info */}
+                                            <div className="flex-1 min-w-0">
+                                                <button
+                                                    onClick={() => { setDayDetailDate(null); ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } }); }}
+                                                    className={`text-sm font-bold text-left hover:text-indigo-600 transition-colors ${
+                                                        ev.completed ? 'text-emerald-700 line-through opacity-70' : 'text-gray-900'
+                                                    }`}
+                                                >
+                                                    {ev.lead?.name ?? '—'}
+                                                </button>
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                    <span className={`inline-flex items-center gap-1 text-[10px] font-bold ${ev.completed ? 'text-emerald-600' : cfg.badgeText}`}>
+                                                        <Icon className="w-2.5 h-2.5" />
+                                                        {ev.completed ? 'Hecho' : isOverdue ? '⚠ Vencido' : cfg.label}
+                                                    </span>
+                                                    <span className="text-[10px] text-gray-400">{timeStr}</span>
+                                                    {ev.lead?.company_name && <span className="text-[10px] text-gray-300">• {ev.lead.company_name}</span>}
+                                                </div>
+                                            </div>
+
+                                            {/* Assignee */}
+                                            {ev.assigned_profile && (
+                                                ev.assigned_profile.avatar_url ? (
+                                                    <img src={ev.assigned_profile.avatar_url} alt={ev.assigned_profile.full_name ?? ''} title={ev.assigned_profile.full_name ?? ''} className="w-7 h-7 rounded-full object-cover ring-2 ring-white shadow-sm shrink-0" />
+                                                ) : (
+                                                    <div title={ev.assigned_profile.full_name ?? ''} className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-black ring-2 ring-white shadow-sm shrink-0">
+                                                        {(ev.assigned_profile.full_name ?? '?').charAt(0).toUpperCase()}
+                                                    </div>
+                                                )
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 }
