@@ -37,7 +37,8 @@ export default function Leads() {
     const { profile } = useAuth();
     const { hasPermission } = usePermissions();
     const isAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
-    const canViewAllLeads = isAdmin || hasPermission('leads_view_all');
+    // Direct check — bypasses usePermissions inheritance (where 'leads' base would grant 'leads_view_all')
+    const canViewAllLeads = isAdmin || (profile?.permissions?.['leads_view_all'] === true);
     const { timezone: rawTimezone } = useTimezone(profile?.company_id);
     const { tableRef: leadsTableRef, wrapperRef: leadsWrapperRef } = useAriasTables();
     const queryClient = useQueryClient();
