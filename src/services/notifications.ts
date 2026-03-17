@@ -102,7 +102,7 @@ export const pushService = {
         body: body || '',
         icon: '/vite.svg',
         tag: `followup-${Date.now()}`,
-        data: { url: leadId ? `/leads?highlight=${leadId}` : '/leads' },
+        data: { url: leadId ? `/leads` : '/leads', leadId: leadId || null },
         requireInteraction: true,
         vibrate: [200, 100, 200],
       } as any);

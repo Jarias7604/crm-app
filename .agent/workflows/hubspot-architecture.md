@@ -2,7 +2,27 @@
 description: Pendientes priorizados del CRM — retomar en próxima sesión
 ---
 
-# 📋 Estado del CRM — Sesión 14 Mar 2026 (00:38 AM)
+# 📋 Estado del CRM — Sesión 14 Mar 2026 (11:47 AM)
+
+## ✅ COMPLETADO HOY (14 Mar AM)
+
+### 🛡️ Sistema Anti-Contaminación de Proyectos
+- **`.agent/PROJECT_IDENTITY.md`** — Identidad del proyecto con lista de keywords de alerta por proyecto hermano (ERP, GlobalAds, VisionSaaS)
+- **`.agent/workflows/session-start.md`** — Protocolo de inicio de sesión seguro con tabla de señales de alerta
+- Regla: si aparece DTE, plan_de_cuentas, BigVU, etc. → STOP antes de tocar nada
+
+### 🎯 Campaign Builder — Mejoras de Audiencia
+- **Estado "Perdido"** agregado al filtro de estados → permite campañas de re-engagement a leads perdidos
+- **Modal de Rubros/Industria** — reemplaza 24+ chips desbordados por:
+  - Botón compacto `"🔍 X rubros seleccionados"` en el panel
+  - Modal con buscador en tiempo real, grilla 2 columnas, checkmarks individuales
+  - Acciones rápidas: "Seleccionar todos" / "Limpiar"
+  - Pills con ❌ para ver/remover seleccionados sin abrir el modal
+  - Color de marca `#0097A7` con `style={{}}` inline (para preservar encoding UTF-8)
+- **Commit:** `f683115` → pushed to `main` → deploy automático en Vercel
+- **Lección aprendida:** Nunca usar PowerShell `Set-Content` para editar archivos TSX/TSX con tildes → corrompe encoding. Siempre usar el editor de archivos del agente.
+
+
 
 ## ✅ COMPLETADO HOY
 

@@ -115,7 +115,12 @@ export function useNotifications() {
       await handleMarkRead(notif.id);
       setIsOpen(false);
       if (notif.lead_id) {
-        navigate(`/leads?highlight=${notif.lead_id}`);
+        // Navigate using location.state so Leads.tsx can open the lead detail panel
+        // Add timestamp to force re-trigger even if already on /leads
+        navigate('/leads', { 
+          state: { leadId: notif.lead_id, _t: Date.now() },
+          replace: false 
+        });
       }
     },
     [handleMarkRead, navigate]
