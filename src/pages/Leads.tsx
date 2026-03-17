@@ -14,6 +14,7 @@ import { es } from 'date-fns/locale';
 import { csvHelper } from '../utils/csvHelper';
 import { storageService } from '../services/storage';
 import { useAuth } from '../auth/AuthProvider';
+import { usePermissions } from '../hooks/usePermissions';
 import { useMemo } from 'react';
 import { CreateLeadFullscreen } from '../components/CreateLeadFullscreen';
 import { QuickActionLogger } from '../components/QuickCallLogger';
@@ -34,7 +35,9 @@ import { localToUtcISO, DEFAULT_TIMEZONE } from '../utils/timezone';
 
 export default function Leads() {
     const { profile } = useAuth();
+    const { hasPermission } = usePermissions();
     const isAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
+    const canViewAllLeads = isAdmin || hasPermission('leads_view_all');
     const { timezone: rawTimezone } = useTimezone(profile?.company_id);
     const { tableRef: leadsTableRef, wrapperRef: leadsWrapperRef } = useAriasTables();
     const queryClient = useQueryClient();
@@ -365,6 +368,9 @@ export default function Leads() {
 
     const filteredLeads = useMemo(() => {
         return leads.filter(lead => {
+            // 🔒 Role-based visibility: collaborators only see their assigned leads
+            if (!canViewAllLeads && lead.assigned_to !== profile?.id) return false;
+
             // Filter by specific lead ID if set (Direct skip)
             if (filteredLeadId) return lead.id === filteredLeadId;
 
@@ -473,7 +479,7 @@ export default function Leads() {
 
             return true;
         });
-    }, [leads, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter, minContactCountFilter]);
+    }, [leads, canViewAllLeads, profile?.id, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter, minContactCountFilter]);
 
     const sortedLeads = useMemo(() => {
         if (!sortConfig) return filteredLeads;
