@@ -1,4 +1,4 @@
-﻿import { useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -276,11 +276,17 @@ export default function Dashboard() {
         return { startDate, endDate };
     }, [selectedDateRange]);
 
+    // 🔒 Role-based dashboard: collaborators without dashboard_view_company only see their own stats
+    const isAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
+    const canViewCompanyDashboard = isAdmin || (profile?.permissions?.['dashboard_view_company'] === true);
+    const dashboardAssignedTo = canViewCompanyDashboard ? undefined : profile?.id;
+
     // Use optimized dashboard hook (replaces 5 queries with 1)
     const { data: dashboardData, isLoading: isDashboardLoading, error: dashboardError } = useDashboardStats(
         profile?.company_id,
         dateRange.startDate,
-        dateRange.endDate
+        dateRange.endDate,
+        dashboardAssignedTo
     );
 
     // Process dashboard data when it arrives
@@ -338,12 +344,13 @@ export default function Dashboard() {
             setLossStageData(dashboardData.lossStages || []);
 
             // Fetch industry distribution
-            supabase
+            const industryQuery = supabase
                 .from('leads')
                 .select('industry')
                 .not('industry', 'is', null)
-                .neq('industry', '')
-                .then(({ data: leadsWithIndustry }) => {
+                .neq('industry', '');
+            if (dashboardAssignedTo) industryQuery.eq('assigned_to', dashboardAssignedTo);
+            industryQuery.then(({ data: leadsWithIndustry }) => {
                     if (leadsWithIndustry && leadsWithIndustry.length > 0) {
                         const counts: Record<string, number> = {};
                         leadsWithIndustry.forEach((l: any) => {
@@ -364,17 +371,18 @@ export default function Dashboard() {
         }
 
         // Load escalation leads (Llamada fría with 6+ contact attempts)
-        supabase
+        const escalationQuery = supabase
             .from('leads')
             .select('id, name, company_name, phone, email, contact_count, created_at, assigned_to')
             .eq('status', 'Llamada fría')
             .gte('contact_count', 6)
             .order('contact_count', { ascending: false })
-            .limit(10)
-            .then(({ data }) => {
+            .limit(10);
+        if (dashboardAssignedTo) escalationQuery.eq('assigned_to', dashboardAssignedTo);
+        escalationQuery.then(({ data }) => {
                 setEscalationLeads(data || []);
             });
-    }, [dashboardData]);
+    }, [dashboardData, dashboardAssignedTo]);
 
     useEffect(() => {
         if (profile?.role === 'super_admin') {

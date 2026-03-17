@@ -13,10 +13,10 @@ export const dashboardService = {
      * @param endDate - Optional end date filter
      * @returns All dashboard data (stats, byStatus, bySource, byPriority, topOpportunities, upcomingFollowUps, recentConversions)
      */
-    async getDashboardStats(startDate?: string, endDate?: string, companyId?: string) {
+    async getDashboardStats(startDate?: string, endDate?: string, companyId?: string, assignedTo?: string) {
         try {
             const finalCompanyId = companyId || await getCurrentUserCompanyId();
-            logger.debug('🔍 FETCHING OPTIMIZED DASHBOARD:', { companyId: finalCompanyId, startDate, endDate });
+            logger.debug('🔍 FETCHING OPTIMIZED DASHBOARD:', { companyId: finalCompanyId, startDate, endDate, assignedTo });
 
             logger.time('getDashboardStats');
 
@@ -24,7 +24,8 @@ export const dashboardService = {
             const { data, error } = await supabase.rpc('get_dashboard_stats', {
                 p_company_id: finalCompanyId,
                 p_start_date: startDate || null,
-                p_end_date: endDate || null
+                p_end_date: endDate || null,
+                p_assigned_to: assignedTo || null
             });
 
             logger.timeEnd('getDashboardStats');

@@ -11,6 +11,8 @@ import { useAriasTables } from '../hooks/useAriasTables';
 
 export default function Cotizaciones() {
     const { profile } = useAuth();
+    const isAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
+    const canViewAllQuotes = isAdmin || (profile?.permissions?.['quotes_view_all'] === true);
     const navigate = useNavigate();
 
     const [cotizaciones, setCotizaciones] = useState<any[]>([]);
@@ -90,14 +92,33 @@ export default function Cotizaciones() {
     useEffect(() => {
         if (profile?.company_id) {
             loadCotizaciones();
-            loadStats();
+            if (canViewAllQuotes) loadStats();
         }
     }, [profile]);
+
+    // Recompute stats from filtered cotizaciones for collaborators
+    useEffect(() => {
+        if (!canViewAllQuotes && cotizaciones.length >= 0 && !loading) {
+            setStats({
+                total: cotizaciones.length,
+                borrador: cotizaciones.filter((c: any) => c.estado === 'borrador').length,
+                enviadas: cotizaciones.filter((c: any) => c.estado === 'enviada').length,
+                aceptadas: cotizaciones.filter((c: any) => c.estado === 'aceptada').length,
+                rechazadas: cotizaciones.filter((c: any) => c.estado === 'rechazada').length,
+                valor_total: cotizaciones.reduce((sum: number, c: any) => sum + (Number(c.total_anual) || 0), 0),
+                valor_aceptadas: cotizaciones.filter((c: any) => c.estado === 'aceptada').reduce((sum: number, c: any) => sum + (Number(c.total_anual) || 0), 0)
+            });
+        }
+    }, [cotizaciones, canViewAllQuotes, loading]);
 
     const loadCotizaciones = async () => {
         try {
             setLoading(true);
-            const data = await cotizacionesService.getCotizaciones(profile!.company_id);
+            let data = await cotizacionesService.getCotizaciones(profile!.company_id);
+            // 🔒 Role-based visibility: collaborators only see their own quotes
+            if (!canViewAllQuotes && profile?.id) {
+                data = data.filter((cot: any) => cot.created_by === profile.id);
+            }
             setCotizaciones(data);
         } catch (error: any) {
             console.error('Error loading cotizaciones:', error);
@@ -109,8 +130,24 @@ export default function Cotizaciones() {
 
     const loadStats = async () => {
         try {
+            // Stats are computed from filtered cotizaciones for role-based consistency
             const data = await cotizacionesService.getStats(profile!.company_id);
-            setStats(data);
+            if (!canViewAllQuotes && profile?.id) {
+                // Recompute stats from already-loaded (filtered) cotizaciones
+                const filtered = cotizaciones.length > 0 ? cotizaciones : [];
+                const recomputed = {
+                    total: filtered.length,
+                    borrador: filtered.filter((c: any) => c.estado === 'borrador').length,
+                    enviadas: filtered.filter((c: any) => c.estado === 'enviada').length,
+                    aceptadas: filtered.filter((c: any) => c.estado === 'aceptada').length,
+                    rechazadas: filtered.filter((c: any) => c.estado === 'rechazada').length,
+                    valor_total: filtered.reduce((sum: number, c: any) => sum + (Number(c.total_anual) || 0), 0),
+                    valor_aceptadas: filtered.filter((c: any) => c.estado === 'aceptada').reduce((sum: number, c: any) => sum + (Number(c.total_anual) || 0), 0)
+                };
+                setStats(recomputed);
+            } else {
+                setStats(data);
+            }
         } catch (error) {
             console.error('Error loading stats:', error);
         }
