@@ -355,6 +355,7 @@ export const leadsService = {
     },
 
     // Create a new follow-up (with assigned_to support)
+    // Auto-marks previous follow-ups for the same lead as completed
     async createFollowUp(followUp: Partial<FollowUp>, assignedTo?: string) {
         const { data: { user } } = await supabase.auth.getUser();
         const { data, error } = await supabase
@@ -373,6 +374,21 @@ export const leadsService = {
             .single();
 
         if (error) throw error;
+
+        // Auto-complete previous follow-ups for this lead
+        if (followUp.lead_id) {
+            await supabase
+                .from('follow_ups')
+                .update({ 
+                    completed: true, 
+                    completed_at: new Date().toISOString(),
+                    completed_by: user?.id 
+                })
+                .eq('lead_id', followUp.lead_id)
+                .eq('completed', false)
+                .neq('id', data.id);
+        }
+
         return data as FollowUp;
     },
 
