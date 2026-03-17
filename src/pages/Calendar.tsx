@@ -361,6 +361,23 @@ export default function Calendar() {
                                     );
                                 })}
                         </div>
+
+                        {/* Status Legend */}
+                        <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5">
+                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Estados</p>
+                            <div className="flex items-center gap-2">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                <span className="text-[11px] text-gray-600">Completado</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Circle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                                <span className="text-[11px] text-gray-600">Vencido sin hacer</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <div className="w-3.5 h-3.5 rounded-full bg-indigo-500 shrink-0" />
+                                <span className="text-[11px] text-gray-600">Pendiente (agendado)</span>
+                            </div>
+                        </div>
                     </div>
                 );
             })()}
