@@ -87,6 +87,11 @@ export default function PricingConfig() {
                 return;
             }
 
+            if (!profile?.company_id) {
+                toast.error('No se pudo identificar tu empresa. Por favor recarga la página.');
+                return;
+            }
+
             // Sanitizar datos: eliminar campos de sistema
             const { id, created_at, updated_at, ...updateData } = formData as any;
 
@@ -94,7 +99,11 @@ export default function PricingConfig() {
                 await pricingService.updatePricingItem(editingId, updateData);
                 toast.success('✅ Ítem actualizado');
             } else {
-                await pricingService.createPricingItem(updateData as any);
+                // Siempre inyectar company_id para satisfacer la política RLS de INSERT
+                await pricingService.createPricingItem({
+                    ...updateData,
+                    company_id: profile.company_id,
+                } as any);
                 toast.success('✅ Ítem creado');
             }
             resetForm();

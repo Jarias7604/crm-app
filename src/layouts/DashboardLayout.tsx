@@ -48,8 +48,23 @@ export default function DashboardLayout() {
                                     {new Date().toLocaleDateString(i18n.language === 'es' ? 'es-ES' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                                 </p>
                             </div>
-                            {/* Notification Bell — visible for all roles */}
-                            <NotificationBell />
+                            {/* Role badge + Notification Bell */}
+                            <div className="flex items-center gap-2">
+                                {profile?.role && (
+                                    <span className={`hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                                        profile.role === 'super_admin'
+                                            ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                                            : profile.role === 'company_admin'
+                                            ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                                            : 'bg-gray-100 text-gray-600 border border-gray-200'
+                                    }`}>
+                                        {profile.role === 'super_admin' ? 'Super Admin'
+                                            : profile.role === 'company_admin' ? 'Administrador'
+                                            : 'Agente'}
+                                    </span>
+                                )}
+                                <NotificationBell />
+                            </div>
                         </div>
                     </header>
                 )}
