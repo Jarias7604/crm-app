@@ -116,7 +116,8 @@ export const clientsService = {
       .select(`
         *,
         etapa_actual:client_pipeline_stages(*),
-        assigned_profile:profiles(id, full_name, email)
+        assigned_profile:profiles(id, full_name, email),
+        doc_count:client_documents(count)
       `)
       .order('created_at', { ascending: false });
 
@@ -126,7 +127,11 @@ export const clientsService = {
 
     const { data, error } = await q;
     if (error) throw error;
-    return (data || []) as unknown as Client[];
+    // Flatten doc_count from [{count: N}] to a number
+    return ((data || []) as any[]).map(c => ({
+      ...c,
+      doc_count: c.doc_count?.[0]?.count ?? 0,
+    })) as unknown as Client[];
   },
 
   async getById(id: string): Promise<Client | null> {

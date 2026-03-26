@@ -195,6 +195,18 @@ export default function Clientes() {
                     </div>
                   )}
 
+                  {/* Doc count badge */}
+                  {(() => {
+                    const docCount = (client as any).doc_count ?? 0;
+                    if (docCount === 0) return null;
+                    return (
+                      <span className="flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[10px] font-bold flex-shrink-0">
+                        <CheckCircle2 className="w-3 h-3" />
+                        {docCount} doc{docCount !== 1 ? 's' : ''}
+                      </span>
+                    );
+                  })()}
+
                   {/* Date + arrow */}
                   <div className="flex items-center gap-3 flex-shrink-0">
                     <span className="text-xs text-gray-400">
