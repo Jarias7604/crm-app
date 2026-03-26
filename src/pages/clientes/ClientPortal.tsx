@@ -534,7 +534,11 @@ function MobileDocList({ docTypes, stageDocs, uploading, hasTerms, termsAccepted
         const pastel = PASTELS[idx % PASTELS.length];
 
         return (
-          <div key={dt.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden transition-all">
+          <div key={dt.id} className={`border rounded-2xl overflow-hidden transition-all ${
+            isFilled
+              ? 'bg-gray-50 border-gray-200 border-l-4 border-l-emerald-400'
+              : 'bg-white border-gray-200'
+          }`}>
             {/* Info row */}
             <div className="flex items-start gap-3.5 px-4 pt-4 pb-3">
               {/* Circle indicator — pastel when pending, big green check when done */}
