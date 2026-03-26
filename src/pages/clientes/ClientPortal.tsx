@@ -121,11 +121,11 @@ export default function ClientPortal() {
 
             {/* Progress */}
             <div className="flex items-center gap-3 flex-shrink-0">
-              <div className="w-20 h-1 bg-gray-200 rounded-full overflow-hidden">
-                <div className="h-full rounded-full bg-gray-900 transition-all duration-700"
+              <div className="w-20 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-700 ${pct === 100 ? 'bg-emerald-500' : 'bg-[#4449AA]'}`}
                   style={{ width: `${pct}%` }} />
               </div>
-              <span className="text-xs font-bold text-gray-600">{pct}%</span>
+              <span className={`text-xs font-bold ${pct === 100 ? 'text-emerald-600' : 'text-gray-600'}`}>{pct}%</span>
             </div>
           </div>
         </header>
@@ -158,8 +158,8 @@ export default function ClientPortal() {
                 <span>{filled.length} de {required.length} documentos</span>
                 <span className="font-bold text-gray-900">{pct}%</span>
               </div>
-              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-gray-900 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
+              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-700 ${pct === 100 ? 'bg-emerald-400' : 'bg-[#4449AA]'}`} style={{ width: `${pct}%` }} />
               </div>
             </div>
 
@@ -448,51 +448,80 @@ function MobileDocList({ docTypes, stageDocs, uploading, hasTerms, termsAccepted
   termsAccepted: boolean;
   handleUpload: (file: File, dt: ClientStageDocumentType) => void;
 }) {
+  // Paleta pastel por índice
+  const PASTELS = [
+    { bg: '#fce7f3', text: '#be185d', btnBg: '#fdf2f8', btnText: '#9d174d' }, // rose
+    { bg: '#ede9fe', text: '#7c3aed', btnBg: '#f5f3ff', btnText: '#6d28d9' }, // violet
+    { bg: '#fef3c7', text: '#d97706', btnBg: '#fffbeb', btnText: '#b45309' }, // amber
+    { bg: '#e0f2fe', text: '#0369a1', btnBg: '#f0f9ff', btnText: '#0c4a6e' }, // sky
+    { bg: '#d1fae5', text: '#065f46', btnBg: '#ecfdf5', btnText: '#064e3b' }, // teal
+  ];
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {docTypes.map((dt, idx) => {
         const uploaded = stageDocs.filter(d => d.doc_type_id === dt.id);
         const isFilled = uploaded.length > 0;
         const isLoading = uploading === dt.id;
         const isDisabled = (hasTerms && !termsAccepted) || isLoading;
+        const pastel = PASTELS[idx % PASTELS.length];
 
         return (
-          <div key={dt.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+          <div key={dt.id} className={`border rounded-2xl overflow-hidden transition-all ${
+            isFilled ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-200'
+          }`}>
             {/* Info row */}
             <div className="flex items-start gap-3.5 px-4 pt-4 pb-3">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-black mt-0.5 ${
-                isFilled ? 'bg-gray-900 text-white' : 'border-2 border-gray-300 text-gray-400'
-              }`}>
-                {isFilled ? '✓' : idx + 1}
-              </div>
+              {/* Circle indicator — pastel when pending, big green check when done */}
+              {isFilled ? (
+                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+                </div>
+              ) : (
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 text-sm font-black"
+                  style={{ background: pastel.bg, color: pastel.text }}
+                >
+                  {idx + 1}
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <p className={`text-[15px] font-bold leading-tight ${isFilled ? 'text-gray-400' : 'text-gray-900'}`}>
+                  <p className={`text-[15px] font-bold leading-tight ${
+                    isFilled ? 'text-emerald-700' : 'text-gray-900'
+                  }`}>
                     {dt.nombre}
                   </p>
+                  {isFilled && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">✓ Listo</span>
+                  )}
                   {dt.requerido && !isFilled && (
                     <span className="text-[9px] font-bold px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">REQ</span>
                   )}
                 </div>
                 {dt.descripcion && <p className="text-xs text-gray-400 mt-0.5">{dt.descripcion}</p>}
                 {uploaded.map(doc => (
-                  <div key={doc.id} className="flex items-center gap-1.5 mt-1.5 bg-gray-50 rounded-lg px-2 py-1">
-                    <File className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                    <span className="text-xs text-gray-500 font-medium truncate">{doc.nombre}</span>
+                  <div key={doc.id} className="flex items-center gap-1.5 mt-1.5 bg-emerald-100/60 rounded-lg px-2 py-1">
+                    <File className="w-3 h-3 text-emerald-500 flex-shrink-0" />
+                    <span className="text-xs text-emerald-700 font-medium truncate">{doc.nombre}</span>
                   </div>
                 ))}
               </div>
             </div>
-            {/* Full-width pill button — matches Option 3 mockup */}
+            {/* Full-width upload button */}
             <div className="px-4 pb-4">
-              <label className={`flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-bold transition-all select-none ${
+              <label className={`flex items-center justify-center gap-2 w-full py-3.5 rounded-xl text-sm font-bold transition-all select-none cursor-pointer active:scale-[0.98] ${
                 isDisabled && !isLoading
                   ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
                   : isFilled
-                  ? 'border border-gray-200 text-gray-500 hover:bg-gray-50 cursor-pointer active:scale-[0.98]'
-                  : 'bg-gray-900 text-white cursor-pointer active:scale-[0.98] shadow-sm'
-              }`}>
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border border-emerald-200'
+                  : ''
+              }`}
+              style={(!isDisabled && !isFilled) ? { background: pastel.btnBg, color: pastel.btnText, border: `1.5px solid ${pastel.bg}` } : {}}
+              >
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> 
+                  : isFilled ? <CheckCircle2 className="w-5 h-5" />
+                  : <Upload className="w-4 h-4" />}
                 <span>{isLoading ? 'Subiendo...' : isFilled ? 'Cambiar archivo' : 'Subir documento'}</span>
                 <input type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx"
                   disabled={isDisabled}
