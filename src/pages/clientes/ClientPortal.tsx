@@ -101,8 +101,12 @@ export default function ClientPortal() {
   const docTypes: ClientStageDocumentType[] = stage.document_types || [];
   const stageDocs = localDocs.filter(d => d.stage_id === stage.id);
   const required = docTypes.filter(d => d.requerido);
+  // Progress counts ALL docs (required + optional)
+  const allFilled = docTypes.filter(d => stageDocs.some(doc => doc.doc_type_id === d.id));
   const filled = required.filter(d => stageDocs.some(doc => doc.doc_type_id === d.id));
-  const pct = required.length > 0 ? Math.round((filled.length / required.length) * 100) : 100;
+  const pct = docTypes.length > 0 ? Math.round((allFilled.length / docTypes.length) * 100) : 100;
+  // Completion card only when ALL required docs are uploaded
+  const isComplete = required.length > 0 ? filled.length === required.length : allFilled.length === docTypes.length;
   const hasTerms = !!company.portal_terms_text;
 
   return (
@@ -159,12 +163,12 @@ export default function ClientPortal() {
                 <span className="font-bold text-gray-900">{pct}%</span>
               </div>
               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className={`h-full rounded-full transition-all duration-700 ${pct === 100 ? 'bg-emerald-400' : 'bg-[#4449AA]'}`} style={{ width: `${pct}%` }} />
+                <div className={`h-full rounded-full transition-all duration-700 ${isComplete ? 'bg-emerald-400' : 'bg-[#4449AA]'}`} style={{ width: `${pct}%` }} />
               </div>
             </div>
 
             {/* Complete */}
-            {pct === 100 && (
+            {isComplete && (
               <CompletionCard companyName={company.nombre} proximaEtapa={client.proxima_etapa} etapaFinal={stage.es_final} />
             )}
 
@@ -224,7 +228,7 @@ export default function ClientPortal() {
                   <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
                     <div className="h-full bg-gray-900 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
                   </div>
-                  {pct === 100 && (
+                  {isComplete && (
                     <div className="flex items-center gap-2 pt-1">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                       <span className="text-xs font-semibold text-emerald-600">Completo</span>
@@ -278,7 +282,7 @@ export default function ClientPortal() {
                 </p>
 
                 {/* Completion card for desktop */}
-                {pct === 100 && (
+                {isComplete && (
                   <CompletionCard companyName={company.nombre} proximaEtapa={client.proxima_etapa} etapaFinal={stage.es_final} />
                 )}
 
