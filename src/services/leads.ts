@@ -375,18 +375,30 @@ export const leadsService = {
 
         if (error) throw error;
 
-        // Auto-complete previous follow-ups for this lead
+        // Auto-complete previous PAST follow-ups for this lead
+        // Do not auto-complete FUTURE meetings/calls (e.g. scheduled for next week)
         if (followUp.lead_id) {
+            const nowIso = new Date().toISOString();
             await supabase
                 .from('follow_ups')
                 .update({ 
                     completed: true, 
-                    completed_at: new Date().toISOString(),
+                    completed_at: nowIso,
                     completed_by: user?.id 
                 })
                 .eq('lead_id', followUp.lead_id)
                 .eq('completed', false)
+                .lte('date', nowIso)
                 .neq('id', data.id);
+
+            // Update lead with the new follow up date and assignee
+            await supabase
+                .from('leads')
+                .update({
+                    next_followup_date: followUp.date,
+                    next_followup_assignee: assignedTo || null
+                })
+                .eq('id', followUp.lead_id);
         }
 
         return data as FollowUp;
@@ -414,6 +426,9 @@ export const leadsService = {
 
     // Get all follow-ups with lead info for Calendar view (sorted by date/time)
     async getCalendarFollowUps() {
+        const sixtyDaysAgo = new Date();
+        sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+
         const { data, error } = await supabase
             .from('follow_ups')
             .select(`
@@ -422,7 +437,9 @@ export const leadsService = {
                 lead:leads(id, name, company_name, phone, email, status),
                 assigned_profile:assigned_to(id, full_name, avatar_url)
             `)
-            .order('date', { ascending: true });
+            .or(`completed.eq.false,date.gte.${sixtyDaysAgo.toISOString()}`)
+            .order('date', { ascending: false })
+            .limit(1500);
 
         if (error) throw error;
         return (data || []) as unknown as Array<{
