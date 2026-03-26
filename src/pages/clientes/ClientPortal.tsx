@@ -42,6 +42,8 @@ export default function ClientPortal() {
       else {
         setData(result);
         setLocalDocs((result.client.documents || []) as unknown as ClientDocument[]);
+        // Auto-accept if no terms are configured
+        if (!result.company.portal_terms_text) setTermsAccepted(true);
       }
     }).finally(() => setLoading(false));
   }, [token]);

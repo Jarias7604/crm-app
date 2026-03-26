@@ -291,7 +291,7 @@ export const clientPortalService = {
         .maybeSingle(),
       supabase
         .from('companies')
-        .select('name, logo_url, portal_terms_text, website, email')
+        .select('name, logo_url, portal_terms_text')
         .eq('id', (client as any).company_id)
         .single(),
     ]);
@@ -305,8 +305,6 @@ export const clientPortalService = {
         nombre: compRes.data?.name || 'CRM',
         logo_url: compRes.data?.logo_url || null,
         portal_terms_text: compRes.data?.portal_terms_text || null,
-        website: compRes.data?.website || null,
-        email: compRes.data?.email || null,
       },
     };
   },
