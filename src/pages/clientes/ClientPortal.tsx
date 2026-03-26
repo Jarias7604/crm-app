@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   Upload, CheckCircle2, Loader2, AlertCircle,
@@ -35,6 +35,54 @@ export default function ClientPortal() {
   const [termsExpanded, setTermsExpanded] = useState(false);
   const [termsModalOpen, setTermsModalOpen] = useState(false);
 
+  // ── Confetti ─────────────────────────────────────────
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const confettiActive = useRef(false);
+
+  const launchConfetti = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || confettiActive.current) return;
+    confettiActive.current = true;
+    const ctx = canvas.getContext('2d')!;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const COLORS = ['#ff6b6b','#ffd93d','#6bcb77','#4d96ff','#ff922b','#cc5de8','#f783ac','#74c0fc'];
+    const pieces = Array.from({ length: 120 }, () => ({
+      x: Math.random() * canvas.width,
+      y: -20 - Math.random() * 100,
+      w: 8 + Math.random() * 8,
+      h: 4 + Math.random() * 6,
+      color: COLORS[Math.floor(Math.random() * COLORS.length)],
+      rot: Math.random() * Math.PI * 2,
+      rotSpeed: (Math.random() - 0.5) * 0.15,
+      vx: (Math.random() - 0.5) * 3,
+      vy: 2 + Math.random() * 4,
+      alpha: 1,
+    }));
+
+    let frame = 0;
+    const MAX_FRAMES = 180;
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      pieces.forEach(p => {
+        p.x += p.vx; p.y += p.vy; p.rot += p.rotSpeed;
+        if (frame > 100) p.alpha = Math.max(0, p.alpha - 0.02);
+        ctx.save();
+        ctx.globalAlpha = p.alpha;
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        ctx.restore();
+      });
+      frame++;
+      if (frame < MAX_FRAMES) requestAnimationFrame(animate);
+      else { ctx.clearRect(0, 0, canvas.width, canvas.height); confettiActive.current = false; }
+    };
+    animate();
+  }, []);
+
   useEffect(() => {
     if (!token) { setNotFound(true); setLoading(false); return; }
     clientPortalService.getByToken(token).then(result => {
@@ -47,6 +95,19 @@ export default function ClientPortal() {
       }
     }).finally(() => setLoading(false));
   }, [token]);
+
+  // Trigger confetti when all required docs are uploaded
+  const prevComplete = useRef(false);
+  useEffect(() => {
+    if (!data) return;
+    const stage = data.client.etapa_actual;
+    const docTypes: ClientStageDocumentType[] = stage.document_types || [];
+    const required = docTypes.filter(d => d.requerido);
+    const filled = required.filter(d => localDocs.some(doc => doc.doc_type_id === d.id));
+    const complete = required.length > 0 ? filled.length === required.length : localDocs.length === docTypes.length;
+    if (complete && !prevComplete.current) launchConfetti();
+    prevComplete.current = complete;
+  }, [localDocs, data, launchConfetti]);
 
   const handleUpload = async (file: File, docType: ClientStageDocumentType) => {
     if (!termsAccepted) { toast.error('Acepta los términos primero'); return; }
@@ -111,6 +172,8 @@ export default function ClientPortal() {
 
   return (
     <>
+      {/* Confetti canvas — fixed overlay, pointer-events-none */}
+      <canvas ref={canvasRef} className="fixed inset-0 z-[999] pointer-events-none" />
       <div className="min-h-screen bg-[#f8f8f7] flex flex-col">
 
         {/* ── Header ─────────────────────────── */}
@@ -471,9 +534,7 @@ function MobileDocList({ docTypes, stageDocs, uploading, hasTerms, termsAccepted
         const pastel = PASTELS[idx % PASTELS.length];
 
         return (
-          <div key={dt.id} className={`border rounded-2xl overflow-hidden transition-all ${
-            isFilled ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-200'
-          }`}>
+          <div key={dt.id} className="bg-white border border-gray-200 rounded-2xl overflow-hidden transition-all">
             {/* Info row */}
             <div className="flex items-start gap-3.5 px-4 pt-4 pb-3">
               {/* Circle indicator — pastel when pending, big green check when done */}
@@ -491,13 +552,11 @@ function MobileDocList({ docTypes, stageDocs, uploading, hasTerms, termsAccepted
               )}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <p className={`text-[15px] font-bold leading-tight ${
-                    isFilled ? 'text-emerald-700' : 'text-gray-900'
-                  }`}>
+                  <p className="text-[15px] font-bold leading-tight text-gray-900">
                     {dt.nombre}
                   </p>
                   {isFilled && (
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">✓ Listo</span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded-full">✓ Listo</span>
                   )}
                   {dt.requerido && !isFilled && (
                     <span className="text-[9px] font-bold px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">REQ</span>
@@ -505,9 +564,9 @@ function MobileDocList({ docTypes, stageDocs, uploading, hasTerms, termsAccepted
                 </div>
                 {dt.descripcion && <p className="text-xs text-gray-400 mt-0.5">{dt.descripcion}</p>}
                 {uploaded.map(doc => (
-                  <div key={doc.id} className="flex items-center gap-1.5 mt-1.5 bg-emerald-100/60 rounded-lg px-2 py-1">
-                    <File className="w-3 h-3 text-emerald-500 flex-shrink-0" />
-                    <span className="text-xs text-emerald-700 font-medium truncate">{doc.nombre}</span>
+                  <div key={doc.id} className="flex items-center gap-1.5 mt-1.5 bg-gray-100 rounded-lg px-2 py-1">
+                    <File className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                    <span className="text-xs text-gray-600 font-medium truncate">{doc.nombre}</span>
                   </div>
                 ))}
               </div>
