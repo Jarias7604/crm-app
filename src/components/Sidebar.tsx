@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthProvider';
-import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft, Zap, Search, Bot, XCircle, Network, BarChart3, UserCircle, Headset, TicketIcon, AlertTriangle } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft, Zap, Search, Bot, XCircle, Network, BarChart3, UserCircle, Headset, TicketIcon, AlertTriangle, UserCheck } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { brandingService } from '../services/branding';
@@ -82,6 +82,10 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         navigation.push({ name: t('sidebar.leads'), href: '/leads', icon: Users, current: location.pathname.startsWith('/leads') });
     }
 
+    if (canAccess('clientes.view') || profile?.role === 'super_admin' || profile?.role === 'company_admin') {
+        navigation.push({ name: 'Clientes', href: '/clientes', icon: UserCheck, current: location.pathname.startsWith('/clientes') });
+    }
+
     if (canAccess('quotes')) {
         navigation.push({ name: 'Cotizaciones', href: '/cotizaciones', icon: FileText, current: location.pathname === '/cotizaciones' });
     }
@@ -129,6 +133,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
 
     const configSubItemsRaw = [
         { name: 'Marca de Empresa', href: '/company/branding', icon: Building, current: location.pathname === '/company/branding', permissionKey: 'branding' },
+        { name: 'Pipeline Clientes', href: '/admin/pipeline', icon: UserCheck, current: location.pathname === '/admin/pipeline', permissionKey: 'pipeline.admin' },
         { name: 'Gestión Precios', href: '/pricing', icon: Layers, current: location.pathname === '/pricing', permissionKey: 'pricing' },
         { name: 'Gestión Paquete', href: '/paquetes', icon: Package, current: location.pathname === '/paquetes', permissionKey: 'paquetes' },
         { name: 'Gestión Item', href: '/items', icon: Layers, current: location.pathname === '/items', permissionKey: 'items' },
@@ -137,7 +142,10 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         { name: 'Rubros / Industrias', href: '/industries', icon: Building2, current: location.pathname === '/industries', permissionKey: 'loss_reasons' },
     ];
 
-    const configSubItems = configSubItemsRaw.filter(item => canAccess(item.permissionKey!));
+    const isSuperOrAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
+    const configSubItems = configSubItemsRaw.filter(item =>
+        canAccess(item.permissionKey!) || (isSuperOrAdmin && item.permissionKey === 'pipeline.admin')
+    );
 
 
     if (profile?.role === 'super_admin') {

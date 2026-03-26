@@ -47,6 +47,9 @@ const Teams = lazy(() => import('./pages/company/Teams'));
 const TeamPerformance = lazy(() => import('./pages/company/TeamPerformance'));
 const Tickets = lazy(() => import('./pages/support/Tickets'));
 const OverdueTickets = lazy(() => import('./pages/support/OverdueTickets'));
+const Clientes = lazy(() => import('./pages/clientes/Clientes'));
+const ClientPortal = lazy(() => import('./pages/clientes/ClientPortal'));
+const PipelineConfig = lazy(() => import('./pages/admin/PipelineConfig'));
 
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -106,6 +109,7 @@ function App() {
                     <Route path="/industries" element={<Industries />} />
                     <Route path="/paquetes" element={<GestionPaquetes />} />
                     <Route path="/items" element={<GestionItems />} />
+                    <Route path="/admin/pipeline" element={<PipelineConfig />} />
                   </Route>
 
                   {/* System Admin Routes (Super Admin only) */}
@@ -133,6 +137,9 @@ function App() {
                     <Route path="/marketing/chat" element={<ChatHub />} />
                   </Route>
 
+                  {/* Clientes Module */}
+                  <Route path="/clientes" element={<Clientes />} />
+
                   {/* Support Routes */}
                   <Route path="/support/tickets" element={<Tickets />} />
                   <Route path="/support/atrasados" element={<OverdueTickets />} />
@@ -141,6 +148,9 @@ function App() {
 
               {/* Public Proposal Page (No Auth Required) */}
               <Route path="/propuesta/:id" element={<PublicQuoteView />} />
+
+              {/* Portal público del cliente (sin auth) */}
+              <Route path="/portal/cliente/:token" element={<ClientPortal />} />
 
               {/* Password Reset from Email Link (No Auth Required) */}
               <Route path="/update-password" element={<UpdatePassword />} />
