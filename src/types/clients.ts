@@ -12,10 +12,12 @@ export interface ClientPipelineStage {
   orden: number;
   es_final: boolean;
   activo: boolean;
+  assigned_to: string | null;
   created_at: string;
   updated_at: string;
   // relaciones
   document_types?: ClientStageDocumentType[];
+  assigned_profile?: { id: string; full_name: string | null; email: string } | null;
 }
 
 export interface ClientStageDocumentType {
@@ -101,5 +103,5 @@ export type UpdateClientInput = Partial<
 
 export type CreateStageInput = Pick<
   ClientPipelineStage,
-  'nombre' | 'descripcion' | 'icono' | 'color' | 'orden' | 'es_final'
+  'company_id' | 'nombre' | 'descripcion' | 'icono' | 'color' | 'orden' | 'es_final' | 'assigned_to'
 >;

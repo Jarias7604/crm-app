@@ -229,6 +229,23 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
                     {selectedStage.descripcion && (
                       <p className="text-xs text-gray-500 mt-0.5">{selectedStage.descripcion}</p>
                     )}
+                    {/* Responsable asignado */}
+                    {(selectedStage as any).assigned_profile && (
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <div
+                          className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-black flex-shrink-0"
+                          style={{ background: selectedStage.color }}
+                        >
+                          {((selectedStage as any).assigned_profile.full_name || (selectedStage as any).assigned_profile.email)[0].toUpperCase()}
+                        </div>
+                        <span className="text-xs text-gray-500">
+                          Responsable:{' '}
+                          <span className="font-semibold text-gray-700">
+                            {(selectedStage as any).assigned_profile.full_name || (selectedStage as any).assigned_profile.email}
+                          </span>
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <StageDocumentUpload

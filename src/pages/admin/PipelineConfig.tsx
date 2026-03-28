@@ -2,12 +2,14 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Plus, Trash2, GripVertical, ChevronDown, ChevronRight,
   Save, Settings2, FileText, Loader2,
-  ShieldCheck, CheckSquare, Square, ArrowUpRight
+  ShieldCheck, CheckSquare, Square, ArrowUpRight, UserCircle2
 } from 'lucide-react';
 import { pipelineStagesService, stageDocTypesService, clientPortalService } from '../../services/clients';
 import type { ClientPipelineStage, ClientStageDocumentType } from '../../types/clients';
 import { supabase } from '../../services/supabase';
 import toast from 'react-hot-toast';
+
+interface TeamMember { id: string; full_name: string | null; email: string; }
 
 const COLOR_OPTIONS = [
   '#4449AA', '#6366f1', '#f59e0b', '#10b981',
@@ -46,6 +48,7 @@ export default function PipelineConfig() {
   const [termsExpanded, setTermsExpanded] = useState(false);
   const [savingTerms, setSavingTerms] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
 
   // ── Drag & Drop ──────────────────────────────────────────────
   const dragId = useRef<string | null>(null);
@@ -72,8 +75,12 @@ export default function PipelineConfig() {
       const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single();
       if (!profile) return;
       setCompanyId(profile.company_id);
-      const { data: comp } = await supabase.from('companies').select('portal_terms_text').eq('id', profile.company_id).single();
-      if (comp?.portal_terms_text) setTermsText(comp.portal_terms_text);
+      const [compRes, teamRes] = await Promise.all([
+        supabase.from('companies').select('portal_terms_text').eq('id', profile.company_id).single(),
+        supabase.from('profiles').select('id, full_name, email').eq('company_id', profile.company_id).order('full_name'),
+      ]);
+      if (compRes.data?.portal_terms_text) setTermsText(compRes.data.portal_terms_text);
+      if (teamRes.data) setTeamMembers(teamRes.data as TeamMember[]);
     });
   }, [load]);
 
@@ -126,15 +133,18 @@ export default function PipelineConfig() {
   };
 
   const handleAddStage = async () => {
+    if (!companyId) { toast.error('Cargando empresa, intenta de nuevo'); return; }
     const maxOrder = stages.length > 0 ? Math.max(...stages.map(s => s.orden)) : 0;
     try {
       await pipelineStagesService.create({
+        company_id: companyId,
         nombre: 'Nueva Etapa',
         descripcion: '',
         icono: 'star',
         color: '#4449AA',
         orden: maxOrder + 1,
         es_final: false,
+        assigned_to: null,
       });
       toast.success('Etapa creada');
       await load();
@@ -272,6 +282,29 @@ export default function PipelineConfig() {
                         title={c}
                       />
                     ))}
+                  </div>
+
+                  {/* Assignee dropdown */}
+                  <div className="relative flex-shrink-0">
+                    <select
+                      value={edits.assigned_to ?? stage.assigned_to ?? ''}
+                      onChange={async e => {
+                        const val = e.target.value || null;
+                        try {
+                          await pipelineStagesService.update(stage.id, { assigned_to: val });
+                          toast.success(val ? '👤 Responsable asignado' : 'Responsable eliminado');
+                          await load();
+                        } catch { toast.error('Error al asignar'); }
+                      }}
+                      className="text-xs border border-gray-200 rounded-lg pl-6 pr-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-[#4449AA]/20 focus:border-[#4449AA] text-gray-700 appearance-none cursor-pointer hover:border-gray-300 transition-colors"
+                      title="Responsable de esta etapa"
+                    >
+                      <option value="">Sin responsable</option>
+                      {teamMembers.map(m => (
+                        <option key={m.id} value={m.id}>{m.full_name || m.email}</option>
+                      ))}
+                    </select>
+                    <UserCircle2 className="absolute left-1.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
                   </div>
 
                   {/* Final stage */}

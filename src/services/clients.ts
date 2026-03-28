@@ -17,7 +17,7 @@ export const pipelineStagesService = {
   async getAll(includeInactive = false): Promise<ClientPipelineStage[]> {
     let q = supabase
       .from('client_pipeline_stages')
-      .select('*, document_types:client_stage_document_types(*)')
+      .select('*, document_types:client_stage_document_types(*), assigned_profile:profiles!assigned_to(id, full_name, email)')
       .order('orden', { ascending: true });
     if (!includeInactive) q = q.eq('activo', true);
     const { data, error } = await q;
