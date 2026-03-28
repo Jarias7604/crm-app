@@ -28,6 +28,7 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
   const [activeStageIdx, setActiveStageIdx] = useState(0);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [savingAssign, setSavingAssign] = useState(false);
+  const [reverting, setReverting] = useState(false);
 
   const load = useCallback(async () => {
     if (!clientId) return;
@@ -142,10 +143,31 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
     toast.success(`Link enviado por ${channel}`);
   };
 
+  const handleRevertStage = async () => {
+    if (!client || !canManage) return;
+    const sorted = [...stages].sort((a, b) => a.orden - b.orden);
+    const currentIdx = sorted.findIndex(s => s.id === client.etapa_actual_id);
+    const prevStage = sorted[currentIdx - 1];
+
+    if (!prevStage) return;
+
+    if (!confirm(`¿Regresar de forma segura a la etapa anterior ("${prevStage.nombre}")?`)) return;
+    setReverting(true);
+    try {
+      // Usar el mismo servicio (es retroactivo visual y base de datos)
+      await clientsService.advanceStage(client.id, prevStage.id);
+      toast.success(`⏪ Regresó a ${prevStage.nombre}`);
+      onUpdated();
+      await load();
+    } catch { toast.error('Error al regresar etapa'); }
+    finally { setReverting(false); }
+  };
+
   const sorted = [...stages].sort((a, b) => a.orden - b.orden);
   const currentStageIdx = sorted.findIndex(s => s.id === client?.etapa_actual_id);
   const completedIds = sorted.slice(0, currentStageIdx).map(s => s.id);
   const isLastStage = currentStageIdx === sorted.length - 1;
+  const isFirstStage = currentStageIdx === 0;
 
   if (!clientId) return null;
 
@@ -327,11 +349,21 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
 
         {/* Footer: advance button */}
         {!loading && client && !client.es_activo && canManage && (
-          <div className="p-4 border-t border-gray-100">
+          <div className="p-4 border-t border-gray-100 flex gap-2">
+            {!isFirstStage && (
+              <button
+                onClick={handleRevertStage}
+                disabled={reverting || advancing}
+                title="Regresar a etapa anterior"
+                className="flex items-center justify-center px-4 py-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl font-bold transition-all disabled:opacity-50 border border-red-100/50"
+              >
+                {reverting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Regresar etapa'}
+              </button>
+            )}
             <button
               onClick={handleAdvanceStage}
-              disabled={advancing}
-              className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all ${
+              disabled={advancing || reverting}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all ${
                 isLastStage
                   ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
                   : 'bg-[#4449AA] hover:bg-[#3338a0] text-white'
