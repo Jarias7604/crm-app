@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, CheckCircle2, Circle, Loader2, ChevronRight, Send, MessageSquare, Mail, Phone } from 'lucide-react';
+import { X, CheckCircle2, Circle, Loader2, ChevronRight, Send, MessageSquare, Mail, Phone, UserCircle2 } from 'lucide-react';
 import type { Client, ClientPipelineStage, ClientDocument, ClientStageDocumentType } from '../../types/clients';
 import { clientsService, pipelineStagesService } from '../../services/clients';
 import StageDocumentUpload from './StageDocumentUpload';
 import { usePermissions } from '../../hooks/usePermissions';
+import { supabase } from '../../services/supabase';
 import toast from 'react-hot-toast';
+
+interface TeamMember { id: string; full_name: string | null; email: string; }
 
 interface Props {
   clientId: string | null;
@@ -23,6 +26,8 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
   const [loading, setLoading] = useState(true);
   const [advancing, setAdvancing] = useState(false);
   const [activeStageIdx, setActiveStageIdx] = useState(0);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [savingAssign, setSavingAssign] = useState(false);
 
   const load = useCallback(async () => {
     if (!clientId) return;
@@ -44,7 +49,36 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
     }
   }, [clientId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    // Cargar equipo de la empresa
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return;
+      const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single();
+      if (!profile?.company_id) return;
+      const { data: team } = await supabase
+        .from('profiles')
+        .select('id, full_name, email')
+        .eq('company_id', profile.company_id)
+        .order('full_name');
+      if (team) setTeamMembers(team as TeamMember[]);
+    });
+  }, [load]);
+
+  const handleAssignStage = async (stageId: string, profileId: string | null) => {
+    setSavingAssign(true);
+    try {
+      await pipelineStagesService.update(stageId, { assigned_to: profileId });
+      // actualizar localmente para no recargar todo
+      setStages(prev => prev.map(s =>
+        s.id === stageId
+          ? { ...s, assigned_to: profileId, assigned_profile: teamMembers.find(m => m.id === profileId) || null }
+          : s
+      ));
+      toast.success(profileId ? '👤 Responsable asignado' : 'Responsable eliminado');
+    } catch { toast.error('Error al asignar responsable'); }
+    finally { setSavingAssign(false); }
+  };
 
   const handleAdvanceStage = async () => {
     if (!client || !canManage) return;
@@ -222,6 +256,8 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
                 document_types: (selectedStage as any).document_types || [],
               } as ClientPipelineStage & { document_types: ClientStageDocumentType[] };
 
+              const assignedProfile = (selectedStage as any).assigned_profile as TeamMember | null;
+
               return (
                 <div className="space-y-4">
                   <div>
@@ -229,23 +265,39 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
                     {selectedStage.descripcion && (
                       <p className="text-xs text-gray-500 mt-0.5">{selectedStage.descripcion}</p>
                     )}
-                    {/* Responsable asignado */}
-                    {(selectedStage as any).assigned_profile && (
-                      <div className="flex items-center gap-1.5 mt-2">
+
+                    {/* Responsable — editable */}
+                    <div className="flex items-center gap-2 mt-2.5 p-2.5 bg-gray-50 rounded-xl border border-gray-100">
+                      {/* Avatar */}
+                      {assignedProfile ? (
                         <div
-                          className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-black flex-shrink-0"
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-black flex-shrink-0 shadow-sm"
                           style={{ background: selectedStage.color }}
                         >
-                          {((selectedStage as any).assigned_profile.full_name || (selectedStage as any).assigned_profile.email)[0].toUpperCase()}
+                          {(assignedProfile.full_name || assignedProfile.email)[0].toUpperCase()}
                         </div>
-                        <span className="text-xs text-gray-500">
-                          Responsable:{' '}
-                          <span className="font-semibold text-gray-700">
-                            {(selectedStage as any).assigned_profile.full_name || (selectedStage as any).assigned_profile.email}
-                          </span>
-                        </span>
+                      ) : (
+                        <UserCircle2 className="w-7 h-7 text-gray-300 flex-shrink-0" />
+                      )}
+
+                      {/* Dropdown */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-0.5">Responsable etapa</p>
+                        <select
+                          value={selectedStage.assigned_to ?? ''}
+                          onChange={e => handleAssignStage(selectedStage.id, e.target.value || null)}
+                          disabled={!canManage || savingAssign}
+                          className="w-full text-xs font-semibold text-gray-700 bg-transparent border-none outline-none cursor-pointer disabled:cursor-default disabled:opacity-60"
+                        >
+                          <option value="">Sin responsable</option>
+                          {teamMembers.map(m => (
+                            <option key={m.id} value={m.id}>{m.full_name || m.email}</option>
+                          ))}
+                        </select>
                       </div>
-                    )}
+
+                      {savingAssign && <Loader2 className="w-3.5 h-3.5 text-[#4449AA] animate-spin flex-shrink-0" />}
+                    </div>
                   </div>
 
                   <StageDocumentUpload
