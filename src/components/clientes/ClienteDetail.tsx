@@ -107,6 +107,18 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
       toast.success(`✅ Avanzado a ${nextStage.nombre}`);
       onUpdated();
       await load();
+
+      // Notificar al responsable de la nueva etapa (in-app ya es automático vía trigger DB)
+      // Esta llamada envía adicionalmente el Telegram si el responsable lo tiene configurado
+      supabase.functions.invoke('notify-stage', {
+        body: {
+          stage_id: nextStage.id,
+          client_id: client.id,
+          client_name: client.nombre,
+          company_id: client.company_id,
+        },
+      }).catch(() => {}); // fire-and-forget — no interrumpe flujo si falla
+
     } catch { toast.error('Error al avanzar etapa'); }
     finally { setAdvancing(false); }
   };

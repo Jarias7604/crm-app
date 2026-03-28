@@ -1,17 +1,25 @@
 import { useRef, useEffect } from 'react';
-import { Bell, BellRing, Check, CheckCheck, X, Calendar, Phone, Mail, Users, Monitor } from 'lucide-react';
+import { Bell, BellRing, Check, CheckCheck, X, Calendar, Phone, Mail, Users, Monitor, GitBranch } from 'lucide-react';
 import { useNotifications } from '../hooks/useNotifications';
 import type { AppNotification } from '../services/notifications';
 import { cn } from '../lib/utils';
 
+// Icons per notification type
 const ACTION_ICONS: Record<string, React.ReactNode> = {
-  call: <Phone className="w-3.5 h-3.5" />,
-  email: <Mail className="w-3.5 h-3.5" />,
-  meeting: <Users className="w-3.5 h-3.5" />,
-  whatsapp: <span className="text-[11px]">💬</span>,
-  demo: <Monitor className="w-3.5 h-3.5" />,
-  follow_up_reminder: <Calendar className="w-3.5 h-3.5" />,
+  call:                  <Phone className="w-3.5 h-3.5" />,
+  email:                 <Mail className="w-3.5 h-3.5" />,
+  meeting:               <Users className="w-3.5 h-3.5" />,
+  whatsapp:              <span className="text-[11px]">💬</span>,
+  demo:                  <Monitor className="w-3.5 h-3.5" />,
+  follow_up_reminder:    <Calendar className="w-3.5 h-3.5" />,
+  stage_client_assigned: <GitBranch className="w-3.5 h-3.5" />,  // pipeline
 };
+
+// Bubble color per type — keeps pipeline (green) separated from leads (indigo)
+const TYPE_COLOR: Record<string, string> = {
+  stage_client_assigned: 'bg-emerald-500',   // green  — pipeline
+};
+const DEFAULT_UNREAD_COLOR = 'bg-indigo-500'; // indigo — leads/follow-ups
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -40,10 +48,10 @@ function NotificationItem({
       )}
       onClick={() => onClick(notif)}
     >
-      {/* Icon bubble */}
+      {/* Icon bubble — color depends on type */}
       <div className={cn(
         'flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white mt-0.5',
-        notif.read ? 'bg-gray-300' : 'bg-indigo-500'
+        notif.read ? 'bg-gray-300' : (TYPE_COLOR[notif.type] || DEFAULT_UNREAD_COLOR)
       )}>
         {ACTION_ICONS[notif.type] || <Calendar className="w-3.5 h-3.5" />}
       </div>
