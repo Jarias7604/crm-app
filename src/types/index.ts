@@ -49,6 +49,7 @@ export interface Profile {
         [key: string]: boolean | undefined;
     };
     custom_role_id?: string;
+    telegram_chat_id?: string | null;
 }
 
 export interface Company {

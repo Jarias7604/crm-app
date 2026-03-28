@@ -4,7 +4,7 @@ import { teamService, type Invitation } from '../../services/team';
 import type { Profile, CustomRole } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, Users, Lock, FileText, Tag, Package, Layers, Building, CreditCard, XCircle, KeyRound, Copy, History, AlertCircle } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, Users, Lock, FileText, Tag, Package, Layers, Building, CreditCard, XCircle, KeyRound, Copy, History, AlertCircle, Send } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../auth/AuthProvider';
 import { storageService } from '../../services/storage';
@@ -448,9 +448,17 @@ export default function Team() {
                                                 )}
                                             </div>
                                             <div className="flex flex-col gap-0 min-w-0">
-                                                <p className="font-black text-gray-900 text-sm leading-tight uppercase tracking-tight group-hover:text-indigo-600 transition-colors truncate">
-                                                    {member.full_name || 'Sin Nombre'}
-                                                </p>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="font-black text-gray-900 text-sm leading-tight uppercase tracking-tight group-hover:text-indigo-600 transition-colors truncate">
+                                                        {member.full_name || 'Sin Nombre'}
+                                                    </p>
+                                                    {member.telegram_chat_id && (
+                                                        <span className="flex flex-shrink-0 items-center gap-1 px-1.5 py-0.5 rounded pl-1 bg-sky-50 text-sky-600 border border-sky-100/50" title="Bot de Telegram conectado">
+                                                            <Send className="w-2.5 h-2.5" />
+                                                            <span className="text-[8px] font-black uppercase tracking-widest">Activo</span>
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <p className="text-[11px] text-gray-400 font-bold tracking-tight lowercase truncate opacity-70 leading-normal">{member.email}</p>
                                             </div>
                                         </div>
