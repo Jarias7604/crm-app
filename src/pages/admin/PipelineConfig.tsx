@@ -143,13 +143,25 @@ export default function PipelineConfig() {
     finally { setSaving(false); }
   };
 
-  // ── Toggle activo (auto-save sin panel de edición) ────────────
+  // ── Toggle activo ─────────────────────────────────────────────
   const handleToggleActive = async (stage: ClientPipelineStage) => {
     try {
       await pipelineStagesService.update(stage.id, { activo: !stage.activo });
       toast.success(stage.activo ? 'Etapa desactivada' : 'Etapa activada');
       await load();
     } catch { toast.error('Error al cambiar estado'); }
+  };
+
+  // ── Eliminar etapa ────────────────────────────────────────────
+  const handleDeleteStage = async (stage: ClientPipelineStage) => {
+    if (!confirm(`¿Eliminar la etapa "${stage.nombre}"?\n\nEsta acción es permanente. Los clientes que estén en esta etapa quedarán sin etapa asignada.`)) return;
+    try {
+      const { error } = await (supabase as any).from('client_pipeline_stages').delete().eq('id', stage.id);
+      if (error) throw error;
+      toast.success(`🗑️ "${stage.nombre}" eliminada`);
+      setEditingId(null);
+      await load();
+    } catch { toast.error('Error al eliminar — puede tener clientes activos asignados'); }
   };
 
   // ── Nueva etapa ───────────────────────────────────────────────
@@ -448,20 +460,31 @@ export default function PipelineConfig() {
                     </div>
 
                     {/* Botones guardar / cancelar */}
-                    <div className="flex items-center gap-2 pt-1">
+                    <div className="flex items-center justify-between pt-1">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleSaveEdit(stage.id)}
+                          disabled={saving || !editForm.nombre.trim()}
+                          className="flex items-center gap-2 px-5 py-2.5 bg-[#4449AA] text-white rounded-xl text-sm font-bold hover:bg-[#3338a0] disabled:opacity-60 transition-all shadow-sm"
+                        >
+                          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                          Guardar cambios
+                        </button>
+                        <button
+                          onClick={cancelEdit}
+                          className="px-4 py-2.5 text-sm font-bold text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                      {/* Zona de peligro */}
                       <button
-                        onClick={() => handleSaveEdit(stage.id)}
-                        disabled={saving || !editForm.nombre.trim()}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-[#4449AA] text-white rounded-xl text-sm font-bold hover:bg-[#3338a0] disabled:opacity-60 transition-all shadow-sm"
+                        onClick={() => handleDeleteStage(stage)}
+                        className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100"
+                        title="Eliminar esta etapa permanentemente"
                       >
-                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                        Guardar cambios
-                      </button>
-                      <button
-                        onClick={cancelEdit}
-                        className="px-4 py-2.5 text-sm font-bold text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all"
-                      >
-                        Cancelar
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Eliminar etapa
                       </button>
                     </div>
                   </div>
