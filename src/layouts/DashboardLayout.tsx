@@ -3,12 +3,15 @@ import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import MobileNav from '../components/MobileNav';
 import NotificationBell from '../components/NotificationBell';
+import UserProfileModal from '../components/UserProfileModal';
 import { cn } from '../lib/utils';
 import { useAuth } from '../auth/AuthProvider';
 import { useTranslation } from 'react-i18next';
+import { UserCircle } from 'lucide-react';
 
 export default function DashboardLayout() {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [profileOpen, setProfileOpen] = useState(false);
     const { profile } = useAuth();
     const { t, i18n } = useTranslation();
     const location = useLocation();
@@ -48,7 +51,7 @@ export default function DashboardLayout() {
                                     {new Date().toLocaleDateString(i18n.language === 'es' ? 'es-ES' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                                 </p>
                             </div>
-                            {/* Role badge + Notification Bell */}
+                            {/* Role badge + Notification Bell + Profile */}
                             <div className="flex items-center gap-2">
                                 {profile?.role && (
                                     <span className={`hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
@@ -64,7 +67,16 @@ export default function DashboardLayout() {
                                     </span>
                                 )}
                                 <NotificationBell />
+                                <button
+                                    onClick={() => setProfileOpen(v => !v)}
+                                    className="flex items-center justify-center w-9 h-9 rounded-xl hover:bg-gray-100 text-gray-500 hover:text-[#4449AA] transition-all"
+                                    title="Mi perfil"
+                                >
+                                    <UserCircle className="w-5 h-5" />
+                                </button>
+                                <UserProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
                             </div>
+
                         </div>
                     </header>
                 )}
