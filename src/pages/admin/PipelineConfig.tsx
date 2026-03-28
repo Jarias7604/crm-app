@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Plus, Trash2, GripVertical, ChevronDown, ChevronRight,
-  Save, Settings2, FileText, Loader2,
-  ShieldCheck, CheckSquare, Square, ArrowUpRight, UserCircle2
+  Save, Settings2, FileText, Loader2, Pencil, X,
+  ShieldCheck, ArrowUpRight, UserCircle2, CheckCircle2
 } from 'lucide-react';
 import { pipelineStagesService, stageDocTypesService, clientPortalService } from '../../services/clients';
 import type { ClientPipelineStage, ClientStageDocumentType } from '../../types/clients';
@@ -11,27 +11,33 @@ import toast from 'react-hot-toast';
 
 interface TeamMember { id: string; full_name: string | null; email: string; }
 
+interface StageForm {
+  nombre: string;
+  descripcion: string;
+  color: string;
+  es_final: boolean;
+  assigned_to: string | null;
+}
+
 const COLOR_OPTIONS = [
   '#4449AA', '#6366f1', '#f59e0b', '#10b981',
   '#ef4444', '#ec4899', '#0ea5e9', '#8b5cf6', '#64748b'
 ];
 
-// iOS-style professional toggle
+// iOS-style toggle
 function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
   return (
     <button
-      onClick={onChange}
+      onClick={e => { e.stopPropagation(); onChange(); }}
       className={`relative inline-flex items-center w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none flex-shrink-0 ${
         checked ? 'bg-emerald-500' : 'bg-gray-200'
       }`}
       role="switch"
       aria-checked={checked}
     >
-      <span
-        className={`inline-block w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
-          checked ? 'translate-x-6' : 'translate-x-0.5'
-        }`}
-      />
+      <span className={`inline-block w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-200 ${
+        checked ? 'translate-x-6' : 'translate-x-0.5'
+      }`} />
     </button>
   );
 }
@@ -40,20 +46,31 @@ export default function PipelineConfig() {
   const [stages, setStages] = useState<ClientPipelineStage[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [expandedStage, setExpandedStage] = useState<string | null>(null);
+
+  // Panel de edición — cuál etapa está en modo edición
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<StageForm>({ nombre: '', descripcion: '', color: '#4449AA', es_final: false, assigned_to: null });
+
+  // Panel de documentos
+  const [expandedDocs, setExpandedDocs] = useState<string | null>(null);
   const [docTypes, setDocTypes] = useState<Record<string, ClientStageDocumentType[]>>({});
-  const [editingStage, setEditingStage] = useState<Record<string, Partial<ClientPipelineStage>>>({});
   const [newDocInputs, setNewDocInputs] = useState<Record<string, { nombre: string; descripcion: string; requerido: boolean }>>({});
+
+  // Términos y empresa
   const [termsText, setTermsText] = useState('');
   const [termsExpanded, setTermsExpanded] = useState(false);
   const [savingTerms, setSavingTerms] = useState(false);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
 
-  // ── Drag & Drop ──────────────────────────────────────────────
+  // Drag & drop
   const dragId = useRef<string | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
 
+  // Ref para auto-focus del input de nombre al abrir edición
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Load ──────────────────────────────────────────────────────
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -84,7 +101,80 @@ export default function PipelineConfig() {
     });
   }, [load]);
 
-  // ── Drag & Drop handlers ─────────────────────────────────────
+  // Focus automático cuando se abre el panel de edición
+  useEffect(() => {
+    if (editingId && nameInputRef.current) {
+      setTimeout(() => nameInputRef.current?.focus(), 50);
+    }
+  }, [editingId]);
+
+  // ── Abrir panel de edición ────────────────────────────────────
+  const openEdit = (stage: ClientPipelineStage) => {
+    setExpandedDocs(null); // cerrar docs si estaban abiertos
+    setEditingId(stage.id);
+    setEditForm({
+      nombre: stage.nombre,
+      descripcion: stage.descripcion || '',
+      color: stage.color,
+      es_final: stage.es_final,
+      assigned_to: stage.assigned_to ?? null,
+    });
+  };
+
+  const cancelEdit = () => setEditingId(null);
+
+  // ── Guardar edición ───────────────────────────────────────────
+  const handleSaveEdit = async (stageId: string) => {
+    const trimmedName = editForm.nombre.trim();
+    if (!trimmedName) { toast.error('El nombre no puede estar vacío'); nameInputRef.current?.focus(); return; }
+    setSaving(true);
+    try {
+      await pipelineStagesService.update(stageId, {
+        nombre: trimmedName,
+        descripcion: editForm.descripcion.trim() || '',
+        color: editForm.color,
+        es_final: editForm.es_final,
+        assigned_to: editForm.assigned_to || null,
+      });
+      toast.success(`✅ "${trimmedName}" guardado`);
+      setEditingId(null);
+      await load();
+    } catch { toast.error('Error al guardar — intenta de nuevo'); }
+    finally { setSaving(false); }
+  };
+
+  // ── Toggle activo (auto-save sin panel de edición) ────────────
+  const handleToggleActive = async (stage: ClientPipelineStage) => {
+    try {
+      await pipelineStagesService.update(stage.id, { activo: !stage.activo });
+      toast.success(stage.activo ? 'Etapa desactivada' : 'Etapa activada');
+      await load();
+    } catch { toast.error('Error al cambiar estado'); }
+  };
+
+  // ── Nueva etapa ───────────────────────────────────────────────
+  const handleAddStage = async () => {
+    if (!companyId) { toast.error('Cargando empresa, intenta de nuevo'); return; }
+    const maxOrder = stages.length > 0 ? Math.max(...stages.map(s => s.orden)) : 0;
+    try {
+      const newStage = await pipelineStagesService.create({
+        company_id: companyId,
+        nombre: 'Nueva Etapa',
+        descripcion: '',
+        icono: 'star',
+        color: '#4449AA',
+        orden: maxOrder + 1,
+        es_final: false,
+        assigned_to: null,
+      });
+      await load();
+      // Abrir automáticamente el panel de edición para la nueva etapa
+      openEdit({ ...newStage, nombre: 'Nueva Etapa', descripcion: '', color: '#4449AA', es_final: false, assigned_to: null } as ClientPipelineStage);
+      toast.success('Etapa creada — ponle un nombre');
+    } catch { toast.error('Error al crear etapa'); }
+  };
+
+  // ── Drag & Drop ───────────────────────────────────────────────
   const onDragStart = (id: string) => { dragId.current = id; };
   const onDragOver = (e: React.DragEvent, id: string) => {
     e.preventDefault();
@@ -95,18 +185,14 @@ export default function PipelineConfig() {
     setDragOver(null);
     dragId.current = null;
     if (!srcId || srcId === targetId) return;
-
     const sorted = [...stages].sort((a, b) => a.orden - b.orden);
     const srcIdx = sorted.findIndex(s => s.id === srcId);
     const tgtIdx = sorted.findIndex(s => s.id === targetId);
     if (srcIdx < 0 || tgtIdx < 0) return;
-
     const reordered = [...sorted];
     const [moved] = reordered.splice(srcIdx, 1);
     reordered.splice(tgtIdx, 0, moved);
     const updates = reordered.map((s, i) => ({ id: s.id, orden: i + 1 }));
-
-    // Optimistic update
     setStages(reordered.map((s, i) => ({ ...s, orden: i + 1 })));
     try {
       await pipelineStagesService.updateOrder(updates);
@@ -118,46 +204,7 @@ export default function PipelineConfig() {
   };
   const onDragEnd = () => { setDragOver(null); dragId.current = null; };
 
-  // ── Stage CRUD ───────────────────────────────────────────────
-  const handleSaveStage = async (stage: ClientPipelineStage) => {
-    const edits = editingStage[stage.id] || {};
-    if (!Object.keys(edits).length) return;
-    setSaving(true);
-    try {
-      await pipelineStagesService.update(stage.id, edits);
-      toast.success(`✅ "${edits.nombre ?? stage.nombre}" actualizado`);
-      setEditingStage(prev => { const n = { ...prev }; delete n[stage.id]; return n; });
-      await load();
-    } catch { toast.error('Error al guardar'); }
-    finally { setSaving(false); }
-  };
-
-  const handleAddStage = async () => {
-    if (!companyId) { toast.error('Cargando empresa, intenta de nuevo'); return; }
-    const maxOrder = stages.length > 0 ? Math.max(...stages.map(s => s.orden)) : 0;
-    try {
-      await pipelineStagesService.create({
-        company_id: companyId,
-        nombre: 'Nueva Etapa',
-        descripcion: '',
-        icono: 'star',
-        color: '#4449AA',
-        orden: maxOrder + 1,
-        es_final: false,
-        assigned_to: null,
-      });
-      toast.success('Etapa creada');
-      await load();
-    } catch { toast.error('Error al crear etapa'); }
-  };
-
-  const handleToggleActive = async (stage: ClientPipelineStage) => {
-    await pipelineStagesService.update(stage.id, { activo: !stage.activo });
-    toast.success(stage.activo ? 'Etapa desactivada' : 'Etapa activada');
-    await load();
-  };
-
-  // ── Doc types CRUD ───────────────────────────────────────────
+  // ── Doc types ─────────────────────────────────────────────────
   const handleAddDocType = async (stageId: string) => {
     const input = newDocInputs[stageId];
     if (!input?.nombre?.trim()) { toast.error('Nombre requerido'); return; }
@@ -190,7 +237,7 @@ export default function PipelineConfig() {
   return (
     <div className="space-y-6 max-w-3xl">
 
-      {/* ── Header ─────────────────────────────────────────── */}
+      {/* ── Header ──────────────────────────────────────────── */}
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-3xl font-black text-gray-900 tracking-tight">Pipeline</h1>
@@ -206,14 +253,14 @@ export default function PipelineConfig() {
         </button>
       </div>
 
-      {/* ── Legend ────────────────────────────────────────── */}
+      {/* ── Legend ──────────────────────────────────────────── */}
       <div className="flex items-center gap-6 px-4 py-2.5 bg-gray-50 rounded-xl border border-gray-100 text-xs text-gray-500">
-        <span className="flex items-center gap-1.5"><GripVertical className="w-3.5 h-3.5" /> Arrasta para reordenar</span>
-        <span className="flex items-center gap-1.5"><Toggle checked={true} onChange={() => {}} /> Activa / Desactiva etapa</span>
-        <span className="flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> Ver tipos de documentos</span>
+        <span className="flex items-center gap-1.5"><GripVertical className="w-3.5 h-3.5" /> Arrastra para reordenar</span>
+        <span className="flex items-center gap-1.5"><Pencil className="w-3.5 h-3.5" /> Click ✏️ para editar nombre, color y responsable</span>
+        <span className="flex items-center gap-1.5"><FileText className="w-3.5 h-3.5" /> Ver documentos</span>
       </div>
 
-      {/* ── Stages list ───────────────────────────────────── */}
+      {/* ── Stages list ─────────────────────────────────────── */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-6 h-6 animate-spin text-[#4449AA]" />
@@ -221,132 +268,207 @@ export default function PipelineConfig() {
       ) : (
         <div className="space-y-2">
           {sorted.map((stage, idx) => {
-            const edits = editingStage[stage.id] || {};
-            const hasEdits = Object.keys(edits).length > 0;
-            const isExpanded = expandedStage === stage.id;
+            const isEditing = editingId === stage.id;
+            const isDocExpanded = expandedDocs === stage.id;
             const stageDocs = docTypes[stage.id] || [];
             const newDoc = newDocInputs[stage.id] || { nombre: '', descripcion: '', requerido: true };
-            const displayName = edits.nombre ?? stage.nombre;
-            const displayColor = edits.color ?? stage.color;
             const isDragTarget = dragOver === stage.id;
+            const assignedProfile = (stage as any).assigned_profile as TeamMember | null;
 
             return (
               <div
                 key={stage.id}
-                draggable
-                onDragStart={() => onDragStart(stage.id)}
+                draggable={!isEditing}
+                onDragStart={() => !isEditing && onDragStart(stage.id)}
                 onDragOver={e => onDragOver(e, stage.id)}
                 onDrop={() => onDrop(stage.id)}
                 onDragEnd={onDragEnd}
                 className={`bg-white rounded-2xl border transition-all ${
                   isDragTarget
                     ? 'border-[#4449AA] border-2 shadow-md shadow-[#4449AA]/10 scale-[1.01]'
+                    : isEditing
+                    ? 'border-[#4449AA] border-2 shadow-lg shadow-[#4449AA]/10'
                     : stage.activo
                     ? 'border-gray-100 hover:border-gray-200'
                     : 'border-dashed border-gray-200 opacity-50'
                 }`}
               >
-                {/* ── Stage header row ───────────────────── */}
-                <div className="flex items-center gap-3 px-6 py-4">
+                {/* ── Fila principal (SOLO LECTURA) ──────────── */}
+                <div className="flex items-center gap-3 px-5 py-3.5">
 
                   {/* Drag handle */}
-                  <div className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 transition-colors flex-shrink-0">
+                  <div className={`text-gray-300 hover:text-gray-500 transition-colors flex-shrink-0 ${isEditing ? 'opacity-30 cursor-not-allowed' : 'cursor-grab active:cursor-grabbing'}`}>
                     <GripVertical className="w-4 h-4" />
                   </div>
 
                   {/* Order badge */}
                   <div
                     className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-black flex-shrink-0 shadow-sm"
-                    style={{ background: displayColor }}
+                    style={{ background: isEditing ? editForm.color : stage.color }}
                   >
                     {idx + 1}
                   </div>
 
-                  {/* Name inline editor */}
-                  <input
-                    value={displayName}
-                    onChange={e => setEditingStage(prev => ({ ...prev, [stage.id]: { ...prev[stage.id], nombre: e.target.value } }))}
-                    className="flex-1 min-w-0 text-sm font-bold text-gray-900 bg-transparent border-b border-transparent hover:border-gray-200 focus:border-[#4449AA] focus:outline-none py-0.5 transition-all"
-                    placeholder="Nombre de la etapa"
-                    onKeyDown={e => e.key === 'Enter' && handleSaveStage(stage)}
-                  />
-
-                  {/* Color swatches */}
-                  <div className="flex gap-2.5 flex-shrink-0">
-                    {COLOR_OPTIONS.map(c => (
-                      <button
-                        key={c}
-                        onClick={() => setEditingStage(prev => ({ ...prev, [stage.id]: { ...prev[stage.id], color: c } }))}
-                        className={`w-5 h-5 rounded-full transition-all ${displayColor === c ? 'ring-2 ring-offset-1 ring-gray-400 scale-125' : 'hover:scale-110'}`}
-                        style={{ background: c }}
-                        title={c}
-                      />
-                    ))}
+                  {/* Stage name — texto, no input */}
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-bold truncate ${isEditing ? 'text-[#4449AA]' : 'text-gray-900'}`}>
+                      {isEditing ? editForm.nombre || 'Sin nombre' : stage.nombre}
+                    </p>
+                    {/* Responsable badge */}
+                    {assignedProfile && !isEditing && (
+                      <p className="text-[11px] text-gray-400 flex items-center gap-1 mt-0.5">
+                        <UserCircle2 className="w-3 h-3" />
+                        {assignedProfile.full_name || assignedProfile.email}
+                      </p>
+                    )}
                   </div>
 
-                  {/* Assignee dropdown */}
-                  <div className="relative flex-shrink-0">
-                    <select
-                      value={edits.assigned_to ?? stage.assigned_to ?? ''}
-                      onChange={async e => {
-                        const val = e.target.value || null;
-                        try {
-                          await pipelineStagesService.update(stage.id, { assigned_to: val });
-                          toast.success(val ? '👤 Responsable asignado' : 'Responsable eliminado');
-                          await load();
-                        } catch { toast.error('Error al asignar'); }
-                      }}
-                      className="text-xs border border-gray-200 rounded-lg pl-6 pr-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-[#4449AA]/20 focus:border-[#4449AA] text-gray-700 appearance-none cursor-pointer hover:border-gray-300 transition-colors"
-                      title="Responsable de esta etapa"
-                    >
-                      <option value="">Sin responsable</option>
-                      {teamMembers.map(m => (
-                        <option key={m.id} value={m.id}>{m.full_name || m.email}</option>
-                      ))}
-                    </select>
-                    <UserCircle2 className="absolute left-1.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-                  </div>
-
-                  {/* Final stage */}
-                  <label className="flex items-center gap-1 cursor-pointer flex-shrink-0 select-none group">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase group-hover:text-gray-600 transition-colors">Final</span>
-                    {(edits.es_final ?? stage.es_final)
-                      ? <CheckSquare className="w-4 h-4 text-[#4449AA]" onClick={() => setEditingStage(prev => ({ ...prev, [stage.id]: { ...prev[stage.id], es_final: false } }))} />
-                      : <Square className="w-4 h-4 text-gray-300" onClick={() => setEditingStage(prev => ({ ...prev, [stage.id]: { ...prev[stage.id], es_final: true } }))} />
-                    }
-                  </label>
-
-                  {/* Save button (only if edits) */}
-                  {hasEdits && (
-                    <button
-                      onClick={() => handleSaveStage(stage)}
-                      disabled={saving}
-                      className="flex items-center gap-1 px-2.5 py-1.5 bg-[#4449AA] text-white rounded-lg text-xs font-bold hover:bg-[#3338a0] disabled:opacity-60 transition-all flex-shrink-0"
-                    >
-                      {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                      Guardar
-                    </button>
+                  {/* Final badge */}
+                  {stage.es_final && (
+                    <span className="flex items-center gap-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 flex-shrink-0">
+                      <CheckCircle2 className="w-3 h-3" /> Final
+                    </span>
                   )}
 
-                  {/* Active toggle */}
-                  <Toggle
-                    checked={stage.activo}
-                    onChange={() => handleToggleActive(stage)}
-                  />
-
-                  {/* Expand doc types */}
+                  {/* Edit button */}
                   <button
-                    onClick={() => setExpandedStage(isExpanded ? null : stage.id)}
+                    onClick={() => isEditing ? cancelEdit() : openEdit(stage)}
+                    title={isEditing ? 'Cancelar edición' : 'Editar etapa'}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex-shrink-0 ${
+                      isEditing
+                        ? 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                        : 'bg-gray-50 text-gray-400 hover:bg-[#4449AA]/10 hover:text-[#4449AA] border border-gray-100'
+                    }`}
+                  >
+                    {isEditing ? <X className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
+                    {isEditing ? 'Cancelar' : 'Editar'}
+                  </button>
+
+                  {/* Active toggle */}
+                  <Toggle checked={stage.activo} onChange={() => handleToggleActive(stage)} />
+
+                  {/* Docs button */}
+                  <button
+                    onClick={() => setExpandedDocs(isDocExpanded ? null : stage.id)}
                     className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-gray-50 hover:bg-gray-100 text-gray-500 text-xs font-bold transition-all flex-shrink-0 border border-gray-100"
                   >
                     <FileText className="w-3 h-3" />
                     {stageDocs.length}
-                    {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                    {isDocExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                   </button>
                 </div>
 
-                {/* ── Doc types panel ────────────────────── */}
-                {isExpanded && (
+                {/* ── Panel de EDICIÓN (expandible) ─────────── */}
+                {isEditing && (
+                  <div className="border-t border-[#4449AA]/10 bg-gradient-to-b from-[#4449AA]/[0.02] to-transparent px-5 py-5 space-y-4">
+
+                    <p className="text-[11px] font-black text-[#4449AA] uppercase tracking-widest">Editando etapa</p>
+
+                    {/* Nombre */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Nombre de la etapa *</label>
+                      <input
+                        ref={nameInputRef}
+                        value={editForm.nombre}
+                        onChange={e => setEditForm(f => ({ ...f, nombre: e.target.value }))}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') handleSaveEdit(stage.id);
+                          if (e.key === 'Escape') cancelEdit();
+                        }}
+                        placeholder="Ej: Documentos, Capacitación..."
+                        className="w-full text-sm font-bold border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-[#4449AA] bg-white transition-colors"
+                        maxLength={60}
+                      />
+                      <p className="text-[10px] text-gray-400">{editForm.nombre.length}/60 · Enter para guardar · Esc para cancelar</p>
+                    </div>
+
+                    {/* Descripción */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Descripción (opcional)</label>
+                      <input
+                        value={editForm.descripcion}
+                        onChange={e => setEditForm(f => ({ ...f, descripcion: e.target.value }))}
+                        placeholder="Qué hace el cliente en esta etapa..."
+                        className="w-full text-sm border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#4449AA] bg-white transition-colors"
+                        maxLength={120}
+                      />
+                    </div>
+
+                    {/* Color + Final + Responsable en fila */}
+                    <div className="grid grid-cols-3 gap-4">
+
+                      {/* Color */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Color</label>
+                        <div className="flex flex-wrap gap-2.5">
+                          {COLOR_OPTIONS.map(c => (
+                            <button
+                              key={c}
+                              type="button"
+                              onClick={() => setEditForm(f => ({ ...f, color: c }))}
+                              className={`w-7 h-7 rounded-full transition-all ${editForm.color === c ? 'ring-3 ring-offset-2 ring-gray-500 scale-110' : 'hover:scale-110 hover:ring-2 hover:ring-offset-1 hover:ring-gray-300'}`}
+                              style={{ background: c }}
+                              title={c}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Responsable */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Responsable</label>
+                        <select
+                          value={editForm.assigned_to ?? ''}
+                          onChange={e => setEditForm(f => ({ ...f, assigned_to: e.target.value || null }))}
+                          className="w-full text-xs border border-gray-200 rounded-xl px-3 py-2.5 bg-white focus:outline-none focus:border-[#4449AA] text-gray-700 cursor-pointer"
+                        >
+                          <option value="">Sin responsable</option>
+                          {teamMembers.map(m => (
+                            <option key={m.id} value={m.id}>{m.full_name || m.email}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Etapa final */}
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Etapa final</label>
+                        <button
+                          type="button"
+                          onClick={() => setEditForm(f => ({ ...f, es_final: !f.es_final }))}
+                          className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-xs font-bold transition-all w-full ${
+                            editForm.es_final
+                              ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
+                              : 'border-gray-200 bg-white text-gray-400 hover:border-gray-300'
+                          }`}
+                        >
+                          <CheckCircle2 className={`w-4 h-4 ${editForm.es_final ? 'text-emerald-500' : 'text-gray-300'}`} />
+                          {editForm.es_final ? 'Sí, es final' : 'No es final'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Botones guardar / cancelar */}
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        onClick={() => handleSaveEdit(stage.id)}
+                        disabled={saving || !editForm.nombre.trim()}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-[#4449AA] text-white rounded-xl text-sm font-bold hover:bg-[#3338a0] disabled:opacity-60 transition-all shadow-sm"
+                      >
+                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                        Guardar cambios
+                      </button>
+                      <button
+                        onClick={cancelEdit}
+                        className="px-4 py-2.5 text-sm font-bold text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Panel de documentos ────────────────────── */}
+                {isDocExpanded && !isEditing && (
                   <div className="border-t border-gray-50 px-4 pt-3 pb-4 space-y-2">
                     <div className="flex items-center gap-2 mb-3">
                       <Settings2 className="w-3 h-3 text-gray-400" />
@@ -361,7 +483,6 @@ export default function PipelineConfig() {
                       </p>
                     )}
 
-                    {/* Doc list */}
                     <div className="space-y-1.5">
                       {stageDocs.map(dt => (
                         <div key={dt.id} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-gray-50 group">
@@ -385,7 +506,7 @@ export default function PipelineConfig() {
                       ))}
                     </div>
 
-                    {/* Add doc type */}
+                    {/* Agregar doc */}
                     <div className="flex items-center gap-2 pt-2 border-t border-gray-100 mt-2">
                       <input
                         value={newDoc.nombre}
@@ -424,7 +545,7 @@ export default function PipelineConfig() {
         </div>
       )}
 
-      {/* ── Terms & Conditions ────────────────────────────── */}
+      {/* ── Términos y Condiciones ───────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
         <button
           onClick={() => setTermsExpanded(v => !v)}
@@ -477,8 +598,8 @@ export default function PipelineConfig() {
       <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-2xl p-4">
         <span className="text-base">💡</span>
         <p className="text-xs text-blue-700 leading-relaxed">
-          <strong>Etapa Final:</strong> Marca la última etapa como "Final" — cuando el cliente sube todos sus documentos, el sistema lo promueve automáticamente a <strong>Cliente Activo</strong>.
-          Arrastra las etapas para cambiar el orden. Los cambios de nombre y color requieren presionar <strong>Guardar</strong>.
+          <strong>Cómo editar:</strong> Haz click en <strong>✏️ Editar</strong> en cualquier etapa para cambiar el nombre, descripción, color, responsable o si es la etapa final.
+          El panel de edición se abre debajo — el cursor va directo al nombre. Presiona <strong>Enter</strong> para guardar o <strong>Esc</strong> para cancelar.
         </p>
       </div>
     </div>
