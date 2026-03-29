@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../services/supabase';
+import { queryClient } from '../lib/queryClient';
 import type { Profile, Role } from '../types';
 
 interface AuthContextType {
@@ -36,6 +37,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
     const [simulatedCompanyId, setSimulatedCompanyId] = useState<string | null>(localStorage.getItem('simulated_company_id'));
     const [simulatedRole, setSimulatedRole] = useState<Role | null>(localStorage.getItem('simulated_role') as any);
+
+    // Track previous userId to detect user switches and clear stale cache
+    const prevUserIdRef = useRef<string | null>(null);
+
 
     const handleSetSimulatedCompanyId = (id: string | null) => {
         try {
@@ -76,10 +81,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
         });
 
-        // Listen for auth changes
+        // Listen for auth changes — clear React Query cache on user switch or logout
+        // This prevents stale tenant data from a previous session from being displayed
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            const previousUserId = prevUserIdRef.current;
+            const currentUserId = session?.user?.id ?? null;
+
+            // If the user changed (different login) or logged out → wipe all cached queries
+            // This is the key fix: prevents Patricia seeing Arias Defense data on login
+            if (previousUserId !== currentUserId) {
+                queryClient.clear();
+            }
+
+            prevUserIdRef.current = currentUserId;
             setSession(session);
             setUser(session?.user ?? null);
+
             if (session?.user) {
                 fetchProfile(session.user.id, session.user.email);
             } else {
@@ -214,6 +231,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const signOut = async () => {
+        // Clear all cached queries before signing out
+        // This ensures the next user who logs in starts with a clean slate
+        queryClient.clear();
+        prevUserIdRef.current = null;
         await supabase.auth.signOut();
     };
 
