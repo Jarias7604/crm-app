@@ -424,10 +424,21 @@ export const leadsService = {
         return data;
     },
 
-    // Get all follow-ups with lead info for Calendar view (sorted by date/time)
-    async getCalendarFollowUps() {
-        const sixtyDaysAgo = new Date();
-        sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+    // Get follow-ups for Calendar view — windowed date range query
+    // Uses idx_follow_ups_company_id_date index for fast lookup
+    // Only loads events for the visible months (not all 1,100+ records)
+    async getCalendarFollowUps(startDate?: string, endDate?: string) {
+        // Default: 1 month back + 2 months forward from today
+        const defaultStart = new Date();
+        defaultStart.setMonth(defaultStart.getMonth() - 1);
+        defaultStart.setDate(1);
+
+        const defaultEnd = new Date();
+        defaultEnd.setMonth(defaultEnd.getMonth() + 3);
+        defaultEnd.setDate(0); // Last day of month+2
+
+        const from = startDate ?? defaultStart.toISOString();
+        const to   = endDate   ?? defaultEnd.toISOString();
 
         const { data, error } = await supabase
             .from('follow_ups')
@@ -437,9 +448,10 @@ export const leadsService = {
                 lead:leads(id, name, company_name, phone, email, status),
                 assigned_profile:assigned_to(id, full_name, avatar_url)
             `)
-            .or(`completed.eq.false,date.gte.${sixtyDaysAgo.toISOString()}`)
+            .gte('date', from)
+            .lte('date', to)
             .order('date', { ascending: false })
-            .limit(1500);
+            .limit(600);
 
         if (error) throw error;
         return (data || []) as unknown as Array<{

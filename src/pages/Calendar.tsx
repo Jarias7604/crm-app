@@ -113,16 +113,29 @@ export default function Calendar() {
     const [dayDetailDate, setDayDetailDate] = useState<Date | null>(null);
     const queryClient = useQueryClient();
 
-    // React Query — cache 5 minutos, sin recargar al volver a la página
+    // Ventana dinámica: 1 mes atrás + 2 meses adelante de la vista actual
+    // Así solo cargamos los eventos del periodo visible, no los 1,100+ registros
+    const windowStart = useMemo(() =>
+        startOfMonth(subMonths(currentDate, 1)).toISOString(),
+        [currentDate]
+    );
+    const windowEnd = useMemo(() =>
+        endOfMonth(addMonths(currentDate, 2)).toISOString(),
+        [currentDate]
+    );
+
+    // React Query — cache 5 min por ventana de mes
+    // queryKey incluye fechas: navegar de mes cambia la clave → carga solo lo necesario
     const { data: calendarEventsData, isLoading: loading } = useQuery({
-        queryKey: ['calendar-follow-ups'],
-        queryFn: () => leadsService.getCalendarFollowUps(),
-        staleTime: 5 * 60 * 1000,   // 5 min en caché
-        gcTime: 15 * 60 * 1000,     // 15 min en memoria
+        queryKey: ['calendar-follow-ups', windowStart, windowEnd],
+        queryFn: () => leadsService.getCalendarFollowUps(windowStart, windowEnd),
+        staleTime: 5 * 60 * 1000,
+        gcTime: 15 * 60 * 1000,
+        placeholderData: (previousData) => previousData, // muestra mes anterior mientras carga el nuevo
     });
     const calendarEvents = calendarEventsData ?? [];
 
-    // Realtime: invalidar cache cuando cambia un follow-up
+    // Realtime: invalidar cache de todas las ventanas cuando cambia un follow-up
     useEffect(() => {
         const channel = supabase.channel('calendar-live')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'follow_ups' },
@@ -130,6 +143,7 @@ export default function Calendar() {
             ).subscribe();
         return () => { supabase.removeChannel(channel); };
     }, [queryClient]);
+
 
     // Role-based filtering: collaborators see only their own
     const filteredEvents = useMemo(() => {
