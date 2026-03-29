@@ -124,7 +124,8 @@ export function ItemTypesManager({ onChanged }: ItemTypesManagerProps) {
             </div>
 
             <div className="p-4 space-y-4">
-                {/* System Types (read-only, shown for reference) */}
+                {/* System Types — only visible when super_admin sees them */}
+                {systemTypes.length > 0 && (
                 <div>
                     <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2 flex items-center gap-1">
                         <Lock className="w-3 h-3" /> Tipos del Sistema (No editables)
@@ -145,6 +146,7 @@ export function ItemTypesManager({ onChanged }: ItemTypesManagerProps) {
                         ))}
                     </div>
                 </div>
+                )}
 
                 {/* Company Custom Types */}
                 <div>
