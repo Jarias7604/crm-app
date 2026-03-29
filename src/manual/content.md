@@ -110,7 +110,43 @@ Panel de control para gestionar usuarios, roles, permisos y configuración gener
 
 ---
 
-## 7. Preguntas Frecuentes (FAQ)
+## 7. Calendario y Gestión de Citas
+
+### Descripción
+El módulo de Calendario te permite visualizar, agendar y organizar todas las reuniones, recordatorios y compromisos vinculados a tus clientes o prospectos. Todo evento está enlazado directamente al perfil del usuario.
+
+### Funcionalidades clave
+- **Vista Múltiple:** Interfaz visual por mes, semana o día.
+- **Recordatorios Automáticos:** Alertas en el sistema para llamadas en frío o seguimientos.
+- **Asociación Directa:** Cada evento se puede enlazar a un Lead específico para mantener el historial.
+
+---
+
+## 8. Notificaciones de Equipo (Telegram)
+
+### Descripción
+Arias CRM cuenta con un sistema robusto de notificaciones instantáneas (Fase 8d) para asegurar que los agentes de ventas nunca pierdan un prospecto asignado.
+
+### Funcionalidades clave
+- **Vínculo por `telegram_chat_id`:** Cada usuario del equipo debe registrar su ID de chat en su perfil (`profiles`).
+- **Alertas de Asignación:** Al asignar un Lead a un agente, el sistema envía un mensaje de forma instantánea al bot de Telegram.
+- **Sincronización:** Los administradores pueden visualizar si sus usuarios tienen activo el bot en la sección de "Equipo / Miembros".
+
+---
+
+## 9. Webhooks e Integraciones (Meta Ads)
+
+### Descripción
+El CRM funciona como un motor de recepción automática (Ingestion Engine). Permite conectar plataformas externas como Facebook e Instagram para que los clientes potenciales entren al embudo de ventas sin intervención humana.
+
+### Funcionalidades clave
+- **Conexión Meta Leads:** Generación de un endpoint seguro (Webhook) para recibir formularios de anuncios de Facebook.
+- **Deduplicación Automática:** Si un Lead entra por webhook, el CRM verifica si el correo o teléfono ya existe para evitar registros dobles.
+- **Enrutamiento:** Asignación inteligente a los agentes disponibles según reglas de negocio.
+
+---
+
+## 10. Preguntas Frecuentes (FAQ)
 
 ### ¿Cómo agrego un nuevo lead manualmente?
 Ve a **Leads → Nuevo Lead**, completa el formulario con nombre, teléfono, fuente y etapa inicial, y haz clic en **Guardar**.

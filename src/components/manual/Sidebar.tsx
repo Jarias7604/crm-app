@@ -7,7 +7,9 @@ import {
   FileText, 
   Megaphone, 
   ShieldCheck, 
-  Code, 
+  Calendar,
+  Bell,
+  Webhook,
   HelpCircle 
 } from 'lucide-react';
 
@@ -19,8 +21,10 @@ const sections = [
   { id: '4-motor-de-cotizaciones', label: 'Cotizador & Finanzas', icon: FileText },
   { id: '5-marketing-omnicanal', label: 'Marketing & Campañas', icon: Megaphone },
   { id: '6-administracion-y-seguridad', label: 'Admin & Seguridad', icon: ShieldCheck },
-  { id: 'api-y-desarrollo', label: 'API & Desarrollo', icon: Code }, // Not in current md, kept for future
-  { id: '7-preguntas-frecuentes-faq', label: 'FAQ & Glosario', icon: HelpCircle },
+  { id: '7-calendario-y-gestion-de-citas', label: 'Calendario y Citas', icon: Calendar },
+  { id: '8-notificaciones-de-equipo-telegram', label: 'Notificaciones (Telegram)', icon: Bell },
+  { id: '9-webhooks-e-integraciones-meta-ads', label: 'Integraciones (Webhooks)', icon: Webhook },
+  { id: '10-preguntas-frecuentes-faq', label: 'FAQ & Glosario', icon: HelpCircle },
 ];
 
 export default function Sidebar() {
