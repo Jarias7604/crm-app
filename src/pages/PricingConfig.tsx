@@ -181,6 +181,96 @@ export default function PricingConfig() {
         );
     }
 
+    // Empty state for new companies
+    if (!loading && items.length === 0 && canEdit) {
+        return (
+            <div className="space-y-6">
+                <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                    <div>
+                        <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Gestión Precios</h1>
+                        <p className="text-gray-500 mt-1 font-medium">Configuración maestra de precios, planes y servicios base.</p>
+                    </div>
+                    <Button
+                        onClick={() => { resetForm(); setShowNewForm(true); }}
+                        className="bg-[#007BFF] hover:bg-blue-600 text-white"
+                    >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Crear primer ítem
+                    </Button>
+                </div>
+
+                {/* Premium empty state */}
+                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="px-8 py-16 text-center max-w-lg mx-auto">
+                        <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                            <span className="text-4xl">💼</span>
+                        </div>
+                        <h2 className="text-2xl font-black text-gray-900 mb-3">Tu catálogo de precios está vacío</h2>
+                        <p className="text-gray-500 leading-relaxed mb-8">
+                            Cada empresa define su propio catálogo. Crea tus planes, módulos,
+                            servicios o cualquier tipo de ítem que vendas — con los nombres y precios de tu negocio.
+                        </p>
+
+                        {/* Steps */}
+                        <div className="grid grid-cols-3 gap-4 mb-8 text-left">
+                            {[
+                                { num: '1', icon: '🏷️', title: 'Define tus tipos', desc: 'Crea categorías propias para tu industria' },
+                                { num: '2', icon: '📦', title: 'Agrega tus ítems', desc: 'Precios anuales, mensuales o por uso' },
+                                { num: '3', icon: '📊', title: 'Usa en cotizaciones', desc: 'Genera presupuestos profesionales' },
+                            ].map(step => (
+                                <div key={step.num} className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                                    <div className="text-2xl mb-2">{step.icon}</div>
+                                    <p className="text-xs font-black text-gray-900 mb-1">{step.title}</p>
+                                    <p className="text-xs text-gray-500">{step.desc}</p>
+                                </div>
+                            ))}
+                        </div>
+
+                        <Button
+                            onClick={() => { resetForm(); setShowNewForm(true); }}
+                            className="bg-[#007BFF] hover:bg-blue-600 text-white px-8 py-3 text-base font-bold rounded-2xl shadow-lg shadow-blue-200"
+                        >
+                            <Plus className="w-5 h-5 mr-2" />
+                            Crear mi primer ítem
+                        </Button>
+                        <p className="text-xs text-gray-400 mt-4">
+                            Solo tú y tu equipo pueden ver y gestionar tu catálogo
+                        </p>
+                    </div>
+                </div>
+
+                {/* New item form (reuse existing modal logic) */}
+                {showNewForm && (
+                    <div className="bg-white border-2 border-blue-200 rounded-xl p-6">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-lg font-bold text-[#4449AA]">➕ Nuevo Ítem</h3>
+                            <button onClick={resetForm} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">Tipo de Ítem</label>
+                                <select value={formData.tipo} onChange={(e) => setFormData({ ...formData, tipo: e.target.value as any })} className="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-blue-500">
+                                    {types.map(t => (<option key={t.slug} value={t.slug}>{t.name}</option>))}
+                                </select>
+                            </div>
+                            <div><label className="block text-sm font-bold text-gray-700 mb-2">Nombre</label><Input value={formData.nombre} onChange={(e) => setFormData({ ...formData, nombre: e.target.value })} placeholder="Ej: Starter, E-commerce, etc." /></div>
+                            <div><label className="block text-sm font-bold text-gray-700 mb-2">Código</label><Input value={formData.codigo} onChange={(e) => setFormData({ ...formData, codigo: e.target.value })} placeholder="COD-001" /></div>
+                            <div><label className="block text-sm font-bold text-gray-700 mb-2">Precio Anual ($)</label><Input type="number" value={formData.precio_anual} onChange={(e) => setFormData({ ...formData, precio_anual: Number(e.target.value) })} /></div>
+                            <div><label className="block text-sm font-bold text-gray-700 mb-2">Precio Mensual ($)</label><Input type="number" value={formData.precio_mensual} onChange={(e) => setFormData({ ...formData, precio_mensual: Number(e.target.value) })} /></div>
+                            <div><label className="block text-sm font-bold text-gray-700 mb-2">Costo Único ($)</label><Input type="number" value={formData.costo_unico} onChange={(e) => setFormData({ ...formData, costo_unico: Number(e.target.value) })} /></div>
+                            <div className="md:col-span-3"><label className="block text-sm font-bold text-gray-700 mb-2">Descripción</label><textarea value={formData.descripcion} onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })} className="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-blue-500" rows={2} /></div>
+                            <div className="flex items-center gap-2"><input type="checkbox" checked={formData.activo} onChange={(e) => setFormData({ ...formData, activo: e.target.checked })} className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" /><span className="text-sm font-semibold text-gray-700">Ítem Activo</span></div>
+                        </div>
+                        <div className="flex gap-2 mt-8">
+                            <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700 text-white min-w-[120px]"><Save className="w-4 h-4 mr-2" />Guardar</Button>
+                            <Button onClick={resetForm} variant="outline" className="min-w-[120px]">Cancelar</Button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
