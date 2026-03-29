@@ -1,7 +1,7 @@
 export interface PricingItem {
     id: string;
     company_id: string | null;
-    tipo: 'plan' | 'modulo' | 'servicio' | 'implementacion';
+    tipo: string;  // Dynamic: comes from catalog_item_types (plan, modulo, servicio, implementacion, or custom)
     nombre: string;
     descripcion?: string;
     codigo?: string;

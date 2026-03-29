@@ -23,7 +23,7 @@ export interface CotizadorPaquete {
 export interface CotizadorItem {
     id: string;
     company_id: string | null;
-    tipo: 'modulo' | 'servicio' | 'otro';
+    tipo: string;  // Dynamic from catalog_item_types: 'modulo', 'servicio', or any custom slug
     nombre: string;
     codigo?: string;
     pago_unico: number;

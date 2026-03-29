@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Edit, Trash2, Save, X, DollarSign, Package, Settings, ArrowUpDown } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, ArrowUpDown } from 'lucide-react';
 import { pricingService } from '../services/pricing';
 import type { PricingItem } from '../types/pricing';
 import { useAuth } from '../auth/AuthProvider';
 import { usePermissions } from '../hooks/usePermissions';
+import { useItemTypes } from '../hooks/useItemTypes';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import toast from 'react-hot-toast';
@@ -12,6 +13,7 @@ import { useAriasTables } from '../hooks/useAriasTables';
 export default function PricingConfig() {
     const { profile } = useAuth();
     const { isAdmin } = usePermissions();
+    const { types, getName, getColor } = useItemTypes();
     const [items, setItems] = useState<PricingItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -45,7 +47,7 @@ export default function PricingConfig() {
     };
 
     const [formData, setFormData] = useState<Partial<PricingItem>>({
-        tipo: 'modulo',
+        tipo: types[0]?.slug ?? 'modulo',
         nombre: '',
         codigo: '',
         precio_anual: 0,
@@ -135,7 +137,7 @@ export default function PricingConfig() {
         setEditingId(null);
         setShowNewForm(false);
         setFormData({
-            tipo: 'modulo',
+            tipo: types[0]?.slug ?? 'modulo',
             nombre: '',
             codigo: '',
             precio_anual: 0,
@@ -146,25 +148,17 @@ export default function PricingConfig() {
         });
     };
 
-    const getTipoIcon = (tipo: string) => {
-        switch (tipo) {
-            case 'modulo': return <Package className="w-4 h-4 text-purple-600" />;
-            case 'servicio': return <Settings className="w-4 h-4 text-green-600" />;
-            case 'plan': return <DollarSign className="w-4 h-4 text-blue-600" />;
-            case 'implementacion': return <Settings className="w-4 h-4 text-orange-600" />;
-            default: return <Settings className="w-4 h-4 text-gray-600" />;
-        }
+    /** Dynamic badge style from catalog color */
+    const getBadgeStyle = (tipo: string) => {
+        const color = getColor(tipo);
+        return {
+            backgroundColor: `${color}18`,
+            color: color,
+            border: `1px solid ${color}35`,
+        };
     };
 
-    const getTipoBadge = (tipo: string) => {
-        switch (tipo) {
-            case 'modulo': return 'bg-purple-100 text-purple-700';
-            case 'servicio': return 'bg-green-100 text-green-700';
-            case 'plan': return 'bg-blue-100 text-blue-700';
-            case 'implementacion': return 'bg-orange-100 text-orange-700';
-            default: return 'bg-gray-100 text-gray-700';
-        }
-    };
+    // Badge and icons are now dynamic from catalog_item_types
 
     const filteredItems = items.filter(item => {
         if (filterTipo === 'all') return true;
@@ -209,19 +203,39 @@ export default function PricingConfig() {
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-                <div className="flex gap-2">
-                    {['all', 'plan', 'modulo', 'servicio', 'implementacion'].map((tipo) => (
-                        <button
-                            key={tipo}
-                            onClick={() => setFilterTipo(tipo)}
-                            className={`px-4 py-2 rounded-lg text-sm font-semibold capitalize transition-all ${filterTipo === tipo
-                                ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
-                                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-                                }`}
-                        >
-                            {tipo === 'all' ? 'Todos' : tipo === 'implementacion' ? 'Implem.' : tipo + 's'}
-                        </button>
-                    ))}
+                <div className="flex flex-wrap gap-2">
+                    <button
+                        onClick={() => setFilterTipo('all')}
+                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${filterTipo === 'all'
+                            ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
+                            : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                            }`}
+                    >
+                        Todos ({items.length})
+                    </button>
+                    {types.map(t => {
+                        const count = items.filter(i => i.tipo === t.slug).length;
+                        const isActive = filterTipo === t.slug;
+                        return (
+                            <button
+                                key={t.slug}
+                                onClick={() => setFilterTipo(t.slug)}
+                                className="px-4 py-2 rounded-lg text-sm font-semibold transition-all border"
+                                style={isActive ? {
+                                    backgroundColor: t.color,
+                                    color: 'white',
+                                    borderColor: t.color,
+                                    boxShadow: `0 4px 12px ${t.color}40`,
+                                } : {
+                                    backgroundColor: `${t.color}10`,
+                                    color: t.color,
+                                    borderColor: `${t.color}30`,
+                                }}
+                            >
+                                {t.name} {count > 0 && `(${count})`}
+                            </button>
+                        );
+                    })}
                 </div>
             </div>
 
@@ -244,10 +258,9 @@ export default function PricingConfig() {
                                 onChange={(e) => setFormData({ ...formData, tipo: e.target.value as any })}
                                 className="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-blue-500"
                             >
-                                <option value="plan">Plan</option>
-                                <option value="modulo">Módulo</option>
-                                <option value="servicio">Servicio</option>
-                                <option value="implementacion">Implementación</option>
+                                {types.map(t => (
+                                    <option key={t.slug} value={t.slug}>{t.name}</option>
+                                ))}
                             </select>
                         </div>
                         <div>
@@ -361,12 +374,12 @@ export default function PricingConfig() {
                                     filteredItems.map((item) => (
                                         <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="flex items-center gap-2">
-                                                    {getTipoIcon(item.tipo)}
-                                                    <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-tighter ${getTipoBadge(item.tipo)}`}>
-                                                        {item.tipo}
-                                                    </span>
-                                                </div>
+                                                <span
+                                                    className="px-2.5 py-1 rounded-full text-xs font-bold"
+                                                    style={getBadgeStyle(item.tipo)}
+                                                >
+                                                    {getName(item.tipo)}
+                                                </span>
                                             </td>
                                             <td className="px-6 py-4">
                                                 <p className="text-sm font-extrabold text-[#4449AA]">{item.nombre}</p>
