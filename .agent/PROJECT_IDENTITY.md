@@ -6,16 +6,21 @@
 **REPOSITORIO:** `Jarias7604/crm-app`
 **RUTA LOCAL:** `c:\Users\jaria\OneDrive\DELL\Desktop\crm-app`
 
-### BASES DE DATOS SUPABASE (INMUTABLES)
-| Ambiente | Project ID | Nombre en Supabase |
-|---|---|---|
-| **PRODUCCIÓN** | `ikofyypxphrqkncimszt` | Jarias7604's Project |
-| **DESARROLLO** | `mtxqqamitglhehaktgxm` | CRM-DEV |
+### BASES DE DATOS SUPABASE (INMUTABLES — VERIFICADO VERCEL 2026-03-29)
+| Ambiente | Project ID | Vercel env | .env.local |
+|---|---|---|---|
+| **PRODUCCIÓN** | `ikofyypxphrqkncimszt` | `VITE_SUPABASE_URL` Production | ❌ NO usar |
+| **DESARROLLO** | `mtxqqamitglhehaktgxm` | `VITE_SUPABASE_URL` Pre-Production | ✅ sí |
+
+> ⚠️ **TRAMPA CONOCIDA:** Supabase muestra el badge "PRODUCTION" en la rama `main` de CUALQUIER proyecto.
+> Ese badge NO indica que sea el proyecto de producción de la app.
+> La fuente de verdad es siempre Vercel → Settings → Environment Variables → Production.
 
 ### DEPLOY
 | Plataforma | URL |
 |---|---|
 | **Vercel** | `crm-app-v2-jimmy-s-projects-88ff4cb4.vercel.app` |
+
 
 ---
 
