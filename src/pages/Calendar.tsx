@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
     format, addMonths, subMonths, startOfMonth, endOfMonth,
@@ -12,6 +13,7 @@ import {
     CheckCircle2, Circle, RotateCcw, X
 } from 'lucide-react';
 import { leadsService } from '../services/leads';
+import { supabase } from '../services/supabase';
 import { useAuth } from '../auth/AuthProvider';
 import { useTimezone } from '../hooks/useTimezone';
 import { formatTimeInZone, utcToLocalDate, DEFAULT_TIMEZONE } from '../utils/timezone';
@@ -106,21 +108,28 @@ export default function Calendar() {
 
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date());
-    const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
-    const [loading, setLoading] = useState(true);
     const [selectedAssigneeId, setSelectedAssigneeId] = useState<string | null>(null);
     const [showAssigneeFilter, setShowAssigneeFilter] = useState(false);
     const [dayDetailDate, setDayDetailDate] = useState<Date | null>(null);
+    const queryClient = useQueryClient();
 
-    useEffect(() => { loadData(); }, [rawTimezone]);
+    // React Query — cache 5 minutos, sin recargar al volver a la página
+    const { data: calendarEventsData, isLoading: loading } = useQuery({
+        queryKey: ['calendar-follow-ups'],
+        queryFn: () => leadsService.getCalendarFollowUps(),
+        staleTime: 5 * 60 * 1000,   // 5 min en caché
+        gcTime: 15 * 60 * 1000,     // 15 min en memoria
+    });
+    const calendarEvents = calendarEventsData ?? [];
 
-    const loadData = async () => {
-        try {
-            setLoading(true);
-            setCalendarEvents(await leadsService.getCalendarFollowUps());
-        } catch (e) { console.error(e); }
-        finally { setLoading(false); }
-    };
+    // Realtime: invalidar cache cuando cambia un follow-up
+    useEffect(() => {
+        const channel = supabase.channel('calendar-live')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'follow_ups' },
+                () => queryClient.invalidateQueries({ queryKey: ['calendar-follow-ups'] })
+            ).subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [queryClient]);
 
     // Role-based filtering: collaborators see only their own
     const filteredEvents = useMemo(() => {
@@ -133,18 +142,23 @@ export default function Calendar() {
     const nextWeek = () => { setCurrentDate(addWeeks(currentDate, 1)); setSelectedDate(addWeeks(selectedDate, 1)); };
     const prevWeek = () => { setCurrentDate(subWeeks(currentDate, 1)); setSelectedDate(subWeeks(selectedDate, 1)); };
 
-    // Toggle completion on a follow-up
+    // Toggle completion on a follow-up — optimistic update via React Query cache
     const handleToggleComplete = useCallback(async (evId: string, currentCompleted: boolean) => {
         try {
             await leadsService.markFollowUpCompleted(evId, !currentCompleted);
-            setCalendarEvents(prev => prev.map(ev =>
-                ev.id === evId ? { ...ev, completed: !currentCompleted, completed_at: !currentCompleted ? new Date().toISOString() : null } : ev
-            ));
+            // Optimistic update: mutar el cache directamente sin recargar de la DB
+            queryClient.setQueryData<CalendarEvent[]>(['calendar-follow-ups'], (prev) =>
+                (prev ?? []).map(ev =>
+                    ev.id === evId
+                        ? { ...ev, completed: !currentCompleted, completed_at: !currentCompleted ? new Date().toISOString() : null }
+                        : ev
+                )
+            );
             toast.success(!currentCompleted ? '✅ Seguimiento completado' : '↩️ Marcado como pendiente');
         } catch (err) {
             toast.error('Error al actualizar seguimiento');
         }
-    }, []);
+    }, [queryClient]);
 
     const getDailyEvents = (date: Date): CalendarEvent[] =>
         filteredEvents
