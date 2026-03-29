@@ -341,3 +341,64 @@ a:active,
         animation: sheet-backdrop 0.28s ease-out both;
     }
 }
+
+/* Premium Glassmorphism & Manual Utilities */
+.glass {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.glass-dark {
+    background: rgba(15, 23, 42, 0.8);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.text-gradient {
+    background: linear-gradient(135deg, #4f46e5 0%, #10b981 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+.manual-content {
+    @apply text-slate-600 leading-relaxed max-w-none antialiased;
+}
+
+.manual-content h3 {
+    @apply text-lg md:text-xl font-bold text-slate-800 mt-8 mb-3 scroll-mt-28 tracking-tight;
+}
+
+.manual-content p {
+    @apply text-[15px] md:text-base text-slate-600 leading-relaxed md:leading-7 mb-5;
+}
+
+.manual-content strong {
+    @apply font-bold text-slate-800;
+}
+
+.manual-content ul {
+    @apply space-y-2.5 my-6 pl-1;
+}
+
+.manual-content li {
+    @apply text-[15px] md:text-base text-slate-600 flex items-start leading-relaxed md:leading-7;
+}
+
+.manual-content li::before {
+    content: '';
+    @apply block w-1.5 h-1.5 rounded-full bg-indigo-500 mt-[10px] mr-3 shrink-0 shadow-sm shadow-indigo-500/30;
+}
+
+.manual-content li > span {
+  @apply flex-1;
+}
+
+.manual-content code {
+  @apply bg-slate-50 text-indigo-600 px-1.5 py-0.5 rounded-md text-[13px] font-mono border border-slate-200/60 shadow-sm font-semibold;
+}
+
+.manual-content hr {
+    @apply my-10 border-t border-slate-100;
+}

@@ -1,4 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import ManualPage from './pages/support/ManualPage';
+import HelpChat from './components/HelpChat/HelpChat';
 import { lazy, Suspense } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './lib/queryClient';
@@ -153,15 +155,19 @@ function App() {
               <Route path="/portal/cliente/:token" element={<ClientPortal />} />
 
               {/* Password Reset from Email Link (No Auth Required) */}
-              <Route path="/update-password" element={<UpdatePassword />} />
+                              <Route path="/update-password" element={<UpdatePassword />} />
+                <Route path="/support/manual" element={<ManualPage />} />
+
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            <HelpChat />
           </Suspense>
         </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
   );
 }
+
 
 export default App;
