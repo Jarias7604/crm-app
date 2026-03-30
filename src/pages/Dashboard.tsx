@@ -54,7 +54,11 @@ const SIA_PERIOD_LABELS: Record<string, string> = {
 
 const PIE_COLORS = [THEME.primary, THEME.success, THEME.accent, THEME.chart2, THEME.chart3, '#94A3B8'];
 
-const FunnelInfographic = ({ data, onStageClick }: { data: any[], onStageClick: (status: string) => void }) => {
+const FunnelInfographic = ({ data, onStageClick, hideClientAmount }: {
+    data: any[];
+    onStageClick: (status: string) => void;
+    hideClientAmount?: boolean;
+}) => {
     // Unicode-safe lookup: normalize both sides to NFC to handle accent encoding variations
     const findByStatus = (status: string) => {
         const normalized = status.normalize('NFC');
@@ -93,7 +97,7 @@ const FunnelInfographic = ({ data, onStageClick }: { data: any[], onStageClick: 
                     <div className="flex justify-between items-center mb-1">
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-indigo-600 transition-colors">{layer.label}</span>
                         <div className="flex items-center gap-2">
-                            {layer.amount > 0 && (
+                            {layer.amount > 0 && !(hideClientAmount && layer.key === 'Cliente') && (
                                 <span className="text-[10px] font-bold text-emerald-600">${layer.amount.toLocaleString()}</span>
                             )}
                             <span className="text-[11px] font-black text-slate-900">{layer.value}</span>
@@ -992,6 +996,7 @@ export default function Dashboard() {
                         <FunnelInfographic
                             data={funnelData}
                             onStageClick={(status) => navigate('/leads', { state: { status, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
+                            hideClientAmount={!isAdmin}
                         />
                     </div>
                 </div >
