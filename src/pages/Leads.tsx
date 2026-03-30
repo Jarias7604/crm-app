@@ -1789,7 +1789,7 @@ export default function Leads() {
                                 <p className="text-gray-400 text-sm font-bold mt-1">Intenta con otros filtros o términos de búsqueda</p>
                             </div>
                         ) : (
-                            filteredLeads.map((lead) => (
+                            paginatedLeads.map((lead) => (
                                 <div
                                     key={lead.id}
                                     className="bg-white rounded-[2rem] p-5 shadow-sm border border-gray-100 active:scale-[0.98] transition-all relative overflow-hidden"
@@ -1891,6 +1891,19 @@ export default function Leads() {
                                 </div>
                             ))
                         )}
+                        {/* Mobile Grid Pagination */}
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-between px-2 py-3 mt-2">
+                                <p className="text-[11px] font-bold text-gray-400">
+                                    {((currentPage - 1) * ROWS_PER_PAGE) + 1}–{Math.min(currentPage * ROWS_PER_PAGE, sortedLeads.length)} de {sortedLeads.length}
+                                </p>
+                                <div className="flex items-center gap-1">
+                                    <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1.5 text-[10px] font-black rounded-lg disabled:opacity-30 text-gray-500 hover:bg-indigo-50">Anterior</button>
+                                    <span className="w-8 h-8 flex items-center justify-center text-[11px] font-black bg-[#4449AA] text-white rounded-lg">{currentPage}</span>
+                                    <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-3 py-1.5 text-[10px] font-black rounded-lg disabled:opacity-30 text-gray-500 hover:bg-indigo-50">Siguiente</button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -1924,7 +1937,7 @@ export default function Leads() {
                 ) : viewMode === 'grid' ? (
                     /* Grid View */
                     <div className="hidden md:grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-in fade-in duration-500">
-                        {filteredLeads.map((lead) => (
+                        {paginatedLeads.map((lead) => (
                             <div
                                 key={lead.id}
                                 onClick={() => openLeadDetail(lead)}
@@ -2034,6 +2047,30 @@ export default function Leads() {
                                 </div>
                             </div>
                         ))}
+                        {/* Desktop Grid Pagination */}
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-between px-4 py-3 mt-3 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                                <p className="text-[11px] font-bold text-gray-400">
+                                    {((currentPage - 1) * ROWS_PER_PAGE) + 1}–{Math.min(currentPage * ROWS_PER_PAGE, sortedLeads.length)} de {sortedLeads.length} leads
+                                </p>
+                                <div className="flex items-center gap-1">
+                                    <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} className="px-2 py-1.5 text-[10px] font-black rounded-lg disabled:opacity-30 text-gray-500 hover:bg-indigo-50">«</button>
+                                    <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1.5 text-[10px] font-black rounded-lg disabled:opacity-30 text-gray-500 hover:bg-indigo-50">Anterior</button>
+                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                        let page: number;
+                                        if (totalPages <= 5) page = i + 1;
+                                        else if (currentPage <= 3) page = i + 1;
+                                        else if (currentPage >= totalPages - 2) page = totalPages - 4 + i;
+                                        else page = currentPage - 2 + i;
+                                        return (
+                                            <button key={page} onClick={() => setCurrentPage(page)} className={`w-8 h-8 text-[11px] font-black rounded-lg transition-all ${currentPage === page ? 'bg-[#4449AA] text-white shadow-md shadow-indigo-200' : 'text-gray-500 hover:bg-indigo-50'}`}>{page}</button>
+                                        );
+                                    })}
+                                    <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-3 py-1.5 text-[10px] font-black rounded-lg disabled:opacity-30 text-gray-500 hover:bg-indigo-50">Siguiente</button>
+                                    <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} className="px-2 py-1.5 text-[10px] font-black rounded-lg disabled:opacity-30 text-gray-500 hover:bg-indigo-50">»</button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 ) : viewMode === 'list' ? (
                     /* List View - Modern Premium Redesign */
