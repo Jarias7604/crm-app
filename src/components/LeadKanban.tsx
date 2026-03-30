@@ -3,17 +3,8 @@ import type { DropResult } from '@hello-pangea/dnd';
 import type { Lead, LeadStatus } from '../types';
 import { SOURCE_CONFIG } from '../types';
 import {
-    MoreVertical,
-    Building2,
-    Clock,
-    Phone,
-    Mail,
-    User,
-    Target,
-    Calendar
+    User
 } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { useRef, useEffect, useCallback } from 'react';
 
 interface LeadKanbanProps {
@@ -183,7 +174,7 @@ export function LeadKanban({ leads, teamMembers, onUpdateStatus, onOpenDetail }:
                                     className={`flex-1 rounded-2xl transition-all duration-300 ${snapshot.isDraggingOver
                                         ? 'bg-blue-50/50 ring-2 ring-blue-200 ring-inset'
                                         : 'bg-transparent'
-                                        } p-2 space-y-4 min-h-[300px]`}
+                                        } p-2 space-y-2 min-h-[300px]`}
                                 >
                                     {getLeadsByStatus(status).map((lead, index) => (
                                         <Draggable key={lead.id} draggableId={lead.id} index={index}>
@@ -193,146 +184,71 @@ export function LeadKanban({ leads, teamMembers, onUpdateStatus, onOpenDetail }:
                                                     {...provided.draggableProps}
                                                     {...provided.dragHandleProps}
                                                     onClick={() => onOpenDetail(lead)}
-                                                    className={`bg-white rounded-[20px] border border-slate-200/60 p-5 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)] hover:shadow-[0_10px_25px_-5px_rgba(0,0,0,0.1)] hover:-translate-y-1 transition-all duration-300 group/card cursor-pointer relative overflow-hidden ${snapshot.isDragging ? 'rotate-1 scale-105 shadow-2xl ring-2 ring-blue-500/20 z-50' : ''
+                                                    className={`bg-white rounded-2xl border border-slate-200/60 px-4 py-3 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] hover:shadow-[0_6px_20px_-5px_rgba(0,0,0,0.1)] hover:-translate-y-0.5 transition-all duration-200 group/card cursor-pointer relative overflow-hidden ${snapshot.isDragging ? 'rotate-1 scale-105 shadow-2xl ring-2 ring-blue-500/20 z-50' : ''
                                                         }`}
                                                 >
-                                                    {/* Priority Indicator Dot */}
-                                                    <div className="absolute top-5 left-5">
-                                                        {(() => {
-                                                            const priorityColors = {
-                                                                very_high: 'bg-rose-500 shadow-rose-200',
-                                                                high: 'bg-orange-500 shadow-orange-200',
-                                                                medium: 'bg-amber-400 shadow-amber-100',
-                                                                low: 'bg-blue-400 shadow-blue-100'
-                                                            };
-                                                            return (
-                                                                <div className={`w-2.5 h-2.5 rounded-full ${priorityColors[lead.priority as keyof typeof priorityColors]} shadow-[0_0_8px_2px_rgba(0,0,0,0)] animate-pulse`}></div>
-                                                            );
-                                                        })()}
-                                                    </div>
-
-                                                    <div className="flex justify-end items-center mb-4 pl-4">
-                                                        <button className="text-slate-300 hover:text-slate-600 transition-colors p-1 rounded-full hover:bg-slate-50">
-                                                            <MoreVertical className="w-4 h-4" />
-                                                        </button>
-                                                    </div>
-
-                                                    {/* Content */}
-                                                    <div className="space-y-4">
-                                                        <div className="space-y-1">
-                                                            <h4 className="font-bold text-[15px] text-slate-900 group-hover/card:text-blue-600 transition-colors leading-tight">
+                                                    {/* Lead Name + Priority Dot */}
+                                                    <div className="flex items-start gap-2 mb-2">
+                                                        <div className="mt-1.5 shrink-0">
+                                                            {(() => {
+                                                                const priorityColors = {
+                                                                    very_high: 'bg-rose-500',
+                                                                    high: 'bg-orange-500',
+                                                                    medium: 'bg-amber-400',
+                                                                    low: 'bg-blue-400'
+                                                                };
+                                                                return (
+                                                                    <div className={`w-2 h-2 rounded-full ${priorityColors[lead.priority as keyof typeof priorityColors]}`}></div>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                        <div className="min-w-0 flex-1">
+                                                            <h4 className="font-bold text-[13px] text-slate-900 group-hover/card:text-blue-600 transition-colors leading-tight truncate">
                                                                 {lead.name}
                                                             </h4>
-
                                                             {lead.company_name && (
-                                                                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
-                                                                    <Building2 className="w-3.5 h-3.5 opacity-40" />
-                                                                    <span className="truncate">{lead.company_name}</span>
-                                                                </div>
+                                                                <p className="text-[11px] text-slate-400 truncate">{lead.company_name}</p>
                                                             )}
+                                                        </div>
+                                                    </div>
 
-                                                            {lead.source && SOURCE_CONFIG[lead.source] && (
-                                                                <div className="flex items-center gap-1.5 mt-1">
-                                                                    <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded-md border ${SOURCE_CONFIG[lead.source].bgColor} ${SOURCE_CONFIG[lead.source].color} border-current opacity-80`}>
-                                                                        {SOURCE_CONFIG[lead.source].icon} {SOURCE_CONFIG[lead.source].label}
-                                                                    </span>
-                                                                </div>
-                                                            )}
+                                                    {/* Source Badge */}
+                                                    {lead.source && SOURCE_CONFIG[lead.source] && (
+                                                        <div className="mb-2">
+                                                            <span className={`px-2 py-0.5 text-[9px] font-black uppercase rounded-md border ${SOURCE_CONFIG[lead.source].bgColor} ${SOURCE_CONFIG[lead.source].color} border-current opacity-80`}>
+                                                                {SOURCE_CONFIG[lead.source].icon} {SOURCE_CONFIG[lead.source].label}
+                                                            </span>
                                                             {(lead.contact_count || 0) > 0 && (
-                                                                <div className="flex items-center gap-1.5 mt-1">
-                                                                    <span className={`px-2 py-0.5 text-[9px] font-black rounded-md border ${(lead.contact_count || 0) >= 6 ? 'bg-red-50 text-red-600 border-red-200' :
-                                                                        (lead.contact_count || 0) >= 4 ? 'bg-amber-50 text-amber-600 border-amber-200' :
-                                                                            'bg-emerald-50 text-emerald-600 border-emerald-200'
-                                                                        }`}>
-                                                                        📞 {lead.contact_count} intentos
-                                                                    </span>
-                                                                </div>
-                                                            )}
-                                                            {(lead.engagement_score || 0) > 0 && (
-                                                                <div className="flex items-center gap-1.5 mt-1">
-                                                                    <span className={`px-2 py-0.5 text-[9px] font-black rounded-md border ${(lead.engagement_score || 0) >= 10 ? 'bg-rose-50 text-rose-600 border-rose-200' :
-                                                                        (lead.engagement_score || 0) >= 5 ? 'bg-orange-50 text-orange-600 border-orange-200' :
-                                                                            'bg-sky-50 text-sky-600 border-sky-200'
-                                                                        }`}>
-                                                                        🔥 Engagement: {lead.engagement_score}
-                                                                    </span>
-                                                                </div>
-                                                            )}
-                                                        </div>
-
-                                                        <div className="flex items-center justify-between py-3 border-y border-slate-50">
-                                                            <div className="flex flex-col">
-                                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Valor</span>
-                                                                <span className="text-lg font-black text-slate-900 tracking-tight">
-                                                                    ${lead.value?.toLocaleString() || '0'}
-                                                                </span>
-                                                            </div>
-
-                                                            {lead.assigned_to ? (() => {
-                                                                const assignee = teamMembers.find(m => m.id === lead.assigned_to);
-                                                                return (
-                                                                    <div className="relative">
-                                                                        {assignee?.avatar_url ? (
-                                                                            <img
-                                                                                src={assignee.avatar_url}
-                                                                                alt=""
-                                                                                className="w-9 h-9 rounded-full object-cover border-2 border-white shadow-md ring-1 ring-slate-100"
-                                                                            />
-                                                                        ) : (
-                                                                            <div className="w-9 h-9 rounded-full bg-slate-50 flex items-center justify-center border-2 border-white shadow-md ring-1 ring-slate-100">
-                                                                                <User className="w-4 h-4 text-slate-400" />
-                                                                            </div>
-                                                                        )}
-                                                                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-white rounded-full flex items-center justify-center shadow-sm border border-slate-100">
-                                                                            <Target className="w-2.5 h-2.5 text-blue-500" />
-                                                                        </div>
-                                                                    </div>
-                                                                );
-                                                            })() : (
-                                                                <div className="w-9 h-9 rounded-full bg-slate-50 flex items-center justify-center border border-dashed border-slate-300">
-                                                                    <User className="w-4 h-4 text-slate-300" />
-                                                                </div>
-                                                            )}
-                                                        </div>
-
-                                                        {/* Footer - Dates & Icons */}
-                                                        <div className="flex items-center justify-between">
-                                                            <div className="flex flex-col gap-1.5">
-                                                                <div className={`flex items-center gap-1.5 text-[11px] font-bold ${lead.next_followup_date && new Date(lead.next_followup_date) < new Date()
-                                                                    ? 'text-rose-500'
-                                                                    : 'text-slate-400'
+                                                                <span className={`ml-1 px-1.5 py-0.5 text-[9px] font-black rounded-md border ${(lead.contact_count || 0) >= 6 ? 'bg-red-50 text-red-600 border-red-200' :
+                                                                    (lead.contact_count || 0) >= 4 ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                                                                        'bg-emerald-50 text-emerald-600 border-emerald-200'
                                                                     }`}>
-                                                                    <div className="bg-slate-50 px-2 py-0.5 rounded-md flex items-center gap-1.5 border border-slate-100">
-                                                                        <Clock className="w-3 h-3 opacity-60" />
-                                                                        <span className="whitespace-nowrap font-black">Prox: {lead.next_followup_date ? (() => {
-                                                                            try {
-                                                                                const pureDate = lead.next_followup_date.split('T')[0];
-                                                                                return format(new Date(`${pureDate}T12:00:00`), 'dd MMM', { locale: es });
-                                                                            } catch (e) { return 'TBD'; }
-                                                                        })() : 'TBD'}</span>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
-                                                                    <div className="bg-slate-50 px-2 py-0.5 rounded-md flex items-center gap-1.5 border border-slate-100">
-                                                                        <Calendar className="w-3 h-3 opacity-60" />
-                                                                        <span className="whitespace-nowrap font-bold">Ingreso: {(() => { try { return format(new Date(lead.created_at.substring(0, 10) + 'T12:00:00'), 'dd MMM', { locale: es }); } catch { return '—'; } })()}</span>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="flex gap-1.5">
-                                                                {lead.phone && (
-                                                                    <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100/50">
-                                                                        <Phone className="w-3.5 h-3.5" />
-                                                                    </div>
-                                                                )}
-                                                                {lead.email && (
-                                                                    <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 border border-blue-100/50">
-                                                                        <Mail className="w-3.5 h-3.5" />
-                                                                    </div>
-                                                                )}
-                                                            </div>
+                                                                    📞 {lead.contact_count}
+                                                                </span>
+                                                            )}
                                                         </div>
+                                                    )}
+
+                                                    {/* Value + Assignee Row */}
+                                                    <div className="flex items-center justify-between pt-2 border-t border-slate-50">
+                                                        <span className="text-sm font-black text-slate-900 tracking-tight">
+                                                            ${lead.value?.toLocaleString() || '0'}
+                                                        </span>
+
+                                                        {lead.assigned_to ? (() => {
+                                                            const assignee = teamMembers.find(m => m.id === lead.assigned_to);
+                                                            return assignee?.avatar_url ? (
+                                                                <img src={assignee.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover border-2 border-white shadow-sm" />
+                                                            ) : (
+                                                                <div className="w-7 h-7 rounded-full bg-slate-50 flex items-center justify-center border border-slate-200">
+                                                                    <User className="w-3.5 h-3.5 text-slate-400" />
+                                                                </div>
+                                                            );
+                                                        })() : (
+                                                            <div className="w-7 h-7 rounded-full bg-slate-50 flex items-center justify-center border border-dashed border-slate-300">
+                                                                <User className="w-3.5 h-3.5 text-slate-300" />
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             )}
