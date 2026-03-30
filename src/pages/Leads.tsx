@@ -494,6 +494,22 @@ export default function Leads() {
         });
     }, [filteredLeads, sortConfig]);
 
+    // ─── Client-side Pagination ─────────────────────────────────────────────
+    // Renders only 50 rows to the DOM instead of all 500+
+    // Data stays in memory (React Query cache) — only DOM rendering is limited
+    const ROWS_PER_PAGE = 50;
+    const [currentPage, setCurrentPage] = useState(1);
+    const totalPages = Math.max(1, Math.ceil(sortedLeads.length / ROWS_PER_PAGE));
+    const paginatedLeads = useMemo(() => {
+        const start = (currentPage - 1) * ROWS_PER_PAGE;
+        return sortedLeads.slice(start, start + ROWS_PER_PAGE);
+    }, [sortedLeads, currentPage]);
+
+    // Reset page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filteredLeads.length]);
+
     const filteredPipelineTotal = useMemo(() => {
         return filteredLeads.reduce((sum, lead) => sum + (lead.value || 0), 0);
     }, [filteredLeads]);
@@ -2031,7 +2047,7 @@ export default function Leads() {
                                     <p className="text-gray-400 text-sm font-bold mt-1">Intenta con otros filtros</p>
                                 </div>
                             ) : (
-                                sortedLeads.map((lead) => (
+                                paginatedLeads.map((lead) => (
                                     <div
                                         key={lead.id}
                                         onClick={() => openLeadDetail(lead)}
@@ -2271,7 +2287,7 @@ export default function Leads() {
                                             </Droppable>
                                         </DragDropContext>
                                         <tbody className="bg-white divide-y divide-gray-50/50">
-                                            {sortedLeads.map((lead) => {
+                                            {paginatedLeads.map((lead) => {
                                                 const isSelected = selectedLeadIds.includes(lead.id);
                                                 return (
                                                     <tr
@@ -2416,6 +2432,70 @@ export default function Leads() {
                                     </table>
                                 </div>
                             </div>
+
+                            {/* Pagination Controls */}
+                            {totalPages > 1 && (
+                                <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100 bg-[#FAFAFB]/60">
+                                    <p className="text-[11px] font-bold text-gray-400">
+                                        {((currentPage - 1) * ROWS_PER_PAGE) + 1}–{Math.min(currentPage * ROWS_PER_PAGE, sortedLeads.length)} de {sortedLeads.length} leads
+                                    </p>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            onClick={() => setCurrentPage(1)}
+                                            disabled={currentPage === 1}
+                                            className="px-2 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed text-gray-500 hover:bg-indigo-50 hover:text-indigo-600"
+                                        >
+                                            «
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                            disabled={currentPage === 1}
+                                            className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed text-gray-500 hover:bg-indigo-50 hover:text-indigo-600"
+                                        >
+                                            Anterior
+                                        </button>
+                                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                            let page: number;
+                                            if (totalPages <= 5) {
+                                                page = i + 1;
+                                            } else if (currentPage <= 3) {
+                                                page = i + 1;
+                                            } else if (currentPage >= totalPages - 2) {
+                                                page = totalPages - 4 + i;
+                                            } else {
+                                                page = currentPage - 2 + i;
+                                            }
+                                            return (
+                                                <button
+                                                    key={page}
+                                                    onClick={() => setCurrentPage(page)}
+                                                    className={`w-8 h-8 text-[11px] font-black rounded-lg transition-all ${
+                                                        currentPage === page
+                                                            ? 'bg-[#4449AA] text-white shadow-md shadow-indigo-200'
+                                                            : 'text-gray-500 hover:bg-indigo-50 hover:text-indigo-600'
+                                                    }`}
+                                                >
+                                                    {page}
+                                                </button>
+                                            );
+                                        })}
+                                        <button
+                                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                            disabled={currentPage === totalPages}
+                                            className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed text-gray-500 hover:bg-indigo-50 hover:text-indigo-600"
+                                        >
+                                            Siguiente
+                                        </button>
+                                        <button
+                                            onClick={() => setCurrentPage(totalPages)}
+                                            disabled={currentPage === totalPages}
+                                            className="px-2 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed text-gray-500 hover:bg-indigo-50 hover:text-indigo-600"
+                                        >
+                                            »
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Floating Bulk Actions Bar */}
