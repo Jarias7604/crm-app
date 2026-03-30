@@ -118,19 +118,21 @@ export const pushService = {
 
 export const notificationsService = {
   // Fetch unread count for badge
-  async getUnreadCount(): Promise<number> {
+  async getUnreadCount(userId: string): Promise<number> {
     const { count } = await supabase
       .from('notifications')
       .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId)
       .eq('read', false);
     return count || 0;
   },
 
-  // Fetch latest notifications (for dropdown)
-  async getNotifications(limit = 20): Promise<AppNotification[]> {
+  // Fetch latest notifications (for dropdown) — solo las del usuario actual
+  async getNotifications(userId: string, limit = 20): Promise<AppNotification[]> {
     const { data, error } = await supabase
       .from('notifications')
       .select('*')
+      .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(limit);
     if (error) throw error;
@@ -142,11 +144,12 @@ export const notificationsService = {
     await supabase.from('notifications').update({ read: true }).eq('id', id);
   },
 
-  // Mark all as read
-  async markAllAsRead(): Promise<void> {
+  // Mark all as read — solo las del usuario actual
+  async markAllAsRead(userId: string): Promise<void> {
     await supabase
       .from('notifications')
       .update({ read: true })
+      .eq('user_id', userId)
       .eq('read', false);
   },
 
