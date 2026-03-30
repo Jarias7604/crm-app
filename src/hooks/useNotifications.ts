@@ -37,8 +37,8 @@ export function useNotifications() {
     if (!userId) return;
     try {
       const [notifs, count] = await Promise.all([
-        notificationsService.getNotifications(20),
-        notificationsService.getUnreadCount(),
+        notificationsService.getNotifications(userId, 20),
+        notificationsService.getUnreadCount(userId),
       ]);
       setNotifications(notifs);
       setUnreadCount(count);
@@ -103,12 +103,13 @@ export function useNotifications() {
   }, []);
 
   const handleMarkAllRead = useCallback(async () => {
+    if (!userId) return;
     setLoading(true);
-    await notificationsService.markAllAsRead();
+    await notificationsService.markAllAsRead(userId);
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     setUnreadCount(0);
     setLoading(false);
-  }, []);
+  }, [userId]);
 
   const handleNotificationClick = useCallback(
     async (notif: AppNotification) => {

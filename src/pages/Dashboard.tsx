@@ -172,6 +172,13 @@ export default function Dashboard() {
     const [recentCompanies, setRecentCompanies] = useState<any[]>([]);
     const [companyTrend, setCompanyTrend] = useState<any[]>([]);
 
+    // Collaborator filter (admin only — ver perspectiva de un agente)
+    const [companyProfiles, setCompanyProfiles] = useState<{ id: string; full_name: string; role: string; avatar_url?: string | null }[]>([]);
+    const [selectedCollabId, setSelectedCollabId] = useState<string | undefined>(undefined);
+    const [selectedCollabName, setSelectedCollabName] = useState<string | null>(null);
+    const [isCollabOpen, setIsCollabOpen] = useState(false);
+    const collabFilterRef = useRef<HTMLDivElement>(null);
+
     // Detectar móvil/tableta
     const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
 
@@ -276,7 +283,8 @@ export default function Dashboard() {
     // 🔒 Role-based dashboard: collaborators without dashboard_view_company only see their own stats
     const isAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
     const canViewCompanyDashboard = isAdmin || (profile?.permissions?.['dashboard_view_company'] === true);
-    const dashboardAssignedTo = canViewCompanyDashboard ? undefined : profile?.id;
+    // Admin: puede ver perspectiva de un colaborador específico; Agent: siempre ve lo suyo
+    const dashboardAssignedTo = canViewCompanyDashboard ? selectedCollabId : profile?.id;
 
     // Use optimized dashboard hook (replaces 5 queries with 1)
     const { data: dashboardData, isLoading: isDashboardLoading, error: dashboardError } = useDashboardStats(
@@ -398,10 +406,28 @@ export default function Dashboard() {
             if (escalationRef.current && !escalationRef.current.contains(event.target as Node)) {
                 setShowEscalation(prev => prev === 'expanded' ? true : prev);
             }
+            if (collabFilterRef.current && !collabFilterRef.current.contains(event.target as Node)) {
+                setIsCollabOpen(false);
+            }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    // Cargar perfiles de la empresa para el filtro de responsable (solo admins)
+    useEffect(() => {
+        const adminCheck = profile?.role === 'super_admin' || profile?.role === 'company_admin';
+        if (!adminCheck || !profile?.company_id) return;
+        supabase
+            .from('profiles')
+            .select('id, full_name, role, avatar_url')
+            .eq('company_id', profile.company_id)
+            .eq('is_active', true)
+            .order('full_name')
+            .then(({ data }) => {
+                if (data) setCompanyProfiles(data);
+            });
+    }, [profile?.company_id, profile?.role]);
 
     const loadSuperAdminData = async () => {
         try {
@@ -704,6 +730,76 @@ export default function Dashboard() {
                             )}
                         </div>
                     )}
+
+                    {/* Responsable Filter — solo admins, igual que en Leads */}
+                    {isAdmin && (
+                        <div className="relative" ref={collabFilterRef}>
+                            <button
+                                onClick={() => setIsCollabOpen(!isCollabOpen)}
+                                className={`flex items-center gap-1.5 h-10 px-4 rounded-xl border text-xs font-bold transition-all ${
+                                    selectedCollabId
+                                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200'
+                                        : 'bg-white border-gray-100 text-slate-600 hover:text-indigo-600 hover:bg-indigo-50'
+                                }`}
+                            >
+                                <Users className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline max-w-[100px] truncate">
+                                    {selectedCollabName || 'Responsable'}
+                                </span>
+                                <ChevronDown className={`w-3 h-3 transition-transform ${isCollabOpen ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {isCollabOpen && (
+                                <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-50 py-2 animate-in fade-in slide-in-from-top-2">
+                                    {/* Todos los responsables */}
+                                    <button
+                                        onClick={() => {
+                                            setSelectedCollabId(undefined);
+                                            setSelectedCollabName(null);
+                                            setIsCollabOpen(false);
+                                        }}
+                                        className={`w-full text-left px-4 py-2 text-[11px] flex items-center gap-2 transition-colors ${
+                                            !selectedCollabId
+                                                ? 'bg-indigo-50 text-indigo-600 font-black'
+                                                : 'text-slate-600 font-bold hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                            <Users className="w-3 h-3 text-slate-400" />
+                                        </div>
+                                        Todos los responsables
+                                        {!selectedCollabId && <CheckCircle className="w-3 h-3 ml-auto shrink-0 text-indigo-600" />}
+                                    </button>
+
+                                    {/* Lista de colaboradores */}
+                                    {companyProfiles.map(member => (
+                                        <button
+                                            key={member.id}
+                                            onClick={() => {
+                                                setSelectedCollabId(member.id);
+                                                setSelectedCollabName(member.full_name);
+                                                setIsCollabOpen(false);
+                                            }}
+                                            className={`w-full text-left px-4 py-2 text-[11px] flex items-center gap-2 transition-colors ${
+                                                selectedCollabId === member.id
+                                                    ? 'bg-indigo-50 text-indigo-600 font-black'
+                                                    : 'text-slate-600 font-bold hover:bg-gray-50'
+                                            }`}
+                                        >
+                                            <div className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center text-[9px] font-black text-indigo-600 shrink-0">
+                                                {member.full_name.charAt(0).toUpperCase()}
+                                            </div>
+                                            <span className="truncate flex-1">{member.full_name}</span>
+                                            {selectedCollabId === member.id && (
+                                                <CheckCircle className="w-3 h-3 shrink-0 text-indigo-600" />
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     <Button
                         onClick={() => setRefreshKey(Date.now())}
                         variant="outline"

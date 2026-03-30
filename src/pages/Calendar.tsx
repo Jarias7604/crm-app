@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -10,7 +10,7 @@ import { es } from 'date-fns/locale';
 import {
     ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail,
     CalendarDays, MessageSquare, Video, FileText, SlidersHorizontal,
-    CheckCircle2, Circle, RotateCcw, X
+    CheckCircle2, Circle, RotateCcw, X, Users, ChevronDown, CheckCircle
 } from 'lucide-react';
 import { leadsService } from '../services/leads';
 import { supabase } from '../services/supabase';
@@ -111,6 +111,13 @@ export default function Calendar() {
     const [selectedAssigneeId, setSelectedAssigneeId] = useState<string | null>(null);
     const [showAssigneeFilter, setShowAssigneeFilter] = useState(false);
     const [dayDetailDate, setDayDetailDate] = useState<Date | null>(null);
+
+    // Responsable filter — admin only, ver perspectiva de un agente en el calendario
+    const [calendarCollabProfiles, setCalendarCollabProfiles] = useState<{ id: string; full_name: string; role: string; avatar_url?: string | null }[]>([]);
+    const [selectedCalendarCollabId, setSelectedCalendarCollabId] = useState<string | undefined>(undefined);
+    const [selectedCalendarCollabName, setSelectedCalendarCollabName] = useState<string | null>(null);
+    const [isCalendarCollabOpen, setIsCalendarCollabOpen] = useState(false);
+    const calendarCollabRef = useRef<HTMLDivElement>(null);
     const queryClient = useQueryClient();
 
     // Ventana dinámica: 1 mes atrás + 2 meses adelante de la vista actual
@@ -144,12 +151,40 @@ export default function Calendar() {
         return () => { supabase.removeChannel(channel); };
     }, [queryClient]);
 
+    // Cargar perfiles para filtro de responsable (solo admins)
+    useEffect(() => {
+        if (!isAdmin || !profile?.company_id) return;
+        supabase
+            .from('profiles')
+            .select('id, full_name, role, avatar_url')
+            .eq('company_id', profile.company_id)
+            .eq('is_active', true)
+            .order('full_name')
+            .then(({ data }) => { if (data) setCalendarCollabProfiles(data); });
+    }, [isAdmin, profile?.company_id, profile?.role]);
 
-    // Role-based filtering: collaborators see only their own
+    // Click-outside para cerrar dropdown de responsable
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (calendarCollabRef.current && !calendarCollabRef.current.contains(e.target as Node)) {
+                setIsCalendarCollabOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+
+    // Role-based filtering: collaborators see only their own; admins can filter by collaborator
     const filteredEvents = useMemo(() => {
-        if (isAdmin) return calendarEvents;
+        if (isAdmin) {
+            if (selectedCalendarCollabId) {
+                return calendarEvents.filter(ev => ev.assigned_to === selectedCalendarCollabId);
+            }
+            return calendarEvents; // admin sin filtro ve todo
+        }
         return calendarEvents.filter(ev => ev.assigned_to === profile?.id);
-    }, [calendarEvents, isAdmin, profile?.id]);
+    }, [calendarEvents, isAdmin, profile?.id, selectedCalendarCollabId]);
 
     const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
     const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
@@ -253,6 +288,58 @@ export default function Calendar() {
                         <ChevronRight className="w-4 h-4" />
                     </button>
                 </div>
+                {/* Responsable filter — solo admins */}
+                {isAdmin && (
+                    <div className="relative" ref={calendarCollabRef}>
+                        <button
+                            onClick={() => setIsCalendarCollabOpen(!isCalendarCollabOpen)}
+                            className={`flex items-center gap-1.5 h-9 px-3 rounded-xl border text-xs font-bold transition-all ${
+                                selectedCalendarCollabId
+                                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200'
+                                    : 'bg-white border-gray-200 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50'
+                            }`}
+                        >
+                            <Users className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline max-w-[100px] truncate">
+                                {selectedCalendarCollabName || 'Responsable'}
+                            </span>
+                            <ChevronDown className={`w-3 h-3 transition-transform ${isCalendarCollabOpen ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {isCalendarCollabOpen && (
+                            <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-50 py-2 animate-in fade-in slide-in-from-top-2">
+                                <button
+                                    onClick={() => { setSelectedCalendarCollabId(undefined); setSelectedCalendarCollabName(null); setIsCalendarCollabOpen(false); }}
+                                    className={`w-full text-left px-4 py-2 text-[11px] flex items-center gap-2 transition-colors ${
+                                        !selectedCalendarCollabId ? 'bg-indigo-50 text-indigo-600 font-black' : 'text-slate-600 font-bold hover:bg-gray-50'
+                                    }`}
+                                >
+                                    <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                                        <Users className="w-3 h-3 text-slate-400" />
+                                    </div>
+                                    Todos los responsables
+                                    {!selectedCalendarCollabId && <CheckCircle className="w-3 h-3 ml-auto shrink-0 text-indigo-600" />}
+                                </button>
+                                {calendarCollabProfiles.map(member => (
+                                    <button
+                                        key={member.id}
+                                        onClick={() => { setSelectedCalendarCollabId(member.id); setSelectedCalendarCollabName(member.full_name); setIsCalendarCollabOpen(false); }}
+                                        className={`w-full text-left px-4 py-2 text-[11px] flex items-center gap-2 transition-colors ${
+                                            selectedCalendarCollabId === member.id ? 'bg-indigo-50 text-indigo-600 font-black' : 'text-slate-600 font-bold hover:bg-gray-50'
+                                        }`}
+                                    >
+                                        <div className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center text-[9px] font-black text-indigo-600 shrink-0">
+                                            {member.full_name.charAt(0).toUpperCase()}
+                                        </div>
+                                        <span className="truncate flex-1">{member.full_name}</span>
+                                        {selectedCalendarCollabId === member.id && <CheckCircle className="w-3 h-3 shrink-0 text-indigo-600" />}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 <button
                     onClick={() => navigate('/leads')}
                     className="flex items-center gap-2 px-4 h-9 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 transition-all"
