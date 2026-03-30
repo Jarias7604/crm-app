@@ -186,11 +186,8 @@ export default function Dashboard() {
         localStorage.setItem('dashboard_selected_date_range', selectedDateRange);
     }, [selectedDateRange]);
 
-    // Refresh data when navigating to Dashboard or when filters change
-    useEffect(() => {
-        // Update refresh key to force data reload
-        setRefreshKey(Date.now());
-    }, [location.pathname]);
+    // React Query handles caching — no forced refresh needed on navigation
+    // The "Sincronizar" button is available for manual refresh via setRefreshKey
 
     // Calculate date range labels for the UI
     const getDateRangeLabelDisplay = (range: DateRange) => {

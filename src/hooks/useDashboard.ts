@@ -15,7 +15,7 @@ export function useDashboardStats(companyId?: string, startDate?: string, endDat
             return dashboardService.getDashboardStats(startDate, endDate, companyId, assignedTo);
         },
         enabled: !!companyId,
-        staleTime: 30 * 1000, // 30 seconds
+        staleTime: 2 * 60 * 1000, // 2 minutes — dashboard data doesn't change rapidly
         gcTime: 5 * 60 * 1000, // 5 minutes
         placeholderData: keepPreviousData,
     });
