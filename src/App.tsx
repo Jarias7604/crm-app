@@ -51,6 +51,7 @@ const OverdueTickets    = lazy(() => import('./pages/support/OverdueTickets'));
 const Clientes          = lazy(() => import('./pages/clientes/Clientes'));
 const ClientPortal      = lazy(() => import('./pages/clientes/ClientPortal'));
 const PipelineConfig    = lazy(() => import('./pages/admin/PipelineConfig'));
+const CallBot           = lazy(() => import('./pages/admin/CallBot'));
 const ManualPage        = lazy(() => import('./pages/support/ManualPage'));
 const HelpChat          = lazy(() => import('./components/HelpChat/HelpChat'));
 const PWAInstallPrompt  = lazy(() => import('./components/PWAInstallPrompt').then(m => ({ default: m.PWAInstallPrompt })));
@@ -159,6 +160,7 @@ function App() {
                     <Route path="/paquetes" element={<GestionPaquetes />} />
                     <Route path="/items" element={<GestionItems />} />
                     <Route path="/admin/pipeline" element={<PipelineConfig />} />
+                    <Route path="/admin/call-bot" element={<CallBot />} />
                   </Route>
 
                   {/* System Admin Routes (Super Admin only) */}
