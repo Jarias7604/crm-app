@@ -8,6 +8,7 @@ import type {
   UpdateClientInput,
   CreateStageInput,
   ClientPortalData,
+  ClientStageComment,
 } from '../types/clients';
 
 // ─────────────────────────────────────
@@ -269,6 +270,49 @@ export const clientDocumentsService = {
       .eq('id', docId);
     if (error) throw error;
     if (count === 0) throw new Error('Sin permiso para eliminar este documento');
+  },
+};
+
+// ─────────────────────────────────────
+// COMENTARIOS POR ETAPA
+// ─────────────────────────────────────
+export const clientStageCommentsService = {
+  async list(clientId: string, stageId: string): Promise<ClientStageComment[]> {
+    const { data, error } = await supabase
+      .from('client_stage_comments')
+      .select(`
+        *,
+        author:profiles!client_stage_comments_created_by_fkey(id, full_name, email, avatar_url)
+      `)
+      .eq('client_id', clientId)
+      .eq('stage_id', stageId)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data || []) as ClientStageComment[];
+  },
+
+  async add(
+    clientId: string,
+    stageId: string,
+    companyId: string,
+    createdBy: string,
+    comment: string
+  ): Promise<ClientStageComment> {
+    const { data, error } = await supabase
+      .from('client_stage_comments')
+      .insert({ client_id: clientId, stage_id: stageId, company_id: companyId, created_by: createdBy, comment })
+      .select(`*, author:profiles!client_stage_comments_created_by_fkey(id, full_name, email, avatar_url)`)
+      .single();
+    if (error) throw error;
+    return data as ClientStageComment;
+  },
+
+  async remove(commentId: string): Promise<void> {
+    const { error } = await supabase
+      .from('client_stage_comments')
+      .delete()
+      .eq('id', commentId);
+    if (error) throw error;
   },
 };
 
