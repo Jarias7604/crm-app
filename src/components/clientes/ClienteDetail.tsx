@@ -88,28 +88,31 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
     const nextStage = sorted[currentIdx + 1];
 
     if (!nextStage) {
-      // Es la etapa final — promover a activo
-      if (!confirm('¿Marcar como Cliente Activo? Esta acción confirma que el onboarding está completo.')) return;
+      // Es la etapa final — promover a activo (sin confirm bloqueante)
       setAdvancing(true);
       try {
         await clientsService.promoteToActive(client.id);
-        toast.success('🎉 ¡Cliente activado!');
+        toast.success('🎉 ¡Cliente activado exitosamente!');
         onUpdated();
         onClose();
-      } catch { toast.error('Error al activar'); }
+      } catch (err: any) {
+        console.error('Error al activar cliente:', err);
+        toast.error(`Error al activar: ${err?.message || 'intenta de nuevo'}`);
+      }
       finally { setAdvancing(false); }
       return;
     }
 
-    if (!confirm(`¿Avanzar a la etapa "${nextStage.nombre}"?`)) return;
     setAdvancing(true);
     try {
       await clientsService.advanceStage(client.id, nextStage.id);
       toast.success(`✅ Avanzado a ${nextStage.nombre}`);
       onUpdated();
       await load();
-
-    } catch { toast.error('Error al avanzar etapa'); }
+    } catch (err: any) {
+      console.error('Error al avanzar etapa:', err);
+      toast.error(`Error al avanzar: ${err?.message || 'intenta de nuevo'}`);
+    }
     finally { setAdvancing(false); }
   };
 
@@ -140,15 +143,16 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
 
     if (!prevStage) return;
 
-    if (!confirm(`¿Regresar de forma segura a la etapa anterior ("${prevStage.nombre}")?`)) return;
     setReverting(true);
     try {
-      // Usar el mismo servicio (es retroactivo visual y base de datos)
       await clientsService.advanceStage(client.id, prevStage.id);
       toast.success(`⏪ Regresó a ${prevStage.nombre}`);
       onUpdated();
       await load();
-    } catch { toast.error('Error al regresar etapa'); }
+    } catch (err: any) {
+      console.error('Error al regresar etapa:', err);
+      toast.error(`Error al regresar: ${err?.message || 'intenta de nuevo'}`);
+    }
     finally { setReverting(false); }
   };
 

@@ -256,9 +256,19 @@ export const clientDocumentsService = {
   },
 
   async delete(docId: string, filePath: string): Promise<void> {
-    await supabase.storage.from('lead-documents').remove([filePath]);
-    const { error } = await supabase.from('client_documents').delete().eq('id', docId);
+    // Borrar del storage (error no es crítico si el archivo ya no existe)
+    const { error: storageError } = await supabase.storage
+      .from('lead-documents')
+      .remove([filePath]);
+    if (storageError) console.warn('Storage delete warning:', storageError.message);
+
+    // Borrar registro de la BD
+    const { error, count } = await supabase
+      .from('client_documents')
+      .delete({ count: 'exact' })
+      .eq('id', docId);
     if (error) throw error;
+    if (count === 0) throw new Error('Sin permiso para eliminar este documento');
   },
 };
 
