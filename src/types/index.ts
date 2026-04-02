@@ -110,6 +110,7 @@ export interface Lead {
     industry?: string | null;
     contact_count?: number;
     engagement_score?: number;
+    call_bot_data?: Record<string, unknown> | null;
     created_at: string;
 }
 

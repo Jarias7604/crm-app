@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-    Phone, Settings, Zap, Activity, CheckCircle2, XCircle,
-    Clock, RefreshCw, Play, StopCircle, Bot,
-    PhoneCall, PhoneIncoming, PhoneMissed, BarChart2,
-    AlertTriangle, X, MessageSquare, ChevronRight,
-    ToggleLeft, ToggleRight, ArrowRight, Calendar, Mic
+    Phone, Settings, Activity, CheckCircle2, XCircle, Clock,
+    RefreshCw, Bot, PhoneCall, PhoneMissed, BarChart2,
+    MessageSquare, ArrowRight, Mic, DollarSign, TrendingUp,
+    ChevronDown, Save, Eye, EyeOff, ToggleLeft, ToggleRight,
+    AlertCircle, Target, Calendar, Zap, Shield
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import {
@@ -12,701 +12,594 @@ import {
     type CallBotStats, DEFAULT_CALL_BOT_CONFIG
 } from '../../services/callBot';
 import toast from 'react-hot-toast';
-import { formatDistanceToNow } from 'date-fns';
-import { es } from 'date-fns/locale';
 
-// ─── Status config ────────────────────────────────────────────────────────────
-const STATUS_CFG: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
-    pending:   { label: 'Pendiente',  color: 'text-amber-600',   bg: 'bg-amber-50',   icon: <Clock className="w-3.5 h-3.5" /> },
-    calling:   { label: 'Llamando',   color: 'text-blue-600',    bg: 'bg-blue-50',    icon: <PhoneCall className="w-3.5 h-3.5 animate-pulse" /> },
-    completed: { label: 'Completada', color: 'text-emerald-600', bg: 'bg-emerald-50', icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
-    no_answer: { label: 'Sin resp.',  color: 'text-gray-500',    bg: 'bg-gray-100',   icon: <PhoneMissed className="w-3.5 h-3.5" /> },
-    cancelled: { label: 'Cancelada',  color: 'text-gray-400',    bg: 'bg-gray-50',    icon: <StopCircle className="w-3.5 h-3.5" /> },
-    failed:    { label: 'Error',      color: 'text-red-600',     bg: 'bg-red-50',     icon: <XCircle className="w-3.5 h-3.5" /> },
-};
-const OUTCOME_CFG: Record<string, { label: string; color: string }> = {
-    connected_qualified:     { label: '✅ Calificó',      color: 'text-emerald-700' },
-    connected_not_qualified: { label: '❌ No calificó',   color: 'text-red-600'     },
-    no_answer:               { label: '📵 Sin respuesta', color: 'text-gray-500'    },
-    voicemail:               { label: '📨 Buzón',         color: 'text-purple-600'  },
-    error:                   { label: '⚠️ Error',         color: 'text-red-500'     },
+// ─── Status config ─────────────────────────────────────────────────────────
+const STATUS_CFG: Record<string, { label: string; color: string; bg: string; dot: string }> = {
+    pending:   { label: 'Pendiente',  color: 'text-amber-700',   bg: 'bg-amber-50 border-amber-200',   dot: 'bg-amber-400' },
+    calling:   { label: 'Llamando',   color: 'text-blue-700',    bg: 'bg-blue-50 border-blue-200',     dot: 'bg-blue-500 animate-pulse' },
+    completed: { label: 'Completada', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200', dot: 'bg-emerald-500' },
+    no_answer: { label: 'Sin resp.',  color: 'text-gray-600',    bg: 'bg-gray-50 border-gray-200',     dot: 'bg-gray-400' },
+    cancelled: { label: 'Cancelada',  color: 'text-gray-500',    bg: 'bg-gray-50 border-gray-200',     dot: 'bg-gray-300' },
+    failed:    { label: 'Error',      color: 'text-red-700',     bg: 'bg-red-50 border-red-200',       dot: 'bg-red-500' },
+    retry:     { label: 'Reintento',  color: 'text-orange-700',  bg: 'bg-orange-50 border-orange-200', dot: 'bg-orange-400' },
 };
 
-// ─── Pipeline Flow Diagram ────────────────────────────────────────────────────
-function PipelineFlowMap({ mapping, stages, onChange }: {
-    mapping: CallBotConfig['outcome_mapping'];
-    stages: string[];
-    onChange: (m: CallBotConfig['outcome_mapping']) => void;
-}) {
-    const outcomes = [
-        { key: 'connected_qualified', label: '✅ Calificó', color: 'bg-emerald-100 border-emerald-300 text-emerald-800' },
-        { key: 'demo_booked', label: '📅 Demo agendada', color: 'bg-purple-100 border-purple-300 text-purple-800' },
-        { key: 'connected_not_qualified', label: '❌ No calificó', color: 'bg-red-100 border-red-300 text-red-800' },
-        { key: 'no_answer', label: '📵 Sin respuesta', color: 'bg-gray-100 border-gray-300 text-gray-700' },
-    ] as const;
+// ─── Cost Estimator ────────────────────────────────────────────────────────
+function CostEstimator() {
+    const [leads, setLeads] = useState(500);
+    const waReplyRate  = 0.30;
+    const waLeads      = Math.round(leads * waReplyRate);
+    const callLeads    = leads - waLeads;
+    const waCost       = leads * 0.0231;
+    const callCost     = callLeads * 0.097;   // 3 min × $0.032/min
+    const total        = waCost + callCost;
+    const savings      = leads * 0.43 - total; // vs Vapi
 
     return (
-        <div className="space-y-3">
-            <p className="text-xs text-gray-500 font-medium">Cuando termine una llamada, el lead se moverá automáticamente a la etapa que configures:</p>
-            {outcomes.map(({ key, label, color }) => (
-                <div key={key} className="flex items-center gap-3">
-                    <div className={`flex-none px-3 py-2 rounded-xl border text-xs font-bold ${color} min-w-[160px] text-center`}>
-                        {label}
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-gray-300 flex-none" />
-                    <select
-                        value={(mapping as unknown as Record<string, string>)[key] || ''}
-                        onChange={e => onChange({ ...mapping, [key]: e.target.value })}
-                        className="flex-1 px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold focus:ring-2 focus:ring-violet-400 transition appearance-none"
-                    >
-                        <option value="">— Sin cambio —</option>
-                        {stages.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
+        <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 text-white space-y-5">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">💰 Estimador de Costos</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">WhatsApp + Telnyx · Stack propio</p>
                 </div>
-            ))}
-        </div>
-    );
-}
+                <span className="bg-emerald-500/20 text-emerald-400 text-xs font-black px-3 py-1 rounded-full border border-emerald-500/30">
+                    Tu stack
+                </span>
+            </div>
 
-// ─── Setup Wizard ─────────────────────────────────────────────────────────────
-const STEPS = ['Vapi', 'Agente', 'Disparadores', 'Pipeline', 'Confirmar'];
-
-function SetupWizard({ config, stages, onSave, onClose }: {
-    config: CallBotConfig;
-    stages: string[];
-    onSave: (c: Partial<CallBotConfig>) => Promise<void>;
-    onClose: () => void;
-}) {
-    const [step, setStep] = useState(0);
-    const [form, setForm] = useState<CallBotConfig>({ ...config });
-    const [saving, setSaving] = useState(false);
-    const upd = (p: Partial<CallBotConfig>) => setForm(prev => ({ ...prev, ...p }));
-
-    const handleSave = async () => {
-        setSaving(true);
-        try {
-            await onSave({ ...form, enabled: true });
-            toast.success('¡Call Bot configurado y activo!');
-            onClose();
-        } catch { toast.error('Error al guardar'); }
-        finally { setSaving(false); }
-    };
-
-    return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-gray-900/70 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden">
-                {/* Header */}
-                <div className="bg-gradient-to-r from-violet-600 to-indigo-600 px-7 pt-6 pb-5">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center">
-                                <Bot className="w-5 h-5 text-white" />
-                            </div>
-                            <div>
-                                <h3 className="text-base font-black text-white">Configurar Call Bot</h3>
-                                <p className="text-[9px] text-white/60 font-bold uppercase tracking-widest">Paso {step + 1} de {STEPS.length}</p>
-                            </div>
-                        </div>
-                        <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl text-white/70 hover:text-white">
-                            <X className="w-4 h-4" />
-                        </button>
-                    </div>
-                    <div className="flex gap-1.5">
-                        {STEPS.map((s, i) => (
-                            <button key={s} onClick={() => setStep(i)}
-                                className={`flex-1 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all ${i === step ? 'bg-white text-indigo-700' : i < step ? 'bg-white/30 text-white' : 'bg-white/10 text-white/40'}`}>
-                                {s}
-                            </button>
-                        ))}
-                    </div>
+            <div>
+                <div className="flex justify-between text-xs text-slate-400 mb-2">
+                    <span>Leads por mes</span>
+                    <span className="font-black text-white text-base">{leads.toLocaleString()}</span>
                 </div>
-
-                {/* Body */}
-                <div className="p-6 space-y-4 overflow-y-auto max-h-[62vh]">
-
-                    {/* Step 0 — Vapi */}
-                    {step === 0 && (
-                        <div className="space-y-4">
-                            <div className="bg-violet-50 border border-violet-100 rounded-2xl p-4">
-                                <p className="text-xs font-black text-violet-700 mb-1">🔑 Conecta tu cuenta Vapi</p>
-                                <p className="text-[11px] text-violet-500">Vapi usa voces de ElevenLabs/OpenAI — 100% natural, no robótico.</p>
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">API Key Privada de Vapi</label>
-                                <input className="mt-1.5 w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-mono focus:ring-2 focus:ring-violet-400 transition"
-                                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-                                    value={form.vapi_api_key}
-                                    onChange={e => upd({ vapi_api_key: e.target.value.trim() })} />
-                                <p className="text-[10px] text-gray-400 mt-1 ml-1">dashboard.vapi.ai → API Keys → Private Key</p>
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">ID del Asistente Vapi</label>
-                                <input className="mt-1.5 w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-mono focus:ring-2 focus:ring-violet-400 transition"
-                                    placeholder="e5b5aac9-5f4f-43b2-8079-6a296f2d5f6e"
-                                    value={form.vapi_assistant_id}
-                                    onChange={e => upd({ vapi_assistant_id: e.target.value.trim() })} />
-                                <p className="text-[10px] text-gray-400 mt-1 ml-1">dashboard.vapi.ai → Assistants → selecciona "Sofia - Arias CRM"</p>
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">ID del Número de Teléfono</label>
-                                <input className="mt-1.5 w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-mono focus:ring-2 focus:ring-violet-400 transition"
-                                    placeholder="fc4554b3-6774-4392-bbb8-faafc5c5f161"
-                                    value={form.vapi_phone_number_id}
-                                    onChange={e => upd({ vapi_phone_number_id: e.target.value.trim() })} />
-                                <p className="text-[10px] text-gray-400 mt-1 ml-1">dashboard.vapi.ai → Phone Numbers → "Arias CRM - Sofia" → copia el ID</p>
-                            </div>
-                            {/* Quick fill for known values */}
-                            <button
-                                onClick={() => upd({
-                                    vapi_api_key: 'a4eaa6da-78c5-49be-8c3d-672b63280af3',
-                                    vapi_assistant_id: 'e5b5aac9-5f4f-43b2-8079-6a296f2d5f6e',
-                                    vapi_phone_number_id: 'fc4554b3-6774-4392-bbb8-faafc5c5f161',
-                                    vapi_phone_number: '+1 (681) 822-9167',
-                                })}
-                                className="w-full py-2.5 bg-indigo-50 border border-dashed border-indigo-200 rounded-2xl text-xs font-black text-indigo-600 hover:bg-indigo-100 transition"
-                            >
-                                ⚡ Autocompletar con credenciales de Arias CRM
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Step 1 — Agente */}
-                    {step === 1 && (
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nombre del Agente AI</label>
-                                <input className="mt-1.5 w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-violet-400"
-                                    placeholder="Sofía, Carlos, María..."
-                                    value={form.agent_name}
-                                    onChange={e => upd({ agent_name: e.target.value })} />
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Horario de llamadas</label>
-                                <div className="grid grid-cols-2 gap-3 mt-1.5">
-                                    <div>
-                                        <p className="text-[9px] text-gray-400 mb-1">Desde</p>
-                                        <input type="time" className="w-full px-3 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold"
-                                            value={form.call_hours.start}
-                                            onChange={e => upd({ call_hours: { ...form.call_hours, start: e.target.value } })} />
-                                    </div>
-                                    <div>
-                                        <p className="text-[9px] text-gray-400 mb-1">Hasta</p>
-                                        <input type="time" className="w-full px-3 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold"
-                                            value={form.call_hours.end}
-                                            onChange={e => upd({ call_hours: { ...form.call_hours, end: e.target.value } })} />
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="bg-gray-50 rounded-2xl p-4">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Días activos</label>
-                                <div className="flex gap-2 mt-2 flex-wrap">
-                                    {[['MON','Lun'],['TUE','Mar'],['WED','Mié'],['THU','Jue'],['FRI','Vie'],['SAT','Sáb'],['SUN','Dom']].map(([k, lbl]) => (
-                                        <button key={k} onClick={() => {
-                                            const days = form.call_days.includes(k)
-                                                ? form.call_days.filter(d => d !== k)
-                                                : [...form.call_days, k];
-                                            upd({ call_days: days });
-                                        }} className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${form.call_days.includes(k) ? 'bg-violet-600 text-white shadow-md' : 'bg-white border border-gray-200 text-gray-500'}`}>
-                                            {lbl}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* ── Guión del Agente ── */}
-                            <div className="border-t border-gray-100 pt-4 space-y-3">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <Mic className="w-3.5 h-3.5 text-violet-500" />
-                                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Guión del Agente</p>
-                                </div>
-
-                                <div>
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Primer mensaje (al contestar)</label>
-                                    <input
-                                        className="mt-1.5 w-full px-4 py-3 bg-violet-50 border border-violet-100 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-violet-400 transition"
-                                        placeholder="Ej: Buenas, con quien tengo el gusto? Soy Sofia de Arias Defense."
-                                        value={form.first_message ?? ''}
-                                        onChange={e => upd({ first_message: e.target.value })}
-                                    />
-                                    <p className="text-[10px] text-gray-400 mt-1 ml-1">Exactamente lo primero que dirá la IA al contestar la llamada.</p>
-                                </div>
-
-                                <div>
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Instrucciones (System Prompt)</label>
-                                        <span className="text-[9px] text-gray-300 font-bold">{(form.system_prompt ?? '').length} chars</span>
-                                    </div>
-                                    <textarea
-                                        rows={7}
-                                        className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-medium text-gray-700 focus:ring-2 focus:ring-violet-400 transition resize-none leading-relaxed"
-                                        placeholder="Describe quién es el agente, qué puede y no puede decir, cuál es su misión..."
-                                        value={form.system_prompt ?? ''}
-                                        onChange={e => upd({ system_prompt: e.target.value })}
-                                    />
-                                    <p className="text-[10px] text-gray-400 mt-1 ml-1">El agente seguirá estas instrucciones durante toda la llamada. Incluye reglas de idioma, tono, y misión.</p>
-                                </div>
-
-                                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
-                                    <p className="text-[10px] font-black text-amber-700 mb-1">💡 Tips para sonar más humano</p>
-                                    <ul className="text-[10px] text-amber-600 space-y-0.5 list-disc ml-3">
-                                        <li>Di "NUNCA digas que eres una IA"</li>
-                                        <li>Limita a 1-2 oraciones por respuesta</li>
-                                        <li>Di que escuche y reaccione antes de preguntar</li>
-                                        <li>Prohíbe explícitamente mencionar precios</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Step 2 — Disparadores */}
-                    {step === 2 && (
-                        <div className="space-y-4">
-                            <div className="bg-violet-50 border border-violet-100 rounded-2xl p-4">
-                                <div className="flex items-center justify-between mb-3">
-                                    <div>
-                                        <p className="text-sm font-black text-gray-900">⏱️ Lead nuevo → llamar en</p>
-                                        <p className="text-[11px] text-gray-500">Cuando llega un lead al CRM con teléfono</p>
-                                    </div>
-                                    <button onClick={() => upd({
-                                        triggers: {
-                                            ...form.triggers,
-                                            new_lead_minutes: form.triggers.new_lead_minutes === null ? 59 : null
-                                        }
-                                    })} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black transition-all ${form.triggers.new_lead_minutes !== null ? 'bg-violet-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
-                                        {form.triggers.new_lead_minutes !== null ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
-                                        {form.triggers.new_lead_minutes !== null ? 'ON' : 'OFF'}
-                                    </button>
-                                </div>
-                                {form.triggers.new_lead_minutes !== null && (
-                                    <div className="flex items-center gap-3">
-                                        <input type="number" min={1} max={1440}
-                                            className="w-20 px-3 py-2 bg-white border border-violet-200 rounded-xl text-sm font-black text-center"
-                                            value={form.triggers.new_lead_minutes}
-                                            onChange={e => upd({ triggers: { ...form.triggers, new_lead_minutes: parseInt(e.target.value) || 59 } })} />
-                                        <span className="text-sm text-gray-600 font-medium">minutos después de ser registrado</span>
-                                    </div>
-                                )}
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Reintentos si no contesta</label>
-                                <div className="flex items-center gap-3 mt-1.5">
-                                    <select className="flex-1 px-3 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold appearance-none"
-                                        value={form.max_retries}
-                                        onChange={e => upd({ max_retries: parseInt(e.target.value) })}>
-                                        {[0, 1, 2, 3].map(n => <option key={n} value={n}>{n} {n === 1 ? 'reintento' : 'reintentos'}</option>)}
-                                    </select>
-                                    <span className="text-sm text-gray-500 flex-none">cada</span>
-                                    <select className="flex-1 px-3 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm font-bold appearance-none"
-                                        value={form.retry_hours}
-                                        onChange={e => upd({ retry_hours: parseInt(e.target.value) })}>
-                                        {[1, 2, 3, 4, 6, 8, 24].map(h => <option key={h} value={h}>{h}h</option>)}
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Step 3 — Pipeline */}
-                    {step === 3 && (
-                        <div className="space-y-4">
-                            <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
-                                <p className="text-xs font-black text-blue-700 mb-1">🔁 Mapa de resultados → Embudo de ventas</p>
-                                <p className="text-[11px] text-blue-500">Al terminar cada llamada, el lead se mueve automáticamente a la etapa configurada.</p>
-                            </div>
-                            <PipelineFlowMap
-                                mapping={form.outcome_mapping}
-                                stages={stages}
-                                onChange={m => upd({ outcome_mapping: m })}
-                            />
-                        </div>
-                    )}
-
-                    {/* Step 4 — Confirmar */}
-                    {step === 4 && (
-                        <div className="space-y-3">
-                            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 space-y-2.5">
-                                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2">Resumen</p>
-                                {[
-                                    ['Proveedor', 'Vapi AI (voz natural)'],
-                                    ['Número', form.vapi_phone_number || 'Vapi #fc4554b3'],
-                                    ['Agente', form.agent_name],
-                                    ['Horario', `${form.call_hours.start} – ${form.call_hours.end}`],
-                                    ['Trigger', form.triggers.new_lead_minutes ? `Leads nuevos en ${form.triggers.new_lead_minutes} min` : 'Solo manual'],
-                                    ['Reintentos', `${form.max_retries}x cada ${form.retry_hours}h`],
-                                    ['Calificó →', form.outcome_mapping.connected_qualified || '—'],
-                                    ['Sin resp →', form.outcome_mapping.no_answer || '—'],
-                                ].map(([k, v]) => (
-                                    <div key={k} className="flex justify-between gap-3">
-                                        <span className="text-[10px] font-bold text-gray-400 uppercase">{k}</span>
-                                        <span className="text-xs font-bold text-gray-800 truncate">{v}</span>
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex gap-2">
-                                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                                <p className="text-xs text-amber-700 font-medium">Al activar, el bot llamará leads automáticamente. Puedes pausarlo en cualquier momento.</p>
-                            </div>
-                        </div>
-                    )}
+                <input
+                    type="range" min="100" max="5000" step="100"
+                    value={leads}
+                    onChange={e => setLeads(Number(e.target.value))}
+                    className="w-full h-2 bg-slate-700 rounded-full appearance-none cursor-pointer accent-violet-500"
+                />
+                <div className="flex justify-between text-[10px] text-slate-600 mt-1">
+                    <span>100</span><span>5,000</span>
                 </div>
+            </div>
 
-                {/* Footer */}
-                <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
-                    <button onClick={() => step > 0 ? setStep(s => s - 1) : onClose()}
-                        className="px-4 py-2.5 text-sm font-bold text-gray-500 hover:text-gray-700 transition">
-                        {step > 0 ? '← Anterior' : 'Cancelar'}
-                    </button>
-                    {step < STEPS.length - 1 ? (
-                        <button onClick={() => setStep(s => s + 1)}
-                            className="bg-violet-600 text-white px-6 py-2.5 rounded-xl text-sm font-black hover:bg-violet-700 transition shadow-lg shadow-violet-200 flex items-center gap-2">
-                            Siguiente <ChevronRight className="w-4 h-4" />
-                        </button>
-                    ) : (
-                        <button onClick={handleSave} disabled={saving}
-                            className="bg-emerald-600 text-white px-6 py-2.5 rounded-xl text-sm font-black hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 flex items-center gap-2 disabled:opacity-50">
-                            <Zap className="w-4 h-4" />
-                            {saving ? 'Activando...' : 'Activar Call Bot'}
-                        </button>
-                    )}
+            <div className="grid grid-cols-2 gap-3">
+                <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3">
+                    <div className="text-green-400 text-[10px] font-black uppercase tracking-widest mb-1">💬 WhatsApp (30%)</div>
+                    <div className="text-2xl font-black text-white">{waLeads}</div>
+                    <div className="text-green-400 text-xs font-bold">${waCost.toFixed(2)}/mes</div>
+                    <div className="text-slate-500 text-[10px] mt-1">$0.023/conversación</div>
+                </div>
+                <div className="bg-violet-500/10 border border-violet-500/20 rounded-xl p-3">
+                    <div className="text-violet-400 text-[10px] font-black uppercase tracking-widest mb-1">📞 Sofía llama (70%)</div>
+                    <div className="text-2xl font-black text-white">{callLeads}</div>
+                    <div className="text-violet-400 text-xs font-bold">${callCost.toFixed(2)}/mes</div>
+                    <div className="text-slate-500 text-[10px] mt-1">$0.097/llamada (3 min)</div>
+                </div>
+            </div>
+
+            <div className="border-t border-slate-700 pt-4 space-y-2">
+                <div className="flex justify-between items-center">
+                    <span className="text-xs text-slate-400">Tu stack (WA + Telnyx)</span>
+                    <span className="text-lg font-black text-emerald-400">${total.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center opacity-40">
+                    <span className="text-xs text-slate-400 line-through">Solo Vapi (antes)</span>
+                    <span className="text-sm font-bold text-red-400 line-through">${(leads * 0.43).toFixed(0)}</span>
+                </div>
+                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-2.5 flex justify-between">
+                    <span className="text-xs text-emerald-400 font-bold">Ahorras vs Vapi</span>
+                    <span className="text-sm font-black text-emerald-400">${savings.toFixed(0)}/mes</span>
                 </div>
             </div>
         </div>
     );
 }
 
-// ─── Transcript Viewer ────────────────────────────────────────────────────────
-function TranscriptViewer({ call, onClose }: { call: CallQueueItem; onClose: () => void }) {
+// ─── Flow Diagram ──────────────────────────────────────────────────────────
+function HybridFlowDiagram() {
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-                    <div>
-                        <p className="text-sm font-black text-gray-900">{call.lead?.name ?? 'Lead'}</p>
-                        <p className="text-[10px] text-gray-400">
-                            {call.outcome ? OUTCOME_CFG[call.outcome]?.label : '—'} ·
-                            {call.duration_seconds ? ` ${Math.floor(call.duration_seconds / 60)}m ${call.duration_seconds % 60}s` : ''}
-                        </p>
-                    </div>
-                    <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100"><X className="w-4 h-4 text-gray-500" /></button>
-                </div>
-                {call.summary && (
-                    <div className="px-6 py-3 bg-violet-50 border-b border-violet-100">
-                        <p className="text-[10px] font-black text-violet-500 uppercase tracking-widest mb-1">Resumen AI</p>
-                        <p className="text-xs text-violet-800 font-medium">{call.summary}</p>
-                    </div>
-                )}
-                <div className="flex-1 overflow-y-auto p-5 space-y-3">
-                    {call.transcript.length === 0 ? (
-                        <p className="text-center text-sm text-gray-300 font-bold py-8">Sin transcripción disponible</p>
-                    ) : call.transcript.map((msg, i) => (
-                        <div key={i} className={`flex ${msg.role === 'bot' ? 'justify-start' : 'justify-end'}`}>
-                            <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${msg.role === 'bot' ? 'bg-violet-50 text-violet-900' : 'bg-gray-900 text-white'}`}>
-                                <p className={`text-[9px] font-black uppercase tracking-widest mb-1 ${msg.role === 'bot' ? 'text-violet-400' : 'text-gray-400'}`}>
-                                    {msg.role === 'bot' ? '🤖 Sofía' : '👤 Lead'}
-                                </p>
-                                <p className="text-xs font-medium leading-relaxed">{msg.content}</p>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">⚡ Flujo Activo — WhatsApp → Sofía</h4>
+            <div className="space-y-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                    {[
+                        { icon: '🎯', label: 'Lead nuevo', c: 'bg-blue-50 border-blue-200 text-blue-800' },
+                        { icon: '💬', label: 'WhatsApp auto', c: 'bg-green-50 border-green-200 text-green-800' },
+                        { icon: '✅', label: 'Responde → califica chat', c: 'bg-emerald-50 border-emerald-200 text-emerald-800' },
+                    ].map((n, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                            <div className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${n.c}`}>
+                                <span>{n.icon}</span><span>{n.label}</span>
                             </div>
+                            {i < 2 && <span className="text-gray-300 font-bold">→</span>}
                         </div>
                     ))}
                 </div>
-                {call.ai_score !== null && (
-                    <div className="px-6 py-3 border-t border-gray-100 flex items-center gap-3">
-                        <span className="text-[10px] font-black text-gray-400 uppercase">Score AI</span>
-                        <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                            <div className="h-full rounded-full bg-violet-500" style={{ width: `${call.ai_score}%` }} />
-                        </div>
-                        <span className="text-sm font-black text-violet-600">{call.ai_score}/100</span>
+                <div className="ml-4 border-l-2 border-dashed border-gray-200 pl-4">
+                    <p className="text-xs text-gray-400 mb-2">Si no responde en <strong>4 horas</strong>:</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {[
+                            { icon: '📞', label: 'Telnyx llama +503', c: 'bg-violet-50 border-violet-200 text-violet-800' },
+                            { icon: '🎙️', label: 'Sofía (tu voz)', c: 'bg-indigo-50 border-indigo-200 text-indigo-800' },
+                            { icon: '🤖', label: 'GPT-4o-mini', c: 'bg-slate-50 border-slate-200 text-slate-700' },
+                            { icon: '📊', label: 'CRM actualizado', c: 'bg-teal-50 border-teal-200 text-teal-800' },
+                        ].map((n, i) => (
+                            <div key={i} className="flex items-center gap-2">
+                                <div className={`px-2.5 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 ${n.c}`}>
+                                    <span>{n.icon}</span><span>{n.label}</span>
+                                </div>
+                                {i < 3 && <span className="text-gray-300 font-bold">→</span>}
+                            </div>
+                        ))}
                     </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─── Collapsible section ────────────────────────────────────────────────────
+function Section({ title, icon, children, defaultOpen = false, badge }: {
+    title: string; icon: React.ReactNode; children: React.ReactNode; defaultOpen?: boolean; badge?: string;
+}) {
+    const [open, setOpen] = useState(defaultOpen);
+    return (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <button
+                onClick={() => setOpen(!open)}
+                className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors"
+            >
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-violet-50 rounded-xl flex items-center justify-center text-violet-600">{icon}</div>
+                    <span className="text-sm font-black text-gray-800">{title}</span>
+                    {badge && <span className="text-[10px] font-black text-violet-600 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full">{badge}</span>}
+                </div>
+                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+            </button>
+            {open && <div className="px-5 pb-5 border-t border-gray-50">{children}</div>}
+        </div>
+    );
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+    return (
+        <div className="space-y-1.5 pt-4">
+            <label className="text-xs font-black text-gray-700 uppercase tracking-widest">{label}</label>
+            {hint && <p className="text-[11px] text-gray-400">{hint}</p>}
+            {children}
+        </div>
+    );
+}
+
+function SecretInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+    const [show, setShow] = useState(false);
+    return (
+        <div className="relative">
+            <input
+                type={show ? 'text' : 'password'}
+                value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono focus:ring-2 focus:ring-violet-400 transition pr-10"
+            />
+            <button onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+        </div>
+    );
+}
+
+function TextInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+    return (
+        <input
+            value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+            className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-violet-400 transition"
+        />
+    );
+}
+
+// ─── Queue Card ─────────────────────────────────────────────────────────────
+function QueueCard({ item }: { item: CallQueueItem }) {
+    const cfg = STATUS_CFG[item.status] || STATUS_CFG.pending;
+    return (
+        <div className={`flex items-center gap-3 p-3 rounded-xl border ${cfg.bg}`}>
+            <div className={`w-2 h-2 rounded-full flex-none ${cfg.dot}`} />
+            <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-gray-900 truncate">{item.lead?.name || 'Lead'}</p>
+                <p className="text-xs text-gray-500">{item.lead?.phone || '—'}</p>
+            </div>
+            <div className="text-right flex-none">
+                <span className={`text-[11px] font-black ${cfg.color}`}>{cfg.label}</span>
+                {item.ai_score !== null && (
+                    <p className="text-[10px] text-gray-400">Score: {item.ai_score}/100</p>
                 )}
             </div>
         </div>
     );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── MAIN ───────────────────────────────────────────────────────────────────
 export default function CallBot() {
     const { profile } = useAuth();
     const [config, setConfig] = useState<CallBotConfig>(DEFAULT_CALL_BOT_CONFIG);
-    const [queue, setQueue] = useState<CallQueueItem[]>([]);
-    const [stats, setStats] = useState<CallBotStats | null>(null);
+    const [stats, setStats]   = useState<CallBotStats | null>(null);
+    const [queue, setQueue]   = useState<CallQueueItem[]>([]);
     const [stages, setStages] = useState<string[]>([]);
+    const [saving, setSaving] = useState(false);
+    const [tab, setTab]       = useState<'dashboard' | 'config' | 'queue'>('dashboard');
     const [loading, setLoading] = useState(true);
-    const [showSetup, setShowSetup] = useState(false);
-    const [selectedCall, setSelectedCall] = useState<CallQueueItem | null>(null);
-    const [triggering, setTriggering] = useState<string | null>(null);
+    const [testing, setTesting] = useState(false);
+    const [testPhoneInput, setTestPhoneInput] = useState('+503');
 
     const load = useCallback(async () => {
         if (!profile?.company_id) return;
         try {
-            const [cfg, q, s, st] = await Promise.all([
+            const [cfg, st, q, sg] = await Promise.all([
                 callBotService.getConfig(profile.company_id),
-                callBotService.getQueue(profile.company_id),
                 callBotService.getStats(profile.company_id),
-                callBotService.getLeadStatuses(profile.company_id),
+                callBotService.getQueue(profile.company_id, 20),
+                callBotService.getPipelineStages(profile.company_id),
             ]);
-            setConfig(cfg);
-            setQueue(q);
-            setStats(s);
-            setStages(st);
-        } catch { toast.error('Error al cargar Call Bot'); }
+            setConfig(cfg); setStats(st); setQueue(q); setStages(sg);
+        } catch (e) { console.error(e); }
         finally { setLoading(false); }
     }, [profile?.company_id]);
 
     useEffect(() => { load(); }, [load]);
 
-    const handleSaveConfig = async (patch: Partial<CallBotConfig>) => {
+    const save = async () => {
         if (!profile?.company_id) return;
-        await callBotService.saveConfig(profile.company_id, patch);
-        setConfig(p => ({ ...p, ...patch }));
-        await load();
-    };
-
-    const handleToggle = async () => {
-        if (!config.vapi_api_key && !config.enabled) { setShowSetup(true); return; }
-        await handleSaveConfig({ enabled: !config.enabled });
-        toast.success(config.enabled ? 'Call Bot pausado' : '✅ Call Bot activado');
-    };
-
-    const handleTriggerCall = async (queueId: string) => {
-        setTriggering(queueId);
+        setSaving(true);
         try {
-            const res = await callBotService.triggerVapiCall(queueId);
-            if (res.success) { toast.success('📞 Llamada iniciada'); load(); }
-            else toast.error(res.error || 'Error al iniciar llamada');
-        } catch { toast.error('Error al iniciar llamada'); }
-        finally { setTriggering(null); }
+            await callBotService.saveConfig(profile.company_id, config);
+            toast.success('Configuración guardada ✓');
+        } catch { toast.error('Error al guardar'); }
+        finally { setSaving(false); }
     };
 
-    const isVapiConfigured = !!(config.vapi_api_key && config.vapi_assistant_id && config.vapi_phone_number_id);
+    const handleTestCall = async () => {
+        if (!profile?.company_id) return;
+        if (!testPhoneInput || testPhoneInput.length < 8) {
+            toast.error('Ingresa un número de teléfono de destino válido');
+            return;
+        }
+        setTesting(true);
+        try {
+            await callBotService.sendTestCall(profile.company_id, testPhoneInput);
+            toast.success('Llamada de prueba lanzada 📞');
+        } catch (e: any) {
+            toast.error(e.message || 'Error al lanzar llamada de prueba');
+        } finally {
+            setTesting(false);
+        }
+    };
+
+    const toggleEnabled = async () => {
+        const next = { ...config, enabled: !config.enabled };
+        setConfig(next);
+        if (profile?.company_id) {
+            await callBotService.saveConfig(profile.company_id, next);
+            toast.success(next.enabled ? '🎙️ Sofía activada' : 'Bot pausado');
+        }
+    };
+
+    const upd = (key: keyof CallBotConfig, val: unknown) =>
+        setConfig(prev => ({ ...prev, [key]: val }));
+
+    if (loading) return (
+        <div className="flex items-center justify-center h-64">
+            <div className="flex flex-col items-center gap-3">
+                <div className="w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm text-gray-500 font-medium">Cargando AI Sales Engine…</p>
+            </div>
+        </div>
+    );
+
+    const isConfigured = !!(config.telnyx_api_key && config.telnyx_phone);
 
     return (
-        <div className="h-full overflow-y-auto p-5 space-y-5">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                <div>
-                    <h1 className="text-2xl font-black text-gray-900 flex items-center gap-2.5">
-                        <div className="w-9 h-9 rounded-xl bg-violet-600 flex items-center justify-center shadow-lg shadow-violet-200">
-                            <Bot className="w-5 h-5 text-white" />
-                        </div>
-                        Call Bot AI
-                    </h1>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-0.5 ml-11">
-                        Agente Vapi · Español latinoamericano · Voz natural
-                    </p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <button onClick={load} className="p-2 hover:bg-gray-100 rounded-xl text-gray-400">
-                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                    </button>
-                    <button onClick={() => setShowSetup(true)}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:bg-gray-50 shadow-sm">
-                        <Settings className="w-4 h-4 text-violet-500" />
-                        Configurar
-                    </button>
-                    <button onClick={handleToggle}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg transition-all ${config.enabled
-                            ? 'bg-red-500 hover:bg-red-600 text-white shadow-red-200'
-                            : 'bg-violet-600 hover:bg-violet-700 text-white shadow-violet-200'}`}>
-                        {config.enabled ? <><StopCircle className="w-4 h-4" />Pausar</> : <><Play className="w-4 h-4" />Activar Bot</>}
-                    </button>
-                </div>
-            </div>
+        <div className="min-h-screen bg-gray-50/50 p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
 
-            {/* Status banner */}
-            <div className={`rounded-2xl border p-4 flex items-center gap-3 transition-all ${config.enabled ? 'bg-emerald-50 border-emerald-200' : isVapiConfigured ? 'bg-gray-50 border-gray-200' : 'bg-amber-50 border-amber-200'}`}>
-                <div className={`w-3 h-3 rounded-full shrink-0 ${config.enabled ? 'bg-emerald-500 animate-pulse' : 'bg-gray-300'}`} />
-                <div className="flex-1">
-                    <p className={`text-sm font-black ${config.enabled ? 'text-emerald-700' : 'text-gray-600'}`}>
-                        {config.enabled
-                            ? `✅ Call Bot activo — Agente "${config.agent_name}" · Vapi`
-                            : isVapiConfigured
-                                ? `⚪ Bot pausado — Agente "${config.agent_name}" configurado`
-                                : '⚠️ Sin configurar — Abre el asistente de configuración'}
-                    </p>
-                    {config.enabled && (
-                        <p className="text-[11px] text-emerald-600 mt-0.5">
-                            {config.vapi_phone_number || 'Vapi #fc4554b3'} ·
-                            {config.call_hours.start}–{config.call_hours.end} ·
-                            {config.triggers.new_lead_minutes ? ` Llama en ${config.triggers.new_lead_minutes} min` : ' Solo manual'}
-                        </p>
-                    )}
-                </div>
-                {!isVapiConfigured && (
-                    <button onClick={() => setShowSetup(true)}
-                        className="ml-auto px-3 py-1.5 bg-violet-600 text-white text-xs font-black rounded-xl hover:bg-violet-700 whitespace-nowrap">
-                        Configurar →
+            {/* HERO */}
+            <div className="relative bg-gradient-to-br from-violet-900 via-indigo-900 to-slate-900 rounded-3xl p-6 sm:p-8 overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-violet-600/20 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
+                <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20 shadow-xl">
+                            <span className="text-2xl">🎙️</span>
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h1 className="text-2xl font-black text-white">Sofía AI Sales Bot</h1>
+                                <span className="bg-violet-500/30 text-violet-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-violet-400/30 uppercase tracking-widest">
+                                    Tu propia voz
+                                </span>
+                            </div>
+                            <p className="text-sm text-slate-400 font-medium mt-0.5">
+                                WhatsApp califica · Telnyx llama · Sofía convierte en español salvadoreño
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={toggleEnabled}
+                        disabled={!isConfigured}
+                        className={`flex items-center gap-3 px-5 py-3 rounded-2xl font-black text-sm transition-all border shadow-lg ${
+                            config.enabled
+                                ? 'bg-emerald-500 border-emerald-400 text-white hover:bg-emerald-600 shadow-emerald-500/30'
+                                : 'bg-white/10 border-white/20 text-white hover:bg-white/20 disabled:opacity-40'
+                        }`}
+                    >
+                        {config.enabled ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
+                        {config.enabled ? 'Sofía Activa' : isConfigured ? 'Activar Sofía' : 'Configura primero'}
                     </button>
+                </div>
+
+                {/* KPIs */}
+                {stats && (
+                    <div className="relative grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
+                        {[
+                            { label: 'Llamadas hoy',    value: stats.total,       icon: <Phone className="w-4 h-4" />,        color: 'text-blue-300' },
+                            { label: 'Calificaron',     value: stats.qualified,   icon: <Target className="w-4 h-4" />,       color: 'text-emerald-300' },
+                            { label: 'Tasa contacto',   value: `${stats.contact_rate}%`, icon: <TrendingUp className="w-4 h-4" />, color: 'text-violet-300' },
+                            { label: 'Demos agendadas', value: stats.demo_booked, icon: <Calendar className="w-4 h-4" />,     color: 'text-amber-300' },
+                        ].map(kpi => (
+                            <div key={kpi.label} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-4">
+                                <div className={`flex items-center gap-1.5 ${kpi.color} mb-2`}>
+                                    {kpi.icon}
+                                    <span className="text-[10px] font-black uppercase tracking-widest opacity-70">{kpi.label}</span>
+                                </div>
+                                <p className="text-2xl font-black text-white">{kpi.value}</p>
+                            </div>
+                        ))}
+                    </div>
                 )}
             </div>
 
-            {/* KPI Strip */}
-            {stats && (
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-                    {[
-                        { label: 'Hoy', val: stats.total_today, color: 'text-gray-800', bg: 'bg-gray-100', icon: <Phone className="w-4 h-4 text-gray-500" /> },
-                        { label: 'Esta semana', val: stats.total_week, color: 'text-gray-700', bg: 'bg-gray-50', icon: <BarChart2 className="w-4 h-4 text-gray-400" /> },
-                        { label: 'Pendientes', val: stats.pending, color: 'text-amber-700', bg: 'bg-amber-50', icon: <Clock className="w-4 h-4 text-amber-500" /> },
-                        { label: 'Conectadas', val: stats.connected, color: 'text-blue-700', bg: 'bg-blue-50', icon: <PhoneIncoming className="w-4 h-4 text-blue-500" /> },
-                        { label: 'Calificaron', val: stats.qualified, color: 'text-emerald-700', bg: 'bg-emerald-50', icon: <CheckCircle2 className="w-4 h-4 text-emerald-500" /> },
-                        { label: 'Demos', val: stats.demos_booked, color: 'text-purple-700', bg: 'bg-purple-50', icon: <Calendar className="w-4 h-4 text-purple-500" /> },
-                        { label: 'Tasa contacto', val: `${stats.contact_rate}%`, color: 'text-indigo-700', bg: 'bg-indigo-50', icon: <Activity className="w-4 h-4 text-indigo-500" /> },
-                    ].map((k, i) => (
-                        <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 hover:shadow-md transition-shadow">
-                            <div className={`w-7 h-7 rounded-lg ${k.bg} flex items-center justify-center mb-2`}>{k.icon}</div>
-                            <p className={`text-xl font-black ${k.color}`}>{k.val}</p>
-                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mt-0.5">{k.label}</p>
-                        </div>
-                    ))}
-                </div>
-            )}
+            {/* TABS */}
+            <div className="flex gap-1 bg-white rounded-2xl p-1.5 border border-gray-100 shadow-sm w-fit">
+                {([
+                    { id: 'dashboard', label: 'Dashboard',  icon: <BarChart2 className="w-4 h-4" /> },
+                    { id: 'config',    label: 'Configurar', icon: <Settings className="w-4 h-4" /> },
+                    { id: 'queue',     label: 'Cola',        icon: <Activity className="w-4 h-4" /> },
+                ] as const).map(t => (
+                    <button key={t.id} onClick={() => setTab(t.id)}
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-black transition-all ${
+                            tab === t.id ? 'bg-violet-600 text-white shadow-lg shadow-violet-200' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+                        }`}>
+                        {t.icon}{t.label}
+                    </button>
+                ))}
+            </div>
 
-            {/* Pipeline Flow Preview */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Flujo de resultados → Embudo</p>
-                <div className="flex items-center gap-2 overflow-x-auto pb-2">
-                    <div className="flex-none text-center">
-                        <div className="w-20 h-16 bg-violet-100 rounded-2xl flex flex-col items-center justify-center gap-1 border border-violet-200">
-                            <Mic className="w-5 h-5 text-violet-600" />
-                            <span className="text-[9px] font-black text-violet-700">LLAMADA</span>
+            {/* DASHBOARD */}
+            {tab === 'dashboard' && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="space-y-6">
+                        <HybridFlowDiagram />
+                        {/* System status */}
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
+                            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">📡 Estado del Sistema</h4>
+                            {[
+                                { label: 'WhatsApp Business API', ok: config.wa_enabled, detail: config.wa_enabled ? 'Activo — envía mensajes automáticos' : 'Desactivado' },
+                                { label: 'Telnyx (telefonía +503)', ok: !!config.telnyx_api_key, detail: config.telnyx_api_key ? 'API Key configurada' : 'Pendiente — crea cuenta Telnyx' },
+                                { label: 'Cartesia (tu voz)', ok: !!config.cartesia_voice_id, detail: config.cartesia_voice_id ? 'Voz clonada lista' : 'Pendiente — clona tu voz' },
+                                { label: 'GPT-4o-mini (cerebro)', ok: true, detail: 'OpenAI · Activo' },
+                                { label: 'Deepgram (escucha STT)', ok: true, detail: 'Nova-2 · Activo' },
+                                { label: 'Cron Job (cada 5 min)', ok: config.enabled, detail: config.enabled ? 'Supabase pg_cron · Activo' : 'Inactivo' },
+                            ].map(item => (
+                                <div key={item.label} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                                    <div className="flex items-center gap-2">
+                                        <div className={`w-2 h-2 rounded-full ${item.ok ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                                        <span className="text-sm font-bold text-gray-700">{item.label}</span>
+                                    </div>
+                                    <span className={`text-xs font-medium ${item.ok ? 'text-emerald-600' : 'text-amber-600'}`}>{item.detail}</span>
+                                </div>
+                            ))}
                         </div>
                     </div>
-                    {[
-                        { label: '✅ Calificó', target: config.outcome_mapping.connected_qualified, color: 'bg-emerald-50 border-emerald-200' },
-                        { label: '📅 Demo', target: config.outcome_mapping.demo_booked, color: 'bg-purple-50 border-purple-200' },
-                        { label: '❌ No calificó', target: config.outcome_mapping.connected_not_qualified, color: 'bg-red-50 border-red-200' },
-                        { label: '📵 Sin resp.', target: config.outcome_mapping.no_answer, color: 'bg-gray-100 border-gray-200' },
-                    ].map(({ label, target, color }) => (
-                        <div key={label} className="flex items-center gap-2 flex-none">
-                            <ArrowRight className="w-4 h-4 text-gray-200" />
-                            <div className={`rounded-xl border px-3 py-2 ${color}`}>
-                                <p className="text-[9px] font-black text-gray-600">{label}</p>
-                                <p className="text-[10px] font-bold text-gray-800 mt-0.5">{target || '—'}</p>
+                    <CostEstimator />
+                </div>
+            )}
+
+            {/* CONFIG */}
+            {tab === 'config' && (
+                <div className="space-y-4">
+
+                    {/* WhatsApp */}
+                    <Section title="💬 WhatsApp — Primer Contacto (siempre activo)" icon={<MessageSquare className="w-4 h-4" />} badge="Siempre ON" defaultOpen>
+                        <Field label="Mensaje automático al llegar el lead" hint="Se envía inmediatamente cuando entra un lead nuevo">
+                            <textarea
+                                value={config.wa_first_message}
+                                onChange={e => upd('wa_first_message', e.target.value)}
+                                rows={4}
+                                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-violet-400 transition resize-none"
+                            />
+                        </Field>
+                        <Field label="Horas de espera antes de llamar" hint="Si no responde WhatsApp, Sofía llama automáticamente">
+                            <div className="flex items-center gap-3">
+                                <input type="number" min={1} max={24} value={config.wa_wait_hours}
+                                    onChange={e => upd('wa_wait_hours', Number(e.target.value))}
+                                    className="w-24 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-violet-400 text-center"
+                                />
+                                <span className="text-sm text-gray-500 font-medium">horas de espera</span>
+                            </div>
+                        </Field>
+                    </Section>
+
+                    {/* Telnyx */}
+                    <Section title="📞 Telnyx — Llamadas a El Salvador" icon={<Phone className="w-4 h-4" />} defaultOpen>
+                        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-2 flex gap-2 mt-4">
+                            <AlertCircle className="w-4 h-4 text-blue-600 flex-none mt-0.5" />
+                            <div>
+                                <p className="text-xs font-black text-blue-800">Registra tu cuenta Telnyx</p>
+                                <p className="text-xs text-blue-700 mt-0.5">
+                                    <a href="https://telnyx.com" target="_blank" rel="noopener noreferrer" className="underline font-bold">telnyx.com</a>
+                                    {' '}→ Mission Control → API Keys + compra un número El Salvador o USA
+                                </p>
                             </div>
                         </div>
-                    ))}
-                </div>
-                <button onClick={() => setShowSetup(true)} className="mt-3 text-[10px] font-black text-violet-500 hover:text-violet-700 transition">
-                    ✏️ Modificar mapeo
-                </button>
-            </div>
+                        <Field label="Telnyx API Key">
+                            <SecretInput value={config.telnyx_api_key} onChange={v => upd('telnyx_api_key', v)} placeholder="KEY0..." />
+                        </Field>
+                        <Field label="Connection ID" hint="Mission Control → Voice → Connections → tu SIP Connection ID">
+                            <TextInput value={config.telnyx_connection_id} onChange={v => upd('telnyx_connection_id', v)} placeholder="1234567890123456789" />
+                        </Field>
+                        <Field label="Número saliente" hint="El número desde el que llamará Sofía (formato +503XXXXXXXX o +1XXXXXXXXXX)">
+                            <TextInput value={config.telnyx_phone} onChange={v => upd('telnyx_phone', v)} placeholder="+50312345678" />
+                        </Field>
+                    </Section>
 
-            {/* Queue Table */}
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between">
-                    <p className="text-[11px] font-black text-gray-500 uppercase tracking-widest">Cola de llamadas</p>
-                    <p className="text-[10px] text-gray-400 font-bold">{queue.length} registros</p>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead>
-                            <tr className="border-b border-gray-50 bg-gray-50/40">
-                                {['Lead / Teléfono', 'Trigger', 'Estado', 'Resultado', 'Score', 'Agendada', 'Acciones'].map(h => (
-                                    <th key={h} className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">{h}</th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                            {loading ? Array.from({ length: 4 }).map((_, i) => (
-                                <tr key={i} className="animate-pulse">
-                                    {Array.from({ length: 7 }).map((_, j) => (
-                                        <td key={j} className="px-4 py-4"><div className="h-3 bg-gray-100 rounded-full" /></td>
-                                    ))}
-                                </tr>
-                            )) : queue.length === 0 ? (
-                                <tr>
-                                    <td colSpan={7} className="py-16 text-center">
-                                        <Bot className="w-10 h-10 text-gray-100 mx-auto mb-3" />
-                                        <p className="text-sm font-bold text-gray-300">
-                                            {config.enabled ? 'Sin llamadas aún' : 'Activa el bot para empezar'}
-                                        </p>
-                                    </td>
-                                </tr>
-                            ) : queue.map(call => {
-                                const sc = STATUS_CFG[call.status] ?? STATUS_CFG.failed;
-                                const oc = call.outcome ? OUTCOME_CFG[call.outcome] : null;
-                                return (
-                                    <tr key={call.id} className="hover:bg-gray-50/50 transition-colors">
-                                        <td className="px-4 py-3.5">
-                                            <p className="text-sm font-black text-gray-900">{call.lead?.name ?? '—'}</p>
-                                            <p className="text-[10px] text-gray-400">{call.lead?.phone ?? 'Sin teléfono'}</p>
-                                        </td>
-                                        <td className="px-4 py-3.5">
-                                            <span className="text-[9px] font-black text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-md uppercase">
-                                                {call.trigger_type === 'new_lead_auto' ? '⏱ Auto' : call.trigger_type === 'stage_change' ? '🔄 Etapa' : '👆 Manual'}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3.5">
-                                            <span className={`flex items-center gap-1.5 w-fit px-2 py-1 rounded-full text-[9px] font-black ${sc.bg} ${sc.color}`}>
-                                                {sc.icon}{sc.label}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3.5">
-                                            {oc ? <span className={`text-xs font-bold ${oc.color}`}>{oc.label}</span> : <span className="text-[10px] text-gray-200">—</span>}
-                                        </td>
-                                        <td className="px-4 py-3.5">
-                                            {call.ai_score !== null ? (
-                                                <div className="flex items-center gap-1.5">
-                                                    <div className="w-10 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                                        <div className="h-full bg-violet-500 rounded-full" style={{ width: `${call.ai_score}%` }} />
-                                                    </div>
-                                                    <span className="text-[10px] font-black text-violet-600">{call.ai_score}</span>
-                                                </div>
-                                            ) : <span className="text-[10px] text-gray-200">—</span>}
-                                        </td>
-                                        <td className="px-4 py-3.5">
-                                            <span className="text-[10px] text-gray-400">
-                                                {formatDistanceToNow(new Date(call.scheduled_at), { addSuffix: true, locale: es })}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3.5">
-                                            <div className="flex items-center gap-1">
-                                                {call.status === 'pending' && isVapiConfigured && (
-                                                    <button
-                                                        onClick={() => handleTriggerCall(call.id)}
-                                                        disabled={triggering === call.id}
-                                                        title="Llamar ahora"
-                                                        className="p-1.5 rounded-lg hover:bg-green-100 text-gray-400 hover:text-green-600 transition disabled:opacity-50">
-                                                        {triggering === call.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <PhoneCall className="w-3.5 h-3.5" />}
-                                                    </button>
-                                                )}
-                                                {call.transcript.length > 0 && (
-                                                    <button onClick={() => setSelectedCall(call)}
-                                                        title="Ver transcripción"
-                                                        className="p-1.5 rounded-lg hover:bg-violet-100 text-gray-400 hover:text-violet-600 transition">
-                                                        <MessageSquare className="w-3.5 h-3.5" />
-                                                    </button>
-                                                )}
-                                                {['pending', 'retry'].includes(call.status) && (
-                                                    <button onClick={() => callBotService.cancelCall(call.id).then(load)}
-                                                        title="Cancelar"
-                                                        className="p-1.5 rounded-lg hover:bg-red-100 text-gray-400 hover:text-red-600 transition">
-                                                        <X className="w-3.5 h-3.5" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                    {/* Cartesia */}
+                    <Section title="🎙️ Cartesia — Tu Voz Clonada" icon={<Mic className="w-4 h-4" />}>
+                        <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 mb-2 mt-4 flex gap-2">
+                            <Shield className="w-4 h-4 text-violet-600 flex-none mt-0.5" />
+                            <div>
+                                <p className="text-xs font-black text-violet-800">Clona tu voz en Cartesia</p>
+                                <p className="text-xs text-violet-700 mt-0.5">
+                                    <a href="https://cartesia.ai" target="_blank" rel="noopener noreferrer" className="underline font-bold">cartesia.ai</a>
+                                    {' '}→ Voices → Clone → sube 1 minuto de tu voz → copia el Voice ID
+                                </p>
+                            </div>
+                        </div>
+                        <Field label="Cartesia API Key">
+                            <SecretInput value={config.cartesia_api_key} onChange={v => upd('cartesia_api_key', v)} placeholder="sk_car_..." />
+                        </Field>
+                        <Field label="Voice ID" hint="El ID de tu voz clonada en Cartesia">
+                            <TextInput value={config.cartesia_voice_id} onChange={v => upd('cartesia_voice_id', v)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+                        </Field>
+                    </Section>
 
-            {/* Modals */}
-            {showSetup && (
-                <SetupWizard
-                    config={config}
-                    stages={stages}
-                    onSave={handleSaveConfig}
-                    onClose={() => setShowSetup(false)}
-                />
+                    {/* Sofia agent */}
+                    <Section title="🤖 Agente Sofía — Guión y Personalidad" icon={<Bot className="w-4 h-4" />}>
+                        <Field label="Nombre del agente">
+                            <TextInput value={config.agent_name} onChange={v => upd('agent_name', v)} placeholder="Sofía" />
+                        </Field>
+                        <Field label="Primer mensaje (lo que dice al contestar el lead)">
+                            <TextInput value={config.first_message} onChange={v => upd('first_message', v)} placeholder="Buenas, ¿con quién tengo el gusto?..." />
+                        </Field>
+                        <Field label="System Prompt — Guión completo de Sofía" hint="Define personalidad, reglas y flujo • Español centroamericano obligatorio">
+                            <textarea
+                                value={config.system_prompt}
+                                onChange={e => upd('system_prompt', e.target.value)}
+                                rows={14}
+                                className="w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono focus:ring-2 focus:ring-violet-400 transition resize-none leading-relaxed"
+                            />
+                        </Field>
+                    </Section>
+
+                    {/* Horario */}
+                    <Section title="🕐 Horario de Llamadas" icon={<Clock className="w-4 h-4" />}>
+                        <div className="grid grid-cols-2 gap-4 pt-4">
+                            <Field label="Hora inicio">
+                                <input type="time" value={config.call_hours.start}
+                                    onChange={e => upd('call_hours', { ...config.call_hours, start: e.target.value })}
+                                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-violet-400"
+                                />
+                            </Field>
+                            <Field label="Hora fin">
+                                <input type="time" value={config.call_hours.end}
+                                    onChange={e => upd('call_hours', { ...config.call_hours, end: e.target.value })}
+                                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-violet-400"
+                                />
+                            </Field>
+                        </div>
+                        <Field label="Días activos">
+                            <div className="flex gap-2 flex-wrap pt-1">
+                                {[{ k: 'MON', l: 'L' }, { k: 'TUE', l: 'M' }, { k: 'WED', l: 'X' }, { k: 'THU', l: 'J' }, { k: 'FRI', l: 'V' }, { k: 'SAT', l: 'S' }, { k: 'SUN', l: 'D' }].map(d => {
+                                    const active = config.call_days.includes(d.k);
+                                    return (
+                                        <button key={d.k}
+                                            onClick={() => upd('call_days', active ? config.call_days.filter(x => x !== d.k) : [...config.call_days, d.k])}
+                                            className={`w-10 h-10 rounded-xl text-sm font-black transition-all ${active ? 'bg-violet-600 text-white shadow-md shadow-violet-200' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                                        >{d.l}</button>
+                                    );
+                                })}
+                            </div>
+                        </Field>
+                    </Section>
+
+                    {/* Pipeline */}
+                    <Section title="🔀 Pipeline — Mover Lead Automáticamente" icon={<Zap className="w-4 h-4" />}>
+                        <p className="text-xs text-gray-500 font-medium pt-4 mb-3">Cuando Sofía termina, el lead se mueve a la etapa configurada:</p>
+                        {[
+                            { key: 'connected_qualified',     label: '✅ Calificó (>50 DTE/mes)',  color: 'bg-emerald-50 border-emerald-200 text-emerald-800' },
+                            { key: 'demo_booked',             label: '📅 Demo agendada',            color: 'bg-purple-50 border-purple-200 text-purple-800' },
+                            { key: 'connected_not_qualified', label: '❌ No calificó',              color: 'bg-red-50 border-red-200 text-red-800' },
+                            { key: 'no_answer',               label: '📵 Sin respuesta',            color: 'bg-gray-100 border-gray-200 text-gray-600' },
+                        ].map(({ key, label, color }) => (
+                            <div key={key} className="flex items-center gap-3 py-2">
+                                <div className={`flex-none px-3 py-2 rounded-xl border text-xs font-bold ${color} w-48 text-center`}>{label}</div>
+                                <ArrowRight className="w-4 h-4 text-gray-300 flex-none" />
+                                <select
+                                    value={(config.outcome_mapping as Record<string, string>)[key] || ''}
+                                    onChange={e => upd('outcome_mapping', { ...config.outcome_mapping, [key]: e.target.value })}
+                                    className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-violet-400 transition"
+                                >
+                                    <option value="">— Sin cambio —</option>
+                                    {stages.map(s => <option key={s} value={s}>{s}</option>)}
+                                </select>
+                            </div>
+                        ))}
+                    </Section>
+
+                    {/* PRUEBA */}
+                    <div className="bg-emerald-50 rounded-2xl border border-emerald-200 p-5 mt-4">
+                        <h4 className="text-emerald-800 font-black mb-1 text-center">Pruébalo ahora mismo</h4>
+                        <p className="text-xs text-emerald-600 mb-4 text-center">Enviaremos una llamada de prueba desde tu sistema hacia el número que ingreses aquí.</p>
+                        
+                        <div className="flex flex-col sm:flex-row items-center gap-3 justify-center w-full max-w-md mx-auto">
+                            <input 
+                                value={testPhoneInput} 
+                                onChange={e => setTestPhoneInput(e.target.value)} 
+                                placeholder="+503..." 
+                                className="flex-1 px-4 py-3 bg-white border border-emerald-200 rounded-xl text-sm font-bold shadow-sm focus:ring-2 focus:ring-emerald-400 focus:outline-none"
+                            />
+                            <button onClick={handleTestCall} disabled={testing || !isConfigured}
+                                className="px-6 py-3 bg-emerald-500 text-white font-black rounded-xl hover:bg-emerald-600 transition flex items-center gap-2 text-sm shadow-md shadow-emerald-500/30 disabled:opacity-50 flex-none">
+                                {testing ? <><RefreshCw className="w-4 h-4 animate-spin" /> Llamando...</> : <><PhoneCall className="w-4 h-4" /> Probar Llamada</>}
+                            </button>
+                        </div>
+                    </div>
+
+                    <button onClick={save} disabled={saving}
+                        className="w-full py-4 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-violet-200 hover:from-violet-700 hover:to-indigo-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2 text-base">
+                        {saving ? <><RefreshCw className="w-5 h-5 animate-spin" /> Guardando...</> : <><Save className="w-5 h-5" /> Guardar configuración</>}
+                    </button>
+                </div>
             )}
-            {selectedCall && (
-                <TranscriptViewer call={selectedCall} onClose={() => setSelectedCall(null)} />
+
+            {/* QUEUE */}
+            {tab === 'queue' && (
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="text-base font-black text-gray-900">Cola de llamadas en vivo</h3>
+                            <p className="text-xs text-gray-500">{queue.length} registros</p>
+                        </div>
+                        <button onClick={load} className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition shadow-sm">
+                            <RefreshCw className="w-3.5 h-3.5" /> Actualizar
+                        </button>
+                    </div>
+                    {queue.length === 0 ? (
+                        <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
+                            <div className="text-4xl mb-3">📭</div>
+                            <p className="text-sm font-bold text-gray-500">Cola vacía</p>
+                            <p className="text-xs text-gray-400 mt-1">Los leads aparecerán cuando Sofía empiece a llamar</p>
+                        </div>
+                    ) : (
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
+                            {queue.map(item => (
+                                <div key={item.id} className="p-3">
+                                    <QueueCard item={item} />
+                                    {item.summary && (
+                                        <div className="mt-2 ml-5 bg-gray-50 rounded-xl px-3 py-2 text-xs text-gray-600">
+                                            <span className="font-bold text-violet-600">Sofía: </span>{item.summary}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             )}
         </div>
     );
