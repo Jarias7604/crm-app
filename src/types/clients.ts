@@ -91,6 +91,19 @@ export interface ClientPortalData {
   };
 }
 
+export interface ClientStageComment {
+  id: string;
+  company_id: string;
+  client_id: string;
+  stage_id: string;
+  comment: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  // relación
+  author?: { id: string; full_name: string | null; email: string; avatar_url?: string | null };
+}
+
 // Para formularios
 export type CreateClientInput = Pick<
   Client,

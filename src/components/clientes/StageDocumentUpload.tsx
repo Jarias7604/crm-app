@@ -3,6 +3,7 @@ import { Upload, File, Trash2, Download, CheckCircle2, Circle, Loader2, X } from
 import { clientDocumentsService } from '../../services/clients';
 import type { Client, ClientPipelineStage, ClientDocument, ClientStageDocumentType } from '../../types/clients';
 import { useAuth } from '../../auth/AuthProvider';
+import StageComments from './StageComments';
 import toast from 'react-hot-toast';
 
 interface Props {
@@ -148,19 +149,26 @@ export default function StageDocumentUpload({ stage, client, documents, onDocume
 
       {/* Docs generales (sin tipo definido) */}
       {stageDocs.filter(d => !d.doc_type_id).map(doc => (
-        <div key={doc.id} className="flex items-center gap-2 p-2 rounded-lg border border-gray-100 bg-white">
-          <File className="w-3.5 h-3.5 text-gray-400" />
-          <span className="text-xs text-gray-600 flex-1 truncate">{doc.nombre}</span>
-          <button onClick={() => handleDownload(doc)} className="text-gray-400 hover:text-[#4449AA]">
+        <div key={doc.id} className="flex items-center gap-2 p-2 rounded-xl bg-gray-50 border border-gray-100">
+          <File className="w-4 h-4 text-[#4449AA]" />
+          <span className="text-xs text-gray-700 font-medium truncate flex-1">{doc.nombre}</span>
+          <button onClick={() => handleDownload(doc)} className="p-1 text-gray-400 hover:text-[#4449AA]">
             <Download className="w-3.5 h-3.5" />
           </button>
           {!readOnly && (
-            <button onClick={() => handleDelete(doc)} className="text-gray-400 hover:text-red-500">
+            <button onClick={() => handleDelete(doc)} className="p-1 text-gray-400 hover:text-red-500">
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
       ))}
+
+      {/* SECCIÓN DE COMENTARIOS DE ETAPA */}
+      <StageComments 
+        clientId={client.id} 
+        stageId={stage.id} 
+        stageName={stage.nombre} 
+      />
     </div>
   );
 }
