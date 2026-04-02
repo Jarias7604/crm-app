@@ -56,13 +56,13 @@ export default function StageDocumentUpload({ stage, client, documents, onDocume
   };
 
   const handleDelete = async (doc: ClientDocument) => {
-    if (!confirm('¿Eliminar este documento?')) return;
     try {
       await clientDocumentsService.delete(doc.id, doc.file_path);
-      toast.success('Documento eliminado');
+      toast.success('🗑️ Documento eliminado');
       onDocumentUploaded();
-    } catch {
-      toast.error('Error al eliminar');
+    } catch (err: any) {
+      console.error('Error al eliminar documento:', err);
+      toast.error(`Error al eliminar: ${err?.message || 'intenta de nuevo'}`);
     }
   };
 

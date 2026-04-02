@@ -62,6 +62,7 @@ export interface Ticket {
     created_by: string | null;
 
     // Joined data
+    lead_name?: string | null;       // snapshot — always readable, even for restricted agents
     lead?: { name: string; email: string };
     category?: TicketCategory;
     assigned_profile?: { id: string; full_name: string; avatar_url: string | null };
@@ -166,6 +167,7 @@ export const ticketService = {
             .from('tickets')
             .select(`
                 *,
+                lead_name,
                 lead:leads(name, email),
                 category:ticket_categories(*),
                 assigned_profile:profiles!tickets_assigned_to_fkey(id, full_name, avatar_url)
@@ -184,7 +186,13 @@ export const ticketService = {
 
         const { data, error } = await query.order('created_at', { ascending: false });
         if (error) throw error;
-        return (data || []) as Ticket[];
+        // fallback: if RLS blocks the lead join (agent doesn't own the lead),
+        // reconstruct lead object from the snapshot column
+        return (data || []).map((t: Record<string, unknown>) => ({
+            ...t,
+            lead: (t.lead as { name: string; email: string } | null) ??
+                  (t.lead_name ? { name: t.lead_name as string, email: null } : undefined),
+        })) as Ticket[];
     },
 
     async createTicket(
@@ -226,6 +234,7 @@ export const ticketService = {
             .eq('id', ticketId)
             .select(`
                 *,
+                lead_name,
                 lead:leads(name, email),
                 category:ticket_categories(*),
                 assigned_profile:profiles!tickets_assigned_to_fkey(id, full_name, avatar_url)
@@ -233,7 +242,14 @@ export const ticketService = {
             .single();
 
         if (error) throw error;
-        return data as Ticket;
+        // Same fallback as getTickets: use snapshot if RLS blocks the join
+        const t = data as Record<string, unknown>;
+        return {
+            ...t,
+            lead: (t.lead as { name: string; email: string } | null) ??
+                  (t.lead_name ? { name: t.lead_name as string, email: null } : undefined),
+        } as Ticket;
+
     },
 
     // ─── Comments (Seguimientos) ─────────────────────────────────────────────

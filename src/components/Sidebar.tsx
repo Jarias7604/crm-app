@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthProvider';
-import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft, Zap, Search, Bot, XCircle, Network, BarChart3, UserCircle, Headset, TicketIcon, AlertTriangle, UserCheck, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft, Zap, Search, Bot, XCircle, Network, BarChart3, UserCircle, Headset, TicketIcon, AlertTriangle, UserCheck, BookOpen, PhoneCall } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { brandingService } from '../services/branding';
@@ -21,7 +21,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         current: boolean;
         subItems?: { name: string; href: string; icon: any }[];
     }
-    const configPaths = ['/company/branding', '/pricing', '/paquetes', '/items', '/financial-rules', '/loss-reasons', '/industries'];
+    const configPaths = ['/company/branding', '/pricing', '/paquetes', '/items', '/financial-rules', '/loss-reasons', '/industries', '/admin/call-bot'];
     const marketingPaths = ['/marketing', '/marketing/email', '/marketing/lead-hunter', '/marketing/ai-agents', '/marketing/settings'];
     const teamPaths = ['/company/team', '/company/teams', '/company/performance'];
     const [configOpen, setConfigOpen] = useState(configPaths.some(path => location.pathname === path));
@@ -141,6 +141,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         { name: 'Gestión Financiera', href: '/financial-rules', icon: CreditCard, current: location.pathname === '/financial-rules', permissionKey: 'financial_rules' },
         { name: 'Motivos de Pérdida', href: '/loss-reasons', icon: XCircle, current: location.pathname === '/loss-reasons', permissionKey: 'loss_reasons' },
         { name: 'Rubros / Industrias', href: '/industries', icon: Building2, current: location.pathname === '/industries', permissionKey: 'loss_reasons' },
+        { name: 'Call Bot AI', href: '/admin/call-bot', icon: PhoneCall, current: location.pathname === '/admin/call-bot', permissionKey: 'pipeline.admin' },
     ];
 
     const isSuperOrAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
