@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Download, Sparkles, Palette, Phone, Globe, ChevronRight, ChevronDown, Search, Loader2, ImageIcon, RefreshCw, Upload, Monitor } from 'lucide-react';
@@ -1092,15 +1092,26 @@ export default function FlyerStudio() {
 
               {/* ─ Scrollable flyer area ─────────────────────────────── */}
               {(() => {
-                const aspect = selectedSize.h / selectedSize.w;
-                const maxW = 500;
-                const maxH = 500;
+                // Templates are designed at 540×675 (their BASE size).
+                // We compute a preview box matching the selected format's aspect ratio,
+                // then COVER-scale the 540×675 template to fill that box exactly.
+                const TMPL_W = 540, TMPL_H = 675;
+                const fmtAspect = selectedSize.h / selectedSize.w;
+                const maxW = 490, maxH = 520;
                 let baseW = maxW;
-                let baseH = baseW * aspect;
-                if (baseH > maxH) { baseH = maxH; baseW = maxH / aspect; }
-                const previewW = baseW * previewZoom;
-                const previewH = baseH * previewZoom;
-                const scale = previewW / selectedSize.w;
+                let baseH = baseW * fmtAspect;
+                if (baseH > maxH) { baseH = maxH; baseW = maxH / fmtAspect; }
+                const pW = Math.round(baseW * previewZoom);
+                const pH = Math.round(baseH * previewZoom);
+
+                // COVER: scale template so it fills pW×pH (may crop edges slightly)
+                const coverScale = Math.max(pW / TMPL_W, pH / TMPL_H);
+                const scaledTW = TMPL_W * coverScale;
+                const scaledTH = TMPL_H * coverScale;
+                // Center template inside the preview box
+                const offsetX = (pW - scaledTW) / 2;
+                const offsetY = (pH - scaledTH) / 2;
+
                 const zoomed = previewZoom > 1.02;
                 return (
                   <div style={{
@@ -1112,8 +1123,15 @@ export default function FlyerStudio() {
                     padding: zoomed ? '52px 20px 52px 20px' : '52px 20px 44px 20px',
                   }}>
                     <div style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.28)', borderRadius: 4, flexShrink: 0 }}>
-                      <div style={{ width: previewW, height: previewH, overflow: 'hidden', borderRadius: 4 }}>
-                        <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: selectedSize.w, height: selectedSize.h }}>
+                      {/* Clip box: exact preview dimensions for the selected format */}
+                      <div style={{ width: pW, height: pH, overflow: 'hidden', borderRadius: 4, position: 'relative' }}>
+                        {/* Template at 540×675, scaled to COVER pW×pH */}
+                        <div style={{
+                          position: 'absolute',
+                          width: TMPL_W, height: TMPL_H,
+                          transform: `translate(${offsetX}px, ${offsetY}px) scale(${coverScale})`,
+                          transformOrigin: 'top left',
+                        }}>
                           <ActiveTemplate d={flyerData} />
                         </div>
                       </div>
@@ -1128,11 +1146,29 @@ export default function FlyerStudio() {
 
       </main>
 
-      {/* Hidden full-size flyer for html2canvas export — exact target dimensions */}
+      {/* Hidden full-size flyer for html2canvas export */}
+      {/* Template (540×675) is scaled to exactly fill selectedSize.w × selectedSize.h */}
       <div style={{ position: 'fixed', top: -9999, left: -9999, zIndex: -1, pointerEvents: 'none' }}>
-        <div ref={flyerRef} style={{ width: selectedSize.w, height: selectedSize.h }}>
-          <ActiveTemplate d={flyerData} />
-        </div>
+        {(() => {
+          const TMPL_W = 540, TMPL_H = 675;
+          const exportCoverScale = Math.max(selectedSize.w / TMPL_W, selectedSize.h / TMPL_H);
+          const scaledTW = TMPL_W * exportCoverScale;
+          const scaledTH = TMPL_H * exportCoverScale;
+          const offX = (selectedSize.w - scaledTW) / 2;
+          const offY = (selectedSize.h - scaledTH) / 2;
+          return (
+            <div ref={flyerRef} style={{ width: selectedSize.w, height: selectedSize.h, overflow: 'hidden', position: 'relative' }}>
+              <div style={{
+                position: 'absolute',
+                width: TMPL_W, height: TMPL_H,
+                transform: `translate(${offX}px, ${offY}px) scale(${exportCoverScale})`,
+                transformOrigin: 'top left',
+              }}>
+                <ActiveTemplate d={flyerData} />
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

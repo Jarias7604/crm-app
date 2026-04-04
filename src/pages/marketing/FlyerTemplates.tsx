@@ -33,8 +33,8 @@ export const imgObjPos = (pos?: { x: number; y: number }) =>
 
 // ─── BASE STYLES ──────────────────────────────────────────────────────────────
 const BASE: React.CSSProperties = {
-  width: '100%',
-  height: '100%',
+  width: 540,
+  height: 675,
   position: 'relative',
   overflow: 'hidden',
   fontFamily: "'Outfit', 'Inter', sans-serif",
