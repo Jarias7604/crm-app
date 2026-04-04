@@ -1059,26 +1059,27 @@ export default function FlyerStudio() {
                 const pW = Math.round(baseW * previewZoom);
                 const pH = Math.round(baseH * previewZoom);
 
-                // Choose scale strategy based on format orientation
+                // SCALE STRATEGY:
+                // Portrait / square (h ≥ w): COVER → fills the frame, looks full-bleed
+                // Landscape (w > h): FIT/CONTAIN → ALL text always visible, gradient fills sides
+                const isLandscape = selectedSize.w > selectedSize.h;
+
                 let previewScale: number;
                 let offsetX: number, offsetY: number;
 
-                if (fmtAspect >= 0.7) {
-                  // Portrait / square-ish → COVER (fills box, may clip edges slightly for very square formats)
+                if (!isLandscape) {
+                  // Portrait/square → COVER: fill the frame
                   previewScale = Math.max(pW / TMPL_W, pH / TMPL_H);
                 } else {
-                  // Landscape / banner → FILL WIDTH (template always fills width, crop from bottom)
-                  previewScale = pW / TMPL_W;
+                  // Landscape → FIT: show ALL content, no clipping
+                  previewScale = Math.min(pW / TMPL_W, pH / TMPL_H);
                 }
 
                 const scaledTW = Math.round(TMPL_W * previewScale);
                 const scaledTH = Math.round(TMPL_H * previewScale);
-                // Center horizontally; for vertical, use focal point Y or center
-                const focalY = flyerData.bgImagePosition?.y ?? 50;
+                // Always center the template in the frame
                 offsetX = Math.round((pW - scaledTW) / 2);
-                // Focal-point-aware vertical offset: align center of focal point to center of box
-                const idealTop = Math.round(pH / 2 - scaledTH * (focalY / 100));
-                offsetY = Math.min(0, Math.max(pH - scaledTH, idealTop));
+                offsetY = Math.round((pH - scaledTH) / 2);
 
                 const zoomed = previewZoom > 1.02;
                 const fillBg = `linear-gradient(160deg, ${flyerData.accent}33 0%, #0f172a 100%)`;
@@ -1125,17 +1126,22 @@ export default function FlyerStudio() {
       <div style={{ position: 'fixed', top: -9999, left: -9999, zIndex: -1, pointerEvents: 'none' }}>
         {(() => {
           const TMPL_W = 540, TMPL_H = 675;
-          // Fill width of the selected format
-          const exportScale = selectedSize.w / TMPL_W;
+          // Same strategy as preview: portrait=fill-width, landscape=FIT (all content visible)
+          const isLandscapeExport = selectedSize.w > selectedSize.h;
+          const exportScale = isLandscapeExport
+            ? Math.min(selectedSize.w / TMPL_W, selectedSize.h / TMPL_H)  // FIT: all text visible
+            : selectedSize.w / TMPL_W;                                       // Fill width for portrait
+          const exportTW = Math.round(TMPL_W * exportScale);
           const exportTH = Math.round(TMPL_H * exportScale);
-          // Center template vertically within selectedSize.h
-          const exportOffY = Math.round(Math.max(0, (selectedSize.h - exportTH) / 2));
+          // Center template in the frame (both X and Y)
+          const exportOffX = Math.round((selectedSize.w - exportTW) / 2);
+          const exportOffY = Math.round((selectedSize.h - exportTH) / 2);
           const fillBg = `linear-gradient(160deg, ${flyerData.accent}44 0%, #0f172a 100%)`;
           return (
             <div ref={flyerRef} style={{ width: selectedSize.w, height: selectedSize.h, overflow: 'hidden', position: 'relative', background: fillBg }}>
               <div style={{
                 position: 'absolute',
-                left: 0, top: exportOffY,
+                left: exportOffX, top: Math.max(0, exportOffY),
                 width: TMPL_W, height: TMPL_H,
                 transform: `scale(${exportScale})`,
                 transformOrigin: 'top left',
