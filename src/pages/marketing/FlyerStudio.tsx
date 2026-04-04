@@ -1043,46 +1043,21 @@ export default function FlyerStudio() {
                 <span>{selectedSize.label} · {selectedSize.w}×{selectedSize.h}px</span>
               </div>
 
-              {/* ─ Scrollable flyer area: template FIT + format-colored fill ──── */}
+              {/* ─ Scrollable flyer area ──── */}
               {(() => {
-                // Templates are designed at 540×675 (4:5 portrait base).
-                // SMART SCALE STRATEGY:
-                //   • Portrait/square formats (h ≥ w): COVER → template fills the box, text always readable
-                //   • Landscape formats (w > h): FILL-WIDTH → template fills width, focal point Y controls vertical crop
-                const TMPL_W = 540, TMPL_H = 675;
-                const tmplAspect = TMPL_H / TMPL_W; // 1.25
-                const fmtAspect  = selectedSize.h / selectedSize.w;
+                // Compute the preview box size that preserves the format's aspect ratio
+                const fmtAspect = selectedSize.h / selectedSize.w;
                 const maxW = 490, maxH = 520;
                 let baseW = maxW;
                 let baseH = baseW * fmtAspect;
                 if (baseH > maxH) { baseH = maxH; baseW = maxH / fmtAspect; }
-                const pW = Math.round(baseW * previewZoom);
-                const pH = Math.round(baseH * previewZoom);
 
-                // SCALE STRATEGY:
-                // Portrait / square (h ≥ w): COVER → fills the frame, looks full-bleed
-                // Landscape (w > h): FIT/CONTAIN → ALL text always visible, gradient fills sides
-                const isLandscape = selectedSize.w > selectedSize.h;
-
-                let previewScale: number;
-                let offsetX: number, offsetY: number;
-
-                if (!isLandscape) {
-                  // Portrait/square → COVER: fill the frame
-                  previewScale = Math.max(pW / TMPL_W, pH / TMPL_H);
-                } else {
-                  // Landscape → FIT: show ALL content, no clipping
-                  previewScale = Math.min(pW / TMPL_W, pH / TMPL_H);
-                }
-
-                const scaledTW = Math.round(TMPL_W * previewScale);
-                const scaledTH = Math.round(TMPL_H * previewScale);
-                // Always center the template in the frame
-                offsetX = Math.round((pW - scaledTW) / 2);
-                offsetY = Math.round((pH - scaledTH) / 2);
+                // previewScale: how much to shrink the template (which renders at selectedSize dimensions)
+                // to fit the preview box. previewZoom scales UP from that base.
+                const previewScale = Math.min(baseW / selectedSize.w, baseH / selectedSize.h);
+                const finalScale = previewScale * previewZoom;
 
                 const zoomed = previewZoom > 1.02;
-                const fillBg = `linear-gradient(160deg, ${flyerData.accent}33 0%, #0f172a 100%)`;
 
                 return (
                   <div style={{
@@ -1094,17 +1069,8 @@ export default function FlyerStudio() {
                     padding: zoomed ? '52px 20px 52px 20px' : '52px 20px 44px 20px',
                   }}>
                     <div style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.35)', borderRadius: 8, flexShrink: 0 }}>
-                      {/* Format-shaped clip box with accent fill for any remaining space */}
-                      <div style={{ width: pW, height: pH, borderRadius: 8, overflow: 'hidden', position: 'relative', background: fillBg }}>
-                        <div style={{
-                          position: 'absolute',
-                          left: offsetX, top: offsetY,
-                          width: TMPL_W, height: TMPL_H,
-                          transform: `scale(${previewScale})`,
-                          transformOrigin: 'top left',
-                        }}>
-                          <ActiveTemplate d={{ ...flyerData, containerW: TMPL_W }} />
-                        </div>
+                      <div style={{ borderRadius: 8, overflow: 'hidden', transform: `scale(${finalScale})`, transformOrigin: 'top left', width: selectedSize.w, height: selectedSize.h }}>
+                        <ActiveTemplate d={{ ...flyerData, containerW: selectedSize.w, containerH: selectedSize.h }} />
                       </div>
                     </div>
                   </div>
@@ -1125,29 +1091,10 @@ export default function FlyerStudio() {
       {/* the template is center-cropped vertically (only bottom may clip slightly).           */}
       <div style={{ position: 'fixed', top: -9999, left: -9999, zIndex: -1, pointerEvents: 'none' }}>
         {(() => {
-          const TMPL_W = 540, TMPL_H = 675;
-          // Same strategy as preview: portrait=fill-width, landscape=FIT (all content visible)
-          const isLandscapeExport = selectedSize.w > selectedSize.h;
-          const exportScale = isLandscapeExport
-            ? Math.min(selectedSize.w / TMPL_W, selectedSize.h / TMPL_H)  // FIT: all text visible
-            : selectedSize.w / TMPL_W;                                       // Fill width for portrait
-          const exportTW = Math.round(TMPL_W * exportScale);
-          const exportTH = Math.round(TMPL_H * exportScale);
-          // Center template in the frame (both X and Y)
-          const exportOffX = Math.round((selectedSize.w - exportTW) / 2);
-          const exportOffY = Math.round((selectedSize.h - exportTH) / 2);
-          const fillBg = `linear-gradient(160deg, ${flyerData.accent}44 0%, #0f172a 100%)`;
+          // Template renders at exact target dimensions — no scaling needed for export
           return (
-            <div ref={flyerRef} style={{ width: selectedSize.w, height: selectedSize.h, overflow: 'hidden', position: 'relative', background: fillBg }}>
-              <div style={{
-                position: 'absolute',
-                left: exportOffX, top: Math.max(0, exportOffY),
-                width: TMPL_W, height: TMPL_H,
-                transform: `scale(${exportScale})`,
-                transformOrigin: 'top left',
-              }}>
-                <ActiveTemplate d={{ ...flyerData, containerW: selectedSize.w }} />
-              </div>
+            <div ref={flyerRef} style={{ width: selectedSize.w, height: selectedSize.h, overflow: 'hidden' }}>
+              <ActiveTemplate d={{ ...flyerData, containerW: selectedSize.w, containerH: selectedSize.h }} />
             </div>
           );
         })()}
