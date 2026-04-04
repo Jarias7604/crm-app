@@ -39,307 +39,539 @@ function injectFonts() {
   if (!document.head.querySelector(`link[href="${f.href}"]`)) document.head.appendChild(f);
 }
 
-// 2. Utilidades Geométricas
+
+// ─── HELPERS PREMIUM ─────────────────────────────────────────────────────────
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+  ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h); ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r); ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
 }
-
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
-  const words = text.split(' ');
-  const lines = []; let currLine = words[0];
+  const words = text.split(' '); const lines: string[] = []; let curr = words[0] || '';
   for (let i = 1; i < words.length; i++) {
-    const w = words[i];
-    if (ctx.measureText(currLine + ' ' + w).width < maxWidth) { currLine += ' ' + w; }
-    else { lines.push(currLine); currLine = w; }
+    if (ctx.measureText(curr+' '+words[i]).width < maxWidth) curr += ' '+words[i];
+    else { lines.push(curr); curr = words[i]; }
   }
-  lines.push(currLine); return lines;
+  lines.push(curr); return lines;
+}
+// Draws full-bleed image + rich gradient overlay — the foundation of ALL professional layouts
+function drawFullBleedBg(ctx: CanvasRenderingContext2D, W: number, H: number, img: HTMLImageElement | null, stops: {pos:number,color:string}[]) {
+  if (img) {
+    // Cover crop: maintain aspect ratio, fill canvas
+    const ir = img.width/img.height; const cr = W/H;
+    let sw=img.width,sh=img.height,sx=0,sy=0;
+    if (ir>cr) { sw=img.height*cr; sx=(img.width-sw)/2; } else { sh=img.width/cr; sy=(img.height-sh)/2; }
+    ctx.drawImage(img,sx,sy,sw,sh,0,0,W,H);
+  } else { ctx.fillStyle='#1e293b'; ctx.fillRect(0,0,W,H); }
+  const gr = ctx.createLinearGradient(0,0,0,H);
+  stops.forEach(s => gr.addColorStop(s.pos, s.color));
+  ctx.fillStyle = gr; ctx.fillRect(0,0,W,H);
+}
+function pxFont(ctx: CanvasRenderingContext2D, font: string) { ctx.font = font; }
+function txt(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string, align: CanvasTextAlign='left') {
+  ctx.fillStyle=color; ctx.textAlign=align; ctx.fillText(text,x,y);
+}
+function shadow(ctx: CanvasRenderingContext2D, color='rgba(0,0,0,0.8)', blur=20, oy=6) {
+  ctx.shadowColor=color; ctx.shadowBlur=blur; ctx.shadowOffsetY=oy;
+}
+function noShadow(ctx: CanvasRenderingContext2D) { ctx.shadowColor='transparent'; ctx.shadowBlur=0; ctx.shadowOffsetY=0; }
+function drawPill(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, bg: string, fg: string, fs=22, px=28, py=14, r=999) {
+  ctx.save(); pxFont(ctx,`800 ${fs}px Outfit`);
+  const tw=ctx.measureText(text).width; const bw=tw+px*2; const bh=fs+py*2;
+  roundRect(ctx,x,y,bw,bh,r); ctx.fillStyle=bg; ctx.fill();
+  txt(ctx,text,x+px,y+bh-py-3,fg,'left'); ctx.restore();
+}
+function drawMultilineTitleLeft(ctx: CanvasRenderingContext2D, title: string, x: number, startY: number, maxW: number, size: number, color1: string, color2: string, acc: string): number {
+  pxFont(ctx, `900 ${size}px Playfair Display`);
+  const lines = wrapText(ctx, title.toUpperCase(), maxW);
+  lines.slice(0,3).forEach((l,i) => {
+    shadow(ctx,'rgba(0,0,0,0.7)',24,8);
+    ctx.fillStyle = i===1 ? acc : (i===0 ? color1 : color2);
+    ctx.textAlign='left'; ctx.fillText(l,x,startY+i*(size+18));
+    noShadow(ctx);
+  });
+  return startY + lines.slice(0,3).length*(size+18);
+}
+function drawMultilineTitleCenter(ctx: CanvasRenderingContext2D, title: string, cx: number, startY: number, maxW: number, size: number, color1: string, acc: string): number {
+  pxFont(ctx, `900 ${size}px Playfair Display`);
+  const lines = wrapText(ctx, title.toUpperCase(), maxW);
+  lines.slice(0,3).forEach((l,i) => {
+    shadow(ctx,'rgba(0,0,0,0.75)',28,10);
+    ctx.fillStyle = i===0 ? color1 : acc;
+    ctx.textAlign='center'; ctx.fillText(l,cx,startY+i*(size+20));
+    noShadow(ctx);
+  });
+  return startY + lines.slice(0,3).length*(size+20);
+}
+function drawBenefitRow(ctx: CanvasRenderingContext2D, items: string[], x: number, y: number, maxW: number, acc: string, light=false) {
+  if (!items.length) return y;
+  const icons = ['✔','★','◆','▸','●','✦'];
+  items.slice(0,4).forEach((b,i) => {
+    const col = i%2; const row = Math.floor(i/2);
+    const bx = x + col*(maxW/2); const by = y + row*72;
+    // Icon circle
+    ctx.save(); ctx.beginPath(); ctx.arc(bx+28,by,28,0,Math.PI*2);
+    ctx.fillStyle=acc; ctx.fill(); noShadow(ctx);
+    pxFont(ctx,'700 20px Outfit'); txt(ctx,icons[i%6],bx+28,by+7,light?'#000':'#fff','center');
+    // Text
+    pxFont(ctx,'700 28px Outfit'); txt(ctx,b.substring(0,26),bx+66,by+10,light?'#1e293b':'rgba(255,255,255,0.95)','left');
+    ctx.restore();
+  });
+  return y + Math.ceil(items.length/2)*76;
+}
+function drawCTAButton(ctx: CanvasRenderingContext2D, text: string, cx: number, y: number, w: number, h: number, bg: string, fg: string) {
+  ctx.save();
+  shadow(ctx,'rgba(0,0,0,0.5)',24,8);
+  roundRect(ctx,cx-w/2,y,w,h,h/2); ctx.fillStyle=bg; ctx.fill(); noShadow(ctx);
+  // Highlight
+  const hi=ctx.createLinearGradient(cx-w/2,y,cx-w/2,y+h*0.4);
+  hi.addColorStop(0,'rgba(255,255,255,0.25)'); hi.addColorStop(1,'rgba(255,255,255,0)');
+  roundRect(ctx,cx-w/2,y,w,h*0.5,h/2); ctx.fillStyle=hi; ctx.fill();
+  pxFont(ctx,`900 ${Math.round(h*0.38)}px Outfit`);
+  shadow(ctx,'rgba(0,0,0,0.4)',6,2);
+  txt(ctx,text,cx,y+h*0.67,fg,'center'); noShadow(ctx);
+  ctx.restore();
+}
+function drawLogoBar(ctx: CanvasRenderingContext2D, W: number, y: number, h: number, bg: string, logo: HTMLImageElement|null, phone: string, web: string, acc: string) {
+  ctx.save(); ctx.fillStyle=bg; ctx.fillRect(0,y,W,h);
+  if (logo) ctx.drawImage(logo,36,y+(h-52)/2,52,52);
+  pxFont(ctx,'800 30px Outfit'); txt(ctx,'ARIAS GROUP',logo?108:40,y+h/2+6,acc,'left');
+  if (phone) { pxFont(ctx,'700 28px Outfit'); txt(ctx,'📞 '+phone,W/2,y+h/2+10,'rgba(255,255,255,0.9)','center'); }
+  if (web) { pxFont(ctx,'600 22px Outfit'); txt(ctx,web,W-40,y+h/2+8,'rgba(255,255,255,0.55)','right'); }
+  ctx.restore();
 }
 
-// ─── HELPERS DE CANVAS PREMIUM ───────────────────────────────────────────────
-function drawBadge(ctx, text, x, y, bg, fg, fontSize = 26, px2 = 28, py2 = 14, r2 = 10) {
-  ctx.save(); ctx.font = `900 ${fontSize}px Outfit`;
-  const tw = ctx.measureText(text).width; const bw = tw + px2 * 2; const bh = fontSize + py2 * 2;
-  roundRect(ctx, x, y, bw, bh, r2); ctx.fillStyle = bg; ctx.fill();
-  ctx.fillStyle = fg; ctx.textAlign = 'left'; ctx.fillText(text, x + px2, y + bh - py2 - 2); ctx.restore();
+// ═══════════════════════════════════════════════════════════════════
+// ENGINE 1: HERO FULL BLEED — Imagen completa, título dominante abajo
+// ═══════════════════════════════════════════════════════════════════
+function engine_splitPanel(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
+  const acc = d.accent||'#D4AF37';
+  // BG: full bleed image, gradient from transparent top → heavy dark bottom
+  drawFullBleedBg(ctx,W,H,d.bgImage,[
+    {pos:0,color:'rgba(0,0,0,0.10)'},{pos:0.45,color:'rgba(0,0,0,0.05)'},
+    {pos:0.65,color:'rgba(0,0,0,0.55)'},{pos:1,color:'rgba(0,0,0,0.93)'}
+  ]);
+  // TOP BAR
+  ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fillRect(0,0,W,110);
+  if(d.logoImage) ctx.drawImage(d.logoImage,40,24,62,62);
+  pxFont(ctx,'800 20px Outfit'); txt(ctx,d.industria||'ARIAS GROUP',d.logoImage?116:40,52,'rgba(255,255,255,0.9)','left');
+  pxFont(ctx,'600 17px Outfit'); txt(ctx,(d.contact?.web||'WWW.EMPRESA.COM').toUpperCase(),d.logoImage?116:40,76,acc,'left');
+  // PRICE BADGE top-right
+  if(d.price) drawPill(ctx,d.price,W-270,26,acc,'#000',36,22,14);
+  // ACCENT stripe
+  ctx.fillStyle=acc; ctx.fillRect(0,H*0.58,W,8);
+  // MAIN TITLE — left aligned big
+  const titY = H*0.62;
+  const titEnd = drawMultilineTitleLeft(ctx,d.title||'Tu Oferta Aquí',60,titY,W-100,110,'#fff','#fff',acc);
+  // SUBTITLE
+  pxFont(ctx,'400 34px Outfit');
+  shadow(ctx,'rgba(0,0,0,0.6)',12,4);
+  txt(ctx,d.subtitle||'',60,titEnd+20,'rgba(255,255,255,0.85)','left');
+  noShadow(ctx);
+  // BENEFITS
+  const benY = drawBenefitRow(ctx,d.beneficios||[],60,titEnd+72,W-80,acc);
+  // CTA
+  drawCTAButton(ctx,d.cta||'CONTÁCTANOS',W/2,benY+36,560,88,acc,'#000');
+  // PHONE + SOCIAL
+  const barY = H-85;
+  ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(0,barY,W,85);
+  pxFont(ctx,'800 30px Outfit'); txt(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,barY+50,'#fff','center');
+  pxFont(ctx,'600 20px Outfit'); txt(ctx,d.contact?.web||'www.empresa.com',W/2,barY+74,'rgba(255,255,255,0.5)','center');
 }
-function drawHex(ctx, cx, cy, r, fill, stroke, sw = 3) {
-  ctx.save(); ctx.beginPath();
-  for (let i = 0; i < 6; i++) { const a = (Math.PI / 3) * i - Math.PI / 6; i === 0 ? ctx.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a)) : ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a)); }
-  ctx.closePath(); ctx.fillStyle = fill; ctx.fill();
-  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = sw; ctx.stroke(); } ctx.restore();
-}
-function drawIconCircle(ctx, cx, cy, r, bg, symbol, fg = '#fff', fs = 22) {
-  ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fillStyle = bg; ctx.fill(); ctx.fillStyle = fg; ctx.font = `700 ${fs}px Outfit`;
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(symbol, cx, cy + 1); ctx.textBaseline = 'alphabetic'; ctx.restore();
-}
-function drawFeatures(ctx, benefits, x, y, maxW, acc, light, cols = 1, iconSize = 32) {
-  if (!benefits?.length) return;
-  const ICONS = ['\u2726', '\u25c8', '\u25b8', '\u2605', '\u2b21', '\u2691'];
-  const colW = maxW / cols;
-  benefits.slice(0, cols * 2).forEach((b, i) => {
-    const col = cols === 2 ? i % 2 : 0; const row = cols === 2 ? Math.floor(i / 2) : i;
-    const bx = x + col * colW; const by = y + row * 72;
-    drawIconCircle(ctx, bx + iconSize, by, iconSize, acc, ICONS[i % ICONS.length], '#fff', Math.round(iconSize * 0.7));
-    ctx.font = '700 26px Outfit'; ctx.fillStyle = light ? '#1e293b' : 'rgba(255,255,255,0.95)'; ctx.textAlign = 'left';
-    ctx.fillText(b.substring(0, 30), bx + iconSize * 2 + 12, by + 9);
+
+// ═══════════════════════════════════════════════════════════════════
+// ENGINE 2: DARK HEADER LUXURY — Franja oscura top, imagen centro, texto bottom
+// ═══════════════════════════════════════════════════════════════════
+function engine_fullOverlay(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
+  const acc=d.accent||'#D4AF37';
+  // Full bleed image
+  drawFullBleedBg(ctx,W,H,d.bgImage,[
+    {pos:0,color:'rgba(0,0,0,0.85)'},{pos:0.3,color:'rgba(0,0,0,0.35)'},
+    {pos:0.6,color:'rgba(0,0,0,0.45)'},{pos:1,color:'rgba(0,0,0,0.97)'}
+  ]);
+  // TOP BRANDING
+  ctx.fillStyle=acc; ctx.fillRect(0,0,W,10);
+  if(d.logoImage) ctx.drawImage(d.logoImage,W/2-36,28,72,72);
+  pxFont(ctx,'700 18px Outfit'); txt(ctx,(d.industria||'MARKETING PREMIUM').toUpperCase(),W/2,d.logoImage?118:60,'rgba(255,255,255,0.6)','center');
+  ctx.fillStyle=acc; ctx.fillRect(W/2-60,d.logoImage?126:68,120,4);
+  // SUPER BIG CENTERED TITLE
+  const titStart = d.logoImage?165:120;
+  const titEnd = drawMultilineTitleCenter(ctx,d.title||'Tu Oferta',W/2,titStart,W-80,128,'#fff',acc);
+  // SUBTITLE
+  pxFont(ctx,'500 36px Outfit'); shadow(ctx,'rgba(0,0,0,0.7)',14,4);
+  txt(ctx,d.subtitle||'',W/2,titEnd+28,'rgba(255,255,255,0.9)','center'); noShadow(ctx);
+  // DIVIDER
+  ctx.fillStyle=acc; ctx.fillRect(W/2-80,titEnd+56,160,4);
+  // BENEFIT PILLS (horizontal, centered)
+  const bens = (d.beneficios||[]).slice(0,3);
+  let bpx = 60; const bpy = titEnd+90;
+  bens.forEach((b: string) => {
+    drawPill(ctx,b.substring(0,22),bpx,bpy,'rgba(255,255,255,0.12)','#fff',26,20,12);
+    bpx += ctx.measureText(b.substring(0,22)).width+80;
   });
+  // CTA
+  const ctaY = Math.max(bpy+90, H-280);
+  drawCTAButton(ctx,d.cta||'VER AHORA',W/2,ctaY,580,92,acc,'#000');
+  // PRICE (if present)
+  if(d.price){ pxFont(ctx,'900 90px Outfit'); shadow(ctx,'rgba(0,0,0,0.8)',20,6);
+    txt(ctx,d.price,W/2,ctaY-60,'#fff','center'); noShadow(ctx); }
+  // BOTTOM BAR
+  ctx.fillStyle=acc; ctx.fillRect(0,H-90,W,90);
+  pxFont(ctx,'900 32px Outfit'); txt(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,H-50,'#000','center');
 }
-function drawShadowText(ctx, text, x, y, color, font, shadowColor = 'rgba(0,0,0,0.7)', blur = 18) {
-  ctx.save(); ctx.shadowColor = shadowColor; ctx.shadowBlur = blur; ctx.shadowOffsetY = 4;
-  ctx.fillStyle = color; ctx.font = font; ctx.fillText(text, x, y); ctx.restore();
+
+// ═══════════════════════════════════════════════════════════════════
+// ENGINE 3: WHITE CARD — Fondo blanco, imagen top, contenido abajo limpio
+// ═══════════════════════════════════════════════════════════════════
+function engine_bottomBanner(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
+  const acc=d.accent||'#e11d48';
+  // WHITE BG
+  ctx.fillStyle='#f8fafc'; ctx.fillRect(0,0,W,H);
+  // TOP IMAGE SECTION (60% height)
+  const imgH = Math.round(H*0.58);
+  ctx.save(); ctx.beginPath(); ctx.rect(0,0,W,imgH); ctx.clip();
+  if(d.bgImage){
+    const ir=d.bgImage.width/d.bgImage.height; const cr=W/imgH;
+    let sw=d.bgImage.width,sh=d.bgImage.height,sx=0,sy=0;
+    if(ir>cr){sw=d.bgImage.height*cr;sx=(d.bgImage.width-sw)/2;}else{sh=d.bgImage.width/cr;sy=(d.bgImage.height-sh)/2;}
+    ctx.drawImage(d.bgImage,sx,sy,sw,sh,0,0,W,imgH);
+  } else { ctx.fillStyle='#cbd5e1'; ctx.fillRect(0,0,W,imgH); }
+  // Overlay bottom of image
+  const og=ctx.createLinearGradient(0,imgH*0.5,0,imgH); og.addColorStop(0,'rgba(248,250,252,0)'); og.addColorStop(1,'#f8fafc');
+  ctx.fillStyle=og; ctx.fillRect(0,0,W,imgH);
+  ctx.restore();
+  // ACCENT BAR
+  ctx.fillStyle=acc; ctx.fillRect(0,imgH,W,10);
+  // TOP LOGO
+  ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(0,0,W,80);
+  if(d.logoImage) ctx.drawImage(d.logoImage,36,12,56,56);
+  pxFont(ctx,'800 22px Outfit'); txt(ctx,d.industria||'ARIAS GROUP',d.logoImage?106:40,44,'#fff','left');
+  if(d.price) drawPill(ctx,d.price,W-260,14,acc,'#fff',36,20,14);
+  // CONTENT (bottom 40%)
+  const contY = imgH+24;
+  pxFont(ctx,'900 22px Outfit'); txt(ctx,(d.industria||'MARKETING').toUpperCase(),60,contY+28,acc,'left');
+  const titEnd=drawMultilineTitleLeft(ctx,d.title||'Tu Oferta',60,contY+60,W-100,96,'#0f172a','#0f172a',acc);
+  pxFont(ctx,'500 30px Outfit'); shadow(ctx,'rgba(0,0,0,0.1)',4,2);
+  txt(ctx,d.subtitle||'',60,titEnd+16,'#475569','left'); noShadow(ctx);
+  const benY=drawBenefitRow(ctx,d.beneficios||[],60,titEnd+58,W-80,acc,true);
+  drawCTAButton(ctx,d.cta||'CONTÁCTANOS',W/2,benY+24,580,86,acc,'#fff');
+  drawLogoBar(ctx,W,H-90,90,'#0f172a',d.logoImage,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',d.contact?.web||'',acc);
 }
-function drawCTA(ctx, text, x, y, w, h, fillColor, textColor, r = 8) {
-  ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 6;
-  roundRect(ctx, x, y, w, h, r); ctx.fillStyle = fillColor; ctx.fill();
-  ctx.shadowColor = 'transparent';
-  const hi = ctx.createLinearGradient(x, y, x, y + h * 0.5);
-  hi.addColorStop(0, 'rgba(255,255,255,0.18)'); hi.addColorStop(1, 'rgba(255,255,255,0)');
-  roundRect(ctx, x, y, w, h * 0.5, r); ctx.fillStyle = hi; ctx.fill();
-  ctx.font = `900 ${Math.round(h * 0.4)}px Outfit`; ctx.fillStyle = textColor; ctx.textAlign = 'center';
-  ctx.fillText(text, x + w / 2, y + h * 0.65); ctx.restore();
-}
-function drawContact(ctx, phone, x, y, acc, light = false) {
-  ctx.save(); drawIconCircle(ctx, x + 28, y, 28, acc, '\u260e', '#fff', 18);
-  ctx.font = '800 24px Outfit'; ctx.fillStyle = light ? '#0f172a' : '#fff'; ctx.textAlign = 'left';
-  ctx.fillText(phone, x + 66, y + 9); ctx.restore();
-}
-function drawSocialBar(ctx, y, W, acc, light, web = '') {
-  ctx.save(); const icons = ['f', 'in', '@', '\u25b6']; let sx = 40;
-  icons.forEach(ic => { drawIconCircle(ctx, sx + 16, y, 16, light ? '#e2e8f0' : 'rgba(255,255,255,0.15)', ic, light ? '#64748b' : 'rgba(255,255,255,0.7)', 11); sx += 42; });
-  if (web) { ctx.font = '600 15px Outfit'; ctx.fillStyle = light ? '#64748b' : 'rgba(255,255,255,0.55)'; ctx.textAlign = 'right'; ctx.fillText(web, W - 40, y + 5); } ctx.restore();
-}
-function drawDotGrid(ctx, x, y, cols, rows, gap, color, r = 2) {
-  ctx.save(); ctx.fillStyle = color;
-  for (let c = 0; c < cols; c++) for (let r2 = 0; r2 < rows; r2++) { ctx.beginPath(); ctx.arc(x + c * gap, y + r2 * gap, r, 0, Math.PI * 2); ctx.fill(); } ctx.restore();
-}
-function engine_splitPanel(ctx, W, H, d) {
-  const acc = d.accent || '#1a56db';
-  ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, W, H);
-  ctx.save(); ctx.beginPath();
-  ctx.moveTo(0,0); ctx.lineTo(W*0.55,0); ctx.bezierCurveTo(W*0.72,H*0.2,W*0.38,H*0.8,W*0.6,H); ctx.lineTo(0,H); ctx.closePath(); ctx.clip();
-  if (d.bgImage) ctx.drawImage(d.bgImage,0,0,W*0.7,H); else { ctx.fillStyle='#334155'; ctx.fillRect(0,0,W,H); }
-  const og=ctx.createLinearGradient(0,0,W*0.6,0); og.addColorStop(0,'rgba(0,0,0,0.18)'); og.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=og; ctx.fillRect(0,0,W,H); ctx.restore();
-  drawDotGrid(ctx,W*0.65,40,5,5,22,acc+'44',3);
-  drawHex(ctx,W*0.82,H*0.15,55,acc+'22',acc+'55',2); drawHex(ctx,W*0.9,H*0.82,35,acc+'15',acc+'33',1);
-  ctx.fillStyle=acc; ctx.fillRect(W*0.62,0,W*0.38,10);
-  if (d.logoImage) ctx.drawImage(d.logoImage,W*0.63,22,50,50);
-  ctx.textAlign='left'; ctx.fillStyle='#64748b'; ctx.font='700 15px Outfit'; ctx.fillText('LOGO HERE',W*0.63+(d.logoImage?60:0),42);
-  ctx.fillStyle=acc; ctx.font='600 13px Outfit'; ctx.fillText('WWW.EMPRESA.COM',W*0.63+(d.logoImage?60:0),62);
-  // Badge rubro
-  drawBadge(ctx,(d.industria||'MARKETING').toUpperCase(),W*0.63,84,acc,'#fff',15,14,8,6);
-  const lines=wrapText(ctx,(d.title||'').toUpperCase(),W*0.34); ctx.textAlign='left';
-  lines.slice(0,3).forEach((l,i)=>{ drawShadowText(ctx,l,W*0.62,148+i*92,i===1?acc:'#0f172a','900 86px Playfair Display','rgba(0,0,0,0.06)',5); });
-  ctx.fillStyle=acc; ctx.fillRect(W*0.62,148+lines.length*92+8,80,5);
-  const subY=148+lines.length*92+32; const subs=wrapText(ctx,d.subtitle||'',W*0.34);
-  ctx.font='500 30px Outfit'; ctx.fillStyle='#334155'; subs.slice(0,2).forEach((s,i)=>ctx.fillText(s,W*0.62,subY+i*36));
-  drawFeatures(ctx,d.beneficios||[],W*0.62,subY+subs.length*36+28,W*0.34,acc,true,1,28);
-  drawCTA(ctx,d.cta||'EMPEZAR AHORA',W*0.62,H-178,W*0.35,68,acc,'#fff');
-  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W*0.62,H-98,acc,true);
-  drawSocialBar(ctx,H-56,W,acc,true,d.contact?.web||'www.empresa.com');
-}
-function engine_fullOverlay(ctx, W, H, d) {
-  const acc = d.accent || '#D4AF37';
-  if (d.bgImage) ctx.drawImage(d.bgImage,0,0,W,H); else { ctx.fillStyle='#1e293b'; ctx.fillRect(0,0,W,H); }
-  const gr=ctx.createLinearGradient(0,0,0,H); gr.addColorStop(0,'rgba(0,0,0,0.8)'); gr.addColorStop(0.4,'rgba(0,0,0,0.25)'); gr.addColorStop(1,'rgba(0,0,0,0.95)'); ctx.fillStyle=gr; ctx.fillRect(0,0,W,H);
-  ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(0,0,W,110);
-  if (d.logoImage) ctx.drawImage(d.logoImage,W/2-30,16,60,60);
-  ctx.textAlign='center'; ctx.fillStyle=acc; ctx.font='800 16px Outfit'; ctx.fillText('ARIAS GROUP  \u2022  EXCLUSIVE',W/2,90);
-  ctx.fillStyle=acc; ctx.fillRect(W/2-60,100,120,4);
-  drawHex(ctx,80,H*0.35,45,'rgba(255,255,255,0.04)',acc+'40',1); drawHex(ctx,W-70,H*0.65,35,'rgba(255,255,255,0.04)',acc+'30',1);
-  const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-80);
-  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,W/2,H*0.42+i*110,'#fff',`900 ${i===0?110:100}px Playfair Display`,'rgba(0,0,0,0.85)',35));
-  ctx.fillStyle=acc; ctx.font='600 34px Outfit'; ctx.textAlign='center'; ctx.fillText(d.subtitle||'',W/2,H*0.42+tl.length*110+18);
-  const fbY=H*0.42+tl.length*110+68;
-  (d.beneficios||[]).slice(0,3).forEach((b,i)=>{
-    ctx.font='700 26px Outfit'; const tw=ctx.measureText(b).width+56; const bx=W/2-tw/2;
-    roundRect(ctx,bx,fbY+i*64,tw,48,24); ctx.fillStyle='rgba(255,255,255,0.13)'; ctx.fill();
-    ctx.strokeStyle=acc+'80'; ctx.lineWidth=1.5; ctx.stroke(); ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.fillText(b,W/2,fbY+i*64+32);
+
+// ═══════════════════════════════════════════════════════════════════
+// ENGINE 4: MAGAZINE BOLD — Imagen derecha, texto bold izquierda
+// ═══════════════════════════════════════════════════════════════════
+function engine_magazine(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
+  const acc=d.accent||'#b91c1c';
+  const splitX=Math.round(W*0.52);
+  // LEFT: dark panel
+  ctx.fillStyle='#0a0a0a'; ctx.fillRect(0,0,splitX,H);
+  // Accent left border
+  ctx.fillStyle=acc; ctx.fillRect(0,0,14,H);
+  // RIGHT: image
+  ctx.save(); ctx.beginPath(); ctx.rect(splitX,0,W-splitX,H); ctx.clip();
+  if(d.bgImage){
+    const ir=d.bgImage.width/d.bgImage.height; const cr=(W-splitX)/H;
+    let sw=d.bgImage.width,sh=d.bgImage.height,sx=0,sy=0;
+    if(ir>cr){sw=d.bgImage.height*cr;sx=(d.bgImage.width-sw)/2;}else{sh=d.bgImage.width/cr;sy=(d.bgImage.height-sh)/2;}
+    ctx.drawImage(d.bgImage,sx,sy,sw,sh,splitX,0,W-splitX,H);
+  } else {ctx.fillStyle='#334155';ctx.fillRect(splitX,0,W-splitX,H);}
+  const rg=ctx.createLinearGradient(splitX,0,W,0); rg.addColorStop(0,'rgba(10,10,10,0.6)'); rg.addColorStop(0.4,'rgba(10,10,10,0)');
+  ctx.fillStyle=rg; ctx.fillRect(splitX,0,W-splitX,H);
+  ctx.restore();
+  // LEFT CONTENT
+  const M=28; const cW=splitX-M*2;
+  if(d.logoImage) ctx.drawImage(d.logoImage,M+14,32,60,60);
+  pxFont(ctx,'700 18px Outfit'); txt(ctx,(d.industria||'ARIAS GROUP').toUpperCase(),M+14,d.logoImage?106:52,'rgba(255,255,255,0.5)','left');
+  ctx.fillStyle=acc; ctx.fillRect(M+14,d.logoImage?114:60,50,4);
+  // BIG TITLE LEFT
+  const titY=d.logoImage?150:110;
+  const titEnd=drawMultilineTitleLeft(ctx,d.title||'Tu Oferta',M+14,titY,cW,118,'#fff','#fff',acc);
+  pxFont(ctx,'500 30px Outfit'); shadow(ctx,'rgba(0,0,0,0.5)',10,3);
+  txt(ctx,d.subtitle||'',M+14,titEnd+18,'rgba(255,255,255,0.8)','left'); noShadow(ctx);
+  ctx.fillStyle='rgba(255,255,255,0.12)'; ctx.fillRect(M+14,titEnd+48,cW,1);
+  // BENEFITS (single column)
+  const icons=['✔','✔','✔','✔'];
+  (d.beneficios||[]).slice(0,4).forEach((b: string,i: number)=>{
+    ctx.save(); ctx.beginPath(); ctx.arc(M+30,titEnd+80+i*70,24,0,Math.PI*2);
+    ctx.fillStyle=acc; ctx.fill(); pxFont(ctx,'900 18px Outfit'); txt(ctx,icons[i],M+30,titEnd+88+i*70,'#fff','center');
+    pxFont(ctx,'700 28px Outfit'); txt(ctx,b.substring(0,24),M+66,titEnd+88+i*70,'rgba(255,255,255,0.9)','left'); ctx.restore();
   });
-  drawCTA(ctx,d.cta||'SABER M\u00c1S',W/2-145,H-168,290,70,acc,'#000');
-  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2-100,H-76,acc,false);
+  const benBot=titEnd+80+(d.beneficios||[]).slice(0,4).length*70;
+  if(d.price){ ctx.fillStyle=acc; ctx.fillRect(M+14,benBot+10,cW-M,4);
+    pxFont(ctx,'900 70px Outfit'); shadow(ctx,'rgba(0,0,0,0.7)',16,5);
+    txt(ctx,d.price,M+14,benBot+96,'#fff','left'); noShadow(ctx); }
+  drawCTAButton(ctx,d.cta||'VER AHORA',M+14+Math.round(cW/2),Math.max(benBot+(d.price?120:20),H-240),cW,82,acc,'#fff');
+  pxFont(ctx,'700 24px Outfit'); txt(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',M+14,H-44,'rgba(255,255,255,0.7)','left');
 }
-function engine_bottomBanner(ctx, W, H, d) {
-  const acc = d.accent || '#e11d48'; const splitY=H*0.48;
-  ctx.save(); ctx.beginPath(); ctx.rect(0,0,W,splitY+20); ctx.clip();
-  if (d.bgImage) ctx.drawImage(d.bgImage,0,0,W,splitY*1.7); else { ctx.fillStyle='#334155'; ctx.fillRect(0,0,W,H); }
-  const pgr=ctx.createLinearGradient(0,0,0,splitY+20); pgr.addColorStop(0,'rgba(0,0,0,0.45)'); pgr.addColorStop(1,'rgba(15,23,42,0.95)'); ctx.fillStyle=pgr; ctx.fillRect(0,0,W,splitY+20); ctx.restore();
-  ctx.fillStyle='#0f172a'; ctx.fillRect(0,splitY,W,H-splitY);
-  ctx.fillStyle=acc; ctx.fillRect(0,splitY,W,8);
-  ctx.save(); ctx.beginPath(); ctx.moveTo(0,splitY+8); ctx.lineTo(W*0.45,splitY+8); ctx.lineTo(W*0.32,splitY+120); ctx.lineTo(0,splitY+120); ctx.closePath(); ctx.fillStyle=acc+'28'; ctx.fill(); ctx.restore();
-  if (d.logoImage) ctx.drawImage(d.logoImage,40,22,54,54);
-  ctx.textAlign='left'; ctx.font='800 18px Outfit'; ctx.fillStyle='#fff'; ctx.fillText('ARIAS GROUP',d.logoImage?108:40,46);
-  ctx.fillStyle=acc; ctx.font='600 14px Outfit'; ctx.fillText('EXCLUSIVE MARKETING',d.logoImage?108:40,68);
-  if (d.price) drawBadge(ctx,d.price,W-240,20,acc,'#fff',42,22,14,10);
-  const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-80);
-  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,40,splitY-140+i*96,'#fff','900 100px Playfair Display'));
-  ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.font='500 32px Outfit'; ctx.textAlign='left'; ctx.fillText(d.subtitle||'',40,splitY-22);
-  drawFeatures(ctx,d.beneficios||[],40,splitY+36,W-80,acc,false,2,28);
-  drawCTA(ctx,d.cta||'CONTACTANOS',W-286,H-96,246,68,acc,'#fff');
-  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',40,H-62,acc,false);
-  drawSocialBar(ctx,H-28,W,acc,false,d.contact?.web||'');
-}
-function engine_magazine(ctx, W, H, d) {
-  const acc = d.accent || '#D4AF37';
-  if (d.bgImage) ctx.drawImage(d.bgImage,0,0,W,H); else { ctx.fillStyle='#1e293b'; ctx.fillRect(0,0,W,H); }
-  ctx.fillStyle='rgba(0,0,0,0.42)'; ctx.fillRect(0,0,W,H);
-  ctx.fillStyle=acc; ctx.fillRect(0,0,18,H);
-  const tgr=ctx.createLinearGradient(0,0,0,240); tgr.addColorStop(0,'rgba(0,0,0,0.95)'); tgr.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=tgr; ctx.fillRect(0,0,W,240);
-  ctx.fillStyle=acc; ctx.font='900 16px Outfit'; ctx.textAlign='left'; ctx.fillText('MARKETING EXCLUSIVE',44,56);
-  ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.font='400 16px Outfit'; ctx.fillText(' \u2014 EDICION ESPECIAL',44+ctx.measureText('MARKETING EXCLUSIVE').width,56);
-  if (d.logoImage) ctx.drawImage(d.logoImage,W-90,20,58,58);
-  ctx.fillStyle=acc+'99'; ctx.fillRect(44,70,W-140,2);
-  drawDotGrid(ctx,W-130,100,4,6,20,'rgba(255,255,255,0.12)',2);
-  const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-60); ctx.textAlign='left';
-  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,36,H*0.42+i*126,'#fff',`900 ${i===0?120:108}px Playfair Display`,'rgba(0,0,0,0.9)',40));
-  ctx.fillStyle=acc; ctx.fillRect(36,H*0.42+tl.length*126+12,100,6);
-  ctx.fillStyle=acc; ctx.font='700 36px Outfit'; ctx.fillText((d.subtitle||'').toUpperCase(),36,H*0.42+tl.length*126+60);
-  drawFeatures(ctx,d.beneficios||[],36,H*0.42+tl.length*126+100,W-72,acc,false,2,28);
-  drawCTA(ctx,d.cta||'VER OFERTA',W-310,H-96,270,68,acc,'#000');
-  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',36,H-52,acc,false);
-}
-function engine_circle(ctx, W, H, d) {
-  const acc = d.accent || '#1a56db';
-  const bgGr=ctx.createLinearGradient(0,0,W,H); bgGr.addColorStop(0,acc); bgGr.addColorStop(1,'#0f172a'); ctx.fillStyle=bgGr; ctx.fillRect(0,0,W,H);
-  const R=W*0.38,cx2=W*0.35,cy2=H*0.38;
-  ctx.save(); const glow=ctx.createRadialGradient(cx2,cy2,0,cx2,cy2,R+20); glow.addColorStop(0,'rgba(255,255,255,0.12)'); glow.addColorStop(1,'transparent');
-  ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(cx2,cy2,R+20,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(cx2,cy2,R,0,Math.PI*2); ctx.clip();
-  if (d.bgImage) ctx.drawImage(d.bgImage,cx2-R,cy2-R,R*2,R*2); else { ctx.fillStyle='#334155'; ctx.fillRect(0,0,W,H); } ctx.restore();
-  ctx.strokeStyle='#fff'; ctx.lineWidth=6; ctx.beginPath(); ctx.arc(cx2,cy2,R,0,Math.PI*2); ctx.stroke();
-  ctx.strokeStyle=acc+'80'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(cx2,cy2,R+16,0,Math.PI*2); ctx.stroke();
-  const feats=(d.beneficios||[]).slice(0,4); const ICONS4=['\u2605','\u25c8','\u25b8','\u2726'];
-  const positions=[{x:cx2-R*1.1,y:cy2-R*0.5},{x:cx2+R*1.0,y:cy2-R*0.7},{x:cx2-R*1.0,y:cy2+R*0.7},{x:cx2+R*1.1,y:cy2+R*0.45}];
-  feats.forEach((b,i)=>{ const pos=positions[i]; drawIconCircle(ctx,pos.x,pos.y,40,'#fff',ICONS4[i],acc,20);
-    ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1; ctx.setLineDash([4,6]); ctx.beginPath(); ctx.moveTo(cx2,cy2); ctx.lineTo(pos.x,pos.y); ctx.stroke(); ctx.setLineDash([]); ctx.restore();
-    ctx.font='700 20px Outfit'; ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.textAlign=pos.x>cx2?'left':'right'; ctx.fillText(b.substring(0,18),pos.x>cx2?pos.x+50:pos.x-50,pos.y+7); });
-  ctx.textAlign='right'; if (d.logoImage) ctx.drawImage(d.logoImage,W-96,32,56,56);
-  ctx.fillStyle=acc+'dd'; ctx.font='800 16px Outfit'; ctx.fillText('ARIAS GROUP EXCLUSIVE',W-36,70);
-  const tl=wrapText(ctx,(d.title||'').toUpperCase(),W*0.43); tl.slice(0,3).forEach((l,i)=>drawShadowText(ctx,l,W-36,H*0.65+i*88,i===1?acc:'#fff','900 72px Playfair Display'));
-  ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.font='500 28px Outfit'; ctx.fillText(d.subtitle||'',W-36,H*0.65+tl.length*88+22);
-  drawCTA(ctx,d.cta||'CONTACTANOS',W-270,H-158,234,64,'#fff',acc);
-  ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='700 22px Outfit'; ctx.textAlign='right'; ctx.fillText(d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W-36,H-74);
-  drawSocialBar(ctx,H-32,W,acc,false,d.contact?.web||'');
-}
-function engine_stripes(ctx, W, H, d) {
-  const acc = d.accent || '#1a56db';
-  ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
-  ctx.fillStyle='#0f172a'; ctx.fillRect(0,0,W,H*0.09); ctx.fillStyle=acc; ctx.fillRect(0,H*0.09,W,H*0.055);
-  ctx.save(); ctx.beginPath(); ctx.rect(0,H*0.145,W,H*0.48); ctx.clip();
-  if (d.bgImage) ctx.drawImage(d.bgImage,0,H*0.12,W,H*0.54); else { ctx.fillStyle='#e2e8f0'; ctx.fillRect(0,0,W,H); }
-  const fgr=ctx.createLinearGradient(0,H*0.5,0,H*0.63); fgr.addColorStop(0,'rgba(255,255,255,0)'); fgr.addColorStop(1,'#fff'); ctx.fillStyle=fgr; ctx.fillRect(0,H*0.5,W,H*0.13); ctx.restore();
-  ctx.fillStyle=acc; ctx.fillRect(0,H*0.625,W,H*0.036); ctx.fillStyle='#0f172a'; ctx.fillRect(0,H*0.661,W,H*0.339);
-  if (d.logoImage) ctx.drawImage(d.logoImage,30,6,54,54);
-  ctx.textAlign='left'; ctx.fillStyle='#fff'; ctx.font='800 18px Outfit'; ctx.fillText('ARIAS GROUP',d.logoImage?96:30,38);
-  drawHex(ctx,W-60,H*0.045,34,acc+'33',acc,2); ctx.fillStyle=acc; ctx.font='700 11px Outfit'; ctx.textAlign='center'; ctx.fillText('PRO',W-60,H*0.045+5);
-  ctx.textAlign='left'; const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-80);
-  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,40,H*0.22+i*100,'#fff','900 96px Playfair Display'));
-  const botY=H*0.68; drawFeatures(ctx,d.beneficios||[],40,botY,W-80,acc,false,2,26);
-  ctx.fillStyle='rgba(255,255,255,0.15)'; ctx.fillRect(40,botY+148,W-80,1);
-  ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.font='500 32px Outfit'; ctx.textAlign='left'; ctx.fillText(d.subtitle||'',40,botY+178);
-  drawCTA(ctx,d.cta||'SABER M\u00c1S',W-288,H-94,248,66,acc,'#fff');
-  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',40,H-52,acc,false);
-}
-function engine_cornerBurst(ctx, W, H, d) {
-  const acc = d.accent || '#0ea5e9';
-  ctx.fillStyle='#0f172a'; ctx.fillRect(0,0,W,H);
-  ctx.save(); ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(W,0); ctx.lineTo(W,H*0.56); ctx.lineTo(0,H*0.44); ctx.closePath(); ctx.clip();
-  if (d.bgImage) ctx.drawImage(d.bgImage,0,0,W,H); else { ctx.fillStyle='#334155'; ctx.fillRect(0,0,W,H); }
-  const dog=ctx.createLinearGradient(0,0,0,H*0.56); dog.addColorStop(0,'rgba(0,0,0,0.55)'); dog.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=dog; ctx.fillRect(0,0,W,H*0.56); ctx.restore();
-  ctx.save(); ctx.globalAlpha=0.9; ctx.fillStyle=acc; ctx.beginPath(); ctx.moveTo(0,H*0.42); ctx.lineTo(W,H*0.54); ctx.lineTo(W,H*0.60); ctx.lineTo(0,H*0.48); ctx.closePath(); ctx.fill(); ctx.globalAlpha=1; ctx.restore();
-  if (d.logoImage) ctx.drawImage(d.logoImage,36,24,54,54);
-  ctx.textAlign='left'; ctx.font='800 16px Outfit'; ctx.fillStyle='#fff'; ctx.fillText('ARIAS GROUP',d.logoImage?102:36,50);
-  ctx.fillStyle=acc; ctx.font='600 13px Outfit'; ctx.fillText('DIGITAL MARKETING',d.logoImage?102:36,70);
-  drawHex(ctx,W-70,80,50,'rgba(255,255,255,0.04)',acc+'66',2); drawDotGrid(ctx,W-140,40,4,4,20,acc+'33',2);
-  drawBadge(ctx,'OFERTA',W-190,26,acc,'#fff',22,18,11,8);
-  const titY=H*0.63; const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-70);
-  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,36,titY+i*96,'#fff','900 90px Playfair Display'));
-  ctx.fillStyle=acc; ctx.font='600 32px Outfit'; ctx.fillText(d.subtitle||'',36,titY+tl.length*96+20);
-  drawFeatures(ctx,d.beneficios||[],36,titY+tl.length*96+64,W-72,acc,false,2,24);
-  drawCTA(ctx,d.cta||'CONTACTANOS',W-284,H-84,248,66,acc,'#fff');
-  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',36,H-44,acc,false);
-}
-function engine_architectural(ctx, W, H, d) {
-  const acc = d.accent || '#D4AF37';
-  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,W,H);
-  ctx.fillStyle=acc; ctx.fillRect(0,0,W,12);
-  drawDotGrid(ctx,W-170,30,6,5,22,'#e2e8f0',3);
-  const px=70,py=56,pw=W-140,ph=H*0.40;
-  ctx.save(); ctx.shadowColor='rgba(0,0,0,0.18)'; ctx.shadowBlur=32; ctx.shadowOffsetY=10;
-  roundRect(ctx,px,py,pw,ph,16); ctx.fillStyle='#e2e8f0'; ctx.fill(); ctx.restore();
-  ctx.save(); roundRect(ctx,px,py,pw,ph,16); ctx.clip();
-  if (d.bgImage) ctx.drawImage(d.bgImage,px,py,pw,ph); else { ctx.fillStyle='#94a3b8'; ctx.fillRect(px,py,pw,ph); }
-  const pfgr=ctx.createLinearGradient(0,py+ph*0.6,0,py+ph); pfgr.addColorStop(0,'rgba(0,0,0,0)'); pfgr.addColorStop(1,'rgba(0,0,0,0.45)'); ctx.fillStyle=pfgr; ctx.fillRect(px,py,pw,ph);
-  drawCTA(ctx,d.cta||'VER DETALLES',px+pw-244,py+ph-76,224,58,acc,'#fff'); ctx.restore();
-  drawBadge(ctx,'NUEVO',px+16,py+16,acc,'#fff',20,16,10,7);
-  const bY=py+ph+28;
-  if (d.logoImage) ctx.drawImage(d.logoImage,px,bY,46,46);
-  ctx.textAlign='left'; ctx.fillStyle='#94a3b8'; ctx.font='700 14px Outfit';
-  ctx.fillText('ARIAS GROUP  \u2022  EXCLUSIVE REAL ESTATE',px+(d.logoImage?58:0),bY+18);
-  ctx.fillStyle=acc; ctx.fillRect(px,bY+34,80,5);
-  const titleY=bY+64; const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-180); ctx.font='900 78px Playfair Display';
-  tl.slice(0,2).forEach((l,i)=>{ ctx.fillStyle=i===0?'#0f172a':acc; ctx.fillText(l,px,titleY+i*88); });
-  const afterTitle=titleY+tl.length*88; ctx.fillStyle='#334155'; ctx.font='500 30px Outfit';
-  const subs=wrapText(ctx,d.subtitle||'',W-160); subs.slice(0,2).forEach((s,i)=>ctx.fillText(s,px,afterTitle+10+i*36));
-  drawFeatures(ctx,d.beneficios||[],px,afterTitle+10+subs.length*36+18,W-160,acc,true,2,26);
-  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',px,H-46,acc,true);
-  drawSocialBar(ctx,H-22,W,acc,true,d.contact?.web||'');
-}
-function engine_luxuryDark(ctx, W, H, d) {
-  const acc = d.accent || '#D4AF37';
+
+// ═══════════════════════════════════════════════════════════════════
+// ENGINE 5: GOLDEN DARK LUXURY — Fondo oscuro premium, detalles dorados
+// ═══════════════════════════════════════════════════════════════════
+function engine_circle(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
+  const acc=d.accent||'#D4AF37';
+  // DARK BG
   ctx.fillStyle='#070711'; ctx.fillRect(0,0,W,H);
-  const rglow=ctx.createRadialGradient(W/2,H*0.5,0,W/2,H*0.5,W*0.55); rglow.addColorStop(0,acc+'18'); rglow.addColorStop(1,'transparent'); ctx.fillStyle=rglow; ctx.fillRect(0,0,W,H);
-  ctx.strokeStyle=acc+'15'; ctx.lineWidth=1;
-  for(let gy=0;gy<H;gy+=70){ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(W,gy);ctx.stroke();}
-  for(let gx=0;gx<W;gx+=70){ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,H);ctx.stroke();}
-  drawHex(ctx,W*0.12,H*0.12,60,acc+'08',acc+'25',1); drawHex(ctx,W*0.88,H*0.88,50,acc+'08',acc+'20',1);
-  const ph=H*0.32,py=H*0.26;
-  ctx.save(); ctx.shadowColor=acc; ctx.shadowBlur=22; ctx.strokeStyle=acc; ctx.lineWidth=3.5;
-  ctx.beginPath(); ctx.rect(W*0.10,py-4,W*0.80,ph+8); ctx.stroke(); ctx.shadowColor='transparent'; ctx.restore();
-  ctx.save(); ctx.beginPath(); ctx.rect(W*0.10,py,W*0.80,ph); ctx.clip();
-  if (d.bgImage) ctx.drawImage(d.bgImage,W*0.10,py-H*0.1,W*0.80,ph+H*0.15); else { ctx.fillStyle='#1e293b'; ctx.fillRect(0,py,W,ph); }
-  const pf=ctx.createLinearGradient(0,py,0,py+ph); pf.addColorStop(0,'rgba(7,7,17,0.75)'); pf.addColorStop(0.3,'rgba(7,7,17,0)'); pf.addColorStop(0.7,'rgba(7,7,17,0)'); pf.addColorStop(1,'rgba(7,7,17,0.88)');
-  ctx.fillStyle=pf; ctx.fillRect(0,py,W,ph); ctx.restore();
-  if (d.logoImage) ctx.drawImage(d.logoImage,W/2-30,24,60,60);
-  ctx.textAlign='center'; ctx.fillStyle=acc; ctx.font='800 16px Outfit'; ctx.fillText('ARIAS GROUP  \u25c6  EXCLUSIVE',W/2,98);
-  const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-80);
-  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,W/2,H*0.16+i*90,i===0?'#fff':acc,'900 90px Playfair Display','rgba(0,0,0,0.85)',28));
-  const afterPh=py+ph+40; ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.font='500 30px Outfit'; ctx.textAlign='center'; ctx.fillText(d.subtitle||'',W/2,afterPh);
-  (d.beneficios||[]).slice(0,3).forEach((b,i)=>{
-    const cardW=W*0.76,cardX=(W-cardW)/2; roundRect(ctx,cardX,afterPh+32+i*66,cardW,52,10);
-    ctx.fillStyle='rgba(255,255,255,0.05)'; ctx.fill(); ctx.strokeStyle=acc+'40'; ctx.lineWidth=1.5; ctx.stroke();
-    drawIconCircle(ctx,cardX+32,afterPh+58+i*66,20,acc,'\u2605','#000',13);
-    ctx.font='700 24px Outfit'; ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.textAlign='left'; ctx.fillText(b.substring(0,34),cardX+62,afterPh+66+i*66);
+  // Radial glow
+  const rg=ctx.createRadialGradient(W*0.5,H*0.4,0,W*0.5,H*0.4,W*0.7);
+  rg.addColorStop(0,acc+'20'); rg.addColorStop(1,'transparent'); ctx.fillStyle=rg; ctx.fillRect(0,0,W,H);
+  // Image - centered oval frame
+  const iw=Math.round(W*0.86),ih=Math.round(H*0.44),ix=(W-iw)/2,iy=Math.round(H*0.2);
+  ctx.save();
+  // Outer glow border
+  ctx.shadowColor=acc; ctx.shadowBlur=28;
+  ctx.strokeStyle=acc; ctx.lineWidth=5;
+  roundRect(ctx,ix,iy,iw,ih,32); ctx.stroke();
+  ctx.shadowColor='transparent'; ctx.shadowBlur=0;
+  roundRect(ctx,ix,iy,iw,ih,32); ctx.clip();
+  if(d.bgImage){
+    const ir=d.bgImage.width/d.bgImage.height; const cr=iw/ih;
+    let sw=d.bgImage.width,sh=d.bgImage.height,sx=0,sy=0;
+    if(ir>cr){sw=d.bgImage.height*cr;sx=(d.bgImage.width-sw)/2;}else{sh=d.bgImage.width/cr;sy=(d.bgImage.height-sh)/2;}
+    ctx.drawImage(d.bgImage,sx,sy,sw,sh,ix,iy,iw,ih);
+  } else {ctx.fillStyle='#1e293b';ctx.fillRect(ix,iy,iw,ih);}
+  const povg=ctx.createLinearGradient(ix,iy+ih*0.6,ix,iy+ih);
+  povg.addColorStop(0,'rgba(7,7,17,0)'); povg.addColorStop(1,'rgba(7,7,17,0.9)');
+  ctx.fillStyle=povg; ctx.fillRect(ix,iy,iw,ih);
+  ctx.restore();
+  // PRICE BADGE on top
+  if(d.price) { const pw=340; drawPill(ctx,d.price,(W-pw)/2,iy-28,acc,'#000',40,28,18); }
+  // TOP LOGO AREA
+  ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(0,0,W,d.price?iy-36:iy-4);
+  if(d.logoImage) ctx.drawImage(d.logoImage,40,20,60,60);
+  pxFont(ctx,'800 20px Outfit'); txt(ctx,(d.industria||'ARIAS GROUP').toUpperCase(),d.logoImage?114:40,52,acc,'left');
+  // TITLE + SUBTITLE (below frame)
+  const botY=iy+ih+20;
+  const titEnd=drawMultilineTitleCenter(ctx,d.title||'Tu Oferta',W/2,botY,W-80,108,'#fff',acc);
+  ctx.fillStyle=acc; ctx.fillRect(W/2-80,titEnd+8,160,5);
+  pxFont(ctx,'500 32px Outfit'); shadow(ctx,'rgba(0,0,0,0.6)',12,3);
+  txt(ctx,d.subtitle||'',W/2,titEnd+52,'rgba(255,255,255,0.85)','center'); noShadow(ctx);
+  // BENEFITS (horizontal pills)
+  let bx2=60; const by2=titEnd+96;
+  (d.beneficios||[]).slice(0,3).forEach((b: string)=>{
+    drawPill(ctx,b.substring(0,18),bx2,by2,'rgba(255,255,255,0.08)','rgba(255,255,255,0.9)',24,16,10);
+    bx2 += ctx.measureText(b.substring(0,18)).width+72;
   });
-  const ctaY=afterPh+32+(d.beneficios||[]).length*66+18;
-  drawCTA(ctx,d.cta||'VER PROPIEDAD',W/2-150,ctaY,300,68,acc,'#000');
-  ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.font='700 22px Outfit'; ctx.textAlign='center'; ctx.fillText(d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,ctaY+88);
+  drawCTAButton(ctx,d.cta||'CONTÁCTANOS',W/2,by2+78,580,88,acc,'#000');
+  // BOTTOM
+  ctx.fillStyle=acc; ctx.fillRect(0,H-80,W,80);
+  pxFont(ctx,'900 30px Outfit'); txt(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,H-38,'#000','center');
 }
-function engine_boldGradient(ctx, W, H, d) {
-  const acc = d.accent || '#0ea5e9'; const dark='#0c1445';
-  const bgGr=ctx.createLinearGradient(0,0,W,H); bgGr.addColorStop(0,dark); bgGr.addColorStop(0.6,acc+'cc'); bgGr.addColorStop(1,dark); ctx.fillStyle=bgGr; ctx.fillRect(0,0,W,H);
-  const ex=W/2,ey=H*0.33,erx=W*0.38,ery=H*0.25;
-  ctx.save(); ctx.shadowColor=acc; ctx.shadowBlur=32; ctx.strokeStyle='rgba(255,255,255,0.55)'; ctx.lineWidth=7;
-  ctx.beginPath(); ctx.ellipse(ex,ey,erx,ery,0,0,Math.PI*2); ctx.stroke(); ctx.shadowColor='transparent'; ctx.restore();
-  ctx.save(); ctx.beginPath(); ctx.ellipse(ex,ey,erx,ery,0,0,Math.PI*2); ctx.clip();
-  if (d.bgImage) ctx.drawImage(d.bgImage,ex-erx,ey-ery,erx*2,ery*2); else { ctx.fillStyle='#1e40af'; ctx.fillRect(0,0,W,H); } ctx.restore();
-  ctx.strokeStyle=acc+'60'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.ellipse(ex,ey,erx+18,ery+18,0,0,Math.PI*2); ctx.stroke();
-  drawDotGrid(ctx,40,80,4,6,22,'rgba(255,255,255,0.08)',2); drawDotGrid(ctx,W-130,H*0.55,4,5,22,'rgba(255,255,255,0.08)',2);
-  if (d.logoImage) ctx.drawImage(d.logoImage,W/2-30,16,60,60);
-  ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.font='800 16px Outfit'; ctx.fillText('ARIAS GROUP  \u2022  EXCLUSIVE REAL ESTATE',W/2,90);
-  if (d.price) { drawShadowText(ctx,d.price,W/2,H*0.07,'#fff','900 108px Outfit','rgba(0,0,0,0.5)',22); ctx.font='800 28px Outfit'; ctx.fillStyle=acc; ctx.fillText('/MES  \u2022  GARANTIA DE PRECIO',W/2,H*0.07+44); }
-  const titY=ey+ery+52; const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-80);
-  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,W/2,titY+i*96,i===0?'#fff':acc,`900 ${i===0?90:80}px Playfair Display`,'rgba(0,0,0,0.7)',22));
-  ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.font='500 32px Outfit'; ctx.textAlign='center'; ctx.fillText(d.subtitle||'',W/2,titY+tl.length*96+18);
-  const featY=titY+tl.length*96+62;
-  (d.beneficios||[]).slice(0,2).forEach((b,i)=>{ drawIconCircle(ctx,W/2-100+(i*200),featY,32,'rgba(255,255,255,0.13)','\u2726','#fff',16); ctx.font='700 24px Outfit'; ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.textAlign='center'; ctx.fillText(b.substring(0,18),W/2-100+(i*200),featY+54); });
-  drawCTA(ctx,d.cta||'LEARN MORE',W/2-155,H-162,310,70,'#fff',dark);
-  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2-90,H-72,acc,false);
-  drawSocialBar(ctx,H-30,W,acc,false,d.contact?.web||'');
+
+// ═══════════════════════════════════════════════════════════════════
+// ENGINE 6: CORPORATE STRIPES — Limpio, barra color + imagen + texto
+// ═══════════════════════════════════════════════════════════════════
+function engine_stripes(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
+  const acc=d.accent||'#1a56db';
+  // Full white BG
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+  // TOP header bar
+  ctx.fillStyle=acc; ctx.fillRect(0,0,W,100);
+  if(d.logoImage) ctx.drawImage(d.logoImage,30,18,64,64);
+  pxFont(ctx,'900 26px Outfit'); txt(ctx,d.industria||'ARIAS GROUP',d.logoImage?108:36,56,'#fff','left');
+  if(d.price) drawPill(ctx,d.price,W-280,18,acc==='#fff'?'#000':acc,'#fff',36,22,14);
+  // IMAGE SECTION
+  const imgY=100; const imgH=Math.round(H*0.48);
+  ctx.save(); ctx.beginPath(); ctx.rect(0,imgY,W,imgH); ctx.clip();
+  if(d.bgImage){
+    const ir=d.bgImage.width/d.bgImage.height; const cr=W/imgH;
+    let sw=d.bgImage.width,sh=d.bgImage.height,sx=0,sy=0;
+    if(ir>cr){sw=d.bgImage.height*cr;sx=(d.bgImage.width-sw)/2;}else{sh=d.bgImage.width/cr;sy=(d.bgImage.height-sh)/2;}
+    ctx.drawImage(d.bgImage,sx,sy,sw,sh,0,imgY,W,imgH);
+  } else {ctx.fillStyle='#e2e8f0'; ctx.fillRect(0,imgY,W,imgH);}
+  // Bottom image fade to white
+  const fgr=ctx.createLinearGradient(0,imgY+imgH*0.65,0,imgY+imgH);
+  fgr.addColorStop(0,'rgba(255,255,255,0)'); fgr.addColorStop(1,'#fff');
+  ctx.fillStyle=fgr; ctx.fillRect(0,imgY,W,imgH);
+  ctx.restore();
+  // ACCENT stripe
+  ctx.fillStyle=acc; ctx.fillRect(0,imgY+imgH,W,10);
+  // CONTENT (bottom area, white bg)
+  const cY=imgY+imgH+22;
+  const titEnd=drawMultilineTitleLeft(ctx,d.title||'Tu Oferta',60,cY,W-100,96,'#0f172a','#0f172a',acc);
+  pxFont(ctx,'500 30px Outfit'); txt(ctx,d.subtitle||'',60,titEnd+14,'#475569','left');
+  const benY2=drawBenefitRow(ctx,d.beneficios||[],60,titEnd+58,W-80,acc,true);
+  drawCTAButton(ctx,d.cta||'CONTÁCTANOS',W/2,benY2+24,580,84,acc,'#fff');
+  drawLogoBar(ctx,W,H-88,88,'#0f172a',null,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',d.contact?.web||'',acc);
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// ENGINE 7: DIAGONAL GEO BURST — Diagonal dramática, foto fondo
+// ═══════════════════════════════════════════════════════════════════
+function engine_cornerBurst(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
+  const acc=d.accent||'#f59e0b';
+  drawFullBleedBg(ctx,W,H,d.bgImage,[
+    {pos:0,color:'rgba(0,0,0,0.55)'},{pos:0.4,color:'rgba(0,0,0,0.2)'},
+    {pos:0.7,color:'rgba(0,0,0,0.6)'},{pos:1,color:'rgba(0,0,0,0.95)'}
+  ]);
+  // DIAGONAL overlay shape
+  ctx.save(); ctx.beginPath();
+  ctx.moveTo(0,0); ctx.lineTo(W*0.62,0); ctx.lineTo(W*0.38,H*0.5); ctx.lineTo(0,H*0.5); ctx.closePath();
+  ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fill(); ctx.restore();
+  // ACCENT diagonal stripe
+  ctx.save(); ctx.beginPath();
+  ctx.moveTo(W*0.60,0); ctx.lineTo(W*0.65,0); ctx.lineTo(W*0.41,H*0.5); ctx.lineTo(W*0.36,H*0.5); ctx.closePath();
+  ctx.fillStyle=acc; ctx.fill(); ctx.restore();
+  // TOP LEFT CONTENT
+  if(d.logoImage) ctx.drawImage(d.logoImage,40,30,64,64);
+  pxFont(ctx,'800 18px Outfit'); txt(ctx,(d.industria||'ARIAS GROUP').toUpperCase(),d.logoImage?118:40,54,'rgba(255,255,255,0.7)','left');
+  if(d.price) drawPill(ctx,d.price,40,d.logoImage?110:80,acc,'#000',36,22,14);
+  const titY2=d.price?220:170;
+  const titEnd2=drawMultilineTitleLeft(ctx,d.title||'Tu Oferta',40,titY2,W*0.55,114,'#fff','#fff',acc);
+  pxFont(ctx,'500 32px Outfit'); shadow(ctx,'rgba(0,0,0,0.7)',10,3);
+  txt(ctx,d.subtitle||'',40,titEnd2+16,'rgba(255,255,255,0.85)','left'); noShadow(ctx);
+  // BOTTOM CONTENT
+  ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(0,H*0.6,W,H*0.4);
+  ctx.fillStyle=acc; ctx.fillRect(0,Math.round(H*0.6),W,8);
+  const benY3=drawBenefitRow(ctx,d.beneficios||[],50,Math.round(H*0.62)+16,W-80,acc);
+  drawCTAButton(ctx,d.cta||'CONTÁCTANOS',W/2,benY3+24,580,86,acc,'#000');
+  pxFont(ctx,'700 26px Outfit'); txt(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,H-40,'rgba(255,255,255,0.75)','center');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ENGINE 8: MINIMAL WHITE EDITORIAL — Clean & Sophisticated
+// ═══════════════════════════════════════════════════════════════════
+function engine_architectural(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
+  const acc=d.accent||'#D4AF37';
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle=acc; ctx.fillRect(0,0,W,16);
+  // DOT PATTERN (decorative)
+  ctx.fillStyle='#f1f5f9';
+  for(let c=0;c<8;c++) for(let r=0;r<8;r++) { ctx.beginPath(); ctx.arc(W-120+c*16,24+r*16,3,0,Math.PI*2); ctx.fill(); }
+  // TOP HEADER
+  if(d.logoImage) ctx.drawImage(d.logoImage,48,28,60,60);
+  pxFont(ctx,'700 16px Outfit'); txt(ctx,(d.industria||'ARIAS GROUP').toUpperCase(),d.logoImage?122:48,50,'#94a3b8','left');
+  pxFont(ctx,'700 16px Outfit'); txt(ctx,acc.toUpperCase(),d.logoImage?122:48,70,acc,'left');
+  // IMAGE in rounded frame
+  const iY=110; const iH=Math.round(H*0.42); const iX=48; const iW=W-96;
+  ctx.save(); ctx.shadowColor='rgba(0,0,0,0.15)'; ctx.shadowBlur=30; ctx.shadowOffsetY=10;
+  roundRect(ctx,iX,iY,iW,iH,24); ctx.fillStyle='#e2e8f0'; ctx.fill(); ctx.restore();
+  ctx.save(); roundRect(ctx,iX,iY,iW,iH,24); ctx.clip();
+  if(d.bgImage){
+    const ir=d.bgImage.width/d.bgImage.height; const cr=iW/iH;
+    let sw=d.bgImage.width,sh=d.bgImage.height,sx=0,sy=0;
+    if(ir>cr){sw=d.bgImage.height*cr;sx=(d.bgImage.width-sw)/2;}else{sh=d.bgImage.width/cr;sy=(d.bgImage.height-sh)/2;}
+    ctx.drawImage(d.bgImage,sx,sy,sw,sh,iX,iY,iW,iH);
+  } else {ctx.fillStyle='#94a3b8'; ctx.fillRect(iX,iY,iW,iH);}
+  // Gradient over image bottom
+  const ipg=ctx.createLinearGradient(iX,iY+iH*0.55,iX,iY+iH);
+  ipg.addColorStop(0,'rgba(255,255,255,0)'); ipg.addColorStop(1,'rgba(255,255,255,0.5)');
+  ctx.fillStyle=ipg; ctx.fillRect(iX,iY,iW,iH);
+  if(d.price) drawPill(ctx,d.price,iX+16,iY+16,acc,'#fff',32,20,12);
+  ctx.restore();
+  // CONTENT BELOW IMAGE
+  const cY=iY+iH+28;
+  ctx.fillStyle=acc; ctx.fillRect(48,cY,80,6);
+  const titEnd3=drawMultilineTitleLeft(ctx,d.title||'Tu Oferta',48,cY+24,W-96,96,'#0f172a','#0f172a',acc);
+  pxFont(ctx,'500 28px Outfit'); txt(ctx,d.subtitle||'',48,titEnd3+14,'#64748b','left');
+  const benY4=drawBenefitRow(ctx,d.beneficios||[],48,titEnd3+54,W-80,acc,true);
+  drawCTAButton(ctx,d.cta||'CONTÁCTANOS',W/2,benY4+16,580,82,acc,'#fff');
+  drawLogoBar(ctx,W,H-86,86,'#0f172a',d.logoImage,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',d.contact?.web||'',acc);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ENGINE 9: PHANTOM DARK PRESTIGE — Ultra dark luxury with glow
+// ═══════════════════════════════════════════════════════════════════
+function engine_luxuryDark(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
+  const acc=d.accent||'#D4AF37';
+  ctx.fillStyle='#050510'; ctx.fillRect(0,0,W,H);
+  // Background glow
+  const glow=ctx.createRadialGradient(W/2,H*0.45,0,W/2,H*0.45,W*0.65);
+  glow.addColorStop(0,acc+'22'); glow.addColorStop(0.5,acc+'08'); glow.addColorStop(1,'transparent');
+  ctx.fillStyle=glow; ctx.fillRect(0,0,W,H);
+  // TOP branding bar
+  ctx.fillStyle=acc; ctx.fillRect(0,0,W,8);
+  ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(0,8,W,92);
+  if(d.logoImage) ctx.drawImage(d.logoImage,40,18,64,64);
+  pxFont(ctx,'800 20px Outfit'); txt(ctx,(d.industria||'ARIAS GROUP').toUpperCase(),d.logoImage?118:40,48,acc,'left');
+  pxFont(ctx,'600 16px Outfit'); txt(ctx,(d.contact?.web||'www.empresa.com').toUpperCase(),d.logoImage?118:40,68,'rgba(255,255,255,0.45)','left');
+  // IMAGE FRAME — full width, elegant border
+  const fY=108; const fH=Math.round(H*0.4); const fPad=40;
+  ctx.save();
+  ctx.shadowColor=acc; ctx.shadowBlur=24;
+  ctx.strokeStyle=acc; ctx.lineWidth=4;
+  roundRect(ctx,fPad,fY,W-fPad*2,fH,16); ctx.stroke();
+  ctx.shadowColor='transparent'; ctx.shadowBlur=0;
+  roundRect(ctx,fPad,fY,W-fPad*2,fH,16); ctx.clip();
+  if(d.bgImage){
+    const ir=d.bgImage.width/d.bgImage.height; const cr=(W-fPad*2)/fH;
+    let sw=d.bgImage.width,sh=d.bgImage.height,sx=0,sy=0;
+    if(ir>cr){sw=d.bgImage.height*cr;sx=(d.bgImage.width-sw)/2;}else{sh=d.bgImage.width/cr;sy=(d.bgImage.height-sh)/2;}
+    ctx.drawImage(d.bgImage,sx,sy,sw,sh,fPad,fY,W-fPad*2,fH);
+  } else {ctx.fillStyle='#1e293b';ctx.fillRect(fPad,fY,W-fPad*2,fH);}
+  const fpg=ctx.createLinearGradient(0,fY+fH*0.5,0,fY+fH);
+  fpg.addColorStop(0,'rgba(5,5,16,0)'); fpg.addColorStop(1,'rgba(5,5,16,0.92)');
+  ctx.fillStyle=fpg; ctx.fillRect(fPad,fY,W-fPad*2,fH);
+  ctx.restore();
+  if(d.price){ const pw=340; drawPill(ctx,d.price,(W-pw)/2,fY+fH-76,acc,'#000',40,28,18); }
+  // CONTENT BELOW
+  const bBot=fY+fH+18;
+  const titEnd4=drawMultilineTitleCenter(ctx,d.title||'Tu Oferta',W/2,bBot,W-80,104,'#fff',acc);
+  ctx.fillStyle=acc; ctx.fillRect(W/2-60,titEnd4+8,120,4);
+  pxFont(ctx,'400 32px Outfit'); shadow(ctx,'rgba(0,0,0,0.5)',10,3);
+  txt(ctx,d.subtitle||'',W/2,titEnd4+50,'rgba(255,255,255,0.78)','center'); noShadow(ctx);
+  // CARD BENEFITS
+  (d.beneficios||[]).slice(0,3).forEach((b: string,i: number)=>{
+    const cW2=W-120; const cX=(W-cW2)/2;
+    roundRect(ctx,cX,titEnd4+80+i*72,cW2,58,12);
+    ctx.fillStyle='rgba(255,255,255,0.04)'; ctx.fill();
+    ctx.strokeStyle=acc+'50'; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.save(); ctx.beginPath(); ctx.arc(cX+34,titEnd4+109+i*72,20,0,Math.PI*2);
+    ctx.fillStyle=acc; ctx.fill(); pxFont(ctx,'900 16px Outfit'); txt(ctx,'★',cX+34,titEnd4+115+i*72,'#000','center');
+    ctx.restore();
+    pxFont(ctx,'700 26px Outfit'); txt(ctx,b.substring(0,32),cX+68,titEnd4+118+i*72,'rgba(255,255,255,0.9)','left');
+  });
+  const ctaY2=titEnd4+80+(d.beneficios||[]).slice(0,3).length*72+16;
+  drawCTAButton(ctx,d.cta||'VER PROPIEDAD',W/2,ctaY2,580,88,acc,'#000');
+  ctx.fillStyle=acc; ctx.fillRect(0,H-80,W,80);
+  pxFont(ctx,'900 28px Outfit'); txt(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,H-36,'#000','center');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ENGINE 10: GRADIENT POWER — Bold color gradient, modern energy
+// ═══════════════════════════════════════════════════════════════════
+function engine_boldGradient(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
+  const acc=d.accent||'#6d28d9';
+  // BOLD GRADIENT BG
+  const bgGr=ctx.createLinearGradient(0,0,W,H);
+  bgGr.addColorStop(0,'#0c1445'); bgGr.addColorStop(0.5,acc+'ee'); bgGr.addColorStop(1,'#0c1445');
+  ctx.fillStyle=bgGr; ctx.fillRect(0,0,W,H);
+  // TOP BAR
+  ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.fillRect(0,0,W,100);
+  if(d.logoImage) ctx.drawImage(d.logoImage,40,18,64,64);
+  pxFont(ctx,'800 20px Outfit'); txt(ctx,(d.industria||'ARIAS GROUP').toUpperCase(),d.logoImage?118:40,50,acc,'left');
+  if(d.price) drawPill(ctx,d.price,W-300,16,acc,'#fff',38,24,16);
+  // IMAGE in full-width rounded frame
+  const iY=110; const iH=Math.round(H*0.40);
+  ctx.save();
+  ctx.shadowColor='rgba(0,0,0,0.5)'; ctx.shadowBlur=24; ctx.shadowOffsetY=8;
+  roundRect(ctx,48,iY,W-96,iH,20); ctx.fillStyle='#1e293b'; ctx.fill();
+  ctx.shadowColor='transparent'; ctx.shadowBlur=0; ctx.shadowOffsetY=0;
+  roundRect(ctx,48,iY,W-96,iH,20); ctx.clip();
+  if(d.bgImage){
+    const ir=d.bgImage.width/d.bgImage.height; const cr=(W-96)/iH;
+    let sw=d.bgImage.width,sh=d.bgImage.height,sx=0,sy=0;
+    if(ir>cr){sw=d.bgImage.height*cr;sx=(d.bgImage.width-sw)/2;}else{sh=d.bgImage.width/cr;sy=(d.bgImage.height-sh)/2;}
+    ctx.drawImage(d.bgImage,sx,sy,sw,sh,48,iY,W-96,iH);
+  } else {ctx.fillStyle='#1e40af'; ctx.fillRect(48,iY,W-96,iH);}
+  const ipg2=ctx.createLinearGradient(0,iY+iH*0.55,0,iY+iH);
+  ipg2.addColorStop(0,'rgba(12,20,69,0)'); ipg2.addColorStop(1,acc+'cc');
+  ctx.fillStyle=ipg2; ctx.fillRect(48,iY,W-96,iH);
+  ctx.restore();
+  // CONTENT BELOW IMAGE
+  const cY2=iY+iH+24;
+  ctx.fillStyle='rgba(255,255,255,0.15)'; ctx.fillRect(48,cY2,W-96,2);
+  const titEnd5=drawMultilineTitleCenter(ctx,d.title||'Tu Oferta',W/2,cY2+18,W-80,108,'#fff',acc);
+  pxFont(ctx,'500 32px Outfit'); shadow(ctx,'rgba(0,0,0,0.6)',12,4);
+  txt(ctx,d.subtitle||'',W/2,titEnd5+22,'rgba(255,255,255,0.85)','center'); noShadow(ctx);
+  const benY5=drawBenefitRow(ctx,d.beneficios||[],60,titEnd5+68,W-80,acc);
+  drawCTAButton(ctx,d.cta||'EMPIEZA HOY',W/2,benY5+24,580,88,'#fff',acc==='#6d28d9'?'#0c1445':acc);
+  // BOTTOM
+  ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(0,H-86,W,86);
+  pxFont(ctx,'800 28px Outfit'); txt(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,H-46,'rgba(255,255,255,0.9)','center');
+  pxFont(ctx,'600 20px Outfit'); txt(ctx,d.contact?.web||'',W/2,H-20,'rgba(255,255,255,0.4)','center');
+}
+
 // ─── MAPA DE ENGINES ─────────────────────────────────────────────────────────
 const ENGINES: Record<string, (ctx: CanvasRenderingContext2D, W: number, H: number, d: any) => void> = {
   splitPanel: engine_splitPanel, fullOverlay: engine_fullOverlay, bottomBanner: engine_bottomBanner,
