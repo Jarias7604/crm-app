@@ -206,6 +206,7 @@ export default function FlyerStudio() {
     accent: '#1a56db', bgImageUrl: null, bgImagePosition: { x: 50, y: 50 },
     bgImage2Url: null, photoLayout: 'single',
     logoUrl: null, industria: '', phone: '', website: '', templateId: 'bold-split',
+    textScale: 1.0,
   });
 
   // Load industries from DB + company defaults
@@ -1028,12 +1029,103 @@ export default function FlyerStudio() {
                 </div>
               )}
 
-              {/* Zoom controls — always visible, top right (above scroll layer) */}
+              {/* Zoom controls — top right */}
               <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 30, display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.60)', backdropFilter: 'blur(8px)', borderRadius: 20, padding: '5px 12px' }}>
                 <button onClick={() => setPreviewZoom(z => Math.max(0.3, +(z - 0.1).toFixed(1)))} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: '0 2px', fontWeight: 700 }}>−</button>
                 <span style={{ color: '#fff', fontSize: 11, fontWeight: 800, minWidth: 36, textAlign: 'center' }}>{Math.round(previewZoom * 100)}%</span>
                 <button onClick={() => setPreviewZoom(z => Math.min(2.5, +(z + 0.1).toFixed(1)))} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: '0 2px', fontWeight: 700 }}>+</button>
                 <button onClick={() => setPreviewZoom(1.0)} style={{ background: 'rgba(255,255,255,0.18)', border: 'none', color: '#fff', fontSize: 10, cursor: 'pointer', borderRadius: 8, padding: '3px 8px', fontWeight: 700, marginLeft: 4 }}>Reset</button>
+              </div>
+
+              {/* ── FLOATING TEXT SIZE TOOLBAR — top center, above flyer ──────── */}
+              <div style={{
+                position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+                zIndex: 30, display: 'flex', alignItems: 'center', gap: 2,
+                background: 'rgba(15,23,42,0.82)', backdropFilter: 'blur(12px)',
+                border: '1px solid rgba(255,255,255,0.13)',
+                borderRadius: 50, padding: '5px 6px',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.45), 0 0 0 1px rgba(212,175,55,0.12)',
+                userSelect: 'none',
+              }}>
+                {/* Label */}
+                <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 10, fontWeight: 800, letterSpacing: '0.07em', padding: '0 8px 0 4px', textTransform: 'uppercase' }}>Texto</span>
+
+                {/* A- button */}
+                <button
+                  onClick={() => setFlyerData(prev => ({ ...prev, textScale: Math.max(0.6, +((prev.textScale ?? 1) - 0.1).toFixed(1)) }))}
+                  title="Texto más pequeño"
+                  style={{
+                    width: 32, height: 32, borderRadius: '50%', border: 'none',
+                    background: 'rgba(255,255,255,0.07)',
+                    color: '#e2e8f0', cursor: 'pointer',
+                    fontSize: 13, fontWeight: 900, letterSpacing: '-0.02em',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'all 0.15s ease', fontFamily: 'inherit',
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={e => { (e.target as HTMLButtonElement).style.background = 'rgba(255,255,255,0.16)'; (e.target as HTMLButtonElement).style.color = '#fff'; }}
+                  onMouseLeave={e => { (e.target as HTMLButtonElement).style.background = 'rgba(255,255,255,0.07)'; (e.target as HTMLButtonElement).style.color = '#e2e8f0'; }}
+                  onMouseDown={e => { (e.target as HTMLButtonElement).style.transform = 'scale(0.88)'; }}
+                  onMouseUp={e => { (e.target as HTMLButtonElement).style.transform = 'scale(1)'; }}
+                >
+                  <span style={{ fontSize: 12 }}>A</span>
+                </button>
+
+                {/* Size slider */}
+                <input
+                  type="range" min={0.6} max={1.6} step={0.05}
+                  value={flyerData.textScale ?? 1}
+                  onChange={e => setFlyerData(prev => ({ ...prev, textScale: parseFloat(e.target.value) }))}
+                  style={{ width: 72, height: 4, accentColor: '#D4AF37', cursor: 'pointer', margin: '0 4px' }}
+                  title="Tamaño de texto"
+                />
+
+                {/* Percentage */}
+                <span style={{
+                  color: '#D4AF37', fontSize: 11, fontWeight: 900,
+                  minWidth: 38, textAlign: 'center', letterSpacing: '0.02em',
+                  transition: 'all 0.15s',
+                }}>
+                  {Math.round((flyerData.textScale ?? 1) * 100)}%
+                </span>
+
+                {/* A+ button */}
+                <button
+                  onClick={() => setFlyerData(prev => ({ ...prev, textScale: Math.min(1.6, +((prev.textScale ?? 1) + 0.1).toFixed(1)) }))}
+                  title="Texto más grande"
+                  style={{
+                    width: 32, height: 32, borderRadius: '50%', border: 'none',
+                    background: 'rgba(255,255,255,0.07)',
+                    color: '#e2e8f0', cursor: 'pointer',
+                    fontSize: 18, fontWeight: 900,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'all 0.15s ease', fontFamily: 'inherit',
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={e => { (e.target as HTMLButtonElement).style.background = 'rgba(255,255,255,0.16)'; (e.target as HTMLButtonElement).style.color = '#fff'; }}
+                  onMouseLeave={e => { (e.target as HTMLButtonElement).style.background = 'rgba(255,255,255,0.07)'; (e.target as HTMLButtonElement).style.color = '#e2e8f0'; }}
+                  onMouseDown={e => { (e.target as HTMLButtonElement).style.transform = 'scale(0.88)'; }}
+                  onMouseUp={e => { (e.target as HTMLButtonElement).style.transform = 'scale(1)'; }}
+                >
+                  <span style={{ fontSize: 17 }}>A</span>
+                </button>
+
+                {/* Reset text scale */}
+                {(flyerData.textScale ?? 1) !== 1 && (
+                  <button
+                    onClick={() => setFlyerData(prev => ({ ...prev, textScale: 1.0 }))}
+                    title="Restablecer tamaño"
+                    style={{
+                      background: 'rgba(212,175,55,0.18)', border: 'none',
+                      color: '#D4AF37', fontSize: 9, cursor: 'pointer',
+                      borderRadius: 10, padding: '3px 8px', fontWeight: 800,
+                      marginLeft: 2, letterSpacing: '0.05em', transition: 'all 0.15s',
+                      whiteSpace: 'nowrap',
+                    }}
+                    onMouseEnter={e => { (e.currentTarget).style.background = 'rgba(212,175,55,0.32)'; }}
+                    onMouseLeave={e => { (e.currentTarget).style.background = 'rgba(212,175,55,0.18)'; }}
+                  >RESET</button>
+                )}
               </div>
 
               {/* Format badge — always visible, bottom center (above scroll layer) */}

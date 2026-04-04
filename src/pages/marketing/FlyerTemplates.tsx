@@ -17,7 +17,8 @@ export interface FlyerData {
   website: string;
   templateId: string;
   containerW?: number;
-  containerH?: number; // NEW: lets templates fill ANY format dimension
+  containerH?: number;
+  textScale?: number; // 0.7–1.5, independently scales font sizes (default 1.0)
 }
 
 // ─── PHOTO HELPERS ────────────────────────────────────────────────────────────
@@ -30,8 +31,10 @@ export const imgObjPos = (pos?: { x: number; y: number }) =>
   pos ? `${pos.x}% ${pos.y}%` : 'center';
 
 // ─── SCALE FACTOR ─────────────────────────────────────────────────────────────
-// s = uniform scale based on smallest dimension so nothing ever overflows
+// s = layout scale based on smallest dimension so layout proportions are correct
 const getScale = (w: number, h: number) => Math.min(w / 540, h / 675);
+// fs = font-size helper: layout scale × text scale
+const getFontScale = (w: number, h: number, ts: number) => getScale(w, h) * ts;
 
 // ─── SHARED COMPONENTS (receive scale factor s) ───────────────────────────────
 const trunc = (s: string, n: number) => s?.length > n ? s.slice(0, n - 1) + '…' : (s || '');
@@ -92,7 +95,7 @@ const Tag = ({ label, bg, color, s = 1 }: { label: string; bg: string; color: st
 // ═══════════════════════════════════════════════════════════════
 export const Template_BoldSplit = ({ d }: { d: FlyerData }) => {
   const W = d.containerW || 540, H = d.containerH || 675;
-  const s = getScale(W, H);
+  const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#1a56db';
   const title = (d.title || 'TU OFERTA').toUpperCase();
   const words = title.split(' ');
@@ -124,7 +127,7 @@ export const Template_BoldSplit = ({ d }: { d: FlyerData }) => {
 // ═══════════════════════════════════════════════════════════════
 export const Template_Cinematic = ({ d }: { d: FlyerData }) => {
   const W = d.containerW || 540, H = d.containerH || 675;
-  const s = getScale(W, H);
+  const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#f59e0b';
   return (
     <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: "'Outfit','Inter',sans-serif", boxSizing: 'border-box', background: '#0f172a' }}>
@@ -158,7 +161,7 @@ export const Template_Cinematic = ({ d }: { d: FlyerData }) => {
 // ═══════════════════════════════════════════════════════════════
 export const Template_WhiteCard = ({ d }: { d: FlyerData }) => {
   const W = d.containerW || 540, H = d.containerH || 675;
-  const s = getScale(W, H);
+  const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#3b82f6';
   return (
     <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: "'Outfit','Inter',sans-serif", boxSizing: 'border-box', background: '#f8fafc' }}>
@@ -196,7 +199,7 @@ export const Template_WhiteCard = ({ d }: { d: FlyerData }) => {
 // ═══════════════════════════════════════════════════════════════
 export const Template_Magazine = ({ d }: { d: FlyerData }) => {
   const W = d.containerW || 540, H = d.containerH || 675;
-  const s = getScale(W, H);
+  const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#ef4444';
   const title = (d.title || 'TU OFERTA').toUpperCase();
   return (
@@ -233,7 +236,7 @@ export const Template_Magazine = ({ d }: { d: FlyerData }) => {
 // ═══════════════════════════════════════════════════════════════
 export const Template_CenterGradient = ({ d }: { d: FlyerData }) => {
   const W = d.containerW || 540, H = d.containerH || 675;
-  const s = getScale(W, H);
+  const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#7c3aed';
   return (
     <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: "'Outfit','Inter',sans-serif", boxSizing: 'border-box', background: `linear-gradient(160deg, ${acc} 0%, ${acc}88 50%, #08031a 100%)` }}>
@@ -266,7 +269,7 @@ export const Template_CenterGradient = ({ d }: { d: FlyerData }) => {
 // ═══════════════════════════════════════════════════════════════
 export const Template_CorporateLight = ({ d }: { d: FlyerData }) => {
   const W = d.containerW || 540, H = d.containerH || 675;
-  const s = getScale(W, H);
+  const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#1e40af';
   return (
     <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: "'Outfit','Inter',sans-serif", boxSizing: 'border-box', display: 'flex', background: '#fff' }}>
@@ -296,7 +299,7 @@ export const Template_CorporateLight = ({ d }: { d: FlyerData }) => {
 // ═══════════════════════════════════════════════════════════════
 export const Template_DarkLuxury = ({ d }: { d: FlyerData }) => {
   const W = d.containerW || 540, H = d.containerH || 675;
-  const s = getScale(W, H);
+  const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#D4AF37';
   return (
     <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: "'Outfit','Inter',sans-serif", boxSizing: 'border-box', background: 'linear-gradient(160deg, #060612 0%, #0d0d1f 100%)' }}>
@@ -335,7 +338,7 @@ export const Template_DarkLuxury = ({ d }: { d: FlyerData }) => {
 // ═══════════════════════════════════════════════════════════════
 export const Template_PromoPop = ({ d }: { d: FlyerData }) => {
   const W = d.containerW || 540, H = d.containerH || 675;
-  const s = getScale(W, H);
+  const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#f59e0b';
   return (
     <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: "'Outfit','Inter',sans-serif", boxSizing: 'border-box', background: '#fff' }}>
@@ -369,7 +372,7 @@ export const Template_PromoPop = ({ d }: { d: FlyerData }) => {
 // ═══════════════════════════════════════════════════════════════
 export const Template_MinimalEditorial = ({ d }: { d: FlyerData }) => {
   const W = d.containerW || 540, H = d.containerH || 675;
-  const s = getScale(W, H);
+  const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#0ea5e9';
   return (
     <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: "'Outfit','Inter',sans-serif", boxSizing: 'border-box', background: '#fff', display: 'flex', flexDirection: 'column' }}>
@@ -401,7 +404,7 @@ export const Template_MinimalEditorial = ({ d }: { d: FlyerData }) => {
 // ═══════════════════════════════════════════════════════════════
 export const Template_FullBleedBold = ({ d }: { d: FlyerData }) => {
   const W = d.containerW || 540, H = d.containerH || 675;
-  const s = getScale(W, H);
+  const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#22d3ee';
   return (
     <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: "'Outfit','Inter',sans-serif", boxSizing: 'border-box' }}>
