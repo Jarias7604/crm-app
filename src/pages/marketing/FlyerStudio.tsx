@@ -1068,8 +1068,25 @@ export default function FlyerStudio() {
                     justifyContent: zoomed ? 'flex-start' : 'center',
                     padding: zoomed ? '52px 20px 52px 20px' : '52px 20px 44px 20px',
                   }}>
-                    <div style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.35)', borderRadius: 8, flexShrink: 0 }}>
-                      <div style={{ borderRadius: 8, overflow: 'hidden', transform: `scale(${finalScale})`, transformOrigin: 'top left', width: selectedSize.w, height: selectedSize.h }}>
+                    {/* Outer wrapper sized to POST-scale visual dimensions so layout is correct */}
+                    <div style={{
+                      width: Math.round(selectedSize.w * finalScale),
+                      height: Math.round(selectedSize.h * finalScale),
+                      boxShadow: '0 24px 64px rgba(0,0,0,0.35)',
+                      borderRadius: 8,
+                      flexShrink: 0,
+                      overflow: 'hidden',
+                      position: 'relative',
+                    }}>
+                      {/* Inner div renders at full format dimensions then scaled down */}
+                      <div style={{
+                        width: selectedSize.w,
+                        height: selectedSize.h,
+                        transform: `scale(${finalScale})`,
+                        transformOrigin: 'top left',
+                        position: 'absolute',
+                        top: 0, left: 0,
+                      }}>
                         <ActiveTemplate d={{ ...flyerData, containerW: selectedSize.w, containerH: selectedSize.h }} />
                       </div>
                     </div>
