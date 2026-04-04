@@ -86,11 +86,16 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
             <h2 style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a', margin: '0 0 8px' }}>
               {isStaleChunk ? 'Nueva versión disponible' : 'Algo salió mal'}
             </h2>
-            <p style={{ color: '#64748b', fontSize: '14px', margin: '0 0 28px', lineHeight: 1.6 }}>
+            <p style={{ color: '#64748b', fontSize: '14px', margin: '0 0 12px', lineHeight: 1.6 }}>
               {isStaleChunk
                 ? 'El sistema fue actualizado. Recarga la página para continuar trabajando con la versión más reciente.'
-                : 'Ocurrió un error inesperado. Por favor recarga la página o contacta al administrador si el problema persiste.'}
+                : 'Ocurrió un error inesperado.'}
             </p>
+            {!isStaleChunk && this.state.error && (
+              <pre style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px', fontSize: 10, color: '#b91c1c', textAlign: 'left', whiteSpace: 'pre-wrap', wordBreak: 'break-all', marginBottom: 16, maxHeight: 160, overflow: 'auto' }}>
+                {this.state.error.message}{'\n'}{(this.state.error.stack||'').slice(0, 500)}
+              </pre>
+            )}
             <button
               onClick={this.handleReload}
               style={{

@@ -5,7 +5,8 @@ import { ArrowLeft, Download, Sparkles, Palette, Phone, Globe, ChevronRight, Loa
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../services/supabase';
 import { flyerService } from '../../services/flyerService';
-import { TEMPLATES, TEMPLATE_LIST, FlyerData } from './FlyerTemplates';
+import type { FlyerData } from './FlyerTemplates';
+import { TEMPLATES, TEMPLATE_LIST } from './FlyerTemplates';
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 interface FlyerIdea {
