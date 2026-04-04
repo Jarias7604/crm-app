@@ -31,18 +31,21 @@ const ACCENT_COLORS = ['#1a56db','#7c3aed','#ef4444','#f59e0b','#10b981','#0ea5e
 
 // ─── CANVAS SIZES ─────────────────────────────────────────────────────────────
 const CANVAS_SIZES = [
-  { id: 'ig-post',      label: 'Instagram Post',    icon: '📷', platform: 'Instagram', w: 1080, h: 1080, tag: '1:1' },
-  { id: 'ig-portrait', label: 'Instagram Retrato',  icon: '📷', platform: 'Instagram', w: 1080, h: 1350, tag: '4:5' },
-  { id: 'ig-story',    label: 'Instagram Story',    icon: '📱', platform: 'Instagram', w: 1080, h: 1920, tag: '9:16' },
-  { id: 'fb-post',     label: 'Facebook Post',      icon: '👥', platform: 'Facebook',  w: 940,  h: 788,  tag: '6:5' },
-  { id: 'fb-cover',    label: 'Facebook Portada',   icon: '👥', platform: 'Facebook',  w: 820,  h: 312,  tag: 'Banner' },
-  { id: 'li-post',     label: 'LinkedIn Post',      icon: '💼', platform: 'LinkedIn',  w: 1200, h: 628,  tag: '1.91:1' },
-  { id: 'li-square',   label: 'LinkedIn Cuadrado',  icon: '💼', platform: 'LinkedIn',  w: 1200, h: 1200, tag: '1:1' },
-  { id: 'tw-post',     label: 'Twitter / X',        icon: '🐦', platform: 'Twitter',   w: 1200, h: 675,  tag: '16:9' },
-  { id: 'yt-thumb',    label: 'YouTube Thumbnail',  icon: '▶️', platform: 'YouTube',   w: 1280, h: 720,  tag: '16:9' },
-  { id: 'tiktok',      label: 'TikTok / Reels',     icon: '🎵', platform: 'TikTok',    w: 1080, h: 1920, tag: '9:16' },
-  { id: 'wa-status',   label: 'WhatsApp Status',    icon: '💬', platform: 'WhatsApp', w: 1080, h: 1920, tag: '9:16' },
-  { id: 'pinterest',   label: 'Pinterest Pin',      icon: '📌', platform: 'Pinterest', w: 1000, h: 1500, tag: '2:3' },
+  // ── IMAGEN ──────────────────────────────────────────────────────────────
+  { id: 'ig-portrait', label: 'Instagram Retrato',   icon: '📷', type: 'Imagen', platform: 'Instagram', w: 1080, h: 1350, tag: '4:5' },
+  { id: 'ig-post',     label: 'Instagram Post',      icon: '📷', type: 'Imagen', platform: 'Instagram', w: 1080, h: 1080, tag: '1:1' },
+  { id: 'fb-post',     label: 'Facebook Post',       icon: '👥', type: 'Imagen', platform: 'Facebook',  w: 940,  h: 788,  tag: '6:5' },
+  { id: 'li-post',     label: 'LinkedIn Post',       icon: '💼', type: 'Imagen', platform: 'LinkedIn',  w: 1200, h: 628,  tag: '1.91:1' },
+  { id: 'li-square',   label: 'LinkedIn Cuadrado',   icon: '💼', type: 'Imagen', platform: 'LinkedIn',  w: 1200, h: 1200, tag: '1:1' },
+  { id: 'tw-post',     label: 'Twitter / X Post',    icon: '🐦', type: 'Imagen', platform: 'Twitter',   w: 1200, h: 675,  tag: '16:9' },
+  { id: 'yt-thumb',    label: 'YouTube Thumbnail',   icon: '▶️', type: 'Imagen', platform: 'YouTube',   w: 1280, h: 720,  tag: '16:9' },
+  { id: 'pinterest',   label: 'Pinterest Pin',       icon: '📌', type: 'Imagen', platform: 'Pinterest', w: 1000, h: 1500, tag: '2:3' },
+  { id: 'fb-cover',    label: 'Facebook Portada',    icon: '👥', type: 'Imagen', platform: 'Facebook',  w: 820,  h: 312,  tag: 'Banner' },
+  // ── VIDEO ───────────────────────────────────────────────────────────────
+  { id: 'vid-story',   label: 'Video Story / Reels', icon: '🎬', type: 'Video',  platform: 'IG/TikTok', w: 1080, h: 1920, tag: '9:16' },
+  { id: 'vid-square',  label: 'Video Cuadrado',      icon: '🎬', type: 'Video',  platform: 'IG/FB',    w: 1080, h: 1080, tag: '1:1' },
+  { id: 'tiktok',      label: 'TikTok Vertical',     icon: '🎵', type: 'Video',  platform: 'TikTok',   w: 1080, h: 1920, tag: '9:16' },
+  { id: 'wa-status',   label: 'WhatsApp Status',     icon: '💬', type: 'Video',  platform: 'WhatsApp', w: 1080, h: 1920, tag: '9:16' },
 ];
 
 // ─── MAIN COMPONENT ────────────────────────────────────────────────────────────
@@ -71,13 +74,14 @@ export default function FlyerStudio() {
   const [industrySearch, setIndustrySearch]  = useState('');
   const industryDropRef = useRef<HTMLDivElement>(null);
 
-  // Step 3 — canvas size + photo upload
-  const [selectedSize, setSelectedSize] = useState(CANVAS_SIZES[1]); // default: Instagram 4:5
+  // Step 3 — canvas size + photo upload + zoom
+  const [selectedSize, setSelectedSize] = useState(CANVAS_SIZES[0]); // default: Instagram Retrato 4:5
   const [isSizeOpen, setIsSizeOpen]     = useState(false);
   const sizeDropRef = useRef<HTMLDivElement>(null);
   const [photoMode, setPhotoMode]       = useState<'ai' | 'upload'>('ai');
   const [userPhotos, setUserPhotos]     = useState<string[]>([]);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const [previewZoom, setPreviewZoom]   = useState(1.0);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -941,20 +945,34 @@ export default function FlyerStudio() {
                 </div>
               )}
 
-              {/* The Flyer — aspect ratio driven by selectedSize */}
+              {/* Zoom controls — top right */}
+              <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 30, display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)', borderRadius: 20, padding: '4px 10px' }}>
+                <button onClick={() => setPreviewZoom(z => Math.max(0.3, +(z - 0.1).toFixed(1)))} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', lineHeight: 1, padding: '0 2px', fontWeight: 700 }}>−</button>
+                <span style={{ color: '#fff', fontSize: 11, fontWeight: 700, minWidth: 34, textAlign: 'center' }}>{Math.round(previewZoom * 100)}%</span>
+                <button onClick={() => setPreviewZoom(z => Math.min(2.0, +(z + 0.1).toFixed(1)))} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', lineHeight: 1, padding: '0 2px', fontWeight: 700 }}>+</button>
+                <button onClick={() => setPreviewZoom(1.0)} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 10, cursor: 'pointer', borderRadius: 8, padding: '2px 6px', fontWeight: 700, marginLeft: 2 }}>Reset</button>
+              </div>
+
+              {/* The Flyer — aspect ratio driven by selectedSize + zoom */}
               {(() => {
                 const aspect = selectedSize.h / selectedSize.w;
-                const maxH = 580;
+                // Base fit (zoom=1): max 520w, max 520h (keeps banner formats visible)
                 const maxW = 520;
-                let previewW = maxW;
-                let previewH = previewW * aspect;
-                if (previewH > maxH) { previewH = maxH; previewW = maxH / aspect; }
+                const maxH = 520;
+                let baseW = maxW;
+                let baseH = baseW * aspect;
+                if (baseH > maxH) { baseH = maxH; baseW = maxH / aspect; }
+                // Apply user zoom
+                const previewW = baseW * previewZoom;
+                const previewH = baseH * previewZoom;
                 const scale = previewW / selectedSize.w;
                 return (
-                  <div style={{ position: 'relative', zIndex: 10, boxShadow: '0 30px 80px rgba(0,0,0,0.3)', borderRadius: 4 }}>
-                    <div style={{ width: previewW, height: previewH, overflow: 'hidden', borderRadius: 4 }}>
-                      <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: selectedSize.w, height: selectedSize.h }}>
-                        <ActiveTemplate d={flyerData} />
+                  <div style={{ overflow: 'auto', maxWidth: '100%', maxHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', zIndex: 10 }}>
+                    <div style={{ boxShadow: '0 30px 80px rgba(0,0,0,0.3)', borderRadius: 4, flexShrink: 0 }}>
+                      <div style={{ width: previewW, height: previewH, overflow: 'hidden', borderRadius: 4 }}>
+                        <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: selectedSize.w, height: selectedSize.h }}>
+                          <ActiveTemplate d={flyerData} />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -962,8 +980,10 @@ export default function FlyerStudio() {
               })()}
 
               {/* Format badge */}
-              <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', color: '#fff', fontSize: 11, fontWeight: 700, padding: '6px 16px', borderRadius: 20, whiteSpace: 'nowrap' }}>
-                {selectedSize.icon} {selectedSize.label} · {selectedSize.w}×{selectedSize.h}px
+              <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', color: '#fff', fontSize: 11, fontWeight: 700, padding: '5px 14px', borderRadius: 20, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>{selectedSize.icon}</span>
+                <span style={{ color: selectedSize.type === 'Video' ? '#86efac' : '#fde68a' }}>{selectedSize.type}</span>
+                <span>{selectedSize.label} · {selectedSize.w}×{selectedSize.h}px</span>
               </div>
             </div>
           </div>
