@@ -433,11 +433,13 @@ export default function FlyerStudio() {
                           .filter(ind => ind.name.toLowerCase().includes(industrySearch.toLowerCase()))
                           .map(ind => {
                             const hue = ind.name.charCodeAt(0) * 5 % 360;
-                            const isSelected = selectedIndustry === ind.name;
+                            const isSelected = selectedIndustries.includes(ind.name);
                             return (
                               <button
                                 key={ind.id}
-                                onClick={() => { setSelectedIndustry(ind.name); setIsIndustryOpen(false); }}
+                                onClick={() => setSelectedIndustries(prev =>
+                                  isSelected ? prev.filter(i => i !== ind.name) : [...prev, ind.name]
+                                )}
                                 style={{
                                   width: '100%', display: 'flex', alignItems: 'center', gap: 12,
                                   padding: '9px 16px', border: 'none', cursor: 'pointer', textAlign: 'left',
@@ -458,7 +460,14 @@ export default function FlyerStudio() {
                                 <span style={{ flex: 1, fontSize: 14, fontWeight: isSelected ? 700 : 500, color: isSelected ? '#92400e' : '#374151' }}>
                                   {ind.name}
                                 </span>
-                                {isSelected && <span style={{ color: '#D4AF37', fontWeight: 900, fontSize: 16 }}>✓</span>}
+                                <div style={{
+                                  width: 20, height: 20, borderRadius: 6, flexShrink: 0,
+                                  border: `2px solid ${isSelected ? '#D4AF37' : '#cbd5e1'}`,
+                                  background: isSelected ? '#D4AF37' : '#fff',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                }}>
+                                  {isSelected && <span style={{ color: '#fff', fontSize: 11, fontWeight: 900 }}>✓</span>}
+                                </div>
                               </button>
                             );
                           })}
