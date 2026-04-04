@@ -59,6 +59,7 @@ export default function FlyerStudio() {
   const [isLoadingIdeas, setIsLoadingIdeas] = useState(false);
   const [isLoadingImg, setIsLoadingImg]   = useState(false);
   const [isExporting, setIsExporting]   = useState(false);
+  const [exportReady, setExportReady]   = useState<{url: string; filename: string} | null>(null);
 
   // Step 1 — form
   const [industries, setIndustries] = useState<Array<{id:string;name:string}>>([]);
@@ -322,9 +323,12 @@ export default function FlyerStudio() {
   };
 
   // ─── EXPORT via html2canvas ─────────────────────────────────────────────────
+  // Chrome drops the user-gesture after html2canvas (async), so we pre-generate
+  // the blob and show a real <a> link the user physically clicks.
   const handleExport = useCallback(async () => {
     if (!flyerRef.current) return;
     setIsExporting(true);
+    setExportReady(null);
     try {
       const html2canvas = (await import('html2canvas')).default;
       const canvas = await html2canvas(flyerRef.current, {
@@ -335,10 +339,9 @@ export default function FlyerStudio() {
         logging: false,
       });
 
-      // Remove accents BEFORE building filename → browsers keep the name (no UUID)
       const sanitize = (str: string) =>
         (str || '')
-          .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // á→a, ó→o, é→e
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '-')
           .replace(/^-+|-+$/g, '')
@@ -346,17 +349,11 @@ export default function FlyerStudio() {
 
       const filename = `flyer-${sanitize(flyerData.title)}-${sanitize(selectedSize.label)}.png`;
 
-      // MUST be synchronous within the user-gesture context so browser respects download attr
-      const dataUrl = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.download = filename;
-      link.href = dataUrl;
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast.success(`✅ Descargado: ${filename}`);
-
+      // Generate blob and store URL — user will click the real <a> link below
+      const blob = await new Promise<Blob>((resolve) => canvas.toBlob(b => resolve(b!), 'image/png'));
+      const url = URL.createObjectURL(blob);
+      setExportReady({ url, filename });
+      toast.success('¡Listo! Haz clic en "⬇️ Descargar PNG" para guardar.');
     } catch (e) {
       console.error(e);
       toast.error('Error al exportar');
@@ -441,7 +438,7 @@ export default function FlyerStudio() {
         </div>
 
         {/* Actions */}
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {step === 3 && (
             <>
               <button
@@ -450,14 +447,34 @@ export default function FlyerStudio() {
               >
                 Guardar
               </button>
+
+              {/* Step 1: Generate the PNG blob */}
               <button
-                onClick={handleExport}
+                onClick={() => { setExportReady(null); handleExport(); }}
                 disabled={isExporting}
-                style={{ background: '#0f172a', color: '#fff', border: 'none', borderRadius: 10, padding: '8px 16px', fontSize: 12, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                style={{ background: '#0f172a', color: '#fff', border: 'none', borderRadius: 10, padding: '8px 16px', fontSize: 12, fontWeight: 800, cursor: isExporting ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
               >
                 <Download size={14} />
-                {isExporting ? 'Exportando...' : 'Exportar PNG'}
+                {isExporting ? 'Preparando...' : 'Preparar PNG'}
               </button>
+
+              {/* Step 2: Real anchor — user clicks this for proper filename */}
+              {exportReady && (
+                <a
+                  href={exportReady.url}
+                  download={exportReady.filename}
+                  onClick={() => setTimeout(() => { URL.revokeObjectURL(exportReady.url); setExportReady(null); }, 1500)}
+                  style={{
+                    background: '#10b981', color: '#fff', borderRadius: 10,
+                    padding: '8px 16px', fontSize: 12, fontWeight: 800,
+                    textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 6,
+                    animation: 'pulse 1s ease-in-out infinite',
+                  }}
+                >
+                  <Download size={14} />
+                  ⬇️ Descargar PNG
+                </a>
+              )}
             </>
           )}
         </div>
