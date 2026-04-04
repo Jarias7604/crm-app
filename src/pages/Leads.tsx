@@ -3067,6 +3067,90 @@ export default function Leads() {
                             </div>
 
 
+                            {/* ── Call Bot AI Results ───────────────────────────────────────── */}
+                            {selectedLead.call_bot_data && Object.keys(selectedLead.call_bot_data as object).length > 0 && (() => {
+                                const cbd = selectedLead.call_bot_data as Record<string, unknown>;
+                                const calificado   = cbd.calificado as boolean | undefined;
+                                const score        = cbd.score_calificacion as number | null | undefined;
+                                const dtes         = cbd.dtes_por_mes as number | null | undefined;
+                                const tieneSistema = cbd.tiene_sistema_dte as boolean | undefined;
+                                const demoAgendada = cbd.demo_agendada as boolean | undefined;
+                                const notas        = cbd.notas_llamada as string | undefined;
+                                const llamadas     = cbd.llamadas_totales as number | undefined;
+                                const ultimaLlamada = cbd.ultima_llamada as string | undefined;
+                                return (
+                                    <div className="bg-gradient-to-br from-violet-50 to-indigo-50 rounded-2xl border border-violet-100 p-4 space-y-3">
+                                        {/* Header */}
+                                        <div className="flex items-center justify-between">
+                                            <h4 className="text-[10px] font-black text-violet-700 uppercase tracking-widest flex items-center gap-2">
+                                                <span className="text-base">🤖</span> Resultado Call Bot AI
+                                            </h4>
+                                            <div className="flex items-center gap-2">
+                                                {llamadas !== undefined && llamadas > 0 && (
+                                                    <span className="text-[9px] font-black text-violet-500 bg-violet-100 px-2 py-0.5 rounded-full">
+                                                        {llamadas} llamada{llamadas !== 1 ? 's' : ''}
+                                                    </span>
+                                                )}
+                                                {ultimaLlamada && (
+                                                    <span className="text-[9px] text-violet-400 font-medium">
+                                                        {(() => { try { return format(new Date(ultimaLlamada), 'dd MMM HH:mm', { locale: es }); } catch { return ''; } })()}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Score + Calificación */}
+                                        <div className="flex items-center gap-3">
+                                            <div className={`flex-none px-3 py-1.5 rounded-xl text-xs font-black border ${calificado ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-600 border-red-100'}`}>
+                                                {calificado ? '✅ Calificó' : '❌ No calificó'}
+                                            </div>
+                                            {score !== null && score !== undefined && (
+                                                <div className="flex-1 flex items-center gap-2">
+                                                    <div className="flex-1 h-2 bg-white/70 rounded-full overflow-hidden border border-violet-100">
+                                                        <div
+                                                            className={`h-full rounded-full transition-all ${score >= 70 ? 'bg-emerald-500' : score >= 40 ? 'bg-amber-400' : 'bg-red-400'}`}
+                                                            style={{ width: `${score}%` }}
+                                                        />
+                                                    </div>
+                                                    <span className="text-sm font-black text-violet-700 flex-none">{score}/100</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* DTE Data */}
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {dtes !== null && dtes !== undefined && (
+                                                <div className="bg-white/70 rounded-xl p-2.5 border border-violet-100">
+                                                    <p className="text-[9px] font-black text-violet-400 uppercase tracking-widest">DTE / mes</p>
+                                                    <p className="text-lg font-black text-gray-900 mt-0.5">{dtes}<span className="text-xs text-gray-400 font-medium ml-1">docs</span></p>
+                                                </div>
+                                            )}
+                                            <div className="bg-white/70 rounded-xl p-2.5 border border-violet-100">
+                                                <p className="text-[9px] font-black text-violet-400 uppercase tracking-widest">Sistema DTE</p>
+                                                <p className={`text-sm font-black mt-0.5 ${tieneSistema ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                                    {tieneSistema === undefined ? '—' : tieneSistema ? '⚠️ Ya tiene' : '✅ Sin sistema'}
+                                                </p>
+                                            </div>
+                                            {demoAgendada !== undefined && (
+                                                <div className={`bg-white/70 rounded-xl p-2.5 border ${demoAgendada ? 'border-purple-200' : 'border-violet-100'}`}>
+                                                    <p className="text-[9px] font-black text-violet-400 uppercase tracking-widest">Demo</p>
+                                                    <p className={`text-sm font-black mt-0.5 ${demoAgendada ? 'text-purple-700' : 'text-gray-400'}`}>
+                                                        {demoAgendada ? '📅 Agendada' : 'No agendada'}
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Notas de la llamada */}
+                                        {notas && (
+                                            <div className="bg-white/60 rounded-xl px-3 py-2.5 border border-violet-100">
+                                                <p className="text-[9px] font-black text-violet-400 uppercase tracking-widest mb-1">Notas de Sofía</p>
+                                                <p className="text-xs text-gray-700 font-medium leading-relaxed">{notas}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
 
                             {/* Follow-up History - Always visible */}
                             <div className="pt-4 border-t border-gray-100">

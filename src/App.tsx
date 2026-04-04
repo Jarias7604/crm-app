@@ -55,6 +55,7 @@ const CallBot           = lazy(() => import('./pages/admin/CallBot'));
 const ManualPage        = lazy(() => import('./pages/support/ManualPage'));
 const HelpChat          = lazy(() => import('./components/HelpChat/HelpChat'));
 const PWAInstallPrompt  = lazy(() => import('./components/PWAInstallPrompt').then(m => ({ default: m.PWAInstallPrompt })));
+const FlyerStudio       = lazy(() => import('./pages/marketing/FlyerStudio'));
 
 // ─── Skeleton Screen (técnica Netflix) ───────────────────────────────────────
 // Muestra estructura visual inmediatamente mientras carga el JS del módulo.
@@ -180,6 +181,7 @@ function App() {
                     <Route path="/marketing/campaign/:id/edit" element={<CampaignBuilder />} />
                     <Route path="/marketing/ai-agents" element={<AiAgentsConfig />} />
                     <Route path="/marketing/settings" element={<MarketingSettings />} />
+                    <Route path="/marketing/flyers" element={<FlyerStudio />} />
                   </Route>
 
                   <Route element={<FeatureProtectedRoute feature="chat" />}>
