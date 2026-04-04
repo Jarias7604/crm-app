@@ -783,9 +783,10 @@ export default function FlyerStudio() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session!.access_token}` },
         body: JSON.stringify({
-          idea: { ...idea, style_instructions: `LUXURY PROPERTIES, PROFESSIONAL MARKETING AGENCY STYLE, cinematic lighting. DO NOT WRITE TEXT ON IMAGE.` },
+          idea,
           industria: selectedIndustry,
-          oferta, tono,
+          oferta,
+          tono,
         }),
       });
       const d = await res.json();
