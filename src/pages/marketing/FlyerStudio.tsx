@@ -39,548 +39,808 @@ function injectFonts() {
   if (!document.head.querySelector(`link[href="${f.href}"]`)) document.head.appendChild(f);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// PINTEREST-GRADE CANVAS ENGINE SYSTEM — 2026 PREMIUM
+// Philosophy: Typography-first, Bold Color Blocks, Gradient Buttons, Cover Photos
+// Reference: Top-performing social media ads (Canva Pro / Agency level)
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// ─── HELPERS PREMIUM ─────────────────────────────────────────────────────────
+// ─── FOUNDATION HELPERS ───────────────────────────────────────────────────────
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  if (w < 2*r) r = w/2; if (h < 2*r) r = h/2;
   ctx.beginPath(); ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
   ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h); ctx.lineTo(x+r,y+h);
   ctx.quadraticCurveTo(x,y+h,x,y+h-r); ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
 }
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
-  const words = text.split(' '); const lines: string[] = []; let curr = words[0] || '';
-  for (let i = 1; i < words.length; i++) {
-    if (ctx.measureText(curr+' '+words[i]).width < maxWidth) curr += ' '+words[i];
-    else { lines.push(curr); curr = words[i]; }
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  if (!text) return [''];
+  const words = text.split(' '); const lines: string[] = []; let curr = words[0]||'';
+  for (let i=1;i<words.length;i++) {
+    const test = curr+' '+words[i];
+    if (ctx.measureText(test).width<maxWidth) curr=test; else { lines.push(curr); curr=words[i]; }
   }
   lines.push(curr); return lines;
 }
-// Draws full-bleed image + rich gradient overlay — the foundation of ALL professional layouts
-function drawFullBleedBg(ctx: CanvasRenderingContext2D, W: number, H: number, img: HTMLImageElement | null, stops: {pos:number,color:string}[]) {
-  if (img) {
-    // Cover crop: maintain aspect ratio, fill canvas
-    const ir = img.width/img.height; const cr = W/H;
-    let sw=img.width,sh=img.height,sx=0,sy=0;
-    if (ir>cr) { sw=img.height*cr; sx=(img.width-sw)/2; } else { sh=img.width/cr; sy=(img.height-sh)/2; }
-    ctx.drawImage(img,sx,sy,sw,sh,0,0,W,H);
-  } else { ctx.fillStyle='#1e293b'; ctx.fillRect(0,0,W,H); }
-  const gr = ctx.createLinearGradient(0,0,0,H);
-  stops.forEach(s => gr.addColorStop(s.pos, s.color));
-  ctx.fillStyle = gr; ctx.fillRect(0,0,W,H);
+
+// Cover-crop: fills target area maintaining image aspect ratio (like CSS object-fit:cover)
+function coverCrop(ctx: CanvasRenderingContext2D, img: HTMLImageElement, dx: number, dy: number, dw: number, dh: number) {
+  const ir=img.width/img.height; const cr=dw/dh;
+  let sw=img.width,sh=img.height,sx=0,sy=0;
+  if (ir>cr) { sw=img.height*cr; sx=(img.width-sw)/2; } else { sh=img.width/cr; sy=(img.height-sh)/2; }
+  ctx.drawImage(img,sx,sy,sw,sh,dx,dy,dw,dh);
 }
-function pxFont(ctx: CanvasRenderingContext2D, font: string) { ctx.font = font; }
-function txt(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string, align: CanvasTextAlign='left') {
-  ctx.fillStyle=color; ctx.textAlign=align; ctx.fillText(text,x,y);
-}
-function shadow(ctx: CanvasRenderingContext2D, color='rgba(0,0,0,0.8)', blur=20, oy=6) {
-  ctx.shadowColor=color; ctx.shadowBlur=blur; ctx.shadowOffsetY=oy;
-}
-function noShadow(ctx: CanvasRenderingContext2D) { ctx.shadowColor='transparent'; ctx.shadowBlur=0; ctx.shadowOffsetY=0; }
-function drawPill(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, bg: string, fg: string, fs=22, px=28, py=14, r=999) {
-  ctx.save(); pxFont(ctx,`800 ${fs}px Outfit`);
-  const tw=ctx.measureText(text).width; const bw=tw+px*2; const bh=fs+py*2;
-  roundRect(ctx,x,y,bw,bh,r); ctx.fillStyle=bg; ctx.fill();
-  txt(ctx,text,x+px,y+bh-py-3,fg,'left'); ctx.restore();
-}
-function drawMultilineTitleLeft(ctx: CanvasRenderingContext2D, title: string, x: number, startY: number, maxW: number, size: number, color1: string, color2: string, acc: string): number {
-  pxFont(ctx, `900 ${size}px Playfair Display`);
-  const lines = wrapText(ctx, title.toUpperCase(), maxW);
-  lines.slice(0,3).forEach((l,i) => {
-    shadow(ctx,'rgba(0,0,0,0.7)',24,8);
-    ctx.fillStyle = i===1 ? acc : (i===0 ? color1 : color2);
-    ctx.textAlign='left'; ctx.fillText(l,x,startY+i*(size+18));
-    noShadow(ctx);
-  });
-  return startY + lines.slice(0,3).length*(size+18);
-}
-function drawMultilineTitleCenter(ctx: CanvasRenderingContext2D, title: string, cx: number, startY: number, maxW: number, size: number, color1: string, acc: string): number {
-  pxFont(ctx, `900 ${size}px Playfair Display`);
-  const lines = wrapText(ctx, title.toUpperCase(), maxW);
-  lines.slice(0,3).forEach((l,i) => {
-    shadow(ctx,'rgba(0,0,0,0.75)',28,10);
-    ctx.fillStyle = i===0 ? color1 : acc;
-    ctx.textAlign='center'; ctx.fillText(l,cx,startY+i*(size+20));
-    noShadow(ctx);
-  });
-  return startY + lines.slice(0,3).length*(size+20);
-}
-function drawBenefitRow(ctx: CanvasRenderingContext2D, items: string[], x: number, y: number, maxW: number, acc: string, light=false) {
-  if (!items.length) return y;
-  const icons = ['✔','★','◆','▸','●','✦'];
-  items.slice(0,4).forEach((b,i) => {
-    const col = i%2; const row = Math.floor(i/2);
-    const bx = x + col*(maxW/2); const by = y + row*72;
-    // Icon circle
-    ctx.save(); ctx.beginPath(); ctx.arc(bx+28,by,28,0,Math.PI*2);
-    ctx.fillStyle=acc; ctx.fill(); noShadow(ctx);
-    pxFont(ctx,'700 20px Outfit'); txt(ctx,icons[i%6],bx+28,by+7,light?'#000':'#fff','center');
-    // Text
-    pxFont(ctx,'700 28px Outfit'); txt(ctx,b.substring(0,26),bx+66,by+10,light?'#1e293b':'rgba(255,255,255,0.95)','left');
-    ctx.restore();
-  });
-  return y + Math.ceil(items.length/2)*76;
-}
-function drawCTAButton(ctx: CanvasRenderingContext2D, text: string, cx: number, y: number, w: number, h: number, bg: string, fg: string) {
+
+// Premium gradient-filled rounded button (like top ad flyers)
+function drawGradBtn(ctx: CanvasRenderingContext2D, label: string, cx: number, y: number, w: number, h: number, c1: string, c2: string, textColor='#fff') {
   ctx.save();
-  shadow(ctx,'rgba(0,0,0,0.5)',24,8);
-  roundRect(ctx,cx-w/2,y,w,h,h/2); ctx.fillStyle=bg; ctx.fill(); noShadow(ctx);
-  // Highlight
-  const hi=ctx.createLinearGradient(cx-w/2,y,cx-w/2,y+h*0.4);
-  hi.addColorStop(0,'rgba(255,255,255,0.25)'); hi.addColorStop(1,'rgba(255,255,255,0)');
-  roundRect(ctx,cx-w/2,y,w,h*0.5,h/2); ctx.fillStyle=hi; ctx.fill();
-  pxFont(ctx,`900 ${Math.round(h*0.38)}px Outfit`);
-  shadow(ctx,'rgba(0,0,0,0.4)',6,2);
-  txt(ctx,text,cx,y+h*0.67,fg,'center'); noShadow(ctx);
+  // Drop shadow
+  ctx.shadowColor='rgba(0,0,0,0.35)'; ctx.shadowBlur=18; ctx.shadowOffsetY=6;
+  // Gradient fill
+  const gr=ctx.createLinearGradient(cx-w/2,y,cx+w/2,y+h);
+  gr.addColorStop(0,c1); gr.addColorStop(1,c2);
+  roundRect(ctx,cx-w/2,y,w,h,h/2); ctx.fillStyle=gr; ctx.fill();
+  // Top shine
+  ctx.shadowColor='transparent'; ctx.shadowBlur=0; ctx.shadowOffsetY=0;
+  const shine=ctx.createLinearGradient(cx-w/2,y,cx-w/2,y+h*0.45);
+  shine.addColorStop(0,'rgba(255,255,255,0.28)'); shine.addColorStop(1,'rgba(255,255,255,0)');
+  roundRect(ctx,cx-w/2,y,w,h*0.5,h/2); ctx.fillStyle=shine; ctx.fill();
+  // Label
+  ctx.font=`900 ${Math.round(h*0.38)}px Outfit`; ctx.fillStyle=textColor; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(label.toUpperCase(),cx,y+h*0.52); ctx.textBaseline='alphabetic';
   ctx.restore();
 }
-function drawLogoBar(ctx: CanvasRenderingContext2D, W: number, y: number, h: number, bg: string, logo: HTMLImageElement|null, phone: string, web: string, acc: string) {
-  ctx.save(); ctx.fillStyle=bg; ctx.fillRect(0,y,W,h);
-  if (logo) ctx.drawImage(logo,36,y+(h-52)/2,52,52);
-  pxFont(ctx,'800 30px Outfit'); txt(ctx,'ARIAS GROUP',logo?108:40,y+h/2+6,acc,'left');
-  if (phone) { pxFont(ctx,'700 28px Outfit'); txt(ctx,'📞 '+phone,W/2,y+h/2+10,'rgba(255,255,255,0.9)','center'); }
-  if (web) { pxFont(ctx,'600 22px Outfit'); txt(ctx,web,W-40,y+h/2+8,'rgba(255,255,255,0.55)','right'); }
+
+// Solid color block background (more impactful than gradient overlays)
+function fillBlock(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string) {
+  ctx.fillStyle=color; ctx.fillRect(x,y,w,h);
+}
+
+// Linear gradient block fill
+function fillGradBlock(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, c1: string, c2: string, angle: 'v'|'h'|'d'='v') {
+  let gr: CanvasGradient;
+  if (angle==='h') gr=ctx.createLinearGradient(x,y,x+w,y);
+  else if (angle==='d') gr=ctx.createLinearGradient(x,y,x+w,y+h);
+  else gr=ctx.createLinearGradient(x,y,x,y+h);
+  gr.addColorStop(0,c1); gr.addColorStop(1,c2); ctx.fillStyle=gr; ctx.fillRect(x,y,w,h);
+}
+
+// Massive typography with letter-spacing effect (dominant text)
+function drawHeroWord(ctx: CanvasRenderingContext2D, word: string, x: number, y: number, size: number, color: string, align: CanvasTextAlign='left') {
+  ctx.save();
+  ctx.font=`900 ${size}px Outfit`; ctx.fillStyle=color; ctx.textAlign=align;
+  // Bold shadow for depth
+  ctx.shadowColor='rgba(0,0,0,0.5)'; ctx.shadowBlur=20; ctx.shadowOffsetY=8;
+  ctx.fillText(word,x,y);
+  ctx.restore();
+}
+
+// Accent underline / bar for section separation
+function drawAccentBar(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, c1: string, c2: string) {
+  const gr=ctx.createLinearGradient(x,y,x+w,y); gr.addColorStop(0,c1); gr.addColorStop(1,c2);
+  ctx.fillStyle=gr; ctx.fillRect(x,y,w,h);
+}
+
+// Logo badge (top-left branding)
+function drawBrandBadge(ctx: CanvasRenderingContext2D, logo: HTMLImageElement|null, name: string, x: number, y: number, textColor: string, acc: string) {
+  ctx.save();
+  if (logo) { ctx.drawImage(logo,x,y-22,44,44); x+=52; }
+  ctx.font='800 20px Outfit'; ctx.fillStyle=textColor; ctx.textAlign='left'; ctx.fillText(name,x,y+6);
+  ctx.font='600 14px Outfit'; ctx.fillStyle=acc; ctx.fillText('★ PREMIUM',x,y+24);
+  ctx.restore();
+}
+
+// Checkmark benefit row (clean, modern)
+function drawCheckBenefit(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, checkColor: string, textColor: string, size=26) {
+  ctx.save();
+  // Check circle
+  ctx.beginPath(); ctx.arc(x+size*0.5,y,size*0.5,0,Math.PI*2); ctx.fillStyle=checkColor; ctx.fill();
+  ctx.font=`900 ${Math.round(size*0.6)}px Outfit`; ctx.fillStyle='#fff'; ctx.textAlign='center';
+  ctx.fillText('✓',x+size*0.5,y+size*0.22);
+  // Text
+  ctx.font=`700 ${size}px Outfit`; ctx.fillStyle=textColor; ctx.textAlign='left';
+  ctx.fillText(text.substring(0,28),x+size*1.3,y+size*0.35);
+  ctx.restore();
+}
+
+// Photo block with clip region
+function drawPhotoBlock(ctx: CanvasRenderingContext2D, img: HTMLImageElement|null, x: number, y: number, w: number, h: number, r=0, fallback='#334155') {
+  ctx.save();
+  if (r>0) { roundRect(ctx,x,y,w,h,r); ctx.clip(); }
+  if (img) { coverCrop(ctx,img,x,y,w,h); } else { ctx.fillStyle=fallback; ctx.fillRect(x,y,w,h); }
+  ctx.restore();
+}
+
+// Promo badge (like "40% OFF", "LIMITED TIME")
+function drawPromoBadge(ctx: CanvasRenderingContext2D, line1: string, line2: string, cx: number, cy: number, size: number, bg: string, fg: string) {
+  ctx.save();
+  ctx.shadowColor='rgba(0,0,0,0.4)'; ctx.shadowBlur=16; ctx.shadowOffsetY=6;
+  ctx.beginPath(); ctx.arc(cx,cy,size,0,Math.PI*2); ctx.fillStyle=bg; ctx.fill();
+  ctx.shadowColor='transparent';
+  ctx.font=`900 ${Math.round(size*0.7)}px Outfit`; ctx.fillStyle=fg; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(line1,cx,cy-size*0.15);
+  ctx.font=`600 ${Math.round(size*0.28)}px Outfit`; ctx.fillText(line2,cx,cy+size*0.45);
+  ctx.textBaseline='alphabetic';
   ctx.restore();
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// ENGINE 1: HERO FULL BLEED — Imagen completa, título dominante abajo
+// ENGINE 1: BOLD SPLIT — Color block left, photo right (like "RISE WITH LOGISTICS")
 // ═══════════════════════════════════════════════════════════════════
 function engine_splitPanel(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
-  const acc = d.accent||'#D4AF37';
-  // BG: full bleed image, gradient from transparent top → heavy dark bottom
-  drawFullBleedBg(ctx,W,H,d.bgImage,[
-    {pos:0,color:'rgba(0,0,0,0.10)'},{pos:0.45,color:'rgba(0,0,0,0.05)'},
-    {pos:0.65,color:'rgba(0,0,0,0.55)'},{pos:1,color:'rgba(0,0,0,0.93)'}
-  ]);
-  // TOP BAR
-  ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fillRect(0,0,W,110);
-  if(d.logoImage) ctx.drawImage(d.logoImage,40,24,62,62);
-  pxFont(ctx,'800 20px Outfit'); txt(ctx,d.industria||'ARIAS GROUP',d.logoImage?116:40,52,'rgba(255,255,255,0.9)','left');
-  pxFont(ctx,'600 17px Outfit'); txt(ctx,(d.contact?.web||'WWW.EMPRESA.COM').toUpperCase(),d.logoImage?116:40,76,acc,'left');
-  // PRICE BADGE top-right
-  if(d.price) drawPill(ctx,d.price,W-270,26,acc,'#000',36,22,14);
-  // ACCENT stripe
-  ctx.fillStyle=acc; ctx.fillRect(0,H*0.58,W,8);
-  // MAIN TITLE — left aligned big
-  const titY = H*0.62;
-  const titEnd = drawMultilineTitleLeft(ctx,d.title||'Tu Oferta Aquí',60,titY,W-100,110,'#fff','#fff',acc);
-  // SUBTITLE
-  pxFont(ctx,'400 34px Outfit');
-  shadow(ctx,'rgba(0,0,0,0.6)',12,4);
-  txt(ctx,d.subtitle||'',60,titEnd+20,'rgba(255,255,255,0.85)','left');
-  noShadow(ctx);
+  const acc=d.accent||'#1a56db';
+  const SPLIT=Math.round(W*0.52);
+
+  // LEFT: bold gradient color block
+  fillGradBlock(ctx,0,0,SPLIT,H,acc,shiftColor(acc,-30),'v');
+
+  // RIGHT: photo
+  drawPhotoBlock(ctx,d.bgImage,SPLIT,0,W-SPLIT,H,0,'#0f172a');
+  // Gradient bleed from left into photo
+  const bleed=ctx.createLinearGradient(SPLIT,0,SPLIT+(W-SPLIT)*0.45,0);
+  bleed.addColorStop(0,acc+'ee'); bleed.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=bleed; ctx.fillRect(SPLIT,0,W-SPLIT,H);
+
+  // TOP BRANDING
+  drawBrandBadge(ctx,d.logoImage,d.industria||'ARIAS GROUP',36,46,'#fff','rgba(255,255,255,0.6)');
+
+  // HERO WORDS — stacked massive text
+  const words = (d.title||'Tu Oferta').toUpperCase().split(' ');
+  const lineH = 130; const startY = Math.round(H*0.28);
+  words.slice(0,4).forEach((w,i) => {
+    const sz = i===0?148:i===1?136:114;
+    ctx.save(); ctx.font=`900 ${sz}px Outfit`;
+    ctx.fillStyle = i%2===0 ? '#fff' : 'rgba(255,255,255,0.75)';
+    ctx.textAlign='left';
+    ctx.shadowColor='rgba(0,0,0,0.4)'; ctx.shadowBlur=18; ctx.shadowOffsetY=6;
+    ctx.fillText(w,36,startY+i*lineH);
+    ctx.restore();
+  });
+
+  // SUBTITLE under title
+  const subY = startY + Math.min(words.length,4)*lineH + 8;
+  ctx.save(); ctx.font='500 32px Outfit'; ctx.fillStyle='rgba(255,255,255,0.82)'; ctx.textAlign='left';
+  const subs = wrapText(ctx,d.subtitle||'',SPLIT-60);
+  subs.slice(0,2).forEach((s,i)=>ctx.fillText(s,36,subY+i*40));
+  ctx.restore();
+
   // BENEFITS
-  const benY = drawBenefitRow(ctx,d.beneficios||[],60,titEnd+72,W-80,acc);
-  // CTA
-  drawCTAButton(ctx,d.cta||'CONTÁCTANOS',W/2,benY+36,560,88,acc,'#000');
-  // PHONE + SOCIAL
-  const barY = H-85;
-  ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(0,barY,W,85);
-  pxFont(ctx,'800 30px Outfit'); txt(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,barY+50,'#fff','center');
-  pxFont(ctx,'600 20px Outfit'); txt(ctx,d.contact?.web||'www.empresa.com',W/2,barY+74,'rgba(255,255,255,0.5)','center');
+  const benStart = subY + subs.slice(0,2).length*40 + 28;
+  (d.beneficios||[]).slice(0,3).forEach((b: string,i: number) =>
+    drawCheckBenefit(ctx,b,36,benStart+i*58,'rgba(255,255,255,0.25)','#fff',28)
+  );
+
+  // CTA BUTTON
+  const ctaY = Math.max(benStart+(d.beneficios||[]).slice(0,3).length*58+28, H-220);
+  drawGradBtn(ctx,d.cta||'CONTACTAR AHORA',SPLIT/2,ctaY,SPLIT-64,80,'#fff',`rgba(255,255,255,0.75)`,acc);
+
+  // CONTACT BAR
+  fillBlock(ctx,0,H-76,W,76,'rgba(0,0,0,0.45)');
+  ctx.save(); ctx.font='800 28px Outfit'; ctx.fillStyle='#fff'; ctx.textAlign='center';
+  ctx.fillText(d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,H-40); ctx.restore();
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// ENGINE 2: DARK HEADER LUXURY — Franja oscura top, imagen centro, texto bottom
+// ENGINE 2: FULL PROMO — Photo background, bold promo text (like "40% OFF Sitewide")
 // ═══════════════════════════════════════════════════════════════════
 function engine_fullOverlay(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
-  const acc=d.accent||'#D4AF37';
-  // Full bleed image
-  drawFullBleedBg(ctx,W,H,d.bgImage,[
-    {pos:0,color:'rgba(0,0,0,0.85)'},{pos:0.3,color:'rgba(0,0,0,0.35)'},
-    {pos:0.6,color:'rgba(0,0,0,0.45)'},{pos:1,color:'rgba(0,0,0,0.97)'}
-  ]);
-  // TOP BRANDING
-  ctx.fillStyle=acc; ctx.fillRect(0,0,W,10);
-  if(d.logoImage) ctx.drawImage(d.logoImage,W/2-36,28,72,72);
-  pxFont(ctx,'700 18px Outfit'); txt(ctx,(d.industria||'MARKETING PREMIUM').toUpperCase(),W/2,d.logoImage?118:60,'rgba(255,255,255,0.6)','center');
-  ctx.fillStyle=acc; ctx.fillRect(W/2-60,d.logoImage?126:68,120,4);
-  // SUPER BIG CENTERED TITLE
-  const titStart = d.logoImage?165:120;
-  const titEnd = drawMultilineTitleCenter(ctx,d.title||'Tu Oferta',W/2,titStart,W-80,128,'#fff',acc);
-  // SUBTITLE
-  pxFont(ctx,'500 36px Outfit'); shadow(ctx,'rgba(0,0,0,0.7)',14,4);
-  txt(ctx,d.subtitle||'',W/2,titEnd+28,'rgba(255,255,255,0.9)','center'); noShadow(ctx);
-  // DIVIDER
-  ctx.fillStyle=acc; ctx.fillRect(W/2-80,titEnd+56,160,4);
-  // BENEFIT PILLS (horizontal, centered)
-  const bens = (d.beneficios||[]).slice(0,3);
-  let bpx = 60; const bpy = titEnd+90;
-  bens.forEach((b: string) => {
-    drawPill(ctx,b.substring(0,22),bpx,bpy,'rgba(255,255,255,0.12)','#fff',26,20,12);
-    bpx += ctx.measureText(b.substring(0,22)).width+80;
+  const acc=d.accent||'#f59e0b';
+
+  // FULL BLEED PHOTO
+  drawPhotoBlock(ctx,d.bgImage,0,0,W,H);
+  // TOP 40% overlay for text legibility (lighter — shows photo more)
+  fillGradBlock(ctx,0,0,W,H*0.55,'rgba(0,0,0,0.78)','rgba(0,0,0,0)','v');
+  // BOTTOM overlay for CTA area
+  fillGradBlock(ctx,0,H*0.6,W,H*0.4,'rgba(0,0,0,0)','rgba(0,0,0,0.94)','v');
+
+  // ACCENT top stripe + branding
+  fillBlock(ctx,0,0,W,8,acc);
+  drawBrandBadge(ctx,d.logoImage,d.industria||'ARIAS GROUP',36,44,'#fff',acc);
+
+  // PROMO BADGE (if price)
+  if (d.price) {
+    drawPromoBadge(ctx,d.price,'OFERTA ESPECIAL',W-100,80,72,acc,'#000');
+  }
+
+  // HUGE CENTERED TITLE
+  ctx.save(); ctx.textAlign='center';
+  const titleWords = (d.title||'TU OFERTA').toUpperCase().split(' ');
+  const bigSz = titleWords.length<=2?180:titleWords.length<=3?148:128;
+  titleWords.slice(0,3).forEach((w,i) => {
+    ctx.font=`900 ${i===0?bigSz:Math.round(bigSz*0.82)}px Outfit`;
+    ctx.shadowColor='rgba(0,0,0,0.8)'; ctx.shadowBlur=28; ctx.shadowOffsetY=10;
+    ctx.fillStyle = i===1 ? acc : '#fff';
+    ctx.fillText(w, W/2, H*0.28+i*(Math.round(bigSz*0.9)+14));
   });
-  // CTA
-  const ctaY = Math.max(bpy+90, H-280);
-  drawCTAButton(ctx,d.cta||'VER AHORA',W/2,ctaY,580,92,acc,'#000');
-  // PRICE (if present)
-  if(d.price){ pxFont(ctx,'900 90px Outfit'); shadow(ctx,'rgba(0,0,0,0.8)',20,6);
-    txt(ctx,d.price,W/2,ctaY-60,'#fff','center'); noShadow(ctx); }
-  // BOTTOM BAR
-  ctx.fillStyle=acc; ctx.fillRect(0,H-90,W,90);
-  pxFont(ctx,'900 32px Outfit'); txt(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,H-50,'#000','center');
+  ctx.restore();
+
+  // SUBTITLE (italic, refined)
+  const subY = H*0.28 + titleWords.slice(0,3).length*(Math.round(bigSz*0.9)+14) + 16;
+  ctx.save(); ctx.font='italic 500 34px Outfit'; ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.textAlign='center';
+  ctx.shadowColor='rgba(0,0,0,0.6)'; ctx.shadowBlur=12;
+  ctx.fillText(d.subtitle||'',W/2,subY); ctx.restore();
+
+  // BENEFIT PILLS (horizontal row)
+  const bens=(d.beneficios||[]).slice(0,3); const pillY=Math.max(subY+52,H*0.68);
+  let pillX=56;
+  bens.forEach((b: string) => {
+    ctx.save(); ctx.font='700 26px Outfit';
+    const tw=ctx.measureText(b.substring(0,20)).width+48; const ph=52;
+    roundRect(ctx,pillX,pillY,tw,ph,ph/2); ctx.fillStyle=acc+'33';
+    ctx.strokeStyle=acc; ctx.lineWidth=2.5; ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.textAlign='left'; ctx.fillText(b.substring(0,20),pillX+24,pillY+36);
+    pillX+=tw+14; ctx.restore();
+  });
+
+  // GRADIENT CTA BUTTON
+  const ctaY=Math.max(pillY+76,H-172);
+  drawGradBtn(ctx,d.cta||'VER OFERTA',W/2,ctaY,W-100,86,acc,shiftColor(acc,-30),'#000');
+
+  // PHONE BAR
+  fillBlock(ctx,0,H-78,W,78,acc);
+  ctx.save(); ctx.font='900 30px Outfit'; ctx.fillStyle='#000'; ctx.textAlign='center';
+  ctx.fillText(d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,H-36); ctx.restore();
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// ENGINE 3: WHITE CARD — Fondo blanco, imagen top, contenido abajo limpio
+// ENGINE 3: WHITE CARD PRO — Clean white bg, photo top, info bottom (like "IMS UNISON")
 // ═══════════════════════════════════════════════════════════════════
 function engine_bottomBanner(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
-  const acc=d.accent||'#e11d48';
-  // WHITE BG
+  const acc=d.accent||'#3b82f6';
+
+  // WHITE base
   ctx.fillStyle='#f8fafc'; ctx.fillRect(0,0,W,H);
-  // TOP IMAGE SECTION (60% height)
-  const imgH = Math.round(H*0.58);
-  ctx.save(); ctx.beginPath(); ctx.rect(0,0,W,imgH); ctx.clip();
-  if(d.bgImage){
-    const ir=d.bgImage.width/d.bgImage.height; const cr=W/imgH;
-    let sw=d.bgImage.width,sh=d.bgImage.height,sx=0,sy=0;
-    if(ir>cr){sw=d.bgImage.height*cr;sx=(d.bgImage.width-sw)/2;}else{sh=d.bgImage.width/cr;sy=(d.bgImage.height-sh)/2;}
-    ctx.drawImage(d.bgImage,sx,sy,sw,sh,0,0,W,imgH);
-  } else { ctx.fillStyle='#cbd5e1'; ctx.fillRect(0,0,W,imgH); }
-  // Overlay bottom of image
-  const og=ctx.createLinearGradient(0,imgH*0.5,0,imgH); og.addColorStop(0,'rgba(248,250,252,0)'); og.addColorStop(1,'#f8fafc');
-  ctx.fillStyle=og; ctx.fillRect(0,0,W,imgH);
+
+  // TOP PHOTO (56% of height)
+  const imgH=Math.round(H*0.56);
+  drawPhotoBlock(ctx,d.bgImage,0,0,W,imgH);
+  // Subtle overlay bottom of photo
+  fillGradBlock(ctx,0,imgH*0.6,W,imgH*0.4,'rgba(248,250,252,0)','#f8fafc','v');
+
+  // ACCENT bar separator
+  fillGradBlock(ctx,0,imgH,W,10,acc,shiftColor(acc,30),'h');
+
+  // TOP badge
+  fillBlock(ctx,0,0,W,72,'rgba(0,0,0,0.38)');
+  drawBrandBadge(ctx,d.logoImage,d.industria||'ARIAS GROUP',32,42,'#fff','rgba(255,255,255,0.55)');
+  if(d.price) drawGradBtn(ctx,d.price,W-120,10,200,52,acc,shiftColor(acc,-20),'#fff');
+
+  // INFO SECTION
+  const infoY=imgH+18;
+  // Category tag
+  ctx.save(); ctx.font='700 20px Outfit';
+  const tagW=ctx.measureText((d.industria||'MARKETING').toUpperCase()).width+32;
+  roundRect(ctx,40,infoY,tagW,40,20); ctx.fillStyle=acc; ctx.fill();
+  ctx.fillStyle='#fff'; ctx.textAlign='left'; ctx.fillText((d.industria||'MARKETING').toUpperCase(),56,infoY+28); ctx.restore();
+
+  // MASSIVE TITLE (dark, left aligned)
+  ctx.save(); ctx.textAlign='left';
+  const titleLines = wrapText(ctx,(d.title||'Tu Oferta').toUpperCase(),W-80);
+  ctx.font=`900 ${titleLines.length<=2?100:82}px Outfit`;
+  // Measure once
+  titleLines.forEach(l => { const m=ctx.measureText(l); return m; });
+  let ty=infoY+62;
+  titleLines.slice(0,2).forEach((l,i)=>{
+    ctx.font=`900 ${i===0?100:82}px Outfit`;
+    ctx.shadowColor='rgba(0,0,0,0.12)'; ctx.shadowBlur=8; ctx.shadowOffsetY=4;
+    ctx.fillStyle = i===0 ? '#0f172a' : acc;
+    ctx.fillText(l,40,ty); ty+=i===0?108:92;
+  });
   ctx.restore();
-  // ACCENT BAR
-  ctx.fillStyle=acc; ctx.fillRect(0,imgH,W,10);
-  // TOP LOGO
-  ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(0,0,W,80);
-  if(d.logoImage) ctx.drawImage(d.logoImage,36,12,56,56);
-  pxFont(ctx,'800 22px Outfit'); txt(ctx,d.industria||'ARIAS GROUP',d.logoImage?106:40,44,'#fff','left');
-  if(d.price) drawPill(ctx,d.price,W-260,14,acc,'#fff',36,20,14);
-  // CONTENT (bottom 40%)
-  const contY = imgH+24;
-  pxFont(ctx,'900 22px Outfit'); txt(ctx,(d.industria||'MARKETING').toUpperCase(),60,contY+28,acc,'left');
-  const titEnd=drawMultilineTitleLeft(ctx,d.title||'Tu Oferta',60,contY+60,W-100,96,'#0f172a','#0f172a',acc);
-  pxFont(ctx,'500 30px Outfit'); shadow(ctx,'rgba(0,0,0,0.1)',4,2);
-  txt(ctx,d.subtitle||'',60,titEnd+16,'#475569','left'); noShadow(ctx);
-  const benY=drawBenefitRow(ctx,d.beneficios||[],60,titEnd+58,W-80,acc,true);
-  drawCTAButton(ctx,d.cta||'CONTÁCTANOS',W/2,benY+24,580,86,acc,'#fff');
-  drawLogoBar(ctx,W,H-90,90,'#0f172a',d.logoImage,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',d.contact?.web||'',acc);
+
+  // SUBTITLE
+  ctx.save(); ctx.font='500 30px Outfit'; ctx.fillStyle='#475569'; ctx.textAlign='left';
+  const subs=wrapText(ctx,d.subtitle||'',W-80); subs.slice(0,2).forEach((s,i)=>ctx.fillText(s,40,ty+i*38)); ctx.restore();
+  ty+=subs.slice(0,2).length*38+18;
+
+  // BENEFITS (2-column check list)
+  const bens=(d.beneficios||[]).slice(0,4);
+  bens.forEach((b: string,i: number)=>{
+    const col=i%2; const row=Math.floor(i/2);
+    drawCheckBenefit(ctx,b,40+col*(W/2-40),ty+row*60,acc,'#1e293b',26);
+  });
+  ty+=Math.ceil(bens.length/2)*62+20;
+
+  // CTA
+  drawGradBtn(ctx,d.cta||'CONTÁCTANOS',W/2,ty,W-80,80,acc,shiftColor(acc,-25),'#fff');
+
+  // BOTTOM BAR
+  fillBlock(ctx,0,H-72,W,72,'#0f172a');
+  ctx.save(); ctx.font='800 26px Outfit'; ctx.fillStyle='#fff'; ctx.textAlign='center';
+  ctx.fillText(d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,H-34); ctx.restore();
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// ENGINE 4: MAGAZINE BOLD — Imagen derecha, texto bold izquierda
+// ENGINE 4: VERTICAL SPLIT MAGAZINE — Dark left text, full photo right (Forbes style)
 // ═══════════════════════════════════════════════════════════════════
 function engine_magazine(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
-  const acc=d.accent||'#b91c1c';
-  const splitX=Math.round(W*0.52);
-  // LEFT: dark panel
-  ctx.fillStyle='#0a0a0a'; ctx.fillRect(0,0,splitX,H);
-  // Accent left border
-  ctx.fillStyle=acc; ctx.fillRect(0,0,14,H);
-  // RIGHT: image
-  ctx.save(); ctx.beginPath(); ctx.rect(splitX,0,W-splitX,H); ctx.clip();
-  if(d.bgImage){
-    const ir=d.bgImage.width/d.bgImage.height; const cr=(W-splitX)/H;
-    let sw=d.bgImage.width,sh=d.bgImage.height,sx=0,sy=0;
-    if(ir>cr){sw=d.bgImage.height*cr;sx=(d.bgImage.width-sw)/2;}else{sh=d.bgImage.width/cr;sy=(d.bgImage.height-sh)/2;}
-    ctx.drawImage(d.bgImage,sx,sy,sw,sh,splitX,0,W-splitX,H);
-  } else {ctx.fillStyle='#334155';ctx.fillRect(splitX,0,W-splitX,H);}
-  const rg=ctx.createLinearGradient(splitX,0,W,0); rg.addColorStop(0,'rgba(10,10,10,0.6)'); rg.addColorStop(0.4,'rgba(10,10,10,0)');
-  ctx.fillStyle=rg; ctx.fillRect(splitX,0,W-splitX,H);
+  const acc=d.accent||'#ef4444';
+  const SPLIT=Math.round(W*0.48);
+
+  // LEFT: DARK solid panel
+  ctx.fillStyle='#070711'; ctx.fillRect(0,0,SPLIT,H);
+  // Accent left edge bar
+  fillGradBlock(ctx,0,0,12,H,acc,shiftColor(acc,30),'v');
+
+  // RIGHT: Full photo
+  drawPhotoBlock(ctx,d.bgImage,SPLIT,0,W-SPLIT,H);
+  // Gradient bleed into photo from left
+  const bleed=ctx.createLinearGradient(SPLIT,0,SPLIT+(W-SPLIT)*0.42,0);
+  bleed.addColorStop(0,'#070711'); bleed.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=bleed; ctx.fillRect(SPLIT,0,W-SPLIT,H);
+
+  // LOGO + BRANDING
+  if(d.logoImage) ctx.drawImage(d.logoImage,24,24,52,52);
+  ctx.save(); ctx.font='700 17px Outfit'; ctx.fillStyle='rgba(255,255,255,0.45)'; ctx.textAlign='left';
+  ctx.fillText((d.industria||'ARIAS GROUP').toUpperCase(),d.logoImage?84:24,44);
   ctx.restore();
-  // LEFT CONTENT
-  const M=28; const cW=splitX-M*2;
-  if(d.logoImage) ctx.drawImage(d.logoImage,M+14,32,60,60);
-  pxFont(ctx,'700 18px Outfit'); txt(ctx,(d.industria||'ARIAS GROUP').toUpperCase(),M+14,d.logoImage?106:52,'rgba(255,255,255,0.5)','left');
-  ctx.fillStyle=acc; ctx.fillRect(M+14,d.logoImage?114:60,50,4);
-  // BIG TITLE LEFT
-  const titY=d.logoImage?150:110;
-  const titEnd=drawMultilineTitleLeft(ctx,d.title||'Tu Oferta',M+14,titY,cW,118,'#fff','#fff',acc);
-  pxFont(ctx,'500 30px Outfit'); shadow(ctx,'rgba(0,0,0,0.5)',10,3);
-  txt(ctx,d.subtitle||'',M+14,titEnd+18,'rgba(255,255,255,0.8)','left'); noShadow(ctx);
-  ctx.fillStyle='rgba(255,255,255,0.12)'; ctx.fillRect(M+14,titEnd+48,cW,1);
-  // BENEFITS (single column)
-  const icons=['✔','✔','✔','✔'];
-  (d.beneficios||[]).slice(0,4).forEach((b: string,i: number)=>{
-    ctx.save(); ctx.beginPath(); ctx.arc(M+30,titEnd+80+i*70,24,0,Math.PI*2);
-    ctx.fillStyle=acc; ctx.fill(); pxFont(ctx,'900 18px Outfit'); txt(ctx,icons[i],M+30,titEnd+88+i*70,'#fff','center');
-    pxFont(ctx,'700 28px Outfit'); txt(ctx,b.substring(0,24),M+66,titEnd+88+i*70,'rgba(255,255,255,0.9)','left'); ctx.restore();
+  drawAccentBar(ctx,24,72,SPLIT-48,4,acc,'transparent');
+
+  // VERTICAL category text (editorial)
+  ctx.save(); ctx.save(); ctx.translate(22,H*0.5); ctx.rotate(-Math.PI/2);
+  ctx.font='700 18px Outfit'; ctx.fillStyle=acc; ctx.textAlign='center';
+  ctx.fillText((d.industria||'MARKETING').toUpperCase(),0,0); ctx.restore(); ctx.restore();
+
+  // MASSIVE STACKED TITLE
+  const words=(d.title||'TU TITULO').toUpperCase().split(' ');
+  let titleY=Math.round(H*0.2);
+  words.slice(0,4).forEach((w,i)=>{
+    const sz=i===0?154:i===1?142:112;
+    ctx.save(); ctx.font=`900 ${sz}px Outfit`; ctx.fillStyle=i===1?acc:'#fff'; ctx.textAlign='left';
+    ctx.shadowColor='rgba(0,0,0,0.5)'; ctx.shadowBlur=22; ctx.shadowOffsetY=8;
+    ctx.fillText(w,20,titleY); titleY+=sz+8; ctx.restore();
   });
-  const benBot=titEnd+80+(d.beneficios||[]).slice(0,4).length*70;
-  if(d.price){ ctx.fillStyle=acc; ctx.fillRect(M+14,benBot+10,cW-M,4);
-    pxFont(ctx,'900 70px Outfit'); shadow(ctx,'rgba(0,0,0,0.7)',16,5);
-    txt(ctx,d.price,M+14,benBot+96,'#fff','left'); noShadow(ctx); }
-  drawCTAButton(ctx,d.cta||'VER AHORA',M+14+Math.round(cW/2),Math.max(benBot+(d.price?120:20),H-240),cW,82,acc,'#fff');
-  pxFont(ctx,'700 24px Outfit'); txt(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',M+14,H-44,'rgba(255,255,255,0.7)','left');
+
+  // DIVIDER
+  drawAccentBar(ctx,20,titleY+8,SPLIT-40,5,acc,'transparent'); titleY+=28;
+
+  // SUBTITLE
+  ctx.save(); ctx.font='500 28px Outfit'; ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.textAlign='left';
+  const subs=wrapText(ctx,d.subtitle||'',SPLIT-40); subs.slice(0,2).forEach((s,i)=>ctx.fillText(s,20,titleY+10+i*36)); ctx.restore();
+  titleY += subs.slice(0,2).length*36+24;
+
+  // BENEFITS (single col)
+  (d.beneficios||[]).slice(0,4).forEach((b: string,i: number)=>{
+    drawCheckBenefit(ctx,b,20,titleY+i*58,acc,'rgba(255,255,255,0.9)',24);
+  });
+  const b4Y=titleY+(d.beneficios||[]).slice(0,4).length*58+20;
+
+  // CTA
+  drawGradBtn(ctx,d.cta||'SABER MÁS',SPLIT/2,b4Y,SPLIT-40,78,acc,shiftColor(acc,-30),'#fff');
+
+  // CONTACT
+  ctx.save(); ctx.font='700 24px Outfit'; ctx.fillStyle='rgba(255,255,255,0.6)'; ctx.textAlign='left';
+  ctx.fillText(d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',20,H-28); ctx.restore();
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// ENGINE 5: GOLDEN DARK LUXURY — Fondo oscuro premium, detalles dorados
+// ENGINE 5: BOLD CENTER DARK — Gradient bg, centered huge text (like "WE'RE OPEN")
 // ═══════════════════════════════════════════════════════════════════
 function engine_circle(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
-  const acc=d.accent||'#D4AF37';
-  // DARK BG
-  ctx.fillStyle='#070711'; ctx.fillRect(0,0,W,H);
-  // Radial glow
-  const rg=ctx.createRadialGradient(W*0.5,H*0.4,0,W*0.5,H*0.4,W*0.7);
-  rg.addColorStop(0,acc+'20'); rg.addColorStop(1,'transparent'); ctx.fillStyle=rg; ctx.fillRect(0,0,W,H);
-  // Image - centered oval frame
-  const iw=Math.round(W*0.86),ih=Math.round(H*0.44),ix=(W-iw)/2,iy=Math.round(H*0.2);
+  const acc=d.accent||'#1a56db';
+
+  // GRADIENT BACKGROUND
+  fillGradBlock(ctx,0,0,W,H,shiftColor(acc,-40),'#060615','d');
+
+  // GEOMETRIC SHAPES for depth
   ctx.save();
-  // Outer glow border
-  ctx.shadowColor=acc; ctx.shadowBlur=28;
-  ctx.strokeStyle=acc; ctx.lineWidth=5;
-  roundRect(ctx,ix,iy,iw,ih,32); ctx.stroke();
-  ctx.shadowColor='transparent'; ctx.shadowBlur=0;
-  roundRect(ctx,ix,iy,iw,ih,32); ctx.clip();
-  if(d.bgImage){
-    const ir=d.bgImage.width/d.bgImage.height; const cr=iw/ih;
-    let sw=d.bgImage.width,sh=d.bgImage.height,sx=0,sy=0;
-    if(ir>cr){sw=d.bgImage.height*cr;sx=(d.bgImage.width-sw)/2;}else{sh=d.bgImage.width/cr;sy=(d.bgImage.height-sh)/2;}
-    ctx.drawImage(d.bgImage,sx,sy,sw,sh,ix,iy,iw,ih);
-  } else {ctx.fillStyle='#1e293b';ctx.fillRect(ix,iy,iw,ih);}
-  const povg=ctx.createLinearGradient(ix,iy+ih*0.6,ix,iy+ih);
-  povg.addColorStop(0,'rgba(7,7,17,0)'); povg.addColorStop(1,'rgba(7,7,17,0.9)');
-  ctx.fillStyle=povg; ctx.fillRect(ix,iy,iw,ih);
+  ctx.beginPath(); ctx.arc(W*0.85,H*0.15,W*0.32,0,Math.PI*2);
+  ctx.fillStyle=acc+'22'; ctx.fill(); ctx.restore();
+  ctx.save();
+  ctx.beginPath(); ctx.arc(W*0.08,H*0.82,W*0.28,0,Math.PI*2);
+  ctx.fillStyle=acc+'15'; ctx.fill(); ctx.restore();
+
+  // PHOTO — right side framed
+  const phX=Math.round(W*0.45), phW=Math.round(W*0.48), phH=Math.round(H*0.52);
+  ctx.save(); roundRect(ctx,phX,(H-phH)/2,phW,phH,24); ctx.clip();
+  drawPhotoBlock(ctx,d.bgImage,phX,(H-phH)/2,phW,phH,0);
+  // Edge fade from left
+  const pfade=ctx.createLinearGradient(phX,0,phX+phW*0.4,0);
+  pfade.addColorStop(0,shiftColor(acc,-40)+'ee'); pfade.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=pfade; ctx.fillRect(phX,(H-phH)/2,phW,phH);
   ctx.restore();
-  // PRICE BADGE on top
-  if(d.price) { const pw=340; drawPill(ctx,d.price,(W-pw)/2,iy-28,acc,'#000',40,28,18); }
-  // TOP LOGO AREA
-  ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(0,0,W,d.price?iy-36:iy-4);
-  if(d.logoImage) ctx.drawImage(d.logoImage,40,20,60,60);
-  pxFont(ctx,'800 20px Outfit'); txt(ctx,(d.industria||'ARIAS GROUP').toUpperCase(),d.logoImage?114:40,52,acc,'left');
-  // TITLE + SUBTITLE (below frame)
-  const botY=iy+ih+20;
-  const titEnd=drawMultilineTitleCenter(ctx,d.title||'Tu Oferta',W/2,botY,W-80,108,'#fff',acc);
-  ctx.fillStyle=acc; ctx.fillRect(W/2-80,titEnd+8,160,5);
-  pxFont(ctx,'500 32px Outfit'); shadow(ctx,'rgba(0,0,0,0.6)',12,3);
-  txt(ctx,d.subtitle||'',W/2,titEnd+52,'rgba(255,255,255,0.85)','center'); noShadow(ctx);
-  // BENEFITS (horizontal pills)
-  let bx2=60; const by2=titEnd+96;
-  (d.beneficios||[]).slice(0,3).forEach((b: string)=>{
-    drawPill(ctx,b.substring(0,18),bx2,by2,'rgba(255,255,255,0.08)','rgba(255,255,255,0.9)',24,16,10);
-    bx2 += ctx.measureText(b.substring(0,18)).width+72;
+
+  // BRANDING TOP
+  fillBlock(ctx,0,0,W,88,'rgba(0,0,0,0.4)');
+  drawBrandBadge(ctx,d.logoImage,d.industria||'ARIAS GROUP',36,50,'#fff',acc);
+  if(d.price) drawGradBtn(ctx,d.price,W-130,12,220,64,acc,shiftColor(acc,20),'#fff');
+
+  // BIG TITLE (left)
+  ctx.save(); ctx.textAlign='left';
+  const tws=(d.title||'TU OFERTA').toUpperCase().split(' ');
+  const bigS=tws.length<=2?170:tws.length<=3?148:122;
+  tws.slice(0,3).forEach((w,i)=>{
+    ctx.font=`900 ${i===0?bigS:Math.round(bigS*0.82)}px Outfit`;
+    ctx.fillStyle=i===1?acc:'#fff';
+    ctx.shadowColor='rgba(0,0,0,0.6)'; ctx.shadowBlur=24; ctx.shadowOffsetY=10;
+    ctx.fillText(w,36,H*0.3+i*(Math.round(bigS*0.9)+12));
   });
-  drawCTAButton(ctx,d.cta||'CONTÁCTANOS',W/2,by2+78,580,88,acc,'#000');
-  // BOTTOM
-  ctx.fillStyle=acc; ctx.fillRect(0,H-80,W,80);
-  pxFont(ctx,'900 30px Outfit'); txt(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,H-38,'#000','center');
+  ctx.restore();
+  const afterTitle=H*0.3+tws.slice(0,3).length*(Math.round(bigS*0.9)+12);
+
+  // SUBTITLE
+  ctx.save(); ctx.font='italic 500 30px Outfit'; ctx.fillStyle='rgba(255,255,255,0.78)'; ctx.textAlign='left';
+  const ss=wrapText(ctx,d.subtitle||'',W*0.44); ss.slice(0,2).forEach((s,i)=>ctx.fillText(s,36,afterTitle+12+i*38)); ctx.restore();
+  const afterSub=afterTitle+12+ss.slice(0,2).length*38+24;
+
+  // BENEFITS (chips)
+  (d.beneficios||[]).slice(0,3).forEach((b: string,i: number)=>{
+    drawCheckBenefit(ctx,b,36,afterSub+i*58,acc,'#fff',26);
+  });
+  const afterBen=afterSub+(d.beneficios||[]).slice(0,3).length*58+24;
+
+  // CTA
+  drawGradBtn(ctx,d.cta||'EMPEZAR AHORA',Math.round(W*0.22),afterBen,Math.round(W*0.42),80,acc,shiftColor(acc,20),'#fff');
+
+  // PHONE
+  fillBlock(ctx,0,H-76,W,76,acc);
+  ctx.save(); ctx.font='900 28px Outfit'; ctx.fillStyle='#fff'; ctx.textAlign='center';
+  ctx.fillText(d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,H-36); ctx.restore();
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// ENGINE 6: CORPORATE STRIPES — Limpio, barra color + imagen + texto
+// ENGINE 6: CORPORATE SPLIT RIGHT — Light bg, photo right, bold info left
 // ═══════════════════════════════════════════════════════════════════
 function engine_stripes(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
-  const acc=d.accent||'#1a56db';
-  // Full white BG
+  const acc=d.accent||'#1e40af';
+  const SPLIT=Math.round(W*0.46);
+
+  // BG white
   ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
-  // TOP header bar
-  ctx.fillStyle=acc; ctx.fillRect(0,0,W,100);
-  if(d.logoImage) ctx.drawImage(d.logoImage,30,18,64,64);
-  pxFont(ctx,'900 26px Outfit'); txt(ctx,d.industria||'ARIAS GROUP',d.logoImage?108:36,56,'#fff','left');
-  if(d.price) drawPill(ctx,d.price,W-280,18,acc==='#fff'?'#000':acc,'#fff',36,22,14);
-  // IMAGE SECTION
-  const imgY=100; const imgH=Math.round(H*0.48);
-  ctx.save(); ctx.beginPath(); ctx.rect(0,imgY,W,imgH); ctx.clip();
-  if(d.bgImage){
-    const ir=d.bgImage.width/d.bgImage.height; const cr=W/imgH;
-    let sw=d.bgImage.width,sh=d.bgImage.height,sx=0,sy=0;
-    if(ir>cr){sw=d.bgImage.height*cr;sx=(d.bgImage.width-sw)/2;}else{sh=d.bgImage.width/cr;sy=(d.bgImage.height-sh)/2;}
-    ctx.drawImage(d.bgImage,sx,sy,sw,sh,0,imgY,W,imgH);
-  } else {ctx.fillStyle='#e2e8f0'; ctx.fillRect(0,imgY,W,imgH);}
-  // Bottom image fade to white
-  const fgr=ctx.createLinearGradient(0,imgY+imgH*0.65,0,imgY+imgH);
-  fgr.addColorStop(0,'rgba(255,255,255,0)'); fgr.addColorStop(1,'#fff');
-  ctx.fillStyle=fgr; ctx.fillRect(0,imgY,W,imgH);
-  ctx.restore();
-  // ACCENT stripe
-  ctx.fillStyle=acc; ctx.fillRect(0,imgY+imgH,W,10);
-  // CONTENT (bottom area, white bg)
-  const cY=imgY+imgH+22;
-  const titEnd=drawMultilineTitleLeft(ctx,d.title||'Tu Oferta',60,cY,W-100,96,'#0f172a','#0f172a',acc);
-  pxFont(ctx,'500 30px Outfit'); txt(ctx,d.subtitle||'',60,titEnd+14,'#475569','left');
-  const benY2=drawBenefitRow(ctx,d.beneficios||[],60,titEnd+58,W-80,acc,true);
-  drawCTAButton(ctx,d.cta||'CONTÁCTANOS',W/2,benY2+24,580,84,acc,'#fff');
-  drawLogoBar(ctx,W,H-88,88,'#0f172a',null,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',d.contact?.web||'',acc);
+
+  // RIGHT: photo full height
+  drawPhotoBlock(ctx,d.bgImage,SPLIT,0,W-SPLIT,H);
+  // Fade from right back to left (photo visible, left panel clean)
+  const rf=ctx.createLinearGradient(SPLIT,0,SPLIT+(W-SPLIT)*0.5,0);
+  rf.addColorStop(0,'#fff'); rf.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=rf; ctx.fillRect(SPLIT,0,W-SPLIT,H);
+
+  // TOP accent stripe
+  fillGradBlock(ctx,0,0,W,10,acc,shiftColor(acc,20),'h');
+
+  // LEFT CONTENT
+  if(d.logoImage) ctx.drawImage(d.logoImage,36,22,56,56);
+  ctx.save(); ctx.font='800 20px Outfit'; ctx.fillStyle=acc; ctx.textAlign='left';
+  ctx.fillText((d.industria||'ARIAS GROUP').toUpperCase(),d.logoImage?102:36,46);
+  ctx.font='600 15px Outfit'; ctx.fillStyle='#94a3b8';
+  ctx.fillText(d.contact?.web||'www.empresa.com',d.logoImage?102:36,66); ctx.restore();
+
+  // HUGE TITLE — dark ink
+  const titleWords=(d.title||'TU TITULO').toUpperCase().split(' ');
+  let ty=Math.round(H*0.2);
+  titleWords.slice(0,4).forEach((w,i)=>{
+    const sz=i===0?148:i===1?136:110;
+    ctx.save(); ctx.font=`900 ${sz}px Outfit`; ctx.textAlign='left';
+    ctx.fillStyle=i===1?acc:'#0f172a';
+    ctx.shadowColor='rgba(0,0,0,0.1)'; ctx.shadowBlur=6; ctx.shadowOffsetY=3;
+    ctx.fillText(w,36,ty); ty+=sz+12; ctx.restore();
+  });
+
+  // DIVIDER
+  drawAccentBar(ctx,36,ty+4,SPLIT-60,6,acc,'transparent'); ty+=24;
+
+  // SUBTITLE
+  ctx.save(); ctx.font='500 28px Outfit'; ctx.fillStyle='#475569'; ctx.textAlign='left';
+  const ss2=wrapText(ctx,d.subtitle||'',SPLIT-60); ss2.slice(0,2).forEach((s,i)=>ctx.fillText(s,36,ty+i*36)); ctx.restore();
+  ty+=ss2.slice(0,2).length*36+24;
+
+  // BENEFITS
+  (d.beneficios||[]).slice(0,4).forEach((b: string,i: number)=>{
+    drawCheckBenefit(ctx,b,36,ty+i*58,acc,'#1e293b',26);
+  });
+  ty+=(d.beneficios||[]).slice(0,4).length*58+24;
+
+  // CTA
+  drawGradBtn(ctx,d.cta||'CONTÁCTANOS',36+Math.round((SPLIT-52)/2),ty,SPLIT-52,80,acc,shiftColor(acc,-20),'#fff');
+
+  // BOTTOM
+  fillBlock(ctx,0,H-72,W,72,'#0f172a');
+  ctx.save(); ctx.font='800 26px Outfit'; ctx.fillStyle='#fff'; ctx.textAlign='center';
+  ctx.fillText(d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,H-34); ctx.restore();
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// ENGINE 7: DIAGONAL GEO BURST — Diagonal dramática, foto fondo
+// ENGINE 7: DIAGONAL CUT IMPACT — Bold diagonal split, photo + text
 // ═══════════════════════════════════════════════════════════════════
 function engine_cornerBurst(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
   const acc=d.accent||'#f59e0b';
-  drawFullBleedBg(ctx,W,H,d.bgImage,[
-    {pos:0,color:'rgba(0,0,0,0.55)'},{pos:0.4,color:'rgba(0,0,0,0.2)'},
-    {pos:0.7,color:'rgba(0,0,0,0.6)'},{pos:1,color:'rgba(0,0,0,0.95)'}
-  ]);
-  // DIAGONAL overlay shape
+
+  // FULL BLEED PHOTO BG
+  drawPhotoBlock(ctx,d.bgImage,0,0,W,H);
+
+  // DIAGONAL dark overlay (top-left triangle covers ~55% for text)
   ctx.save(); ctx.beginPath();
-  ctx.moveTo(0,0); ctx.lineTo(W*0.62,0); ctx.lineTo(W*0.38,H*0.5); ctx.lineTo(0,H*0.5); ctx.closePath();
-  ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fill(); ctx.restore();
-  // ACCENT diagonal stripe
+  ctx.moveTo(0,0); ctx.lineTo(W*0.68,0); ctx.lineTo(W*0.35,H); ctx.lineTo(0,H); ctx.closePath();
+  fillGradBlock(ctx,0,0,W*0.55,H,shiftColor(acc,-50)+'f2',shiftColor(acc,-60)+'cc','d');
+  ctx.clip();
+  fillGradBlock(ctx,0,0,W*0.55,H,shiftColor(acc,-50)+'f2',shiftColor(acc,-60)+'cc','d');
+  ctx.restore();
+
+  // ACCENT diagonal stripe border between sections
   ctx.save(); ctx.beginPath();
-  ctx.moveTo(W*0.60,0); ctx.lineTo(W*0.65,0); ctx.lineTo(W*0.41,H*0.5); ctx.lineTo(W*0.36,H*0.5); ctx.closePath();
+  ctx.moveTo(W*0.65,0); ctx.lineTo(W*0.70,0); ctx.lineTo(W*0.37,H); ctx.lineTo(W*0.32,H); ctx.closePath();
   ctx.fillStyle=acc; ctx.fill(); ctx.restore();
-  // TOP LEFT CONTENT
-  if(d.logoImage) ctx.drawImage(d.logoImage,40,30,64,64);
-  pxFont(ctx,'800 18px Outfit'); txt(ctx,(d.industria||'ARIAS GROUP').toUpperCase(),d.logoImage?118:40,54,'rgba(255,255,255,0.7)','left');
-  if(d.price) drawPill(ctx,d.price,40,d.logoImage?110:80,acc,'#000',36,22,14);
-  const titY2=d.price?220:170;
-  const titEnd2=drawMultilineTitleLeft(ctx,d.title||'Tu Oferta',40,titY2,W*0.55,114,'#fff','#fff',acc);
-  pxFont(ctx,'500 32px Outfit'); shadow(ctx,'rgba(0,0,0,0.7)',10,3);
-  txt(ctx,d.subtitle||'',40,titEnd2+16,'rgba(255,255,255,0.85)','left'); noShadow(ctx);
-  // BOTTOM CONTENT
-  ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(0,H*0.6,W,H*0.4);
-  ctx.fillStyle=acc; ctx.fillRect(0,Math.round(H*0.6),W,8);
-  const benY3=drawBenefitRow(ctx,d.beneficios||[],50,Math.round(H*0.62)+16,W-80,acc);
-  drawCTAButton(ctx,d.cta||'CONTÁCTANOS',W/2,benY3+24,580,86,acc,'#000');
-  pxFont(ctx,'700 26px Outfit'); txt(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,H-40,'rgba(255,255,255,0.75)','center');
+
+  // TOP BRANDING
+  fillBlock(ctx,0,0,W,82,'rgba(0,0,0,0.35)');
+  drawBrandBadge(ctx,d.logoImage,d.industria||'ARIAS GROUP',36,46,'#fff','rgba(255,255,255,0.55)');
+  if(d.price) drawGradBtn(ctx,d.price,W-130,10,220,62,acc,shiftColor(acc,20),'#000');
+
+  // MASSIVE STACKED WORDS (left)
+  const ws=(d.title||'TU OFERTA').toUpperCase().split(' ');
+  let wy=Math.round(H*0.25);
+  ws.slice(0,4).forEach((w,i)=>{
+    const sz=i===0?162:i===1?148:118;
+    ctx.save(); ctx.font=`900 ${sz}px Outfit`; ctx.textAlign='left'; ctx.fillStyle=i===1?acc:'#fff';
+    ctx.shadowColor='rgba(0,0,0,0.6)'; ctx.shadowBlur=24; ctx.shadowOffsetY=10;
+    ctx.fillText(w,36,wy); wy+=sz+6; ctx.restore();
+  });
+  drawAccentBar(ctx,36,wy+10,260,7,acc,'rgba(255,255,0,0)'); wy+=32;
+
+  // SUBTITLE
+  ctx.save(); ctx.font='italic 500 30px Outfit'; ctx.fillStyle='rgba(255,255,255,0.82)'; ctx.textAlign='left';
+  const ss3=wrapText(ctx,d.subtitle||'',W*0.52); ss3.slice(0,2).forEach((s,i)=>ctx.fillText(s,36,wy+i*38)); ctx.restore();
+  wy+=ss3.slice(0,2).length*38+24;
+
+  // BENEFITS
+  (d.beneficios||[]).slice(0,3).forEach((b: string,i: number)=>{
+    drawCheckBenefit(ctx,b,36,wy+i*56,acc,'#fff',26);
+  });
+  wy+=(d.beneficios||[]).slice(0,3).length*56+24;
+
+  // CTA
+  drawGradBtn(ctx,d.cta||'SABER MÁS',Math.round(W*0.18),wy,Math.round(W*0.38),82,acc,shiftColor(acc,20),'#000');
+
+  // CONTACT
+  fillBlock(ctx,0,H-76,W,76,'rgba(0,0,0,0.55)');
+  ctx.save(); ctx.font='800 26px Outfit'; ctx.fillStyle='#fff'; ctx.textAlign='center';
+  ctx.fillText(d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,H-38); ctx.restore();
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// ENGINE 8: MINIMAL WHITE EDITORIAL — Clean & Sophisticated
+// ENGINE 8: CLEAN EDITORIAL WHITE — Minimal premium, card image top
 // ═══════════════════════════════════════════════════════════════════
 function engine_architectural(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
-  const acc=d.accent||'#D4AF37';
-  ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
-  ctx.fillStyle=acc; ctx.fillRect(0,0,W,16);
-  // DOT PATTERN (decorative)
-  ctx.fillStyle='#f1f5f9';
-  for(let c=0;c<8;c++) for(let r=0;r<8;r++) { ctx.beginPath(); ctx.arc(W-120+c*16,24+r*16,3,0,Math.PI*2); ctx.fill(); }
-  // TOP HEADER
-  if(d.logoImage) ctx.drawImage(d.logoImage,48,28,60,60);
-  pxFont(ctx,'700 16px Outfit'); txt(ctx,(d.industria||'ARIAS GROUP').toUpperCase(),d.logoImage?122:48,50,'#94a3b8','left');
-  pxFont(ctx,'700 16px Outfit'); txt(ctx,acc.toUpperCase(),d.logoImage?122:48,70,acc,'left');
-  // IMAGE in rounded frame
-  const iY=110; const iH=Math.round(H*0.42); const iX=48; const iW=W-96;
-  ctx.save(); ctx.shadowColor='rgba(0,0,0,0.15)'; ctx.shadowBlur=30; ctx.shadowOffsetY=10;
-  roundRect(ctx,iX,iY,iW,iH,24); ctx.fillStyle='#e2e8f0'; ctx.fill(); ctx.restore();
-  ctx.save(); roundRect(ctx,iX,iY,iW,iH,24); ctx.clip();
-  if(d.bgImage){
-    const ir=d.bgImage.width/d.bgImage.height; const cr=iW/iH;
-    let sw=d.bgImage.width,sh=d.bgImage.height,sx=0,sy=0;
-    if(ir>cr){sw=d.bgImage.height*cr;sx=(d.bgImage.width-sw)/2;}else{sh=d.bgImage.width/cr;sy=(d.bgImage.height-sh)/2;}
-    ctx.drawImage(d.bgImage,sx,sy,sw,sh,iX,iY,iW,iH);
-  } else {ctx.fillStyle='#94a3b8'; ctx.fillRect(iX,iY,iW,iH);}
-  // Gradient over image bottom
-  const ipg=ctx.createLinearGradient(iX,iY+iH*0.55,iX,iY+iH);
-  ipg.addColorStop(0,'rgba(255,255,255,0)'); ipg.addColorStop(1,'rgba(255,255,255,0.5)');
-  ctx.fillStyle=ipg; ctx.fillRect(iX,iY,iW,iH);
-  if(d.price) drawPill(ctx,d.price,iX+16,iY+16,acc,'#fff',32,20,12);
+  const acc=d.accent||'#0ea5e9';
+
+  // PURE WHITE CANVAS
+  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,W,H);
+
+  // TOP ACCENT BAR
+  fillGradBlock(ctx,0,0,W,12,acc,shiftColor(acc,20),'h');
+
+  // TOP PHOTO in rounded card
+  const photoY=72; const photoW=W-72; const photoH=Math.round(H*0.44);
+  // Card shadow
+  ctx.save(); ctx.shadowColor='rgba(0,0,0,0.18)'; ctx.shadowBlur=32; ctx.shadowOffsetY=12;
+  roundRect(ctx,36,photoY,photoW,photoH,20); ctx.fillStyle='#e2e8f0'; ctx.fill(); ctx.restore();
+  // Photo
+  ctx.save(); roundRect(ctx,36,photoY,photoW,photoH,20); ctx.clip();
+  drawPhotoBlock(ctx,d.bgImage,36,photoY,photoW,photoH,0);
+  // Bottom photo fade to white
+  fillGradBlock(ctx,36,photoY+photoH*0.6,photoW,photoH*0.4,'rgba(255,255,255,0)','rgba(255,255,255,0.7)','v');
+  // OVERLAY TAGS IN PHOTO
+  drawBrandBadge(ctx,d.logoImage,d.industria||'ARIAS GROUP',52,photoY+32,'#fff','rgba(255,255,255,0.6)');
+  if(d.price) drawGradBtn(ctx,d.price,W-130,photoY+14,200,56,acc,shiftColor(acc,-20),'#fff');
   ctx.restore();
-  // CONTENT BELOW IMAGE
-  const cY=iY+iH+28;
-  ctx.fillStyle=acc; ctx.fillRect(48,cY,80,6);
-  const titEnd3=drawMultilineTitleLeft(ctx,d.title||'Tu Oferta',48,cY+24,W-96,96,'#0f172a','#0f172a',acc);
-  pxFont(ctx,'500 28px Outfit'); txt(ctx,d.subtitle||'',48,titEnd3+14,'#64748b','left');
-  const benY4=drawBenefitRow(ctx,d.beneficios||[],48,titEnd3+54,W-80,acc,true);
-  drawCTAButton(ctx,d.cta||'CONTÁCTANOS',W/2,benY4+16,580,82,acc,'#fff');
-  drawLogoBar(ctx,W,H-86,86,'#0f172a',d.logoImage,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',d.contact?.web||'',acc);
+
+  // CONTENT BELOW PHOTO
+  const cY=photoY+photoH+20;
+  // Accent pill tag
+  ctx.save(); ctx.font='700 18px Outfit';
+  const tgW=ctx.measureText((d.industria||'MARKETING').toUpperCase()).width+28;
+  roundRect(ctx,36,cY,tgW,36,18); ctx.fillStyle=acc; ctx.fill();
+  ctx.fillStyle='#fff'; ctx.textAlign='left'; ctx.fillText((d.industria||'MARKETING').toUpperCase(),50,cY+26); ctx.restore();
+
+  // TITLE
+  ctx.save(); ctx.textAlign='left';
+  const tls=wrapText(ctx,(d.title||'TU OFERTA').toUpperCase(),W-72);
+  let titleY2=cY+54;
+  tls.slice(0,2).forEach((l,i)=>{
+    ctx.font=`900 ${i===0?96:80}px Outfit`;
+    ctx.fillStyle=i===0?'#0f172a':acc;
+    ctx.shadowColor='rgba(0,0,0,0.1)'; ctx.shadowBlur=6; ctx.shadowOffsetY=3;
+    ctx.fillText(l,36,titleY2); titleY2+=i===0?104:88;
+  });
+  ctx.restore();
+
+  // SUBTITLE
+  ctx.save(); ctx.font='500 28px Outfit'; ctx.fillStyle='#64748b'; ctx.textAlign='left';
+  const ss=wrapText(ctx,d.subtitle||'',W-72); ss.slice(0,2).forEach((s,i)=>ctx.fillText(s,36,titleY2+i*36)); ctx.restore();
+  titleY2+=ss.slice(0,2).length*36+20;
+
+  // BENEFITS (2-col)
+  const bens=(d.beneficios||[]).slice(0,4);
+  bens.forEach((b: string,i: number)=>{
+    const col=i%2; const row=Math.floor(i/2);
+    drawCheckBenefit(ctx,b,40+col*(W/2-40),titleY2+row*56,acc,'#1e293b',24);
+  });
+  titleY2+=Math.ceil(bens.length/2)*58+20;
+
+  // CTA
+  drawGradBtn(ctx,d.cta||'VER MÁS',W/2,titleY2,W-72,80,acc,shiftColor(acc,-25),'#fff');
+
+  // BOTTOM
+  fillBlock(ctx,0,H-68,W,68,'#0f172a');
+  ctx.save(); ctx.font='800 24px Outfit'; ctx.fillStyle='#fff'; ctx.textAlign='center';
+  ctx.fillText(d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,H-32); ctx.restore();
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// ENGINE 9: PHANTOM DARK PRESTIGE — Ultra dark luxury with glow
+// ENGINE 9: ULTRA DARK LUXURY — Gold accents, prestige frame (like Charles Schwab)
 // ═══════════════════════════════════════════════════════════════════
 function engine_luxuryDark(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
   const acc=d.accent||'#D4AF37';
-  ctx.fillStyle='#050510'; ctx.fillRect(0,0,W,H);
-  // Background glow
-  const glow=ctx.createRadialGradient(W/2,H*0.45,0,W/2,H*0.45,W*0.65);
-  glow.addColorStop(0,acc+'22'); glow.addColorStop(0.5,acc+'08'); glow.addColorStop(1,'transparent');
+
+  // ULTRA DARK BG with subtle gradient
+  fillGradBlock(ctx,0,0,W,H,'#060612','#0d0d1f','d');
+
+  // Decorative radial glow
+  const glow=ctx.createRadialGradient(W*0.5,H*0.4,0,W*0.5,H*0.4,W*0.6);
+  glow.addColorStop(0,acc+'18'); glow.addColorStop(0.6,acc+'06'); glow.addColorStop(1,'transparent');
   ctx.fillStyle=glow; ctx.fillRect(0,0,W,H);
-  // TOP branding bar
-  ctx.fillStyle=acc; ctx.fillRect(0,0,W,8);
-  ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(0,8,W,92);
-  if(d.logoImage) ctx.drawImage(d.logoImage,40,18,64,64);
-  pxFont(ctx,'800 20px Outfit'); txt(ctx,(d.industria||'ARIAS GROUP').toUpperCase(),d.logoImage?118:40,48,acc,'left');
-  pxFont(ctx,'600 16px Outfit'); txt(ctx,(d.contact?.web||'www.empresa.com').toUpperCase(),d.logoImage?118:40,68,'rgba(255,255,255,0.45)','left');
-  // IMAGE FRAME — full width, elegant border
-  const fY=108; const fH=Math.round(H*0.4); const fPad=40;
-  ctx.save();
-  ctx.shadowColor=acc; ctx.shadowBlur=24;
-  ctx.strokeStyle=acc; ctx.lineWidth=4;
-  roundRect(ctx,fPad,fY,W-fPad*2,fH,16); ctx.stroke();
-  ctx.shadowColor='transparent'; ctx.shadowBlur=0;
-  roundRect(ctx,fPad,fY,W-fPad*2,fH,16); ctx.clip();
-  if(d.bgImage){
-    const ir=d.bgImage.width/d.bgImage.height; const cr=(W-fPad*2)/fH;
-    let sw=d.bgImage.width,sh=d.bgImage.height,sx=0,sy=0;
-    if(ir>cr){sw=d.bgImage.height*cr;sx=(d.bgImage.width-sw)/2;}else{sh=d.bgImage.width/cr;sy=(d.bgImage.height-sh)/2;}
-    ctx.drawImage(d.bgImage,sx,sy,sw,sh,fPad,fY,W-fPad*2,fH);
-  } else {ctx.fillStyle='#1e293b';ctx.fillRect(fPad,fY,W-fPad*2,fH);}
-  const fpg=ctx.createLinearGradient(0,fY+fH*0.5,0,fY+fH);
-  fpg.addColorStop(0,'rgba(5,5,16,0)'); fpg.addColorStop(1,'rgba(5,5,16,0.92)');
-  ctx.fillStyle=fpg; ctx.fillRect(fPad,fY,W-fPad*2,fH);
+
+  // TOP GOLD BAR
+  fillGradBlock(ctx,0,0,W,10,acc,shiftColor(acc,20),'h');
+
+  // BRAND HEADER
+  fillBlock(ctx,0,10,W,82,'rgba(0,0,0,0.5)');
+  if(d.logoImage) ctx.drawImage(d.logoImage,32,20,56,56);
+  ctx.save(); ctx.font='800 20px Outfit'; ctx.fillStyle=acc; ctx.textAlign='left';
+  ctx.fillText((d.industria||'ARIAS GROUP').toUpperCase(),d.logoImage?98:32,48);
+  ctx.font='600 15px Outfit'; ctx.fillStyle='rgba(255,255,255,0.35)';
+  ctx.fillText(d.contact?.web||'www.empresa.com',d.logoImage?98:32,68); ctx.restore();
+
+  // PHOTO in golden-bordered frame
+  const frameX=36; const frameY=102; const frameW=W-72; const frameH=Math.round(H*0.4);
+  // Gold glow shadow
+  ctx.save(); ctx.shadowColor=acc; ctx.shadowBlur=30; ctx.lineWidth=4; ctx.strokeStyle=acc;
+  roundRect(ctx,frameX,frameY,frameW,frameH,16); ctx.stroke(); ctx.restore();
+  ctx.save(); roundRect(ctx,frameX,frameY,frameW,frameH,16); ctx.clip();
+  drawPhotoBlock(ctx,d.bgImage,frameX,frameY,frameW,frameH,0);
+  // Photo overlay: dark vignette
+  const pov=ctx.createRadialGradient(W/2,frameY+frameH/2,frameH*0.2,W/2,frameY+frameH/2,frameH*0.9);
+  pov.addColorStop(0,'rgba(6,6,18,0)'); pov.addColorStop(1,'rgba(6,6,18,0.7)');
+  ctx.fillStyle=pov; ctx.fillRect(frameX,frameY,frameW,frameH);
+  if(d.price) drawPromoBadge(ctx,d.price,'OFERTA',W/2,frameY+frameH/2,66,acc,'#000');
   ctx.restore();
-  if(d.price){ const pw=340; drawPill(ctx,d.price,(W-pw)/2,fY+fH-76,acc,'#000',40,28,18); }
+
   // CONTENT BELOW
-  const bBot=fY+fH+18;
-  const titEnd4=drawMultilineTitleCenter(ctx,d.title||'Tu Oferta',W/2,bBot,W-80,104,'#fff',acc);
-  ctx.fillStyle=acc; ctx.fillRect(W/2-60,titEnd4+8,120,4);
-  pxFont(ctx,'400 32px Outfit'); shadow(ctx,'rgba(0,0,0,0.5)',10,3);
-  txt(ctx,d.subtitle||'',W/2,titEnd4+50,'rgba(255,255,255,0.78)','center'); noShadow(ctx);
-  // CARD BENEFITS
-  (d.beneficios||[]).slice(0,3).forEach((b: string,i: number)=>{
-    const cW2=W-120; const cX=(W-cW2)/2;
-    roundRect(ctx,cX,titEnd4+80+i*72,cW2,58,12);
-    ctx.fillStyle='rgba(255,255,255,0.04)'; ctx.fill();
-    ctx.strokeStyle=acc+'50'; ctx.lineWidth=1.5; ctx.stroke();
-    ctx.save(); ctx.beginPath(); ctx.arc(cX+34,titEnd4+109+i*72,20,0,Math.PI*2);
-    ctx.fillStyle=acc; ctx.fill(); pxFont(ctx,'900 16px Outfit'); txt(ctx,'★',cX+34,titEnd4+115+i*72,'#000','center');
-    ctx.restore();
-    pxFont(ctx,'700 26px Outfit'); txt(ctx,b.substring(0,32),cX+68,titEnd4+118+i*72,'rgba(255,255,255,0.9)','left');
+  let cY=frameY+frameH+28;
+  // TITLE centered
+  ctx.save(); ctx.textAlign='center';
+  const tw=(d.title||'TU OFERTA').toUpperCase().split(' ');
+  tw.slice(0,3).forEach((w,i)=>{
+    const sz=i===0?110:i===1?96:82;
+    ctx.font=`900 ${sz}px Outfit`; ctx.fillStyle=i===1?acc:'#fff';
+    ctx.shadowColor='rgba(0,0,0,0.8)'; ctx.shadowBlur=24; ctx.shadowOffsetY=8;
+    ctx.fillText(w,W/2,cY); cY+=sz+10;
   });
-  const ctaY2=titEnd4+80+(d.beneficios||[]).slice(0,3).length*72+16;
-  drawCTAButton(ctx,d.cta||'VER PROPIEDAD',W/2,ctaY2,580,88,acc,'#000');
-  ctx.fillStyle=acc; ctx.fillRect(0,H-80,W,80);
-  pxFont(ctx,'900 28px Outfit'); txt(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,H-36,'#000','center');
+  ctx.restore();
+
+  // Gold line
+  drawAccentBar(ctx,W/2-80,cY+8,160,5,acc,'transparent'); cY+=28;
+
+  // SUBTITLE
+  ctx.save(); ctx.font='italic 400 28px Outfit'; ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.textAlign='center';
+  ctx.fillText(d.subtitle||'',W/2,cY+8); ctx.restore(); cY+=48;
+
+  // BENEFIT CARDS
+  (d.beneficios||[]).slice(0,3).forEach((b: string,i: number)=>{
+    const cw=W-88; const cx2=(W-cw)/2;
+    roundRect(ctx,cx2,cY+i*64,cw,52,10);
+    ctx.fillStyle='rgba(255,255,255,0.04)'; ctx.fill();
+    ctx.strokeStyle=acc+'60'; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.save(); ctx.beginPath(); ctx.arc(cx2+30,cY+i*64+26,18,0,Math.PI*2);
+    ctx.fillStyle=acc; ctx.fill(); ctx.font='900 14px Outfit'; ctx.fillStyle='#000'; ctx.textAlign='center';
+    ctx.fillText('★',cx2+30,cY+i*64+32); ctx.restore();
+    ctx.font='700 26px Outfit'; ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.textAlign='left';
+    ctx.fillText(b.substring(0,32),cx2+58,cY+i*64+34);
+  });
+  cY+=(d.beneficios||[]).slice(0,3).length*64+24;
+
+  // CTA
+  drawGradBtn(ctx,d.cta||'CONTÁCTANOS',W/2,cY,W-80,84,acc,shiftColor(acc,-20),'#000');
+
+  // GOLD BOTTOM BAR
+  fillGradBlock(ctx,0,H-76,W,76,acc,shiftColor(acc,20),'h');
+  ctx.save(); ctx.font='900 28px Outfit'; ctx.fillStyle='#000'; ctx.textAlign='center';
+  ctx.fillText(d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,H-36); ctx.restore();
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// ENGINE 10: GRADIENT POWER — Bold color gradient, modern energy
+// ENGINE 10: GRADIENT POWER BOOST — Bold gradient bg, huge type, energy
 // ═══════════════════════════════════════════════════════════════════
 function engine_boldGradient(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
-  const acc=d.accent||'#6d28d9';
-  // BOLD GRADIENT BG
-  const bgGr=ctx.createLinearGradient(0,0,W,H);
-  bgGr.addColorStop(0,'#0c1445'); bgGr.addColorStop(0.5,acc+'ee'); bgGr.addColorStop(1,'#0c1445');
-  ctx.fillStyle=bgGr; ctx.fillRect(0,0,W,H);
-  // TOP BAR
-  ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.fillRect(0,0,W,100);
-  if(d.logoImage) ctx.drawImage(d.logoImage,40,18,64,64);
-  pxFont(ctx,'800 20px Outfit'); txt(ctx,(d.industria||'ARIAS GROUP').toUpperCase(),d.logoImage?118:40,50,acc,'left');
-  if(d.price) drawPill(ctx,d.price,W-300,16,acc,'#fff',38,24,16);
-  // IMAGE in full-width rounded frame
-  const iY=110; const iH=Math.round(H*0.40);
+  const acc=d.accent||'#7c3aed';
+
+  // VIVID GRADIENT BACKGROUND
+  fillGradBlock(ctx,0,0,W,H,acc,shiftColor(acc,-45),'d');
+
+  // Overlay for depth
   ctx.save();
-  ctx.shadowColor='rgba(0,0,0,0.5)'; ctx.shadowBlur=24; ctx.shadowOffsetY=8;
-  roundRect(ctx,48,iY,W-96,iH,20); ctx.fillStyle='#1e293b'; ctx.fill();
-  ctx.shadowColor='transparent'; ctx.shadowBlur=0; ctx.shadowOffsetY=0;
-  roundRect(ctx,48,iY,W-96,iH,20); ctx.clip();
-  if(d.bgImage){
-    const ir=d.bgImage.width/d.bgImage.height; const cr=(W-96)/iH;
-    let sw=d.bgImage.width,sh=d.bgImage.height,sx=0,sy=0;
-    if(ir>cr){sw=d.bgImage.height*cr;sx=(d.bgImage.width-sw)/2;}else{sh=d.bgImage.width/cr;sy=(d.bgImage.height-sh)/2;}
-    ctx.drawImage(d.bgImage,sx,sy,sw,sh,48,iY,W-96,iH);
-  } else {ctx.fillStyle='#1e40af'; ctx.fillRect(48,iY,W-96,iH);}
-  const ipg2=ctx.createLinearGradient(0,iY+iH*0.55,0,iY+iH);
-  ipg2.addColorStop(0,'rgba(12,20,69,0)'); ipg2.addColorStop(1,acc+'cc');
-  ctx.fillStyle=ipg2; ctx.fillRect(48,iY,W-96,iH);
+  const ov=ctx.createRadialGradient(W*0.1,H*0.1,0,W*0.1,H*0.1,W*0.7);
+  ov.addColorStop(0,'rgba(255,255,255,0.12)'); ov.addColorStop(1,'rgba(0,0,0,0.3)');
+  ctx.fillStyle=ov; ctx.fillRect(0,0,W,H); ctx.restore();
+
+  // PHOTO in center frame
+  const phY=Math.round(H*0.18); const phH=Math.round(H*0.43); const phX=44; const phW=W-88;
+  ctx.save(); ctx.shadowColor='rgba(0,0,0,0.5)'; ctx.shadowBlur=32; ctx.shadowOffsetY=12;
+  roundRect(ctx,phX,phY,phW,phH,24); ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.fill(); ctx.restore();
+  ctx.save(); roundRect(ctx,phX,phY,phW,phH,24); ctx.clip();
+  drawPhotoBlock(ctx,d.bgImage,phX,phY,phW,phH,0);
+  // Photo vignette
+  const pv=ctx.createLinearGradient(phX,phY+phH*0.55,phX,phY+phH);
+  pv.addColorStop(0,'rgba(0,0,0,0)'); pv.addColorStop(1,shiftColor(acc,-45)+'ee');
+  ctx.fillStyle=pv; ctx.fillRect(phX,phY,phW,phH);
   ctx.restore();
-  // CONTENT BELOW IMAGE
-  const cY2=iY+iH+24;
-  ctx.fillStyle='rgba(255,255,255,0.15)'; ctx.fillRect(48,cY2,W-96,2);
-  const titEnd5=drawMultilineTitleCenter(ctx,d.title||'Tu Oferta',W/2,cY2+18,W-80,108,'#fff',acc);
-  pxFont(ctx,'500 32px Outfit'); shadow(ctx,'rgba(0,0,0,0.6)',12,4);
-  txt(ctx,d.subtitle||'',W/2,titEnd5+22,'rgba(255,255,255,0.85)','center'); noShadow(ctx);
-  const benY5=drawBenefitRow(ctx,d.beneficios||[],60,titEnd5+68,W-80,acc);
-  drawCTAButton(ctx,d.cta||'EMPIEZA HOY',W/2,benY5+24,580,88,'#fff',acc==='#6d28d9'?'#0c1445':acc);
-  // BOTTOM
-  ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(0,H-86,W,86);
-  pxFont(ctx,'800 28px Outfit'); txt(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,H-46,'rgba(255,255,255,0.9)','center');
-  pxFont(ctx,'600 20px Outfit'); txt(ctx,d.contact?.web||'',W/2,H-20,'rgba(255,255,255,0.4)','center');
+
+  // TOP BRANDING
+  fillBlock(ctx,0,0,W,88,'rgba(0,0,0,0.35)');
+  drawBrandBadge(ctx,d.logoImage,d.industria||'ARIAS GROUP',36,50,'#fff','rgba(255,255,255,0.55)');
+  if(d.price) drawGradBtn(ctx,d.price,W-130,12,220,64,'rgba(255,255,255,0.25)','rgba(255,255,255,0.08)','#fff');
+
+  // CONTENT BELOW PHOTO
+  let bcY=phY+phH+20;
+  // TITLE — centered massive
+  ctx.save(); ctx.textAlign='center';
+  const bw=(d.title||'TU OFERTA').toUpperCase().split(' ');
+  const bsz=bw.length<=2?152:bw.length<=3?126:108;
+  bw.slice(0,3).forEach((w,i)=>{
+    ctx.font=`900 ${i===0?bsz:Math.round(bsz*0.82)}px Outfit`; ctx.fillStyle='#fff';
+    ctx.shadowColor='rgba(0,0,0,0.7)'; ctx.shadowBlur=22; ctx.shadowOffsetY=8;
+    ctx.fillText(w,W/2,bcY); bcY+=(i===0?bsz:Math.round(bsz*0.82))+10;
+  });
+  ctx.restore();
+
+  // DIVIDER
+  ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=2;
+  ctx.setLineDash([8,8]); ctx.beginPath(); ctx.moveTo(60,bcY+10); ctx.lineTo(W-60,bcY+10); ctx.stroke();
+  ctx.setLineDash([]); ctx.restore(); bcY+=38;
+
+  // SUBTITLE + BENEFITS
+  ctx.save(); ctx.font='italic 500 30px Outfit'; ctx.fillStyle='rgba(255,255,255,0.82)'; ctx.textAlign='center';
+  ctx.fillText(d.subtitle||'',W/2,bcY); ctx.restore(); bcY+=52;
+  
+  // BENEFITS horizontal
+  let bpx=54; const bpy=bcY;
+  (d.beneficios||[]).slice(0,3).forEach((b: string)=>{
+    ctx.save(); ctx.font='700 24px Outfit';
+    const tw=ctx.measureText(b.substring(0,22)).width+44; const bph=48;
+    roundRect(ctx,bpx,bpy,tw,bph,24); ctx.fillStyle='rgba(255,255,255,0.15)';
+    ctx.strokeStyle='rgba(255,255,255,0.4)'; ctx.lineWidth=1.5; ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.textAlign='left'; ctx.fillText(b.substring(0,22),bpx+22,bpy+33);
+    bpx+=tw+12; ctx.restore();
+  });
+  bcY=bpy+72;
+
+  // CTA
+  drawGradBtn(ctx,d.cta||'AHORA',W/2,bcY,W-100,86,'rgba(255,255,255,0.95)','rgba(255,255,255,0.7)',acc);
+
+  // CONTACT
+  fillBlock(ctx,0,H-74,W,74,'rgba(0,0,0,0.45)');
+  ctx.save(); ctx.font='800 26px Outfit'; ctx.fillStyle='#fff'; ctx.textAlign='center';
+  ctx.fillText(d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,H-36); ctx.restore();
 }
 
-// ─── MAPA DE ENGINES ─────────────────────────────────────────────────────────
+// ─── COLOR UTILITY: Shift a hex color lighter/darker ─────────────────────────
+function shiftColor(hex: string, amount: number): string {
+  const clamp=(n: number)=>Math.max(0,Math.min(255,n));
+  let h=hex.replace('#','');
+  if (h.length===3) h=h.split('').map(c=>c+c).join('');
+  if (h.length!==6) return hex;
+  const r=clamp(parseInt(h.slice(0,2),16)+amount);
+  const g=clamp(parseInt(h.slice(2,4),16)+amount);
+  const b=clamp(parseInt(h.slice(4,6),16)+amount);
+  return '#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('');
+}
+
+// ─── ENGINE MAP ───────────────────────────────────────────────────────────────
 const ENGINES: Record<string, (ctx: CanvasRenderingContext2D, W: number, H: number, d: any) => void> = {
   splitPanel: engine_splitPanel, fullOverlay: engine_fullOverlay, bottomBanner: engine_bottomBanner,
   magazine: engine_magazine, circle: engine_circle, stripes: engine_stripes,
   cornerBurst: engine_cornerBurst, architectural: engine_architectural,
   luxuryDark: engine_luxuryDark, boldGradient: engine_boldGradient,
 };
-
-// ─── 50 PRESETS ───────────────────────────────────────────────────────────────
 export const LAYOUT_PRESETS = [
   { id: 'l1',  name: '1. Split Asimetrico (Agencia Marketing)', engine: 'splitPanel' },
   { id: 'l2',  name: '2. Full Overlay Cinematografico', engine: 'fullOverlay' },
