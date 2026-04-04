@@ -344,14 +344,14 @@ export default function FlyerStudio() {
 
               <button
                 onClick={handleGenerateIdeas}
-                disabled={isLoadingIdeas || !selectedIndustry || !oferta.trim()}
+                disabled={isLoadingIdeas || !selectedIndustries.length || !oferta.trim()}
                 style={{
-                  background: !selectedIndustry || !oferta.trim() ? '#e2e8f0' : 'linear-gradient(135deg, #D4AF37, #f59e0b)',
-                  color: !selectedIndustry || !oferta.trim() ? '#94a3b8' : '#000',
+                  background: !selectedIndustries.length || !oferta.trim() ? '#e2e8f0' : 'linear-gradient(135deg, #D4AF37, #f59e0b)',
+                  color: !selectedIndustries.length || !oferta.trim() ? '#94a3b8' : '#000',
                   border: 'none', borderRadius: 14, padding: '16px 24px',
-                  fontSize: 14, fontWeight: 900, cursor: !selectedIndustry || !oferta.trim() ? 'not-allowed' : 'pointer',
+                  fontSize: 14, fontWeight: 900, cursor: !selectedIndustries.length || !oferta.trim() ? 'not-allowed' : 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  boxShadow: !selectedIndustry || !oferta.trim() ? 'none' : '0 8px 24px rgba(212,175,55,0.35)',
+                  boxShadow: !selectedIndustries.length || !oferta.trim() ? 'none' : '0 8px 24px rgba(212,175,55,0.35)',
                   transition: 'all 0.2s',
                 }}
               >
@@ -365,37 +365,44 @@ export default function FlyerStudio() {
               <div>
                 <label style={{ fontSize: 11, fontWeight: 800, color: '#475569', letterSpacing: '0.06em', display: 'block', marginBottom: 8 }}>RUBRO / INDUSTRIA</label>
                 <div ref={industryDropRef} style={{ position: 'relative' }}>
-                  {/* Trigger button */}
+                  {/* Trigger — shows pills for each selected */}
                   <button
                     onClick={() => { setIsIndustryOpen(o => !o); setIndustrySearch(''); }}
                     style={{
-                      width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-                      padding: '12px 14px', borderRadius: 12, cursor: 'pointer',
-                      border: `1.5px solid ${selectedIndustry ? '#D4AF37' : '#e2e8f0'}`,
-                      background: selectedIndustry ? '#fffbeb' : '#fff',
+                      width: '100%', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6,
+                      padding: '10px 12px', borderRadius: 12, cursor: 'pointer', minHeight: 48,
+                      border: `1.5px solid ${selectedIndustries.length ? '#D4AF37' : '#e2e8f0'}`,
+                      background: selectedIndustries.length ? '#fffbeb' : '#fff',
                       transition: 'all 0.15s', boxShadow: isIndustryOpen ? '0 0 0 3px rgba(212,175,55,0.15)' : 'none',
                     }}
                   >
-                    {selectedIndustry ? (
+                    {selectedIndustries.length > 0 ? (
                       <>
-                        {/* Colored circle with initial */}
-                        <div style={{
-                          width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
-                          background: `hsl(${selectedIndustry.charCodeAt(0) * 5 % 360}, 65%, 55%)`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 13, fontWeight: 900, color: '#fff',
-                        }}>
-                          {selectedIndustry[0].toUpperCase()}
-                        </div>
-                        <span style={{ fontSize: 14, fontWeight: 700, color: '#92400e', flex: 1, textAlign: 'left' }}>{selectedIndustry}</span>
-                        <button onClick={e => { e.stopPropagation(); setSelectedIndustry(''); }} style={{ background: 'none', border: 'none', color: '#92400e', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 4px' }}>×</button>
+                        {selectedIndustries.map(name => {
+                          const hue = name.charCodeAt(0) * 5 % 360;
+                          return (
+                            <span key={name} style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 5,
+                              background: `hsl(${hue}, 65%, 55%)`, color: '#fff',
+                              fontSize: 12, fontWeight: 700, padding: '4px 10px',
+                              borderRadius: 20, whiteSpace: 'nowrap',
+                            }}>
+                              {name}
+                              <span
+                                onClick={e => { e.stopPropagation(); setSelectedIndustries(prev => prev.filter(i => i !== name)); }}
+                                style={{ cursor: 'pointer', fontSize: 14, lineHeight: 1, opacity: 0.85 }}
+                              >×</span>
+                            </span>
+                          );
+                        })}
+                        <ChevronDown size={14} color="#92400e" style={{ marginLeft: 'auto', transform: isIndustryOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', flexShrink: 0 }} />
                       </>
                     ) : (
                       <>
-                        <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          <Search size={14} color="#94a3b8" />
+                        <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Search size={13} color="#94a3b8" />
                         </div>
-                        <span style={{ fontSize: 14, fontWeight: 500, color: '#94a3b8', flex: 1, textAlign: 'left' }}>Selecciona un rubro...</span>
+                        <span style={{ fontSize: 14, fontWeight: 500, color: '#94a3b8', flex: 1, textAlign: 'left' }}>Selecciona uno o más rubros...</span>
                         <ChevronDown size={16} color="#94a3b8" style={{ transform: isIndustryOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
                       </>
                     )}
@@ -527,7 +534,7 @@ export default function FlyerStudio() {
                     {/* Card header with accent color */}
                     <div style={{ background: `linear-gradient(135deg, ${accent}, ${accent}bb)`, padding: '20px 20px 16px', position: 'relative' }}>
                       <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.7)', letterSpacing: '0.08em', marginBottom: 6 }}>
-                        {selectedIndustry.toUpperCase()} · {idea.tono?.toUpperCase() || 'PREMIUM'}
+                        {selectedIndustries.join(' · ').toUpperCase() || 'MARKETING'} · {idea.tono?.toUpperCase() || 'PREMIUM'}
                       </div>
                       <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', lineHeight: 1.2 }}>
                         {idea.titulo}
