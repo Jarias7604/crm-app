@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Download, Sparkles, Palette, Phone, Globe, ChevronRight, Loader2, ImageIcon, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Download, Sparkles, Palette, Phone, Globe, ChevronRight, ChevronDown, Search, Loader2, ImageIcon, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../services/supabase';
 import { flyerService } from '../../services/flyerService';
@@ -43,12 +43,28 @@ export default function FlyerStudio() {
 
   // Step 1 — form
   const [industries, setIndustries] = useState<Array<{id:string;name:string}>>([]);
-  const [selectedIndustry, setSelectedIndustry] = useState('');
+  const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [oferta, setOferta]         = useState('');
   const [tono, setTono]             = useState('premium');
 
   // Step 2 — ideas
   const [ideas, setIdeas] = useState<FlyerIdea[]>([]);
+
+  // Industry dropdown state
+  const [isIndustryOpen, setIsIndustryOpen] = useState(false);
+  const [industrySearch, setIndustrySearch]  = useState('');
+  const industryDropRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (industryDropRef.current && !industryDropRef.current.contains(e.target as Node)) {
+        setIsIndustryOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   // Step 3 — flyer data
   const [flyerData, setFlyerData] = useState<FlyerData>({
@@ -80,14 +96,15 @@ export default function FlyerStudio() {
 
   // ─── STEP 1 → 2: Generate ideas ────────────────────────────────────────────
   const handleGenerateIdeas = async () => {
-    if (!selectedIndustry || !oferta.trim()) {
-      toast.error('Selecciona un rubro y describe tu oferta');
+    if (!selectedIndustries.length || !oferta.trim()) {
+      toast.error('Selecciona al menos un rubro y describe tu oferta');
       return;
     }
+    const industriaStr = selectedIndustries.join(', ');
     setIsLoadingIdeas(true);
     try {
       const result = await flyerService.recommendIdeas({
-        industria: selectedIndustry,
+        industria: industriaStr,
         oferta,
         tono,
         companyId: profile?.company_id || '',
@@ -99,8 +116,8 @@ export default function FlyerStudio() {
       // Premium AI fallback
       setIdeas([
         {
-          titulo: `${selectedIndustry.toUpperCase()} PREMIUM`,
-          gancho: `La mejor solución en ${selectedIndustry} para tu negocio`,
+          titulo: `${industriaStr.toUpperCase()} PREMIUM`,
+          gancho: `La mejor solución en ${industriaStr} para tu negocio`,
           beneficios: ['Calidad garantizada', 'Atención personalizada', 'Resultados inmediatos'],
           cta: 'CONTÁCTANOS HOY',
           paleta: ['#1a56db'],
@@ -108,14 +125,14 @@ export default function FlyerStudio() {
         },
         {
           titulo: 'OFERTA ESPECIAL',
-          gancho: `Aprovecha nuestra promoción en ${selectedIndustry}`,
+          gancho: `Aprovecha nuestra promoción en ${industriaStr}`,
           beneficios: ['Precio competitivo', 'Entrega inmediata', 'Garantía incluida'],
           cta: 'VER OFERTA',
           paleta: ['#f59e0b'],
           tono,
         },
         {
-          titulo: `LÍDERES EN ${selectedIndustry.toUpperCase()}`,
+          titulo: `LÍDERES EN ${industriaStr.toUpperCase()}`,
           gancho: 'Te ayudamos a crecer con los mejores recursos del mercado',
           beneficios: ['Experiencia comprobada', 'Tecnología de punta', 'Soporte 24/7'],
           cta: 'SABER MÁS',
@@ -140,7 +157,7 @@ export default function FlyerStudio() {
       beneficios: idea.beneficios || [],
       accent,
       bgImageUrl: null,
-      industria: selectedIndustry,
+      industria: selectedIndustries[0] || selectedIndustries.join(', '),
     }));
     setStep(3);
     await generateImage(idea, accent);
@@ -153,7 +170,7 @@ export default function FlyerStudio() {
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flyer-generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session!.access_token}` },
-        body: JSON.stringify({ idea, industria: selectedIndustry, oferta, tono }),
+        body: JSON.stringify({ idea, industria: selectedIndustries.join(', '), oferta, tono }),
       });
       const data = await res.json();
       if (data.fondo_url) {
@@ -344,34 +361,107 @@ export default function FlyerStudio() {
 
             {/* Right: Industry + Tone */}
             <div style={{ background: '#fff', borderRadius: 20, padding: 28, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* Industry */}
+              {/* Industry dropdown */}
               <div>
-                <label style={{ fontSize: 11, fontWeight: 800, color: '#475569', letterSpacing: '0.06em', display: 'block', marginBottom: 10 }}>RUBRO / INDUSTRIA</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, maxHeight: 280, overflowY: 'auto' }}>
-                  {industries.map(ind => (
-                    <button
-                      key={ind.id}
-                      onClick={() => setSelectedIndustry(ind.name)}
-                      style={{
-                        padding: '10px 14px', borderRadius: 10, textAlign: 'left',
-                        border: `1.5px solid ${selectedIndustry === ind.name ? '#D4AF37' : '#e2e8f0'}`,
-                        background: selectedIndustry === ind.name ? '#fffbeb' : '#f8fafc',
-                        color: selectedIndustry === ind.name ? '#92400e' : '#374151',
-                        fontSize: 12, fontWeight: selectedIndustry === ind.name ? 800 : 500,
-                        cursor: 'pointer', transition: 'all 0.15s',
-                      }}
-                    >
-                      {ind.name}
-                    </button>
-                  ))}
+                <label style={{ fontSize: 11, fontWeight: 800, color: '#475569', letterSpacing: '0.06em', display: 'block', marginBottom: 8 }}>RUBRO / INDUSTRIA</label>
+                <div ref={industryDropRef} style={{ position: 'relative' }}>
+                  {/* Trigger button */}
+                  <button
+                    onClick={() => { setIsIndustryOpen(o => !o); setIndustrySearch(''); }}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                      padding: '12px 14px', borderRadius: 12, cursor: 'pointer',
+                      border: `1.5px solid ${selectedIndustry ? '#D4AF37' : '#e2e8f0'}`,
+                      background: selectedIndustry ? '#fffbeb' : '#fff',
+                      transition: 'all 0.15s', boxShadow: isIndustryOpen ? '0 0 0 3px rgba(212,175,55,0.15)' : 'none',
+                    }}
+                  >
+                    {selectedIndustry ? (
+                      <>
+                        {/* Colored circle with initial */}
+                        <div style={{
+                          width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                          background: `hsl(${selectedIndustry.charCodeAt(0) * 5 % 360}, 65%, 55%)`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 13, fontWeight: 900, color: '#fff',
+                        }}>
+                          {selectedIndustry[0].toUpperCase()}
+                        </div>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: '#92400e', flex: 1, textAlign: 'left' }}>{selectedIndustry}</span>
+                        <button onClick={e => { e.stopPropagation(); setSelectedIndustry(''); }} style={{ background: 'none', border: 'none', color: '#92400e', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 4px' }}>×</button>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Search size={14} color="#94a3b8" />
+                        </div>
+                        <span style={{ fontSize: 14, fontWeight: 500, color: '#94a3b8', flex: 1, textAlign: 'left' }}>Selecciona un rubro...</span>
+                        <ChevronDown size={16} color="#94a3b8" style={{ transform: isIndustryOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+                      </>
+                    )}
+                  </button>
+
+                  {/* Dropdown panel */}
+                  {isIndustryOpen && (
+                    <div style={{
+                      position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 50,
+                      background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0',
+                      boxShadow: '0 12px 40px rgba(0,0,0,0.12)', overflow: 'hidden',
+                      animation: 'dropIn 0.15s ease',
+                    }}>
+                      {/* Search inside dropdown */}
+                      <div style={{ padding: '10px 12px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Search size={14} color="#94a3b8" />
+                        <input
+                          autoFocus
+                          value={industrySearch}
+                          onChange={e => setIndustrySearch(e.target.value)}
+                          placeholder="Buscar rubro..."
+                          style={{ border: 'none', outline: 'none', fontSize: 13, color: '#374151', flex: 1, background: 'transparent' }}
+                        />
+                      </div>
+                      {/* List */}
+                      <div style={{ maxHeight: 220, overflowY: 'auto', padding: '6px 0' }}>
+                        {industries
+                          .filter(ind => ind.name.toLowerCase().includes(industrySearch.toLowerCase()))
+                          .map(ind => {
+                            const hue = ind.name.charCodeAt(0) * 5 % 360;
+                            const isSelected = selectedIndustry === ind.name;
+                            return (
+                              <button
+                                key={ind.id}
+                                onClick={() => { setSelectedIndustry(ind.name); setIsIndustryOpen(false); }}
+                                style={{
+                                  width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+                                  padding: '9px 16px', border: 'none', cursor: 'pointer', textAlign: 'left',
+                                  background: isSelected ? '#fffbeb' : 'transparent',
+                                  transition: 'background 0.1s',
+                                }}
+                                onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = '#f8fafc'; }}
+                                onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                              >
+                                <div style={{
+                                  width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                                  background: `hsl(${hue}, 65%, 55%)`,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  fontSize: 13, fontWeight: 900, color: '#fff',
+                                }}>
+                                  {ind.name[0].toUpperCase()}
+                                </div>
+                                <span style={{ flex: 1, fontSize: 14, fontWeight: isSelected ? 700 : 500, color: isSelected ? '#92400e' : '#374151' }}>
+                                  {ind.name}
+                                </span>
+                                {isSelected && <span style={{ color: '#D4AF37', fontWeight: 900, fontSize: 16 }}>✓</span>}
+                              </button>
+                            );
+                          })}
+                        {industries.filter(i => i.name.toLowerCase().includes(industrySearch.toLowerCase())).length === 0 && (
+                          <div style={{ padding: '16px', textAlign: 'center', fontSize: 13, color: '#94a3b8' }}>Sin resultados</div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                {selectedIndustry && (
-                  <div style={{ marginTop: 10, padding: '8px 14px', background: '#fffbeb', borderRadius: 10, border: '1.5px solid #D4AF37', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 15 }}>✓</span>
-                    <span style={{ fontSize: 12, fontWeight: 800, color: '#92400e' }}>{selectedIndustry}</span>
-                    <button onClick={() => setSelectedIndustry('')} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#92400e', cursor: 'pointer', fontSize: 16 }}>×</button>
-                  </div>
-                )}
               </div>
 
               {/* Tone */}
