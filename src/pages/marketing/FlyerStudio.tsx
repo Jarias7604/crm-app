@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Download, Sparkles, Palette, Phone, Globe, ChevronRight, ChevronDown, Search, Loader2, ImageIcon, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Download, Sparkles, Palette, Phone, Globe, ChevronRight, ChevronDown, Search, Loader2, ImageIcon, RefreshCw, Upload, Monitor } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../services/supabase';
 import { flyerService } from '../../services/flyerService';
@@ -29,6 +29,22 @@ const TONES = [
 
 const ACCENT_COLORS = ['#1a56db','#7c3aed','#ef4444','#f59e0b','#10b981','#0ea5e9','#D4AF37','#ec4899','#06b6d4','#84cc16'];
 
+// ─── CANVAS SIZES ─────────────────────────────────────────────────────────────
+const CANVAS_SIZES = [
+  { id: 'ig-post',      label: 'Instagram Post',    icon: '📷', platform: 'Instagram', w: 1080, h: 1080, tag: '1:1' },
+  { id: 'ig-portrait', label: 'Instagram Retrato',  icon: '📷', platform: 'Instagram', w: 1080, h: 1350, tag: '4:5' },
+  { id: 'ig-story',    label: 'Instagram Story',    icon: '📱', platform: 'Instagram', w: 1080, h: 1920, tag: '9:16' },
+  { id: 'fb-post',     label: 'Facebook Post',      icon: '👥', platform: 'Facebook',  w: 940,  h: 788,  tag: '6:5' },
+  { id: 'fb-cover',    label: 'Facebook Portada',   icon: '👥', platform: 'Facebook',  w: 820,  h: 312,  tag: 'Banner' },
+  { id: 'li-post',     label: 'LinkedIn Post',      icon: '💼', platform: 'LinkedIn',  w: 1200, h: 628,  tag: '1.91:1' },
+  { id: 'li-square',   label: 'LinkedIn Cuadrado',  icon: '💼', platform: 'LinkedIn',  w: 1200, h: 1200, tag: '1:1' },
+  { id: 'tw-post',     label: 'Twitter / X',        icon: '🐦', platform: 'Twitter',   w: 1200, h: 675,  tag: '16:9' },
+  { id: 'yt-thumb',    label: 'YouTube Thumbnail',  icon: '▶️', platform: 'YouTube',   w: 1280, h: 720,  tag: '16:9' },
+  { id: 'tiktok',      label: 'TikTok / Reels',     icon: '🎵', platform: 'TikTok',    w: 1080, h: 1920, tag: '9:16' },
+  { id: 'wa-status',   label: 'WhatsApp Status',    icon: '💬', platform: 'WhatsApp', w: 1080, h: 1920, tag: '9:16' },
+  { id: 'pinterest',   label: 'Pinterest Pin',      icon: '📌', platform: 'Pinterest', w: 1000, h: 1500, tag: '2:3' },
+];
+
 // ─── MAIN COMPONENT ────────────────────────────────────────────────────────────
 export default function FlyerStudio() {
   const { profile } = useAuth();
@@ -55,16 +71,44 @@ export default function FlyerStudio() {
   const [industrySearch, setIndustrySearch]  = useState('');
   const industryDropRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown on outside click
+  // Step 3 — canvas size + photo upload
+  const [selectedSize, setSelectedSize] = useState(CANVAS_SIZES[1]); // default: Instagram 4:5
+  const [isSizeOpen, setIsSizeOpen]     = useState(false);
+  const sizeDropRef = useRef<HTMLDivElement>(null);
+  const [photoMode, setPhotoMode]       = useState<'ai' | 'upload'>('ai');
+  const [userPhotos, setUserPhotos]     = useState<string[]>([]);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+
+  // Close dropdowns on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (industryDropRef.current && !industryDropRef.current.contains(e.target as Node)) {
         setIsIndustryOpen(false);
       }
+      if (sizeDropRef.current && !sizeDropRef.current.contains(e.target as Node)) {
+        setIsSizeOpen(false);
+      }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  // Handle photo uploads → convert to data URLs
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []).slice(0, 3);
+    if (!files.length) return;
+    const readers = files.map(file => new Promise<string>(resolve => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result as string);
+      r.readAsDataURL(file);
+    }));
+    Promise.all(readers).then(urls => {
+      setUserPhotos(urls);
+      // Use first photo as flyer background immediately
+      setFlyerData(prev => ({ ...prev, bgImageUrl: urls[0] }));
+      toast.success(`${urls.length} foto${urls.length > 1 ? 's' : ''} cargada${urls.length > 1 ? 's' : ''}`);
+    });
+  };
 
   // Step 3 — flyer data
   const [flyerData, setFlyerData] = useState<FlyerData>({
@@ -605,6 +649,152 @@ export default function FlyerStudio() {
 
               <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
+                {/* ── FORMAT SIZE DROPDOWN ──────────────────────────── */}
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 800, color: '#475569', letterSpacing: '0.06em', display: 'block', marginBottom: 8 }}>
+                    <Monitor size={12} style={{ display: 'inline', marginRight: 4 }} />
+                    FORMATO DE PUBLICACIÓN
+                  </label>
+                  <div ref={sizeDropRef} style={{ position: 'relative' }}>
+                    {/* Trigger */}
+                    <button
+                      onClick={() => setIsSizeOpen(o => !o)}
+                      style={{
+                        width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
+                        borderRadius: 10, cursor: 'pointer', border: '1.5px solid #D4AF37',
+                        background: '#fffbeb', transition: 'all 0.15s',
+                        boxShadow: isSizeOpen ? '0 0 0 3px rgba(212,175,55,0.15)' : 'none',
+                      }}
+                    >
+                      <span style={{ fontSize: 18 }}>{selectedSize.icon}</span>
+                      <div style={{ flex: 1, textAlign: 'left' }}>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: '#92400e' }}>{selectedSize.label}</div>
+                        <div style={{ fontSize: 10, color: '#b45309' }}>{selectedSize.w}×{selectedSize.h}px · {selectedSize.tag}</div>
+                      </div>
+                      <ChevronDown size={14} color="#92400e" style={{ transform: isSizeOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+                    </button>
+                    {/* Dropdown panel */}
+                    {isSizeOpen && (
+                      <div style={{
+                        position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 60,
+                        background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0',
+                        boxShadow: '0 12px 40px rgba(0,0,0,0.12)', overflow: 'hidden', maxHeight: 260, overflowY: 'auto',
+                      }}>
+                        {CANVAS_SIZES.map(sz => {
+                          const isSel = selectedSize.id === sz.id;
+                          return (
+                            <button key={sz.id} onClick={() => { setSelectedSize(sz); setIsSizeOpen(false); }}
+                              style={{
+                                width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                                padding: '9px 14px', border: 'none', cursor: 'pointer', textAlign: 'left',
+                                background: isSel ? '#fffbeb' : 'transparent', transition: 'background 0.1s',
+                              }}
+                              onMouseEnter={e => { if (!isSel) (e.currentTarget as HTMLElement).style.background = '#f8fafc'; }}
+                              onMouseLeave={e => { if (!isSel) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                            >
+                              <span style={{ fontSize: 16 }}>{sz.icon}</span>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 12, fontWeight: isSel ? 800 : 500, color: isSel ? '#92400e' : '#374151' }}>{sz.label}</div>
+                                <div style={{ fontSize: 10, color: '#94a3b8' }}>{sz.w}×{sz.h}px · {sz.tag}</div>
+                              </div>
+                              {isSel && <span style={{ color: '#D4AF37', fontWeight: 900 }}>✓</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── PHOTO SOURCE: AI vs Upload ─────────────────────── */}
+                <div>
+                  <label style={{ fontSize: 10, fontWeight: 800, color: '#475569', letterSpacing: '0.06em', display: 'block', marginBottom: 8 }}>IMAGEN DE FONDO</label>
+                  {/* Toggle */}
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                    <button
+                      onClick={() => { setPhotoMode('ai'); setFlyerData(prev => ({ ...prev, bgImageUrl: null })); }}
+                      style={{
+                        flex: 1, padding: '8px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer',
+                        border: `1.5px solid ${photoMode === 'ai' ? '#D4AF37' : '#e2e8f0'}`,
+                        background: photoMode === 'ai' ? '#fffbeb' : '#f8fafc',
+                        color: photoMode === 'ai' ? '#92400e' : '#64748b',
+                      }}
+                    >🤖 Generar con IA</button>
+                    <button
+                      onClick={() => setPhotoMode('upload')}
+                      style={{
+                        flex: 1, padding: '8px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer',
+                        border: `1.5px solid ${photoMode === 'upload' ? '#D4AF37' : '#e2e8f0'}`,
+                        background: photoMode === 'upload' ? '#fffbeb' : '#f8fafc',
+                        color: photoMode === 'upload' ? '#92400e' : '#64748b',
+                      }}
+                    >📷 Mis fotos</button>
+                  </div>
+                  {/* Upload zone (only when upload mode) */}
+                  {photoMode === 'upload' && (
+                    <div>
+                      <input ref={photoInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handlePhotoUpload} />
+                      {userPhotos.length === 0 ? (
+                        <button
+                          onClick={() => photoInputRef.current?.click()}
+                          style={{
+                            width: '100%', padding: '20px 10px', borderRadius: 10, border: '2px dashed #D4AF37',
+                            background: '#fffbeb', cursor: 'pointer', display: 'flex', flexDirection: 'column',
+                            alignItems: 'center', gap: 6,
+                          }}
+                        >
+                          <Upload size={20} color="#D4AF37" />
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#92400e' }}>Subir 1-3 fotos</span>
+                          <span style={{ fontSize: 10, color: '#b45309' }}>JPG, PNG, WEBP · Máx. 10MB c/u</span>
+                        </button>
+                      ) : (
+                        <div>
+                          {/* Thumbnails */}
+                          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                            {userPhotos.map((url, i) => (
+                              <div key={i} style={{ position: 'relative', flex: 1 }}>
+                                <img src={url} alt={`foto ${i+1}`} style={{
+                                  width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 8,
+                                  border: flyerData.bgImageUrl === url ? '2px solid #D4AF37' : '2px solid #e2e8f0',
+                                  cursor: 'pointer',
+                                }}
+                                onClick={() => setFlyerData(prev => ({ ...prev, bgImageUrl: url }))}
+                                />
+                                <button
+                                  onClick={() => {
+                                    const newPhotos = userPhotos.filter((_, j) => j !== i);
+                                    setUserPhotos(newPhotos);
+                                    if (flyerData.bgImageUrl === url) {
+                                      setFlyerData(prev => ({ ...prev, bgImageUrl: newPhotos[0] || null }));
+                                    }
+                                  }}
+                                  style={{ position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}
+                                >×</button>
+                              </div>
+                            ))}
+                            {userPhotos.length < 3 && (
+                              <button onClick={() => photoInputRef.current?.click()}
+                                style={{ flex: 1, aspectRatio: '1', borderRadius: 8, border: '2px dashed #D4AF37', background: '#fffbeb', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 50 }}
+                              ><Upload size={14} color="#D4AF37" /></button>
+                            )}
+                          </div>
+                          <p style={{ fontSize: 10, color: '#94a3b8', margin: 0 }}>Toca una foto para usarla como fondo principal</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {photoMode === 'ai' && (
+                    <button
+                      onClick={() => generateImage({ titulo: flyerData.title, gancho: flyerData.subtitle, beneficios: flyerData.beneficios, cta: flyerData.cta, paleta: [flyerData.accent], tono }, flyerData.accent)}
+                      disabled={isLoadingImg}
+                      style={{ width: '100%', background: '#f1f5f9', color: '#374151', border: '1.5px solid #e2e8f0', borderRadius: 10, padding: '10px 16px', fontSize: 12, fontWeight: 700, cursor: isLoadingImg ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                    >
+                      <RefreshCw size={14} className={isLoadingImg ? 'animate-spin' : ''} />
+                      {isLoadingImg ? 'Generando imagen IA...' : 'Regenerar imagen IA'}
+                    </button>
+                  )}
+                </div>
+
                 {/* Template selector */}
                 <div>
                   <label style={{ fontSize: 10, fontWeight: 800, color: '#475569', letterSpacing: '0.06em', display: 'block', marginBottom: 8 }}>
@@ -731,15 +921,7 @@ export default function FlyerStudio() {
                   </div>
                 </div>
 
-                {/* Regenerate image */}
-                <button
-                  onClick={() => generateImage({ titulo: flyerData.title, gancho: flyerData.subtitle, beneficios: flyerData.beneficios, cta: flyerData.cta, paleta: [flyerData.accent], tono }, flyerData.accent)}
-                  disabled={isLoadingImg}
-                  style={{ background: '#f1f5f9', color: '#374151', border: '1.5px solid #e2e8f0', borderRadius: 10, padding: '10px 16px', fontSize: 12, fontWeight: 700, cursor: isLoadingImg ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-                >
-                  <RefreshCw size={14} className={isLoadingImg ? 'animate-spin' : ''} />
-                  {isLoadingImg ? 'Generando imagen IA...' : 'Regenerar imagen IA'}
-                </button>
+                {/* Regenerate button removed — now inside IMAGEN DE FONDO section */}
 
               </div>
             </div>
@@ -759,18 +941,29 @@ export default function FlyerStudio() {
                 </div>
               )}
 
-              {/* The Flyer — scaled preview (visual only) */}
-              <div style={{ position: 'relative', zIndex: 10, boxShadow: '0 30px 80px rgba(0,0,0,0.3)', borderRadius: 4 }}>
-                <div style={{ width: 540 * 0.72, height: 675 * 0.72, overflow: 'hidden', borderRadius: 4 }}>
-                  <div style={{ transform: 'scale(0.72)', transformOrigin: 'top left', width: 540, height: 675 }}>
-                    <ActiveTemplate d={flyerData} />
+              {/* The Flyer — aspect ratio driven by selectedSize */}
+              {(() => {
+                const aspect = selectedSize.h / selectedSize.w;
+                const maxH = 580;
+                const maxW = 520;
+                let previewW = maxW;
+                let previewH = previewW * aspect;
+                if (previewH > maxH) { previewH = maxH; previewW = maxH / aspect; }
+                const scale = previewW / selectedSize.w;
+                return (
+                  <div style={{ position: 'relative', zIndex: 10, boxShadow: '0 30px 80px rgba(0,0,0,0.3)', borderRadius: 4 }}>
+                    <div style={{ width: previewW, height: previewH, overflow: 'hidden', borderRadius: 4 }}>
+                      <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: selectedSize.w, height: selectedSize.h }}>
+                        <ActiveTemplate d={flyerData} />
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                );
+              })()}
 
-              {/* Template info badge */}
-              <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', color: '#fff', fontSize: 11, fontWeight: 700, padding: '6px 16px', borderRadius: 20 }}>
-                {TEMPLATE_LIST.find(t => t.id === flyerData.templateId)?.name || 'Template'} · 1080×1350px
+              {/* Format badge */}
+              <div style={{ position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', color: '#fff', fontSize: 11, fontWeight: 700, padding: '6px 16px', borderRadius: 20, whiteSpace: 'nowrap' }}>
+                {selectedSize.icon} {selectedSize.label} · {selectedSize.w}×{selectedSize.h}px
               </div>
             </div>
           </div>
@@ -778,9 +971,9 @@ export default function FlyerStudio() {
 
       </main>
 
-      {/* Hidden full-size flyer for html2canvas export — never visible to user */}
+      {/* Hidden full-size flyer for html2canvas export — exact target dimensions */}
       <div style={{ position: 'fixed', top: -9999, left: -9999, zIndex: -1, pointerEvents: 'none' }}>
-        <div ref={flyerRef}>
+        <div ref={flyerRef} style={{ width: selectedSize.w, height: selectedSize.h }}>
           <ActiveTemplate d={flyerData} />
         </div>
       </div>
