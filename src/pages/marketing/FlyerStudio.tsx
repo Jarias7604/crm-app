@@ -2,8 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Download, Sparkles, Palette, Phone, Globe, ChevronRight, Loader2, ImageIcon, RefreshCw } from 'lucide-react';
-import { useAuth } from '../../hooks/useAuth';
-import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../auth/AuthProvider';
+import { supabase } from '../../services/supabase';
 import { flyerService } from '../../services/flyerService';
 import { TEMPLATES, TEMPLATE_LIST, FlyerData } from './FlyerTemplates';
 
