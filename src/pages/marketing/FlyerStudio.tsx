@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Zap, Target, Crown, Flame, Star, 
@@ -75,16 +75,16 @@ function drawIconCircle(ctx, cx, cy, r, bg, symbol, fg = '#fff', fs = 22) {
   ctx.fillStyle = bg; ctx.fill(); ctx.fillStyle = fg; ctx.font = `700 ${fs}px Outfit`;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(symbol, cx, cy + 1); ctx.textBaseline = 'alphabetic'; ctx.restore();
 }
-function drawFeatures(ctx, benefits, x, y, maxW, acc, light, cols = 1, iconSize = 26) {
+function drawFeatures(ctx, benefits, x, y, maxW, acc, light, cols = 1, iconSize = 32) {
   if (!benefits?.length) return;
   const ICONS = ['\u2726', '\u25c8', '\u25b8', '\u2605', '\u2b21', '\u2691'];
   const colW = maxW / cols;
   benefits.slice(0, cols * 2).forEach((b, i) => {
     const col = cols === 2 ? i % 2 : 0; const row = cols === 2 ? Math.floor(i / 2) : i;
-    const bx = x + col * colW; const by = y + row * 60;
+    const bx = x + col * colW; const by = y + row * 72;
     drawIconCircle(ctx, bx + iconSize, by, iconSize, acc, ICONS[i % ICONS.length], '#fff', Math.round(iconSize * 0.7));
-    ctx.font = '600 20px Outfit'; ctx.fillStyle = light ? '#1e293b' : 'rgba(255,255,255,0.9)'; ctx.textAlign = 'left';
-    ctx.fillText(b.substring(0, 32), bx + iconSize * 2 + 10, by + 7);
+    ctx.font = '700 26px Outfit'; ctx.fillStyle = light ? '#1e293b' : 'rgba(255,255,255,0.95)'; ctx.textAlign = 'left';
+    ctx.fillText(b.substring(0, 30), bx + iconSize * 2 + 12, by + 9);
   });
 }
 function drawShadowText(ctx, text, x, y, color, font, shadowColor = 'rgba(0,0,0,0.7)', blur = 18) {
@@ -103,9 +103,9 @@ function drawCTA(ctx, text, x, y, w, h, fillColor, textColor, r = 8) {
   ctx.fillText(text, x + w / 2, y + h * 0.65); ctx.restore();
 }
 function drawContact(ctx, phone, x, y, acc, light = false) {
-  ctx.save(); drawIconCircle(ctx, x + 22, y, 22, acc, '\u260e', '#fff', 14);
-  ctx.font = '700 18px Outfit'; ctx.fillStyle = light ? '#0f172a' : '#fff'; ctx.textAlign = 'left';
-  ctx.fillText(phone, x + 52, y + 7); ctx.restore();
+  ctx.save(); drawIconCircle(ctx, x + 28, y, 28, acc, '\u260e', '#fff', 18);
+  ctx.font = '800 24px Outfit'; ctx.fillStyle = light ? '#0f172a' : '#fff'; ctx.textAlign = 'left';
+  ctx.fillText(phone, x + 66, y + 9); ctx.restore();
 }
 function drawSocialBar(ctx, y, W, acc, light, web = '') {
   ctx.save(); const icons = ['f', 'in', '@', '\u25b6']; let sx = 40;
@@ -122,82 +122,83 @@ function engine_splitPanel(ctx, W, H, d) {
   ctx.save(); ctx.beginPath();
   ctx.moveTo(0,0); ctx.lineTo(W*0.55,0); ctx.bezierCurveTo(W*0.72,H*0.2,W*0.38,H*0.8,W*0.6,H); ctx.lineTo(0,H); ctx.closePath(); ctx.clip();
   if (d.bgImage) ctx.drawImage(d.bgImage,0,0,W*0.7,H); else { ctx.fillStyle='#334155'; ctx.fillRect(0,0,W,H); }
-  const og=ctx.createLinearGradient(0,0,W*0.6,0); og.addColorStop(0,'rgba(0,0,0,0.15)'); og.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=og; ctx.fillRect(0,0,W,H); ctx.restore();
+  const og=ctx.createLinearGradient(0,0,W*0.6,0); og.addColorStop(0,'rgba(0,0,0,0.18)'); og.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=og; ctx.fillRect(0,0,W,H); ctx.restore();
   drawDotGrid(ctx,W*0.65,40,5,5,22,acc+'44',3);
   drawHex(ctx,W*0.82,H*0.15,55,acc+'22',acc+'55',2); drawHex(ctx,W*0.9,H*0.82,35,acc+'15',acc+'33',1);
-  ctx.fillStyle=acc; ctx.fillRect(W*0.62,0,W*0.38,8);
-  if (d.logoImage) ctx.drawImage(d.logoImage,W*0.63,24,44,44);
-  ctx.textAlign='left'; ctx.fillStyle='#64748b'; ctx.font='700 13px Outfit'; ctx.fillText('LOGO HERE',W*0.63+(d.logoImage?52:0),40);
-  ctx.fillStyle=acc; ctx.font='600 11px Outfit'; ctx.fillText('WWW.EMPRESA.COM',W*0.63+(d.logoImage?52:0),58);
-  for(let i=0;i<3;i++){ctx.beginPath();ctx.arc(W*0.63+(i*18),80,4,0,Math.PI*2);ctx.fillStyle=i===0?acc:acc+'55';ctx.fill();}
-  const lines=wrapText(ctx,(d.title||'').toUpperCase(),W*0.36); ctx.textAlign='left';
-  lines.slice(0,3).forEach((l,i)=>{ ctx.font=i===0?'900 64px Playfair Display':'900 60px Playfair Display'; drawShadowText(ctx,l,W*0.62,160+i*74,i===1?acc:'#0f172a',ctx.font,'rgba(0,0,0,0.05)',4); });
-  ctx.fillStyle=acc; ctx.fillRect(W*0.62,160+lines.length*74+8,60,4);
-  const subY=160+lines.length*74+28; const subs=wrapText(ctx,d.subtitle||'',W*0.36);
-  ctx.font='400 20px Outfit'; ctx.fillStyle='#475569'; subs.slice(0,3).forEach((s,i)=>ctx.fillText(s,W*0.62,subY+i*28));
-  drawFeatures(ctx,d.beneficios||[],W*0.62,subY+subs.length*28+30,W*0.34,acc,true,1,22);
-  drawCTA(ctx,d.cta||'GET STARTED',W*0.62,H-170,230,58,acc,'#fff');
-  drawSocialBar(ctx,H-72,W,acc,true,d.contact?.web||'www.empresa.com');
-  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W*0.62,H-105,acc,true);
+  ctx.fillStyle=acc; ctx.fillRect(W*0.62,0,W*0.38,10);
+  if (d.logoImage) ctx.drawImage(d.logoImage,W*0.63,22,50,50);
+  ctx.textAlign='left'; ctx.fillStyle='#64748b'; ctx.font='700 15px Outfit'; ctx.fillText('LOGO HERE',W*0.63+(d.logoImage?60:0),42);
+  ctx.fillStyle=acc; ctx.font='600 13px Outfit'; ctx.fillText('WWW.EMPRESA.COM',W*0.63+(d.logoImage?60:0),62);
+  // Badge rubro
+  drawBadge(ctx,(d.industria||'MARKETING').toUpperCase(),W*0.63,84,acc,'#fff',15,14,8,6);
+  const lines=wrapText(ctx,(d.title||'').toUpperCase(),W*0.34); ctx.textAlign='left';
+  lines.slice(0,3).forEach((l,i)=>{ drawShadowText(ctx,l,W*0.62,148+i*92,i===1?acc:'#0f172a','900 86px Playfair Display','rgba(0,0,0,0.06)',5); });
+  ctx.fillStyle=acc; ctx.fillRect(W*0.62,148+lines.length*92+8,80,5);
+  const subY=148+lines.length*92+32; const subs=wrapText(ctx,d.subtitle||'',W*0.34);
+  ctx.font='500 30px Outfit'; ctx.fillStyle='#334155'; subs.slice(0,2).forEach((s,i)=>ctx.fillText(s,W*0.62,subY+i*36));
+  drawFeatures(ctx,d.beneficios||[],W*0.62,subY+subs.length*36+28,W*0.34,acc,true,1,28);
+  drawCTA(ctx,d.cta||'EMPEZAR AHORA',W*0.62,H-178,W*0.35,68,acc,'#fff');
+  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W*0.62,H-98,acc,true);
+  drawSocialBar(ctx,H-56,W,acc,true,d.contact?.web||'www.empresa.com');
 }
 function engine_fullOverlay(ctx, W, H, d) {
   const acc = d.accent || '#D4AF37';
   if (d.bgImage) ctx.drawImage(d.bgImage,0,0,W,H); else { ctx.fillStyle='#1e293b'; ctx.fillRect(0,0,W,H); }
-  const gr=ctx.createLinearGradient(0,0,0,H); gr.addColorStop(0,'rgba(0,0,0,0.75)'); gr.addColorStop(0.45,'rgba(0,0,0,0.3)'); gr.addColorStop(1,'rgba(0,0,0,0.92)'); ctx.fillStyle=gr; ctx.fillRect(0,0,W,H);
-  ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(0,0,W,100);
-  if (d.logoImage) ctx.drawImage(d.logoImage,W/2-26,18,52,52);
-  ctx.textAlign='center'; ctx.fillStyle=acc; ctx.font='700 13px Outfit'; ctx.fillText('ARIAS GROUP  \u2022  EXCLUSIVE',W/2,82);
-  ctx.fillStyle=acc; ctx.fillRect(W/2-50,92,100,3);
+  const gr=ctx.createLinearGradient(0,0,0,H); gr.addColorStop(0,'rgba(0,0,0,0.8)'); gr.addColorStop(0.4,'rgba(0,0,0,0.25)'); gr.addColorStop(1,'rgba(0,0,0,0.95)'); ctx.fillStyle=gr; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(0,0,W,110);
+  if (d.logoImage) ctx.drawImage(d.logoImage,W/2-30,16,60,60);
+  ctx.textAlign='center'; ctx.fillStyle=acc; ctx.font='800 16px Outfit'; ctx.fillText('ARIAS GROUP  \u2022  EXCLUSIVE',W/2,90);
+  ctx.fillStyle=acc; ctx.fillRect(W/2-60,100,120,4);
   drawHex(ctx,80,H*0.35,45,'rgba(255,255,255,0.04)',acc+'40',1); drawHex(ctx,W-70,H*0.65,35,'rgba(255,255,255,0.04)',acc+'30',1);
-  const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-120);
-  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,W/2,H*0.45+i*92,'#fff',`900 ${i===0?84:80}px Playfair Display`,'rgba(0,0,0,0.8)',30));
-  ctx.fillStyle=acc; ctx.font='500 28px Outfit'; ctx.textAlign='center'; ctx.fillText(d.subtitle||'',W/2,H*0.45+tl.length*92+10);
-  const fbY=H*0.45+tl.length*92+60;
+  const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-80);
+  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,W/2,H*0.42+i*110,'#fff',`900 ${i===0?110:100}px Playfair Display`,'rgba(0,0,0,0.85)',35));
+  ctx.fillStyle=acc; ctx.font='600 34px Outfit'; ctx.textAlign='center'; ctx.fillText(d.subtitle||'',W/2,H*0.42+tl.length*110+18);
+  const fbY=H*0.42+tl.length*110+68;
   (d.beneficios||[]).slice(0,3).forEach((b,i)=>{
-    ctx.font='600 19px Outfit'; const tw=ctx.measureText(b).width+48; const bx=W/2-tw/2;
-    roundRect(ctx,bx,fbY+i*54,tw,40,20); ctx.fillStyle='rgba(255,255,255,0.12)'; ctx.fill();
-    ctx.strokeStyle=acc+'80'; ctx.lineWidth=1; ctx.stroke(); ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.fillText(b,W/2,fbY+i*54+27);
+    ctx.font='700 26px Outfit'; const tw=ctx.measureText(b).width+56; const bx=W/2-tw/2;
+    roundRect(ctx,bx,fbY+i*64,tw,48,24); ctx.fillStyle='rgba(255,255,255,0.13)'; ctx.fill();
+    ctx.strokeStyle=acc+'80'; ctx.lineWidth=1.5; ctx.stroke(); ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.fillText(b,W/2,fbY+i*64+32);
   });
-  drawCTA(ctx,d.cta||'SABER M\u00c1S',W/2-130,H-160,260,62,acc,'#000');
-  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2-80,H-70,acc,false);
+  drawCTA(ctx,d.cta||'SABER M\u00c1S',W/2-145,H-168,290,70,acc,'#000');
+  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2-100,H-76,acc,false);
 }
 function engine_bottomBanner(ctx, W, H, d) {
-  const acc = d.accent || '#e11d48'; const splitY=H*0.5;
+  const acc = d.accent || '#e11d48'; const splitY=H*0.48;
   ctx.save(); ctx.beginPath(); ctx.rect(0,0,W,splitY+20); ctx.clip();
-  if (d.bgImage) ctx.drawImage(d.bgImage,0,0,W,splitY*1.6); else { ctx.fillStyle='#334155'; ctx.fillRect(0,0,W,H); }
-  const pgr=ctx.createLinearGradient(0,0,0,splitY+20); pgr.addColorStop(0,'rgba(0,0,0,0.5)'); pgr.addColorStop(1,'rgba(15,23,42,0.95)'); ctx.fillStyle=pgr; ctx.fillRect(0,0,W,splitY+20); ctx.restore();
+  if (d.bgImage) ctx.drawImage(d.bgImage,0,0,W,splitY*1.7); else { ctx.fillStyle='#334155'; ctx.fillRect(0,0,W,H); }
+  const pgr=ctx.createLinearGradient(0,0,0,splitY+20); pgr.addColorStop(0,'rgba(0,0,0,0.45)'); pgr.addColorStop(1,'rgba(15,23,42,0.95)'); ctx.fillStyle=pgr; ctx.fillRect(0,0,W,splitY+20); ctx.restore();
   ctx.fillStyle='#0f172a'; ctx.fillRect(0,splitY,W,H-splitY);
-  ctx.fillStyle=acc; ctx.fillRect(0,splitY,W,6);
-  ctx.save(); ctx.beginPath(); ctx.moveTo(0,splitY+6); ctx.lineTo(W*0.45,splitY+6); ctx.lineTo(W*0.35,splitY+100); ctx.lineTo(0,splitY+100); ctx.closePath(); ctx.fillStyle=acc+'22'; ctx.fill(); ctx.restore();
-  if (d.logoImage) ctx.drawImage(d.logoImage,40,26,48,48);
-  ctx.textAlign='left'; ctx.font='700 15px Outfit'; ctx.fillStyle='#fff'; ctx.fillText('ARIAS GROUP',d.logoImage?100:40,45);
-  ctx.fillStyle=acc; ctx.font='600 12px Outfit'; ctx.fillText('EXCLUSIVE MARKETING',d.logoImage?100:40,64);
-  if (d.price) drawBadge(ctx,d.price,W-220,26,acc,'#fff',38,20,12,8);
+  ctx.fillStyle=acc; ctx.fillRect(0,splitY,W,8);
+  ctx.save(); ctx.beginPath(); ctx.moveTo(0,splitY+8); ctx.lineTo(W*0.45,splitY+8); ctx.lineTo(W*0.32,splitY+120); ctx.lineTo(0,splitY+120); ctx.closePath(); ctx.fillStyle=acc+'28'; ctx.fill(); ctx.restore();
+  if (d.logoImage) ctx.drawImage(d.logoImage,40,22,54,54);
+  ctx.textAlign='left'; ctx.font='800 18px Outfit'; ctx.fillStyle='#fff'; ctx.fillText('ARIAS GROUP',d.logoImage?108:40,46);
+  ctx.fillStyle=acc; ctx.font='600 14px Outfit'; ctx.fillText('EXCLUSIVE MARKETING',d.logoImage?108:40,68);
+  if (d.price) drawBadge(ctx,d.price,W-240,20,acc,'#fff',42,22,14,10);
   const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-80);
-  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,40,splitY-120+i*80,'#fff','900 72px Playfair Display'));
-  ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.font='400 22px Outfit'; ctx.textAlign='left'; ctx.fillText(d.subtitle||'',40,splitY-20);
-  drawFeatures(ctx,d.beneficios||[],40,splitY+40,W-80,acc,false,2,24);
-  drawCTA(ctx,d.cta||'CONTACTANOS',W-268,H-90,228,58,acc,'#fff');
-  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',40,H-58,acc,false);
-  drawSocialBar(ctx,H-30,W,acc,false,d.contact?.web||'');
+  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,40,splitY-140+i*96,'#fff','900 100px Playfair Display'));
+  ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.font='500 32px Outfit'; ctx.textAlign='left'; ctx.fillText(d.subtitle||'',40,splitY-22);
+  drawFeatures(ctx,d.beneficios||[],40,splitY+36,W-80,acc,false,2,28);
+  drawCTA(ctx,d.cta||'CONTACTANOS',W-286,H-96,246,68,acc,'#fff');
+  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',40,H-62,acc,false);
+  drawSocialBar(ctx,H-28,W,acc,false,d.contact?.web||'');
 }
 function engine_magazine(ctx, W, H, d) {
   const acc = d.accent || '#D4AF37';
   if (d.bgImage) ctx.drawImage(d.bgImage,0,0,W,H); else { ctx.fillStyle='#1e293b'; ctx.fillRect(0,0,W,H); }
-  ctx.fillStyle='rgba(0,0,0,0.38)'; ctx.fillRect(0,0,W,H);
-  ctx.fillStyle=acc; ctx.fillRect(0,0,16,H);
-  const tgr=ctx.createLinearGradient(0,0,0,220); tgr.addColorStop(0,'rgba(0,0,0,0.9)'); tgr.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=tgr; ctx.fillRect(0,0,W,220);
-  ctx.fillStyle=acc; ctx.font='900 13px Outfit'; ctx.textAlign='left'; ctx.fillText('MARKETING EXCLUSIVE',40,52);
-  ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.font='400 13px Outfit'; ctx.fillText(' \u2014 EDICION ESPECIAL',40+ctx.measureText('MARKETING EXCLUSIVE').width,52);
-  if (d.logoImage) ctx.drawImage(d.logoImage,W-80,24,50,50);
-  ctx.fillStyle=acc+'99'; ctx.fillRect(40,64,W-130,1);
-  drawDotGrid(ctx,W-120,100,4,6,20,'rgba(255,255,255,0.12)',2);
-  const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-80); ctx.textAlign='left';
-  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,36,H*0.44+i*110,'#fff',`900 ${i===0?100:92}px Playfair Display`,'rgba(0,0,0,0.9)',35));
-  ctx.fillStyle=acc; ctx.fillRect(36,H*0.44+tl.length*110+10,80,4);
-  ctx.fillStyle=acc; ctx.font='600 28px Outfit'; ctx.fillText((d.subtitle||'').toUpperCase(),36,H*0.44+tl.length*110+50);
-  drawFeatures(ctx,d.beneficios||[],36,H*0.44+tl.length*110+90,W-72,acc,false,2,24);
-  drawCTA(ctx,d.cta||'VER OFERTA',W-296,H-90,256,58,acc,'#000');
+  ctx.fillStyle='rgba(0,0,0,0.42)'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle=acc; ctx.fillRect(0,0,18,H);
+  const tgr=ctx.createLinearGradient(0,0,0,240); tgr.addColorStop(0,'rgba(0,0,0,0.95)'); tgr.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=tgr; ctx.fillRect(0,0,W,240);
+  ctx.fillStyle=acc; ctx.font='900 16px Outfit'; ctx.textAlign='left'; ctx.fillText('MARKETING EXCLUSIVE',44,56);
+  ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.font='400 16px Outfit'; ctx.fillText(' \u2014 EDICION ESPECIAL',44+ctx.measureText('MARKETING EXCLUSIVE').width,56);
+  if (d.logoImage) ctx.drawImage(d.logoImage,W-90,20,58,58);
+  ctx.fillStyle=acc+'99'; ctx.fillRect(44,70,W-140,2);
+  drawDotGrid(ctx,W-130,100,4,6,20,'rgba(255,255,255,0.12)',2);
+  const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-60); ctx.textAlign='left';
+  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,36,H*0.42+i*126,'#fff',`900 ${i===0?120:108}px Playfair Display`,'rgba(0,0,0,0.9)',40));
+  ctx.fillStyle=acc; ctx.fillRect(36,H*0.42+tl.length*126+12,100,6);
+  ctx.fillStyle=acc; ctx.font='700 36px Outfit'; ctx.fillText((d.subtitle||'').toUpperCase(),36,H*0.42+tl.length*126+60);
+  drawFeatures(ctx,d.beneficios||[],36,H*0.42+tl.length*126+100,W-72,acc,false,2,28);
+  drawCTA(ctx,d.cta||'VER OFERTA',W-310,H-96,270,68,acc,'#000');
   drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',36,H-52,acc,false);
 }
 function engine_circle(ctx, W, H, d) {
@@ -208,20 +209,20 @@ function engine_circle(ctx, W, H, d) {
   ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(cx2,cy2,R+20,0,Math.PI*2); ctx.fill();
   ctx.beginPath(); ctx.arc(cx2,cy2,R,0,Math.PI*2); ctx.clip();
   if (d.bgImage) ctx.drawImage(d.bgImage,cx2-R,cy2-R,R*2,R*2); else { ctx.fillStyle='#334155'; ctx.fillRect(0,0,W,H); } ctx.restore();
-  ctx.strokeStyle='#fff'; ctx.lineWidth=5; ctx.beginPath(); ctx.arc(cx2,cy2,R,0,Math.PI*2); ctx.stroke();
-  ctx.strokeStyle=acc+'80'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx2,cy2,R+14,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle='#fff'; ctx.lineWidth=6; ctx.beginPath(); ctx.arc(cx2,cy2,R,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle=acc+'80'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(cx2,cy2,R+16,0,Math.PI*2); ctx.stroke();
   const feats=(d.beneficios||[]).slice(0,4); const ICONS4=['\u2605','\u25c8','\u25b8','\u2726'];
   const positions=[{x:cx2-R*1.1,y:cy2-R*0.5},{x:cx2+R*1.0,y:cy2-R*0.7},{x:cx2-R*1.0,y:cy2+R*0.7},{x:cx2+R*1.1,y:cy2+R*0.45}];
-  feats.forEach((b,i)=>{ const pos=positions[i]; drawIconCircle(ctx,pos.x,pos.y,36,'#fff',ICONS4[i],acc,18);
+  feats.forEach((b,i)=>{ const pos=positions[i]; drawIconCircle(ctx,pos.x,pos.y,40,'#fff',ICONS4[i],acc,20);
     ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1; ctx.setLineDash([4,6]); ctx.beginPath(); ctx.moveTo(cx2,cy2); ctx.lineTo(pos.x,pos.y); ctx.stroke(); ctx.setLineDash([]); ctx.restore();
-    ctx.font='600 15px Outfit'; ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.textAlign=pos.x>cx2?'left':'right'; ctx.fillText(b.substring(0,18),pos.x>cx2?pos.x+44:pos.x-44,pos.y+6); });
-  ctx.textAlign='right'; if (d.logoImage) ctx.drawImage(d.logoImage,W-90,36,50,50);
-  ctx.fillStyle=acc+'dd'; ctx.font='700 13px Outfit'; ctx.fillText('ARIAS GROUP EXCLUSIVE',W-36,65);
-  const tl=wrapText(ctx,(d.title||'').toUpperCase(),W*0.43); tl.slice(0,3).forEach((l,i)=>drawShadowText(ctx,l,W-36,H*0.65+i*76,i===1?acc:'#fff','900 56px Playfair Display'));
-  ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.font='400 20px Outfit'; ctx.fillText(d.subtitle||'',W-36,H*0.65+tl.length*76+18);
-  drawCTA(ctx,d.cta||'CONTACTANOS',W-256,H-150,220,52,'#fff',acc);
-  ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.font='600 16px Outfit'; ctx.textAlign='right'; ctx.fillText(d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W-36,H-70);
-  drawSocialBar(ctx,H-30,W,acc,false,d.contact?.web||'');
+    ctx.font='700 20px Outfit'; ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.textAlign=pos.x>cx2?'left':'right'; ctx.fillText(b.substring(0,18),pos.x>cx2?pos.x+50:pos.x-50,pos.y+7); });
+  ctx.textAlign='right'; if (d.logoImage) ctx.drawImage(d.logoImage,W-96,32,56,56);
+  ctx.fillStyle=acc+'dd'; ctx.font='800 16px Outfit'; ctx.fillText('ARIAS GROUP EXCLUSIVE',W-36,70);
+  const tl=wrapText(ctx,(d.title||'').toUpperCase(),W*0.43); tl.slice(0,3).forEach((l,i)=>drawShadowText(ctx,l,W-36,H*0.65+i*88,i===1?acc:'#fff','900 72px Playfair Display'));
+  ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.font='500 28px Outfit'; ctx.fillText(d.subtitle||'',W-36,H*0.65+tl.length*88+22);
+  drawCTA(ctx,d.cta||'CONTACTANOS',W-270,H-158,234,64,'#fff',acc);
+  ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='700 22px Outfit'; ctx.textAlign='right'; ctx.fillText(d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W-36,H-74);
+  drawSocialBar(ctx,H-32,W,acc,false,d.contact?.web||'');
 }
 function engine_stripes(ctx, W, H, d) {
   const acc = d.accent || '#1a56db';
@@ -231,15 +232,15 @@ function engine_stripes(ctx, W, H, d) {
   if (d.bgImage) ctx.drawImage(d.bgImage,0,H*0.12,W,H*0.54); else { ctx.fillStyle='#e2e8f0'; ctx.fillRect(0,0,W,H); }
   const fgr=ctx.createLinearGradient(0,H*0.5,0,H*0.63); fgr.addColorStop(0,'rgba(255,255,255,0)'); fgr.addColorStop(1,'#fff'); ctx.fillStyle=fgr; ctx.fillRect(0,H*0.5,W,H*0.13); ctx.restore();
   ctx.fillStyle=acc; ctx.fillRect(0,H*0.625,W,H*0.036); ctx.fillStyle='#0f172a'; ctx.fillRect(0,H*0.661,W,H*0.339);
-  if (d.logoImage) ctx.drawImage(d.logoImage,30,6,50,50);
-  ctx.textAlign='left'; ctx.fillStyle='#fff'; ctx.font='700 15px Outfit'; ctx.fillText('ARIAS GROUP',d.logoImage?90:30,35);
-  drawHex(ctx,W-60,H*0.045,34,acc+'33',acc,2); ctx.fillStyle=acc; ctx.font='700 10px Outfit'; ctx.textAlign='center'; ctx.fillText('PRO',W-60,H*0.045+4);
+  if (d.logoImage) ctx.drawImage(d.logoImage,30,6,54,54);
+  ctx.textAlign='left'; ctx.fillStyle='#fff'; ctx.font='800 18px Outfit'; ctx.fillText('ARIAS GROUP',d.logoImage?96:30,38);
+  drawHex(ctx,W-60,H*0.045,34,acc+'33',acc,2); ctx.fillStyle=acc; ctx.font='700 11px Outfit'; ctx.textAlign='center'; ctx.fillText('PRO',W-60,H*0.045+5);
   ctx.textAlign='left'; const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-80);
-  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,40,H*0.24+i*86,'#fff','900 76px Playfair Display'));
-  const botY=H*0.69; drawFeatures(ctx,d.beneficios||[],40,botY,W-80,acc,false,2,22);
-  ctx.fillStyle='rgba(255,255,255,0.15)'; ctx.fillRect(40,botY+130,W-80,1);
-  ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='400 20px Outfit'; ctx.textAlign='left'; ctx.fillText(d.subtitle||'',40,botY+158);
-  drawCTA(ctx,d.cta||'SABER M\u00c1S',W-268,H-90,228,54,acc,'#fff');
+  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,40,H*0.22+i*100,'#fff','900 96px Playfair Display'));
+  const botY=H*0.68; drawFeatures(ctx,d.beneficios||[],40,botY,W-80,acc,false,2,26);
+  ctx.fillStyle='rgba(255,255,255,0.15)'; ctx.fillRect(40,botY+148,W-80,1);
+  ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.font='500 32px Outfit'; ctx.textAlign='left'; ctx.fillText(d.subtitle||'',40,botY+178);
+  drawCTA(ctx,d.cta||'SABER M\u00c1S',W-288,H-94,248,66,acc,'#fff');
   drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',40,H-52,acc,false);
 }
 function engine_cornerBurst(ctx, W, H, d) {
@@ -247,45 +248,45 @@ function engine_cornerBurst(ctx, W, H, d) {
   ctx.fillStyle='#0f172a'; ctx.fillRect(0,0,W,H);
   ctx.save(); ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(W,0); ctx.lineTo(W,H*0.56); ctx.lineTo(0,H*0.44); ctx.closePath(); ctx.clip();
   if (d.bgImage) ctx.drawImage(d.bgImage,0,0,W,H); else { ctx.fillStyle='#334155'; ctx.fillRect(0,0,W,H); }
-  const dog=ctx.createLinearGradient(0,0,0,H*0.56); dog.addColorStop(0,'rgba(0,0,0,0.5)'); dog.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=dog; ctx.fillRect(0,0,W,H*0.56); ctx.restore();
+  const dog=ctx.createLinearGradient(0,0,0,H*0.56); dog.addColorStop(0,'rgba(0,0,0,0.55)'); dog.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=dog; ctx.fillRect(0,0,W,H*0.56); ctx.restore();
   ctx.save(); ctx.globalAlpha=0.9; ctx.fillStyle=acc; ctx.beginPath(); ctx.moveTo(0,H*0.42); ctx.lineTo(W,H*0.54); ctx.lineTo(W,H*0.60); ctx.lineTo(0,H*0.48); ctx.closePath(); ctx.fill(); ctx.globalAlpha=1; ctx.restore();
-  if (d.logoImage) ctx.drawImage(d.logoImage,36,28,48,48);
-  ctx.textAlign='left'; ctx.font='700 14px Outfit'; ctx.fillStyle='#fff'; ctx.fillText('ARIAS GROUP',d.logoImage?96:36,50);
-  ctx.fillStyle=acc; ctx.font='600 11px Outfit'; ctx.fillText('DIGITAL MARKETING',d.logoImage?96:36,68);
+  if (d.logoImage) ctx.drawImage(d.logoImage,36,24,54,54);
+  ctx.textAlign='left'; ctx.font='800 16px Outfit'; ctx.fillStyle='#fff'; ctx.fillText('ARIAS GROUP',d.logoImage?102:36,50);
+  ctx.fillStyle=acc; ctx.font='600 13px Outfit'; ctx.fillText('DIGITAL MARKETING',d.logoImage?102:36,70);
   drawHex(ctx,W-70,80,50,'rgba(255,255,255,0.04)',acc+'66',2); drawDotGrid(ctx,W-140,40,4,4,20,acc+'33',2);
-  drawBadge(ctx,'OFERTA',W-180,30,acc,'#fff',20,16,10,6);
-  const titY=H*0.65; const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-80);
-  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,36,titY+i*80,'#fff','900 68px Playfair Display'));
-  ctx.fillStyle=acc; ctx.font='500 24px Outfit'; ctx.fillText(d.subtitle||'',36,titY+tl.length*80+16);
-  drawFeatures(ctx,d.beneficios||[],36,titY+tl.length*80+56,W-72,acc,false,2,20);
-  drawCTA(ctx,d.cta||'CONTACTANOS',W-268,H-80,230,54,acc,'#fff');
+  drawBadge(ctx,'OFERTA',W-190,26,acc,'#fff',22,18,11,8);
+  const titY=H*0.63; const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-70);
+  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,36,titY+i*96,'#fff','900 90px Playfair Display'));
+  ctx.fillStyle=acc; ctx.font='600 32px Outfit'; ctx.fillText(d.subtitle||'',36,titY+tl.length*96+20);
+  drawFeatures(ctx,d.beneficios||[],36,titY+tl.length*96+64,W-72,acc,false,2,24);
+  drawCTA(ctx,d.cta||'CONTACTANOS',W-284,H-84,248,66,acc,'#fff');
   drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',36,H-44,acc,false);
 }
 function engine_architectural(ctx, W, H, d) {
   const acc = d.accent || '#D4AF37';
   ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,W,H);
-  ctx.fillStyle=acc; ctx.fillRect(0,0,W,10);
-  drawDotGrid(ctx,W-160,30,6,5,22,'#e2e8f0',3);
-  const px=80,py=60,pw=W-160,ph=H*0.42;
-  ctx.save(); ctx.shadowColor='rgba(0,0,0,0.15)'; ctx.shadowBlur=30; ctx.shadowOffsetY=8;
+  ctx.fillStyle=acc; ctx.fillRect(0,0,W,12);
+  drawDotGrid(ctx,W-170,30,6,5,22,'#e2e8f0',3);
+  const px=70,py=56,pw=W-140,ph=H*0.40;
+  ctx.save(); ctx.shadowColor='rgba(0,0,0,0.18)'; ctx.shadowBlur=32; ctx.shadowOffsetY=10;
   roundRect(ctx,px,py,pw,ph,16); ctx.fillStyle='#e2e8f0'; ctx.fill(); ctx.restore();
   ctx.save(); roundRect(ctx,px,py,pw,ph,16); ctx.clip();
   if (d.bgImage) ctx.drawImage(d.bgImage,px,py,pw,ph); else { ctx.fillStyle='#94a3b8'; ctx.fillRect(px,py,pw,ph); }
-  const pfgr=ctx.createLinearGradient(0,py+ph*0.6,0,py+ph); pfgr.addColorStop(0,'rgba(0,0,0,0)'); pfgr.addColorStop(1,'rgba(0,0,0,0.4)'); ctx.fillStyle=pfgr; ctx.fillRect(px,py,pw,ph);
-  drawCTA(ctx,d.cta||'VER DETALLES',px+pw-230,py+ph-72,210,50,acc,'#fff'); ctx.restore();
-  drawBadge(ctx,'NUEVO',px+16,py+16,acc,'#fff',18,14,8,6);
-  const bY=py+ph+32;
-  if (d.logoImage) ctx.drawImage(d.logoImage,px,bY,40,40);
-  ctx.textAlign='left'; ctx.fillStyle='#94a3b8'; ctx.font='700 12px Outfit';
-  ctx.fillText('ARIAS GROUP  \u2022  EXCLUSIVE REAL ESTATE',px+(d.logoImage?50:0),bY+16);
-  ctx.fillStyle=acc; ctx.fillRect(px,bY+30,60,4);
-  const titleY=bY+58; const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-200); ctx.font='900 62px Playfair Display';
-  tl.slice(0,2).forEach((l,i)=>{ ctx.fillStyle=i===0?'#0f172a':acc; ctx.fillText(l,px,titleY+i*72); });
-  const afterTitle=titleY+tl.length*72; ctx.fillStyle='#64748b'; ctx.font='400 20px Outfit';
-  const subs=wrapText(ctx,d.subtitle||'',W-180); subs.slice(0,2).forEach((s,i)=>ctx.fillText(s,px,afterTitle+8+i*28));
-  drawFeatures(ctx,d.beneficios||[],px,afterTitle+8+subs.length*28+20,W-180,acc,true,2,22);
-  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',px,H-44,acc,true);
-  drawSocialBar(ctx,H-24,W,acc,true,d.contact?.web||'');
+  const pfgr=ctx.createLinearGradient(0,py+ph*0.6,0,py+ph); pfgr.addColorStop(0,'rgba(0,0,0,0)'); pfgr.addColorStop(1,'rgba(0,0,0,0.45)'); ctx.fillStyle=pfgr; ctx.fillRect(px,py,pw,ph);
+  drawCTA(ctx,d.cta||'VER DETALLES',px+pw-244,py+ph-76,224,58,acc,'#fff'); ctx.restore();
+  drawBadge(ctx,'NUEVO',px+16,py+16,acc,'#fff',20,16,10,7);
+  const bY=py+ph+28;
+  if (d.logoImage) ctx.drawImage(d.logoImage,px,bY,46,46);
+  ctx.textAlign='left'; ctx.fillStyle='#94a3b8'; ctx.font='700 14px Outfit';
+  ctx.fillText('ARIAS GROUP  \u2022  EXCLUSIVE REAL ESTATE',px+(d.logoImage?58:0),bY+18);
+  ctx.fillStyle=acc; ctx.fillRect(px,bY+34,80,5);
+  const titleY=bY+64; const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-180); ctx.font='900 78px Playfair Display';
+  tl.slice(0,2).forEach((l,i)=>{ ctx.fillStyle=i===0?'#0f172a':acc; ctx.fillText(l,px,titleY+i*88); });
+  const afterTitle=titleY+tl.length*88; ctx.fillStyle='#334155'; ctx.font='500 30px Outfit';
+  const subs=wrapText(ctx,d.subtitle||'',W-160); subs.slice(0,2).forEach((s,i)=>ctx.fillText(s,px,afterTitle+10+i*36));
+  drawFeatures(ctx,d.beneficios||[],px,afterTitle+10+subs.length*36+18,W-160,acc,true,2,26);
+  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',px,H-46,acc,true);
+  drawSocialBar(ctx,H-22,W,acc,true,d.contact?.web||'');
 }
 function engine_luxuryDark(ctx, W, H, d) {
   const acc = d.accent || '#D4AF37';
@@ -295,49 +296,49 @@ function engine_luxuryDark(ctx, W, H, d) {
   for(let gy=0;gy<H;gy+=70){ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(W,gy);ctx.stroke();}
   for(let gx=0;gx<W;gx+=70){ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,H);ctx.stroke();}
   drawHex(ctx,W*0.12,H*0.12,60,acc+'08',acc+'25',1); drawHex(ctx,W*0.88,H*0.88,50,acc+'08',acc+'20',1);
-  const ph=H*0.33,py=H*0.27;
-  ctx.save(); ctx.shadowColor=acc; ctx.shadowBlur=20; ctx.strokeStyle=acc; ctx.lineWidth=3;
-  ctx.beginPath(); ctx.rect(W*0.12,py-4,W*0.76,ph+8); ctx.stroke(); ctx.shadowColor='transparent'; ctx.restore();
-  ctx.save(); ctx.beginPath(); ctx.rect(W*0.12,py,W*0.76,ph); ctx.clip();
-  if (d.bgImage) ctx.drawImage(d.bgImage,W*0.12,py-H*0.1,W*0.76,ph+H*0.15); else { ctx.fillStyle='#1e293b'; ctx.fillRect(0,py,W,ph); }
-  const pf=ctx.createLinearGradient(0,py,0,py+ph); pf.addColorStop(0,'rgba(7,7,17,0.75)'); pf.addColorStop(0.3,'rgba(7,7,17,0)'); pf.addColorStop(0.7,'rgba(7,7,17,0)'); pf.addColorStop(1,'rgba(7,7,17,0.85)');
+  const ph=H*0.32,py=H*0.26;
+  ctx.save(); ctx.shadowColor=acc; ctx.shadowBlur=22; ctx.strokeStyle=acc; ctx.lineWidth=3.5;
+  ctx.beginPath(); ctx.rect(W*0.10,py-4,W*0.80,ph+8); ctx.stroke(); ctx.shadowColor='transparent'; ctx.restore();
+  ctx.save(); ctx.beginPath(); ctx.rect(W*0.10,py,W*0.80,ph); ctx.clip();
+  if (d.bgImage) ctx.drawImage(d.bgImage,W*0.10,py-H*0.1,W*0.80,ph+H*0.15); else { ctx.fillStyle='#1e293b'; ctx.fillRect(0,py,W,ph); }
+  const pf=ctx.createLinearGradient(0,py,0,py+ph); pf.addColorStop(0,'rgba(7,7,17,0.75)'); pf.addColorStop(0.3,'rgba(7,7,17,0)'); pf.addColorStop(0.7,'rgba(7,7,17,0)'); pf.addColorStop(1,'rgba(7,7,17,0.88)');
   ctx.fillStyle=pf; ctx.fillRect(0,py,W,ph); ctx.restore();
-  if (d.logoImage) ctx.drawImage(d.logoImage,W/2-26,28,52,52);
-  ctx.textAlign='center'; ctx.fillStyle=acc; ctx.font='700 13px Outfit'; ctx.fillText('ARIAS GROUP  \u25c6  EXCLUSIVE',W/2,94);
-  const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-100);
-  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,W/2,H*0.17+i*80,i===0?'#fff':acc,'900 72px Playfair Display','rgba(0,0,0,0.8)',25));
-  const afterPh=py+ph+44; ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='400 22px Outfit'; ctx.textAlign='center'; ctx.fillText(d.subtitle||'',W/2,afterPh);
+  if (d.logoImage) ctx.drawImage(d.logoImage,W/2-30,24,60,60);
+  ctx.textAlign='center'; ctx.fillStyle=acc; ctx.font='800 16px Outfit'; ctx.fillText('ARIAS GROUP  \u25c6  EXCLUSIVE',W/2,98);
+  const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-80);
+  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,W/2,H*0.16+i*90,i===0?'#fff':acc,'900 90px Playfair Display','rgba(0,0,0,0.85)',28));
+  const afterPh=py+ph+40; ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.font='500 30px Outfit'; ctx.textAlign='center'; ctx.fillText(d.subtitle||'',W/2,afterPh);
   (d.beneficios||[]).slice(0,3).forEach((b,i)=>{
-    const cardW=W*0.68,cardX=(W-cardW)/2; roundRect(ctx,cardX,afterPh+32+i*58,cardW,46,8);
-    ctx.fillStyle='rgba(255,255,255,0.05)'; ctx.fill(); ctx.strokeStyle=acc+'40'; ctx.lineWidth=1; ctx.stroke();
-    drawIconCircle(ctx,cardX+28,afterPh+55+i*58,18,acc,'\u2605','#000',11);
-    ctx.font='600 18px Outfit'; ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.textAlign='left'; ctx.fillText(b.substring(0,36),cardX+54,afterPh+62+i*58);
+    const cardW=W*0.76,cardX=(W-cardW)/2; roundRect(ctx,cardX,afterPh+32+i*66,cardW,52,10);
+    ctx.fillStyle='rgba(255,255,255,0.05)'; ctx.fill(); ctx.strokeStyle=acc+'40'; ctx.lineWidth=1.5; ctx.stroke();
+    drawIconCircle(ctx,cardX+32,afterPh+58+i*66,20,acc,'\u2605','#000',13);
+    ctx.font='700 24px Outfit'; ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.textAlign='left'; ctx.fillText(b.substring(0,34),cardX+62,afterPh+66+i*66);
   });
-  const ctaY=afterPh+32+(d.beneficios||[]).length*58+20;
-  drawCTA(ctx,d.cta||'VER PROPIEDAD',W/2-135,ctaY,270,58,acc,'#000');
-  ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.font='600 15px Outfit'; ctx.textAlign='center'; ctx.fillText(d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,ctaY+78);
+  const ctaY=afterPh+32+(d.beneficios||[]).length*66+18;
+  drawCTA(ctx,d.cta||'VER PROPIEDAD',W/2-150,ctaY,300,68,acc,'#000');
+  ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.font='700 22px Outfit'; ctx.textAlign='center'; ctx.fillText(d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,ctaY+88);
 }
 function engine_boldGradient(ctx, W, H, d) {
   const acc = d.accent || '#0ea5e9'; const dark='#0c1445';
   const bgGr=ctx.createLinearGradient(0,0,W,H); bgGr.addColorStop(0,dark); bgGr.addColorStop(0.6,acc+'cc'); bgGr.addColorStop(1,dark); ctx.fillStyle=bgGr; ctx.fillRect(0,0,W,H);
-  const ex=W/2,ey=H*0.34,erx=W*0.38,ery=H*0.26;
-  ctx.save(); ctx.shadowColor=acc; ctx.shadowBlur=30; ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=6;
+  const ex=W/2,ey=H*0.33,erx=W*0.38,ery=H*0.25;
+  ctx.save(); ctx.shadowColor=acc; ctx.shadowBlur=32; ctx.strokeStyle='rgba(255,255,255,0.55)'; ctx.lineWidth=7;
   ctx.beginPath(); ctx.ellipse(ex,ey,erx,ery,0,0,Math.PI*2); ctx.stroke(); ctx.shadowColor='transparent'; ctx.restore();
   ctx.save(); ctx.beginPath(); ctx.ellipse(ex,ey,erx,ery,0,0,Math.PI*2); ctx.clip();
   if (d.bgImage) ctx.drawImage(d.bgImage,ex-erx,ey-ery,erx*2,ery*2); else { ctx.fillStyle='#1e40af'; ctx.fillRect(0,0,W,H); } ctx.restore();
-  ctx.strokeStyle=acc+'60'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(ex,ey,erx+16,ery+16,0,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle=acc+'60'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.ellipse(ex,ey,erx+18,ery+18,0,0,Math.PI*2); ctx.stroke();
   drawDotGrid(ctx,40,80,4,6,22,'rgba(255,255,255,0.08)',2); drawDotGrid(ctx,W-130,H*0.55,4,5,22,'rgba(255,255,255,0.08)',2);
-  if (d.logoImage) ctx.drawImage(d.logoImage,W/2-26,20,52,52);
-  ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.font='700 13px Outfit'; ctx.fillText('ARIAS GROUP  \u2022  EXCLUSIVE REAL ESTATE',W/2,86);
-  if (d.price) { drawShadowText(ctx,d.price,W/2,H*0.08,'#fff','900 90px Outfit','rgba(0,0,0,0.5)',20); ctx.font='700 22px Outfit'; ctx.fillStyle=acc; ctx.fillText('/MES  \u2022  GARANTIA DE PRECIO',W/2,H*0.08+36); }
-  const titY=ey+ery+50; const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-100);
-  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,W/2,titY+i*84,i===0?'#fff':acc,`900 ${i===0?74:68}px Playfair Display`,'rgba(0,0,0,0.7)',20));
-  ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.font='400 22px Outfit'; ctx.textAlign='center'; ctx.fillText(d.subtitle||'',W/2,titY+tl.length*84+14);
-  const featY=titY+tl.length*84+50;
-  (d.beneficios||[]).slice(0,2).forEach((b,i)=>{ drawIconCircle(ctx,W/2-90+(i*180),featY,28,'rgba(255,255,255,0.12)','\u2726','#fff',14); ctx.font='600 18px Outfit'; ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.textAlign='center'; ctx.fillText(b.substring(0,18),W/2-90+(i*180),featY+46); });
-  drawCTA(ctx,d.cta||'LEARN MORE',W/2-140,H-155,280,62,'#fff',dark);
-  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2-80,H-68,acc,false);
-  drawSocialBar(ctx,H-28,W,acc,false,d.contact?.web||'');
+  if (d.logoImage) ctx.drawImage(d.logoImage,W/2-30,16,60,60);
+  ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.font='800 16px Outfit'; ctx.fillText('ARIAS GROUP  \u2022  EXCLUSIVE REAL ESTATE',W/2,90);
+  if (d.price) { drawShadowText(ctx,d.price,W/2,H*0.07,'#fff','900 108px Outfit','rgba(0,0,0,0.5)',22); ctx.font='800 28px Outfit'; ctx.fillStyle=acc; ctx.fillText('/MES  \u2022  GARANTIA DE PRECIO',W/2,H*0.07+44); }
+  const titY=ey+ery+52; const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-80);
+  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,W/2,titY+i*96,i===0?'#fff':acc,`900 ${i===0?90:80}px Playfair Display`,'rgba(0,0,0,0.7)',22));
+  ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.font='500 32px Outfit'; ctx.textAlign='center'; ctx.fillText(d.subtitle||'',W/2,titY+tl.length*96+18);
+  const featY=titY+tl.length*96+62;
+  (d.beneficios||[]).slice(0,2).forEach((b,i)=>{ drawIconCircle(ctx,W/2-100+(i*200),featY,32,'rgba(255,255,255,0.13)','\u2726','#fff',16); ctx.font='700 24px Outfit'; ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.textAlign='center'; ctx.fillText(b.substring(0,18),W/2-100+(i*200),featY+54); });
+  drawCTA(ctx,d.cta||'LEARN MORE',W/2-155,H-162,310,70,'#fff',dark);
+  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2-90,H-72,acc,false);
+  drawSocialBar(ctx,H-30,W,acc,false,d.contact?.web||'');
 }
 // ─── MAPA DE ENGINES ─────────────────────────────────────────────────────────
 const ENGINES: Record<string, (ctx: CanvasRenderingContext2D, W: number, H: number, d: any) => void> = {
