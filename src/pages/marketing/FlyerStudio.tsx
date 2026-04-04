@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+﻿import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Zap, Target, Crown, Flame, Star, 
@@ -57,358 +57,288 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
   lines.push(currLine); return lines;
 }
 
-// ─── HELPERS DE CANVAS ──────────────────────────────────────────────────────
-function drawShadowText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string, font: string, shadowColor = 'rgba(0,0,0,0.7)', blur = 18) {
-  ctx.save();
-  ctx.shadowColor = shadowColor; ctx.shadowBlur = blur; ctx.shadowOffsetY = 4;
-  ctx.fillStyle = color; ctx.font = font; ctx.fillText(text, x, y);
-  ctx.restore();
+// ─── HELPERS DE CANVAS PREMIUM ───────────────────────────────────────────────
+function drawBadge(ctx, text, x, y, bg, fg, fontSize = 26, px2 = 28, py2 = 14, r2 = 10) {
+  ctx.save(); ctx.font = `900 ${fontSize}px Outfit`;
+  const tw = ctx.measureText(text).width; const bw = tw + px2 * 2; const bh = fontSize + py2 * 2;
+  roundRect(ctx, x, y, bw, bh, r2); ctx.fillStyle = bg; ctx.fill();
+  ctx.fillStyle = fg; ctx.textAlign = 'left'; ctx.fillText(text, x + px2, y + bh - py2 - 2); ctx.restore();
 }
-function drawCTA(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, w: number, h: number, fillColor: string, textColor: string, r = 30) {
-  ctx.save();
-  roundRect(ctx, x, y, w, h, r); ctx.fillStyle = fillColor; ctx.fill();
-  ctx.font = `900 ${Math.round(h * 0.38)}px Outfit`; ctx.fillStyle = textColor; ctx.textAlign = 'center';
-  ctx.fillText(text, x + w / 2, y + h * 0.65);
-  ctx.restore();
+function drawHex(ctx, cx, cy, r, fill, stroke, sw = 3) {
+  ctx.save(); ctx.beginPath();
+  for (let i = 0; i < 6; i++) { const a = (Math.PI / 3) * i - Math.PI / 6; i === 0 ? ctx.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a)) : ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a)); }
+  ctx.closePath(); ctx.fillStyle = fill; ctx.fill();
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = sw; ctx.stroke(); } ctx.restore();
 }
-function drawContact(ctx: CanvasRenderingContext2D, phone: string, x: number, y: number, acc: string, light = false) {
-  ctx.save();
-  ctx.beginPath(); ctx.arc(x + 22, y, 22, 0, Math.PI * 2); ctx.fillStyle = acc; ctx.fill();
-  ctx.font = '700 13px Outfit'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
-  ctx.fillText('☎', x + 22, y + 5);
-  ctx.font = '700 18px Outfit'; ctx.fillStyle = light ? '#0f172a' : '#fff'; ctx.textAlign = 'left';
-  ctx.fillText(phone, x + 52, y + 7);
-  ctx.restore();
+function drawIconCircle(ctx, cx, cy, r, bg, symbol, fg = '#fff', fs = 22) {
+  ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = bg; ctx.fill(); ctx.fillStyle = fg; ctx.font = `700 ${fs}px Outfit`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(symbol, cx, cy + 1); ctx.textBaseline = 'alphabetic'; ctx.restore();
 }
-function drawBenefits(ctx: CanvasRenderingContext2D, benefits: string[], startX: number, startY: number, maxW: number, acc: string, darkText: boolean, cols = 2) {
-  if (!benefits || benefits.length === 0) return;
+function drawFeatures(ctx, benefits, x, y, maxW, acc, light, cols = 1, iconSize = 26) {
+  if (!benefits?.length) return;
+  const ICONS = ['\u2726', '\u25c8', '\u25b8', '\u2605', '\u2b21', '\u2691'];
   const colW = maxW / cols;
-  benefits.slice(0, cols * 2).forEach((b: string, i: number) => {
-    const col = i % cols; const row = Math.floor(i / cols);
-    const bx = startX + col * colW; const by = startY + row * 52;
-    ctx.save();
-    ctx.fillStyle = acc; ctx.font = '900 18px Outfit'; ctx.textAlign = 'left';
-    ctx.fillText('▸', bx, by);
-    ctx.fillStyle = darkText ? '#1e293b' : '#e2e8f0'; ctx.font = '600 20px Outfit';
-    ctx.fillText(b.substring(0, 28), bx + 24, by);
-    ctx.restore();
+  benefits.slice(0, cols * 2).forEach((b, i) => {
+    const col = cols === 2 ? i % 2 : 0; const row = cols === 2 ? Math.floor(i / 2) : i;
+    const bx = x + col * colW; const by = y + row * 60;
+    drawIconCircle(ctx, bx + iconSize, by, iconSize, acc, ICONS[i % ICONS.length], '#fff', Math.round(iconSize * 0.7));
+    ctx.font = '600 20px Outfit'; ctx.fillStyle = light ? '#1e293b' : 'rgba(255,255,255,0.9)'; ctx.textAlign = 'left';
+    ctx.fillText(b.substring(0, 32), bx + iconSize * 2 + 10, by + 7);
   });
 }
-
-// ─── ENGINE 1: SPLIT PANEL ───────────────────────────────────────────────────
-function engine_splitPanel(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
-  const acc = d.accent || '#22c55e';
-  ctx.fillStyle = acc; ctx.fillRect(0, 0, W, H);
+function drawShadowText(ctx, text, x, y, color, font, shadowColor = 'rgba(0,0,0,0.7)', blur = 18) {
+  ctx.save(); ctx.shadowColor = shadowColor; ctx.shadowBlur = blur; ctx.shadowOffsetY = 4;
+  ctx.fillStyle = color; ctx.font = font; ctx.fillText(text, x, y); ctx.restore();
+}
+function drawCTA(ctx, text, x, y, w, h, fillColor, textColor, r = 8) {
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 6;
+  roundRect(ctx, x, y, w, h, r); ctx.fillStyle = fillColor; ctx.fill();
+  ctx.shadowColor = 'transparent';
+  const hi = ctx.createLinearGradient(x, y, x, y + h * 0.5);
+  hi.addColorStop(0, 'rgba(255,255,255,0.18)'); hi.addColorStop(1, 'rgba(255,255,255,0)');
+  roundRect(ctx, x, y, w, h * 0.5, r); ctx.fillStyle = hi; ctx.fill();
+  ctx.font = `900 ${Math.round(h * 0.4)}px Outfit`; ctx.fillStyle = textColor; ctx.textAlign = 'center';
+  ctx.fillText(text, x + w / 2, y + h * 0.65); ctx.restore();
+}
+function drawContact(ctx, phone, x, y, acc, light = false) {
+  ctx.save(); drawIconCircle(ctx, x + 22, y, 22, acc, '\u260e', '#fff', 14);
+  ctx.font = '700 18px Outfit'; ctx.fillStyle = light ? '#0f172a' : '#fff'; ctx.textAlign = 'left';
+  ctx.fillText(phone, x + 52, y + 7); ctx.restore();
+}
+function drawSocialBar(ctx, y, W, acc, light, web = '') {
+  ctx.save(); const icons = ['f', 'in', '@', '\u25b6']; let sx = 40;
+  icons.forEach(ic => { drawIconCircle(ctx, sx + 16, y, 16, light ? '#e2e8f0' : 'rgba(255,255,255,0.15)', ic, light ? '#64748b' : 'rgba(255,255,255,0.7)', 11); sx += 42; });
+  if (web) { ctx.font = '600 15px Outfit'; ctx.fillStyle = light ? '#64748b' : 'rgba(255,255,255,0.55)'; ctx.textAlign = 'right'; ctx.fillText(web, W - 40, y + 5); } ctx.restore();
+}
+function drawDotGrid(ctx, x, y, cols, rows, gap, color, r = 2) {
+  ctx.save(); ctx.fillStyle = color;
+  for (let c = 0; c < cols; c++) for (let r2 = 0; r2 < rows; r2++) { ctx.beginPath(); ctx.arc(x + c * gap, y + r2 * gap, r, 0, Math.PI * 2); ctx.fill(); } ctx.restore();
+}
+function engine_splitPanel(ctx, W, H, d) {
+  const acc = d.accent || '#1a56db';
+  ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, W, H);
   ctx.save(); ctx.beginPath();
-  ctx.moveTo(W * 0.58, 0); ctx.bezierCurveTo(W * 0.92, H * 0.25, W * 0.22, H * 0.75, W * 0.58, H);
-  ctx.lineTo(W, H); ctx.lineTo(W, 0); ctx.closePath(); ctx.clip();
-  if (d.bgImage) ctx.drawImage(d.bgImage, 0, 0, W, H); else { ctx.fillStyle = '#334155'; ctx.fillRect(0, 0, W, H); }
-  ctx.restore();
-  ctx.save(); ctx.beginPath();
-  ctx.moveTo(0, 0); ctx.lineTo(W * 0.62, 0);
-  ctx.bezierCurveTo(W * 0.96, H * 0.25, W * 0.26, H * 0.75, W * 0.62, H);
-  ctx.lineTo(0, H); ctx.closePath();
-  ctx.shadowColor = 'rgba(0,0,0,0.2)'; ctx.shadowBlur = 60; ctx.shadowOffsetX = 12;
-  ctx.fillStyle = '#fff'; ctx.fill(); ctx.restore();
-  if (d.logoImage) ctx.drawImage(d.logoImage, 48, 40, 54, 54);
-  ctx.textAlign = 'left'; ctx.fillStyle = '#64748b'; ctx.font = '700 15px Outfit';
-  ctx.fillText('ARIAS GROUP • EXCLUSIVE REAL ESTATE', 48, 120);
-  const titleLines = wrapText(ctx, (d.title || '').toUpperCase(), W * 0.55);
-  ctx.font = '900 62px Playfair Display';
-  titleLines.slice(0, 3).forEach((line: string, i: number) => {
-    ctx.fillStyle = i === 1 ? acc : '#0f172a'; ctx.fillText(line, 48, 230 + i * 72);
-  });
-  const spSubY = 230 + titleLines.length * 72 + 14;
-  const subLines = wrapText(ctx, d.subtitle || '', W * 0.52);
-  ctx.fillStyle = '#64748b'; ctx.font = '400 21px Outfit';
-  subLines.slice(0, 3).forEach((sl: string, ix: number) => ctx.fillText(sl, 48, spSubY + ix * 30));
-  drawBenefits(ctx, d.beneficios || [], 48, spSubY + subLines.slice(0,3).length * 30 + 30, W * 0.53, acc, true, 1);
-  drawCTA(ctx, d.cta || 'CONTACTANOS', 48, H - 190, 240, 58, acc, '#fff');
-  drawContact(ctx, d.contact?.whatsapp || profile_phone || '+503 7XXX-XXXX', 48, H - 90, acc, true);
+  ctx.moveTo(0,0); ctx.lineTo(W*0.55,0); ctx.bezierCurveTo(W*0.72,H*0.2,W*0.38,H*0.8,W*0.6,H); ctx.lineTo(0,H); ctx.closePath(); ctx.clip();
+  if (d.bgImage) ctx.drawImage(d.bgImage,0,0,W*0.7,H); else { ctx.fillStyle='#334155'; ctx.fillRect(0,0,W,H); }
+  const og=ctx.createLinearGradient(0,0,W*0.6,0); og.addColorStop(0,'rgba(0,0,0,0.15)'); og.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=og; ctx.fillRect(0,0,W,H); ctx.restore();
+  drawDotGrid(ctx,W*0.65,40,5,5,22,acc+'44',3);
+  drawHex(ctx,W*0.82,H*0.15,55,acc+'22',acc+'55',2); drawHex(ctx,W*0.9,H*0.82,35,acc+'15',acc+'33',1);
+  ctx.fillStyle=acc; ctx.fillRect(W*0.62,0,W*0.38,8);
+  if (d.logoImage) ctx.drawImage(d.logoImage,W*0.63,24,44,44);
+  ctx.textAlign='left'; ctx.fillStyle='#64748b'; ctx.font='700 13px Outfit'; ctx.fillText('LOGO HERE',W*0.63+(d.logoImage?52:0),40);
+  ctx.fillStyle=acc; ctx.font='600 11px Outfit'; ctx.fillText('WWW.EMPRESA.COM',W*0.63+(d.logoImage?52:0),58);
+  for(let i=0;i<3;i++){ctx.beginPath();ctx.arc(W*0.63+(i*18),80,4,0,Math.PI*2);ctx.fillStyle=i===0?acc:acc+'55';ctx.fill();}
+  const lines=wrapText(ctx,(d.title||'').toUpperCase(),W*0.36); ctx.textAlign='left';
+  lines.slice(0,3).forEach((l,i)=>{ ctx.font=i===0?'900 64px Playfair Display':'900 60px Playfair Display'; drawShadowText(ctx,l,W*0.62,160+i*74,i===1?acc:'#0f172a',ctx.font,'rgba(0,0,0,0.05)',4); });
+  ctx.fillStyle=acc; ctx.fillRect(W*0.62,160+lines.length*74+8,60,4);
+  const subY=160+lines.length*74+28; const subs=wrapText(ctx,d.subtitle||'',W*0.36);
+  ctx.font='400 20px Outfit'; ctx.fillStyle='#475569'; subs.slice(0,3).forEach((s,i)=>ctx.fillText(s,W*0.62,subY+i*28));
+  drawFeatures(ctx,d.beneficios||[],W*0.62,subY+subs.length*28+30,W*0.34,acc,true,1,22);
+  drawCTA(ctx,d.cta||'GET STARTED',W*0.62,H-170,230,58,acc,'#fff');
+  drawSocialBar(ctx,H-72,W,acc,true,d.contact?.web||'www.empresa.com');
+  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W*0.62,H-105,acc,true);
 }
-
-// ─── ENGINE 2: FULL OVERLAY ──────────────────────────────────────────────────
-function engine_fullOverlay(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
+function engine_fullOverlay(ctx, W, H, d) {
   const acc = d.accent || '#D4AF37';
-  if (d.bgImage) ctx.drawImage(d.bgImage, 0, 0, W, H); else { ctx.fillStyle = '#1e293b'; ctx.fillRect(0, 0, W, H); }
-  const gr = ctx.createLinearGradient(0, H * 0.35, 0, H);
-  gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(0.5, 'rgba(0,0,0,0.7)'); gr.addColorStop(1, 'rgba(0,0,0,0.95)');
-  ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
-  const foTopGr = ctx.createLinearGradient(0, 0, 0, 180);
-  foTopGr.addColorStop(0, 'rgba(0,0,0,0.8)'); foTopGr.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = foTopGr; ctx.fillRect(0, 0, W, 180);
-  if (d.logoImage) ctx.drawImage(d.logoImage, W / 2 - 28, 38, 56, 56);
-  ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.font = '700 15px Outfit';
-  ctx.fillText('ARIAS GROUP • EXCLUSIVE REAL ESTATE', W / 2, 120);
-  ctx.fillStyle = acc; ctx.fillRect(W / 2 - 40, 130, 80, 3);
-  const foTitleLines = wrapText(ctx, (d.title || '').toUpperCase(), W - 100);
-  foTitleLines.slice(0, 2).forEach((line: string, i: number) => {
-    drawShadowText(ctx, line, W / 2, H * 0.6 + i * 90, '#fff', '900 80px Playfair Display');
+  if (d.bgImage) ctx.drawImage(d.bgImage,0,0,W,H); else { ctx.fillStyle='#1e293b'; ctx.fillRect(0,0,W,H); }
+  const gr=ctx.createLinearGradient(0,0,0,H); gr.addColorStop(0,'rgba(0,0,0,0.75)'); gr.addColorStop(0.45,'rgba(0,0,0,0.3)'); gr.addColorStop(1,'rgba(0,0,0,0.92)'); ctx.fillStyle=gr; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(0,0,W,100);
+  if (d.logoImage) ctx.drawImage(d.logoImage,W/2-26,18,52,52);
+  ctx.textAlign='center'; ctx.fillStyle=acc; ctx.font='700 13px Outfit'; ctx.fillText('ARIAS GROUP  \u2022  EXCLUSIVE',W/2,82);
+  ctx.fillStyle=acc; ctx.fillRect(W/2-50,92,100,3);
+  drawHex(ctx,80,H*0.35,45,'rgba(255,255,255,0.04)',acc+'40',1); drawHex(ctx,W-70,H*0.65,35,'rgba(255,255,255,0.04)',acc+'30',1);
+  const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-120);
+  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,W/2,H*0.45+i*92,'#fff',`900 ${i===0?84:80}px Playfair Display`,'rgba(0,0,0,0.8)',30));
+  ctx.fillStyle=acc; ctx.font='500 28px Outfit'; ctx.textAlign='center'; ctx.fillText(d.subtitle||'',W/2,H*0.45+tl.length*92+10);
+  const fbY=H*0.45+tl.length*92+60;
+  (d.beneficios||[]).slice(0,3).forEach((b,i)=>{
+    ctx.font='600 19px Outfit'; const tw=ctx.measureText(b).width+48; const bx=W/2-tw/2;
+    roundRect(ctx,bx,fbY+i*54,tw,40,20); ctx.fillStyle='rgba(255,255,255,0.12)'; ctx.fill();
+    ctx.strokeStyle=acc+'80'; ctx.lineWidth=1; ctx.stroke(); ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.fillText(b,W/2,fbY+i*54+27);
   });
-  ctx.fillStyle = acc; ctx.font = '400 32px Outfit'; ctx.textAlign = 'center';
-  ctx.fillText(d.subtitle || '', W / 2, H * 0.6 + foTitleLines.length * 90 + 10);
-  if (d.beneficios?.length) {
-    d.beneficios.slice(0, 3).forEach((b: string, i: number) => {
-      ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.font = '600 20px Outfit';
-      ctx.fillText(`◆  ${b}`, W / 2, H * 0.6 + foTitleLines.length * 90 + 55 + i * 32);
-    });
-  }
-  drawCTA(ctx, d.cta || 'VER MAS', W / 2 - 130, H - 150, 260, 60, acc, '#000');
-  ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.font = '600 17px Outfit';
-  ctx.fillText(d.contact?.whatsapp || profile_phone || '+503 7XXX-XXXX', W / 2, H - 55);
+  drawCTA(ctx,d.cta||'SABER M\u00c1S',W/2-130,H-160,260,62,acc,'#000');
+  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2-80,H-70,acc,false);
 }
-
-// ─── ENGINE 3: BOTTOM BANNER ─────────────────────────────────────────────────
-function engine_bottomBanner(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
+function engine_bottomBanner(ctx, W, H, d) {
+  const acc = d.accent || '#e11d48'; const splitY=H*0.5;
+  ctx.save(); ctx.beginPath(); ctx.rect(0,0,W,splitY+20); ctx.clip();
+  if (d.bgImage) ctx.drawImage(d.bgImage,0,0,W,splitY*1.6); else { ctx.fillStyle='#334155'; ctx.fillRect(0,0,W,H); }
+  const pgr=ctx.createLinearGradient(0,0,0,splitY+20); pgr.addColorStop(0,'rgba(0,0,0,0.5)'); pgr.addColorStop(1,'rgba(15,23,42,0.95)'); ctx.fillStyle=pgr; ctx.fillRect(0,0,W,splitY+20); ctx.restore();
+  ctx.fillStyle='#0f172a'; ctx.fillRect(0,splitY,W,H-splitY);
+  ctx.fillStyle=acc; ctx.fillRect(0,splitY,W,6);
+  ctx.save(); ctx.beginPath(); ctx.moveTo(0,splitY+6); ctx.lineTo(W*0.45,splitY+6); ctx.lineTo(W*0.35,splitY+100); ctx.lineTo(0,splitY+100); ctx.closePath(); ctx.fillStyle=acc+'22'; ctx.fill(); ctx.restore();
+  if (d.logoImage) ctx.drawImage(d.logoImage,40,26,48,48);
+  ctx.textAlign='left'; ctx.font='700 15px Outfit'; ctx.fillStyle='#fff'; ctx.fillText('ARIAS GROUP',d.logoImage?100:40,45);
+  ctx.fillStyle=acc; ctx.font='600 12px Outfit'; ctx.fillText('EXCLUSIVE MARKETING',d.logoImage?100:40,64);
+  if (d.price) drawBadge(ctx,d.price,W-220,26,acc,'#fff',38,20,12,8);
+  const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-80);
+  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,40,splitY-120+i*80,'#fff','900 72px Playfair Display'));
+  ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.font='400 22px Outfit'; ctx.textAlign='left'; ctx.fillText(d.subtitle||'',40,splitY-20);
+  drawFeatures(ctx,d.beneficios||[],40,splitY+40,W-80,acc,false,2,24);
+  drawCTA(ctx,d.cta||'CONTACTANOS',W-268,H-90,228,58,acc,'#fff');
+  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',40,H-58,acc,false);
+  drawSocialBar(ctx,H-30,W,acc,false,d.contact?.web||'');
+}
+function engine_magazine(ctx, W, H, d) {
   const acc = d.accent || '#D4AF37';
-  const panelY = H * 0.55;
-  if (d.bgImage) { ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, panelY + 30); ctx.clip(); ctx.drawImage(d.bgImage, 0, 0, W, H * 0.85); ctx.restore(); }
-  else { ctx.fillStyle = '#334155'; ctx.fillRect(0, 0, W, panelY + 30); }
-  const bbFadeGr = ctx.createLinearGradient(0, panelY - 80, 0, panelY + 30);
-  bbFadeGr.addColorStop(0, 'rgba(0,0,0,0)'); bbFadeGr.addColorStop(1, '#0f172a');
-  ctx.fillStyle = bbFadeGr; ctx.fillRect(0, panelY - 80, W, 110);
-  ctx.fillStyle = '#0f172a'; ctx.fillRect(0, panelY + 28, W, H - panelY - 28);
-  ctx.fillStyle = acc; ctx.fillRect(0, panelY + 26, W, 6);
-  const bbTopGr = ctx.createLinearGradient(0, 0, 0, 160);
-  bbTopGr.addColorStop(0, 'rgba(0,0,0,0.85)'); bbTopGr.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = bbTopGr; ctx.fillRect(0, 0, W, 160);
-  if (d.logoImage) ctx.drawImage(d.logoImage, 50, 36, 50, 50);
-  ctx.textAlign = 'left'; ctx.fillStyle = '#fff'; ctx.font = '700 16px Outfit';
-  ctx.fillText('ARIAS GROUP • EXCLUSIVE REAL ESTATE', 115, 72);
-  const bbTitleLines = wrapText(ctx, (d.title || '').toUpperCase(), W - 80);
-  bbTitleLines.slice(0, 2).forEach((line: string, i: number) => {
-    drawShadowText(ctx, line, 50, panelY + 95 + i * 78, '#fff', '900 68px Playfair Display');
-  });
-  ctx.fillStyle = acc; ctx.font = '500 26px Outfit'; ctx.textAlign = 'left';
-  ctx.fillText(d.subtitle || '', 50, panelY + 95 + bbTitleLines.length * 78 + 8);
-  drawBenefits(ctx, d.beneficios || [], 50, panelY + 95 + bbTitleLines.length * 78 + 50, W - 100, acc, false, 2);
-  drawCTA(ctx, d.cta || 'CONTACTANOS', W - 290, H - 80, 240, 54, acc, '#000');
-  drawContact(ctx, d.contact?.whatsapp || profile_phone || '+503 7XXX-XXXX', 50, H - 53, acc, false);
+  if (d.bgImage) ctx.drawImage(d.bgImage,0,0,W,H); else { ctx.fillStyle='#1e293b'; ctx.fillRect(0,0,W,H); }
+  ctx.fillStyle='rgba(0,0,0,0.38)'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle=acc; ctx.fillRect(0,0,16,H);
+  const tgr=ctx.createLinearGradient(0,0,0,220); tgr.addColorStop(0,'rgba(0,0,0,0.9)'); tgr.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=tgr; ctx.fillRect(0,0,W,220);
+  ctx.fillStyle=acc; ctx.font='900 13px Outfit'; ctx.textAlign='left'; ctx.fillText('MARKETING EXCLUSIVE',40,52);
+  ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.font='400 13px Outfit'; ctx.fillText(' \u2014 EDICION ESPECIAL',40+ctx.measureText('MARKETING EXCLUSIVE').width,52);
+  if (d.logoImage) ctx.drawImage(d.logoImage,W-80,24,50,50);
+  ctx.fillStyle=acc+'99'; ctx.fillRect(40,64,W-130,1);
+  drawDotGrid(ctx,W-120,100,4,6,20,'rgba(255,255,255,0.12)',2);
+  const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-80); ctx.textAlign='left';
+  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,36,H*0.44+i*110,'#fff',`900 ${i===0?100:92}px Playfair Display`,'rgba(0,0,0,0.9)',35));
+  ctx.fillStyle=acc; ctx.fillRect(36,H*0.44+tl.length*110+10,80,4);
+  ctx.fillStyle=acc; ctx.font='600 28px Outfit'; ctx.fillText((d.subtitle||'').toUpperCase(),36,H*0.44+tl.length*110+50);
+  drawFeatures(ctx,d.beneficios||[],36,H*0.44+tl.length*110+90,W-72,acc,false,2,24);
+  drawCTA(ctx,d.cta||'VER OFERTA',W-296,H-90,256,58,acc,'#000');
+  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',36,H-52,acc,false);
 }
-
-// ─── ENGINE 4: MAGAZINE EDITORIAL ────────────────────────────────────────────
-function engine_magazine(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
+function engine_circle(ctx, W, H, d) {
+  const acc = d.accent || '#1a56db';
+  const bgGr=ctx.createLinearGradient(0,0,W,H); bgGr.addColorStop(0,acc); bgGr.addColorStop(1,'#0f172a'); ctx.fillStyle=bgGr; ctx.fillRect(0,0,W,H);
+  const R=W*0.38,cx2=W*0.35,cy2=H*0.38;
+  ctx.save(); const glow=ctx.createRadialGradient(cx2,cy2,0,cx2,cy2,R+20); glow.addColorStop(0,'rgba(255,255,255,0.12)'); glow.addColorStop(1,'transparent');
+  ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(cx2,cy2,R+20,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx2,cy2,R,0,Math.PI*2); ctx.clip();
+  if (d.bgImage) ctx.drawImage(d.bgImage,cx2-R,cy2-R,R*2,R*2); else { ctx.fillStyle='#334155'; ctx.fillRect(0,0,W,H); } ctx.restore();
+  ctx.strokeStyle='#fff'; ctx.lineWidth=5; ctx.beginPath(); ctx.arc(cx2,cy2,R,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle=acc+'80'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(cx2,cy2,R+14,0,Math.PI*2); ctx.stroke();
+  const feats=(d.beneficios||[]).slice(0,4); const ICONS4=['\u2605','\u25c8','\u25b8','\u2726'];
+  const positions=[{x:cx2-R*1.1,y:cy2-R*0.5},{x:cx2+R*1.0,y:cy2-R*0.7},{x:cx2-R*1.0,y:cy2+R*0.7},{x:cx2+R*1.1,y:cy2+R*0.45}];
+  feats.forEach((b,i)=>{ const pos=positions[i]; drawIconCircle(ctx,pos.x,pos.y,36,'#fff',ICONS4[i],acc,18);
+    ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.2)'; ctx.lineWidth=1; ctx.setLineDash([4,6]); ctx.beginPath(); ctx.moveTo(cx2,cy2); ctx.lineTo(pos.x,pos.y); ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+    ctx.font='600 15px Outfit'; ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.textAlign=pos.x>cx2?'left':'right'; ctx.fillText(b.substring(0,18),pos.x>cx2?pos.x+44:pos.x-44,pos.y+6); });
+  ctx.textAlign='right'; if (d.logoImage) ctx.drawImage(d.logoImage,W-90,36,50,50);
+  ctx.fillStyle=acc+'dd'; ctx.font='700 13px Outfit'; ctx.fillText('ARIAS GROUP EXCLUSIVE',W-36,65);
+  const tl=wrapText(ctx,(d.title||'').toUpperCase(),W*0.43); tl.slice(0,3).forEach((l,i)=>drawShadowText(ctx,l,W-36,H*0.65+i*76,i===1?acc:'#fff','900 56px Playfair Display'));
+  ctx.fillStyle='rgba(255,255,255,0.7)'; ctx.font='400 20px Outfit'; ctx.fillText(d.subtitle||'',W-36,H*0.65+tl.length*76+18);
+  drawCTA(ctx,d.cta||'CONTACTANOS',W-256,H-150,220,52,'#fff',acc);
+  ctx.fillStyle='rgba(255,255,255,0.55)'; ctx.font='600 16px Outfit'; ctx.textAlign='right'; ctx.fillText(d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W-36,H-70);
+  drawSocialBar(ctx,H-30,W,acc,false,d.contact?.web||'');
+}
+function engine_stripes(ctx, W, H, d) {
+  const acc = d.accent || '#1a56db';
+  ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#0f172a'; ctx.fillRect(0,0,W,H*0.09); ctx.fillStyle=acc; ctx.fillRect(0,H*0.09,W,H*0.055);
+  ctx.save(); ctx.beginPath(); ctx.rect(0,H*0.145,W,H*0.48); ctx.clip();
+  if (d.bgImage) ctx.drawImage(d.bgImage,0,H*0.12,W,H*0.54); else { ctx.fillStyle='#e2e8f0'; ctx.fillRect(0,0,W,H); }
+  const fgr=ctx.createLinearGradient(0,H*0.5,0,H*0.63); fgr.addColorStop(0,'rgba(255,255,255,0)'); fgr.addColorStop(1,'#fff'); ctx.fillStyle=fgr; ctx.fillRect(0,H*0.5,W,H*0.13); ctx.restore();
+  ctx.fillStyle=acc; ctx.fillRect(0,H*0.625,W,H*0.036); ctx.fillStyle='#0f172a'; ctx.fillRect(0,H*0.661,W,H*0.339);
+  if (d.logoImage) ctx.drawImage(d.logoImage,30,6,50,50);
+  ctx.textAlign='left'; ctx.fillStyle='#fff'; ctx.font='700 15px Outfit'; ctx.fillText('ARIAS GROUP',d.logoImage?90:30,35);
+  drawHex(ctx,W-60,H*0.045,34,acc+'33',acc,2); ctx.fillStyle=acc; ctx.font='700 10px Outfit'; ctx.textAlign='center'; ctx.fillText('PRO',W-60,H*0.045+4);
+  ctx.textAlign='left'; const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-80);
+  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,40,H*0.24+i*86,'#fff','900 76px Playfair Display'));
+  const botY=H*0.69; drawFeatures(ctx,d.beneficios||[],40,botY,W-80,acc,false,2,22);
+  ctx.fillStyle='rgba(255,255,255,0.15)'; ctx.fillRect(40,botY+130,W-80,1);
+  ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='400 20px Outfit'; ctx.textAlign='left'; ctx.fillText(d.subtitle||'',40,botY+158);
+  drawCTA(ctx,d.cta||'SABER M\u00c1S',W-268,H-90,228,54,acc,'#fff');
+  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',40,H-52,acc,false);
+}
+function engine_cornerBurst(ctx, W, H, d) {
+  const acc = d.accent || '#0ea5e9';
+  ctx.fillStyle='#0f172a'; ctx.fillRect(0,0,W,H);
+  ctx.save(); ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(W,0); ctx.lineTo(W,H*0.56); ctx.lineTo(0,H*0.44); ctx.closePath(); ctx.clip();
+  if (d.bgImage) ctx.drawImage(d.bgImage,0,0,W,H); else { ctx.fillStyle='#334155'; ctx.fillRect(0,0,W,H); }
+  const dog=ctx.createLinearGradient(0,0,0,H*0.56); dog.addColorStop(0,'rgba(0,0,0,0.5)'); dog.addColorStop(1,'rgba(0,0,0,0)'); ctx.fillStyle=dog; ctx.fillRect(0,0,W,H*0.56); ctx.restore();
+  ctx.save(); ctx.globalAlpha=0.9; ctx.fillStyle=acc; ctx.beginPath(); ctx.moveTo(0,H*0.42); ctx.lineTo(W,H*0.54); ctx.lineTo(W,H*0.60); ctx.lineTo(0,H*0.48); ctx.closePath(); ctx.fill(); ctx.globalAlpha=1; ctx.restore();
+  if (d.logoImage) ctx.drawImage(d.logoImage,36,28,48,48);
+  ctx.textAlign='left'; ctx.font='700 14px Outfit'; ctx.fillStyle='#fff'; ctx.fillText('ARIAS GROUP',d.logoImage?96:36,50);
+  ctx.fillStyle=acc; ctx.font='600 11px Outfit'; ctx.fillText('DIGITAL MARKETING',d.logoImage?96:36,68);
+  drawHex(ctx,W-70,80,50,'rgba(255,255,255,0.04)',acc+'66',2); drawDotGrid(ctx,W-140,40,4,4,20,acc+'33',2);
+  drawBadge(ctx,'OFERTA',W-180,30,acc,'#fff',20,16,10,6);
+  const titY=H*0.65; const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-80);
+  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,36,titY+i*80,'#fff','900 68px Playfair Display'));
+  ctx.fillStyle=acc; ctx.font='500 24px Outfit'; ctx.fillText(d.subtitle||'',36,titY+tl.length*80+16);
+  drawFeatures(ctx,d.beneficios||[],36,titY+tl.length*80+56,W-72,acc,false,2,20);
+  drawCTA(ctx,d.cta||'CONTACTANOS',W-268,H-80,230,54,acc,'#fff');
+  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',36,H-44,acc,false);
+}
+function engine_architectural(ctx, W, H, d) {
   const acc = d.accent || '#D4AF37';
-  if (d.bgImage) ctx.drawImage(d.bgImage, 0, 0, W, H); else { ctx.fillStyle = '#1e293b'; ctx.fillRect(0, 0, W, H); }
-  ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = acc; ctx.fillRect(0, 0, 12, H); ctx.fillStyle = acc; ctx.fillRect(0, 0, W, 4);
-  const magTopGr = ctx.createLinearGradient(0, 0, 0, 200);
-  magTopGr.addColorStop(0, 'rgba(0,0,0,0.85)'); magTopGr.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = magTopGr; ctx.fillRect(0, 0, W, 200);
-  if (d.logoImage) ctx.drawImage(d.logoImage, 30, 30, 50, 50);
-  ctx.textAlign = 'left'; ctx.fillStyle = '#fff'; ctx.font = '800 15px Outfit';
-  ctx.fillText('ARIAS GROUP  EXCLUSIVE REAL ESTATE', 92, 62);
-  ctx.fillStyle = acc; ctx.fillRect(92, 72, 320, 2);
-  const magTitleLines = wrapText(ctx, (d.title || '').toUpperCase(), W - 60);
-  magTitleLines.slice(0, 2).forEach((line: string, i: number) => {
-    drawShadowText(ctx, line, 30, H * 0.45 + i * 108, '#fff', '900 96px Playfair Display', 'rgba(0,0,0,0.9)', 30);
-  });
-  ctx.fillStyle = acc; ctx.font = '700 36px Outfit'; ctx.textAlign = 'left';
-  ctx.fillText((d.subtitle || '').toUpperCase(), 30, H * 0.45 + magTitleLines.length * 108 + 16);
-  drawBenefits(ctx, d.beneficios || [], 30, H * 0.45 + magTitleLines.length * 108 + 65, W - 60, acc, false, 2);
-  drawCTA(ctx, d.cta || 'VER PROPIEDAD', W - 300, H - 80, 268, 56, acc, '#000');
-  ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '600 17px Outfit'; ctx.textAlign = 'left';
-  ctx.fillText(d.contact?.whatsapp || profile_phone || '+503 7XXX-XXXX', 30, H - 50);
+  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle=acc; ctx.fillRect(0,0,W,10);
+  drawDotGrid(ctx,W-160,30,6,5,22,'#e2e8f0',3);
+  const px=80,py=60,pw=W-160,ph=H*0.42;
+  ctx.save(); ctx.shadowColor='rgba(0,0,0,0.15)'; ctx.shadowBlur=30; ctx.shadowOffsetY=8;
+  roundRect(ctx,px,py,pw,ph,16); ctx.fillStyle='#e2e8f0'; ctx.fill(); ctx.restore();
+  ctx.save(); roundRect(ctx,px,py,pw,ph,16); ctx.clip();
+  if (d.bgImage) ctx.drawImage(d.bgImage,px,py,pw,ph); else { ctx.fillStyle='#94a3b8'; ctx.fillRect(px,py,pw,ph); }
+  const pfgr=ctx.createLinearGradient(0,py+ph*0.6,0,py+ph); pfgr.addColorStop(0,'rgba(0,0,0,0)'); pfgr.addColorStop(1,'rgba(0,0,0,0.4)'); ctx.fillStyle=pfgr; ctx.fillRect(px,py,pw,ph);
+  drawCTA(ctx,d.cta||'VER DETALLES',px+pw-230,py+ph-72,210,50,acc,'#fff'); ctx.restore();
+  drawBadge(ctx,'NUEVO',px+16,py+16,acc,'#fff',18,14,8,6);
+  const bY=py+ph+32;
+  if (d.logoImage) ctx.drawImage(d.logoImage,px,bY,40,40);
+  ctx.textAlign='left'; ctx.fillStyle='#94a3b8'; ctx.font='700 12px Outfit';
+  ctx.fillText('ARIAS GROUP  \u2022  EXCLUSIVE REAL ESTATE',px+(d.logoImage?50:0),bY+16);
+  ctx.fillStyle=acc; ctx.fillRect(px,bY+30,60,4);
+  const titleY=bY+58; const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-200); ctx.font='900 62px Playfair Display';
+  tl.slice(0,2).forEach((l,i)=>{ ctx.fillStyle=i===0?'#0f172a':acc; ctx.fillText(l,px,titleY+i*72); });
+  const afterTitle=titleY+tl.length*72; ctx.fillStyle='#64748b'; ctx.font='400 20px Outfit';
+  const subs=wrapText(ctx,d.subtitle||'',W-180); subs.slice(0,2).forEach((s,i)=>ctx.fillText(s,px,afterTitle+8+i*28));
+  drawFeatures(ctx,d.beneficios||[],px,afterTitle+8+subs.length*28+20,W-180,acc,true,2,22);
+  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',px,H-44,acc,true);
+  drawSocialBar(ctx,H-24,W,acc,true,d.contact?.web||'');
 }
-
-// ─── ENGINE 5: CIRCULO FOTOGRAFICO ───────────────────────────────────────────
-function engine_circle(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
+function engine_luxuryDark(ctx, W, H, d) {
   const acc = d.accent || '#D4AF37';
-  ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, W, H);
-  const cirGr = ctx.createRadialGradient(W * 0.3, H * 0.3, 0, W * 0.3, H * 0.3, W * 0.8);
-  cirGr.addColorStop(0, acc + '33'); cirGr.addColorStop(1, 'transparent');
-  ctx.fillStyle = cirGr; ctx.fillRect(0, 0, W, H);
-  const R = W * 0.42, cirCx = W * 0.28, cirCy = H * 0.38;
-  ctx.save(); ctx.beginPath(); ctx.arc(cirCx, cirCy, R, 0, Math.PI * 2); ctx.clip();
-  if (d.bgImage) ctx.drawImage(d.bgImage, cirCx - R, cirCy - R, R * 2, R * 2);
-  else { ctx.fillStyle = '#334155'; ctx.fillRect(0, 0, W, H); }
-  ctx.restore();
-  ctx.strokeStyle = acc; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(cirCx, cirCy, R, 0, Math.PI * 2); ctx.stroke();
-  if (d.logoImage) ctx.drawImage(d.logoImage, W * 0.55, 50, 50, 50);
-  ctx.textAlign = 'right'; ctx.fillStyle = '#94a3b8'; ctx.font = '700 14px Outfit';
-  ctx.fillText('ARIAS GROUP EXCLUSIVE', W - 44, 82);
-  const cirTitleLines = wrapText(ctx, (d.title || '').toUpperCase(), W * 0.45);
-  ctx.font = '900 60px Playfair Display'; ctx.textAlign = 'right';
-  cirTitleLines.slice(0, 3).forEach((line: string, i: number) => {
-    ctx.fillStyle = i === 0 ? '#fff' : (i === 1 ? acc : '#94a3b8');
-    ctx.fillText(line, W - 40, H * 0.35 + i * 70);
+  ctx.fillStyle='#070711'; ctx.fillRect(0,0,W,H);
+  const rglow=ctx.createRadialGradient(W/2,H*0.5,0,W/2,H*0.5,W*0.55); rglow.addColorStop(0,acc+'18'); rglow.addColorStop(1,'transparent'); ctx.fillStyle=rglow; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle=acc+'15'; ctx.lineWidth=1;
+  for(let gy=0;gy<H;gy+=70){ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(W,gy);ctx.stroke();}
+  for(let gx=0;gx<W;gx+=70){ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,H);ctx.stroke();}
+  drawHex(ctx,W*0.12,H*0.12,60,acc+'08',acc+'25',1); drawHex(ctx,W*0.88,H*0.88,50,acc+'08',acc+'20',1);
+  const ph=H*0.33,py=H*0.27;
+  ctx.save(); ctx.shadowColor=acc; ctx.shadowBlur=20; ctx.strokeStyle=acc; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.rect(W*0.12,py-4,W*0.76,ph+8); ctx.stroke(); ctx.shadowColor='transparent'; ctx.restore();
+  ctx.save(); ctx.beginPath(); ctx.rect(W*0.12,py,W*0.76,ph); ctx.clip();
+  if (d.bgImage) ctx.drawImage(d.bgImage,W*0.12,py-H*0.1,W*0.76,ph+H*0.15); else { ctx.fillStyle='#1e293b'; ctx.fillRect(0,py,W,ph); }
+  const pf=ctx.createLinearGradient(0,py,0,py+ph); pf.addColorStop(0,'rgba(7,7,17,0.75)'); pf.addColorStop(0.3,'rgba(7,7,17,0)'); pf.addColorStop(0.7,'rgba(7,7,17,0)'); pf.addColorStop(1,'rgba(7,7,17,0.85)');
+  ctx.fillStyle=pf; ctx.fillRect(0,py,W,ph); ctx.restore();
+  if (d.logoImage) ctx.drawImage(d.logoImage,W/2-26,28,52,52);
+  ctx.textAlign='center'; ctx.fillStyle=acc; ctx.font='700 13px Outfit'; ctx.fillText('ARIAS GROUP  \u25c6  EXCLUSIVE',W/2,94);
+  const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-100);
+  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,W/2,H*0.17+i*80,i===0?'#fff':acc,'900 72px Playfair Display','rgba(0,0,0,0.8)',25));
+  const afterPh=py+ph+44; ctx.fillStyle='rgba(255,255,255,0.65)'; ctx.font='400 22px Outfit'; ctx.textAlign='center'; ctx.fillText(d.subtitle||'',W/2,afterPh);
+  (d.beneficios||[]).slice(0,3).forEach((b,i)=>{
+    const cardW=W*0.68,cardX=(W-cardW)/2; roundRect(ctx,cardX,afterPh+32+i*58,cardW,46,8);
+    ctx.fillStyle='rgba(255,255,255,0.05)'; ctx.fill(); ctx.strokeStyle=acc+'40'; ctx.lineWidth=1; ctx.stroke();
+    drawIconCircle(ctx,cardX+28,afterPh+55+i*58,18,acc,'\u2605','#000',11);
+    ctx.font='600 18px Outfit'; ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.textAlign='left'; ctx.fillText(b.substring(0,36),cardX+54,afterPh+62+i*58);
   });
-  ctx.fillStyle = acc; ctx.fillRect(W * 0.55, H * 0.35 + cirTitleLines.length * 70 + 14, W * 0.41, 3);
-  ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.font = '400 22px Outfit'; ctx.textAlign = 'right';
-  const cirSubLines = wrapText(ctx, d.subtitle || '', W * 0.44);
-  cirSubLines.slice(0, 3).forEach((sl: string, ix: number) => ctx.fillText(sl, W - 40, H * 0.35 + cirTitleLines.length * 70 + 40 + ix * 30));
-  drawBenefits(ctx, d.beneficios || [], W * 0.54, H * 0.65, W * 0.41, acc, false, 1);
-  drawCTA(ctx, d.cta || 'CONTACTANOS', W - 280, H - 160, 238, 54, acc, '#000');
-  ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = '600 17px Outfit'; ctx.textAlign = 'right';
-  ctx.fillText(d.contact?.whatsapp || profile_phone || '+503 7XXX-XXXX', W - 40, H - 55);
+  const ctaY=afterPh+32+(d.beneficios||[]).length*58+20;
+  drawCTA(ctx,d.cta||'VER PROPIEDAD',W/2-135,ctaY,270,58,acc,'#000');
+  ctx.fillStyle='rgba(255,255,255,0.35)'; ctx.font='600 15px Outfit'; ctx.textAlign='center'; ctx.fillText(d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2,ctaY+78);
 }
-
-// ─── ENGINE 6: FRANJAS ───────────────────────────────────────────────────────
-function engine_stripes(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
-  const acc = d.accent || '#D4AF37';
-  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, W, H * 0.08);
-  ctx.fillStyle = acc; ctx.fillRect(0, H * 0.08, W, H * 0.06);
-  ctx.save(); ctx.beginPath(); ctx.rect(0, H * 0.14, W, H * 0.52); ctx.clip();
-  if (d.bgImage) ctx.drawImage(d.bgImage, 0, H * 0.12, W, H * 0.56);
-  else { ctx.fillStyle = '#e2e8f0'; ctx.fillRect(0, 0, W, H); }
-  const strFadeGr = ctx.createLinearGradient(0, H * 0.54, 0, H * 0.66);
-  strFadeGr.addColorStop(0, 'rgba(255,255,255,0)'); strFadeGr.addColorStop(1, '#fff');
-  ctx.fillStyle = strFadeGr; ctx.fillRect(0, H * 0.54, W, H * 0.12);
-  ctx.restore();
-  ctx.fillStyle = acc; ctx.fillRect(0, H * 0.66, W, H * 0.04);
-  ctx.fillStyle = '#0f172a'; ctx.fillRect(0, H * 0.70, W, H * 0.30);
-  if (d.logoImage) ctx.drawImage(d.logoImage, 30, 8, 42, 42);
-  ctx.textAlign = 'left'; ctx.fillStyle = '#fff'; ctx.font = '700 15px Outfit';
-  ctx.fillText('ARIAS GROUP EXCLUSIVE REAL ESTATE', 84, 40);
-  const strTitleLines = wrapText(ctx, (d.title || '').toUpperCase(), W - 60);
-  ctx.font = '900 64px Playfair Display';
-  strTitleLines.slice(0, 2).forEach((line: string, i: number) => {
-    ctx.fillStyle = i === 0 ? '#fff' : acc; ctx.fillText(line, 40, H * 0.77 + i * 74);
-  });
-  ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '400 22px Outfit';
-  ctx.fillText(d.subtitle || '', 40, H * 0.77 + strTitleLines.length * 74 + 10);
-  drawBenefits(ctx, d.beneficios || [], 40, H * 0.77 + strTitleLines.length * 74 + 46, W - 80, acc, false, 2);
-  drawCTA(ctx, d.cta || 'CONTACTANOS', W - 280, H - 70, 238, 50, acc, '#000');
-  ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '600 16px Outfit';
-  ctx.fillText(d.contact?.whatsapp || profile_phone || '+503 7XXX-XXXX', 40, H - 44);
+function engine_boldGradient(ctx, W, H, d) {
+  const acc = d.accent || '#0ea5e9'; const dark='#0c1445';
+  const bgGr=ctx.createLinearGradient(0,0,W,H); bgGr.addColorStop(0,dark); bgGr.addColorStop(0.6,acc+'cc'); bgGr.addColorStop(1,dark); ctx.fillStyle=bgGr; ctx.fillRect(0,0,W,H);
+  const ex=W/2,ey=H*0.34,erx=W*0.38,ery=H*0.26;
+  ctx.save(); ctx.shadowColor=acc; ctx.shadowBlur=30; ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=6;
+  ctx.beginPath(); ctx.ellipse(ex,ey,erx,ery,0,0,Math.PI*2); ctx.stroke(); ctx.shadowColor='transparent'; ctx.restore();
+  ctx.save(); ctx.beginPath(); ctx.ellipse(ex,ey,erx,ery,0,0,Math.PI*2); ctx.clip();
+  if (d.bgImage) ctx.drawImage(d.bgImage,ex-erx,ey-ery,erx*2,ery*2); else { ctx.fillStyle='#1e40af'; ctx.fillRect(0,0,W,H); } ctx.restore();
+  ctx.strokeStyle=acc+'60'; ctx.lineWidth=2; ctx.beginPath(); ctx.ellipse(ex,ey,erx+16,ery+16,0,0,Math.PI*2); ctx.stroke();
+  drawDotGrid(ctx,40,80,4,6,22,'rgba(255,255,255,0.08)',2); drawDotGrid(ctx,W-130,H*0.55,4,5,22,'rgba(255,255,255,0.08)',2);
+  if (d.logoImage) ctx.drawImage(d.logoImage,W/2-26,20,52,52);
+  ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.font='700 13px Outfit'; ctx.fillText('ARIAS GROUP  \u2022  EXCLUSIVE REAL ESTATE',W/2,86);
+  if (d.price) { drawShadowText(ctx,d.price,W/2,H*0.08,'#fff','900 90px Outfit','rgba(0,0,0,0.5)',20); ctx.font='700 22px Outfit'; ctx.fillStyle=acc; ctx.fillText('/MES  \u2022  GARANTIA DE PRECIO',W/2,H*0.08+36); }
+  const titY=ey+ery+50; const tl=wrapText(ctx,(d.title||'').toUpperCase(),W-100);
+  tl.slice(0,2).forEach((l,i)=>drawShadowText(ctx,l,W/2,titY+i*84,i===0?'#fff':acc,`900 ${i===0?74:68}px Playfair Display`,'rgba(0,0,0,0.7)',20));
+  ctx.fillStyle='rgba(255,255,255,0.75)'; ctx.font='400 22px Outfit'; ctx.textAlign='center'; ctx.fillText(d.subtitle||'',W/2,titY+tl.length*84+14);
+  const featY=titY+tl.length*84+50;
+  (d.beneficios||[]).slice(0,2).forEach((b,i)=>{ drawIconCircle(ctx,W/2-90+(i*180),featY,28,'rgba(255,255,255,0.12)','\u2726','#fff',14); ctx.font='600 18px Outfit'; ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.textAlign='center'; ctx.fillText(b.substring(0,18),W/2-90+(i*180),featY+46); });
+  drawCTA(ctx,d.cta||'LEARN MORE',W/2-140,H-155,280,62,'#fff',dark);
+  drawContact(ctx,d.contact?.whatsapp||profile_phone||'+503 7XXX-XXXX',W/2-80,H-68,acc,false);
+  drawSocialBar(ctx,H-28,W,acc,false,d.contact?.web||'');
 }
-
-// ─── ENGINE 7: CORNER BURST ──────────────────────────────────────────────────
-function engine_cornerBurst(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
-  const acc = d.accent || '#D4AF37';
-  ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, W, H);
-  ctx.save(); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(W, 0); ctx.lineTo(W, H * 0.62); ctx.lineTo(0, H * 0.48); ctx.closePath(); ctx.clip();
-  if (d.bgImage) ctx.drawImage(d.bgImage, 0, 0, W, H); else { ctx.fillStyle = '#334155'; ctx.fillRect(0, 0, W, H); }
-  const cbGr2 = ctx.createLinearGradient(0, 0, 0, H * 0.62);
-  cbGr2.addColorStop(0, 'rgba(0,0,0,0.6)'); cbGr2.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = cbGr2; ctx.fillRect(0, 0, W, H * 0.62); ctx.restore();
-  ctx.save(); ctx.beginPath(); ctx.moveTo(0, H * 0.46); ctx.lineTo(W, H * 0.6); ctx.lineTo(W, H * 0.66); ctx.lineTo(0, H * 0.52); ctx.closePath(); ctx.fillStyle = acc; ctx.fill(); ctx.restore();
-  ctx.save(); ctx.beginPath(); ctx.moveTo(0, H * 0.50); ctx.lineTo(W, H * 0.64); ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath(); ctx.fillStyle = '#0f172a'; ctx.fill(); ctx.restore();
-  if (d.logoImage) ctx.drawImage(d.logoImage, 40, 36, 52, 52);
-  ctx.textAlign = 'left'; ctx.fillStyle = '#fff'; ctx.font = '700 15px Outfit';
-  ctx.fillText('ARIAS GROUP EXCLUSIVE REAL ESTATE', 106, 70);
-  const cbTitleLines = wrapText(ctx, (d.title || '').toUpperCase(), W - 80);
-  cbTitleLines.slice(0, 2).forEach((line: string, i: number) => {
-    drawShadowText(ctx, line, 40, H * 0.72 + i * 78, '#fff', '900 70px Playfair Display');
-  });
-  ctx.fillStyle = acc; ctx.font = '500 28px Outfit'; ctx.textAlign = 'left';
-  ctx.fillText(d.subtitle || '', 40, H * 0.72 + cbTitleLines.length * 78 + 12);
-  drawBenefits(ctx, d.beneficios || [], 40, H * 0.72 + cbTitleLines.length * 78 + 52, W - 80, acc, false, 2);
-  drawCTA(ctx, d.cta || 'CONTACTANOS', W - 288, H - 72, 246, 52, acc, '#000');
-  ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '600 17px Outfit'; ctx.textAlign = 'left';
-  ctx.fillText(d.contact?.whatsapp || profile_phone || '+503 7XXX-XXXX', 40, H - 42);
-}
-
-// ─── ENGINE 8: ARQUITECTONICO LIGHT ──────────────────────────────────────────
-function engine_architectural(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
-  const acc = d.accent || '#D4AF37';
-  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = acc; ctx.fillRect(0, 0, W, 10);
-  const archPX = W * 0.1, archPY = H * 0.08, archPW = W * 0.8, archPH = H * 0.44;
-  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.2)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 8;
-  ctx.fillStyle = '#ddd'; roundRect(ctx, archPX, archPY, archPW, archPH, 12); ctx.fill(); ctx.restore();
-  ctx.save(); roundRect(ctx, archPX, archPY, archPW, archPH, 12); ctx.clip();
-  if (d.bgImage) ctx.drawImage(d.bgImage, archPX, archPY, archPW, archPH);
-  else { ctx.fillStyle = '#94a3b8'; ctx.fillRect(archPX, archPY, archPW, archPH); }
-  ctx.restore();
-  ctx.save(); ctx.fillStyle = acc + 'cc';
-  roundRect(ctx, archPX + archPW - 180, archPY + archPH - 60, 168, 48, 8); ctx.fill();
-  ctx.fillStyle = '#fff'; ctx.font = '700 14px Outfit'; ctx.textAlign = 'center';
-  ctx.fillText(d.cta || 'VER DETALLES', archPX + archPW - 96, archPY + archPH - 28); ctx.restore();
-  if (d.logoImage) ctx.drawImage(d.logoImage, archPX, H * 0.08 + archPH + 24, 40, 40);
-  ctx.textAlign = 'left'; ctx.fillStyle = '#94a3b8'; ctx.font = '700 13px Outfit';
-  ctx.fillText('ARIAS GROUP EXCLUSIVE REAL ESTATE', archPX + 52, H * 0.08 + archPH + 52);
-  ctx.fillStyle = acc; ctx.fillRect(archPX, H * 0.08 + archPH + 72, 50, 4);
-  const archTitleLines = wrapText(ctx, (d.title || '').toUpperCase(), W * 0.75);
-  ctx.font = '900 68px Playfair Display';
-  archTitleLines.slice(0, 2).forEach((line: string, i: number) => {
-    ctx.fillStyle = i === 0 ? '#0f172a' : acc; ctx.textAlign = 'left';
-    ctx.fillText(line, archPX, H * 0.08 + archPH + 110 + i * 76);
-  });
-  const archAfter = H * 0.08 + archPH + 110 + archTitleLines.length * 76;
-  ctx.fillStyle = '#64748b'; ctx.font = '400 22px Outfit';
-  const archSubLines = wrapText(ctx, d.subtitle || '', W * 0.76);
-  archSubLines.slice(0, 2).forEach((sl: string, ix: number) => ctx.fillText(sl, archPX, archAfter + 10 + ix * 30));
-  drawBenefits(ctx, d.beneficios || [], archPX, archAfter + 10 + archSubLines.length * 30 + 22, W * 0.77, acc, true, 2);
-  drawContact(ctx, d.contact?.whatsapp || profile_phone || '+503 7XXX-XXXX', archPX, H - 46, acc, true);
-}
-
-// ─── ENGINE 9: LUXURY DARK ───────────────────────────────────────────────────
-function engine_luxuryDark(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
-  const acc = d.accent || '#D4AF37';
-  ctx.fillStyle = '#0a0a0f'; ctx.fillRect(0, 0, W, H);
-  const lxMeshGr = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, W * 0.6);
-  lxMeshGr.addColorStop(0, acc + '15'); lxMeshGr.addColorStop(1, 'transparent');
-  ctx.fillStyle = lxMeshGr; ctx.fillRect(0, 0, W, H);
-  ctx.strokeStyle = acc + '20'; ctx.lineWidth = 1;
-  for (let lxy = 0; lxy < H; lxy += 60) { ctx.beginPath(); ctx.moveTo(0, lxy); ctx.lineTo(W, lxy); ctx.stroke(); }
-  const lxPH = H * 0.32, lxPY = H * 0.28;
-  ctx.save(); ctx.beginPath(); ctx.rect(0, lxPY, W, lxPH); ctx.clip();
-  if (d.bgImage) ctx.drawImage(d.bgImage, 0, lxPY - H * 0.18, W, H);
-  else { ctx.fillStyle = '#1e293b'; ctx.fillRect(0, lxPY, W, lxPH); }
-  const lxPhotoFade = ctx.createLinearGradient(0, lxPY, 0, lxPY + lxPH);
-  lxPhotoFade.addColorStop(0, 'rgba(10,10,15,0.8)'); lxPhotoFade.addColorStop(0.4, 'rgba(10,10,15,0)');
-  lxPhotoFade.addColorStop(0.6, 'rgba(10,10,15,0)'); lxPhotoFade.addColorStop(1, 'rgba(10,10,15,0.9)');
-  ctx.fillStyle = lxPhotoFade; ctx.fillRect(0, lxPY, W, lxPH); ctx.restore();
-  ctx.strokeStyle = acc; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(W * 0.15, lxPY); ctx.lineTo(W * 0.85, lxPY); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(W * 0.15, lxPY + lxPH); ctx.lineTo(W * 0.85, lxPY + lxPH); ctx.stroke();
-  if (d.logoImage) ctx.drawImage(d.logoImage, W / 2 - 28, 32, 56, 56);
-  ctx.textAlign = 'center'; ctx.fillStyle = acc; ctx.font = '700 14px Outfit';
-  ctx.fillText('ARIAS GROUP EXCLUSIVE', W / 2, 110);
-  const lxTitleLines = wrapText(ctx, (d.title || '').toUpperCase(), W - 80);
-  ctx.font = '900 74px Playfair Display';
-  lxTitleLines.slice(0, 2).forEach((line: string, i: number) => {
-    ctx.fillStyle = i === 0 ? '#fff' : acc; ctx.fillText(line, W / 2, H * 0.18 + i * 82);
-  });
-  const lxAfter = lxPY + lxPH + 40;
-  ctx.fillStyle = 'rgba(255,255,255,0.65)'; ctx.font = '400 24px Outfit'; ctx.textAlign = 'center';
-  ctx.fillText(d.subtitle || '', W / 2, lxAfter);
-  if (d.beneficios?.length) {
-    d.beneficios.slice(0, 3).forEach((b: string, i: number) => {
-      ctx.fillStyle = acc; ctx.font = '600 20px Outfit';
-      ctx.fillText(`— ${b} —`, W / 2, lxAfter + 42 + i * 34);
-    });
-  }
-  drawCTA(ctx, d.cta || 'VER PROPIEDAD', W / 2 - 140, H - 145, 280, 58, acc, '#000');
-  ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.font = '600 17px Outfit'; ctx.textAlign = 'center';
-  ctx.fillText(d.contact?.whatsapp || profile_phone || '+503 7XXX-XXXX', W / 2, H - 55);
-}
-
-// ─── ENGINE 10: BOLD GRADIENT ELIPSE ─────────────────────────────────────────
-function engine_boldGradient(ctx: CanvasRenderingContext2D, W: number, H: number, d: any) {
-  const acc = d.accent || '#D4AF37';
-  const bgGr = ctx.createLinearGradient(0, 0, W, H);
-  bgGr.addColorStop(0, '#0f172a'); bgGr.addColorStop(0.5, acc + 'bb'); bgGr.addColorStop(1, '#0f172a');
-  ctx.fillStyle = bgGr; ctx.fillRect(0, 0, W, H);
-  const bgOX = W / 2, bgOY = H * 0.36, bgORx = W * 0.36, bgORy = H * 0.28;
-  ctx.save(); ctx.beginPath(); ctx.ellipse(bgOX, bgOY, bgORx, bgORy, 0, 0, Math.PI * 2); ctx.clip();
-  if (d.bgImage) ctx.drawImage(d.bgImage, bgOX - bgORx, bgOY - bgORy, bgORx * 2, bgORy * 2);
-  else { ctx.fillStyle = '#334155'; ctx.fillRect(0, 0, W, H); }
-  ctx.restore();
-  ctx.strokeStyle = '#fff'; ctx.lineWidth = 5;
-  ctx.beginPath(); ctx.ellipse(bgOX, bgOY, bgORx + 4, bgORy + 4, 0, 0, Math.PI * 2); ctx.stroke();
-  ctx.strokeStyle = acc; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.ellipse(bgOX, bgOY, bgORx + 14, bgORy + 14, 0, 0, Math.PI * 2); ctx.stroke();
-  if (d.logoImage) ctx.drawImage(d.logoImage, W / 2 - 24, 22, 48, 48);
-  ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.font = '700 15px Outfit';
-  ctx.fillText('ARIAS GROUP EXCLUSIVE REAL ESTATE', W / 2, 85);
-  const bgTitleLines = wrapText(ctx, (d.title || '').toUpperCase(), W - 80);
-  bgTitleLines.slice(0, 2).forEach((line: string, i: number) => {
-    drawShadowText(ctx, line, W / 2, H * 0.68 + i * 80, i === 0 ? '#fff' : acc, '900 70px Playfair Display', 'rgba(0,0,0,0.9)', 25);
-  });
-  ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.font = '400 26px Outfit'; ctx.textAlign = 'center';
-  ctx.fillText(d.subtitle || '', W / 2, H * 0.68 + bgTitleLines.length * 80 + 10);
-  if (d.beneficios?.length) {
-    ctx.font = '600 19px Outfit'; ctx.fillStyle = '#fff';
-    d.beneficios.slice(0, 2).forEach((b: string, i: number) => ctx.fillText(`◆ ${b}`, W / 2, H * 0.68 + bgTitleLines.length * 80 + 50 + i * 32));
-  }
-  drawCTA(ctx, d.cta || 'CONTACTANOS', W / 2 - 130, H - 135, 260, 56, '#fff', '#0f172a');
-  ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = '600 17px Outfit'; ctx.textAlign = 'center';
-  ctx.fillText(d.contact?.whatsapp || profile_phone || '+503 7XXX-XXXX', W / 2, H - 55);
-}
-
 // ─── MAPA DE ENGINES ─────────────────────────────────────────────────────────
 const ENGINES: Record<string, (ctx: CanvasRenderingContext2D, W: number, H: number, d: any) => void> = {
   splitPanel: engine_splitPanel, fullOverlay: engine_fullOverlay, bottomBanner: engine_bottomBanner,
