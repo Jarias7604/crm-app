@@ -8,6 +8,9 @@ export interface FlyerData {
   beneficios: string[];
   accent: string;
   bgImageUrl: string | null;
+  bgImagePosition?: { x: number; y: number };   // focal point %, default 50/50
+  bgImage2Url?: string | null;                   // second photo for composite layouts
+  photoLayout?: 'single' | 'split-h' | 'split-v' | 'pip-br' | 'pip-bl';
   logoUrl: string | null;
   industria: string;
   phone: string;
@@ -15,10 +18,23 @@ export interface FlyerData {
   templateId: string;
 }
 
+// ─── PHOTO HELPERS ────────────────────────────────────────────────────────────
+/** CSS backgroundImage + backgroundPosition respecting focal point */
+export const imgBg = (url: string | null | undefined, pos?: { x: number; y: number }): React.CSSProperties => ({
+  backgroundImage: url ? `url(${url})` : undefined,
+  backgroundSize: 'cover',
+  backgroundPosition: pos ? `${pos.x}% ${pos.y}%` : 'center',
+});
+/** objectPosition string from focal point */
+export const imgObjPos = (pos?: { x: number; y: number }) =>
+  pos ? `${pos.x}% ${pos.y}%` : 'center';
+
+
+
 // ─── BASE STYLES ──────────────────────────────────────────────────────────────
 const BASE: React.CSSProperties = {
-  width: 540,
-  height: 675,
+  width: '100%',
+  height: '100%',
   position: 'relative',
   overflow: 'hidden',
   fontFamily: "'Outfit', 'Inter', sans-serif",
@@ -122,8 +138,7 @@ export const Template_BoldSplit = ({ d }: { d: FlyerData }) => {
       {d.bgImageUrl && (
         <div style={{
           position: 'absolute', right: 0, top: 0, width: '55%', height: '100%',
-          backgroundImage: `url(${d.bgImageUrl})`,
-          backgroundSize: 'cover', backgroundPosition: 'center',
+          ...imgBg(d.bgImageUrl, d.bgImagePosition),
         }} />
       )}
       {/* Gradient bleed from color panel into photo */}
@@ -178,8 +193,7 @@ export const Template_Cinematic = ({ d }: { d: FlyerData }) => {
       {/* TOP: Full photo */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, height: '58%',
-        backgroundImage: d.bgImageUrl ? `url(${d.bgImageUrl})` : undefined,
-        backgroundSize: 'cover', backgroundPosition: 'center',
+        ...imgBg(d.bgImageUrl, d.bgImagePosition),
         background: d.bgImageUrl ? undefined : `linear-gradient(135deg, #1e293b, #0f172a)`,
       }}>
         {/* Gradient fade into bottom panel */}
@@ -328,7 +342,7 @@ export const Template_Magazine = ({ d }: { d: FlyerData }) => {
       {/* RIGHT: Photo full height */}
       <div style={{ flex: 1, position: 'relative' }}>
         {d.bgImageUrl ? (
-          <img src={d.bgImageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} crossOrigin="anonymous" />
+          <img src={d.bgImageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', objectPosition: imgObjPos(d.bgImagePosition) }} crossOrigin="anonymous" />
         ) : (
           <div style={{ width: '100%', height: '100%', background: `linear-gradient(135deg, ${acc}44, #0f172a)` }} />
         )}
@@ -454,7 +468,7 @@ export const Template_DarkLuxury = ({ d }: { d: FlyerData }) => {
       {/* Framed photo */}
       <div style={{ margin: '16px 24px', borderRadius: 16, overflow: 'hidden', height: 230, border: `2px solid ${acc}55`, boxShadow: `0 0 30px ${acc}33`, position: 'relative' }}>
         {d.bgImageUrl ? (
-          <img src={d.bgImageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} crossOrigin="anonymous" />
+          <img src={d.bgImageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: imgObjPos(d.bgImagePosition) }} crossOrigin="anonymous" />
         ) : (
           <div style={{ width: '100%', height: '100%', background: `radial-gradient(ellipse, ${acc}22, #060612)` }} />
         )}
@@ -594,7 +608,7 @@ export const Template_FullBleedBold = ({ d }: { d: FlyerData }) => {
     <div style={{ ...BASE }}>
       {/* Full bleed photo */}
       {d.bgImageUrl ? (
-        <img src={d.bgImageUrl} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} crossOrigin="anonymous" />
+        <img src={d.bgImageUrl} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: imgObjPos(d.bgImagePosition) }} crossOrigin="anonymous" />
       ) : (
         <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(160deg, ${acc}44, #0f172a)` }} />
       )}

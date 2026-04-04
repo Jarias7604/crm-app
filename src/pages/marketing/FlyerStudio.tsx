@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+﻿import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Download, Sparkles, Palette, Phone, Globe, ChevronRight, ChevronDown, Search, Loader2, ImageIcon, RefreshCw, Upload, Monitor } from 'lucide-react';
@@ -82,6 +82,10 @@ export default function FlyerStudio() {
   const [userPhotos, setUserPhotos]     = useState<string[]>([]);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [previewZoom, setPreviewZoom]   = useState(1.0);
+  const [photoLayout, setPhotoLayout]   = useState<'single' | 'split-h' | 'split-v' | 'pip-br' | 'pip-bl'>('single');
+  const cropPreviewRef = useRef<HTMLDivElement>(null);
+  const isDraggingCrop = useRef(false);
+  const dragStart = useRef({ mx: 0, my: 0, px: 50, py: 50 });
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -97,9 +101,9 @@ export default function FlyerStudio() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Handle photo uploads → convert to data URLs
+  // Handle photo uploads → convert to data URLs, store in userPhotos
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []).slice(0, 3);
+    const files = Array.from(e.target.files || []).slice(0, 3 - userPhotos.length);
     if (!files.length) return;
     const readers = files.map(file => new Promise<string>(resolve => {
       const r = new FileReader();
@@ -107,18 +111,101 @@ export default function FlyerStudio() {
       r.readAsDataURL(file);
     }));
     Promise.all(readers).then(urls => {
-      setUserPhotos(urls);
-      // Use first photo as flyer background immediately
-      setFlyerData(prev => ({ ...prev, bgImageUrl: urls[0] }));
+      const merged = [...userPhotos, ...urls].slice(0, 3);
+      setUserPhotos(merged);
+      setFlyerData(prev => ({
+        ...prev,
+        bgImageUrl: merged[0] || null,
+        bgImage2Url: merged[1] || null,
+        bgImagePosition: { x: 50, y: 50 },
+      }));
       toast.success(`${urls.length} foto${urls.length > 1 ? 's' : ''} cargada${urls.length > 1 ? 's' : ''}`);
+      // Reset input so same file can be re-added
+      if (e.target) e.target.value = '';
     });
   };
+
+  // ─── CANVAS COMPOSITOR: merge 2 photos into 1 data URL ─────────────────────
+  const composePhotos = useCallback(async (
+    url1: string, url2: string,
+    layout: 'split-h' | 'split-v' | 'pip-br' | 'pip-bl',
+    pos1: { x: number; y: number },
+    w: number, h: number
+  ): Promise<string> => {
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d')!;
+    const loadImg = (src: string) => new Promise<HTMLImageElement>(res => {
+      const img = new Image(); img.crossOrigin = 'anonymous';
+      img.onload = () => res(img); img.src = src;
+    });
+    const [img1, img2] = await Promise.all([loadImg(url1), loadImg(url2)]);
+
+    const drawCover = (img: HTMLImageElement, x: number, y: number, dw: number, dh: number, focalX = 50, focalY = 50) => {
+      const scaleW = dw / img.width, scaleH = dh / img.height;
+      const scale = Math.max(scaleW, scaleH);
+      const sw = img.width * scale, sh = img.height * scale;
+      const ox = (dw - sw) * (focalX / 100);
+      const oy = (dh - sh) * (focalY / 100);
+      ctx.save();
+      ctx.beginPath(); ctx.rect(x, y, dw, dh); ctx.clip();
+      ctx.drawImage(img, x + ox, y + oy, sw, sh);
+      ctx.restore();
+    };
+
+    if (layout === 'split-h') {
+      drawCover(img1, 0, 0, w / 2, h, pos1.x, pos1.y);
+      drawCover(img2, w / 2, 0, w / 2, h);
+      // Divider line
+      ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, h); ctx.stroke();
+    } else if (layout === 'split-v') {
+      drawCover(img1, 0, 0, w, h / 2, pos1.x, pos1.y);
+      drawCover(img2, 0, h / 2, w, h / 2);
+      ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2); ctx.stroke();
+    } else if (layout === 'pip-br') {
+      drawCover(img1, 0, 0, w, h, pos1.x, pos1.y);
+      const pw = Math.round(w * 0.38), ph = Math.round(pw * (img2.height / img2.width));
+      const px = w - pw - 16, py = h - ph - 16;
+      ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 16;
+      drawCover(img2, px, py, pw, ph);
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 3;
+      ctx.strokeRect(px, py, pw, ph);
+    } else if (layout === 'pip-bl') {
+      drawCover(img1, 0, 0, w, h, pos1.x, pos1.y);
+      const pw = Math.round(w * 0.38), ph = Math.round(pw * (img2.height / img2.width));
+      const px = 16, py = h - ph - 16;
+      ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 16;
+      drawCover(img2, px, py, pw, ph);
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 3;
+      ctx.strokeRect(px, py, pw, ph);
+    }
+    return canvas.toDataURL('image/jpeg', 0.92);
+  }, []);
+
+  // Auto-recompose when layout or photos change
+  useEffect(() => {
+    const p1 = userPhotos[0], p2 = userPhotos[1];
+    if (photoMode !== 'upload' || !p1 || !p2 || photoLayout === 'single') {
+      if (p1 && photoLayout === 'single') setFlyerData(prev => ({ ...prev, bgImageUrl: p1 }));
+      return;
+    }
+    const pos = flyerData.bgImagePosition || { x: 50, y: 50 };
+    composePhotos(p1, p2, photoLayout as 'split-h' | 'split-v' | 'pip-br' | 'pip-bl', pos, selectedSize.w, selectedSize.h)
+      .then(url => setFlyerData(prev => ({ ...prev, bgImageUrl: url })));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photoLayout, userPhotos, photoMode, selectedSize.w, selectedSize.h]);
+
 
   // Step 3 — flyer data
   const [flyerData, setFlyerData] = useState<FlyerData>({
     title: '', subtitle: '', cta: '', beneficios: [],
-    accent: '#1a56db', bgImageUrl: null, logoUrl: null,
-    industria: '', phone: '', website: '', templateId: 'bold-split',
+    accent: '#1a56db', bgImageUrl: null, bgImagePosition: { x: 50, y: 50 },
+    bgImage2Url: null, photoLayout: 'single',
+    logoUrl: null, industria: '', phone: '', website: '', templateId: 'bold-split',
   });
 
   // Load industries from DB + company defaults
@@ -711,92 +798,135 @@ export default function FlyerStudio() {
                 </div>
 
                 {/* ── PHOTO SOURCE: AI vs Upload ─────────────────────── */}
-                <div>
-                  <label style={{ fontSize: 10, fontWeight: 800, color: '#475569', letterSpacing: '0.06em', display: 'block', marginBottom: 8 }}>IMAGEN DE FONDO</label>
-                  {/* Toggle */}
-                  <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-                    <button
-                      onClick={() => { setPhotoMode('ai'); setFlyerData(prev => ({ ...prev, bgImageUrl: null })); }}
-                      style={{
-                        flex: 1, padding: '8px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer',
-                        border: `1.5px solid ${photoMode === 'ai' ? '#D4AF37' : '#e2e8f0'}`,
-                        background: photoMode === 'ai' ? '#fffbeb' : '#f8fafc',
-                        color: photoMode === 'ai' ? '#92400e' : '#64748b',
-                      }}
-                    >🤖 Generar con IA</button>
-                    <button
-                      onClick={() => setPhotoMode('upload')}
-                      style={{
-                        flex: 1, padding: '8px', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer',
-                        border: `1.5px solid ${photoMode === 'upload' ? '#D4AF37' : '#e2e8f0'}`,
-                        background: photoMode === 'upload' ? '#fffbeb' : '#f8fafc',
-                        color: photoMode === 'upload' ? '#92400e' : '#64748b',
-                      }}
-                    >📷 Mis fotos</button>
+                {/* ── PHOTO STUDIO ──────────────────────────────────────────── */}
+                <div style={{ background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                  {/* Header */}
+                  <div style={{ padding: '10px 14px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, color: '#475569', letterSpacing: '0.06em' }}>📸 FOTO DE FONDO</span>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button onClick={() => { setPhotoMode('ai'); setUserPhotos([]); setPhotoLayout('single'); setFlyerData(prev => ({ ...prev, bgImageUrl: null, bgImage2Url: null, bgImagePosition: { x: 50, y: 50 } })); }}
+                        style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 800, cursor: 'pointer', border: `1.5px solid ${photoMode === 'ai' ? '#D4AF37' : '#e2e8f0'}`, background: photoMode === 'ai' ? '#fffbeb' : '#fff', color: photoMode === 'ai' ? '#92400e' : '#64748b' }}>
+                        �� IA
+                      </button>
+                      <button onClick={() => setPhotoMode('upload')}
+                        style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 800, cursor: 'pointer', border: `1.5px solid ${photoMode === 'upload' ? '#D4AF37' : '#e2e8f0'}`, background: photoMode === 'upload' ? '#fffbeb' : '#fff', color: photoMode === 'upload' ? '#92400e' : '#64748b' }}>
+                        📷 Mis fotos
+                      </button>
+                    </div>
                   </div>
-                  {/* Upload zone (only when upload mode) */}
-                  {photoMode === 'upload' && (
-                    <div>
+                  <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {/* AI MODE */}
+                    {photoMode === 'ai' && (
+                      <button onClick={() => generateImage({ titulo: flyerData.title, gancho: flyerData.subtitle, beneficios: flyerData.beneficios, cta: flyerData.cta, paleta: [flyerData.accent], tono }, flyerData.accent)}
+                        disabled={isLoadingImg}
+                        style={{ width: '100%', background: '#fff', color: '#374151', border: '1.5px solid #e2e8f0', borderRadius: 10, padding: '10px 16px', fontSize: 12, fontWeight: 700, cursor: isLoadingImg ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                        <RefreshCw size={14} className={isLoadingImg ? 'animate-spin' : ''} />
+                        {isLoadingImg ? 'Generando con IA...' : 'Regenerar imagen IA'}
+                      </button>
+                    )}
+                    {/* UPLOAD MODE */}
+                    {photoMode === 'upload' && (<>
                       <input ref={photoInputRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handlePhotoUpload} />
-                      {userPhotos.length === 0 ? (
-                        <button
-                          onClick={() => photoInputRef.current?.click()}
-                          style={{
-                            width: '100%', padding: '20px 10px', borderRadius: 10, border: '2px dashed #D4AF37',
-                            background: '#fffbeb', cursor: 'pointer', display: 'flex', flexDirection: 'column',
-                            alignItems: 'center', gap: 6,
-                          }}
-                        >
-                          <Upload size={20} color="#D4AF37" />
-                          <span style={{ fontSize: 12, fontWeight: 700, color: '#92400e' }}>Subir 1-3 fotos</span>
-                          <span style={{ fontSize: 10, color: '#b45309' }}>JPG, PNG, WEBP · Máx. 10MB c/u</span>
+                      {userPhotos.length === 0 && (
+                        <button onClick={() => photoInputRef.current?.click()}
+                          style={{ width: '100%', padding: '18px 10px', borderRadius: 10, border: '2px dashed #D4AF37', background: '#fffbeb', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                          <Upload size={22} color="#D4AF37" />
+                          <span style={{ fontSize: 12, fontWeight: 700, color: '#92400e' }}>Subir 1 a 3 fotos</span>
+                          <span style={{ fontSize: 10, color: '#b45309' }}>JPG · PNG · WEBP</span>
                         </button>
-                      ) : (
-                        <div>
-                          {/* Thumbnails */}
-                          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                            {userPhotos.map((url, i) => (
-                              <div key={i} style={{ position: 'relative', flex: 1 }}>
-                                <img src={url} alt={`foto ${i+1}`} style={{
-                                  width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 8,
-                                  border: flyerData.bgImageUrl === url ? '2px solid #D4AF37' : '2px solid #e2e8f0',
-                                  cursor: 'pointer',
-                                }}
-                                onClick={() => setFlyerData(prev => ({ ...prev, bgImageUrl: url }))}
-                                />
-                                <button
-                                  onClick={() => {
-                                    const newPhotos = userPhotos.filter((_, j) => j !== i);
-                                    setUserPhotos(newPhotos);
-                                    if (flyerData.bgImageUrl === url) {
-                                      setFlyerData(prev => ({ ...prev, bgImageUrl: newPhotos[0] || null }));
-                                    }
-                                  }}
-                                  style={{ position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}
-                                >×</button>
-                              </div>
-                            ))}
-                            {userPhotos.length < 3 && (
-                              <button onClick={() => photoInputRef.current?.click()}
-                                style={{ flex: 1, aspectRatio: '1', borderRadius: 8, border: '2px dashed #D4AF37', background: '#fffbeb', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 50 }}
-                              ><Upload size={14} color="#D4AF37" /></button>
-                            )}
-                          </div>
-                          <p style={{ fontSize: 10, color: '#94a3b8', margin: 0 }}>Toca una foto para usarla como fondo principal</p>
+                      )}
+                      {userPhotos.length > 0 && (
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          {userPhotos.map((url, i) => (
+                            <div key={i} style={{ position: 'relative', flex: 1 }}>
+                              <img src={url} alt={`foto ${i + 1}`} style={{ width: '100%', aspectRatio: '1', objectFit: 'cover', borderRadius: 8, border: i === 0 ? '2.5px solid #D4AF37' : '2px solid #e2e8f0', display: 'block' }} />
+                              {i === 0 && <div style={{ position: 'absolute', bottom: 2, left: 2, fontSize: 8, fontWeight: 900, background: '#D4AF37', color: '#000', borderRadius: 4, padding: '1px 5px' }}>PRINCIPAL</div>}
+                              <button onClick={() => { const np = userPhotos.filter((_, j) => j !== i); setUserPhotos(np); setFlyerData(prev => ({ ...prev, bgImageUrl: np[0] || null, bgImage2Url: np[1] || null })); if (np.length < 2) setPhotoLayout('single'); }}
+                                style={{ position: 'absolute', top: -4, right: -4, width: 18, height: 18, borderRadius: '50%', background: '#ef4444', color: '#fff', border: 'none', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900 }}>×</button>
+                            </div>
+                          ))}
+                          {userPhotos.length < 3 && (
+                            <button onClick={() => photoInputRef.current?.click()}
+                              style={{ flex: 1, aspectRatio: '1', borderRadius: 8, border: '2px dashed #D4AF37', background: '#fffbeb', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, minWidth: 48 }}>
+                              <Upload size={13} color="#D4AF37" />
+                              <span style={{ fontSize: 8, fontWeight: 800, color: '#b45309' }}>+FOTO</span>
+                            </button>
+                          )}
                         </div>
                       )}
-                    </div>
-                  )}
-                  {photoMode === 'ai' && (
-                    <button
-                      onClick={() => generateImage({ titulo: flyerData.title, gancho: flyerData.subtitle, beneficios: flyerData.beneficios, cta: flyerData.cta, paleta: [flyerData.accent], tono }, flyerData.accent)}
-                      disabled={isLoadingImg}
-                      style={{ width: '100%', background: '#f1f5f9', color: '#374151', border: '1.5px solid #e2e8f0', borderRadius: 10, padding: '10px 16px', fontSize: 12, fontWeight: 700, cursor: isLoadingImg ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-                    >
-                      <RefreshCw size={14} className={isLoadingImg ? 'animate-spin' : ''} />
-                      {isLoadingImg ? 'Generando imagen IA...' : 'Regenerar imagen IA'}
-                    </button>
-                  )}
+                      {userPhotos.length > 0 && (() => {
+                        const pos = flyerData.bgImagePosition || { x: 50, y: 50 };
+                        const updatePos = (nx: number, ny: number) => {
+                          const newPos = { x: Math.round(nx), y: Math.round(ny) };
+                          setFlyerData(prev => ({ ...prev, bgImagePosition: newPos }));
+                          if (photoLayout !== 'single' && userPhotos[1]) {
+                            composePhotos(userPhotos[0], userPhotos[1], photoLayout as 'split-h' | 'split-v' | 'pip-br' | 'pip-bl', newPos, selectedSize.w, selectedSize.h)
+                              .then(url => setFlyerData(prev => ({ ...prev, bgImageUrl: url })));
+                          } else {
+                            setFlyerData(prev => ({ ...prev, bgImageUrl: userPhotos[0] }));
+                          }
+                        };
+                        return (
+                          <div style={{ background: '#fff', borderRadius: 10, border: '1.5px solid #e2e8f0', overflow: 'hidden' }}>
+                            <div style={{ padding: '7px 10px', borderBottom: '1px solid #f1f5f9', fontSize: 9, fontWeight: 800, color: '#64748b', letterSpacing: '0.05em' }}>🎯 ENCUADRE — arrastra para enfocar</div>
+                            <div style={{ padding: '8px 10px' }}>
+                              <div ref={cropPreviewRef}
+                                style={{ width: '100%', height: 80, borderRadius: 8, overflow: 'hidden', position: 'relative', cursor: 'crosshair', userSelect: 'none', backgroundImage: `url(${userPhotos[0]})`, backgroundSize: 'cover', backgroundPosition: `${pos.x}% ${pos.y}%` }}
+                                onMouseDown={e => { isDraggingCrop.current = true; dragStart.current = { mx: e.clientX, my: e.clientY, px: pos.x, py: pos.y }; }}
+                                onMouseMove={e => {
+                                  if (!isDraggingCrop.current || !cropPreviewRef.current) return;
+                                  const rect = cropPreviewRef.current.getBoundingClientRect();
+                                  const dx = (e.clientX - dragStart.current.mx) / rect.width * 100;
+                                  const dy = (e.clientY - dragStart.current.my) / rect.height * 100;
+                                  updatePos(Math.max(0, Math.min(100, dragStart.current.px - dx)), Math.max(0, Math.min(100, dragStart.current.py - dy)));
+                                }}
+                                onMouseUp={() => { isDraggingCrop.current = false; }}
+                                onMouseLeave={() => { isDraggingCrop.current = false; }}
+                              >
+                                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: 28, height: 28, pointerEvents: 'none' }}>
+                                  <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1.5, background: 'rgba(255,255,255,0.85)', transform: 'translateY(-50%)' }} />
+                                  <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1.5, background: 'rgba(255,255,255,0.85)', transform: 'translateX(-50%)' }} />
+                                </div>
+                                <div style={{ position: 'absolute', bottom: 4, right: 6, fontSize: 8, color: 'rgba(255,255,255,0.9)', fontWeight: 700, background: 'rgba(0,0,0,0.4)', padding: '1px 5px', borderRadius: 4, pointerEvents: 'none' }}>Arrastra para mover</div>
+                              </div>
+                              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span style={{ fontSize: 9, fontWeight: 800, color: '#94a3b8', width: 14 }}>X</span>
+                                  <input type="range" min={0} max={100} value={pos.x} onChange={e => updatePos(+e.target.value, pos.y)} style={{ flex: 1, accentColor: '#D4AF37' }} />
+                                  <span style={{ fontSize: 9, color: '#64748b', width: 24, textAlign: 'right' }}>{pos.x}%</span>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span style={{ fontSize: 9, fontWeight: 800, color: '#94a3b8', width: 14 }}>Y</span>
+                                  <input type="range" min={0} max={100} value={pos.y} onChange={e => updatePos(pos.x, +e.target.value)} style={{ flex: 1, accentColor: '#D4AF37' }} />
+                                  <span style={{ fontSize: 9, color: '#64748b', width: 24, textAlign: 'right' }}>{pos.y}%</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                      {userPhotos.length >= 2 && (
+                        <div style={{ background: '#fff', borderRadius: 10, border: '1.5px solid #e2e8f0', overflow: 'hidden' }}>
+                          <div style={{ padding: '7px 10px', borderBottom: '1px solid #f1f5f9', fontSize: 9, fontWeight: 800, color: '#64748b', letterSpacing: '0.05em' }}>🧩 COMPOSICIÓN — 2 fotos</div>
+                          <div style={{ padding: '8px 10px', display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                            {([
+                              { k: 'single',  label: '1 sola',      icon: '▪' },
+                              { k: 'split-h', label: 'Lado a lado', icon: '◧' },
+                              { k: 'split-v', label: 'Apiladas',    icon: '⬒' },
+                              { k: 'pip-br',  label: 'Mini der.',   icon: '🔲' },
+                              { k: 'pip-bl',  label: 'Mini izq.',   icon: '🔳' },
+                            ] as const).map(opt => (
+                              <button key={opt.k} onClick={() => setPhotoLayout(opt.k)}
+                                style={{ flex: 1, minWidth: '28%', padding: '6px 4px', borderRadius: 8, fontSize: 9, fontWeight: 800, cursor: 'pointer', textAlign: 'center', border: `1.5px solid ${photoLayout === opt.k ? '#D4AF37' : '#e2e8f0'}`, background: photoLayout === opt.k ? '#fffbeb' : '#f8fafc', color: photoLayout === opt.k ? '#92400e' : '#64748b', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                                <span style={{ fontSize: 13 }}>{opt.icon}</span>
+                                <span>{opt.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>)}
+                  </div>
                 </div>
 
                 {/* Template selector */}
