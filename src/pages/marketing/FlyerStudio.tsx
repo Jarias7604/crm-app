@@ -334,18 +334,43 @@ export default function FlyerStudio() {
         backgroundColor: null,
         logging: false,
       });
-      const link = document.createElement('a');
-      link.download = `flyer-${flyerData.title.toLowerCase().replace(/\s+/g, '-') || 'premium'}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-      toast.success('¡Flyer exportado en alta resolución!');
+
+      // Sanitize title: remove accents and special chars to avoid UUID filenames
+      const sanitizeFilename = (str: string) =>
+        str
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove accents (á→a, ó→o, etc.)
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')   // non-alphanumeric → dash
+          .replace(/^-+|-+$/g, '')        // trim leading/trailing dashes
+          .substring(0, 40) || 'flyer';
+
+      // Get current format label for filename
+      const sizeInfo = CANVAS_SIZES.find(s => s.id === flyerData.formatoId);
+      const formatSlug = sanitizeFilename(sizeInfo?.label || 'instagram');
+      const titleSlug = sanitizeFilename(flyerData.title);
+      const filename = `flyer-${titleSlug}-${formatSlug}.png`;
+
+      // Use Blob URL instead of dataURL — browsers handle filename correctly
+      canvas.toBlob((blob) => {
+        if (!blob) { toast.error('Error al generar imagen'); return; }
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = url;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        toast.success(`✅ Descargado: ${filename}`);
+      }, 'image/png');
+
     } catch (e) {
       console.error(e);
       toast.error('Error al exportar');
     } finally {
       setIsExporting(false);
     }
-  }, [flyerData.title]);
+  }, [flyerData.title, flyerData.formatoId]);
 
   // ─── SAVE TO CRM ────────────────────────────────────────────────────────────
   const handleSave = useCallback(async () => {
