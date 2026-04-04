@@ -335,22 +335,20 @@ export default function FlyerStudio() {
         logging: false,
       });
 
-      // Sanitize title: remove accents and special chars to avoid UUID filenames
-      const sanitizeFilename = (str: string) =>
-        str
-          .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove accents (á→a, ó→o, etc.)
+      // Sanitize: remove accents + special chars so browser keeps filename intact
+      const sanitize = (str: string) =>
+        (str || '')
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // á→a, ó→o, é→e ...
           .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')   // non-alphanumeric → dash
-          .replace(/^-+|-+$/g, '')        // trim leading/trailing dashes
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
           .substring(0, 40) || 'flyer';
 
-      // Get current format label for filename
-      const sizeInfo = CANVAS_SIZES.find(s => s.id === flyerData.formatoId);
-      const formatSlug = sanitizeFilename(sizeInfo?.label || 'instagram');
-      const titleSlug = sanitizeFilename(flyerData.title);
-      const filename = `flyer-${titleSlug}-${formatSlug}.png`;
+      const titleSlug  = sanitize(flyerData.title);
+      const formatSlug = sanitize(selectedSize.label);  // e.g. "instagram-retrato"
+      const filename   = `flyer-${titleSlug}-${formatSlug}.png`;
 
-      // Use Blob URL instead of dataURL — browsers handle filename correctly
+      // Blob URL → browser respects the download filename correctly
       canvas.toBlob((blob) => {
         if (!blob) { toast.error('Error al generar imagen'); return; }
         const url = URL.createObjectURL(blob);
@@ -370,7 +368,7 @@ export default function FlyerStudio() {
     } finally {
       setIsExporting(false);
     }
-  }, [flyerData.title, flyerData.formatoId]);
+  }, [flyerData.title, selectedSize.label]);
 
   // ─── SAVE TO CRM ────────────────────────────────────────────────────────────
   const handleSave = useCallback(async () => {
