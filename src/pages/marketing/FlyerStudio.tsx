@@ -797,8 +797,8 @@ export default function FlyerStudio() {
                   </div>
                 </div>
 
-                {/* ── PHOTO SOURCE: AI vs Upload ─────────────────────── */}
-                {/* ── PHOTO STUDIO ──────────────────────────────────────────── */}
+
+                {/* ── PHOTO STUDIO — always visible first ──────────────── */}
                 <div style={{ background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
                   {/* Header */}
                   <div style={{ padding: '10px 14px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -929,26 +929,26 @@ export default function FlyerStudio() {
                   </div>
                 </div>
 
-                {/* Template selector */}
+                {/* Template selector — compact 2-col grid */}
                 <div>
                   <label style={{ fontSize: 10, fontWeight: 800, color: '#475569', letterSpacing: '0.06em', display: 'block', marginBottom: 8 }}>
                     <Palette size={12} style={{ display: 'inline', marginRight: 4 }} />
                     ESTILO ({TEMPLATE_LIST.length} DISEÑOS)
                   </label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
                     {TEMPLATE_LIST.map(t => (
                       <button
                         key={t.id}
                         onClick={() => setFlyerData(prev => ({ ...prev, templateId: t.id }))}
                         style={{
-                          padding: '10px 14px', borderRadius: 10, textAlign: 'left',
+                          padding: '8px 10px', borderRadius: 10, textAlign: 'left',
                           border: `1.5px solid ${flyerData.templateId === t.id ? '#D4AF37' : '#e2e8f0'}`,
                           background: flyerData.templateId === t.id ? '#fffbeb' : '#f8fafc',
-                          cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 2,
+                          cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 1,
                         }}
                       >
-                        <span style={{ fontSize: 12, fontWeight: flyerData.templateId === t.id ? 800 : 600, color: flyerData.templateId === t.id ? '#92400e' : '#374151' }}>{t.name}</span>
-                        <span style={{ fontSize: 10, color: '#94a3b8', fontWeight: 400 }}>{t.desc}</span>
+                        <span style={{ fontSize: 11, fontWeight: flyerData.templateId === t.id ? 800 : 600, color: flyerData.templateId === t.id ? '#92400e' : '#374151', lineHeight: 1.2 }}>{t.name}</span>
+                        <span style={{ fontSize: 9, color: '#94a3b8', fontWeight: 400, lineHeight: 1.2 }}>{t.desc}</span>
                       </button>
                     ))}
                   </div>
