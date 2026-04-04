@@ -305,7 +305,7 @@ export default function FlyerStudio() {
       const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flyer-generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session!.access_token}` },
-        body: JSON.stringify({ idea, industria: selectedIndustries.join(', '), oferta, tono }),
+        body: JSON.stringify({ idea, industria: selectedIndustries.join(', '), oferta, tono, seed: Date.now() }),
       });
       const data = await res.json();
       if (data.fondo_url) {
@@ -799,14 +799,14 @@ export default function FlyerStudio() {
 
 
                 {/* ── PHOTO STUDIO — always visible first ──────────────── */}
-                <div style={{ background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+                <div style={{ background: '#f8fafc', borderRadius: 12, border: '1px solid #e2e8f0', minHeight: 80 }}>
                   {/* Header */}
                   <div style={{ padding: '10px 14px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 10, fontWeight: 800, color: '#475569', letterSpacing: '0.06em' }}>📸 FOTO DE FONDO</span>
                     <div style={{ display: 'flex', gap: 4 }}>
                       <button onClick={() => { setPhotoMode('ai'); setUserPhotos([]); setPhotoLayout('single'); setFlyerData(prev => ({ ...prev, bgImageUrl: null, bgImage2Url: null, bgImagePosition: { x: 50, y: 50 } })); }}
                         style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 800, cursor: 'pointer', border: `1.5px solid ${photoMode === 'ai' ? '#D4AF37' : '#e2e8f0'}`, background: photoMode === 'ai' ? '#fffbeb' : '#fff', color: photoMode === 'ai' ? '#92400e' : '#64748b' }}>
-                        �� IA
+                        🎨 IA
                       </button>
                       <button onClick={() => setPhotoMode('upload')}
                         style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 800, cursor: 'pointer', border: `1.5px solid ${photoMode === 'upload' ? '#D4AF37' : '#e2e8f0'}`, background: photoMode === 'upload' ? '#fffbeb' : '#fff', color: photoMode === 'upload' ? '#92400e' : '#64748b' }}>
