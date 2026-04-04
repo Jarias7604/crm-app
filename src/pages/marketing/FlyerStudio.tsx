@@ -335,32 +335,27 @@ export default function FlyerStudio() {
         logging: false,
       });
 
-      // Sanitize: remove accents + special chars so browser keeps filename intact
+      // Remove accents BEFORE building filename → browsers keep the name (no UUID)
       const sanitize = (str: string) =>
         (str || '')
-          .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // á→a, ó→o, é→e ...
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // á→a, ó→o, é→e
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '-')
           .replace(/^-+|-+$/g, '')
           .substring(0, 40) || 'flyer';
 
-      const titleSlug  = sanitize(flyerData.title);
-      const formatSlug = sanitize(selectedSize.label);  // e.g. "instagram-retrato"
-      const filename   = `flyer-${titleSlug}-${formatSlug}.png`;
+      const filename = `flyer-${sanitize(flyerData.title)}-${sanitize(selectedSize.label)}.png`;
 
-      // Blob URL → browser respects the download filename correctly
-      canvas.toBlob((blob) => {
-        if (!blob) { toast.error('Error al generar imagen'); return; }
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.download = filename;
-        link.href = url;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-        toast.success(`✅ Descargado: ${filename}`);
-      }, 'image/png');
+      // MUST be synchronous within the user-gesture context so browser respects download attr
+      const dataUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = dataUrl;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success(`✅ Descargado: ${filename}`);
 
     } catch (e) {
       console.error(e);
