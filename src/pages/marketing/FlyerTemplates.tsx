@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 
 // ─── TIPOS ────────────────────────────────────────────────────────────────────
 export interface FlyerData {
@@ -16,8 +16,7 @@ export interface FlyerData {
   phone: string;
   website: string;
   templateId: string;
-  /** Actual render width in px — templates scale all sizes proportionally (base = 540px). */
-  containerW?: number;
+  containerW?: number; // injected by preview/export for future use
 }
 
 // ─── PHOTO HELPERS ────────────────────────────────────────────────────────────
@@ -34,16 +33,6 @@ export const imgObjPos = (pos?: { x: number; y: number }) =>
 
 
 // ─── BASE STYLES ──────────────────────────────────────────────────────────────
-/** Returns a BASE style object scaled to the actual container width */
-const base = (d: FlyerData): React.CSSProperties => ({
-  width: d.containerW ?? 540,
-  height: Math.round((d.containerW ?? 540) * (675 / 540)),
-  position: 'relative',
-  overflow: 'hidden',
-  fontFamily: "'Outfit', 'Inter', sans-serif",
-  boxSizing: 'border-box',
-});
-// Keep static BASE for backwards compat in Partial renders
 const BASE: React.CSSProperties = {
   width: 540,
   height: 675,
@@ -53,15 +42,8 @@ const BASE: React.CSSProperties = {
   boxSizing: 'border-box',
 };
 
-// ─── PROPORTIONAL SCALE HELPER ────────────────────────────────────────────────
-/** Scale factor: actual canvas width ÷ 540px design base.
- *  Multiply ALL hardcoded px values by sf(d) in each template. */
-const sf = (d: FlyerData) => (d.containerW ?? 540) / 540;
-
 // Truncate text to max chars
-const trunc = (str: string, n: number) => str?.length > n ? str.slice(0, n - 1) + '…' : (str || '');
-
-
+const trunc = (s: string, n: number) => s?.length > n ? s.slice(0, n - 1) + '…' : (s || '');
 
 // Gradient text utility
 const GradText = ({ text, from, to, size, weight = 900, style = {} }: { text: string; from: string; to: string; size: number; weight?: number; style?: React.CSSProperties }) => (
@@ -86,7 +68,7 @@ const PillBtn = ({ label, bg1, bg2, color = '#fff', style = {} }: { label: strin
     background: `linear-gradient(135deg, ${bg1}, ${bg2})`,
     color,
     fontWeight: 900,
-    fontSize: sf(d)*15,
+    fontSize: 15,
     letterSpacing: '0.08em',
     borderRadius: 50,
     padding: '14px 32px',
@@ -105,9 +87,9 @@ const BenRow = ({ text, color }: { text: string; color: string }) => (
     <div style={{
       width: 22, height: 22, borderRadius: '50%', background: color,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      flexShrink: 0, fontSize: sf(d)*12, fontWeight: 900, color: '#fff',
+      flexShrink: 0, fontSize: 12, fontWeight: 900, color: '#fff',
     }}>✓</div>
-    <span style={{ fontSize: sf(d)*13, fontWeight: 600, color: '#fff', lineHeight: 1.3 }}>{trunc(text, 45)}</span>
+    <span style={{ fontSize: 13, fontWeight: 600, color: '#fff', lineHeight: 1.3 }}>{trunc(text, 45)}</span>
   </div>
 );
 
@@ -116,9 +98,9 @@ const BenRowDark = ({ text, color }: { text: string; color: string }) => (
     <div style={{
       width: 22, height: 22, borderRadius: '50%', background: color,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      flexShrink: 0, fontSize: sf(d)*12, fontWeight: 900, color: '#fff',
+      flexShrink: 0, fontSize: 12, fontWeight: 900, color: '#fff',
     }}>✓</div>
-    <span style={{ fontSize: sf(d)*13, fontWeight: 600, color: '#334155', lineHeight: 1.3 }}>{trunc(text, 45)}</span>
+    <span style={{ fontSize: 13, fontWeight: 600, color: '#334155', lineHeight: 1.3 }}>{trunc(text, 45)}</span>
   </div>
 );
 
@@ -126,13 +108,13 @@ const BenRowDark = ({ text, color }: { text: string; color: string }) => (
 const Brand = ({ logo, name, color = '#fff' }: { logo: string | null; name: string; color?: string }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
     {logo && <img src={logo} style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover' }} crossOrigin="anonymous" />}
-    <span style={{ fontSize: sf(d)*13, fontWeight: 800, color, letterSpacing: '0.05em' }}>{trunc(name, 20).toUpperCase()}</span>
+    <span style={{ fontSize: 13, fontWeight: 800, color, letterSpacing: '0.05em' }}>{trunc(name, 20).toUpperCase()}</span>
   </div>
 );
 
 // Tag pill
 const Tag = ({ label, bg, color }: { label: string; bg: string; color: string }) => (
-  <div style={{ background: bg, color, fontSize: sf(d)*11, fontWeight: 800, padding: '4px 14px', borderRadius: 20, letterSpacing: '0.06em', display: 'inline-block' }}>
+  <div style={{ background: bg, color, fontSize: 11, fontWeight: 800, padding: '4px 14px', borderRadius: 20, letterSpacing: '0.06em', display: 'inline-block' }}>
     {label.toUpperCase()}
   </div>
 );
@@ -146,7 +128,7 @@ export const Template_BoldSplit = ({ d }: { d: FlyerData }) => {
   const title = (d.title || 'TU OFERTA').toUpperCase();
   const words = title.split(' ');
   return (
-    <div style={{ ...base(d) }}>
+    <div style={{ ...BASE }}>
       {/* LEFT color panel */}
       <div style={{
         position: 'absolute', left: 0, top: 0, width: '52%', height: '100%',
@@ -184,7 +166,7 @@ export const Template_BoldSplit = ({ d }: { d: FlyerData }) => {
           ))}
         </div>
         {/* Subtitle */}
-        <div style={{ fontSize: sf(d)*12, color: 'rgba(255,255,255,0.85)', fontWeight: 500, lineHeight: 1.4, marginBottom: 14 }}>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', fontWeight: 500, lineHeight: 1.4, marginBottom: 14 }}>
           {trunc(d.subtitle || '', 80)}
         </div>
         {/* Benefits */}
@@ -192,11 +174,11 @@ export const Template_BoldSplit = ({ d }: { d: FlyerData }) => {
           {(d.beneficios || []).slice(0, 3).map((b, i) => <BenRow key={i} text={b} color="rgba(255,255,255,0.25)" />)}
         </div>
         {/* CTA */}
-        <PillBtn label={d.cta || 'CONTACTAR'} bg1="#fff" bg2="rgba(255,255,255,0.85)" color={acc} style={{ fontSize: sf(d)*12, padding: '12px 20px', width: '100%', boxSizing: 'border-box' }} />
+        <PillBtn label={d.cta || 'CONTACTAR'} bg1="#fff" bg2="rgba(255,255,255,0.85)" color={acc} style={{ fontSize: 12, padding: '12px 20px', width: '100%', boxSizing: 'border-box' }} />
       </div>
       {/* Contact bar */}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 40, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
-        <span style={{ color: '#fff', fontWeight: 800, fontSize: sf(d)*13, letterSpacing: '0.04em' }}>{d.phone || '+503 7XXX-XXXX'}</span>
+        <span style={{ color: '#fff', fontWeight: 800, fontSize: 13, letterSpacing: '0.04em' }}>{d.phone || '+503 7XXX-XXXX'}</span>
       </div>
     </div>
   );
@@ -230,28 +212,28 @@ export const Template_Cinematic = ({ d }: { d: FlyerData }) => {
         {/* Tag */}
         <Tag label={d.industria || 'Marketing'} bg={acc} color="#000" />
         {/* Title */}
-        <div style={{ fontSize: sf(d)*36, fontWeight: 900, color: '#fff', lineHeight: 1.1, letterSpacing: '-0.02em', margin: '8px 0' }}>
+        <div style={{ fontSize: 36, fontWeight: 900, color: '#fff', lineHeight: 1.1, letterSpacing: '-0.02em', margin: '8px 0' }}>
           {trunc((d.title || 'TU OFERTA').toUpperCase(), 40)}
         </div>
         {/* Subtitle */}
-        <div style={{ fontSize: sf(d)*12, color: 'rgba(255,255,255,0.7)', fontWeight: 400, lineHeight: 1.4, marginBottom: 10 }}>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', fontWeight: 400, lineHeight: 1.4, marginBottom: 10 }}>
           {trunc(d.subtitle || '', 90)}
         </div>
         {/* Benefits in horizontal pills */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
           {(d.beneficios || []).slice(0, 3).map((b, i) => (
-            <div key={i} style={{ background: 'rgba(255,255,255,0.08)', border: `1px solid ${acc}44`, color: '#e2e8f0', fontSize: sf(d)*11, fontWeight: 600, padding: '5px 12px', borderRadius: 20 }}>
+            <div key={i} style={{ background: 'rgba(255,255,255,0.08)', border: `1px solid ${acc}44`, color: '#e2e8f0', fontSize: 11, fontWeight: 600, padding: '5px 12px', borderRadius: 20 }}>
               {trunc(b, 28)}
             </div>
           ))}
         </div>
         {/* CTA */}
-        <PillBtn label={d.cta || 'VER MÁS'} bg1={acc} bg2={acc + 'cc'} color="#000" style={{ fontSize: sf(d)*13, alignSelf: 'flex-start' }} />
+        <PillBtn label={d.cta || 'VER MÁS'} bg1={acc} bg2={acc + 'cc'} color="#000" style={{ fontSize: 13, alignSelf: 'flex-start' }} />
       </div>
 
       {/* Contact bar */}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 38, background: acc, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ color: '#000', fontWeight: 900, fontSize: sf(d)*13, letterSpacing: '0.05em' }}>{d.phone || '+503 7XXX-XXXX'}</span>
+        <span style={{ color: '#000', fontWeight: 900, fontSize: 13, letterSpacing: '0.05em' }}>{d.phone || '+503 7XXX-XXXX'}</span>
       </div>
     </div>
   );
@@ -287,13 +269,13 @@ export const Template_WhiteCard = ({ d }: { d: FlyerData }) => {
       {/* Info block */}
       <div style={{ padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {/* Title */}
-        <div style={{ fontSize: sf(d)*34, fontWeight: 900, color: '#0f172a', lineHeight: 1.1, letterSpacing: '-0.03em' }}>
+        <div style={{ fontSize: 34, fontWeight: 900, color: '#0f172a', lineHeight: 1.1, letterSpacing: '-0.03em' }}>
           {trunc((d.title || 'TU OFERTA').toUpperCase(), 30)}
         </div>
         {/* Accent line */}
         <div style={{ height: 4, width: 60, background: acc, borderRadius: 2 }} />
         {/* Subtitle */}
-        <div style={{ fontSize: sf(d)*13, color: '#475569', fontWeight: 400, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 13, color: '#475569', fontWeight: 400, lineHeight: 1.5 }}>
           {trunc(d.subtitle || '', 100)}
         </div>
         {/* Benefits — 2 col */}
@@ -345,7 +327,7 @@ export const Template_Magazine = ({ d }: { d: FlyerData }) => {
         {/* Divider */}
         <div style={{ height: 3, background: acc, margin: '12px 0', width: '40%' }} />
         {/* Subtitle */}
-        <div style={{ fontSize: sf(d)*11, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5, marginBottom: 14 }}>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', lineHeight: 1.5, marginBottom: 14 }}>
           {trunc(d.subtitle || '', 80)}
         </div>
         {/* Benefits */}
@@ -353,9 +335,9 @@ export const Template_Magazine = ({ d }: { d: FlyerData }) => {
           {(d.beneficios || []).slice(0, 3).map((b, i) => <BenRow key={i} text={b} color={acc} />)}
         </div>
         {/* CTA */}
-        <PillBtn label={d.cta || 'MÁS INFO'} bg1={acc} bg2={acc + 'bb'} color="#fff" style={{ fontSize: sf(d)*12, padding: '12px 16px' }} />
+        <PillBtn label={d.cta || 'MÁS INFO'} bg1={acc} bg2={acc + 'bb'} color="#fff" style={{ fontSize: 12, padding: '12px 16px' }} />
         {/* Phone */}
-        <div style={{ marginTop: 10, fontSize: sf(d)*11, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>{d.phone || '+503 7XXX-XXXX'}</div>
+        <div style={{ marginTop: 10, fontSize: 11, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>{d.phone || '+503 7XXX-XXXX'}</div>
       </div>
 
       {/* RIGHT: Photo full height */}
@@ -383,7 +365,7 @@ export const Template_CenterGradient = ({ d }: { d: FlyerData }) => {
       {/* Top brand bar */}
       <div style={{ padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Brand logo={d.logoUrl} name={d.industria || 'ARIAS'} color="#fff" />
-        <div style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 20, padding: '5px 14px', fontSize: sf(d)*11, fontWeight: 800, color: '#fff' }}>
+        <div style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 20, padding: '5px 14px', fontSize: 11, fontWeight: 800, color: '#fff' }}>
           ★ PREMIUM
         </div>
       </div>
@@ -400,23 +382,23 @@ export const Template_CenterGradient = ({ d }: { d: FlyerData }) => {
       {/* Content below photo */}
       <div style={{ padding: '16px 28px', textAlign: 'center' }}>
         {/* Title */}
-        <div style={{ fontSize: sf(d)*42, fontWeight: 900, color: '#fff', lineHeight: 1.05, letterSpacing: '-0.03em', textShadow: '0 4px 16px rgba(0,0,0,0.5)', marginBottom: 8 }}>
+        <div style={{ fontSize: 42, fontWeight: 900, color: '#fff', lineHeight: 1.05, letterSpacing: '-0.03em', textShadow: '0 4px 16px rgba(0,0,0,0.5)', marginBottom: 8 }}>
           {trunc((d.title || 'TU OFERTA').toUpperCase(), 25)}
         </div>
         {/* Subtitle */}
-        <div style={{ fontSize: sf(d)*13, color: 'rgba(255,255,255,0.8)', fontWeight: 400, lineHeight: 1.5, marginBottom: 14 }}>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', fontWeight: 400, lineHeight: 1.5, marginBottom: 14 }}>
           {trunc(d.subtitle || '', 80)}
         </div>
         {/* Benefits row */}
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginBottom: 16 }}>
           {(d.beneficios || []).slice(0, 3).map((b, i) => (
-            <div key={i} style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', fontSize: sf(d)*11, fontWeight: 600, padding: '5px 12px', borderRadius: 20 }}>
+            <div key={i} style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', fontSize: 11, fontWeight: 600, padding: '5px 12px', borderRadius: 20 }}>
               ✓ {trunc(b, 24)}
             </div>
           ))}
         </div>
         {/* CTA */}
-        <PillBtn label={d.cta || 'EMPEZAR'} bg1="rgba(255,255,255,0.95)" bg2="rgba(255,255,255,0.75)" color={acc} style={{ fontSize: sf(d)*14, minWidth: 200 }} />
+        <PillBtn label={d.cta || 'EMPEZAR'} bg1="rgba(255,255,255,0.95)" bg2="rgba(255,255,255,0.75)" color={acc} style={{ fontSize: 14, minWidth: 200 }} />
       </div>
 
       {/* Contact bar */}
@@ -442,17 +424,17 @@ export const Template_CorporateLight = ({ d }: { d: FlyerData }) => {
         <Brand logo={d.logoUrl} name={d.industria || 'ARIAS GROUP'} color={acc} />
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', marginTop: 20 }}>
           <Tag label={d.industria || 'Servicios'} bg={acc} color="#fff" />
-          <div style={{ fontSize: sf(d)*38, fontWeight: 900, color: '#0f172a', lineHeight: 1.05, letterSpacing: '-0.03em', margin: '12px 0 8px' }}>
+          <div style={{ fontSize: 38, fontWeight: 900, color: '#0f172a', lineHeight: 1.05, letterSpacing: '-0.03em', margin: '12px 0 8px' }}>
             {trunc((d.title || 'TU OFERTA').toUpperCase(), 22)}
           </div>
           <div style={{ height: 4, background: acc, width: 50, borderRadius: 2, marginBottom: 10 }} />
-          <div style={{ fontSize: sf(d)*12, color: '#475569', fontWeight: 400, lineHeight: 1.5, marginBottom: 16 }}>
+          <div style={{ fontSize: 12, color: '#475569', fontWeight: 400, lineHeight: 1.5, marginBottom: 16 }}>
             {trunc(d.subtitle || '', 100)}
           </div>
           {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRowDark key={i} text={b} color={acc} />)}
         </div>
-        <PillBtn label={d.cta || 'CONTACTAR'} bg1={acc} bg2={acc + 'cc'} color="#fff" style={{ marginTop: 12, fontSize: sf(d)*12, padding: '12px 20px' }} />
-        <div style={{ marginTop: 8, fontSize: sf(d)*11, color: '#94a3b8', fontWeight: 600 }}>{d.phone}</div>
+        <PillBtn label={d.cta || 'CONTACTAR'} bg1={acc} bg2={acc + 'cc'} color="#fff" style={{ marginTop: 12, fontSize: 12, padding: '12px 20px' }} />
+        <div style={{ marginTop: 8, fontSize: 11, color: '#94a3b8', fontWeight: 600 }}>{d.phone}</div>
       </div>
 
       {/* RIGHT: Photo */}
@@ -481,7 +463,7 @@ export const Template_DarkLuxury = ({ d }: { d: FlyerData }) => {
       {/* Header */}
       <div style={{ padding: '12px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${acc}22` }}>
         <Brand logo={d.logoUrl} name={d.industria || 'ARIAS GROUP'} color={acc} />
-        <span style={{ fontSize: sf(d)*11, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>{d.website || 'www.empresa.com'}</span>
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>{d.website || 'www.empresa.com'}</span>
       </div>
 
       {/* Framed photo */}
@@ -496,27 +478,27 @@ export const Template_DarkLuxury = ({ d }: { d: FlyerData }) => {
 
       {/* Content */}
       <div style={{ padding: '8px 24px', textAlign: 'center' }}>
-        <div style={{ fontSize: sf(d)*36, fontWeight: 900, color: '#fff', lineHeight: 1.1, letterSpacing: '-0.02em', marginBottom: 6 }}>
+        <div style={{ fontSize: 36, fontWeight: 900, color: '#fff', lineHeight: 1.1, letterSpacing: '-0.02em', marginBottom: 6 }}>
           {trunc((d.title || 'TU OFERTA').toUpperCase(), 28)}
         </div>
         <div style={{ height: 3, width: 80, background: acc, borderRadius: 2, margin: '8px auto 10px' }} />
-        <div style={{ fontSize: sf(d)*12, color: 'rgba(255,255,255,0.6)', fontStyle: 'italic', lineHeight: 1.5, marginBottom: 14 }}>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontStyle: 'italic', lineHeight: 1.5, marginBottom: 14 }}>
           {trunc(d.subtitle || '', 80)}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, textAlign: 'left' }}>
           {(d.beneficios || []).slice(0, 3).map((b, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,0.04)', border: `1px solid ${acc}33`, borderRadius: 10, padding: '8px 14px' }}>
               <span style={{ color: acc, fontWeight: 900, flexShrink: 0 }}>★</span>
-              <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: sf(d)*12, fontWeight: 500 }}>{trunc(b, 42)}</span>
+              <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: 500 }}>{trunc(b, 42)}</span>
             </div>
           ))}
         </div>
-        <PillBtn label={d.cta || 'CONTACTAR'} bg1={acc} bg2={acc + 'bb'} color="#000" style={{ fontSize: sf(d)*13, minWidth: 220 }} />
+        <PillBtn label={d.cta || 'CONTACTAR'} bg1={acc} bg2={acc + 'bb'} color="#000" style={{ fontSize: 13, minWidth: 220 }} />
       </div>
 
       {/* Bottom gold bar */}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 38, background: `linear-gradient(90deg, ${acc}, ${acc}bb)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ color: '#000', fontWeight: 900, fontSize: sf(d)*13, letterSpacing: '0.05em' }}>{d.phone || '+503 7XXX-XXXX'}</span>
+        <span style={{ color: '#000', fontWeight: 900, fontSize: 13, letterSpacing: '0.05em' }}>{d.phone || '+503 7XXX-XXXX'}</span>
       </div>
     </div>
   );
@@ -545,25 +527,25 @@ export const Template_PromoPop = ({ d }: { d: FlyerData }) => {
         </div>
         {/* Promo badge top-right */}
         <div style={{ position: 'absolute', top: 12, right: 20, background: acc, borderRadius: '50%', width: 80, height: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', boxShadow: `0 8px 24px ${acc}66` }}>
-          <div style={{ fontSize: sf(d)*22, fontWeight: 900, color: '#000', lineHeight: 1 }}>HOY</div>
-          <div style={{ fontSize: sf(d)*10, fontWeight: 800, color: '#000' }}>ESPECIAL</div>
+          <div style={{ fontSize: 22, fontWeight: 900, color: '#000', lineHeight: 1 }}>HOY</div>
+          <div style={{ fontSize: 10, fontWeight: 800, color: '#000' }}>ESPECIAL</div>
         </div>
       </div>
 
       {/* Info section white */}
       <div style={{ padding: '4px 24px 48px', display: 'flex', flexDirection: 'column', gap: 8 }}>
         <Tag label={d.industria || 'Promo'} bg={acc} color="#000" />
-        <div style={{ fontSize: sf(d)*36, fontWeight: 900, color: '#0f172a', lineHeight: 1.1, letterSpacing: '-0.03em' }}>
+        <div style={{ fontSize: 36, fontWeight: 900, color: '#0f172a', lineHeight: 1.1, letterSpacing: '-0.03em' }}>
           {trunc((d.title || 'TU OFERTA').toUpperCase(), 28)}
         </div>
-        <div style={{ fontSize: sf(d)*13, color: '#64748b', lineHeight: 1.5 }}>
+        <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>
           {trunc(d.subtitle || '', 90)}
         </div>
         {/* Benefits */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px' }}>
           {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRowDark key={i} text={b} color={acc} />)}
         </div>
-        <PillBtn label={d.cta || 'OBTENER OFERTA'} bg1={acc} bg2={acc + 'cc'} color="#000" style={{ fontSize: sf(d)*13, marginTop: 8 }} />
+        <PillBtn label={d.cta || 'OBTENER OFERTA'} bg1={acc} bg2={acc + 'cc'} color="#000" style={{ fontSize: 13, marginTop: 8 }} />
       </div>
 
       {/* Contact bar */}
@@ -602,12 +584,12 @@ export const Template_MinimalEditorial = ({ d }: { d: FlyerData }) => {
         {/* Huge clean title */}
         <GradText text={trunc((d.title || 'TU OFERTA').toUpperCase(), 28)} from={acc} to={acc + 'aa'} size={38} />
         <div style={{ height: 3, background: acc, width: 50, borderRadius: 2 }} />
-        <div style={{ fontSize: sf(d)*13, color: '#64748b', lineHeight: 1.5 }}>{trunc(d.subtitle || '', 100)}</div>
+        <div style={{ fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>{trunc(d.subtitle || '', 100)}</div>
         {/* 2-col benefits */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 8px', flex: 1 }}>
           {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRowDark key={i} text={b} color={acc} />)}
         </div>
-        <PillBtn label={d.cta || 'SABER MÁS'} bg1={acc} bg2={acc + 'bb'} color="#fff" style={{ fontSize: sf(d)*13, marginTop: 4 }} />
+        <PillBtn label={d.cta || 'SABER MÁS'} bg1={acc} bg2={acc + 'bb'} color="#fff" style={{ fontSize: 13, marginTop: 4 }} />
       </div>
 
       {/* Footer */}
@@ -624,7 +606,7 @@ export const Template_MinimalEditorial = ({ d }: { d: FlyerData }) => {
 export const Template_FullBleedBold = ({ d }: { d: FlyerData }) => {
   const acc = d.accent || '#22d3ee';
   return (
-    <div style={{ ...base(d) }}>
+    <div style={{ ...BASE }}>
       {/* Full bleed photo */}
       {d.bgImageUrl ? (
         <img src={d.bgImageUrl} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: imgObjPos(d.bgImagePosition) }} crossOrigin="anonymous" />
@@ -649,17 +631,17 @@ export const Template_FullBleedBold = ({ d }: { d: FlyerData }) => {
 
       {/* Content bottom */}
       <div style={{ position: 'absolute', bottom: 38, left: 20, right: 20, zIndex: 5 }}>
-        <div style={{ fontSize: sf(d)*46, fontWeight: 900, color: '#fff', lineHeight: 1.0, letterSpacing: '-0.03em', textShadow: '0 4px 20px rgba(0,0,0,0.8)', marginBottom: 8 }}>
+        <div style={{ fontSize: 46, fontWeight: 900, color: '#fff', lineHeight: 1.0, letterSpacing: '-0.03em', textShadow: '0 4px 20px rgba(0,0,0,0.8)', marginBottom: 8 }}>
           {trunc((d.title || 'TU OFERTA').toUpperCase(), 25)}
         </div>
         <div style={{ height: 3, background: acc, width: 60, borderRadius: 2, marginBottom: 10 }} />
-        <div style={{ fontSize: sf(d)*13, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, marginBottom: 12 }}>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.8)', lineHeight: 1.5, marginBottom: 12 }}>
           {trunc(d.subtitle || '', 80)}
         </div>
         {/* Benefits compact */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
           {(d.beneficios || []).slice(0, 3).map((b, i) => (
-            <div key={i} style={{ background: 'rgba(255,255,255,0.1)', border: `1px solid ${acc}55`, color: '#fff', fontSize: sf(d)*11, fontWeight: 600, padding: '4px 10px', borderRadius: 16 }}>
+            <div key={i} style={{ background: 'rgba(255,255,255,0.1)', border: `1px solid ${acc}55`, color: '#fff', fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 16 }}>
               ✓ {trunc(b, 22)}
             </div>
           ))}
@@ -669,7 +651,7 @@ export const Template_FullBleedBold = ({ d }: { d: FlyerData }) => {
 
       {/* Contact bar */}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 36, background: acc, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ color: '#000', fontWeight: 900, fontSize: sf(d)*12, letterSpacing: '0.04em' }}>{d.phone || '+503 7XXX-XXXX'}</span>
+        <span style={{ color: '#000', fontWeight: 900, fontSize: 12, letterSpacing: '0.04em' }}>{d.phone || '+503 7XXX-XXXX'}</span>
       </div>
     </div>
   );
