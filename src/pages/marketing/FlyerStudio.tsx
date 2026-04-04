@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { ArrowLeft, Download, Sparkles, Palette, Phone, Globe, ChevronRight, ChevronDown, Search, Loader2, ImageIcon, RefreshCw, Upload, Monitor } from 'lucide-react';
@@ -1009,8 +1009,9 @@ export default function FlyerStudio() {
                   </div>
                 </div>
 
-              </div>
+                </div>
 
+            </div>
 
             {/* ── RIGHT PANEL: Live Preview ─────────────────────────── */}
             <div style={{ flex: 1, background: '#e2e8f0', borderRadius: 20, position: 'relative', overflow: 'hidden' }}>
