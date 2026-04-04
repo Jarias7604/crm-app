@@ -931,13 +931,13 @@ export default function FlyerStudio() {
             </div>
 
             {/* ── RIGHT PANEL: Live Preview ─────────────────────────── */}
-            <div style={{ flex: 1, background: '#e2e8f0', borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-              {/* Checkerboard pattern */}
-              <div style={{ position: 'absolute', inset: 0, backgroundImage: 'repeating-conic-gradient(#cbd5e1 0% 25%, #e2e8f0 0% 50%)', backgroundSize: '20px 20px', opacity: 0.5 }} />
+            <div style={{ flex: 1, background: '#e2e8f0', borderRadius: 20, position: 'relative', overflow: 'hidden' }}>
+              {/* Checkerboard background */}
+              <div style={{ position: 'absolute', inset: 0, backgroundImage: 'repeating-conic-gradient(#cbd5e1 0% 25%, #e2e8f0 0% 50%)', backgroundSize: '20px 20px', opacity: 0.5, pointerEvents: 'none' }} />
 
               {/* AI loading overlay */}
               {isLoadingImg && (
-                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 20, borderRadius: 20, backdropFilter: 'blur(8px)', gap: 12 }}>
+                <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 25, borderRadius: 20, backdropFilter: 'blur(8px)', gap: 12 }}>
                   <ImageIcon size={32} color="#fff" />
                   <Loader2 size={32} color="#D4AF37" className="animate-spin" />
                   <div style={{ color: '#fff', fontWeight: 800, fontSize: 14 }}>Generando foto con IA...</div>
@@ -945,30 +945,43 @@ export default function FlyerStudio() {
                 </div>
               )}
 
-              {/* Zoom controls — top right */}
-              <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 30, display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(8px)', borderRadius: 20, padding: '4px 10px' }}>
-                <button onClick={() => setPreviewZoom(z => Math.max(0.3, +(z - 0.1).toFixed(1)))} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', lineHeight: 1, padding: '0 2px', fontWeight: 700 }}>−</button>
-                <span style={{ color: '#fff', fontSize: 11, fontWeight: 700, minWidth: 34, textAlign: 'center' }}>{Math.round(previewZoom * 100)}%</span>
-                <button onClick={() => setPreviewZoom(z => Math.min(2.0, +(z + 0.1).toFixed(1)))} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 18, cursor: 'pointer', lineHeight: 1, padding: '0 2px', fontWeight: 700 }}>+</button>
-                <button onClick={() => setPreviewZoom(1.0)} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', fontSize: 10, cursor: 'pointer', borderRadius: 8, padding: '2px 6px', fontWeight: 700, marginLeft: 2 }}>Reset</button>
+              {/* Zoom controls — always visible, top right (above scroll layer) */}
+              <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 30, display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.60)', backdropFilter: 'blur(8px)', borderRadius: 20, padding: '5px 12px' }}>
+                <button onClick={() => setPreviewZoom(z => Math.max(0.3, +(z - 0.1).toFixed(1)))} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: '0 2px', fontWeight: 700 }}>−</button>
+                <span style={{ color: '#fff', fontSize: 11, fontWeight: 800, minWidth: 36, textAlign: 'center' }}>{Math.round(previewZoom * 100)}%</span>
+                <button onClick={() => setPreviewZoom(z => Math.min(2.5, +(z + 0.1).toFixed(1)))} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: '0 2px', fontWeight: 700 }}>+</button>
+                <button onClick={() => setPreviewZoom(1.0)} style={{ background: 'rgba(255,255,255,0.18)', border: 'none', color: '#fff', fontSize: 10, cursor: 'pointer', borderRadius: 8, padding: '3px 8px', fontWeight: 700, marginLeft: 4 }}>Reset</button>
               </div>
 
-              {/* The Flyer — aspect ratio driven by selectedSize + zoom */}
+              {/* Format badge — always visible, bottom center (above scroll layer) */}
+              <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 30, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)', color: '#fff', fontSize: 11, fontWeight: 700, padding: '5px 14px', borderRadius: 20, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6, pointerEvents: 'none' }}>
+                <span>{selectedSize.icon}</span>
+                <span style={{ color: selectedSize.type === 'Video' ? '#86efac' : '#fde68a' }}>{selectedSize.type}</span>
+                <span>{selectedSize.label} · {selectedSize.w}×{selectedSize.h}px</span>
+              </div>
+
+              {/* ─ Scrollable flyer area ─────────────────────────────── */}
               {(() => {
                 const aspect = selectedSize.h / selectedSize.w;
-                // Base fit (zoom=1): max 520w, max 520h (keeps banner formats visible)
-                const maxW = 520;
-                const maxH = 520;
+                const maxW = 500;
+                const maxH = 500;
                 let baseW = maxW;
                 let baseH = baseW * aspect;
                 if (baseH > maxH) { baseH = maxH; baseW = maxH / aspect; }
-                // Apply user zoom
                 const previewW = baseW * previewZoom;
                 const previewH = baseH * previewZoom;
                 const scale = previewW / selectedSize.w;
+                const zoomed = previewZoom > 1.02;
                 return (
-                  <div style={{ overflow: 'auto', maxWidth: '100%', maxHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', zIndex: 10 }}>
-                    <div style={{ boxShadow: '0 30px 80px rgba(0,0,0,0.3)', borderRadius: 4, flexShrink: 0 }}>
+                  <div style={{
+                    position: 'absolute', inset: 0, zIndex: 10,
+                    overflow: 'auto',
+                    display: 'flex',
+                    alignItems: zoomed ? 'flex-start' : 'center',
+                    justifyContent: zoomed ? 'flex-start' : 'center',
+                    padding: zoomed ? '52px 20px 52px 20px' : '52px 20px 44px 20px',
+                  }}>
+                    <div style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.28)', borderRadius: 4, flexShrink: 0 }}>
                       <div style={{ width: previewW, height: previewH, overflow: 'hidden', borderRadius: 4 }}>
                         <div style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: selectedSize.w, height: selectedSize.h }}>
                           <ActiveTemplate d={flyerData} />
@@ -978,14 +991,8 @@ export default function FlyerStudio() {
                   </div>
                 );
               })()}
-
-              {/* Format badge */}
-              <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', color: '#fff', fontSize: 11, fontWeight: 700, padding: '5px 14px', borderRadius: 20, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span>{selectedSize.icon}</span>
-                <span style={{ color: selectedSize.type === 'Video' ? '#86efac' : '#fde68a' }}>{selectedSize.type}</span>
-                <span>{selectedSize.label} · {selectedSize.w}×{selectedSize.h}px</span>
-              </div>
             </div>
+
           </div>
         )}
 
