@@ -734,7 +734,10 @@ export default function FlyerStudio() {
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
               {ideas.map((idea, idx) => {
-                const accent = idea.paleta?.[0] || ACCENT_COLORS[idx % ACCENT_COLORS.length];
+                const rawAccent = idea.paleta?.[0] || ACCENT_COLORS[idx % ACCENT_COLORS.length];
+                // Guard: if AI returns white/invalid color, force a visible accent
+                const isInvisible = !rawAccent || rawAccent === '#fff' || rawAccent === '#ffffff' || rawAccent === 'white' || rawAccent === 'transparent';
+                const accent = isInvisible ? ACCENT_COLORS[idx % ACCENT_COLORS.length] : rawAccent;
                 return (
                   <button
                     key={idx}
