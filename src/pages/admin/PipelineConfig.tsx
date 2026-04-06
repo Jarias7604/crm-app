@@ -56,6 +56,10 @@ export default function PipelineConfig() {
   const [docTypes, setDocTypes] = useState<Record<string, ClientStageDocumentType[]>>({});
   const [newDocInputs, setNewDocInputs] = useState<Record<string, { nombre: string; descripcion: string; requerido: boolean }>>({});
 
+  // Edición inline de doc types
+  const [editingDocId, setEditingDocId] = useState<string | null>(null);
+  const [editDocForm, setEditDocForm] = useState<{ nombre: string; descripcion: string; requerido: boolean }>({ nombre: '', descripcion: '', requerido: true });
+
   // Términos y empresa
   const [termsText, setTermsText] = useState('');
   const [termsExpanded, setTermsExpanded] = useState(false);
@@ -242,6 +246,25 @@ export default function PipelineConfig() {
       toast.success('Documento eliminado');
       await load();
     } catch { toast.error('Error al eliminar'); }
+  };
+
+  const openEditDoc = (dt: ClientStageDocumentType) => {
+    setEditingDocId(dt.id);
+    setEditDocForm({ nombre: dt.nombre, descripcion: dt.descripcion || '', requerido: dt.requerido });
+  };
+
+  const handleUpdateDocType = async (docId: string) => {
+    if (!editDocForm.nombre.trim()) { toast.error('Nombre requerido'); return; }
+    try {
+      await stageDocTypesService.update(docId, {
+        nombre: editDocForm.nombre.trim(),
+        descripcion: editDocForm.descripcion.trim(),
+        requerido: editDocForm.requerido,
+      });
+      toast.success('✅ Documento actualizado');
+      setEditingDocId(null);
+      await load();
+    } catch { toast.error('Error al actualizar'); }
   };
 
   const sorted = [...stages].sort((a, b) => a.orden - b.orden);
@@ -507,26 +530,92 @@ export default function PipelineConfig() {
                     )}
 
                     <div className="space-y-1.5">
-                      {stageDocs.map(dt => (
-                        <div key={dt.id} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-gray-50 group">
-                          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dt.requerido ? 'bg-red-400' : 'bg-gray-300'}`} />
-                          <span className="text-xs font-semibold text-gray-800 flex-1">{dt.nombre}</span>
-                          {dt.descripcion && (
-                            <span className="text-xs text-gray-400 truncate max-w-[160px]">{dt.descripcion}</span>
-                          )}
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
-                            dt.requerido ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-400'
+                      {stageDocs.map(dt => {
+                        const isEditingDoc = editingDocId === dt.id;
+                        return (
+                          <div key={dt.id} className={`rounded-xl border transition-all ${
+                            isEditingDoc
+                              ? 'bg-blue-50/60 border-[#4449AA]/20 p-3'
+                              : 'flex items-center gap-2.5 px-3 py-2.5 bg-gray-50 border-transparent group'
                           }`}>
-                            {dt.requerido ? 'Req.' : 'Opt.'}
-                          </span>
-                          <button
-                            onClick={() => handleDeleteDocType(dt.id)}
-                            className="p-0.5 text-gray-200 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))}
+                            {isEditingDoc ? (
+                              /* ── Modo edición inline ── */
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    autoFocus
+                                    value={editDocForm.nombre}
+                                    onChange={e => setEditDocForm(f => ({ ...f, nombre: e.target.value }))}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter') handleUpdateDocType(dt.id);
+                                      if (e.key === 'Escape') setEditingDocId(null);
+                                    }}
+                                    placeholder="Nombre del documento"
+                                    className="flex-1 text-xs font-semibold border-2 border-[#4449AA]/30 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#4449AA] bg-white transition-colors"
+                                  />
+                                  <input
+                                    value={editDocForm.descripcion}
+                                    onChange={e => setEditDocForm(f => ({ ...f, descripcion: e.target.value }))}
+                                    placeholder="Descripción (opcional)"
+                                    className="w-36 text-xs border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#4449AA] bg-white"
+                                  />
+                                  <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer flex-shrink-0 select-none">
+                                    <input
+                                      type="checkbox"
+                                      checked={editDocForm.requerido}
+                                      onChange={e => setEditDocForm(f => ({ ...f, requerido: e.target.checked }))}
+                                      className="accent-[#4449AA]"
+                                    />
+                                    Req.
+                                  </label>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => handleUpdateDocType(dt.id)}
+                                    className="flex items-center gap-1 px-3 py-1 bg-[#4449AA] text-white rounded-lg text-xs font-bold hover:bg-[#3338a0] transition-all"
+                                  >
+                                    <Save className="w-3 h-3" /> Guardar
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingDocId(null)}
+                                    className="px-2 py-1 text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+                                  >
+                                    Cancelar
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              /* ── Modo lectura ── */
+                              <>
+                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dt.requerido ? 'bg-red-400' : 'bg-gray-300'}`} />
+                                <span className="text-xs font-semibold text-gray-800 flex-1">{dt.nombre}</span>
+                                {dt.descripcion && (
+                                  <span className="text-xs text-gray-400 truncate max-w-[160px]">{dt.descripcion}</span>
+                                )}
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                                  dt.requerido ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-400'
+                                }`}>
+                                  {dt.requerido ? 'Req.' : 'Opt.'}
+                                </span>
+                                <button
+                                  onClick={() => openEditDoc(dt)}
+                                  className="p-0.5 text-gray-300 hover:text-[#4449AA] transition-colors opacity-0 group-hover:opacity-100"
+                                  title="Editar documento"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteDocType(dt.id)}
+                                  className="p-0.5 text-gray-200 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                                  title="Eliminar documento"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
 
                     {/* Agregar doc */}
