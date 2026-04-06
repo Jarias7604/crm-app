@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 
 // ─── TIPOS ────────────────────────────────────────────────────────────────────
 export interface FlyerData {
@@ -209,7 +209,6 @@ export const Template_Cinematic = ({ d }: { d: FlyerData }) => {
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: Math.round(4 * s), background: `linear-gradient(90deg, ${acc}, ${acc}88)` }} />
       </div>
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '44%', padding: `${Math.round(12 * s)}px ${Math.round(28 * s)}px ${Math.round(48 * s)}px`, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-        <Tag label={d.industria || 'Marketing'} bg={acc} color="#000" s={s} />
         <div style={{ fontSize: Math.round(36 * s), fontWeight: 900, color: '#fff', lineHeight: 1.1, letterSpacing: '-0.02em', margin: `${Math.round(8 * s)}px 0` }}>{trunc((d.title || 'TU OFERTA').toUpperCase(), 40)}</div>
         <div style={{ fontSize: Math.round(12 * s), color: 'rgba(255,255,255,0.7)', fontWeight: 400, lineHeight: 1.4, marginBottom: Math.round(10 * s) }}>{trunc(d.subtitle || '', 90)}</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: Math.round(6 * s), marginBottom: Math.round(14 * s) }}>
@@ -238,7 +237,6 @@ export const Template_WhiteCard = ({ d }: { d: FlyerData }) => {
       <div style={{ height: Math.round(5 * s), background: `linear-gradient(90deg, ${acc}, ${acc}88)` }} />
       <div style={{ padding: `${Math.round(12 * s)}px ${Math.round(24 * s)}px`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
         <Brand logo={d.logoX !== undefined ? null : d.logoUrl} name={d.industria || 'ARIAS GROUP'} color="#0f172a" s={s} />
-        <Tag label={d.industria || 'Premium'} bg={acc} color="#fff" s={s} />
       </div>
       <div style={{ margin: `${Math.round(16 * s)}px ${Math.round(20 * s)}px 0`, borderRadius: Math.round(16 * s), overflow: 'hidden', height: Math.round(210 * s), position: 'relative', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}>
         {d.bgImageUrl ? (
@@ -347,7 +345,6 @@ export const Template_CorporateLight = ({ d }: { d: FlyerData }) => {
         <div style={{ height: Math.round(4 * s), background: `linear-gradient(90deg, ${acc}, ${acc}44)`, marginBottom: Math.round(18 * s), borderRadius: Math.round(2 * s) }} />
         <Brand logo={d.logoX !== undefined ? null : d.logoUrl} name={d.industria || 'ARIAS GROUP'} color={acc} s={s} />
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', marginTop: Math.round(20 * s) }}>
-          <Tag label={d.industria || 'Servicios'} bg={acc} color="#fff" s={s} />
           <div style={{ fontSize: Math.round(38 * s), fontWeight: 900, color: '#0f172a', lineHeight: 1.05, letterSpacing: '-0.03em', margin: `${Math.round(12 * s)}px 0 ${Math.round(8 * s)}px` }}>{trunc((d.title || 'TU OFERTA').toUpperCase(), 22)}</div>
           <div style={{ height: Math.round(4 * s), background: acc, width: Math.round(50 * s), borderRadius: Math.round(2 * s), marginBottom: Math.round(10 * s) }} />
           <div style={{ fontSize: Math.round(12 * s), color: '#475569', fontWeight: 400, lineHeight: 1.5, marginBottom: Math.round(16 * s) }}>{trunc(d.subtitle || '', 100)}</div>
@@ -422,7 +419,6 @@ export const Template_PromoPop = ({ d }: { d: FlyerData }) => {
         </div>
       </div>
       <div style={{ padding: `${Math.round(4 * s)}px ${Math.round(24 * s)}px ${Math.round(48 * s)}px`, display: 'flex', flexDirection: 'column', gap: Math.round(8 * s) }}>
-        <Tag label={d.industria || 'Promo'} bg={acc} color="#000" s={s} />
         <div style={{ fontSize: Math.round(36 * s), fontWeight: 900, color: '#0f172a', lineHeight: 1.1, letterSpacing: '-0.03em' }}>{trunc((d.title || 'TU OFERTA').toUpperCase(), 28)}</div>
         <div style={{ fontSize: Math.round(13 * s), color: '#64748b', lineHeight: 1.5 }}>{trunc(d.subtitle || '', 90)}</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: `${Math.round(4 * s)}px ${Math.round(8 * s)}px` }}>
@@ -453,7 +449,6 @@ export const Template_MinimalEditorial = ({ d }: { d: FlyerData }) => {
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: Math.round(4 * s), background: acc }} />
       </div>
       <div style={{ flex: 1, padding: `${Math.round(8 * s)}px ${Math.round(24 * s)}px ${Math.round(44 * s)}px`, display: 'flex', flexDirection: 'column', gap: Math.round(8 * s) }}>
-        <Tag label={d.industria || 'Servicio'} bg={`${acc}22`} color={acc} s={s} />
         <div style={{ fontSize: Math.round(38 * s), fontWeight: 900, color: acc, lineHeight: 1.1, letterSpacing: '-0.03em' }}>{trunc((d.title || 'TU OFERTA').toUpperCase(), 28)}</div>
         <div style={{ height: Math.round(3 * s), background: acc, width: Math.round(50 * s), borderRadius: Math.round(2 * s) }} />
         <div style={{ fontSize: Math.round(13 * s), color: '#64748b', lineHeight: 1.5 }}>{trunc(d.subtitle || '', 100)}</div>
@@ -488,7 +483,6 @@ export const Template_FullBleedBold = ({ d }: { d: FlyerData }) => {
       <div style={{ position: 'absolute', left: 0, top: '52%', bottom: 0, width: Math.round(5 * s), background: acc }} />
       <div style={{ position: 'absolute', top: Math.round(16 * s), left: Math.round(20 * s), right: Math.round(20 * s), display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 5 }}>
         <Brand logo={d.logoX !== undefined ? null : d.logoUrl} name={d.industria || 'ARIAS GROUP'} color="#fff" s={s} />
-        <Tag label="PREMIUM" bg={acc} color="#000" s={s} />
       </div>
       <div style={{ position: 'absolute', bottom: Math.round(38 * s), left: Math.round(20 * s), right: Math.round(20 * s), zIndex: 5 }}>
         <div style={{ fontSize: Math.round(46 * s), fontWeight: 900, color: '#fff', lineHeight: 1.0, letterSpacing: '-0.03em', textShadow: '0 4px 20px rgba(0,0,0,0.8)', marginBottom: Math.round(8 * s) }}>{trunc((d.title || 'TU OFERTA').toUpperCase(), 25)}</div>
