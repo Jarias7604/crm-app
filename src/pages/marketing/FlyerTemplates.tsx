@@ -187,7 +187,7 @@ export const Template_BoldSplit = ({ d }: { d: FlyerData }) => {
             <div key={i} style={{ fontSize: Math.round((i === 0 ? 58 : i === 1 ? 52 : 42) * s), fontWeight: 900, color: i === 1 ? 'rgba(255,255,255,0.78)' : '#fff', lineHeight: 1.0, textShadow: '0 4px 12px rgba(0,0,0,0.3)', letterSpacing: '-0.02em' }}>{w}</div>
           ))}
         </div>
-        <div style={{ fontSize: Math.round(12 * s * (d.subtitleScale ?? 1)), color: 'rgba(255,255,255,0.85)', fontWeight: 500, lineHeight: 1.4, marginBottom: Math.round(14 * s * (d.subtitleScale ?? 1)) }}>{trunc(d.subtitle || '', 80)}</div>
+        <div style={{ fontSize: Math.round(12 * s * (d.subtitleScale ?? 1)), color: 'rgba(255,255,255,0.85)', fontWeight: (d.subtitleBold ? 900 : 500), lineHeight: 1.4, marginBottom: Math.round(14 * s * (d.subtitleScale ?? 1)) }}>{trunc(d.subtitle || '', 80)}</div>
         <div style={{ marginBottom: Math.round(16 * s) }}>{(d.beneficios || []).slice(0, 3).map((b, i) => <BenRow key={i} text={b} scale={d.benefitsScale ?? 1} bold={!!d.benefitsBold} color="rgba(255,255,255,0.25)" s={s} />)}</div>
         <PillBtn label={d.cta || 'CONTACTAR'} bg1="#fff" bg2="rgba(255,255,255,0.85)" color={acc} s={s} style={{ fontSize: Math.round(12 * s), padding: `${Math.round(12 * s)}px ${Math.round(20 * s)}px`, width: '100%', boxSizing: 'border-box' }} />
       </div>
@@ -216,7 +216,7 @@ export const Template_Cinematic = ({ d }: { d: FlyerData }) => {
       </div>
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '44%', padding: `${Math.round(12 * s)}px ${Math.round(28 * s)}px ${Math.round(48 * s)}px`, boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
         <div style={{ fontSize: Math.round(36 * s), fontWeight: 900, color: '#fff', lineHeight: 1.1, letterSpacing: '-0.02em', margin: `${Math.round(8 * s)}px 0` }}>{trunc((d.title || 'TU OFERTA').toUpperCase(), 40)}</div>
-        <div style={{ fontSize: Math.round(12 * s * (d.subtitleScale ?? 1)), color: 'rgba(255,255,255,0.7)', fontWeight: 400, lineHeight: 1.4, marginBottom: Math.round(10 * s * (d.subtitleScale ?? 1)) }}>{trunc(d.subtitle || '', 90)}</div>
+        <div style={{ fontSize: Math.round(12 * s * (d.subtitleScale ?? 1)), color: 'rgba(255,255,255,0.7)', fontWeight: (d.subtitleBold ? 900 : 400), lineHeight: 1.4, marginBottom: Math.round(10 * s * (d.subtitleScale ?? 1)) }}>{trunc(d.subtitle || '', 90)}</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: Math.round(6 * s), marginBottom: Math.round(14 * s) }}>
           {(d.beneficios || []).slice(0, 3).map((b, i) => (
             <div key={i} style={{ background: 'rgba(255,255,255,0.08)', border: `1px solid ${acc}44`, color: '#e2e8f0', fontSize: Math.round(11 * s), fontWeight: 600, padding: `${Math.round(5 * s)}px ${Math.round(12 * s)}px`, borderRadius: Math.round(20 * s) }}>{trunc(b, 28)}</div>
@@ -255,7 +255,7 @@ export const Template_WhiteCard = ({ d }: { d: FlyerData }) => {
       <div style={{ padding: `${Math.round(16 * s)}px ${Math.round(24 * s)}px`, display: 'flex', flexDirection: 'column', gap: Math.round(8 * s) }}>
         <div style={{ fontSize: Math.round(34 * s), fontWeight: 900, color: '#0f172a', lineHeight: 1.1, letterSpacing: '-0.03em' }}>{trunc((d.title || 'TU OFERTA').toUpperCase(), 30)}</div>
         <div style={{ height: Math.round(4 * s), width: Math.round(60 * s), background: acc, borderRadius: Math.round(2 * s) }} />
-        <div style={{ fontSize: Math.round(13 * s * (d.subtitleScale ?? 1)), color: '#475569', fontWeight: 400, lineHeight: 1.5 }}>{trunc(d.subtitle || '', 100)}</div>
+        <div style={{ fontSize: Math.round(13 * s * (d.subtitleScale ?? 1)), color: '#475569', fontWeight: (d.subtitleBold ? 900 : 400), lineHeight: 1.5 }}>{trunc(d.subtitle || '', 100)}</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: `${Math.round(4 * s)}px ${Math.round(8 * s)}px`, marginTop: Math.round(4 * s) }}>
           {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRowDark key={i} text={b} scale={d.benefitsScale ?? 1} bold={!!d.benefitsBold} color={acc} s={s} />)}
         </div>
@@ -323,7 +323,7 @@ export const Template_CenterGradient = ({ d }: { d: FlyerData }) => {
       </div>
       <div style={{ padding: `${Math.round(16 * s)}px ${Math.round(28 * s)}px`, textAlign: 'center' }}>
         <div style={{ fontSize: Math.round(42 * s), fontWeight: 900, color: '#fff', lineHeight: 1.05, letterSpacing: '-0.03em', textShadow: '0 4px 16px rgba(0,0,0,0.5)', marginBottom: Math.round(8 * s) }}>{trunc((d.title || 'TU OFERTA').toUpperCase(), 25)}</div>
-        <div style={{ fontSize: Math.round(13 * s * (d.subtitleScale ?? 1)), color: 'rgba(255,255,255,0.8)', fontWeight: 400, lineHeight: 1.5, marginBottom: Math.round(14 * s * (d.subtitleScale ?? 1)) }}>{trunc(d.subtitle || '', 80)}</div>
+        <div style={{ fontSize: Math.round(13 * s * (d.subtitleScale ?? 1)), color: 'rgba(255,255,255,0.8)', fontWeight: (d.subtitleBold ? 900 : 400), lineHeight: 1.5, marginBottom: Math.round(14 * s * (d.subtitleScale ?? 1)) }}>{trunc(d.subtitle || '', 80)}</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: Math.round(8 * s), marginBottom: Math.round(16 * s) }}>
           {(d.beneficios || []).slice(0, 3).map((b, i) => (
             <div key={i} style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', fontSize: Math.round(11 * s), fontWeight: 600, padding: `${Math.round(5 * s)}px ${Math.round(12 * s)}px`, borderRadius: Math.round(20 * s) }}>✓ {trunc(b, 24)}</div>
@@ -353,7 +353,7 @@ export const Template_CorporateLight = ({ d }: { d: FlyerData }) => {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', marginTop: Math.round(20 * s) }}>
           <div style={{ fontSize: Math.round(38 * s), fontWeight: 900, color: '#0f172a', lineHeight: 1.05, letterSpacing: '-0.03em', margin: `${Math.round(12 * s)}px 0 ${Math.round(8 * s)}px` }}>{trunc((d.title || 'TU OFERTA').toUpperCase(), 22)}</div>
           <div style={{ height: Math.round(4 * s), background: acc, width: Math.round(50 * s), borderRadius: Math.round(2 * s), marginBottom: Math.round(10 * s) }} />
-          <div style={{ fontSize: Math.round(12 * s * (d.subtitleScale ?? 1)), color: '#475569', fontWeight: 400, lineHeight: 1.5, marginBottom: Math.round(16 * s * (d.subtitleScale ?? 1)) }}>{trunc(d.subtitle || '', 100)}</div>
+          <div style={{ fontSize: Math.round(12 * s * (d.subtitleScale ?? 1)), color: '#475569', fontWeight: (d.subtitleBold ? 900 : 400), lineHeight: 1.5, marginBottom: Math.round(16 * s * (d.subtitleScale ?? 1)) }}>{trunc(d.subtitle || '', 100)}</div>
           {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRowDark key={i} text={b} scale={d.benefitsScale ?? 1} bold={!!d.benefitsBold} color={acc} s={s} />)}
         </div>
         <PillBtn label={d.cta || 'CONTACTAR'} bg1={acc} bg2={acc + 'cc'} color="#fff" s={s} style={{ marginTop: Math.round(12 * s), fontSize: Math.round(12 * s), padding: `${Math.round(12 * s)}px ${Math.round(20 * s)}px` }} />
