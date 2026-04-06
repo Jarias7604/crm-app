@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 
 // ─── TIPOS ────────────────────────────────────────────────────────────────────
 export interface FlyerData {
@@ -94,12 +94,15 @@ const BenRowDark = ({ text, color, s = 1, scale = 1, bold = false }: { text: str
 
 const Brand = ({ logo, name, color = '#fff', s = 1 }: {
   logo: string | null; name: string; color?: string; s?: number;
-}) => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(8 * s) }}>
-    {logo && <img src={logo} style={{ width: Math.round(40 * s), height: Math.round(40 * s), borderRadius: Math.round(8 * s), objectFit: 'contain' }} crossOrigin="anonymous" />}
-    <span style={{ fontSize: Math.round(13 * s), fontWeight: 800, color, letterSpacing: '0.05em' }}>{trunc(name, 20).toUpperCase()}</span>
-  </div>
-);
+}) => {
+  if (!logo) return null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(8 * s) }}>
+      <img src={logo} style={{ width: Math.round(40 * s), height: Math.round(40 * s), borderRadius: Math.round(8 * s), objectFit: 'contain' }} crossOrigin="anonymous" />
+      <span style={{ fontSize: Math.round(13 * s), fontWeight: 800, color, letterSpacing: '0.05em' }}>{trunc(name, 20).toUpperCase()}</span>
+    </div>
+  );
+};
 
 // ─── FREE LOGO overlay (drag + resize) ────────────────────────────────────────
 export const FreeLogo = ({ d, onMove, onResize }: {
