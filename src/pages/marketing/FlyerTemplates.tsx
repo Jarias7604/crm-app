@@ -182,7 +182,7 @@ export const Template_BoldSplit = ({ d }: { d: FlyerData }) => {
           ))}
         </div>
         <div style={{ fontSize: Math.round(12 * s), color: 'rgba(255,255,255,0.85)', fontWeight: 500, lineHeight: 1.4, marginBottom: Math.round(14 * s) }}>{trunc(d.subtitle || '', 80)}</div>
-        <div style={{ marginBottom: Math.round(16 * s) }}>{(d.beneficios || []).slice(0, 3).map((b, i) => <BenRow key={i} text={b} color="rgba(255,255,255,0.25)" s={s} />)}</div>
+        <div style={{ marginBottom: Math.round(16 * s) }}>{(d.beneficios || []).slice(0, 3).map((b, i) => <BenRow key={i} text={b} scale={d.benefitsScale ?? 1} bold={!!d.benefitsBold} color="rgba(255,255,255,0.25)" s={s} />)}</div>
         <PillBtn label={d.cta || 'CONTACTAR'} bg1="#fff" bg2="rgba(255,255,255,0.85)" color={acc} s={s} style={{ fontSize: Math.round(12 * s), padding: `${Math.round(12 * s)}px ${Math.round(20 * s)}px`, width: '100%', boxSizing: 'border-box' }} />
       </div>
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: Math.round(40 * s), background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
@@ -251,7 +251,7 @@ export const Template_WhiteCard = ({ d }: { d: FlyerData }) => {
         <div style={{ height: Math.round(4 * s), width: Math.round(60 * s), background: acc, borderRadius: Math.round(2 * s) }} />
         <div style={{ fontSize: Math.round(13 * s), color: '#475569', fontWeight: 400, lineHeight: 1.5 }}>{trunc(d.subtitle || '', 100)}</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: `${Math.round(4 * s)}px ${Math.round(8 * s)}px`, marginTop: Math.round(4 * s) }}>
-          {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRowDark key={i} text={b} color={acc} s={s} />)}
+          {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRowDark key={i} text={b} scale={d.benefitsScale ?? 1} bold={!!d.benefitsBold} color={acc} s={s} />)}
         </div>
         <PillBtn label={d.cta || 'CONTACTAR'} bg1={acc} bg2={acc + 'cc'} color="#fff" s={s} style={{ marginTop: Math.round(8 * s), textAlign: 'center', fontSize: Math.round(13 * s) }} />
       </div>
@@ -283,7 +283,7 @@ export const Template_Magazine = ({ d }: { d: FlyerData }) => {
         </div>
         <div style={{ height: Math.round(3 * s), background: acc, margin: `${Math.round(12 * s)}px 0`, width: '40%' }} />
         <div style={{ fontSize: Math.round(11 * s), color: 'rgba(255,255,255,0.65)', lineHeight: 1.5, marginBottom: Math.round(14 * s) }}>{trunc(d.subtitle || '', 80)}</div>
-        <div style={{ marginBottom: Math.round(14 * s) }}>{(d.beneficios || []).slice(0, 3).map((b, i) => <BenRow key={i} text={b} color={acc} s={s} />)}</div>
+        <div style={{ marginBottom: Math.round(14 * s) }}>{(d.beneficios || []).slice(0, 3).map((b, i) => <BenRow key={i} text={b} scale={d.benefitsScale ?? 1} bold={!!d.benefitsBold} color={acc} s={s} />)}</div>
         <PillBtn label={d.cta || 'MÁS INFO'} bg1={acc} bg2={acc + 'bb'} color="#fff" s={s} style={{ fontSize: Math.round(12 * s), padding: `${Math.round(12 * s)}px ${Math.round(16 * s)}px` }} />
         <div style={{ marginTop: Math.round(10 * s), fontSize: Math.round(11 * s), color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>{d.phone || '+503 7XXX-XXXX'}</div>
       </div>
@@ -348,7 +348,7 @@ export const Template_CorporateLight = ({ d }: { d: FlyerData }) => {
           <div style={{ fontSize: Math.round(38 * s), fontWeight: 900, color: '#0f172a', lineHeight: 1.05, letterSpacing: '-0.03em', margin: `${Math.round(12 * s)}px 0 ${Math.round(8 * s)}px` }}>{trunc((d.title || 'TU OFERTA').toUpperCase(), 22)}</div>
           <div style={{ height: Math.round(4 * s), background: acc, width: Math.round(50 * s), borderRadius: Math.round(2 * s), marginBottom: Math.round(10 * s) }} />
           <div style={{ fontSize: Math.round(12 * s), color: '#475569', fontWeight: 400, lineHeight: 1.5, marginBottom: Math.round(16 * s) }}>{trunc(d.subtitle || '', 100)}</div>
-          {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRowDark key={i} text={b} color={acc} s={s} />)}
+          {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRowDark key={i} text={b} scale={d.benefitsScale ?? 1} bold={!!d.benefitsBold} color={acc} s={s} />)}
         </div>
         <PillBtn label={d.cta || 'CONTACTAR'} bg1={acc} bg2={acc + 'cc'} color="#fff" s={s} style={{ marginTop: Math.round(12 * s), fontSize: Math.round(12 * s), padding: `${Math.round(12 * s)}px ${Math.round(20 * s)}px` }} />
         <div style={{ marginTop: Math.round(8 * s), fontSize: Math.round(11 * s), color: '#94a3b8', fontWeight: 600 }}>{d.phone}</div>
@@ -422,7 +422,7 @@ export const Template_PromoPop = ({ d }: { d: FlyerData }) => {
         <div style={{ fontSize: Math.round(36 * s), fontWeight: 900, color: '#0f172a', lineHeight: 1.1, letterSpacing: '-0.03em' }}>{trunc((d.title || 'TU OFERTA').toUpperCase(), 28)}</div>
         <div style={{ fontSize: Math.round(13 * s), color: '#64748b', lineHeight: 1.5 }}>{trunc(d.subtitle || '', 90)}</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: `${Math.round(4 * s)}px ${Math.round(8 * s)}px` }}>
-          {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRowDark key={i} text={b} color={acc} s={s} />)}
+          {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRowDark key={i} text={b} scale={d.benefitsScale ?? 1} bold={!!d.benefitsBold} color={acc} s={s} />)}
         </div>
         <PillBtn label={d.cta || 'OBTENER OFERTA'} bg1={acc} bg2={acc + 'cc'} color="#000" s={s} style={{ fontSize: Math.round(13 * s), marginTop: Math.round(8 * s) }} />
       </div>
@@ -453,7 +453,7 @@ export const Template_MinimalEditorial = ({ d }: { d: FlyerData }) => {
         <div style={{ height: Math.round(3 * s), background: acc, width: Math.round(50 * s), borderRadius: Math.round(2 * s) }} />
         <div style={{ fontSize: Math.round(13 * s), color: '#64748b', lineHeight: 1.5 }}>{trunc(d.subtitle || '', 100)}</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: `${Math.round(4 * s)}px ${Math.round(8 * s)}px`, flex: 1 }}>
-          {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRowDark key={i} text={b} color={acc} s={s} />)}
+          {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRowDark key={i} text={b} scale={d.benefitsScale ?? 1} bold={!!d.benefitsBold} color={acc} s={s} />)}
         </div>
         <PillBtn label={d.cta || 'SABER MÁS'} bg1={acc} bg2={acc + 'bb'} color="#fff" s={s} style={{ fontSize: Math.round(13 * s), marginTop: Math.round(4 * s) }} />
       </div>
