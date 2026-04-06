@@ -6,7 +6,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../services/supabase';
 import { flyerService } from '../../services/flyerService';
 import type { FlyerData } from './FlyerTemplates';
-import { TEMPLATES, TEMPLATE_LIST } from './FlyerTemplates';
+import { TEMPLATE_LIST, RenderFlyer } from './FlyerTemplates';
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 interface FlyerIdea {
@@ -207,7 +207,10 @@ export default function FlyerStudio() {
     accent: '#1a56db', bgImageUrl: null, bgImagePosition: { x: 50, y: 50 },
     bgImage2Url: null, photoLayout: 'single',
     logoUrl: null, industria: '', phone: '', website: '', templateId: 'bold-split',
-    textScale: 1.0,
+    textScale: 1.0, logoSize: 1.0, logoPos: 'top-left',
+    subtitleScale: 1.0, subtitleBold: false,
+    benefitsScale: 1.0, benefitsBold: false,
+    ctaGradient: true,
   });
 
   // Load industries from DB + company defaults
@@ -226,7 +229,7 @@ export default function FlyerStudio() {
         .eq('id', profile?.company_id || '')
         .single();
       if (comp) {
-        setFlyerData(prev => ({ ...prev, logoUrl: comp.logo_url, phone: comp.phone || '', website: comp.website || '' }));
+        setFlyerData(prev => ({ ...prev, logoUrl: comp.logo_url, phone: comp.phone || '', website: comp.website || '', logoX: prev.logoX ?? 5, logoY: prev.logoY ?? 5 }));
       }
     })();
   }, [profile?.company_id]);
@@ -400,8 +403,45 @@ export default function FlyerStudio() {
     }
   }, [flyerData, profile]);
 
-  // ─── ACTIVE TEMPLATE COMPONENT ──────────────────────────────────────────────
-  const ActiveTemplate = TEMPLATES[flyerData.templateId] || TEMPLATES['bold-split'];
+  // ─── LOGO DRAG STATE ─────────────────────────────────────────────────────────
+  const dragState = useRef<{ active: boolean; mode: 'move' | 'resize'; startX: number; startY: number; startLogoX: number; startLogoY: number; startLogoSize: number } | null>(null);
+  const previewWrapRef = useRef<HTMLDivElement>(null);
+
+  const handleLogoPointerDown = useCallback((e: React.PointerEvent, mode: 'move' | 'resize') => {
+    if (!previewWrapRef.current) return;
+    e.preventDefault(); e.stopPropagation();
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    dragState.current = {
+      active: true, mode,
+      startX: e.clientX, startY: e.clientY,
+      startLogoX: flyerData.logoX ?? 5,
+      startLogoY: flyerData.logoY ?? 5,
+      startLogoSize: flyerData.logoSize ?? 1,
+    };
+  }, [flyerData.logoX, flyerData.logoY, flyerData.logoSize]);
+
+  const handleLogoPointerMove = useCallback((e: React.PointerEvent) => {
+    const ds = dragState.current;
+    if (!ds?.active || !previewWrapRef.current) return;
+    const rect = previewWrapRef.current.getBoundingClientRect();
+    const scaleX = selectedSize.w / rect.width;
+    const scaleY = selectedSize.h / rect.height;
+    const dx = (e.clientX - ds.startX) * scaleX;
+    const dy = (e.clientY - ds.startY) * scaleY;
+    if (ds.mode === 'move') {
+      const nx = Math.max(0, Math.min(90, ds.startLogoX + (dx / selectedSize.w) * 100));
+      const ny = Math.max(0, Math.min(90, ds.startLogoY + (dy / selectedSize.h) * 100));
+      setFlyerData(prev => ({ ...prev, logoX: +nx.toFixed(1), logoY: +ny.toFixed(1) }));
+    } else {
+      const delta = (dx + dy) / 200;
+      const ns = Math.max(0.3, Math.min(5, ds.startLogoSize + delta));
+      setFlyerData(prev => ({ ...prev, logoSize: +ns.toFixed(2) }));
+    }
+  }, [selectedSize.w, selectedSize.h]);
+
+  const handleLogoPointerUp = useCallback(() => {
+    if (dragState.current) dragState.current.active = false;
+  }, []);
 
   // ─── RENDER ─────────────────────────────────────────────────────────────────
   return (
@@ -766,9 +806,11 @@ export default function FlyerStudio() {
               width: 320, background: '#fff', borderRadius: 20, border: '1px solid #e2e8f0',
               display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0,
             }}>
-              <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: '#D4AF37', letterSpacing: '0.08em' }}>ESTUDIO DE DISEÑO</div>
-                <div style={{ fontSize: 15, fontWeight: 900, color: '#0f172a' }}>Personaliza tu flyer</div>
+              <div style={{ borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+                <div style={{ padding: '16px 20px 10px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: '#D4AF37', letterSpacing: '0.08em' }}>ESTUDIO DE DISEÑO</div>
+                  <div style={{ fontSize: 15, fontWeight: 900, color: '#0f172a' }}>Personaliza tu flyer</div>
+                </div>
               </div>
 
               <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -954,7 +996,7 @@ export default function FlyerStudio() {
                   </div>
                 </div>
 
-                {/* ═══ 3. PLANTILLA ══════════════════════════════════════════════ */}
+                {/* ═══ 3. PLANTILLA ══════════════════════════════════════════ */}
                 <div style={{ position: 'relative', zIndex: 5 }}>
                   <label style={{ fontSize: 10, fontWeight: 800, color: '#475569', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>
                     <Palette size={11} style={{ display: 'inline', marginRight: 4 }} />
@@ -971,7 +1013,15 @@ export default function FlyerStudio() {
                   </div>
                 </div>
 
-                {/* ═══ 4. COLOR ══════════════════════════════════════════════════ */}
+                {/* ═══ 4. LOGO — drag en el canvas ══════════════════════════ */}
+                {flyerData.logoUrl && (
+                  <div style={{ fontSize: 9, color: '#64748b', padding: '4px 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <img src={flyerData.logoUrl} style={{ width: 22, height: 22, borderRadius: 5, objectFit: 'cover', border: '1px solid #e2e8f0' }} />
+                    <span>🖱️ <b>Arrastra</b> el logo en el flyer · esquina inferior para redimensionar</span>
+                  </div>
+                )}
+
+                {/* ═══ 5. COLOR ══════════════════════════════════════════════════ */}
                 <div style={{ position: 'relative', zIndex: 5 }}>
                   <label style={{ fontSize: 10, fontWeight: 800, color: '#475569', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>COLOR DE MARCA</label>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
@@ -985,7 +1035,68 @@ export default function FlyerStudio() {
                   </div>
                 </div>
 
-                {/* ═══ 5. TEXTOS ═════════════════════════════════════════════════ */}
+                {/* ═══ 6. TIPOGRAFÍA ══════════════════════════════════════════════ */}
+                <div style={{ position: 'relative', zIndex: 5, border: '1.5px solid #bfdbfe', borderRadius: 10, background: '#fff', borderLeft: '4px solid #1a56db' }}>
+                  <div style={{ fontSize: 10, fontWeight: 800, color: '#1e40af', letterSpacing: '0.06em', padding: '8px 12px', borderBottom: '1px solid #eff6ff', background: '#eff6ff', borderRadius: '8px 8px 0 0' }}>
+                    ✦ TIPOGRAFÍA POR ELEMENTO
+                  </div>
+                  <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {/* Subtítulo */}
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: '#374151' }}>Gancho / Subtítulo</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: '#D4AF37' }}>{Math.round((flyerData.subtitleScale ?? 1) * 100)}%</span>
+                          <button onClick={() => setFlyerData(prev => ({ ...prev, subtitleBold: !prev.subtitleBold }))}
+                            style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 900, cursor: 'pointer', border: `1.5px solid ${flyerData.subtitleBold ? '#1a56db' : '#e2e8f0'}`, background: flyerData.subtitleBold ? '#1a56db' : '#f8fafc', color: flyerData.subtitleBold ? '#fff' : '#64748b', transition: 'all 0.12s' }}>B</button>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <button onClick={() => setFlyerData(prev => ({ ...prev, subtitleScale: Math.max(0.7, +((prev.subtitleScale ?? 1) - 0.1).toFixed(1)) }))}
+                          style={{ width: 22, height: 22, borderRadius: 5, border: '1px solid #e2e8f0', background: '#f8fafc', cursor: 'pointer', fontSize: 14, fontWeight: 900, color: '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>−</button>
+                        <input type="range" min={0.7} max={2.0} step={0.1} value={flyerData.subtitleScale ?? 1}
+                          onChange={e => setFlyerData(prev => ({ ...prev, subtitleScale: parseFloat(e.target.value) }))}
+                          style={{ accentColor: '#1a56db', flex: 1 }} />
+                        <button onClick={() => setFlyerData(prev => ({ ...prev, subtitleScale: Math.min(2, +((prev.subtitleScale ?? 1) + 0.1).toFixed(1)) }))}
+                          style={{ width: 22, height: 22, borderRadius: 5, border: '1px solid #e2e8f0', background: '#f8fafc', cursor: 'pointer', fontSize: 14, fontWeight: 900, color: '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>+</button>
+                      </div>
+                    </div>
+                    <div style={{ height: 1, background: '#f1f5f9' }} />
+                    {/* Beneficios */}
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: '#374151' }}>Beneficios / Puntos</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: '#D4AF37' }}>{Math.round((flyerData.benefitsScale ?? 1) * 100)}%</span>
+                          <button onClick={() => setFlyerData(prev => ({ ...prev, benefitsBold: !prev.benefitsBold }))}
+                            style={{ padding: '2px 8px', borderRadius: 6, fontSize: 11, fontWeight: 900, cursor: 'pointer', border: `1.5px solid ${flyerData.benefitsBold ? '#1a56db' : '#e2e8f0'}`, background: flyerData.benefitsBold ? '#1a56db' : '#f8fafc', color: flyerData.benefitsBold ? '#fff' : '#64748b', transition: 'all 0.12s' }}>B</button>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <button onClick={() => setFlyerData(prev => ({ ...prev, benefitsScale: Math.max(0.7, +((prev.benefitsScale ?? 1) - 0.1).toFixed(1)) }))}
+                          style={{ width: 22, height: 22, borderRadius: 5, border: '1px solid #e2e8f0', background: '#f8fafc', cursor: 'pointer', fontSize: 14, fontWeight: 900, color: '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>−</button>
+                        <input type="range" min={0.7} max={2.0} step={0.1} value={flyerData.benefitsScale ?? 1}
+                          onChange={e => setFlyerData(prev => ({ ...prev, benefitsScale: parseFloat(e.target.value) }))}
+                          style={{ accentColor: '#1a56db', flex: 1 }} />
+                        <button onClick={() => setFlyerData(prev => ({ ...prev, benefitsScale: Math.min(2, +((prev.benefitsScale ?? 1) + 0.1).toFixed(1)) }))}
+                          style={{ width: 22, height: 22, borderRadius: 5, border: '1px solid #e2e8f0', background: '#f8fafc', cursor: 'pointer', fontSize: 14, fontWeight: 900, color: '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>+</button>
+                      </div>
+                    </div>
+                    <div style={{ height: 1, background: '#f1f5f9' }} />
+                    {/* CTA Toggle */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: '#374151' }}>Botón CTA</div>
+                        <div style={{ fontSize: 9, color: '#94a3b8', marginTop: 1 }}>{flyerData.ctaGradient ? 'Degradado activo' : 'Color sólido'}</div>
+                      </div>
+                      <button onClick={() => setFlyerData(prev => ({ ...prev, ctaGradient: !prev.ctaGradient }))}
+                        style={{ width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', background: flyerData.ctaGradient ? 'linear-gradient(135deg, #1a56db, #7c3aed)' : '#e2e8f0', position: 'relative', transition: 'all 0.2s', flexShrink: 0 }}>
+                        <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: flyerData.ctaGradient ? 23 : 3, transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 <div style={{ position: 'relative', zIndex: 5 }}>
                   <label style={{ fontSize: 10, fontWeight: 800, color: '#475569', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>TÍTULO PRINCIPAL</label>
                   <input value={flyerData.title} onChange={e => setFlyerData(prev => ({ ...prev, title: e.target.value }))}
@@ -1014,14 +1125,41 @@ export default function FlyerStudio() {
                 </div>
 
                 <div style={{ position: 'relative', zIndex: 5 }}>
-                  <label style={{ fontSize: 10, fontWeight: 800, color: '#475569', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>BENEFICIOS (uno por línea)</label>
-                  <textarea value={flyerData.beneficios.join('\n')}
-                    onChange={e => setFlyerData(prev => ({ ...prev, beneficios: e.target.value.split('\n').filter(Boolean) }))}
-                    placeholder={'Beneficio 1\nBeneficio 2\nBeneficio 3'} rows={4}
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: 9, border: '1.5px solid #e2e8f0', fontSize: 12, resize: 'none', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' }}
-                    onFocus={e => e.target.style.borderColor = '#D4AF37'}
-                    onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                    <label style={{ fontSize: 10, fontWeight: 800, color: '#475569', letterSpacing: '0.06em' }}>BENEFICIOS</label>
+                    {flyerData.beneficios.length < 5 && (
+                      <button
+                        onClick={() => setFlyerData(prev => ({ ...prev, beneficios: [...prev.beneficios, ''] }))}
+                        style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '3px 9px', borderRadius: 7, border: '1.5px solid #D4AF37', background: '#fffbeb', cursor: 'pointer', fontSize: 11, fontWeight: 800, color: '#92400e' }}
+                      >+ Agregar</button>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {(flyerData.beneficios.length === 0 ? [''] : flyerData.beneficios).map((b, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ fontSize: 12, color: '#D4AF37', fontWeight: 900, flexShrink: 0 }}>✓</span>
+                        <input
+                          value={b}
+                          onChange={e => setFlyerData(prev => { const nb = [...prev.beneficios]; nb[i] = e.target.value; return { ...prev, beneficios: nb }; })}
+                          placeholder={`Beneficio ${i + 1}`}
+                          style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: 12, outline: 'none', boxSizing: 'border-box' }}
+                          onFocus={e => e.target.style.borderColor = '#D4AF37'}
+                          onBlur={e => e.target.style.borderColor = '#e2e8f0'}
+                        />
+                        <button
+                          onClick={() => setFlyerData(prev => ({ ...prev, beneficios: prev.beneficios.filter((_, j) => j !== i) }))}
+                          style={{ width: 22, height: 22, borderRadius: 6, border: '1px solid #fecaca', background: '#fff', cursor: 'pointer', fontSize: 14, color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, lineHeight: 1 }}
+                        >×</button>
+                      </div>
+                    ))}
+                    {flyerData.beneficios.length === 0 && (
+                      <button onClick={() => setFlyerData(prev => ({ ...prev, beneficios: [''] }))}
+                        style={{ padding: '8px', borderRadius: 8, border: '1.5px dashed #D4AF37', background: '#fffbeb', cursor: 'pointer', fontSize: 11, color: '#92400e', fontWeight: 700 }}
+                      >+ Agregar primer beneficio</button>
+                    )}
+                  </div>
                 </div>
+
 
                 <div style={{ position: 'relative', zIndex: 5, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   <div>
@@ -1068,6 +1206,35 @@ export default function FlyerStudio() {
                 <button onClick={() => setPreviewZoom(z => Math.min(2.5, +(z + 0.1).toFixed(1)))} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: '0 2px', fontWeight: 700 }}>+</button>
                 <button onClick={() => setPreviewZoom(1.0)} style={{ background: 'rgba(255,255,255,0.18)', border: 'none', color: '#fff', fontSize: 10, cursor: 'pointer', borderRadius: 8, padding: '3px 8px', fontWeight: 700, marginLeft: 4 }}>Reset</button>
               </div>
+
+              {/* ═══ TIPOGRAFÍA — floating below zoom ═══ */}
+              <div style={{ position: 'absolute', top: 56, right: 12, zIndex: 30, background: 'rgba(0,0,0,0.60)', backdropFilter: 'blur(8px)', borderRadius: 14, padding: '8px 0', minWidth: 130 }}>
+                <div style={{ fontSize: 9, fontWeight: 800, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.08em', textAlign: 'center', marginBottom: 4, paddingBottom: 4, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>TIPOGRAFÍA</div>
+                {([
+                  { id: 'Outfit',           label: 'Outfit',      ff: 'Outfit, sans-serif' },
+                  { id: 'Montserrat',       label: 'Montserrat',  ff: 'Montserrat, sans-serif' },
+                  { id: 'Oswald',           label: 'Oswald',      ff: 'Oswald, sans-serif' },
+                  { id: 'Poppins',          label: 'Poppins',     ff: 'Poppins, sans-serif' },
+                  { id: 'Playfair Display', label: 'Playfair',    ff: '"Playfair Display", serif' },
+                  { id: 'Bebas Neue',       label: 'Bebas Neue',  ff: '"Bebas Neue", sans-serif' },
+                  { id: 'Raleway',          label: 'Raleway',     ff: 'Raleway, sans-serif' },
+                  { id: 'Inter',            label: 'Inter',       ff: 'Inter, sans-serif' },
+                ]).map(f => {
+                  const active = (flyerData.flyerFont ?? 'Outfit') === f.id;
+                  return (
+                    <button key={f.id}
+                      onClick={() => setFlyerData(prev => ({ ...prev, flyerFont: f.id }))}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', padding: '5px 12px', border: 'none', background: active ? 'rgba(212,175,55,0.18)' : 'transparent', cursor: 'pointer', fontFamily: f.ff, fontSize: 12, color: active ? '#D4AF37' : 'rgba(255,255,255,0.75)', fontWeight: active ? 800 : 400, transition: 'all 0.1s', boxSizing: 'border-box' }}
+                      onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; }}
+                      onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                    >
+                      <span>{f.label}</span>
+                      {active && <span style={{ fontSize: 9, color: '#D4AF37' }}>✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+
 
               {/* ── FLOATING TEXT SIZE TOOLBAR — top center, above flyer ──────── */}
               <div style={{
@@ -1201,7 +1368,11 @@ export default function FlyerStudio() {
                       flexShrink: 0,
                       overflow: 'hidden',
                       position: 'relative',
-                    }}>
+                    }}
+                    ref={previewWrapRef}
+                    onPointerMove={handleLogoPointerMove}
+                    onPointerUp={handleLogoPointerUp}
+                  >
                       {/* Inner div renders at full format dimensions then scaled down */}
                       <div style={{
                         width: selectedSize.w,
@@ -1211,7 +1382,36 @@ export default function FlyerStudio() {
                         position: 'absolute',
                         top: 0, left: 0,
                       }}>
-                        <ActiveTemplate d={{ ...flyerData, containerW: selectedSize.w, containerH: selectedSize.h }} />
+                        <RenderFlyer d={{ ...flyerData, containerW: selectedSize.w, containerH: selectedSize.h }} />
+                        {/* Drag handle — hover-only border, no visible border at rest */}
+                        {flyerData.logoUrl && flyerData.logoX != null && flyerData.logoY != null && (() => {
+                          const sz = Math.round(32 * (Math.min(selectedSize.w / 540, selectedSize.h / 675)) * (flyerData.logoSize ?? 1));
+                          const lx = (flyerData.logoX / 100) * selectedSize.w;
+                          const ly = (flyerData.logoY / 100) * selectedSize.h;
+                          return (
+                            <div style={{ position: 'absolute', left: lx, top: ly, width: sz, height: sz, zIndex: 30, boxSizing: 'border-box', border: '2px dashed transparent', borderRadius: 8, cursor: 'move', transition: 'border-color 0.15s' }}
+                              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = 'rgba(255,255,255,0.85)'; const r = e.currentTarget.querySelector('.rh') as HTMLElement; if(r) r.style.opacity = '1'; }}
+                              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = 'transparent'; const r = e.currentTarget.querySelector('.rh') as HTMLElement; if(r) r.style.opacity = '0'; }}
+                              onPointerDown={e => handleLogoPointerDown(e, 'move')}>
+                              <div className="rh" style={{ position: 'absolute', bottom: -6, right: -6, width: 14, height: 14, background: '#fff', border: '2px solid #1a56db', borderRadius: 4, cursor: 'nwse-resize', opacity: 0, transition: 'opacity 0.15s' }}
+                                onPointerDown={e => { e.stopPropagation(); handleLogoPointerDown(e, 'resize'); }} />
+                            </div>
+                          );
+                        })()}
+                        {/* First-click activation: click anywhere to place logo in free mode */}
+                        {flyerData.logoUrl && flyerData.logoX == null && (
+                          <div
+                            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 25, cursor: 'crosshair' }}
+                            title="Clic para posicionar logo libremente"
+                            onPointerDown={e => {
+                              const rect = previewWrapRef.current?.getBoundingClientRect();
+                              if (!rect) return;
+                              const xPct = ((e.clientX - rect.left) / rect.width) * 100;
+                              const yPct = ((e.clientY - rect.top) / rect.height) * 100;
+                              setFlyerData(prev => ({ ...prev, logoX: +Math.max(0, Math.min(85, xPct)).toFixed(1), logoY: +Math.max(0, Math.min(85, yPct)).toFixed(1) }));
+                            }}
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1235,7 +1435,7 @@ export default function FlyerStudio() {
           // Template renders at exact target dimensions — no scaling needed for export
           return (
             <div ref={flyerRef} style={{ width: selectedSize.w, height: selectedSize.h, overflow: 'hidden' }}>
-              <ActiveTemplate d={{ ...flyerData, containerW: selectedSize.w, containerH: selectedSize.h }} />
+              <RenderFlyer d={{ ...flyerData, containerW: selectedSize.w, containerH: selectedSize.h }} />
             </div>
           );
         })()}
