@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 
 // ─── TIPOS ────────────────────────────────────────────────────────────────────
 export interface FlyerData {
@@ -75,7 +75,7 @@ const PillBtn = ({ label, bg1, bg2, color = '#fff', style = {}, s = 1 }: {
 );
 
 const BenRow = ({ text, color, s = 1, scale = 1, bold = false }: { text: string; color: string; s?: number; scale?: number; bold?: boolean }) => {
-  const maxChars = Math.max(15, Math.floor(42 / scale));
+  const maxChars = Math.max(12, Math.floor(30 / scale));
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(10 * s), marginBottom: Math.round(6 * s), overflow: 'hidden' }}>
       <div style={{ width: Math.round(22 * s), height: Math.round(22 * s), borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -87,7 +87,7 @@ const BenRow = ({ text, color, s = 1, scale = 1, bold = false }: { text: string;
 };
 
 const BenRowDark = ({ text, color, s = 1, scale = 1, bold = false }: { text: string; color: string; s?: number; scale?: number; bold?: boolean }) => {
-  const maxChars = Math.max(15, Math.floor(42 / scale));
+  const maxChars = Math.max(12, Math.floor(30 / scale));
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(10 * s), marginBottom: Math.round(8 * s), overflow: 'hidden' }}>
       <div style={{ width: Math.round(22 * s), height: Math.round(22 * s), borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -192,7 +192,7 @@ export const Template_BoldSplit = ({ d }: { d: FlyerData }) => {
         <PillBtn label={d.cta || 'CONTACTAR'} bg1="#fff" bg2="rgba(255,255,255,0.85)" color={acc} s={s} style={{ fontSize: Math.round(12 * s), padding: `${Math.round(12 * s)}px ${Math.round(20 * s)}px`, width: '100%', boxSizing: 'border-box' }} />
       </div>
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: Math.round(40 * s), background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
-        <span style={{ color: '#fff', fontWeight: 800, fontSize: Math.round(13 * s), letterSpacing: '0.04em' }}>{d.phone || '+503 7XXX-XXXX'}</span>
+        <span style={{ color: '#fff', fontWeight: 800, fontSize: Math.round(13 * s), letterSpacing: '0.04em' }}>{d.phone || '+503 7XXX-XXXX'}{d.website ?  Â·  : ''}</span>
       </div>
     </div>
   );
@@ -225,7 +225,7 @@ export const Template_Cinematic = ({ d }: { d: FlyerData }) => {
         <PillBtn label={d.cta || 'VER MÁS'} bg1={acc} bg2={acc + 'cc'} color="#000" s={s} style={{ fontSize: Math.round(13 * s), alignSelf: 'flex-start' }} />
       </div>
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: Math.round(38 * s), background: acc, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ color: '#000', fontWeight: 900, fontSize: Math.round(13 * s), letterSpacing: '0.05em' }}>{d.phone || '+503 7XXX-XXXX'}</span>
+        <span style={{ color: '#000', fontWeight: 900, fontSize: Math.round(13 * s), letterSpacing: '0.05em' }}>{d.phone || '+503 7XXX-XXXX'}{d.website ?  Â·  : ''}</span>
       </div>
     </div>
   );
@@ -262,7 +262,7 @@ export const Template_WhiteCard = ({ d }: { d: FlyerData }) => {
         <PillBtn label={d.cta || 'CONTACTAR'} bg1={acc} bg2={acc + 'cc'} color="#fff" s={s} style={{ marginTop: Math.round(8 * s), textAlign: 'center', fontSize: Math.round(13 * s) }} />
       </div>
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: Math.round(36 * s), background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ color: '#fff', fontWeight: 800, fontSize: Math.round(12 * s) }}>{d.phone || '+503 7XXX-XXXX'} {d.website ? `· ${d.website}` : ''}</span>
+        <span style={{ color: '#fff', fontWeight: 800, fontSize: Math.round(12 * s) }}>{d.phone || '+503 7XXX-XXXX'}{d.website ?  Â·  : ''} {d.website ? `· ${d.website}` : ''}</span>
       </div>
     </div>
   );
@@ -291,7 +291,7 @@ export const Template_Magazine = ({ d }: { d: FlyerData }) => {
         <div style={{ fontSize: Math.round(11 * s * (d.subtitleScale ?? 1)), color: 'rgba(255,255,255,0.65)', lineHeight: 1.5, marginBottom: Math.round(14 * s * (d.subtitleScale ?? 1)) }}>{trunc(d.subtitle || '', 80)}</div>
         <div style={{ marginBottom: Math.round(14 * s) }}>{(d.beneficios || []).slice(0, 3).map((b, i) => <BenRow key={i} text={b} scale={d.benefitsScale ?? 1} bold={!!d.benefitsBold} color={acc} s={s} />)}</div>
         <PillBtn label={d.cta || 'MÁS INFO'} bg1={acc} bg2={acc + 'bb'} color="#fff" s={s} style={{ fontSize: Math.round(12 * s), padding: `${Math.round(12 * s)}px ${Math.round(16 * s)}px` }} />
-        <div style={{ marginTop: Math.round(10 * s), fontSize: Math.round(11 * s), color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>{d.phone || '+503 7XXX-XXXX'}</div>
+        <div style={{ marginTop: Math.round(10 * s), fontSize: Math.round(11 * s), color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>{d.phone || '+503 7XXX-XXXX'}{d.website ?  Â·  : ''}</div>
       </div>
       <div style={{ flex: 1, position: 'relative' }}>
         {d.bgImageUrl ? (
@@ -332,7 +332,7 @@ export const Template_CenterGradient = ({ d }: { d: FlyerData }) => {
         <PillBtn label={d.cta || 'EMPEZAR'} bg1="rgba(255,255,255,0.95)" bg2="rgba(255,255,255,0.75)" color={acc} s={s} style={{ fontSize: Math.round(14 * s), minWidth: Math.round(200 * s) }} />
       </div>
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: Math.round(38 * s), background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ color: '#fff', fontWeight: 800, fontSize: Math.round(13 * s) }}>{d.phone || '+503 7XXX-XXXX'}</span>
+        <span style={{ color: '#fff', fontWeight: 800, fontSize: Math.round(13 * s) }}>{d.phone || '+503 7XXX-XXXX'}{d.website ?  Â·  : ''}</span>
       </div>
     </div>
   );
@@ -400,7 +400,7 @@ export const Template_DarkLuxury = ({ d }: { d: FlyerData }) => {
         <PillBtn label={d.cta || 'CONTACTAR'} bg1={acc} bg2={acc + 'bb'} color="#000" s={s} style={{ fontSize: Math.round(13 * s), minWidth: Math.round(220 * s) }} />
       </div>
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: Math.round(38 * s), background: `linear-gradient(90deg, ${acc}, ${acc}bb)`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ color: '#000', fontWeight: 900, fontSize: Math.round(13 * s), letterSpacing: '0.05em' }}>{d.phone || '+503 7XXX-XXXX'}</span>
+        <span style={{ color: '#000', fontWeight: 900, fontSize: Math.round(13 * s), letterSpacing: '0.05em' }}>{d.phone || '+503 7XXX-XXXX'}{d.website ?  Â·  : ''}</span>
       </div>
     </div>
   );
@@ -433,7 +433,7 @@ export const Template_PromoPop = ({ d }: { d: FlyerData }) => {
         <PillBtn label={d.cta || 'OBTENER OFERTA'} bg1={acc} bg2={acc + 'cc'} color="#000" s={s} style={{ fontSize: Math.round(13 * s), marginTop: Math.round(8 * s) }} />
       </div>
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: Math.round(38 * s), background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ color: '#fff', fontWeight: 800, fontSize: Math.round(12 * s) }}>{d.phone || '+503 7XXX-XXXX'}</span>
+        <span style={{ color: '#fff', fontWeight: 800, fontSize: Math.round(12 * s) }}>{d.phone || '+503 7XXX-XXXX'}{d.website ?  Â·  : ''}</span>
       </div>
     </div>
   );
@@ -464,7 +464,7 @@ export const Template_MinimalEditorial = ({ d }: { d: FlyerData }) => {
         <PillBtn label={d.cta || 'SABER MÁS'} bg1={acc} bg2={acc + 'bb'} color="#fff" s={s} style={{ fontSize: Math.round(13 * s), marginTop: Math.round(4 * s) }} />
       </div>
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: Math.round(36 * s), background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ color: '#fff', fontWeight: 800, fontSize: Math.round(12 * s) }}>{d.phone || '+503 7XXX-XXXX'}{d.website ? ` · ${d.website}` : ''}</span>
+        <span style={{ color: '#fff', fontWeight: 800, fontSize: Math.round(12 * s) }}>{d.phone || '+503 7XXX-XXXX'}{d.website ?  Â·  : ''}{d.website ? ` · ${d.website}` : ''}</span>
       </div>
     </div>
   );
@@ -502,7 +502,7 @@ export const Template_FullBleedBold = ({ d }: { d: FlyerData }) => {
         <PillBtn label={d.cta || 'VER MÁS'} bg1={acc} bg2={acc + 'bb'} color="#000" s={s} style={{ fontSize: Math.round(13 * s) }} />
       </div>
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: Math.round(36 * s), background: acc, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ color: '#000', fontWeight: 900, fontSize: Math.round(12 * s), letterSpacing: '0.04em' }}>{d.phone || '+503 7XXX-XXXX'}</span>
+        <span style={{ color: '#000', fontWeight: 900, fontSize: Math.round(12 * s), letterSpacing: '0.04em' }}>{d.phone || '+503 7XXX-XXXX'}{d.website ?  Â·  : ''}</span>
       </div>
     </div>
   );
