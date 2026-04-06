@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 
 // ─── TIPOS ────────────────────────────────────────────────────────────────────
 export interface FlyerData {
@@ -18,7 +18,17 @@ export interface FlyerData {
   templateId: string;
   containerW?: number;
   containerH?: number;
-  textScale?: number; // 0.7–1.5, independently scales font sizes (default 1.0)
+  textScale?: number;
+  logoSize?: number;
+  logoPos?: 'top-left' | 'top-right' | 'top-center';
+  logoX?: number;
+  logoY?: number;
+  subtitleScale?: number;
+  subtitleBold?: boolean;
+  benefitsScale?: number;
+  benefitsBold?: boolean;
+  ctaGradient?: boolean;
+  flyerFont?: string;
 }
 
 // ─── PHOTO HELPERS ────────────────────────────────────────────────────────────
@@ -30,10 +40,19 @@ export const imgBg = (url: string | null | undefined, pos?: { x: number; y: numb
 export const imgObjPos = (pos?: { x: number; y: number }) =>
   pos ? `${pos.x}% ${pos.y}%` : 'center';
 
+// ─── FONT SYSTEM ──────────────────────────────────────────────────────────────
+export const getFontFamily = (f?: string) =>
+  f && f !== 'Outfit' ? `'${f}','Outfit','Inter',sans-serif` : "'Outfit','Inter',sans-serif";
+
+if (typeof document !== 'undefined' && !document.getElementById('gf-flyer')) {
+  const lk = document.createElement('link');
+  lk.id = 'gf-flyer'; lk.rel = 'stylesheet';
+  lk.href = 'https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&family=Montserrat:wght@400;700;900&family=Oswald:wght@400;700&family=Poppins:wght@400;700;900&family=Playfair+Display:ital,wght@0,700;1,700&family=Bebas+Neue&family=Raleway:wght@400;700;900&family=Inter:wght@400;700;900&display=swap';
+  document.head.appendChild(lk);
+}
+
 // ─── SCALE FACTOR ─────────────────────────────────────────────────────────────
-// s = layout scale based on smallest dimension so layout proportions are correct
 const getScale = (w: number, h: number) => Math.min(w / 540, h / 675);
-// fs = font-size helper: layout scale × text scale
 const getFontScale = (w: number, h: number, ts: number) => getScale(w, h) * ts;
 
 // ─── SHARED COMPONENTS (receive scale factor s) ───────────────────────────────
@@ -55,34 +74,86 @@ const PillBtn = ({ label, bg1, bg2, color = '#fff', style = {}, s = 1 }: {
   </div>
 );
 
-const BenRow = ({ text, color, s = 1 }: { text: string; color: string; s?: number }) => (
+const BenRow = ({ text, color, s = 1, scale = 1, bold = false }: { text: string; color: string; s?: number; scale?: number; bold?: boolean }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(10 * s), marginBottom: Math.round(6 * s) }}>
-    <div style={{
-      width: Math.round(22 * s), height: Math.round(22 * s), borderRadius: '50%', background: color,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      flexShrink: 0, fontSize: Math.round(12 * s), fontWeight: 900, color: '#fff',
-    }}>✓</div>
-    <span style={{ fontSize: Math.round(13 * s), fontWeight: 600, color: '#fff', lineHeight: 1.3 }}>{trunc(text, 45)}</span>
+    <div style={{ width: Math.round(22 * s), height: Math.round(22 * s), borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <svg width={Math.round(12 * s)} height={Math.round(12 * s)} viewBox="0 0 12 12" fill="none"><path d="M2 6.5L4.8 9.5L10 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+    </div>
+    <span style={{ fontSize: Math.round(13 * s * scale), fontWeight: bold ? 800 : 600, color: '#fff', lineHeight: 1.3 }}>{trunc(text, 45)}</span>
   </div>
 );
 
-const BenRowDark = ({ text, color, s = 1 }: { text: string; color: string; s?: number }) => (
+const BenRowDark = ({ text, color, s = 1, scale = 1, bold = false }: { text: string; color: string; s?: number; scale?: number; bold?: boolean }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(10 * s), marginBottom: Math.round(8 * s) }}>
-    <div style={{
-      width: Math.round(22 * s), height: Math.round(22 * s), borderRadius: '50%', background: color,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      flexShrink: 0, fontSize: Math.round(12 * s), fontWeight: 900, color: '#fff',
-    }}>✓</div>
-    <span style={{ fontSize: Math.round(13 * s), fontWeight: 600, color: '#334155', lineHeight: 1.3 }}>{trunc(text, 45)}</span>
+    <div style={{ width: Math.round(22 * s), height: Math.round(22 * s), borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <svg width={Math.round(12 * s)} height={Math.round(12 * s)} viewBox="0 0 12 12" fill="none"><path d="M2 6.5L4.8 9.5L10 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+    </div>
+    <span style={{ fontSize: Math.round(13 * s * scale), fontWeight: bold ? 800 : 600, color: '#334155', lineHeight: 1.3 }}>{trunc(text, 45)}</span>
   </div>
 );
 
-const Brand = ({ logo, name, color = '#fff', s = 1 }: { logo: string | null; name: string; color?: string; s?: number }) => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(8 * s) }}>
-    {logo && <img src={logo} style={{ width: Math.round(32 * s), height: Math.round(32 * s), borderRadius: Math.round(8 * s), objectFit: 'cover' }} crossOrigin="anonymous" />}
-    <span style={{ fontSize: Math.round(13 * s), fontWeight: 800, color, letterSpacing: '0.05em' }}>{trunc(name, 20).toUpperCase()}</span>
-  </div>
-);
+const Brand = ({ logo, name, color = '#fff', s = 1, logoSize = 1, logoX, logoY }: {
+  logo: string | null; name: string; color?: string; s?: number; logoSize?: number; logoX?: number; logoY?: number;
+}) => {
+  if ((logoX !== undefined && logoX >= 0) || (logoY !== undefined && logoY >= 0)) return null;
+  const sz = Math.round(32 * s * (logoSize ?? 1));
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(8 * s) }}>
+      {logo && <img src={logo} style={{ width: sz, height: sz, borderRadius: Math.round(8 * s), objectFit: 'cover' }} crossOrigin="anonymous" />}
+      <span style={{ fontSize: Math.round(13 * s), fontWeight: 800, color, letterSpacing: '0.05em' }}>{trunc(name, 20).toUpperCase()}</span>
+    </div>
+  );
+};
+
+// ─── FREE LOGO overlay (drag + resize) ────────────────────────────────────────
+export const FreeLogo = ({ d, onMove, onResize }: {
+  d: FlyerData;
+  onMove?: (x: number, y: number) => void;
+  onResize?: (size: number) => void;
+}) => {
+  if (!d.logoUrl || d.logoX === undefined) return null;
+  const W = d.containerW || 540, H = d.containerH || 675;
+  const sz = Math.round(64 * (d.logoSize ?? 1));
+  const x = (d.logoX / 100) * W, y = (d.logoY ?? 5) / 100 * H;
+  return (
+    <div style={{ position: 'absolute', left: x, top: y, width: sz, height: sz, cursor: onMove ? 'move' : 'default', zIndex: 20, userSelect: 'none' }}
+      onMouseDown={e => {
+        if (!onMove) return;
+        e.preventDefault();
+        const startX = e.clientX - x, startY = e.clientY - y;
+        const move = (ev: MouseEvent) => onMove(Math.min(95, Math.max(0, ((ev.clientX - startX) / W) * 100)), Math.min(95, Math.max(0, ((ev.clientY - startY) / H) * 100)));
+        const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+        window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+      }}
+    >
+      <img src={d.logoUrl} style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 8, pointerEvents: 'none' }} crossOrigin="anonymous" />
+      {onResize && (
+        <div style={{ position: 'absolute', bottom: -4, right: -4, width: 14, height: 14, background: '#D4AF37', borderRadius: '50%', cursor: 'se-resize', zIndex: 21 }}
+          onMouseDown={e => {
+            e.stopPropagation(); e.preventDefault();
+            const startX = e.clientX, startSz = d.logoSize ?? 1;
+            const move = (ev: MouseEvent) => onResize(Math.max(0.3, Math.min(4, startSz + (ev.clientX - startX) / 80)));
+            const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
+            window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+// ─── RENDER FLYER wrapper ─────────────────────────────────────────────────────
+export const RenderFlyer = ({ d, onLogoMove, onLogoResize }: {
+  d: FlyerData; onLogoMove?: (x: number, y: number) => void; onLogoResize?: (s: number) => void;
+}) => {
+  const Tmpl = TEMPLATES[d.templateId] || Template_BoldSplit;
+  return (
+    <div style={{ position: 'relative', width: d.containerW || 540, height: d.containerH || 675 }}>
+      <Tmpl d={d} />
+      <FreeLogo d={d} onMove={onLogoMove} onResize={onLogoResize} />
+    </div>
+  );
+};
 
 const Tag = ({ label, bg, color, s = 1 }: { label: string; bg: string; color: string; s?: number }) => (
   <div style={{ background: bg, color, fontSize: Math.round(11 * s), fontWeight: 800, padding: `${Math.round(4 * s)}px ${Math.round(14 * s)}px`, borderRadius: Math.round(20 * s), letterSpacing: '0.06em', display: 'inline-block' }}>
@@ -100,7 +171,7 @@ export const Template_BoldSplit = ({ d }: { d: FlyerData }) => {
   const title = (d.title || 'TU OFERTA').toUpperCase();
   const words = title.split(' ');
   return (
-    <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: "'Outfit','Inter',sans-serif", boxSizing: 'border-box' }}>
+    <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: getFontFamily(d.flyerFont), boxSizing: 'border-box' }}>
       <div style={{ position: 'absolute', left: 0, top: 0, width: '52%', height: '100%', background: `linear-gradient(160deg, ${acc} 0%, ${acc}cc 100%)`, zIndex: 2 }} />
       {d.bgImageUrl && <div style={{ position: 'absolute', right: 0, top: 0, width: '55%', height: '100%', ...imgBg(d.bgImageUrl, d.bgImagePosition) }} />}
       <div style={{ position: 'absolute', left: '42%', top: 0, width: '20%', height: '100%', background: `linear-gradient(90deg, ${acc}ee 0%, transparent 100%)`, zIndex: 3 }} />
@@ -130,7 +201,7 @@ export const Template_Cinematic = ({ d }: { d: FlyerData }) => {
   const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#f59e0b';
   return (
-    <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: "'Outfit','Inter',sans-serif", boxSizing: 'border-box', background: '#0f172a' }}>
+    <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: getFontFamily(d.flyerFont), boxSizing: 'border-box', background: '#0f172a' }}>
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '58%', ...imgBg(d.bgImageUrl, d.bgImagePosition), background: d.bgImageUrl ? undefined : `linear-gradient(135deg, #1e293b, #0f172a)` }}>
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: Math.round(80 * s), background: 'linear-gradient(0deg, #0f172a 0%, transparent 100%)' }} />
         <div style={{ position: 'absolute', top: Math.round(16 * s), left: Math.round(20 * s), zIndex: 2 }}>
@@ -164,7 +235,7 @@ export const Template_WhiteCard = ({ d }: { d: FlyerData }) => {
   const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#3b82f6';
   return (
-    <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: "'Outfit','Inter',sans-serif", boxSizing: 'border-box', background: '#f8fafc' }}>
+    <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: getFontFamily(d.flyerFont), boxSizing: 'border-box', background: '#f8fafc' }}>
       <div style={{ height: Math.round(5 * s), background: `linear-gradient(90deg, ${acc}, ${acc}88)` }} />
       <div style={{ padding: `${Math.round(12 * s)}px ${Math.round(24 * s)}px`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', borderBottom: '1px solid #e2e8f0' }}>
         <Brand logo={d.logoUrl} name={d.industria || 'ARIAS GROUP'} color="#0f172a" s={s} />
@@ -203,7 +274,7 @@ export const Template_Magazine = ({ d }: { d: FlyerData }) => {
   const acc = d.accent || '#ef4444';
   const title = (d.title || 'TU OFERTA').toUpperCase();
   return (
-    <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: "'Outfit','Inter',sans-serif", boxSizing: 'border-box', display: 'flex' }}>
+    <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: getFontFamily(d.flyerFont), boxSizing: 'border-box', display: 'flex' }}>
       <div style={{ width: '48%', background: '#09090f', display: 'flex', flexDirection: 'column', padding: `${Math.round(24 * s)}px ${Math.round(20 * s)}px`, boxSizing: 'border-box', position: 'relative', zIndex: 2 }}>
         <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: Math.round(5 * s), background: `linear-gradient(180deg, ${acc}, ${acc}44)` }} />
         <Brand logo={d.logoUrl} name={d.industria || 'ARIAS'} color={acc} s={s} />
@@ -239,7 +310,7 @@ export const Template_CenterGradient = ({ d }: { d: FlyerData }) => {
   const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#7c3aed';
   return (
-    <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: "'Outfit','Inter',sans-serif", boxSizing: 'border-box', background: `linear-gradient(160deg, ${acc} 0%, ${acc}88 50%, #08031a 100%)` }}>
+    <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: getFontFamily(d.flyerFont), boxSizing: 'border-box', background: `linear-gradient(160deg, ${acc} 0%, ${acc}88 50%, #08031a 100%)` }}>
       <div style={{ padding: `${Math.round(16 * s)}px ${Math.round(24 * s)}px`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Brand logo={d.logoUrl} name={d.industria || 'ARIAS'} color="#fff" s={s} />
         <div style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: Math.round(20 * s), padding: `${Math.round(5 * s)}px ${Math.round(14 * s)}px`, fontSize: Math.round(11 * s), fontWeight: 800, color: '#fff' }}>★ PREMIUM</div>
@@ -272,7 +343,7 @@ export const Template_CorporateLight = ({ d }: { d: FlyerData }) => {
   const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#1e40af';
   return (
-    <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: "'Outfit','Inter',sans-serif", boxSizing: 'border-box', display: 'flex', background: '#fff' }}>
+    <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: getFontFamily(d.flyerFont), boxSizing: 'border-box', display: 'flex', background: '#fff' }}>
       <div style={{ width: '50%', padding: `${Math.round(28 * s)}px ${Math.round(22 * s)}px`, display: 'flex', flexDirection: 'column', boxSizing: 'border-box', borderRight: `${Math.round(4 * s)}px solid ${acc}` }}>
         <div style={{ height: Math.round(4 * s), background: `linear-gradient(90deg, ${acc}, ${acc}44)`, marginBottom: Math.round(18 * s), borderRadius: Math.round(2 * s) }} />
         <Brand logo={d.logoUrl} name={d.industria || 'ARIAS GROUP'} color={acc} s={s} />
@@ -302,7 +373,7 @@ export const Template_DarkLuxury = ({ d }: { d: FlyerData }) => {
   const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#D4AF37';
   return (
-    <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: "'Outfit','Inter',sans-serif", boxSizing: 'border-box', background: 'linear-gradient(160deg, #060612 0%, #0d0d1f 100%)' }}>
+    <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: getFontFamily(d.flyerFont), boxSizing: 'border-box', background: 'linear-gradient(160deg, #060612 0%, #0d0d1f 100%)' }}>
       <div style={{ height: Math.round(5 * s), background: `linear-gradient(90deg, ${acc}, ${acc}88)` }} />
       <div style={{ padding: `${Math.round(12 * s)}px ${Math.round(24 * s)}px`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${acc}22` }}>
         <Brand logo={d.logoUrl} name={d.industria || 'ARIAS GROUP'} color={acc} s={s} />
@@ -341,7 +412,7 @@ export const Template_PromoPop = ({ d }: { d: FlyerData }) => {
   const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#f59e0b';
   return (
-    <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: "'Outfit','Inter',sans-serif", boxSizing: 'border-box', background: '#fff' }}>
+    <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: getFontFamily(d.flyerFont), boxSizing: 'border-box', background: '#fff' }}>
       <div style={{ height: Math.round(310 * s), position: 'relative', overflow: 'hidden' }}>
         {d.bgImageUrl ? <img src={d.bgImageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} crossOrigin="anonymous" /> : <div style={{ width: '100%', height: '100%', background: `linear-gradient(135deg, ${acc}, ${acc}44)` }} />}
         <div style={{ position: 'absolute', bottom: -1, left: 0, right: 0, height: Math.round(60 * s), background: '#fff', clipPath: 'polygon(0 60%, 100% 0, 100% 100%, 0 100%)' }} />
@@ -375,7 +446,7 @@ export const Template_MinimalEditorial = ({ d }: { d: FlyerData }) => {
   const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#0ea5e9';
   return (
-    <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: "'Outfit','Inter',sans-serif", boxSizing: 'border-box', background: '#fff', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: getFontFamily(d.flyerFont), boxSizing: 'border-box', background: '#fff', display: 'flex', flexDirection: 'column' }}>
       <div style={{ height: Math.round(300 * s), position: 'relative', overflow: 'hidden' }}>
         {d.bgImageUrl ? <img src={d.bgImageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} crossOrigin="anonymous" /> : <div style={{ width: '100%', height: '100%', background: `linear-gradient(135deg, ${acc}44, ${acc}22)` }} />}
         <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(0deg, #fff 0%, transparent 40%)` }} />
@@ -407,7 +478,7 @@ export const Template_FullBleedBold = ({ d }: { d: FlyerData }) => {
   const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#22d3ee';
   return (
-    <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: "'Outfit','Inter',sans-serif", boxSizing: 'border-box' }}>
+    <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', fontFamily: getFontFamily(d.flyerFont), boxSizing: 'border-box' }}>
       {d.bgImageUrl ? (
         <img src={d.bgImageUrl} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: imgObjPos(d.bgImagePosition) }} crossOrigin="anonymous" />
       ) : (
@@ -451,6 +522,9 @@ export const TEMPLATES: Record<string, React.ComponentType<{ d: FlyerData }>> = 
   'minimal-editorial': Template_MinimalEditorial,
   'full-bleed': Template_FullBleedBold,
 };
+
+// Lazy forward ref so RenderFlyer can reference TEMPLATES
+Object.assign(RenderFlyer, {});
 
 export const TEMPLATE_LIST = [
   { id: 'bold-split',        name: '1. Split Asimétrico Bold',      desc: 'Panel color + foto, texto masivo' },
