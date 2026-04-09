@@ -740,7 +740,10 @@ export default function Companies() {
                                                 {companyMembers.map(member => (
                                                     <button
                                                         key={member.id}
-                                                         onClick={() => {
+                                                        type="button"
+                                                         onClick={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
                                                             setEditingMemberId(member.id);
                                                             setShowPasswordPanel(false);
                                                             setNewPassword('');
