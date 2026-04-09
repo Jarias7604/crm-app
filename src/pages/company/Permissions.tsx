@@ -20,7 +20,7 @@ export default function Permissions() {
 
     const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
     const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
-    const [newRole, setNewRole] = useState({ name: '', base_role: 'collaborator' as any });
+    const [newRole, setNewRole] = useState({ name: '', base_role: 'sales_agent' as any });
     const [isCreatingRole, setIsCreatingRole] = useState(false);
 
     const isSuperAdmin = profile?.role === 'super_admin';
@@ -122,7 +122,7 @@ export default function Permissions() {
             });
             toast.success('Rol creado');
             setIsRoleModalOpen(false);
-            setNewRole({ name: '', base_role: 'collaborator' });
+            setNewRole({ name: '', base_role: 'sales_agent' });
             setSelectedRoleId(role.id);
             loadData();
         } catch (error) {
@@ -383,11 +383,11 @@ export default function Permissions() {
                             <div className="grid grid-cols-2 gap-6">
                                 <button
                                     type="button"
-                                    onClick={() => setNewRole({ ...newRole, base_role: 'collaborator' })}
-                                    className={`p-10 rounded-[2.5rem] border-2 transition-all flex flex-col items-center gap-4 ${newRole.base_role === 'collaborator' ? 'border-[#4449AA] bg-indigo-50 shadow-xl scale-[1.02]' : 'border-gray-50 bg-gray-50/30'
+                                    onClick={() => setNewRole({ ...newRole, base_role: 'sales_agent' })}
+                                    className={`p-10 rounded-[2.5rem] border-2 transition-all flex flex-col items-center gap-4 ${newRole.base_role === 'sales_agent' ? 'border-[#4449AA] bg-indigo-50 shadow-xl scale-[1.02]' : 'border-gray-50 bg-gray-50/30'
                                         }`}
                                 >
-                                    <Users className={`w-10 h-10 ${newRole.base_role === 'collaborator' ? 'text-[#4449AA]' : 'text-gray-300'}`} />
+                                    <Users className={`w-10 h-10 ${newRole.base_role === 'sales_agent' ? 'text-[#4449AA]' : 'text-gray-300'}`} />
                                     <div className="text-center">
                                         <p className="font-black text-xs uppercase tracking-widest mb-1">Colaborador</p>
                                         <p className="text-[10px] text-gray-400 font-bold leading-tight">Visibilidad<br />Restringida</p>
