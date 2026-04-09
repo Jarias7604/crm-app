@@ -70,10 +70,10 @@ export const adminService = {
         const { data, error } = await supabase.rpc('admin_create_user', {
             new_email: params.email,
             new_password: params.password,
-            new_role: 'company_admin',
             new_full_name: params.full_name || params.email,
-            new_phone: null,
+            new_role: 'company_admin',
             new_company_id: params.company_id,
+            new_phone: null,
             new_custom_role_id: null,
             new_birth_date: null,
             new_address: null
