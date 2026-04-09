@@ -7,6 +7,8 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const CRM_RESET_REDIRECT = 'https://crm-app-v2.vercel.app/update-password';
+
 serve(async (req) => {
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders });
@@ -15,8 +17,8 @@ serve(async (req) => {
     try {
         const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
         const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-        // 1. Validate the caller's JWT (anon client — honors RLS)
         const authHeader = req.headers.get('Authorization');
         if (!authHeader) {
             return new Response(JSON.stringify({ error: 'No autorizado' }), {
@@ -24,109 +26,145 @@ serve(async (req) => {
             });
         }
 
-        // Client with caller's JWT to verify identity
-        const callerClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!, {
+        const callerClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
             global: { headers: { Authorization: authHeader } }
         });
 
         const { data: { user: callerUser }, error: authError } = await callerClient.auth.getUser();
         if (authError || !callerUser) {
-            return new Response(JSON.stringify({ error: 'Token inválido' }), {
+            return new Response(JSON.stringify({ error: 'Token invalido' }), {
                 status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
         }
 
-        // Admin client with service role (for DB lookups + password update)
         const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-        // 2. Verify caller is an admin
-        const { data: callerProfile, error: profileError } = await adminClient
+        const { data: callerProfile } = await adminClient
             .from('profiles')
-            .select('role, company_id')
+            .select('role, company_id, full_name, email')
             .eq('id', callerUser.id)
             .single();
 
-        if (profileError || !callerProfile) {
-            return new Response(JSON.stringify({ error: 'Perfil no encontrado' }), {
-                status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            });
-        }
-
-        if (!['company_admin', 'super_admin'].includes(callerProfile.role)) {
+        if (!callerProfile || !['company_admin', 'super_admin'].includes(callerProfile.role)) {
             return new Response(JSON.stringify({ error: 'Se requiere rol de administrador' }), {
                 status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
         }
 
-        // 3. Parse request body
-        const { target_user_id, new_password } = await req.json();
+        const bodyText = await req.text();
+        const { target_user_id, new_password, mode = 'direct' } = JSON.parse(bodyText);
 
-        if (!target_user_id || !new_password) {
-            return new Response(JSON.stringify({ error: 'Faltan parámetros requeridos' }), {
+        if (!target_user_id) {
+            return new Response(JSON.stringify({ error: 'target_user_id requerido' }), {
                 status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
         }
 
-        if (new_password.length < 6) {
-            return new Response(JSON.stringify({ error: 'La contraseña debe tener al menos 6 caracteres' }), {
-                status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            });
-        }
+        const [{ data: targetProfile }, { data: authUserData }] = await Promise.all([
+            adminClient.from('profiles').select('role, company_id, full_name, email').eq('id', target_user_id).single(),
+            adminClient.auth.admin.getUserById(target_user_id)
+        ]);
 
-        // 4. Verify target user exists and check company isolation
-        const { data: targetProfile, error: targetError } = await adminClient
-            .from('profiles')
-            .select('role, company_id, full_name, email')
-            .eq('id', target_user_id)
-            .single();
-
-        if (targetError || !targetProfile) {
+        if (!targetProfile) {
             return new Response(JSON.stringify({ error: 'Usuario destino no encontrado' }), {
                 status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
         }
 
-        // Company admin can only reset passwords within their own company
-        if (callerProfile.role === 'company_admin' && callerProfile.company_id !== targetProfile.company_id) {
-            return new Response(JSON.stringify({ error: 'No puedes resetear contraseñas de otra empresa' }), {
-                status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        const targetAuthEmail = authUserData?.user?.email || targetProfile.email;
+
+        // super_admin bypasses ALL restrictions
+        if (callerProfile.role !== 'super_admin') {
+            if (callerProfile.company_id !== targetProfile.company_id) {
+                return new Response(JSON.stringify({ error: 'No puedes resetear contrasenas de otra empresa' }), {
+                    status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+            if (targetProfile.role === 'super_admin') {
+                return new Response(JSON.stringify({ error: 'No puedes resetear la contrasena de un Super Admin' }), {
+                    status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+        }
+
+        const ipAddress = req.headers.get('x-forwarded-for') || 'unknown';
+        const callerEmail = callerProfile.email || callerUser.email || 'unknown';
+
+        if (mode === 'email_link') {
+            if (!targetAuthEmail) {
+                return new Response(JSON.stringify({ error: 'El usuario no tiene correo electronico registrado.' }), {
+                    status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+            const { error: linkError } = await adminClient.auth.resetPasswordForEmail(
+                targetAuthEmail, { redirectTo: CRM_RESET_REDIRECT }
+            );
+            if (linkError) {
+                return new Response(JSON.stringify({ error: linkError.message }), {
+                    status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+            
+            // ANTI-FAIL: Wrap logs in try-catch so it never breaks the UI flow
+            try {
+                await adminClient.from('password_reset_log').insert({
+                    target_user_id, target_email: targetAuthEmail,
+                    target_full_name: targetProfile.full_name || null,
+                    performed_by_id: callerUser.id, performed_by_email: callerEmail,
+                    performed_by_role: callerProfile.role, ip_address: ipAddress, reset_method: 'email_link'
+                });
+            } catch(e) { console.warn('Log insert failed:', e.message); }
+            
+            console.log(`[reset-password] EMAIL LINK: ${callerEmail} -> ${targetAuthEmail}`);
+            
+            return new Response(JSON.stringify({
+                success: true, mode: 'email_link',
+                message: `Enlace enviado a ${targetAuthEmail}`
+            }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+
+        // MODE B: Direct
+        if (!new_password || new_password.length < 6) {
+            return new Response(JSON.stringify({ error: 'Contrasena invalida (minimo 6 caracteres)' }), {
+                status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
         }
 
-        // Only super_admin can reset another super_admin's password
-        if (targetProfile.role === 'super_admin' && callerProfile.role !== 'super_admin') {
-            return new Response(JSON.stringify({ error: 'No puedes resetear la contraseña de un Super Admin' }), {
-                status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            });
-        }
+        console.log(`[reset-password] Updating password for user ${target_user_id}`);
 
-        // 5. Reset the password using the official Supabase Admin API
-        const { data, error: resetError } = await adminClient.auth.admin.updateUserById(
-            target_user_id,
-            { password: new_password }
+        // MAIN ACTION: Update password
+        const { error: resetError } = await adminClient.auth.admin.updateUserById(
+            target_user_id, { password: new_password }
         );
 
         if (resetError) {
-            console.error('Password reset error:', resetError);
+            console.error('Password reset error:', resetError.message);
             return new Response(JSON.stringify({ error: resetError.message }), {
                 status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
         }
 
-        console.log(`Password reset: ${callerUser.email} reset password for ${targetProfile.email}`);
+        // ANTI-FAIL: Wrap logs in try-catch so it never breaks the UI flow
+        try {
+            await adminClient.from('password_reset_log').insert({
+                target_user_id, target_email: targetAuthEmail || 'unknown',
+                target_full_name: targetProfile.full_name || null,
+                performed_by_id: callerUser.id, performed_by_email: callerEmail,
+                performed_by_role: callerProfile.role, ip_address: ipAddress, reset_method: 'direct'
+            });
+        } catch(e) { console.warn('Log insert failed:', e.message); }
+
+        console.log(`[reset-password] SUCCESS: ${callerEmail} -> ${targetAuthEmail}`);
 
         return new Response(JSON.stringify({
-            success: true,
-            message: `Contraseña actualizada para ${targetProfile.full_name}`
-        }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
+            success: true, mode: 'direct',
+            message: `Contrasena actualizada para ${targetProfile.full_name || targetAuthEmail}`
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     } catch (err) {
-        console.error('Unexpected error:', err);
+        console.error('Unexpected error:', err.message);
         return new Response(JSON.stringify({ error: err.message || 'Error inesperado' }), {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     }
 });
