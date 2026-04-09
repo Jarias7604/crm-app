@@ -113,9 +113,9 @@ export default function Team() {
             return;
         }
 
-        // Graceful fallback: if no custom roles, use 'collaborator' as base role
+        // Graceful fallback: if no custom roles, use 'sales_agent' as base role (valid app_role enum)
         const selectedRole = customRoles.find(r => r.id === formData.customRoleId);
-        const baseRole = selectedRole?.base_role || 'collaborator';
+        const baseRole = selectedRole?.base_role || 'sales_agent';
         const customRoleId = selectedRole?.id || null;
 
         setIsCreating(true);
@@ -407,7 +407,7 @@ export default function Team() {
                                                             password: tempPwd,
                                                             fullName: formData.fullName,
                                                             phone: formData.phone,
-                                                            role: selectedRole?.base_role || 'collaborator',
+                                                            role: selectedRole?.base_role || 'sales_agent',
                                                             companyId: myProfile!.company_id!,
                                                             customRoleId: selectedRole?.id || formData.customRoleId,
                                                             birthDate: formData.birthDate,
