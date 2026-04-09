@@ -29,7 +29,10 @@ import {
     Mail,
     KeyRound,
     Pencil,
-    ArrowUpDown
+    ArrowUpDown,
+    Copy,
+    Loader2,
+    X
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -68,10 +71,16 @@ export default function Companies() {
     const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null);
     const [companyMembers, setCompanyMembers] = useState<{ id: string; email: string; full_name: string; role: string; created_at: string }[]>([]);
     const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
-    const [memberEditData, setMemberEditData] = useState({ full_name: '', email: '', phone: '', role: '', address: '', new_password: '' });
+    const [memberEditData, setMemberEditData] = useState({ full_name: '', email: '', phone: '', role: '', address: '' });
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<LicenseStatus | 'all'>('all');
     const location = useLocation();
+
+    // Password reset panel state (Super Admin)
+    const [showPasswordPanel, setShowPasswordPanel] = useState(false);
+    const [newPassword, setNewPassword] = useState('');
+    const [isResettingPassword, setIsResettingPassword] = useState(false);
+    const [isSendingEmailLink, setIsSendingEmailLink] = useState(false);
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
     const { tableRef: companiesTableRef, wrapperRef: companiesWrapperRef } = useAriasTables();
 
@@ -233,6 +242,8 @@ export default function Companies() {
         setEditingCompanyId(null);
         setEditingMemberId(null);
         setActiveTab('info');
+        setShowPasswordPanel(false);
+        setNewPassword('');
         setFormData({
             name: '',
             license_status: 'active',
@@ -245,6 +256,71 @@ export default function Companies() {
             admin_password: '',
             admin_full_name: ''
         });
+    };
+
+    // Password helpers (mirrors Team.tsx)
+    const generatePassword = () => {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$';
+        return Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    };
+
+    const callResetFunction = async (body: object) => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('No hay sesión activa');
+        const response = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-reset-password`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                },
+                body: JSON.stringify(body)
+            }
+        );
+        const result = await response.json();
+        if (!response.ok || result.error) throw new Error(result.error || 'Error desconocido');
+        return result;
+    };
+
+    const handleOpenPasswordPanel = () => {
+        setNewPassword(generatePassword());
+        setShowPasswordPanel(true);
+    };
+
+    const handleSendEmailLink = async () => {
+        if (!editingMemberId) return;
+        const member = companyMembers.find(m => m.id === editingMemberId);
+        setIsSendingEmailLink(true);
+        try {
+            await callResetFunction({ target_user_id: editingMemberId, mode: 'email_link' });
+            toast.success(`📧 Enlace enviado al correo de ${member?.full_name?.split(' ')[0] || 'usuario'}. Puede crear su propia contraseña.`, { duration: 8000 });
+            setShowPasswordPanel(false);
+        } catch (error: any) {
+            toast.error(`❌ ${error.message}`, { duration: 10000 });
+        } finally {
+            setIsSendingEmailLink(false);
+        }
+    };
+
+    const handleSaveNewPassword = async () => {
+        if (!editingMemberId || !newPassword || newPassword.length < 6) {
+            toast.error('La contraseña debe tener al menos 6 caracteres.');
+            return;
+        }
+        const member = companyMembers.find(m => m.id === editingMemberId);
+        setIsResettingPassword(true);
+        try {
+            await callResetFunction({ target_user_id: editingMemberId, new_password: newPassword, mode: 'direct' });
+            toast.success(`✅ ¡${member?.full_name?.split(' ')[0] || 'Usuario'} ya puede ingresar con la nueva contraseña!`, { duration: 6000 });
+            setShowPasswordPanel(false);
+            setNewPassword('');
+        } catch (error: any) {
+            toast.error(`❌ ${error.message}`, { duration: 10000 });
+        } finally {
+            setIsResettingPassword(false);
+        }
     };
 
     const toggleModule = (moduleKey: string) => {
@@ -357,17 +433,17 @@ export default function Companies() {
                             <tbody className="bg-white divide-y divide-slate-50">
                                 {filteredCompanies.map((company: any) => (
                                     <tr key={company.id} className="hover:bg-slate-50/50 transition-all duration-300 group">
-                                        <td className="px-8 py-6 whitespace-nowrap">
-                                            <div className="flex items-center gap-5">
+                                        <td className="px-8 py-6 overflow-hidden" style={{ maxWidth: columnWidths['name'] ?? 260 }}>
+                                            <div className="flex items-center gap-3 min-w-0">
                                                 <div className="flex-shrink-0 h-14 w-14 bg-indigo-50 rounded-[1.25rem] flex items-center justify-center text-[#4449AA] border border-indigo-100/50 shadow-sm transition-all group-hover:scale-110 group-hover:rotate-3 shadow-indigo-50">
                                                     <Building className="h-6 w-6" />
                                                 </div>
-                                                <div className="flex flex-col">
-                                                    <div className="text-lg font-black text-slate-900 leading-none mb-1.5">{company.name}</div>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-[10px] text-slate-400 font-mono tracking-tighter uppercase">ID: {company.id.slice(0, 8)}</span>
-                                                        <span className="w-1 h-1 rounded-full bg-slate-200"></span>
-                                                        <span className="text-[10px] text-slate-400 font-bold">Desde {format(new Date(company.created_at), 'MM/yyyy')}</span>
+                                                <div className="flex flex-col min-w-0">
+                                                    <div className="text-lg font-black text-slate-900 leading-none mb-1.5 truncate" title={company.name}>{company.name}</div>
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <span className="text-[10px] text-slate-400 font-mono tracking-tighter uppercase truncate">ID: {company.id.slice(0, 8)}</span>
+                                                        <span className="w-1 h-1 rounded-full bg-slate-200 shrink-0"></span>
+                                                        <span className="text-[10px] text-slate-400 font-bold shrink-0">Desde {format(new Date(company.created_at), 'MM/yyyy')}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -647,8 +723,10 @@ export default function Companies() {
                                                     type="button"
                                                     onClick={() => {
                                                         setEditingMemberId(null);
+                                                        setShowPasswordPanel(false);
+                                                        setNewPassword('');
                                                         setFormData(prev => ({ ...prev, admin_full_name: '', admin_email: '', admin_password: '' }));
-                                                        setMemberEditData({ full_name: '', email: '', phone: '', role: 'company_admin', address: '', new_password: '' });
+                                                        setMemberEditData({ full_name: '', email: '', phone: '', role: 'company_admin', address: '' });
                                                     }}
                                                     className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all ${!editingMemberId
                                                         ? 'bg-emerald-100 text-emerald-600 ring-2 ring-emerald-200'
@@ -662,9 +740,10 @@ export default function Companies() {
                                                 {companyMembers.map(member => (
                                                     <button
                                                         key={member.id}
-                                                        type="button"
-                                                        onClick={() => {
+                                                         onClick={() => {
                                                             setEditingMemberId(member.id);
+                                                            setShowPasswordPanel(false);
+                                                            setNewPassword('');
                                                             setFormData(prev => ({
                                                                 ...prev,
                                                                 admin_full_name: member.full_name || '',
@@ -676,8 +755,7 @@ export default function Companies() {
                                                                 email: member.email || '',
                                                                 phone: (member as any).phone || '',
                                                                 role: member.role,
-                                                                address: (member as any).address || '',
-                                                                new_password: ''
+                                                                address: (member as any).address || ''
                                                             });
                                                         }}
                                                         className={`flex items-center gap-3 rounded-2xl px-4 py-3 border transition-all duration-200 ${editingMemberId === member.id
@@ -746,7 +824,7 @@ export default function Companies() {
                                                 className="h-14 bg-slate-50 border-slate-200 rounded-2xl font-black text-slate-900 focus:bg-white transition-all shadow-sm text-lg"
                                             />
                                         </div>
-                                        <div>
+                                        <div className="col-span-2">
                                             <div className="flex items-center justify-between mb-2 px-1">
                                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                                                     <Mail className="w-3.5 h-3.5" /> Email de Acceso
@@ -767,27 +845,49 @@ export default function Companies() {
                                                 className="h-14 bg-slate-50 border-slate-200 rounded-2xl font-black text-slate-900 focus:bg-white shadow-sm"
                                             />
                                         </div>
-                                        <div>
+                                        {/* Premium password for new admin creation only */}
+                                        {!editingMemberId && (
+                                        <div className="col-span-2">
                                             <div className="flex items-center justify-between mb-2 px-1">
                                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                                    <Lock className="w-3.5 h-3.5" /> {editingMemberId ? 'Nueva Contraseña' : 'Contraseña'}
+                                                    <Lock className="w-3.5 h-3.5" /> Contraseña
                                                 </label>
-                                                {!editingMemberId && !editingCompanyId && <span className="text-[9px] font-bold text-rose-400 uppercase">* Requerido</span>}
+                                                {!editingCompanyId && <span className="text-[9px] font-bold text-rose-400 uppercase">* Requerido</span>}
                                             </div>
-                                            <Input
-                                                type="password"
-                                                value={editingMemberId ? memberEditData.new_password : formData.admin_password}
-                                                onChange={(e) => {
-                                                    if (editingMemberId) {
-                                                        setMemberEditData(prev => ({ ...prev, new_password: e.target.value }));
-                                                    } else {
-                                                        setFormData({ ...formData, admin_password: e.target.value });
-                                                    }
-                                                }}
-                                                placeholder={editingMemberId ? 'Dejar vacío para no cambiar' : 'Mínimo 6 caracteres'}
-                                                className="h-14 bg-slate-50 border-slate-200 rounded-2xl font-black text-slate-900 focus:bg-white shadow-sm"
-                                            />
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={formData.admin_password}
+                                                    onChange={(e) => setFormData({ ...formData, admin_password: e.target.value })}
+                                                    placeholder="Mínimo 6 caracteres..."
+                                                    className="flex-1 h-14 px-5 rounded-2xl bg-slate-50 border border-slate-200 font-mono font-bold text-base text-indigo-700 tracking-widest outline-none focus:border-indigo-300 focus:bg-white transition-all shadow-sm"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setFormData({ ...formData, admin_password: generatePassword() })}
+                                                    className="h-14 px-5 rounded-2xl border border-orange-200 bg-white text-orange-500 hover:bg-orange-50 transition-all flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest shrink-0 shadow-sm"
+                                                    title="Generar contraseña automática"
+                                                >
+                                                    <KeyRound className="w-3.5 h-3.5" />
+                                                    Auto
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { if (formData.admin_password) { navigator.clipboard.writeText(formData.admin_password); toast.success('¡Contraseña copiada!'); } else { toast.error('Genera una contraseña primero'); } }}
+                                                    className="h-14 px-5 rounded-2xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition-all flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest shrink-0 shadow-sm"
+                                                    title="Copiar contraseña"
+                                                >
+                                                    <Copy className="w-3.5 h-3.5" />
+                                                    Copiar
+                                                </button>
+                                            </div>
+                                            {formData.admin_password && formData.admin_password.length >= 6 && (
+                                                <p className="text-[10px] text-orange-400 font-medium mt-2 ml-1">
+                                                    ⚠️ Guarda esta contraseña — no podrás verla después de guardar.
+                                                </p>
+                                            )}
                                         </div>
+                                        )}
 
                                         {/* Extra fields visible when editing an existing user */}
                                         {editingMemberId && (
@@ -825,6 +925,112 @@ export default function Companies() {
                                             </>
                                         )}
                                     </div>
+
+                                    {/* ── Premium Password Reset Panel (existing users only) ── */}
+                                    {editingMemberId && (
+                                        <div className="mt-2">
+                                            {!showPasswordPanel ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleOpenPasswordPanel}
+                                                    className="h-12 px-6 rounded-2xl font-black text-[11px] uppercase tracking-widest border border-orange-200 text-orange-500 hover:bg-orange-50 transition-all flex items-center gap-2"
+                                                >
+                                                    <KeyRound className="w-4 h-4" />
+                                                    Cambiar Contraseña
+                                                </button>
+                                            ) : (
+                                                <div className="border border-orange-200 bg-orange-50/50 rounded-2xl p-6 animate-in slide-in-from-bottom-2 duration-200 space-y-5">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center">
+                                                            <KeyRound className="w-4 h-4 text-orange-500" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-black text-sm text-gray-900 uppercase tracking-tight">Restablecer Acceso</p>
+                                                            <p className="text-[10px] text-gray-400 font-medium">Elige el método según si el usuario tiene correo electrónico</p>
+                                                        </div>
+                                                        <button type="button" onClick={() => { setShowPasswordPanel(false); setNewPassword(''); }} className="ml-auto p-1.5 hover:bg-orange-100 rounded-lg transition-colors">
+                                                            <X className="w-4 h-4 text-gray-400" />
+                                                        </button>
+                                                    </div>
+
+                                                    {/* OPCIÓN A: Email link */}
+                                                    <div className="bg-white rounded-xl border border-green-100 p-4">
+                                                        <div className="flex items-start justify-between gap-4">
+                                                            <div className="flex-1">
+                                                                <p className="text-[11px] font-black text-green-700 uppercase tracking-widest flex items-center gap-1.5 mb-1">
+                                                                    <span className="w-4 h-4 rounded-full bg-green-100 text-green-600 flex items-center justify-center text-[9px] font-black">A</span>
+                                                                    Enviar enlace por correo <span className="text-[9px] text-green-500 font-bold normal-case tracking-normal">(Recomendado)</span>
+                                                                </p>
+                                                                <p className="text-[10px] text-gray-400">El usuario recibe un email y crea su propia contraseña. Más seguro — nadie más la conoce.</p>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleSendEmailLink}
+                                                                disabled={isSendingEmailLink}
+                                                                className="h-10 px-5 rounded-xl bg-green-600 text-white font-black text-[10px] uppercase tracking-widest hover:bg-green-700 transition-all disabled:opacity-50 flex items-center gap-2 shrink-0"
+                                                            >
+                                                                {isSendingEmailLink ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                                                Enviar Link
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Divider */}
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="flex-1 h-px bg-orange-100" />
+                                                        <span className="text-[9px] font-black text-orange-300 uppercase tracking-widest">o si no tiene correo</span>
+                                                        <div className="flex-1 h-px bg-orange-100" />
+                                                    </div>
+
+                                                    {/* OPCIÓN B: Direct */}
+                                                    <div className="bg-white rounded-xl border border-orange-100 p-4 space-y-3">
+                                                        <p className="text-[11px] font-black text-orange-600 uppercase tracking-widest flex items-center gap-1.5">
+                                                            <span className="w-4 h-4 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-[9px] font-black">B</span>
+                                                            Establecer contraseña manualmente
+                                                        </p>
+                                                        <p className="text-[10px] text-gray-400">Para usuarios sin correo electrónico. Comparte la contraseña de forma segura.</p>
+                                                        <div className="flex gap-2">
+                                                            <div className="relative flex-1">
+                                                                <input
+                                                                    type="text"
+                                                                    value={newPassword}
+                                                                    onChange={e => setNewPassword(e.target.value)}
+                                                                    placeholder="Mínimo 6 caracteres..."
+                                                                    className="w-full h-12 px-4 rounded-xl bg-white border border-orange-200 font-mono font-bold text-sm text-indigo-700 tracking-widest outline-none focus:border-orange-400 transition-all"
+                                                                />
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setNewPassword(generatePassword())}
+                                                                className="h-12 px-4 rounded-xl border border-orange-200 bg-white text-orange-500 hover:bg-orange-100 transition-all flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest shrink-0"
+                                                            >
+                                                                <KeyRound className="w-3.5 h-3.5" />
+                                                                Auto
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => { navigator.clipboard.writeText(newPassword); toast.success('¡Copiado al portapapeles!'); }}
+                                                                className="h-12 px-4 rounded-xl border border-orange-200 bg-white text-gray-500 hover:bg-orange-100 transition-all flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest shrink-0"
+                                                            >
+                                                                <Copy className="w-3.5 h-3.5" />
+                                                                Copiar
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={handleSaveNewPassword}
+                                                                disabled={isResettingPassword || newPassword.length < 6}
+                                                                className="h-12 px-5 rounded-xl bg-[#4449AA] text-white font-black text-[10px] uppercase tracking-widest hover:translate-y-[-1px] transition-all disabled:opacity-50 flex items-center gap-2 shrink-0"
+                                                            >
+                                                                {isResettingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                                                {isResettingPassword ? 'Guardando...' : 'Guardar'}
+                                                            </button>
+                                                        </div>
+                                                        <p className="text-[10px] text-orange-400 font-medium mt-3">⚠️ Comparte esta contraseña con {companyMembers.find(m => m.id === editingMemberId)?.full_name?.split(' ')[0] || 'el usuario'} para que pueda ingresar.</p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
 
                                     {!editingMemberId && (
                                         <div className="bg-amber-50 rounded-2xl p-5 border border-amber-100 flex items-start gap-3">
