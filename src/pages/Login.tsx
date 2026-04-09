@@ -57,7 +57,7 @@ export default function Login() {
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="mt-1 block w-full rounded-2xl border-gray-100 bg-gray-50/50"
+                        className="mt-1 block w-full h-14 rounded-2xl border-gray-100 bg-gray-50/50"
                     />
                 </div>
 
@@ -72,18 +72,18 @@ export default function Login() {
                             required
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="pr-12 block w-full rounded-2xl border-gray-100 bg-gray-50/50"
+                            className="pr-14 block w-full h-14 rounded-2xl border-gray-100 bg-gray-50/50"
                         />
                         <button
                             type="button"
-                            className="absolute inset-y-1 right-1 flex items-center justify-center w-10 bg-indigo-50 text-indigo-600 hover:bg-[#4449AA] hover:text-white rounded-xl transition-all shadow-sm"
+                            className="absolute inset-y-0 right-0 h-full w-14 flex items-center justify-center bg-indigo-50/80 text-indigo-600 hover:bg-[#4449AA] hover:text-white rounded-r-2xl border-l border-gray-100 transition-all"
                             onClick={() => setShowPassword(!showPassword)}
                             title={showPassword ? "Ocultar Contraseña" : "Ver Contraseña"}
                         >
                             {showPassword ? (
-                                <EyeOff className="h-4 w-4" />
+                                <EyeOff className="h-5 w-5" />
                             ) : (
-                                <Eye className="h-4 w-4" />
+                                <Eye className="h-5 w-5" />
                             )}
                         </button>
                     </div>
