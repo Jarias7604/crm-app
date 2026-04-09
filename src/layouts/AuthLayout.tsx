@@ -32,108 +32,107 @@ export default function AuthLayout() {
                 </div>
             </div>
 
-            {/* Right Column: Enterprise Trust & Professionalism */}
-            <div className="hidden lg:flex relative w-0 flex-1 bg-[#1a1d4b] overflow-hidden">
-                {/* Subtle Corporate Gradients & Structure */}
-                <div className="absolute inset-0 bg-gradient-to-br from-[#4449AA] to-[#121433] opacity-90" />
+            {/* Right Column: Aggressive Marketing & Differentiators */}
+            <div className="hidden lg:flex relative w-0 flex-1 bg-[#0b0f19] overflow-hidden">
+                {/* Advanced Tech Background */}
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-900/40 via-[#0b0f19] to-[#0b0f19]" />
                 
-                {/* Engineering Grid (Conveys Order, Precision, Data) */}
-                <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff0a_1px,transparent_1px),linear-gradient(to_bottom,#ffffff0a_1px,transparent_1px)] bg-[size:24px_24px]" />
-
                 <div className="absolute top-6 right-8 z-50">
                     <LanguageSwitcher />
                 </div>
 
-                <div className="relative z-10 flex flex-col justify-center items-center w-full px-12 xl:px-24">
-                    <div className="max-w-xl w-full">
-                        {/* High-Trust Typography */}
-                        <h1 className="text-4xl xl:text-5xl font-black text-white leading-tight mb-5 tracking-tight">
-                            Control estructurado.<br/>
-                            <span className="text-indigo-200">Visión empresarial.</span>
+                <div className="relative z-10 flex flex-col justify-center items-center w-full h-full px-12 xl:px-20">
+                    <div className="max-w-2xl w-full text-center mb-10">
+                        {/* Dominant Marketing Copy */}
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 font-bold text-[10px] uppercase tracking-widest mb-6">
+                            <Zap className="w-3.5 h-3.5" /> La Ventaja Competitiva Definitiva
+                        </div>
+                        <h1 className="text-4xl xl:text-[2.75rem] font-black text-white leading-[1.1] mb-5 tracking-tight">
+                            No compres software.<br/>
+                            <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-blue-400 to-cyan-400">Invierte en dominio del mercado.</span>
                         </h1>
-                        <p className="text-base text-indigo-100/80 mb-12 font-medium leading-relaxed max-w-lg">
-                            Un ecosistema diseñado para brindar orden operativo, seguridad en el manejo de datos y una experiencia de usuario moderna y profesional.
+                        <p className="text-[15px] text-indigo-200/70 font-medium leading-relaxed max-w-xl mx-auto">
+                            Mientras la competencia usa herramientas desconectadas, nuestro ecosistema unifica Inteligencia Artificial, Marketing y Ventas en un solo motor de alta precisión.
                         </p>
+                    </div>
 
-                        {/* Enterprise Values Grid (Monochromatic, Clean) */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-10">
-                            <div className="flex flex-col gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center border border-white/20">
-                                    <Shield className="w-5 h-5 text-white" />
-                                </div>
-                                <div>
-                                    <h4 className="text-white font-bold text-sm tracking-wide">Seguridad de Grado</h4>
-                                    <p className="text-xs text-indigo-200/70 mt-1 leading-relaxed">Protección de datos y aislamiento total de información entre usuarios y roles.</p>
-                                </div>
-                            </div>
-                            
-                            <div className="flex flex-col gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center border border-white/20">
-                                    <Target className="w-5 h-5 text-white" />
-                                </div>
-                                <div>
-                                    <h4 className="text-white font-bold text-sm tracking-wide">Precisión Operativa</h4>
-                                    <p className="text-xs text-indigo-200/70 mt-1 leading-relaxed">Gestión de prospectos e inventarios con un orden inquebrantable.</p>
-                                </div>
-                            </div>
+                    {/* Highly Visual "Hub and Spoke" Flow Diagram (CSS Only) */}
+                    <div className="relative w-full max-w-xl h-[400px] flex items-center justify-center mt-4">
+                        {/* Connecting Lines SVG */}
+                        <svg className="absolute inset-0 w-full h-full" style={{ zIndex: 0 }}>
+                            <defs>
+                                <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stopColor="#818cf8" stopOpacity="0.2" />
+                                    <stop offset="50%" stopColor="#818cf8" stopOpacity="0.8" />
+                                    <stop offset="100%" stopColor="#818cf8" stopOpacity="0.2" />
+                                </linearGradient>
+                            </defs>
+                            {/* Lines from Center to Nodes */}
+                            <path d="M 288 200 L 100 80" stroke="url(#lineGrad)" strokeWidth="2" strokeDasharray="4 4" className="animate-[dash_20s_linear_infinite]" />
+                            <path d="M 288 200 L 476 80" stroke="url(#lineGrad)" strokeWidth="2" strokeDasharray="4 4" className="animate-[dash_20s_linear_infinite]" />
+                            <path d="M 288 200 L 60 200" stroke="url(#lineGrad)" strokeWidth="2" strokeDasharray="4 4" className="animate-[dash_20s_linear_infinite]" />
+                            <path d="M 288 200 L 516 200" stroke="url(#lineGrad)" strokeWidth="2" strokeDasharray="4 4" className="animate-[dash_20s_linear_infinite]" />
+                            <path d="M 288 200 L 288 340" stroke="url(#lineGrad)" strokeWidth="3" className="opacity-50" />
+                        </svg>
 
-                            <div className="flex flex-col gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center border border-white/20">
-                                    <Zap className="w-5 h-5 text-white" />
-                                </div>
-                                <div>
-                                    <h4 className="text-white font-bold text-sm tracking-wide">Modernización Integral</h4>
-                                    <p className="text-xs text-indigo-200/70 mt-1 leading-relaxed">Flujos de trabajo acelerados por arquitectura de software de última generación.</p>
-                                </div>
-                            </div>
+                        <style>{`
+                            @keyframes dash {
+                                to { stroke-dashoffset: 1000; }
+                            }
+                        `}</style>
 
-                            <div className="flex flex-col gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center border border-white/20">
-                                    <Bot className="w-5 h-5 text-white" />
-                                </div>
-                                <div>
-                                    <h4 className="text-white font-bold text-sm tracking-wide">Automatización Limpia</h4>
-                                    <p className="text-xs text-indigo-200/70 mt-1 leading-relaxed">Procesos delegados al sistema para eliminar el error humano.</p>
-                                </div>
+                        {/* Central Hub Container */}
+                        <div className="relative z-10 w-28 h-28 rounded-full bg-gradient-to-br from-indigo-500 to-blue-700 p-1 shadow-[0_0_60px_rgba(99,102,241,0.4)] animate-pulse" style={{ animationDuration: '3s' }}>
+                            <div className="w-full h-full rounded-full bg-[#0b0f19] flex flex-col items-center justify-center">
+                                <Bot className="w-8 h-8 text-indigo-400 mb-1" />
+                                <span className="text-[10px] font-black text-white tracking-widest">NÚCLEO AI</span>
                             </div>
                         </div>
 
-                        {/* Professional Data Concept Abstract Component */}
-                        <div className="mt-16 relative w-full h-[180px] rounded-2xl bg-gradient-to-b from-white/5 to-transparent border border-white/10 p-1 overflow-hidden">
-                            <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-indigo-400 to-transparent opacity-50" />
-                            
-                            <div className="w-full h-full rounded-xl bg-[#121433]/50 backdrop-blur-sm flex flex-col p-6">
-                                {/* Header of Abstract Widget */}
-                                <div className="flex items-center justify-between mb-6">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
-                                        <span className="text-[10px] text-emerald-400 font-extrabold uppercase tracking-[0.2em]">Sistema Operacional Activo</span>
-                                    </div>
-                                    <div className="text-[10px] text-white/40 font-mono">Última auditoría: {new Date().toLocaleDateString()}</div>
-                                </div>
-                                
-                                {/* Clean Data Lines */}
-                                <div className="space-y-4 flex-1">
-                                    <div className="w-full flex items-center gap-4">
-                                        <div className="w-1/4 h-1.5 bg-white/20 rounded-full" />
-                                        <div className="w-3/4 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                            <div className="w-[85%] h-full bg-indigo-400 rounded-full" />
-                                        </div>
-                                    </div>
-                                    <div className="w-full flex items-center gap-4">
-                                        <div className="w-1/3 h-1.5 bg-white/20 rounded-full" />
-                                        <div className="w-2/3 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                            <div className="w-[60%] h-full bg-indigo-400 rounded-full" />
-                                        </div>
-                                    </div>
-                                    <div className="w-full flex items-center gap-4">
-                                        <div className="w-1/5 h-1.5 bg-white/20 rounded-full" />
-                                        <div className="w-4/5 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                            <div className="w-[92%] h-full bg-indigo-400 rounded-full" />
-                                        </div>
-                                    </div>
-                                </div>
+                        {/* The Differentiating Features (Nodes) */}
+                        {/* Node 1: Top Left */}
+                        <div className="absolute top-[40px] left-[20px] bg-white/5 border border-indigo-500/20 backdrop-blur-md rounded-2xl p-4 w-48 shadow-xl transition-transform hover:scale-105 group">
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-300 group-hover:text-indigo-200"><Target className="w-4 h-4" /></div>
+                                <h4 className="text-white font-bold text-xs">Lead Hunter AI</h4>
                             </div>
+                            <p className="text-[10px] text-gray-400 leading-relaxed">Captación hipersegmentada con radar geo-satelital integrado.</p>
+                        </div>
+
+                        {/* Node 2: Top Right */}
+                        <div className="absolute top-[40px] right-[20px] bg-white/5 border border-amber-500/20 backdrop-blur-md rounded-2xl p-4 w-48 shadow-xl transition-transform hover:scale-105 group">
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-300 group-hover:text-amber-200"><Zap className="w-4 h-4" /></div>
+                                <h4 className="text-white font-bold text-xs">Cotizador Inteligente</h4>
+                            </div>
+                            <p className="text-[10px] text-gray-400 leading-relaxed">Proyecciones precisas y cierres instantáneos que aniquilan la demora tradicional.</p>
+                        </div>
+
+                        {/* Node 3: Middle Left */}
+                        <div className="absolute top-[170px] left-[-20px] bg-white/5 border border-emerald-500/20 backdrop-blur-md rounded-2xl p-4 w-44 shadow-xl transition-transform hover:scale-105 group">
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 group-hover:text-emerald-200"><Shield className="w-4 h-4" /></div>
+                                <h4 className="text-white font-bold text-xs">Aislamiento Total</h4>
+                            </div>
+                            <p className="text-[10px] text-gray-400 leading-relaxed">Arquitectura empresarial multi-tenant con seguridad RLS militar.</p>
+                        </div>
+
+                        {/* Node 4: Middle Right */}
+                        <div className="absolute top-[170px] right-[-20px] bg-white/5 border border-sky-500/20 backdrop-blur-md rounded-2xl p-4 w-44 shadow-xl transition-transform hover:scale-105 group">
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="p-1.5 rounded-lg bg-sky-500/20 text-sky-300 group-hover:text-sky-200"><MessageSquare className="w-4 h-4" /></div>
+                                <h4 className="text-white font-bold text-xs">Omnicanalidad</h4>
+                            </div>
+                            <p className="text-[10px] text-gray-400 leading-relaxed">WhatsApp, Email y Redes en un canal unificado imbatible.</p>
+                        </div>
+
+                        {/* Node 5: Bottom Center */}
+                        <div className="absolute bottom-[20px] bg-white/5 border border-purple-500/20 backdrop-blur-md rounded-2xl p-4 w-64 shadow-2xl transition-transform hover:scale-105 group text-center mt-5">
+                            <div className="flex items-center justify-center gap-2 mb-2">
+                                <div className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse" />
+                                <h4 className="text-white font-black text-[13px] uppercase tracking-widest">ECOSISTEMA UNIFICADO</h4>
+                            </div>
+                            <p className="text-[11px] text-gray-300 font-medium">El único CRM que te permite dominar el mercado.</p>
                         </div>
                     </div>
                 </div>
