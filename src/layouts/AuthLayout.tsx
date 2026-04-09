@@ -32,88 +32,107 @@ export default function AuthLayout() {
                 </div>
             </div>
 
-            {/* Right Column: Premium Showcase */}
-            <div className="hidden lg:flex relative w-0 flex-1 bg-[#0f172a] overflow-hidden">
-                {/* Background Decor */}
-                <div className="absolute inset-0 bg-gradient-to-br from-[#4449AA] via-indigo-900 to-[#1e1b4b] opacity-90" />
+            {/* Right Column: Enterprise Trust & Professionalism */}
+            <div className="hidden lg:flex relative w-0 flex-1 bg-[#1a1d4b] overflow-hidden">
+                {/* Subtle Corporate Gradients & Structure */}
+                <div className="absolute inset-0 bg-gradient-to-br from-[#4449AA] to-[#121433] opacity-90" />
                 
-                {/* Abstract Shapes */}
-                <div className="absolute -top-32 -left-32 w-[600px] h-[600px] bg-white opacity-5 rounded-full blur-3xl" />
-                <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-blue-500 opacity-10 rounded-full blur-3xl" />
-                
+                {/* Engineering Grid (Conveys Order, Precision, Data) */}
+                <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff0a_1px,transparent_1px),linear-gradient(to_bottom,#ffffff0a_1px,transparent_1px)] bg-[size:24px_24px]" />
+
                 <div className="absolute top-6 right-8 z-50">
                     <LanguageSwitcher />
                 </div>
 
                 <div className="relative z-10 flex flex-col justify-center items-center w-full px-12 xl:px-24">
                     <div className="max-w-xl w-full">
-                        <h1 className="text-4xl xl:text-5xl font-black text-white leading-tight mb-6">
-                            Potencia tus ventas con inteligencia.
+                        {/* High-Trust Typography */}
+                        <h1 className="text-4xl xl:text-5xl font-black text-white leading-tight mb-5 tracking-tight">
+                            Control estructurado.<br/>
+                            <span className="text-indigo-200">Visión empresarial.</span>
                         </h1>
-                        <p className="text-lg text-indigo-100 mb-12 font-medium leading-relaxed opacity-90">
-                            La plataforma todo en uno diseñada para cerrar más negocios, automatizar seguimientos y controlar toda tu operación comercial en tiempo real.
+                        <p className="text-base text-indigo-100/80 mb-12 font-medium leading-relaxed max-w-lg">
+                            Un ecosistema diseñado para brindar orden operativo, seguridad en el manejo de datos y una experiencia de usuario moderna y profesional.
                         </p>
 
-                        {/* Features Grid */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                            <div className="flex items-start gap-4">
-                                <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center shrink-0 border border-white/10">
-                                    <Target className="w-5 h-5 text-indigo-300" />
+                        {/* Enterprise Values Grid (Monochromatic, Clean) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-10">
+                            <div className="flex flex-col gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center border border-white/20">
+                                    <Shield className="w-5 h-5 text-white" />
                                 </div>
                                 <div>
-                                    <h4 className="text-white font-bold mb-1">Gestión de Leads</h4>
-                                    <p className="text-sm text-indigo-200/70">Centraliza y clasifica prospectos automáticamente.</p>
+                                    <h4 className="text-white font-bold text-sm tracking-wide">Seguridad de Grado</h4>
+                                    <p className="text-xs text-indigo-200/70 mt-1 leading-relaxed">Protección de datos y aislamiento total de información entre usuarios y roles.</p>
                                 </div>
                             </div>
                             
-                            <div className="flex items-start gap-4">
-                                <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center shrink-0 border border-white/10">
-                                    <Zap className="w-5 h-5 text-amber-300" />
+                            <div className="flex flex-col gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center border border-white/20">
+                                    <Target className="w-5 h-5 text-white" />
                                 </div>
                                 <div>
-                                    <h4 className="text-white font-bold mb-1">Automatizaciones</h4>
-                                    <p className="text-sm text-indigo-200/70">Seguimientos y tareas impulsadas en piloto automático.</p>
+                                    <h4 className="text-white font-bold text-sm tracking-wide">Precisión Operativa</h4>
+                                    <p className="text-xs text-indigo-200/70 mt-1 leading-relaxed">Gestión de prospectos e inventarios con un orden inquebrantable.</p>
                                 </div>
                             </div>
 
-                            <div className="flex items-start gap-4">
-                                <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center shrink-0 border border-white/10">
-                                    <Bot className="w-5 h-5 text-emerald-300" />
+                            <div className="flex flex-col gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center border border-white/20">
+                                    <Zap className="w-5 h-5 text-white" />
                                 </div>
                                 <div>
-                                    <h4 className="text-white font-bold mb-1">Cotizador AI</h4>
-                                    <p className="text-sm text-indigo-200/70">Arma propuestas comerciales con Inteligencia Artificial.</p>
+                                    <h4 className="text-white font-bold text-sm tracking-wide">Modernización Integral</h4>
+                                    <p className="text-xs text-indigo-200/70 mt-1 leading-relaxed">Flujos de trabajo acelerados por arquitectura de software de última generación.</p>
                                 </div>
                             </div>
 
-                            <div className="flex items-start gap-4">
-                                <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center shrink-0 border border-white/10">
-                                    <MessageSquare className="w-5 h-5 text-sky-300" />
+                            <div className="flex flex-col gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center border border-white/20">
+                                    <Bot className="w-5 h-5 text-white" />
                                 </div>
                                 <div>
-                                    <h4 className="text-white font-bold mb-1">Omnicanalidad</h4>
-                                    <p className="text-sm text-indigo-200/70">Integra WhatsApp, Correos y Redes en un solo lugar.</p>
+                                    <h4 className="text-white font-bold text-sm tracking-wide">Automatización Limpia</h4>
+                                    <p className="text-xs text-indigo-200/70 mt-1 leading-relaxed">Procesos delegados al sistema para eliminar el error humano.</p>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Glass Panel Mockup Simulation */}
-                        <div className="mt-16 relative rounded-2xl bg-white/5 border border-white/10 p-6 backdrop-blur-md shadow-2xl overflow-hidden group">
-                            <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                            <div className="flex items-center gap-4 mb-4">
-                                <div className="flex gap-1.5">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-red-400"></div>
-                                    <div className="w-2.5 h-2.5 rounded-full bg-amber-400"></div>
-                                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-400"></div>
+                        {/* Professional Data Concept Abstract Component */}
+                        <div className="mt-16 relative w-full h-[180px] rounded-2xl bg-gradient-to-b from-white/5 to-transparent border border-white/10 p-1 overflow-hidden">
+                            <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-indigo-400 to-transparent opacity-50" />
+                            
+                            <div className="w-full h-full rounded-xl bg-[#121433]/50 backdrop-blur-sm flex flex-col p-6">
+                                {/* Header of Abstract Widget */}
+                                <div className="flex items-center justify-between mb-6">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+                                        <span className="text-[10px] text-emerald-400 font-extrabold uppercase tracking-[0.2em]">Sistema Operacional Activo</span>
+                                    </div>
+                                    <div className="text-[10px] text-white/40 font-mono">Última auditoría: {new Date().toLocaleDateString()}</div>
                                 </div>
-                                <div className="h-4 w-32 bg-white/10 rounded overflow-hidden">
-                                     <div className="w-full h-full bg-white/20 animate-pulse"></div>
+                                
+                                {/* Clean Data Lines */}
+                                <div className="space-y-4 flex-1">
+                                    <div className="w-full flex items-center gap-4">
+                                        <div className="w-1/4 h-1.5 bg-white/20 rounded-full" />
+                                        <div className="w-3/4 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                            <div className="w-[85%] h-full bg-indigo-400 rounded-full" />
+                                        </div>
+                                    </div>
+                                    <div className="w-full flex items-center gap-4">
+                                        <div className="w-1/3 h-1.5 bg-white/20 rounded-full" />
+                                        <div className="w-2/3 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                            <div className="w-[60%] h-full bg-indigo-400 rounded-full" />
+                                        </div>
+                                    </div>
+                                    <div className="w-full flex items-center gap-4">
+                                        <div className="w-1/5 h-1.5 bg-white/20 rounded-full" />
+                                        <div className="w-4/5 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                                            <div className="w-[92%] h-full bg-indigo-400 rounded-full" />
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="space-y-3">
-                                <div className="h-2 w-3/4 bg-white/10 rounded"></div>
-                                <div className="h-2 w-1/2 bg-white/10 rounded"></div>
-                                <div className="h-2 w-5/6 bg-white/10 rounded"></div>
                             </div>
                         </div>
                     </div>
