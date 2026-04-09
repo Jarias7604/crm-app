@@ -704,7 +704,7 @@ export default function Team() {
                                             <select
                                                 className="w-full h-14 rounded-2xl border-white bg-white px-5 font-bold text-sm text-gray-900 shadow-sm outline-none"
                                                 value={editingMember.custom_role_id || ''}
-                                                onChange={e => setEditingMember({ ...editingMember, custom_role_id: e.target.value })}
+                                                onChange={e => { const val = e.target.value; setEditingMember(prev => prev ? { ...prev, custom_role_id: val } : prev); }}
                                                 disabled={editingMember.id === myProfile?.id}
                                             >
                                                 {customRoles
@@ -740,7 +740,7 @@ export default function Team() {
                                                         icon={item.icon}
                                                         mainKey={key}
                                                         permissions={editingMember.permissions}
-                                                        onChange={(p: any) => setEditingMember({ ...editingMember, permissions: p })}
+                                                        onChange={(p: any) => setEditingMember(prev => prev ? { ...prev, permissions: p } : prev)}
                                                     />
                                                 );
                                             })}
