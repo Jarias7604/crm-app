@@ -67,28 +67,20 @@ export const adminService = {
         full_name?: string | null;
         company_id: string;
     }) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) throw new Error('No session');
-
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const response = await fetch(`${supabaseUrl}/functions/v1/admin-create-user`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({
-                new_email: params.email,
-                new_password: params.password,
-                new_full_name: params.full_name || params.email,
-                new_role: 'company_admin',
-                new_company_id: params.company_id,
-            }),
+        const { data, error } = await supabase.rpc('admin_create_user', {
+            new_email: params.email,
+            new_password: params.password,
+            new_full_name: params.full_name || params.email,
+            new_role: 'company_admin',
+            new_company_id: params.company_id,
+            new_phone: null,
+            new_custom_role_id: null,
+            new_birth_date: null,
+            new_address: null
         });
 
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Error al crear administrador');
-        return result;
+        if (error) throw error;
+        return data;
     },
 
     async updateCompany(id: string, updates: Partial<Company>) {
