@@ -199,7 +199,8 @@ export default function Team() {
             setEditingMember(null);
             loadData();
         } catch (error: any) {
-            toast.error('Error al guardar');
+            console.error('❌ handleSaveEdit error:', error);
+            toast.error(`Error al guardar: ${error?.message || JSON.stringify(error)}`);
         } finally {
             setIsSaving(false);
         }
