@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { supabase } from '../services/supabase';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function Login() {
     const { t } = useTranslation();
@@ -11,6 +12,7 @@ export default function Login() {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [showPassword, setShowPassword] = useState(false);
     const navigate = useNavigate();
 
     const handleLogin = async (e: React.FormEvent) => {
@@ -59,18 +61,31 @@ export default function Login() {
                     />
                 </div>
 
-                <div>
+                <div className="relative">
                     <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                         {t('auth.passwordLabel')}
                     </label>
-                    <Input
-                        id="password"
-                        type="password"
-                        required
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="mt-1"
-                    />
+                    <div className="relative mt-1">
+                        <Input
+                            id="password"
+                            type={showPassword ? "text" : "password"}
+                            required
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="pr-10"
+                        />
+                        <button
+                            type="button"
+                            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                            onClick={() => setShowPassword(!showPassword)}
+                        >
+                            {showPassword ? (
+                                <EyeOff className="h-4 w-4" />
+                            ) : (
+                                <Eye className="h-4 w-4" />
+                            )}
+                        </button>
+                    </div>
                 </div>
 
                 <Button type="submit" disabled={loading} className="w-full">
