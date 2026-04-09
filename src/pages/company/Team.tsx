@@ -53,6 +53,13 @@ export default function Team() {
         address: ''
     });
 
+    // New member password panel helper
+    const handleNewMemberAutoGenerate = () => {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$';
+        const pwd = Array.from({ length: 12 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+        setFormData(prev => ({ ...prev, password: pwd }));
+    };
+
     useEffect(() => {
         if (myProfile?.company_id) {
             loadData();
@@ -106,11 +113,10 @@ export default function Team() {
             return;
         }
 
+        // Graceful fallback: if no custom roles, use 'collaborator' as base role
         const selectedRole = customRoles.find(r => r.id === formData.customRoleId);
-        if (!selectedRole) {
-            toast.error('Seleccione un rol válido');
-            return;
-        }
+        const baseRole = selectedRole?.base_role || 'collaborator';
+        const customRoleId = selectedRole?.id || null;
 
         setIsCreating(true);
         try {
@@ -119,9 +125,9 @@ export default function Team() {
                 password: formData.password,
                 fullName: formData.fullName,
                 phone: formData.phone,
-                role: selectedRole.base_role,
+                role: baseRole,
                 companyId: myProfile.company_id,
-                customRoleId: selectedRole.id,
+                customRoleId: customRoleId,
                 birthDate: formData.birthDate,
                 address: formData.address
             });
@@ -323,8 +329,10 @@ export default function Team() {
             <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 items-start">
 
                 {/* Left Column: Admin Control Panel (Sticky Sidebar) */}
-                <div className="lg:col-span-3 space-y-4 lg:sticky lg:top-0 h-full">
-                    <div className="bg-white rounded-[3.5rem] border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] p-10 pt-12 space-y-6 h-[calc(100vh-220px)] flex flex-col overflow-hidden">
+                <div className="lg:col-span-4 space-y-4 lg:sticky lg:top-0">
+                    <div className="bg-white rounded-[3.5rem] border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] h-[calc(100vh-220px)] flex flex-col overflow-hidden">
+                        {/* Fixed Header */}
+                        <div className="px-10 pt-10 pb-4 border-b border-gray-50 shrink-0">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shadow-sm">
@@ -334,7 +342,10 @@ export default function Team() {
                             </div>
                             <div className="w-1.5 h-1.5 rounded-full bg-indigo-200" />
                         </div>
+                        </div>
 
+                        {/* Scrollable Form Body */}
+                        <div className="flex-1 overflow-y-auto px-10 py-6 scrollbar-thin scrollbar-thumb-gray-200 scrollbar-track-transparent">
                         <form onSubmit={handleCreateMember} className="space-y-4">
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.15em] ml-1">Nombre Completo</label>
@@ -346,16 +357,7 @@ export default function Team() {
                                 <Input type="email" required value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="h-11 rounded-xl bg-gray-50/50 border-gray-100 focus:bg-white font-bold text-sm placeholder:text-gray-300 transition-all shadow-inner" placeholder="email@empresa.com" />
                             </div>
 
-                            <div className="grid grid-cols-1 gap-4">
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.15em] ml-1">Contraseña</label>
-                                    <div className="relative">
-                                        <Input type="password" required value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} className="h-11 rounded-xl bg-gray-50/50 border-gray-100 focus:bg-white font-bold text-sm transition-all shadow-inner" placeholder="••••••••" />
-                                        <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-200" />
-                                    </div>
-                                </div>
-                            </div>
-
+                            {/* PERFIL DE ACCESO */}
                             <div className="space-y-1.5">
                                 <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.15em] ml-1">Perfil de Acceso</label>
                                 <div className="relative">
@@ -364,29 +366,122 @@ export default function Team() {
                                         value={formData.customRoleId}
                                         onChange={e => setFormData({ ...formData, customRoleId: e.target.value })}
                                     >
-                                        {customRoles
-                                            .filter(role => myProfile?.role === 'super_admin' || role.base_role !== 'super_admin')
-                                            .map(role => (
-                                                <option key={role.id} value={role.id}>{role.name}</option>
-                                            ))}
+                                        {customRoles.length === 0 ? (
+                                            <option value="collaborator">Colaborador (Predeterminado)</option>
+                                        ) : (
+                                            customRoles
+                                                .filter(role => myProfile?.role === 'super_admin' || role.base_role !== 'super_admin')
+                                                .map(role => (
+                                                    <option key={role.id} value={role.id}>{role.name}</option>
+                                                ))
+                                        )}
                                     </select>
                                     <Shield className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300 pointer-events-none" />
                                 </div>
                             </div>
 
+                            {/* CONTRASEÑA PREMIUM — Auto-generar o Email Link */}
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-gray-400 tracking-[0.15em] ml-1">Contraseña de Acceso</label>
+                                <div className="rounded-2xl border border-amber-100 bg-amber-50/40 p-4 space-y-3">
+                                    {/* Opción A: Email */}
+                                    <div className="flex items-start gap-3">
+                                        <span className="mt-0.5 w-5 h-5 rounded-full bg-green-100 text-green-700 flex items-center justify-center text-[9px] font-black shrink-0">A</span>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[10px] font-black text-gray-500 uppercase tracking-wide">Enviar por correo <span className="text-green-600">(Recomendado)</span></p>
+                                            <p className="text-[9px] text-gray-400 mt-0.5">El colaborador recibirá un link para crear su propia contraseña.</p>
+                                            <button
+                                                type="button"
+                                                onClick={async () => {
+                                                    if (!formData.email || formData.email.length < 3) {
+                                                        toast.error('Ingresa el correo electrónico primero');
+                                                        return;
+                                                    }
+                                                    // Create user first, then send email link via edge function
+                                                    setIsCreating(true);
+                                                    try {
+                                                        const tempPwd = generatePassword();
+                                                        const selectedRole = customRoles.find(r => r.id === formData.customRoleId);
+                                                        const createdMember = await teamService.createMember({
+                                                            email: formData.email,
+                                                            password: tempPwd,
+                                                            fullName: formData.fullName,
+                                                            phone: formData.phone,
+                                                            role: selectedRole?.base_role || 'collaborator',
+                                                            companyId: myProfile!.company_id!,
+                                                            customRoleId: selectedRole?.id || formData.customRoleId,
+                                                            birthDate: formData.birthDate,
+                                                            address: formData.address
+                                                        });
+                                                        // Send email reset link
+                                                        const { data: { session } } = await supabase.auth.getSession();
+                                                        if (session && createdMember?.id) {
+                                                            await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-reset-password`, {
+                                                                method: 'POST',
+                                                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}`, 'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY },
+                                                                body: JSON.stringify({ target_user_id: createdMember.id, mode: 'email_link' })
+                                                            });
+                                                        }
+                                                        setFormData(prev => ({ ...prev, email: '', password: '', fullName: '', phone: '', birthDate: '', address: '' }));
+                                                        toast.success(`📧 Colaborador creado. Link de acceso enviado a ${formData.email}`, { duration: 8000 });
+                                                        loadData();
+                                                    } catch (err: any) {
+                                                        toast.error(`Error: ${err.message}`);
+                                                    } finally {
+                                                        setIsCreating(false);
+                                                    }
+                                                }}
+                                                disabled={isCreating || isLimitReached}
+                                                className="mt-2 px-4 py-1.5 rounded-lg bg-green-600 text-white text-[9px] font-black uppercase tracking-widest hover:bg-green-700 transition-all disabled:opacity-50"
+                                            >
+                                                {isCreating ? 'Creando...' : '📧 Crear y Enviar Link'}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="border-t border-amber-100 pt-3">
+                                        <div className="flex items-start gap-3">
+                                            <span className="mt-0.5 w-5 h-5 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center text-[9px] font-black shrink-0">B</span>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-[10px] font-black text-gray-500 uppercase tracking-wide">Contraseña Manual</p>
+                                                <p className="text-[9px] text-gray-400 mt-0.5">Para usuarios sin correo. Comparte la contraseña de forma segura.</p>
+                                                <div className="flex items-center gap-2 mt-2">
+                                                    <input
+                                                        type="text"
+                                                        value={formData.password}
+                                                        onChange={e => setFormData({ ...formData, password: e.target.value })}
+                                                        placeholder="Contraseña..."
+                                                        className="flex-1 h-8 rounded-lg border border-amber-200 bg-white px-3 text-[11px] font-bold text-gray-700 outline-none focus:border-indigo-300 min-w-0"
+                                                    />
+                                                    <button type="button" onClick={handleNewMemberAutoGenerate}
+                                                        className="h-8 px-2.5 rounded-lg border border-amber-200 bg-white text-[9px] font-black text-amber-700 uppercase tracking-wide hover:bg-amber-50 transition-all shrink-0 flex items-center gap-1">
+                                                        <KeyRound className="w-3 h-3" /> Auto
+                                                    </button>
+                                                    <button type="button" onClick={() => { navigator.clipboard.writeText(formData.password); toast.success('Copiada'); }}
+                                                        className="h-8 px-2.5 rounded-lg border border-amber-200 bg-white text-[9px] font-black text-amber-700 uppercase tracking-wide hover:bg-amber-50 transition-all shrink-0 flex items-center gap-1" disabled={!formData.password}>
+                                                        <Copy className="w-3 h-3" /> Copiar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <button
                                 type="submit"
-                                disabled={isCreating || isLimitReached}
-                                className="w-full h-12 rounded-xl bg-[#4449AA] text-white font-black text-[11px] uppercase tracking-[0.2em] shadow-lg shadow-indigo-100 hover:translate-y-[-1px] active:scale-95 transition-all mt-4 disabled:opacity-50 disabled:translate-y-0"
+                                disabled={isCreating || isLimitReached || !formData.password}
+                                className="w-full h-12 rounded-xl bg-[#4449AA] text-white font-black text-[11px] uppercase tracking-[0.2em] shadow-lg shadow-indigo-100 hover:translate-y-[-1px] active:scale-95 transition-all mt-2 disabled:opacity-50 disabled:translate-y-0"
                             >
-                                {isCreating ? 'Procesando...' : 'Vincular Miembro'}
+                                {isCreating ? 'Procesando...' : '🔑 Vincular con Contraseña B'}
                             </button>
                         </form>
+                        </div>
                     </div>
                 </div>
 
                 {/* Right Column: Active Members Directory */}
-                <div className="lg:col-span-7 space-y-4">
+                <div className="lg:col-span-6 space-y-4">
                     <div className="h-full">
                         <div className="bg-white rounded-[3.5rem] shadow-[0_8px_40px_rgb(0,0,0,0.03)] border border-gray-100/50 overflow-hidden flex flex-col max-h-[calc(100vh-220px)]">
 
