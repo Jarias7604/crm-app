@@ -43,12 +43,46 @@ export default function ChatHub() {
     const { profile } = useAuth();
     const { isAdmin } = usePermissions();
 
-    // 1. Initial Load
+    // 1. Initial Load + realtime new message notifications
     useEffect(() => {
         loadData();
+        // Realtime: refresh conversation list when any new inbound message arrives
         const sub = chatService.subscribeToConversations(() => loadData());
-        return () => { sub.unsubscribe(); };
-    }, []);
+
+        // Show toast notification for new messages from contacts NOT currently open
+        const newMsgSub = supabase
+            .channel('global_new_inbound_toast')
+            .on('postgres_changes', {
+                event: 'INSERT', schema: 'public', table: 'marketing_messages'
+            }, async (payload: any) => {
+                const msg = payload.new;
+                if (msg.direction !== 'inbound') return;
+                // Only notify if not the currently open conversation
+                if (selectedConv?.id === msg.conversation_id) return;
+
+                const { data: conv } = await supabase
+                    .from('marketing_conversations')
+                    .select('lead_id, channel, leads(name)')
+                    .eq('id', msg.conversation_id)
+                    .maybeSingle();
+
+                if (conv) {
+                    const leadName = (conv as any).leads?.name || 'Nuevo contacto';
+                    const channelEmoji = conv.channel === 'whatsapp' ? '📲' : '✈️';
+                    toast(`${channelEmoji} Mensaje de ${leadName}`, {
+                        icon: conv.channel === 'whatsapp' ? '🟢' : '🔵',
+                        duration: 4000
+                    });
+                    loadData(); // Refresh list to update unread count
+                }
+            })
+            .subscribe();
+
+        return () => {
+            sub.unsubscribe();
+            newMsgSub.unsubscribe();
+        };
+    }, [selectedConv?.id]);
 
     // 2. Handle incoming quote for review from location state
     useEffect(() => {
@@ -416,9 +450,11 @@ export default function ChatHub() {
         if (existing) {
             setSelectedConv(existing);
         } else {
+            // Default to whatsapp if has phone, otherwise telegram
+            const defaultChannel = lead.whatsapp_source ? 'whatsapp' : 'whatsapp';
             const placeholder: ChatConversation = {
                 id: 'new',
-                channel: 'telegram',
+                channel: defaultChannel,
                 status: 'open',
                 last_message: 'Iniciando conversación...',
                 last_message_at: new Date().toISOString(),

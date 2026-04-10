@@ -53,12 +53,12 @@ serve(async (req) => {
                             const phoneNumberId = change.value.metadata.phone_number_id;
 
                             // IDENTIFY COMPANY
-                            // A. Via URL Param (BYOK Best Practice)
+                            // A. Via URL Param (recommended: add ?company_id=UUID to webhook URL in Meta Portal)
                             let targetCompanyId = url.searchParams.get('company_id');
                             let companyId = null;
 
                             if (targetCompanyId) {
-                                // Validate it exists
+                                // Validate it exists and is active
                                 const { data: integration } = await supabase
                                     .from('marketing_integrations')
                                     .select('company_id')
@@ -69,20 +69,32 @@ serve(async (req) => {
                                 if (integration) companyId = integration.company_id;
                             }
 
-                            // B. Fallback: Lookup by Phone Number ID in DB (Smart Multi-tenant)
+                            // B. Fallback: Lookup by Phone Number ID in DB
+                            // The table uses 'settings' JSONB column (not 'credentials')
                             if (!companyId && phoneNumberId) {
                                 console.log(`Looking up company for PhoneID: ${phoneNumberId}`);
-                                // Access JSONB field: credentials ->> 'phoneNumberId'
-                                // NOTE: In Postgres JSONB, text lookup needs ->>
                                 const { data: integ } = await supabase
                                     .from('marketing_integrations')
                                     .select('company_id')
                                     .eq('provider', 'whatsapp')
-                                    .filter('credentials->>phoneNumberId', 'eq', phoneNumberId)
                                     .eq('is_active', true)
+                                    .filter('settings->>phoneNumberId', 'eq', phoneNumberId)
                                     .maybeSingle();
 
                                 if (integ) companyId = integ.company_id;
+
+                                // C. Last resort: grab first active whatsapp integration
+                                if (!companyId) {
+                                    console.warn(`PhoneID ${phoneNumberId} not matched. Trying first active WhatsApp integration.`);
+                                    const { data: fallback } = await supabase
+                                        .from('marketing_integrations')
+                                        .select('company_id')
+                                        .eq('provider', 'whatsapp')
+                                        .eq('is_active', true)
+                                        .limit(1)
+                                        .maybeSingle();
+                                    if (fallback) companyId = fallback.company_id;
+                                }
                             }
 
                             if (!companyId) {
