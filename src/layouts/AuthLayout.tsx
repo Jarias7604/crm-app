@@ -32,107 +32,93 @@ export default function AuthLayout() {
                 </div>
             </div>
 
-            {/* Right Column: Aggressive Marketing & Differentiators */}
-            <div className="hidden lg:flex relative w-0 flex-1 bg-[#0b0f19] overflow-hidden">
-                {/* Advanced Tech Background */}
-                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-900/40 via-[#0b0f19] to-[#0b0f19]" />
+            {/* Right Column: Premium Showcase */}
+            <div className="hidden lg:flex relative w-0 flex-1 bg-[#0f172a] overflow-hidden">
+                {/* Background Decor */}
+                <div className="absolute inset-0 bg-gradient-to-br from-[#4449AA] via-indigo-900 to-[#1e1b4b] opacity-90" />
+                
+                {/* Abstract Shapes */}
+                <div className="absolute -top-32 -left-32 w-[600px] h-[600px] bg-white opacity-5 rounded-full blur-3xl" />
+                <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-blue-500 opacity-10 rounded-full blur-3xl" />
                 
                 <div className="absolute top-6 right-8 z-50">
                     <LanguageSwitcher />
                 </div>
 
-                <div className="relative z-10 flex flex-col justify-center items-center w-full h-full px-12 xl:px-20">
-                    <div className="max-w-2xl w-full text-center mb-10">
-                        {/* Dominant Marketing Copy */}
-                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 font-bold text-[10px] uppercase tracking-widest mb-6">
-                            <Zap className="w-3.5 h-3.5" /> Superior a Salesforce y Hubspot
+                <div className="relative z-10 flex flex-col justify-center items-center w-full px-12 xl:px-24">
+                    <div className="max-w-xl w-full">
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20 text-white font-bold text-xs shadow-xl backdrop-blur-md mb-6">
+                            <Zap className="w-4 h-4 text-amber-300" /> Superior a Salesforce y HubSpot
                         </div>
-                        <h1 className="text-4xl xl:text-[2.75rem] font-black text-white leading-[1.1] mb-5 tracking-tight">
-                            Gana una<br/>
-                            <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-blue-400 to-cyan-400">Ventaja Injusta.</span>
+                        <h1 className="text-4xl xl:text-5xl font-black text-white leading-tight mb-4">
+                            Poder Absoluto.<br/>
+                            <span className="text-indigo-200">Increíblemente fácil de usar.</span>
                         </h1>
-                        <p className="text-[15px] text-indigo-200/70 font-medium leading-relaxed max-w-xl mx-auto">
-                            Deja de pagar miles de dólares por licencias limitadas. Nuestro NÚCLEO agrupa todo tu ecosistema en un solo motor bélico. 10x más rápido, 10x más agresivo.
+                        <p className="text-lg text-indigo-100 mb-12 font-medium leading-relaxed opacity-90">
+                            La plataforma todo en uno diseñada para ser intuitiva desde el primer segundo. Cierra más tratos, eleva el éxito de tus clientes y controla todo tu ecosistema sin configuraciones complejas.
                         </p>
-                    </div>
 
-                    {/* Highly Visual "Hub and Spoke" Flow Diagram (CSS Only) */}
-                    <div className="relative w-full max-w-xl h-[400px] flex items-center justify-center mt-4">
-                        {/* Connecting Lines SVG */}
-                        <svg className="absolute inset-0 w-full h-full" style={{ zIndex: 0 }}>
-                            <defs>
-                                <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                    <stop offset="0%" stopColor="#818cf8" stopOpacity="0.2" />
-                                    <stop offset="50%" stopColor="#818cf8" stopOpacity="0.8" />
-                                    <stop offset="100%" stopColor="#818cf8" stopOpacity="0.2" />
-                                </linearGradient>
-                            </defs>
-                            {/* Lines from Center to Nodes */}
-                            <path d="M 288 200 L 100 80" stroke="url(#lineGrad)" strokeWidth="2" strokeDasharray="4 4" className="animate-[dash_20s_linear_infinite]" />
-                            <path d="M 288 200 L 476 80" stroke="url(#lineGrad)" strokeWidth="2" strokeDasharray="4 4" className="animate-[dash_20s_linear_infinite]" />
-                            <path d="M 288 200 L 60 200" stroke="url(#lineGrad)" strokeWidth="2" strokeDasharray="4 4" className="animate-[dash_20s_linear_infinite]" />
-                            <path d="M 288 200 L 516 200" stroke="url(#lineGrad)" strokeWidth="2" strokeDasharray="4 4" className="animate-[dash_20s_linear_infinite]" />
-                            <path d="M 288 200 L 288 340" stroke="url(#lineGrad)" strokeWidth="3" className="opacity-50" />
-                        </svg>
+                        {/* Features Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div className="flex items-start gap-4">
+                                <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center shrink-0 border border-white/10 shadow-lg">
+                                    <Target className="w-5 h-5 text-indigo-300" />
+                                </div>
+                                <div>
+                                    <h4 className="text-white font-bold mb-1">Resultados Reales</h4>
+                                    <p className="text-sm text-indigo-200/70">Tus clientes verán métricas y entregas impecables.</p>
+                                </div>
+                            </div>
+                            
+                            <div className="flex items-start gap-4">
+                                <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center shrink-0 border border-white/10 shadow-lg">
+                                    <Zap className="w-5 h-5 text-amber-300" />
+                                </div>
+                                <div>
+                                    <h4 className="text-white font-bold mb-1">100% Intuitivo</h4>
+                                    <p className="text-sm text-indigo-200/70">Diseño amigable. Tu equipo lo usará el mismo día.</p>
+                                </div>
+                            </div>
 
-                        <style>{`
-                            @keyframes dash {
-                                to { stroke-dashoffset: 1000; }
-                            }
-                        `}</style>
+                            <div className="flex items-start gap-4">
+                                <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center shrink-0 border border-white/10 shadow-lg">
+                                    <Bot className="w-5 h-5 text-emerald-300" />
+                                </div>
+                                <div>
+                                    <h4 className="text-white font-bold mb-1">Cotizador AI</h4>
+                                    <p className="text-sm text-indigo-200/70">A diferencia de la competencia, la IA está integrada.</p>
+                                </div>
+                            </div>
 
-                        {/* Central Hub Container */}
-                        <div className="relative z-10 w-28 h-28 rounded-full bg-gradient-to-br from-indigo-500 to-blue-700 p-1 shadow-[0_0_60px_rgba(99,102,241,0.4)] animate-pulse" style={{ animationDuration: '3s' }}>
-                            <div className="w-full h-full rounded-full bg-[#0b0f19] flex flex-col items-center justify-center">
-                                <Bot className="w-8 h-8 text-indigo-400 mb-1" />
-                                <span className="text-[10px] font-black text-white tracking-widest">NÚCLEO AI</span>
+                            <div className="flex items-start gap-4">
+                                <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center shrink-0 border border-white/10 shadow-lg">
+                                    <MessageSquare className="w-5 h-5 text-sky-300" />
+                                </div>
+                                <div>
+                                    <h4 className="text-white font-bold mb-1">Omnicanalidad</h4>
+                                    <p className="text-sm text-indigo-200/70">WhatsApp centralizado y ecosistema de marketing.</p>
+                                </div>
                             </div>
                         </div>
 
-                        {/* The Differentiating Features (Nodes) */}
-                        {/* Node 1: Top Left */}
-                        <div className="absolute top-[40px] left-[20px] bg-white/5 border border-indigo-500/20 backdrop-blur-md rounded-2xl p-4 w-48 shadow-xl transition-transform hover:scale-105 group">
-                            <div className="flex items-center gap-3 mb-2">
-                                <div className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-300 group-hover:text-indigo-200"><Target className="w-4 h-4" /></div>
-                                <h4 className="text-white font-bold text-xs">Lead Hunter AI</h4>
+                        {/* Glass Panel Mockup Simulation */}
+                        <div className="mt-16 relative rounded-2xl bg-white/5 border border-white/10 p-6 backdrop-blur-md shadow-2xl overflow-hidden group">
+                            <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                            <div className="flex items-center gap-4 mb-4">
+                                <div className="flex gap-1.5">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-red-400"></div>
+                                    <div className="w-2.5 h-2.5 rounded-full bg-amber-400"></div>
+                                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-400"></div>
+                                </div>
+                                <div className="h-4 w-32 bg-white/10 rounded overflow-hidden">
+                                     <div className="w-full h-full bg-white/20 animate-pulse"></div>
+                                </div>
                             </div>
-                            <p className="text-[10px] text-gray-400 leading-relaxed">Captación hipersegmentada con radar geo-satelital integrado.</p>
-                        </div>
-
-                        {/* Node 2: Top Right */}
-                        <div className="absolute top-[40px] right-[20px] bg-white/5 border border-amber-500/20 backdrop-blur-md rounded-2xl p-4 w-48 shadow-xl transition-transform hover:scale-105 group">
-                            <div className="flex items-center gap-3 mb-2">
-                                <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-300 group-hover:text-amber-200"><Zap className="w-4 h-4" /></div>
-                                <h4 className="text-white font-bold text-xs">Cotizador Inteligente</h4>
+                            <div className="space-y-3">
+                                <div className="h-2 w-3/4 bg-white/10 rounded"></div>
+                                <div className="h-2 w-1/2 bg-white/10 rounded"></div>
+                                <div className="h-2 w-5/6 bg-white/10 rounded"></div>
                             </div>
-                            <p className="text-[10px] text-gray-400 leading-relaxed">Proyecciones precisas y cierres instantáneos que aniquilan la demora tradicional.</p>
-                        </div>
-
-                        {/* Node 3: Middle Left */}
-                        <div className="absolute top-[170px] left-[-20px] bg-white/5 border border-emerald-500/20 backdrop-blur-md rounded-2xl p-4 w-44 shadow-xl transition-transform hover:scale-105 group">
-                            <div className="flex items-center gap-3 mb-2">
-                                <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 group-hover:text-emerald-200"><Shield className="w-4 h-4" /></div>
-                                <h4 className="text-white font-bold text-xs">Aislamiento Total</h4>
-                            </div>
-                            <p className="text-[10px] text-gray-400 leading-relaxed">Arquitectura empresarial multi-tenant con seguridad RLS militar.</p>
-                        </div>
-
-                        {/* Node 4: Middle Right */}
-                        <div className="absolute top-[170px] right-[-20px] bg-white/5 border border-sky-500/20 backdrop-blur-md rounded-2xl p-4 w-44 shadow-xl transition-transform hover:scale-105 group">
-                            <div className="flex items-center gap-3 mb-2">
-                                <div className="p-1.5 rounded-lg bg-sky-500/20 text-sky-300 group-hover:text-sky-200"><MessageSquare className="w-4 h-4" /></div>
-                                <h4 className="text-white font-bold text-xs">Omnicanalidad</h4>
-                            </div>
-                            <p className="text-[10px] text-gray-400 leading-relaxed">WhatsApp, Email y Redes en un canal unificado imbatible.</p>
-                        </div>
-
-                        {/* Node 5: Bottom Center */}
-                        <div className="absolute bottom-[20px] bg-white/5 border border-purple-500/20 backdrop-blur-md rounded-2xl p-4 w-64 shadow-2xl transition-transform hover:scale-105 group text-center mt-5">
-                            <div className="flex items-center justify-center gap-2 mb-2">
-                                <div className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-pulse" />
-                                <h4 className="text-white font-black text-[13px] uppercase tracking-widest">ECOSISTEMA UNIFICADO</h4>
-                            </div>
-                            <p className="text-[11px] text-gray-300 font-medium">El único CRM que te permite dominar el mercado.</p>
                         </div>
                     </div>
                 </div>
