@@ -134,7 +134,7 @@ export const FreeLogo = ({ d, onMove, onResize }: {
         window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
       }}
     >
-      <img src={d.logoUrl} style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: 8, pointerEvents: 'none' }} crossOrigin="anonymous" />
+      <div style={{ width: '100%', height: '100%', backgroundImage: `url(${d.logoUrl})`, backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', borderRadius: 8, pointerEvents: 'none' }} />
       {onResize && (
         <div style={{ position: 'absolute', bottom: -4, right: -4, width: 14, height: 14, background: '#D4AF37', borderRadius: '50%', cursor: 'se-resize', zIndex: 21 }}
           onMouseDown={e => {
@@ -249,7 +249,7 @@ export const Template_WhiteCard = ({ d }: { d: FlyerData }) => {
       </div>
       <div style={{ margin: `${Math.round(16 * s)}px ${Math.round(20 * s)}px 0`, borderRadius: Math.round(16 * s), overflow: 'hidden', height: Math.round(210 * s), position: 'relative', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}>
         {d.bgImageUrl ? (
-          <img src={d.bgImageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} crossOrigin="anonymous" />
+          <div style={{ width: '100%', height: '100%', ...imgBg(d.bgImageUrl, d.bgImagePosition) }} />
         ) : (
           <div style={{ width: '100%', height: '100%', background: `linear-gradient(135deg, ${acc}, ${acc}88)` }} />
         )}
@@ -298,7 +298,7 @@ export const Template_Magazine = ({ d }: { d: FlyerData }) => {
       </div>
       <div style={{ flex: 1, position: 'relative' }}>
         {d.bgImageUrl ? (
-          <img src={d.bgImageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', objectPosition: imgObjPos(d.bgImagePosition) }} crossOrigin="anonymous" />
+          <div style={{ width: '100%', height: '100%', ...imgBg(d.bgImageUrl, d.bgImagePosition) }} />
         ) : (
           <div style={{ width: '100%', height: '100%', background: `linear-gradient(135deg, ${acc}44, #0f172a)` }} />
         )}
@@ -322,7 +322,7 @@ export const Template_CenterGradient = ({ d }: { d: FlyerData }) => {
         <div style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: Math.round(20 * s), padding: `${Math.round(5 * s)}px ${Math.round(14 * s)}px`, fontSize: Math.round(11 * s), fontWeight: 800, color: '#fff' }}>★ PREMIUM</div>
       </div>
       <div style={{ margin: `${Math.round(8 * s)}px ${Math.round(28 * s)}px`, borderRadius: Math.round(20 * s), overflow: 'hidden', height: Math.round(220 * s), boxShadow: '0 20px 60px rgba(0,0,0,0.6)', position: 'relative' }}>
-        {d.bgImageUrl ? <img src={d.bgImageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} crossOrigin="anonymous" /> : <div style={{ width: '100%', height: '100%', background: 'rgba(255,255,255,0.1)' }} />}
+        {d.bgImageUrl ? <div style={{ width: '100%', height: '100%', ...imgBg(d.bgImageUrl, d.bgImagePosition) }} /> : <div style={{ width: '100%', height: '100%', background: 'rgba(255,255,255,0.1)' }} />}
       </div>
       <div style={{ padding: `${Math.round(16 * s)}px ${Math.round(28 * s)}px`, textAlign: 'center' }}>
         <div style={{ fontSize: Math.round(42 * s), fontWeight: 900, color: '#fff', lineHeight: 1.05, letterSpacing: '-0.03em', textShadow: '0 4px 16px rgba(0,0,0,0.5)', marginBottom: Math.round(8 * s) }}>{trunc((d.title || 'TU OFERTA').toUpperCase(), 25)}</div>
@@ -363,7 +363,7 @@ export const Template_CorporateLight = ({ d }: { d: FlyerData }) => {
         <div style={{ marginTop: Math.round(8 * s), fontSize: Math.round(11 * s), color: '#94a3b8', fontWeight: 600 }}>{d.phone}</div>
       </div>
       <div style={{ flex: 1, position: 'relative' }}>
-        {d.bgImageUrl ? <img src={d.bgImageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} crossOrigin="anonymous" /> : <div style={{ width: '100%', height: '100%', background: `linear-gradient(135deg, ${acc}44, ${acc}22)` }} />}
+        {d.bgImageUrl ? <div style={{ width: '100%', height: '100%', ...imgBg(d.bgImageUrl, d.bgImagePosition) }} /> : <div style={{ width: '100%', height: '100%', background: `linear-gradient(135deg, ${acc}44, ${acc}22)` }} />}
         <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '30%', background: 'linear-gradient(90deg, #fff, transparent)' }} />
       </div>
     </div>
