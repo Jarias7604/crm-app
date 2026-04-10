@@ -45,14 +45,14 @@ export default function AuthLayout() {
                     <div className="max-w-2xl w-full text-center mb-10">
                         {/* Dominant Marketing Copy */}
                         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 font-bold text-[10px] uppercase tracking-widest mb-6">
-                            <Zap className="w-3.5 h-3.5" /> La Ventaja Competitiva Definitiva
+                            <Zap className="w-3.5 h-3.5" /> Superior a Salesforce y Hubspot
                         </div>
                         <h1 className="text-4xl xl:text-[2.75rem] font-black text-white leading-[1.1] mb-5 tracking-tight">
-                            No compres software.<br/>
-                            <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-blue-400 to-cyan-400">Invierte en dominio del mercado.</span>
+                            Gana una<br/>
+                            <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-blue-400 to-cyan-400">Ventaja Injusta.</span>
                         </h1>
                         <p className="text-[15px] text-indigo-200/70 font-medium leading-relaxed max-w-xl mx-auto">
-                            Mientras la competencia usa herramientas desconectadas, nuestro ecosistema unifica Inteligencia Artificial, Marketing y Ventas en un solo motor de alta precisión.
+                            Deja de pagar miles de dólares por licencias limitadas. Nuestro NÚCLEO agrupa todo tu ecosistema en un solo motor bélico. 10x más rápido, 10x más agresivo.
                         </p>
                     </div>
 
