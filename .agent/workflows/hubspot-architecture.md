@@ -1,7 +1,18 @@
 ---
 description: Pendientes priorizados del CRM — retomar en próxima sesión
 ---
-# Sesión Completa: Manual Maestro y NLP Chatbot (Marzo 28)
+# Sesión: Pipeline Clientes — Bug Fix + Inline Edit (Abril 6, 2026)
+
+**Logros de la Sesión:**
+1. **Fix bug "Error al agregar" en PROD/DEV:** La función `auto_set_company_id()` y sus triggers (`trg_auto_company_id`) existían en DEV pero faltaban en PRODUCCIÓN. Al insertar un subdocumento sin `company_id`, la RLS lo rechazaba. Se aplicó migración `fix_auto_company_id_trigger_pipeline_docs` directamente en producción (`ikofyypxphrqkncimszt`). Ahora agregar/crear documentos funciona en todos los ambientes.
+2. **Edición inline de documentos de etapa:** Se agregó edición inline en `PipelineConfig.tsx`. Hover sobre un documento → aparece ✏️ → clic → fila se convierte en inputs pre-rellenados (nombre, descripción, checkbox Req.) + botones Guardar/Cancelar. Deploado en `develop` y `main`.
+
+**Estado del Deploy (Abril 6):**
+- `develop` → `935fe7f` ✅
+- `main` → `c3479e1` ✅
+- `develop` y `main` sincronizados ✅
+
+# Sesión Anterior: Manual Maestro y NLP Chatbot (Marzo 28)
 
 **Logros de la Sesión:**
 1. **Rediseño Premium del Manual:** Se compactaron los márgenes y centrado adoptando una lectura tipo *Stripe* con renderizado de vectores y componentes Glassmorphism. Se agregó un buscador en tiempo real en la cabecera del manual.

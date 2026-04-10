@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Download, Sparkles, Palette, Phone, Globe, ChevronRight, ChevronDown, Search, Loader2, ImageIcon, RefreshCw, Upload, Monitor } from 'lucide-react';
+import { ArrowLeft, Download, Sparkles, Palette, Phone, Globe, ChevronRight, ChevronDown, Search, Loader2, ImageIcon, RefreshCw, Upload, Monitor, Pen, Trash2, Undo2 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../services/supabase';
 import { flyerService } from '../../services/flyerService';
@@ -87,6 +87,18 @@ export default function FlyerStudio() {
   const cropPreviewRef = useRef<HTMLDivElement>(null);
   const isDraggingCrop = useRef(false);
   const dragStart = useRef({ mx: 0, my: 0, px: 50, py: 50 });
+
+  // ─── DRAW TOOL STATE ────────────────────────────────────────────────────────
+  type DrawLine = { x1: number; y1: number; x2: number; y2: number; color: string; width: number; arrow: boolean };
+  const [drawMode, setDrawMode]           = useState(false);
+  const [drawLines, setDrawLines]         = useState<DrawLine[]>([]);
+  const [drawColor, setDrawColor]         = useState('#FF3B3B');
+  const [drawWidth, setDrawWidth]         = useState(4);
+  const [drawArrow, setDrawArrow]         = useState(true);
+  const drawingRef = useRef<{ active: boolean; startX: number; startY: number }>({ active: false, startX: 0, startY: 0 });
+  const svgDrawRef = useRef<SVGSVGElement>(null);
+  const drawPreviewRef = useRef<{ x2: number; y2: number } | null>(null);
+  const [drawPreviewLine, setDrawPreviewLine] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -682,6 +694,14 @@ export default function FlyerStudio() {
                         {industries.filter(i => i.name.toLowerCase().includes(industrySearch.toLowerCase())).length === 0 && (
                           <div style={{ padding: '16px', textAlign: 'center', fontSize: 13, color: '#94a3b8' }}>Sin resultados</div>
                         )}
+                        {/* Drawing Overlay */}
+                        {drawMode && (
+                          <svg ref={svgDrawRef} style={{ position: "absolute", top: 0, left: 0, width: selectedSize.w, height: selectedSize.h, zIndex: 50, cursor: "crosshair", userSelect: "none" }} onMouseDown={e => { const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect(); const sx = selectedSize.w / rect.width, sy = selectedSize.h / rect.height; const x = (e.clientX - rect.left) * sx, y = (e.clientY - rect.top) * sy; drawingRef.current = { active: true, startX: x, startY: y }; setDrawPreviewLine({ x1: x, y1: y, x2: x, y2: y }); }} onMouseMove={e => { if (!drawingRef.current.active) return; const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect(); const sx = selectedSize.w / rect.width, sy = selectedSize.h / rect.height; const x = (e.clientX - rect.left) * sx, y = (e.clientY - rect.top) * sy; setDrawPreviewLine(prev => prev ? { ...prev, x2: x, y2: y } : null); }} onMouseUp={e => { if (!drawingRef.current.active) return; const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect(); const sx = selectedSize.w / rect.width, sy = selectedSize.h / rect.height; const x2 = (e.clientX - rect.left) * sx, y2 = (e.clientY - rect.top) * sy; const { startX: x1, startY: y1 } = drawingRef.current; if (Math.hypot(x2 - x1, y2 - y1) > 8) { setDrawLines(prev => [...prev, { x1, y1, x2, y2, color: drawColor, width: drawWidth, arrow: drawArrow }]); } drawingRef.current.active = false; setDrawPreviewLine(null); }} onMouseLeave={() => { drawingRef.current.active = false; setDrawPreviewLine(null); }}>
+                            <defs>{[...new Set([drawColor, ...drawLines.map((l) => l.color)])].map(c => (<marker key={c} id={`arr-${c.replace("#","")}`} markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill={c} /></marker>))}</defs>
+                            {drawLines.map((l, i) => (<line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke={l.color} strokeWidth={l.width} strokeLinecap="round" markerEnd={l.arrow ? `url(#arr-${l.color.replace("#","")})` : undefined} style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.6))" }} />))}
+                            {drawPreviewLine && (<line x1={drawPreviewLine.x1} y1={drawPreviewLine.y1} x2={drawPreviewLine.x2} y2={drawPreviewLine.y2} stroke={drawColor} strokeWidth={drawWidth} strokeLinecap="round" strokeDasharray="12 6" opacity="0.75" markerEnd={drawArrow ? `url(#arr-${drawColor.replace("#","")})` : undefined} />)}
+                          </svg>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1202,6 +1222,78 @@ export default function FlyerStudio() {
                 </div>
               )}
 
+              {/* ─── DRAW TOOL PANEL ──────────────────────────────────── */}
+              <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 40, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {/* Toggle button */}
+                <button
+                  onClick={() => setDrawMode(m => !m)}
+                  title={drawMode ? 'Desactivar dibujo' : 'Dibujar líneas en la foto (ideal para marcar lotes)'}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '8px 14px', borderRadius: 20, border: 'none', cursor: 'pointer',
+                    background: drawMode ? '#FF3B3B' : 'rgba(0,0,0,0.7)',
+                    color: '#fff', fontSize: 11, fontWeight: 800,
+                    backdropFilter: 'blur(8px)',
+                    boxShadow: drawMode ? '0 0 12px rgba(255,59,59,0.5)' : 'none',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  <Pen size={13} /> {drawMode ? 'DIBUJO ACTIVO' : 'DIBUJAR LÍNEAS'}
+                </button>
+
+                {/* Draw controls — only when draw mode is on */}
+                {drawMode && (
+                  <div style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(10px)', borderRadius: 14, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 10, minWidth: 170 }}>
+                    {/* Color swatches */}
+                    <div>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', fontWeight: 800, marginBottom: 5, letterSpacing: '0.06em' }}>COLOR DE LÍNEA</div>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {['#FF3B3B','#FFCC00','#00D4AA','#3B82F6','#fff','#000'].map(c => (
+                          <button key={c} onClick={() => setDrawColor(c)}
+                            style={{ width: 22, height: 22, borderRadius: '50%', background: c, border: drawColor === c ? '2.5px solid #D4AF37' : '2px solid rgba(255,255,255,0.3)', cursor: 'pointer' }} />
+                        ))}
+                        <label style={{ width: 22, height: 22, borderRadius: '50%', background: 'conic-gradient(red,yellow,green,cyan,blue,magenta,red)', border: '2px solid rgba(255,255,255,0.4)', cursor: 'pointer', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <input type="color" value={drawColor} onChange={e => setDrawColor(e.target.value)} style={{ opacity: 0, width: 0, height: 0 }} />
+                        </label>
+                      </div>
+                    </div>
+                    {/* Line width */}
+                    <div>
+                      <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', fontWeight: 800, marginBottom: 4, letterSpacing: '0.06em' }}>GROSOR</div>
+                      <div style={{ display: 'flex', gap: 5 }}>
+                        {[2, 4, 7, 11].map(w => (
+                          <button key={w} onClick={() => setDrawWidth(w)}
+                            style={{ flex: 1, height: 28, borderRadius: 7, border: `1.5px solid ${drawWidth === w ? '#D4AF37' : 'rgba(255,255,255,0.2)'}`, background: drawWidth === w ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.08)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{ height: w > 7 ? 6 : w > 3 ? 3 : 1.5, width: '60%', borderRadius: 99, background: '#fff' }} />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Arrow toggle */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', fontWeight: 700 }}>Con flecha →</span>
+                      <button onClick={() => setDrawArrow(a => !a)}
+                        style={{ width: 40, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer', background: drawArrow ? '#10b981' : 'rgba(255,255,255,0.2)', position: 'relative', transition: 'background 0.2s' }}>
+                        <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: drawArrow ? 21 : 3, transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.4)' }} />
+                      </button>
+                    </div>
+                    {/* Undo / Clear */}
+                    <div style={{ display: 'flex', gap: 5, marginTop: 4 }}>
+                      <button onClick={() => setDrawLines(prev => prev.slice(0, -1))}
+                        disabled={drawLines.length === 0}
+                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '6px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.08)', color: drawLines.length === 0 ? 'rgba(255,255,255,0.3)' : '#fff', cursor: drawLines.length === 0 ? 'not-allowed' : 'pointer', fontSize: 10, fontWeight: 700 }}>
+                        <Undo2 size={11} /> Deshacer
+                      </button>
+                      <button onClick={() => setDrawLines([])}
+                        disabled={drawLines.length === 0}
+                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '6px', borderRadius: 8, border: '1px solid rgba(255,100,100,0.3)', background: 'rgba(239,68,68,0.12)', color: drawLines.length === 0 ? 'rgba(255,255,255,0.3)' : '#fca5a5', cursor: drawLines.length === 0 ? 'not-allowed' : 'pointer', fontSize: 10, fontWeight: 700 }}>
+                        <Trash2 size={11} /> Borrar todo
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Zoom controls — top right */}
               <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 30, display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,0.60)', backdropFilter: 'blur(8px)', borderRadius: 20, padding: '5px 12px' }}>
                 <button onClick={() => setPreviewZoom(z => Math.max(0.3, +(z - 0.1).toFixed(1)))} style={{ background: 'none', border: 'none', color: '#fff', fontSize: 20, cursor: 'pointer', lineHeight: 1, padding: '0 2px', fontWeight: 700 }}>−</button>
@@ -1415,6 +1507,62 @@ export default function FlyerStudio() {
                             }}
                           />
                         )}
+
+                        {/* ─── DRAWING SVG OVERLAY ─────────────────────────── */}
+                        {drawMode && (
+                          <svg
+                            ref={svgDrawRef}
+                            style={{ position: 'absolute', top: 0, left: 0, width: selectedSize.w, height: selectedSize.h, zIndex: 50, cursor: 'crosshair', userSelect: 'none' }}
+                            onMouseDown={e => {
+                              const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
+                              const sx = selectedSize.w / rect.width, sy = selectedSize.h / rect.height;
+                              const x = (e.clientX - rect.left) * sx, y = (e.clientY - rect.top) * sy;
+                              drawingRef.current = { active: true, startX: x, startY: y };
+                              setDrawPreviewLine({ x1: x, y1: y, x2: x, y2: y });
+                            }}
+                            onMouseMove={e => {
+                              if (!drawingRef.current.active) return;
+                              const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
+                              const sx = selectedSize.w / rect.width, sy = selectedSize.h / rect.height;
+                              const x = (e.clientX - rect.left) * sx, y = (e.clientY - rect.top) * sy;
+                              setDrawPreviewLine(prev => prev ? { ...prev, x2: x, y2: y } : null);
+                            }}
+                            onMouseUp={e => {
+                              if (!drawingRef.current.active) return;
+                              const rect = (e.currentTarget as SVGSVGElement).getBoundingClientRect();
+                              const sx = selectedSize.w / rect.width, sy = selectedSize.h / rect.height;
+                              const x2 = (e.clientX - rect.left) * sx, y2 = (e.clientY - rect.top) * sy;
+                              const { startX: x1, startY: y1 } = drawingRef.current;
+                              if (Math.hypot(x2 - x1, y2 - y1) > 8) {
+                                setDrawLines(prev => [...prev, { x1, y1, x2, y2, color: drawColor, width: drawWidth, arrow: drawArrow }]);
+                              }
+                              drawingRef.current.active = false;
+                              setDrawPreviewLine(null);
+                            }}
+                            onMouseLeave={() => { drawingRef.current.active = false; setDrawPreviewLine(null); }}
+                          >
+                            <defs>
+                              {[...new Set([drawColor, ...drawLines.map((l) => l.color)])].map(c => (
+                                <marker key={c} id={`arr-${c.replace('#','')}`} markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                                  <path d="M0,0 L0,6 L8,3 z" fill={c} />
+                                </marker>
+                              ))}
+                            </defs>
+                            {drawLines.map((l, i) => (
+                              <line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2}
+                                stroke={l.color} strokeWidth={l.width} strokeLinecap="round"
+                                markerEnd={l.arrow ? `url(#arr-${l.color.replace('#','')})` : undefined}
+                                style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))' }}
+                              />
+                            ))}
+                            {drawPreviewLine && (
+                              <line x1={drawPreviewLine.x1} y1={drawPreviewLine.y1} x2={drawPreviewLine.x2} y2={drawPreviewLine.y2}
+                                stroke={drawColor} strokeWidth={drawWidth} strokeLinecap="round" strokeDasharray="12 6" opacity="0.75"
+                                markerEnd={drawArrow ? `url(#arr-${drawColor.replace('#','')})` : undefined}
+                              />
+                            )}
+                          </svg>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1437,8 +1585,26 @@ export default function FlyerStudio() {
         {(() => {
           // Template renders at exact target dimensions — no scaling needed for export
           return (
-            <div ref={flyerRef} style={{ width: selectedSize.w, height: selectedSize.h, overflow: 'hidden' }}>
+            <div ref={flyerRef} style={{ width: selectedSize.w, height: selectedSize.h, overflow: 'hidden', position: 'relative' }}>
               <RenderFlyer d={{ ...flyerData, containerW: selectedSize.w, containerH: selectedSize.h }} />
+              
+              {/* STATIC SVG OVERLAY FOR EXPORT */}
+              <svg style={{ position: 'absolute', top: 0, left: 0, width: selectedSize.w, height: selectedSize.h, pointerEvents: 'none' }}>
+                <defs>
+                  {[...new Set(drawLines.map(l => l.color))].map(c => (
+                    <marker key={c} id={`export-arr-${c.replace('#','')}`} markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                      <path d="M0,0 L0,6 L8,3 z" fill={c} />
+                    </marker>
+                  ))}
+                </defs>
+                {drawLines.map((l, i) => (
+                  <line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2}
+                    stroke={l.color} strokeWidth={l.width} strokeLinecap="round"
+                    markerEnd={l.arrow ? `url(#export-arr-${l.color.replace('#','')})` : undefined}
+                    style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))' }}
+                  />
+                ))}
+              </svg>
             </div>
           );
         })()}

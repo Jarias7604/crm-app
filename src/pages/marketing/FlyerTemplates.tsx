@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 
 // ─── TIPOS ────────────────────────────────────────────────────────────────────
 export interface FlyerData {
@@ -75,25 +75,28 @@ const PillBtn = ({ label, bg1, bg2, color = '#fff', style = {}, s = 1 }: {
 );
 
 const BenRow = ({ text, color, s = 1, scale = 1, bold = false }: { text: string; color: string; s?: number; scale?: number; bold?: boolean }) => {
-  const maxChars = Math.max(12, Math.floor(30 / scale));
+  // Dynamically shrink font as text grows longer so everything fits
+  const len = (text || '').length;
+  const dynScale = len > 40 ? scale * 0.82 : len > 25 ? scale * 0.91 : scale;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(10 * s), marginBottom: Math.round(6 * s), overflow: 'hidden' }}>
-      <div style={{ width: Math.round(22 * s), height: Math.round(22 * s), borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: Math.round(10 * s), marginBottom: Math.round(6 * s) }}>
+      <div style={{ width: Math.round(22 * s), height: Math.round(22 * s), borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
         <svg width={Math.round(12 * s)} height={Math.round(12 * s)} viewBox="0 0 12 12" fill="none"><path d="M2 6.5L4.8 9.5L10 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
       </div>
-      <span style={{ fontSize: Math.round(13 * s * scale), fontWeight: bold ? 800 : 600, color: '#fff', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{trunc(text, maxChars)}</span>
+      <span style={{ fontSize: Math.round(13 * s * dynScale), fontWeight: bold ? 800 : 600, color: '#fff', lineHeight: 1.35, wordBreak: 'break-word' }}>{text || ''}</span>
     </div>
   );
 };
 
 const BenRowDark = ({ text, color, s = 1, scale = 1, bold = false }: { text: string; color: string; s?: number; scale?: number; bold?: boolean }) => {
-  const maxChars = Math.max(12, Math.floor(30 / scale));
+  const len = (text || '').length;
+  const dynScale = len > 40 ? scale * 0.82 : len > 25 ? scale * 0.91 : scale;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: Math.round(10 * s), marginBottom: Math.round(8 * s), overflow: 'hidden' }}>
-      <div style={{ width: Math.round(22 * s), height: Math.round(22 * s), borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: Math.round(10 * s), marginBottom: Math.round(8 * s) }}>
+      <div style={{ width: Math.round(22 * s), height: Math.round(22 * s), borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
         <svg width={Math.round(12 * s)} height={Math.round(12 * s)} viewBox="0 0 12 12" fill="none"><path d="M2 6.5L4.8 9.5L10 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
       </div>
-      <span style={{ fontSize: Math.round(13 * s * scale), fontWeight: bold ? 800 : 600, color: '#334155', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{trunc(text, maxChars)}</span>
+      <span style={{ fontSize: Math.round(13 * s * dynScale), fontWeight: bold ? 800 : 600, color: '#334155', lineHeight: 1.35, wordBreak: 'break-word' }}>{text || ''}</span>
     </div>
   );
 };
