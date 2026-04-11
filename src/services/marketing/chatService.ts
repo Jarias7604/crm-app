@@ -123,12 +123,21 @@ export const chatService = {
         if (error) throw error;
 
         // 3. PROACTIVE DISPATCH (Reliability Fix)
-        // Instead of waiting for database triggers which can be slow or blocked,
-        // we proactively notify the delivery service.
+        // Detect channel and dispatch to correct delivery service
         if (direction === 'outbound') {
-            supabase.functions.invoke('send-telegram-message', {
-                body: { record: msg }
-            }).catch(error => console.error('Error in proactive dispatch:', error));
+            // Look up the channel for this conversation to route correctly
+            supabase.from('marketing_conversations')
+                .select('channel')
+                .eq('id', conversationId)
+                .single()
+                .then(({ data: conv }) => {
+                    const channel = conv?.channel || 'telegram';
+                    const fnName = channel === 'whatsapp' ? 'send-whatsapp-message' : 'send-telegram-message';
+                    supabase.functions.invoke(fnName, {
+                        body: { record: msg }
+                    }).catch(error => console.error(`Error dispatching to ${fnName}:`, error));
+                })
+                .catch(error => console.error('Error detecting channel:', error));
         }
 
         return msg as ChatMessage;
