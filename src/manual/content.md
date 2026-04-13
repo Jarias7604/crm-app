@@ -27,7 +27,19 @@ El módulo de Leads es el corazón del CRM. Gestiona la captura, deduplicación 
 
 ---
 
-## 2. Módulo de Ventas / Oportunidades
+## 2. Módulo de Clientes (Cartera Ganada)
+
+### Descripción
+A diferencia de los Leads (prospectos en proceso), el módulo de Clientes gestiona el portafolio exclusivo de cuentas que ya han cerrado exitosamente una negociación.
+
+### Funcionalidades clave
+- **Perfil Integral:** Agrupa el historial de cotizaciones aceptadas, seguimientos post-venta y documentación final.
+- **Transición Inteligente:** Al mover un Lead a una etapa final (ej. "Cerrado Ganado"), la información comercial se consolida para gestión pasiva.
+- **Acceso Controlado:** Por el nivel de confidencialidad, este módulo está restringido por defecto. Los colaboradores necesitan recibir el permiso "Ver Clientes" y "Editar Clientes" explícitamente desde la Matriz de Seguridad.
+
+---
+
+## 3. Módulo de Ventas / Oportunidades
 
 ### Descripción
 El módulo de Ventas muestra el pipeline completo de oportunidades activas, métricas de rendimiento y pronósticos de ingresos.
@@ -93,24 +105,20 @@ Planifica y ejecuta campañas masivas de marketing por múltiples canales con an
 
 ---
 
-## 6. Administración y Seguridad
+## 7. Matriz de Seguridad y Permisos Avanzados
 
 ### Descripción
-Panel de control para gestionar usuarios, roles, permisos y configuración general del sistema.
-
-![Vista general del módulo de Administración](/manual/assets/admin_overview.png)
+Panel de control estratégico para crear perfiles de puesto y determinar con precisión a qué datos de la empresa puede acceder cada colaborador.
 
 ### Funcionalidades clave
-- **RBAC (Control de acceso basado en roles):** Admin empresa, Agente, Supervisor.
-- **Matriz de permisos granular** por módulo y acción.
-- **Registro de auditoría** con historial de cambios por usuario.
-- **Gestión multi-empresa** (multi-tenant): cada empresa ve únicamente sus datos.
-- **Configuración de pipeline:** etapas personalizadas con colores e iconos.
-- **Flags de funcionalidades** para activar/desactivar módulos por empresa.
+- **RBAC (Roles Personalizados):** Permite crear nombramientos únicos como "Agente Call Center" o "Supervisor Regional".
+- **Permisos Explícitos:** Configuración granular de lectura y escritura por módulo (Ej: Impedir exportación a Excel, o habilitar módulo "Clientes" solo a gerentes).
+- **Supremacía de Permisos:** Si el Administrador aprueba una capacidad desde la "Matriz de Permisos", el usuario tendrá acceso garantizado, sobrepasando los bloqueos por defecto del software.
+- **Aplicación Instantánea:** Los cambios de rol se propagan inmediatamente a la sesión del usuario conectado.
 
 ---
 
-## 7. Calendario y Gestión de Citas
+## 8. Calendario y Gestión de Citas
 
 ### Descripción
 El módulo de Calendario te permite visualizar, agendar y organizar todas las reuniones, recordatorios y compromisos vinculados a tus clientes o prospectos. Todo evento está enlazado directamente al perfil del usuario.
@@ -160,8 +168,8 @@ Abre el detalle del lead y en el campo **Asignado a**, selecciona el agente dese
 ### ¿Cómo genero una cotización desde un lead?
 Dentro del detalle del lead, haz clic en **Crear Cotización**. El motor de cotizaciones se abrirá con los datos del lead precargados.
 
-### ¿Cómo configuro las etapas del pipeline?
-Ve a **Admin → Pipeline** y arrastra las etapas para reordenarlas, edita sus nombres y colores, o crea nuevas etapas según tu proceso comercial.
+### ¿Cómo configuro las etapas del pipeline o revierto un Lead?
+Ve a **Admin → Pipeline** y arrastra las etapas para reordenarlas, edita sus nombres y marca hitos importantes. En el Tablero visual, los agentes también pueden utilizar el botón **"Revertir"** para regresar un Lead a la etapa anterior si hubo equivocaciones o re-negociaciones.
 
 ### ¿Los datos de cada empresa están separados?
 Sí. El sistema es **multi-tenant** con aislamiento completo por Row Level Security (RLS) en la base de datos. Cada empresa ve únicamente sus propios datos.

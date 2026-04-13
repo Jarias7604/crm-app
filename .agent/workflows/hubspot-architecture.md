@@ -22,5 +22,5 @@ description: Pendientes priorizados del CRM — retomar en próxima sesión
 5. **Expansión de Conocimiento:** Se crearon capítulos nuevos directamente en `content.md` sobre "Calendario", "Telegram (Fase 8d)" y "Webhooks Meta". El bot memorizó esto al instante sin requerir entrenamiento.
 
 **Siguiente Reto en la Próxima Sesión:**
-- **Pipeline:** Implementar el "Botón para revertir etapa de Lead" o "Notificaciones de Telegram (Phase 8d)", considerando que la migración SQL `phase8d` ya se ejecutó exitosamente.
-- Seguir enriqueciendo `content.md` con nuevos módulos conforme se liberen nuevas versiones del CRM.
+- **Manual del Usuario:** Seguir enriqueciendo `content.md` con nuevos módulos conforme se liberen nuevas versiones del CRM. Específicamente agregar capítulos para el Módulo de Clientes, Pipeline y Permisos.
+*(Nota: Pipeline revertir etapa, notificaciones Telegram y estabilización de build ya fueron resueltos en sesiones anteriores).*
