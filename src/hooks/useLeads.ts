@@ -3,13 +3,17 @@ import { queryKeys } from '../lib/queryClient';
 import { leadsService } from '../services/leads';
 import { logger } from '../utils/logger';
 import toast from 'react-hot-toast';
+import { useAuth } from '../auth/AuthProvider';
 
 /**
  * Hook to fetch paginated leads with automatic caching
  */
 export function useLeads(page = 1, pageSize = 50) {
+    const { profile } = useAuth();
+    const companyId = profile?.company_id || '';
+
     return useQuery({
-        queryKey: queryKeys.leads.list(page, pageSize),
+        queryKey: queryKeys.leads.list(companyId, page, pageSize),
         queryFn: async () => {
             logger.debug('Fetching leads', { page, pageSize });
             return leadsService.getLeads(page, pageSize);
@@ -22,8 +26,11 @@ export function useLeads(page = 1, pageSize = 50) {
  * Hook to fetch team members
  */
 export function useTeamMembers() {
+    const { profile } = useAuth();
+    const companyId = profile?.company_id || '';
+
     return useQuery({
-        queryKey: queryKeys.team.members(),
+        queryKey: queryKeys.team.members(companyId),
         queryFn: async () => {
             logger.debug('Fetching team members');
             return leadsService.getTeamMembers();
@@ -36,8 +43,11 @@ export function useTeamMembers() {
  * Hook to fetch follow-ups for a specific lead
  */
 export function useFollowUps(leadId: string) {
+    const { profile } = useAuth();
+    const companyId = profile?.company_id || '';
+
     return useQuery({
-        queryKey: queryKeys.leads.followUps(leadId),
+        queryKey: queryKeys.leads.followUps(companyId, leadId),
         queryFn: async () => {
             logger.debug('Fetching follow-ups', { leadId });
             return leadsService.getFollowUps(leadId);
@@ -52,12 +62,14 @@ export function useFollowUps(leadId: string) {
  */
 export function useCreateLead() {
     const queryClient = useQueryClient();
+    const { profile } = useAuth();
+    const companyId = profile?.company_id || '';
 
     return useMutation({
         mutationFn: leadsService.createLead,
         onSuccess: () => {
             // Invalidate leads list to refetch
-            queryClient.invalidateQueries({ queryKey: queryKeys.leads.all });
+            queryClient.invalidateQueries({ queryKey: queryKeys.leads.all(companyId) });
             toast.success('Nuevo lead creado');
         },
         onError: (error: any) => {
@@ -72,14 +84,16 @@ export function useCreateLead() {
  */
 export function useUpdateLead() {
     const queryClient = useQueryClient();
+    const { profile } = useAuth();
+    const companyId = profile?.company_id || '';
 
     return useMutation({
         mutationFn: ({ id, updates }: { id: string; updates: any }) =>
             leadsService.updateLead(id, updates),
         onSuccess: (_, variables) => {
             // Invalidate specific lead and list
-            queryClient.invalidateQueries({ queryKey: queryKeys.leads.detail(variables.id) });
-            queryClient.invalidateQueries({ queryKey: queryKeys.leads.all });
+            queryClient.invalidateQueries({ queryKey: queryKeys.leads.detail(companyId, variables.id) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.leads.all(companyId) });
         },
         onError: (error: any) => {
             logger.error('Failed to update lead', error, { action: 'useUpdateLead' });
@@ -93,12 +107,14 @@ export function useUpdateLead() {
  */
 export function useDeleteLead() {
     const queryClient = useQueryClient();
+    const { profile } = useAuth();
+    const companyId = profile?.company_id || '';
 
     return useMutation({
         mutationFn: leadsService.deleteLead,
         onSuccess: () => {
             // Invalidate leads list
-            queryClient.invalidateQueries({ queryKey: queryKeys.leads.all });
+            queryClient.invalidateQueries({ queryKey: queryKeys.leads.all(companyId) });
             toast.success('Lead eliminado correctamente');
         },
         onError: (error: any) => {
@@ -113,11 +129,13 @@ export function useDeleteLead() {
  */
 export function useImportLeads() {
     const queryClient = useQueryClient();
+    const { profile } = useAuth();
+    const companyId = profile?.company_id || '';
 
     return useMutation({
         mutationFn: leadsService.importLeads,
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: queryKeys.leads.all });
+            queryClient.invalidateQueries({ queryKey: queryKeys.leads.all(companyId) });
             toast.success('Leads importados correctamente');
         },
         onError: (error: any) => {

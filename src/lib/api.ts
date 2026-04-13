@@ -40,7 +40,7 @@ export async function sendMessage(query: string) {
     // Parse the entire manual into sections based on headers
     const sections = manualContent.split(/(?=\n## |\n# )/g);
     
-    let bestSection = null;
+    let bestSection: string | null = null;
     let maxScore = 0;
 
     for (const section of sections) {

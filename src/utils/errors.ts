@@ -3,18 +3,25 @@
  */
 
 export class AppError extends Error {
+    code: string;
+    statusCode: number;
+    context?: Record<string, any>;
+
     constructor(
         message: string,
-        public code: string,
-        public statusCode: number = 500,
-        public context?: Record<string, any>
+        code: string,
+        statusCode: number = 500,
+        context?: Record<string, any>
     ) {
         super(message);
+        this.code = code;
+        this.statusCode = statusCode;
+        this.context = context;
         this.name = 'AppError';
 
         // Maintains proper stack trace for where our error was thrown (only available on V8)
-        if (Error.captureStackTrace) {
-            Error.captureStackTrace(this, AppError);
+        if (typeof (Error as any).captureStackTrace === 'function') {
+            (Error as any).captureStackTrace(this, AppError);
         }
     }
 }

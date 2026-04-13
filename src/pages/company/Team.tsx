@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { teamService, type Invitation } from '../../services/team';
-import type { Profile, CustomRole } from '../../types';
+import type { Profile, CustomRole, Role } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, Users, Lock, FileText, Tag, Package, Layers, Building, CreditCard, XCircle, KeyRound, Copy, History, AlertCircle, Send } from 'lucide-react';
@@ -113,9 +113,9 @@ export default function Team() {
             return;
         }
 
-        // Graceful fallback: if no custom roles, use 'sales_agent' as base role (valid app_role enum)
+        // Graceful fallback: if no custom roles, use 'collaborator' as base role (valid app_role enum)
         const selectedRole = customRoles.find(r => r.id === formData.customRoleId);
-        const baseRole = selectedRole?.base_role || 'sales_agent';
+        const baseRole = selectedRole?.base_role || 'collaborator';
         const customRoleId = selectedRole?.id || null;
 
         setIsCreating(true);
@@ -125,9 +125,9 @@ export default function Team() {
                 password: formData.password,
                 fullName: formData.fullName,
                 phone: formData.phone,
-                role: baseRole,
+                role: baseRole as Role,
                 companyId: myProfile.company_id,
-                customRoleId: customRoleId,
+                customRoleId: customRoleId || undefined,
                 birthDate: formData.birthDate,
                 address: formData.address
             });
@@ -408,9 +408,9 @@ export default function Team() {
                                                             password: tempPwd,
                                                             fullName: formData.fullName,
                                                             phone: formData.phone,
-                                                            role: selectedRole?.base_role || 'sales_agent',
+                                                            role: (selectedRole?.base_role as Role) || 'collaborator',
                                                             companyId: myProfile!.company_id!,
-                                                            customRoleId: selectedRole?.id || formData.customRoleId,
+                                                            customRoleId: selectedRole?.id || formData.customRoleId || undefined,
                                                             birthDate: formData.birthDate,
                                                             address: formData.address
                                                         });

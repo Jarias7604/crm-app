@@ -50,12 +50,7 @@ export default function LeadHunter() {
         }
     };
 
-    // Check if website has a real domain usable for email (not social media/listings)
-    const hasEmailableDomain = (website?: string) => {
-        if (!website) return false;
-        const excluded = ['facebook.com', 'google.com', 'yelp.com', 'instagram.com', 'twitter.com', 'tiktok.com', 'youtube.com', 'linkedin.com', 'tripadvisor.com', 'maps.google'];
-        return !excluded.some(domain => website.toLowerCase().includes(domain));
-    };
+
 
     // Apply client-side filtering
     const filteredResults = useMemo(() => {

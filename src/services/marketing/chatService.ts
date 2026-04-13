@@ -126,18 +126,30 @@ export const chatService = {
         // Detect channel and dispatch to correct delivery service
         if (direction === 'outbound') {
             // Look up the channel for this conversation to route correctly
-            supabase.from('marketing_conversations')
-                .select('channel')
-                .eq('id', conversationId)
-                .single()
-                .then(({ data: conv }) => {
+            (async () => {
+                try {
+                    const { data: conv, error: convError } = await supabase.from('marketing_conversations')
+                        .select('channel')
+                        .eq('id', conversationId)
+                        .single();
+                        
+                    if (convError) throw convError;
+
                     const channel = conv?.channel || 'telegram';
                     const fnName = channel === 'whatsapp' ? 'send-whatsapp-message' : 'send-telegram-message';
-                    supabase.functions.invoke(fnName, {
-                        body: { record: msg }
-                    }).catch(error => console.error(`Error dispatching to ${fnName}:`, error));
-                })
-                .catch(error => console.error('Error detecting channel:', error));
+                    
+                    try {
+                        const { error: fnError } = await supabase.functions.invoke(fnName, {
+                            body: { record: msg }
+                        });
+                        if (fnError) throw fnError;
+                    } catch (err: any) {
+                        console.error(`Error dispatching to ${fnName}:`, err);
+                    }
+                } catch (err: any) {
+                    console.error('Error detecting channel:', err);
+                }
+            })();
         }
 
         return msg as ChatMessage;

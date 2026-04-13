@@ -163,12 +163,6 @@ export const RenderFlyer = ({ d, onLogoMove, onLogoResize }: {
   );
 };
 
-const Tag = ({ label, bg, color, s = 1 }: { label: string; bg: string; color: string; s?: number }) => (
-  <div style={{ background: bg, color, fontSize: Math.round(11 * s), fontWeight: 800, padding: `${Math.round(4 * s)}px ${Math.round(14 * s)}px`, borderRadius: Math.round(20 * s), letterSpacing: '0.06em', display: 'inline-block' }}>
-    {label.toUpperCase()}
-  </div>
-);
-
 // ═══════════════════════════════════════════════════════════════
 // TEMPLATE 1: BOLD SPLIT — color panel left, photo right
 // ═══════════════════════════════════════════════════════════════

@@ -530,7 +530,7 @@ export default function CallBot() {
                                 <div className={`flex-none px-3 py-2 rounded-xl border text-xs font-bold ${color} w-48 text-center`}>{label}</div>
                                 <ArrowRight className="w-4 h-4 text-gray-300 flex-none" />
                                 <select
-                                    value={(config.outcome_mapping as Record<string, string>)[key] || ''}
+                                    value={(config.outcome_mapping as unknown as Record<string, string>)[key] || ''}
                                     onChange={e => upd('outcome_mapping', { ...config.outcome_mapping, [key]: e.target.value })}
                                     className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm font-bold focus:ring-2 focus:ring-violet-400 transition"
                                 >

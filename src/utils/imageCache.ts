@@ -107,6 +107,13 @@ class ImageCacheManager {
   }
 
   /**
+   * Load multiple images in parallel
+   */
+  async loadImagesParallel(urls: string[]): Promise<(string | null)[]> {
+    return Promise.all(urls.map((url) => this.loadImage(url)));
+  }
+
+  /**
    * Clear entire cache
    */
   clearCache(): void {

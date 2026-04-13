@@ -56,7 +56,7 @@ export function detectPreferredChannel(lead: any): 'email' | 'whatsapp' | 'teleg
 /**
  * Calcula mejor hora para enviar según timezone
  */
-export function calculateOptimalSendTime(timezone: string = 'America/Costa_Rica'): Date {
+export function calculateOptimalSendTime(_timezone: string = 'America/Costa_Rica'): Date {
     const now = new Date();
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);

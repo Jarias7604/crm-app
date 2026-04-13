@@ -15,7 +15,7 @@
  *  // → automáticamente agrega .eq('company_id', companyId)
  */
 
-import { supabase } from '@/lib/supabase';
+import { supabase } from '../services/supabase';
 
 // Tablas que NO necesitan company_id (son globales o del sistema)
 const EXEMPT_TABLES = new Set([

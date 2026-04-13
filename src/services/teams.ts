@@ -145,7 +145,7 @@ export const teamsService = {
         }));
 
         // Leader profile
-        let leader = null;
+        let leader: { id: string; full_name: string | null; email: string; avatar_url: string | null } | null = null;
         if (team.leader_id) {
             const { data: leaderProfile } = await supabase
                 .from('profiles')

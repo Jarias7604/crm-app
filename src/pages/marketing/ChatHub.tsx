@@ -127,7 +127,7 @@ export default function ChatHub() {
         }
 
         // Find best candidate
-        let candidate = null;
+        let candidate: ChatConversation | undefined = undefined;
         if (stateConvId && stateConvId !== 'new') {
             candidate = conversations.find(c => c.id === stateConvId);
         }

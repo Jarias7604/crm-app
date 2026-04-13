@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
-import { Save, Send, ArrowLeft, Users, FileText, Eye, X, Zap, Building2 } from 'lucide-react';
+import { ArrowLeft, Users, FileText, Eye, X, Zap } from 'lucide-react';
 import { campaignService } from '../../services/marketing/campaignService';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../auth/AuthProvider';
 import { STATUS_CONFIG, type LeadStatus } from '../../types';
 import RichTextEditor from '../../components/marketing/RichTextEditor';
+import { cn } from '../../lib/utils';
 
 export default function EmailBuilder() {
     const { profile } = useAuth();

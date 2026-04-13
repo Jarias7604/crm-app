@@ -5,7 +5,6 @@ import {
     Zap,
     Settings,
     Bot,
-    ExternalLink,
     Users,
     DollarSign,
     Target,
@@ -214,7 +213,7 @@ export default function MarketingDashboard() {
     );
 }
 
-function CompactStatCard({ title, value, trend, trendUp, icon: Icon, desc }: any) {
+function CompactStatCard({ title, value, trend, icon: Icon, desc }: any) {
     return (
         <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm group hover:border-indigo-100 transition-all">
             <div className="flex justify-between items-start mb-2">

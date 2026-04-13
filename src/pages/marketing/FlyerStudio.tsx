@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Download, Sparkles, Palette, Phone, Globe, ChevronRight, ChevronDown, Search, Loader2, ImageIcon, RefreshCw, Upload, Monitor, Pen, Trash2, Undo2 } from 'lucide-react';
+import { ArrowLeft, Download, Sparkles, Palette, Phone, ChevronRight, ChevronDown, Search, Loader2, ImageIcon, RefreshCw, Upload, Monitor, Pen, Trash2, Undo2 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../services/supabase';
 import { flyerService } from '../../services/flyerService';
@@ -59,7 +59,6 @@ export default function FlyerStudio() {
   const [isLoadingIdeas, setIsLoadingIdeas] = useState(false);
   const [isLoadingImg, setIsLoadingImg]   = useState(false);
   const [isExporting, setIsExporting]   = useState(false);
-  const [exportReady, setExportReady]   = useState<{url: string; filename: string} | null>(null);
 
   // Step 1 — form
   const [industries, setIndustries] = useState<Array<{id:string;name:string}>>([]);
@@ -97,7 +96,6 @@ export default function FlyerStudio() {
   const [drawArrow, setDrawArrow]         = useState(true);
   const drawingRef = useRef<{ active: boolean; startX: number; startY: number }>({ active: false, startX: 0, startY: 0 });
   const svgDrawRef = useRef<SVGSVGElement>(null);
-  const drawPreviewRef = useRef<{ x2: number; y2: number } | null>(null);
   const [drawPreviewLine, setDrawPreviewLine] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
 
   // Close dropdowns on outside click
@@ -312,10 +310,10 @@ export default function FlyerStudio() {
       industria: selectedIndustries[0] || selectedIndustries.join(', '),
     }));
     setStep(3);
-    await generateImage(idea, accent);
+    await generateImage(idea);
   };
 
-  const generateImage = async (idea: FlyerIdea, accent: string) => {
+  const generateImage = async (idea: FlyerIdea) => {
     setIsLoadingImg(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -858,10 +856,9 @@ export default function FlyerStudio() {
                   </div>
                   {/* Content */}
                   <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    {/* ── AI MODE ── */}
                     {photoMode === 'ai' && (
                       <button
-                        onClick={() => generateImage({ titulo: flyerData.title, gancho: flyerData.subtitle, beneficios: flyerData.beneficios, cta: flyerData.cta, paleta: [flyerData.accent], tono }, flyerData.accent)}
+                        onClick={() => generateImage({ titulo: flyerData.title, gancho: flyerData.subtitle, beneficios: flyerData.beneficios, cta: flyerData.cta, paleta: [flyerData.accent], tono })}
                         disabled={isLoadingImg}
                         style={{ width: '100%', background: isLoadingImg ? '#f8fafc' : '#fff', color: '#374151', border: '1.5px solid #e2e8f0', borderRadius: 10, padding: '11px 16px', fontSize: 12, fontWeight: 700, cursor: isLoadingImg ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.15s' }}>
                         <RefreshCw size={14} className={isLoadingImg ? 'animate-spin' : ''} />
