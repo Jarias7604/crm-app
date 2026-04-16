@@ -425,6 +425,7 @@ export const csvHelper = {
                                     while (match = regex.exec(row)) {
                                         let val = match[2] !== undefined ? match[2].replace(/""/g, '"') : match[3];
                                         values.push((val || '').trim());
+                                        if (match.index === regex.lastIndex) regex.lastIndex++; // FIJA EL BUCLE INFINITO
                                     }
 
                                     const lead: any = {};
