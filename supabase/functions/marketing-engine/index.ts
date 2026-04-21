@@ -156,8 +156,9 @@ Deno.serve(async (req) => {
 
         // Fetch Resend sender details
         let senderName = "CRM Marketing";
-        let senderEmail = "marketing@ariasdefense.com";
+        let senderEmail = "ventas@ariasdefense.com";
 
+        // 1. Check if tenant has their own Resend integration
         const { data: resendIntegration } = await supabase
             .from('marketing_integrations')
             .select('settings')
@@ -166,18 +167,35 @@ Deno.serve(async (req) => {
             .eq('is_active', true)
             .maybeSingle();
 
-        // PRIORITIZE Database API Key
-        let resendToken = Deno.env.get("RESEND_API_KEY");
-        if (resendIntegration?.settings?.apiKey) {
-            resendToken = resendIntegration.settings.apiKey;
+        // 2. Fallback: use platform (Arias Defense) Resend config for tenants without own config
+        let platformResendIntegration = null;
+        if (!resendIntegration) {
+            const { data: platformIntegration } = await supabase
+                .from('marketing_integrations')
+                .select('settings')
+                .eq('company_id', '7a582ba5-f7d0-4ae3-9985-35788deb1c30') // Arias Defense - platform owner
+                .eq('provider', 'resend')
+                .eq('is_active', true)
+                .maybeSingle();
+            platformResendIntegration = platformIntegration;
         }
 
-        if (resendIntegration?.settings?.senderName) {
-            senderName = resendIntegration.settings.senderName;
+        // 3. Use tenant config if available, otherwise platform fallback
+        const activeResend = resendIntegration || platformResendIntegration;
+
+        let resendToken = Deno.env.get("RESEND_API_KEY");
+        if (activeResend?.settings?.apiKey) {
+            resendToken = activeResend.settings.apiKey;
         }
-        if (resendIntegration?.settings?.senderEmail) {
-            senderEmail = resendIntegration.settings.senderEmail;
+
+        if (activeResend?.settings?.senderName) {
+            senderName = activeResend.settings.senderName;
         }
+        if (activeResend?.settings?.senderEmail) {
+            senderEmail = activeResend.settings.senderEmail;
+        }
+
+        console.log(`[Marketing-Engine] Email sender: ${senderEmail} (${resendIntegration ? 'tenant config' : 'platform fallback'})`);
 
         const fromDisplay = `${senderName} <${senderEmail}>`;
 
