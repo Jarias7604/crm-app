@@ -233,32 +233,27 @@ export default function Team() {
         }
     };
 
-    const callResetFunction = async (body: object) => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) throw new Error('No hay sesión activa');
-        const response = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-reset-password`,
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session.access_token}`,
-                    'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-                },
-                body: JSON.stringify(body)
-            }
-        );
-        const result = await response.json();
-        if (!response.ok || result.error) throw new Error(result.error || 'Error desconocido');
-        return result;
-    };
-
-    // Opción A: Enviar link de reset por email (recomendado si tiene correo)
+    // Opción A: Enviar link de reset por email
     const handleSendEmailLink = async () => {
         if (!editingMember) return;
         setIsSendingEmailLink(true);
         try {
-            await callResetFunction({ target_user_id: editingMember.id, mode: 'email_link' });
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error('No hay sesión activa. Por favor cierra sesión y vuelve a entrar.');
+            const response = await fetch(
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-reset-password`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session.access_token}`,
+                        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                    },
+                    body: JSON.stringify({ target_user_id: editingMember.id, mode: 'email_link' })
+                }
+            );
+            const result = await response.json();
+            if (!response.ok || result.error) throw new Error(result.error || 'Error desconocido');
             toast.success(`📧 Enlace enviado al correo de ${editingMember.full_name?.split(' ')[0]}. El usuario puede crear su propia contraseña.`, { duration: 8000 });
             setShowPasswordPanel(false);
             loadPasswordResetLog(editingMember.id);
@@ -269,7 +264,7 @@ export default function Team() {
         }
     };
 
-    // Opción B: Establecer contraseña directamente (para usuarios sin correo)
+    // Opción B: Establecer contraseña directamente usando RPC de base de datos
     const handleSaveNewPassword = async () => {
         if (!editingMember || !newPassword || newPassword.length < 6) {
             toast.error('La contraseña debe tener al menos 6 caracteres.');
@@ -277,7 +272,12 @@ export default function Team() {
         }
         setIsResettingPassword(true);
         try {
-            await callResetFunction({ target_user_id: editingMember.id, new_password: newPassword, mode: 'direct' });
+            const { data, error } = await supabase.rpc('admin_reset_user_password', {
+                target_user_id: editingMember.id,
+                new_password: newPassword
+            });
+            if (error) throw error;
+            if (data && !data.success) throw new Error(data.error || 'Error desconocido');
             toast.success(`✅ ¡${editingMember.full_name?.split(' ')[0]} ya puede ingresar con la nueva contraseña!`, { duration: 6000 });
             setShowPasswordPanel(false);
             setNewPassword('');
