@@ -223,20 +223,16 @@ export default function MarketingSettings() {
                         {activeTab === 'email' && (
                             <>
                                 <ProviderButton
-                                    icon={Mail} color="text-red-600 bg-red-50"
-                                    title="Gmail / Workspace" desc="Para uso personal o PyMEs."
-                                    onClick={() => setSelectedProvider('gmail')}
-                                />
-                                <ProviderButton
-                                    icon={Server} color="text-gray-900 bg-gray-100"
-                                    title="Resend / API" desc="Alto rendimiento y volumen."
+                                    icon={Server} color="text-blue-600 bg-blue-50"
+                                    title="Resend — Email Profesional"
+                                    desc="Configura tu dominio y remitente. Sin configuración, el CRM usa el email de la plataforma automáticamente."
                                     onClick={() => setSelectedProvider('resend')}
                                 />
-                                <ProviderButton
-                                    icon={Cloud} color="text-blue-600 bg-blue-50"
-                                    title="Outlook / Exchange" desc="Correo corporativo Microsoft."
-                                    onClick={() => setSelectedProvider('outlook')}
-                                />
+                                <div className="bg-gray-50 border border-dashed border-gray-200 rounded-3xl p-6 flex flex-col items-center justify-center text-center opacity-60">
+                                    <Mail className="w-8 h-8 text-gray-300 mb-3" />
+                                    <h3 className="text-sm font-bold text-gray-400">Gmail / Outlook</h3>
+                                    <p className="text-xs text-gray-400 mt-1">Próximamente disponible</p>
+                                </div>
                             </>
                         )}
                         {activeTab === 'whatsapp' && (
