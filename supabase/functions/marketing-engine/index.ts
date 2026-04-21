@@ -2,32 +2,29 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers":
-        "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-/**
- * Senior Standard Phone Normalization (E.164)
- * Handles: +503..., 503..., 1..., 7744-3322 (local)
- */
 function normalizePhone(phone: string, defaultCountryCode = '503'): string {
     if (!phone) return "";
-
-    // Remove all non-numeric characters
     let cleaned = phone.replace(/\D/g, "");
-
-    // If it starts with 00, replace with +
-    if (phone.startsWith("00")) {
-        cleaned = cleaned.substring(2);
-    }
-
-    // logic for local numbers (El Salvador specific 8 digits)
-    if (cleaned.length === 8 && defaultCountryCode === '503') {
-        return `+503${cleaned}`;
-    }
-
-    // If it doesn't have a plus, add it
+    if (phone.startsWith("00")) { cleaned = cleaned.substring(2); }
+    if (cleaned.length === 8 && defaultCountryCode === '503') { return `+503${cleaned}`; }
     return `+${cleaned}`;
+}
+
+/**
+ * Injects click tracking into all <a href="..."> links in the HTML.
+ * Replaces original URLs with a tracked redirect URL.
+ */
+function injectClickTracking(html: string, trackingBase: string, messageId: string): string {
+    return html.replace(/<a(\s+[^>]*?)href="([^"]+)"([^>]*?)>/gi, (_match, before, href, after) => {
+        if (href.startsWith('mailto:') || href.startsWith('#') || href.includes(trackingBase)) {
+            return _match; // Skip mailto, anchors, and already-tracked links
+        }
+        const trackedUrl = `${trackingBase}?type=click&mid=${messageId}&url=${encodeURIComponent(href)}`;
+        return `<a${before}href="${trackedUrl}"${after}>`;
+    });
 }
 
 Deno.serve(async (req) => {
@@ -38,487 +35,229 @@ Deno.serve(async (req) => {
     try {
         const { campaignId } = await req.json();
 
+        // Security: require a valid Supabase anon key or user token
+        const authHeader = req.headers.get('Authorization') || '';
+        const apiKey = req.headers.get('apikey') || '';
+        if (!authHeader && !apiKey) {
+            return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders });
+        }
+
         const supabase = createClient(
             Deno.env.get("SUPABASE_URL") ?? "",
             Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
         );
 
-        // 1. Fetch Campaign Details
         const { data: campaign, error: campError } = await supabase
-            .from("marketing_campaigns")
-            .select("*")
-            .eq("id", campaignId)
-            .single();
+            .from("marketing_campaigns").select("*").eq("id", campaignId).single();
 
-        if (campError || !campaign) {
-            throw new Error(`Campaign not found: ${campError?.message}`);
-        }
+        if (campError || !campaign) throw new Error(`Campaign not found: ${campError?.message}`);
 
-        // 2. Fetch Audience based on filters
         const filters = campaign.audience_filters || {};
-        let query = supabase
-            .from("leads")
-            .select("id, name, email, phone, priority")
-            .eq("company_id", campaign.company_id);
+        let query = supabase.from("leads").select("id, name, email, phone, priority").eq("company_id", campaign.company_id);
 
         if (filters.specificIds && filters.specificIds.length > 0) {
-            const idField = filters.idType || 'id';
-            query = query.in(idField, filters.specificIds);
+            query = query.in(filters.idType || 'id', filters.specificIds);
         } else {
-            if (filters.status && filters.status.length > 0) {
-                query = query.in("status", filters.status);
-            }
-            if (filters.priority && filters.priority !== 'all') {
-                query = query.eq("priority", filters.priority);
-            }
+            if (filters.status?.length > 0) query = query.in("status", filters.status);
+            if (filters.priority && filters.priority !== 'all') query = query.eq("priority", filters.priority);
             if (filters.dateRange === "new") {
-                const thirtyDaysAgo = new Date();
-                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-                query = query.gte("created_at", thirtyDaysAgo.toISOString());
+                const d = new Date(); d.setDate(d.getDate() - 30);
+                query = query.gte("created_at", d.toISOString());
             }
         }
 
-
-        if (campaign.type === 'email') {
-            query = query.not('email', 'is', null).neq('email', '');
-        }
+        if (campaign.type === 'email') query = query.not('email', 'is', null).neq('email', '');
 
         const { data: leads, error: leadError } = await query;
         if (leadError) throw leadError;
-
         if (!leads || leads.length === 0) {
-            return new Response(JSON.stringify({ message: "No audience found" }), {
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
+            return new Response(JSON.stringify({ message: "No audience found" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
-        // 2b. Smart Audience: Exclude manually deselected leads
         const excludedIds = new Set(filters.excludedIds || []);
-        const afterExclusion = excludedIds.size > 0
-            ? leads.filter(l => !excludedIds.has(l.id))
-            : leads;
+        const afterExclusion = excludedIds.size > 0 ? leads.filter(l => !excludedIds.has(l.id)) : leads;
 
-        // 2c. Senior Idempotency: Exclude already sent leads for this campaign
-        const { data: sentMessages } = await supabase
-            .from('marketing_messages')
-            .select('metadata->lead_id')
-            .eq('metadata->>campaign_id', campaignId);
-
+        const { data: sentMessages } = await supabase.from('marketing_messages').select('metadata->lead_id').eq('metadata->>campaign_id', campaignId);
         const sentLeadIds = new Set(sentMessages?.map(m => m.lead_id) || []);
         const filteredLeads = afterExclusion.filter(l => !sentLeadIds.has(l.id));
 
         if (filteredLeads.length === 0) {
             return new Response(JSON.stringify({
-                success: true,
-                message: "All leads already processed",
+                success: true, message: "All leads already processed",
                 results: { success: 0, failed: 0, total: leads.length, skipped: leads.length }
-            }), {
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
+            }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
-        // 3. Mark as Sending
-        await supabase
-            .from("marketing_campaigns")
-            .update({ status: "sending" })
-            .eq("id", campaignId);
+        await supabase.from("marketing_campaigns").update({ status: "sending" }).eq("id", campaignId);
 
-        // 4. Batch Processing
         const results = { success: 0, failed: 0 };
         const trackingBaseUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/tracking`;
 
-        // Fetch integration settings based on campaign type
         let telegramToken = null;
         let whatsappConfig = null;
 
         if (campaign.type === 'whatsapp') {
-            // Fetch Meta Cloud API credentials for WhatsApp
-            const { data: integration } = await supabase
-                .from('marketing_integrations')
-                .select('settings')
-                .eq('company_id', campaign.company_id)
-                .eq('provider', 'whatsapp')
-                .eq('is_active', true)
-                .maybeSingle();
-
-            whatsappConfig = integration?.settings;
+            const { data: i } = await supabase.from('marketing_integrations').select('settings').eq('company_id', campaign.company_id).eq('provider', 'whatsapp').eq('is_active', true).maybeSingle();
+            whatsappConfig = i?.settings;
         } else if (campaign.type === 'social' || campaign.type === 'telegram') {
-            // Fetch Telegram credentials for social/telegram campaigns
-            const { data: integration } = await supabase
-                .from('marketing_integrations')
-                .select('settings')
-                .eq('company_id', campaign.company_id)
-                .eq('provider', 'telegram')
-                .eq('is_active', true)
-                .maybeSingle();
-            telegramToken = integration?.settings?.token;
+            const { data: i } = await supabase.from('marketing_integrations').select('settings').eq('company_id', campaign.company_id).eq('provider', 'telegram').eq('is_active', true).maybeSingle();
+            telegramToken = i?.settings?.token;
         }
 
-        // Fetch Resend sender details
+        // Email config — platform fallback to Arias Defense if no tenant config
         let senderName = "CRM Marketing";
         let senderEmail = "ventas@ariasdefense.com";
-
-        // 1. Check if tenant has their own Resend integration
-        const { data: resendIntegration } = await supabase
-            .from('marketing_integrations')
-            .select('settings')
-            .eq('company_id', campaign.company_id)
-            .eq('provider', 'resend')
-            .eq('is_active', true)
-            .maybeSingle();
-
-        // 2. Fallback: use platform (Arias Defense) Resend config for tenants without own config
-        let platformResendIntegration = null;
-        if (!resendIntegration) {
-            const { data: platformIntegration } = await supabase
-                .from('marketing_integrations')
-                .select('settings')
-                .eq('company_id', '7a582ba5-f7d0-4ae3-9985-35788deb1c30') // Arias Defense - platform owner
-                .eq('provider', 'resend')
-                .eq('is_active', true)
-                .maybeSingle();
-            platformResendIntegration = platformIntegration;
+        const { data: tenantResend } = await supabase.from('marketing_integrations').select('settings').eq('company_id', campaign.company_id).eq('provider', 'resend').eq('is_active', true).maybeSingle();
+        let platformResend = null;
+        if (!tenantResend) {
+            const { data: pr } = await supabase.from('marketing_integrations').select('settings')
+                .eq('company_id', '7a582ba5-f7d0-4ae3-9985-35788deb1c30') // Arias Defense — platform owner
+                .eq('provider', 'resend').eq('is_active', true).maybeSingle();
+            platformResend = pr;
         }
-
-        // 3. Use tenant config if available, otherwise platform fallback
-        const activeResend = resendIntegration || platformResendIntegration;
-
+        const activeResend = tenantResend || platformResend;
         let resendToken = Deno.env.get("RESEND_API_KEY");
-        if (activeResend?.settings?.apiKey) {
-            resendToken = activeResend.settings.apiKey;
-        }
-
-        if (activeResend?.settings?.senderName) {
-            senderName = activeResend.settings.senderName;
-        }
-        if (activeResend?.settings?.senderEmail) {
-            senderEmail = activeResend.settings.senderEmail;
-        }
-
-        console.log(`[Marketing-Engine] Email sender: ${senderEmail} (${resendIntegration ? 'tenant config' : 'platform fallback'})`);
-
+        if (activeResend?.settings?.apiKey) resendToken = activeResend.settings.apiKey;
+        if (activeResend?.settings?.senderName) senderName = activeResend.settings.senderName;
+        if (activeResend?.settings?.senderEmail) senderEmail = activeResend.settings.senderEmail;
         const fromDisplay = `${senderName} <${senderEmail}>`;
+        console.log(`[Marketing-Engine] Sender: ${senderEmail} (${tenantResend ? 'tenant config' : 'platform fallback'})`);
 
-        // Fetch Template if applicable
         let templateData = null;
         if (campaign.template_id) {
-            const { data } = await supabase
-                .from('marketing_templates')
-                .select('*')
-                .eq('id', campaign.template_id)
-                .maybeSingle();
+            const { data } = await supabase.from('marketing_templates').select('*').eq('id', campaign.template_id).maybeSingle();
             templateData = data;
         }
 
-        console.log(`[Marketing-Engine] Starting batch processing for ${filteredLeads.length} leads.`);
+        console.log(`[Marketing-Engine] Processing ${filteredLeads.length} leads.`);
 
         for (let i = 0; i < filteredLeads.length; i++) {
             const lead = filteredLeads[i];
-            console.log(`[Marketing-Engine] [${i + 1}/${filteredLeads.length}] Processing lead: ${lead.email || lead.phone || lead.id}`);
-
-            // Senior Bulk Pattern: Small delay to avoid slamming APIs and hitting rate limits
             if (i > 0) await new Promise(r => setTimeout(r, 600));
-
             const phone = normalizePhone(lead.phone);
 
             try {
                 const messageId = crypto.randomUUID();
                 let conversationId = null;
-
-                // Professional Variable Substitution: {{name}}, {{first_name}}, {{greeting}}, {{phone}}
                 let localizedContent = campaign.content || '';
 
-                const getGreeting = () => {
-                    // Use a standardized greeting based on server time (UTC-6 for Central America usually)
-                    const hour = new Date().getHours();
-                    if (hour >= 5 && hour < 12) return 'Buenos días';
-                    if (hour >= 12 && hour < 19) return 'Buenas tardes';
-                    return 'Buenas noches';
-                };
-
-                const greeting = getGreeting();
+                const hour = new Date().getHours();
+                const greeting = hour >= 5 && hour < 12 ? 'Buenos días' : hour >= 12 && hour < 19 ? 'Buenas tardes' : 'Buenas noches';
                 const firstName = (lead.name || '').split(' ')[0] || 'Hola';
+                localizedContent = localizedContent
+                    .replace(/{{greeting}}/g, greeting)
+                    .replace(/{{name}}/g, lead.name || '')
+                    .replace(/{{first_name}}/g, firstName)
+                    .replace(/{{phone}}/g, lead.phone || '');
 
-                localizedContent = localizedContent.replace(/{{greeting}}/g, greeting);
-                localizedContent = localizedContent.replace(/{{name}}/g, lead.name || '');
-                localizedContent = localizedContent.replace(/{{first_name}}/g, firstName);
-                localizedContent = localizedContent.replace(/{{phone}}/g, lead.phone || '');
-
-                // --- Media Extraction & Formatting Utility ---
                 const extractMediaAndText = (html: string) => {
-                    let text = html;
                     let mediaUrl: string | null = null;
                     let mediaType: 'image' | 'video' | 'document' | null = null;
-
-                    // Extract Image
                     const imgMatch = html.match(/<img[^>]+src="([^">]+)"/);
-                    if (imgMatch) {
-                        mediaUrl = imgMatch[1];
-                        mediaType = 'image';
-                    }
-
-                    // Extract Video
+                    if (imgMatch) { mediaUrl = imgMatch[1]; mediaType = 'image'; }
                     const videoMatch = html.match(/<source[^>]+src="([^">]+)"/);
-                    if (videoMatch) {
-                        mediaUrl = videoMatch[1];
-                        mediaType = 'video';
-                    }
-
-                    // Extract Document
+                    if (videoMatch) { mediaUrl = videoMatch[1]; mediaType = 'video'; }
                     const docMatch = html.match(/<a[^>]+href="([^">]+)"[^>]*>Ver Archivo<\/a>/);
-                    if (docMatch) {
-                        mediaUrl = docMatch[1];
-                        mediaType = 'document';
-                    }
-
-                    // Strip HTML for WhatsApp
-                    const cleanText = text
-                        .replace(/<br\s*\/?>/gi, '\n')
-                        .replace(/<b>(.*?)<\/b>/gi, '*$1*')
-                        .replace(/<strong>(.*?)<\/strong>/gi, '*$1*')
-                        .replace(/<i>(.*?)<\/i>/gi, '_$1_')
+                    if (docMatch) { mediaUrl = docMatch[1]; mediaType = 'document'; }
+                    const cleanText = html
+                        .replace(/<br\s*\/?>/gi, '\n').replace(/<b>(.*?)<\/b>/gi, '*$1*')
+                        .replace(/<strong>(.*?)<\/strong>/gi, '*$1*').replace(/<i>(.*?)<\/i>/gi, '_$1_')
                         .replace(/<em>(.*?)<\/em>/gi, '_$1_')
                         .replace(/<a[^>]+href="([^">]+)"[^>]*>(.*?)<\/a>/gi, '$2 ($1)')
-                        .replace(/<p>(.*?)<\/p>/gi, '$1\n')
-                        .replace(/<h[1-2]>(.*?)<\/h[1-2]>/gi, '*$1*\n')
-                        .replace(/<[^>]+>/g, '') // Final strip of any remaining tags
-                        .trim();
-
+                        .replace(/<p>(.*?)<\/p>/gi, '$1\n').replace(/<h[1-2]>(.*?)<\/h[1-2]>/gi, '*$1*\n')
+                        .replace(/<[^>]+>/g, '').trim();
                     return { cleanText, mediaUrl, mediaType };
                 };
-
                 const richContent = extractMediaAndText(localizedContent);
 
-                // A. WhatsApp Send (Meta Cloud API) - Generic Foundation
+                // A. WhatsApp
                 if (campaign.type === 'whatsapp' && phone) {
-                    const { data: conv } = await supabase
-                        .from('marketing_conversations')
-                        .upsert({
-                            company_id: campaign.company_id,
-                            lead_id: lead.id,
-                            channel: 'whatsapp',
-                            status: 'active',
-                            external_id: phone.replace('+', '') // Use numeric ID for Meta
-                        }, { onConflict: 'lead_id,channel' })
-                        .select('id, external_id')
-                        .single();
+                    const { data: conv } = await supabase.from('marketing_conversations').upsert({
+                        company_id: campaign.company_id, lead_id: lead.id, channel: 'whatsapp',
+                        status: 'active', external_id: phone.replace('+', '')
+                    }, { onConflict: 'lead_id,channel' }).select('id, external_id').single();
                     conversationId = conv?.id;
 
                     if (whatsappConfig?.token && whatsappConfig?.phoneNumberId) {
-                        try {
-                            let payload: any = {
-                                messaging_product: 'whatsapp',
-                                to: lead.phone.replace(/\D/g, '')
-                            };
-
-                            if (campaign.template_id) {
-                                payload.type = 'template';
-                                payload.template = {
-                                    name: campaign.subject || campaign.name,
-                                    language: { code: 'es' },
-                                    components: [{
-                                        type: 'body',
-                                        parameters: lead.name ? [{ type: 'text', text: lead.name }] : []
-                                    }]
-                                };
-                            } else if (richContent.mediaUrl) {
-                                // Rich Media Delivery
-                                payload.type = richContent.mediaType;
-                                payload[richContent.mediaType!] = {
-                                    link: richContent.mediaUrl,
-                                    caption: richContent.cleanText
-                                };
-                            } else {
-                                payload.type = 'text';
-                                payload.text = { body: richContent.cleanText };
-                            }
-
-                            const whatsappRes = await fetch(
-                                `https://graph.facebook.com/v18.0/${whatsappConfig.phoneNumberId}/messages`,
-                                {
-                                    method: 'POST',
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'Authorization': `Bearer ${whatsappConfig.token}`
-                                    },
-                                    body: JSON.stringify(payload)
-                                }
-                            );
-
-                            if (!whatsappRes.ok) {
-                                const errData = await whatsappRes.text();
-                                console.error('WhatsApp API Error:', errData);
-                                throw new Error(`WhatsApp Error: ${errData}`);
-                            }
-
-                            const waData = await whatsappRes.json();
-                            if (waData.messages?.[0]?.id) {
-                                await supabase
-                                    .from('marketing_conversations')
-                                    .update({
-                                        external_id: waData.messages[0].id,
-                                        last_message: campaign.template_id ? 'Plantilla WhatsApp enviada' : richContent.cleanText.substring(0, 100),
-                                        last_message_at: new Date().toISOString()
-                                    })
-                                    .eq('id', conversationId);
-                            }
-                        } catch (waError) {
-                            console.error(`WhatsApp send error for lead ${lead.id}:`, waError);
-                            throw waError;
+                        let payload: any = { messaging_product: 'whatsapp', to: lead.phone.replace(/\D/g, '') };
+                        if (campaign.template_id) {
+                            payload.type = 'template';
+                            payload.template = { name: campaign.subject || campaign.name, language: { code: 'es' }, components: [{ type: 'body', parameters: lead.name ? [{ type: 'text', text: lead.name }] : [] }] };
+                        } else if (richContent.mediaUrl) {
+                            payload.type = richContent.mediaType;
+                            payload[richContent.mediaType!] = { link: richContent.mediaUrl, caption: richContent.cleanText };
+                        } else {
+                            payload.type = 'text'; payload.text = { body: richContent.cleanText };
                         }
+                        const waRes = await fetch(`https://graph.facebook.com/v18.0/${whatsappConfig.phoneNumberId}/messages`, {
+                            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${whatsappConfig.token}` },
+                            body: JSON.stringify(payload)
+                        });
+                        if (!waRes.ok) { const e = await waRes.text(); throw new Error(`WhatsApp Error: ${e}`); }
+                    } else {
+                        throw new Error("WhatsApp no configurado. Ve a Marketing > Configuración > WhatsApp para activarlo.");
                     }
                 }
 
-                // B. Telegram Send (for 'social' or 'telegram' campaigns) - High Standard
-                if ((campaign.type === 'social' || campaign.type === 'telegram')) {
-                    const { data: conv } = await supabase
-                        .from('marketing_conversations')
-                        .upsert({
-                            company_id: campaign.company_id,
-                            lead_id: lead.id,
-                            channel: 'telegram',
-                            status: 'active'
-                        }, { onConflict: 'lead_id,channel' })
-                        .select('id, external_id')
-                        .single();
+                // B. Telegram
+                if (campaign.type === 'social' || campaign.type === 'telegram') {
+                    const { data: conv } = await supabase.from('marketing_conversations').upsert({
+                        company_id: campaign.company_id, lead_id: lead.id, channel: 'telegram', status: 'active'
+                    }, { onConflict: 'lead_id,channel' }).select('id, external_id').single();
                     conversationId = conv?.id;
 
                     if (conv?.external_id && telegramToken) {
                         let method = 'sendMessage';
-                        const payload: any = {
-                            chat_id: conv.external_id,
-                            parse_mode: 'HTML'
-                        };
-
+                        const payload: any = { chat_id: conv.external_id, parse_mode: 'HTML' };
                         if (richContent.mediaUrl) {
-                            // Telegram Rich Media Support
                             if (richContent.mediaType === 'image') method = 'sendPhoto';
                             else if (richContent.mediaType === 'video') method = 'sendVideo';
                             else method = 'sendDocument';
-
                             payload[richContent.mediaType === 'image' ? 'photo' : richContent.mediaType!] = richContent.mediaUrl;
-                            payload.caption = localizedContent; // Telegram supports HTML in captions
-                        } else {
-                            payload.text = localizedContent;
-                        }
-
-                        // Support for Professional Buttons (Inline Keyboard)
+                            payload.caption = localizedContent;
+                        } else { payload.text = localizedContent; }
                         if (templateData?.channel === 'telegram' && templateData.content?.buttons) {
-                            payload.reply_markup = {
-                                inline_keyboard: templateData.content.buttons.map((btn: any) => ([{
-                                    text: btn.text,
-                                    url: btn.url ? btn.url.replace(/{{name}}/g, lead.name || '') : undefined
-                                }]))
-                            };
+                            payload.reply_markup = { inline_keyboard: templateData.content.buttons.map((btn: any) => ([{ text: btn.text, url: btn.url?.replace(/{{name}}/g, lead.name || '') }])) };
                         }
-
                         const tgRes = await fetch(`https://api.telegram.org/bot${telegramToken}/${method}`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
+                            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
                         });
-
-                        if (!tgRes.ok) {
-                            const errData = await tgRes.json();
-                            console.error(`Telegram Error for lead ${lead.id}:`, errData);
-                            throw new Error(`Telegram Error: ${errData.description || 'Unknown error'}`);
-                        }
-
-                        // Update conversation preview
-                        await supabase
-                            .from('marketing_conversations')
-                            .update({
-                                last_message: richContent.cleanText.substring(0, 100),
-                                last_message_at: new Date().toISOString()
-                            })
-                            .eq('id', conversationId);
+                        if (!tgRes.ok) { const e = await tgRes.json(); throw new Error(`Telegram Error: ${e.description || 'Unknown'}`); }
+                        await supabase.from('marketing_conversations').update({ last_message: richContent.cleanText.substring(0, 100), last_message_at: new Date().toISOString() }).eq('id', conversationId);
                     } else {
-                        throw new Error("Missing Telegram Chat ID (external_id). Lead must start conversation with bot first.");
+                        throw new Error("Telegram no configurado. El lead debe iniciar conversación con el bot primero.");
                     }
                 }
 
-                // C. Email Send (Resend)
+                // C. Email — with open pixel + click tracking link injection
                 if (campaign.type === "email" && lead.email) {
-                    // Senior Robustness: Clean email from dirty data (newlines, spaces, multiple emails)
                     const cleanEmail = lead.email.trim().split(/[\r\n,;]/)[0].trim();
-
-                    // Create/Get Conversation for Email channel
-                    const { data: conv } = await supabase
-                        .from('marketing_conversations')
-                        .upsert({
-                            company_id: campaign.company_id,
-                            lead_id: lead.id,
-                            channel: 'email',
-                            status: 'active',
-                            external_id: cleanEmail
-                        }, { onConflict: 'lead_id,channel' })
-                        .select('id')
-                        .single();
-
-                    if (!conv) throw new Error("Failed to create conversation bucket");
+                    const { data: conv } = await supabase.from('marketing_conversations').upsert({
+                        company_id: campaign.company_id, lead_id: lead.id, channel: 'email', status: 'active', external_id: cleanEmail
+                    }, { onConflict: 'lead_id,channel' }).select('id').single();
+                    if (!conv) throw new Error("Failed to create conversation");
                     conversationId = conv.id;
+                    if (!resendToken) throw new Error("Missing Resend API Key — configure email integration.");
 
-                    if (!resendToken) {
-                        console.error(`Missing Resend API Key for company ${campaign.company_id}`);
-                        throw new Error("Missing Resend API Key configuration");
-                    }
-
-                    const trackedHtml = `
-                        ${localizedContent}
-                        <img src="${trackingBaseUrl}?type=open&mid=${messageId}" width="1" height="1" style="display:none;" />
-                    `;
+                    // Inject click tracking into all links, then append open pixel
+                    const clickTrackedContent = injectClickTracking(localizedContent, trackingBaseUrl, messageId);
+                    const trackedHtml = `${clickTrackedContent}<img src="${trackingBaseUrl}?type=open&mid=${messageId}" width="1" height="1" style="display:none;" />`;
 
                     const res = await fetch('https://api.resend.com/emails', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${resendToken}`
-                        },
-                        body: JSON.stringify({
-                            from: fromDisplay,
-                            to: cleanEmail,
-                            subject: campaign.subject || campaign.name,
-                            html: trackedHtml
-                        })
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${resendToken}` },
+                        body: JSON.stringify({ from: fromDisplay, to: cleanEmail, subject: campaign.subject || campaign.name, html: trackedHtml })
                     });
-
-                    if (!res.ok) {
-                        const errData = await res.text();
-                        console.error("Resend API Error:", errData);
-                        throw new Error(`Resend Error: ${errData}`);
-                    }
-
-                    // Update conversation preview
-                    await supabase
-                        .from('marketing_conversations')
-                        .update({
-                            last_message: campaign.subject || campaign.name,
-                            last_message_at: new Date().toISOString()
-                        })
-                        .eq('id', conversationId);
+                    if (!res.ok) { const e = await res.text(); console.error("Resend Error:", e); throw new Error(`Resend Error: ${e}`); }
+                    await supabase.from('marketing_conversations').update({ last_message: campaign.subject || campaign.name, last_message_at: new Date().toISOString() }).eq('id', conversationId);
                 }
 
-                // D. Create Message Record
-                const { error: msgError } = await supabase.from("marketing_messages").insert({
-                    id: messageId,
-                    conversation_id: conversationId,
-                    content: localizedContent,
-                    direction: "outbound",
-                    type: "text",
-                    status: (campaign.type === 'email' && !resendToken) ? 'sent' : 'delivered',
-                    metadata: {
-                        campaign_id: campaignId,
-                        lead_id: lead.id,
-                        processed_by: 'edge-function',
-                        tracking_url: `${trackingBaseUrl}?type=click&mid=${messageId}&url=`
-                    }
+                // D. Record message
+                await supabase.from("marketing_messages").insert({
+                    id: messageId, conversation_id: conversationId, content: localizedContent,
+                    direction: "outbound", type: "text", status: 'delivered',
+                    metadata: { campaign_id: campaignId, lead_id: lead.id, processed_by: 'edge-function', tracking_url: `${trackingBaseUrl}?type=click&mid=${messageId}&url=` }
                 });
-
-                if (msgError) {
-                    console.error(`Database Error for lead ${lead.id}:`, msgError.message);
-                    throw new Error(`DB Error: ${msgError.message}`);
-                }
-
                 results.success++;
             } catch (e) {
                 console.error(`Error sending to lead ${lead.id}:`, e);
@@ -526,45 +265,17 @@ Deno.serve(async (req) => {
             }
         }
 
-        // 5. Finalize Campaign with cumulative stats
-        const { count: totalSent } = await supabase
-            .from('marketing_messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('metadata->>campaign_id', campaignId);
+        const { count: totalSent } = await supabase.from('marketing_messages').select('*', { count: 'exact', head: true }).eq('metadata->>campaign_id', campaignId);
+        await supabase.from("marketing_campaigns").update({
+            status: "completed", sent_at: new Date().toISOString(),
+            total_recipients: totalSent || results.success,
+            stats: { sent: totalSent || results.success, failed: results.failed, total: leads.length, opened: 0, clicked: 0 }
+        }).eq("id", campaignId);
 
-        console.log(`[Marketing-Engine] Campaign finished. New: ${results.success}, Cumulative Total: ${totalSent}`);
-
-        await supabase
-            .from("marketing_campaigns")
-            .update({
-                status: "completed",
-                sent_at: new Date().toISOString(),
-                total_recipients: totalSent || results.success,
-                stats: {
-                    sent: totalSent || results.success,
-                    failed: results.failed,
-                    total: leads.length,
-                    opened: 0,
-                    clicked: 0
-                },
-            })
-            .eq("id", campaignId);
-
-        return new Response(JSON.stringify({
-            success: true,
-            results: {
-                success: results.success,
-                failed: results.failed,
-                cumulative: totalSent,
-                total: leads.length
-            }
-        }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
+        return new Response(JSON.stringify({ success: true, results: { success: results.success, failed: results.failed, cumulative: totalSent, total: leads.length } }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
         });
     } catch (err) {
-        return new Response(JSON.stringify({ error: err.message }), {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 });
