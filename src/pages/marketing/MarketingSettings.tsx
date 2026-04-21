@@ -184,15 +184,37 @@ export default function MarketingSettings() {
                             </div>
                         </div>
                     ) : (
-                        <div className="bg-white border border-dashed border-gray-200 rounded-3xl p-10 text-center">
-                            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                                {activeTab === 'email' && <Mail className="w-8 h-8 text-gray-300" />}
-                                {activeTab === 'whatsapp' && <MessageSquare className="w-8 h-8 text-gray-300" />}
-                                {activeTab === 'telegram' && <Send className="w-8 h-8 text-gray-300" />}
-                                {activeTab === 'chat' && <Bot className="w-8 h-8 text-gray-300" />}
-                            </div>
-                            <h3 className="text-xl font-black text-gray-900 mb-1">Canal no configurado</h3>
-                            <p className="text-sm text-gray-500 max-w-sm mx-auto mb-6">Selecciona un proveedor abajo para comenzar a enviar mensajes por {activeTab}.</p>
+                        <div className={activeTab === 'email'
+                            ? "bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 rounded-3xl p-6 flex flex-col md:flex-row items-center gap-5"
+                            : "bg-white border border-dashed border-gray-200 rounded-3xl p-10 text-center"
+                        }>
+                            {activeTab === 'email' ? (
+                                <>
+                                    <div className="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center text-emerald-600 border border-emerald-100 shrink-0">
+                                        <CheckCircle className="w-7 h-7" />
+                                    </div>
+                                    <div className="flex-1 text-center md:text-left">
+                                        <div className="flex items-center justify-center md:justify-start gap-2 mb-1">
+                                            <h3 className="text-lg font-black text-emerald-900">Email — Plataforma Activa</h3>
+                                            <span className="px-1.5 py-0.5 bg-emerald-500 text-white text-[9px] font-black rounded-full uppercase tracking-tighter">Funcionando</span>
+                                        </div>
+                                        <p className="text-sm text-emerald-700 font-medium">
+                                            Tus campañas de email funcionan usando la infraestructura del CRM. 
+                                            Configura tu propio Resend abajo para usar tu dominio personalizado como remitente.
+                                        </p>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        {activeTab === 'whatsapp' && <MessageSquare className="w-8 h-8 text-gray-300" />}
+                                        {activeTab === 'telegram' && <Send className="w-8 h-8 text-gray-300" />}
+                                        {activeTab === 'chat' && <Bot className="w-8 h-8 text-gray-300" />}
+                                    </div>
+                                    <h3 className="text-xl font-black text-gray-900 mb-1">Canal no configurado</h3>
+                                    <p className="text-sm text-gray-500 max-w-sm mx-auto mb-6">Selecciona un proveedor abajo para comenzar a enviar mensajes por {activeTab}.</p>
+                                </>
+                            )}
                         </div>
                     )}
 
