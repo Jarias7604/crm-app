@@ -85,6 +85,7 @@ Leer `.agent/workflows/hubspot-architecture.md` para retomar tareas pendientes.
 | `meta-insights`, `campaign AI`, `DALL-E ads` | GlobalAds AI OS |
 | `ga_organizations`, `ga_profiles`, `ga_campaigns` | GlobalAds AI OS |
 | `Call AI`, `Erick Roofer`, `roofer`, `roofing` | Call AI Erick Roofer |
+| `Ecclesia`, `miembros`, `pastoral`, `diezmos`, `congregación`, `at risk members` | Ecclesia Church SaaS |
 
 ---
 
