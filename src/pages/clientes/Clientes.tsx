@@ -10,8 +10,8 @@ import toast from 'react-hot-toast';
 type Tab = 'pipeline' | 'activos';
 
 export default function Clientes() {
-  const { hasPermission } = usePermissions();
-  const canView = hasPermission('clientes.view');
+  const { hasPermission, isAdmin } = usePermissions();
+  const canView = hasPermission('clientes.view') || isAdmin();
 
   const [tab, setTab] = useState<Tab>('pipeline');
   const [clients, setClients] = useState<Client[]>([]);

@@ -16,9 +16,9 @@ interface Props {
 }
 
 export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
-  const { hasPermission } = usePermissions();
-  const canManage = hasPermission('clientes.manage');
-  const canSendPortal = hasPermission('clientes.send_portal');
+  const { hasPermission, isAdmin } = usePermissions();
+  const canManage = hasPermission('clientes.manage') || isAdmin();
+  const canSendPortal = hasPermission('clientes.send_portal') || isAdmin();
 
   const [client, setClient] = useState<Client | null>(null);
   const [stages, setStages] = useState<ClientPipelineStage[]>([]);
