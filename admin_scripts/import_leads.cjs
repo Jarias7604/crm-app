@@ -3,7 +3,7 @@ const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 
 const supabaseDomain = process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseDomain || !supabaseKey) {
   console.log('No tokens');
@@ -20,15 +20,20 @@ async function main() {
     const userMap = {
         'Patricia Martinez': '6dd1b1fe-c96c-4ff1-80cd-34a1449a6a90',
         'Melvin Rodriguez': '160a23cb-a8f2-4726-b6ad-cbf15b899a19',
-        'Jimmy Arias': '292bc954-0d25-4147-9526-b7a7268be8e1'
+        'Diana Morales': 'c2a49973-30a8-4ddd-bc2a-0431d001aa5d',
+        'Jimmy Arias': '292bc954-0d25-4147-9526-b7a7268be8e1',
+        'Jimmy': 'c9c01b04-4160-4e4c-9718-15298c961e9b',
+        'Gerson Gutierrez': '6f3ef40e-a3d9-419c-8f5e-01378d75f601'
     };
 
     const statusMap = {
         'prospecto': 'Prospecto',
         'calificado': 'Lead calificado', 'lead calificado': 'Lead calificado',
-        'frio': 'Prospecto', 'frío': 'Prospecto', 'llamada fría': 'Prospecto', 'llamada fria': 'Prospecto',
-        'negociacion': 'Negociación', 'negociación': 'Negociación', 
+        'llamada fría': 'Llamada fría', 'llamada fria': 'Llamada fría', 'frio': 'Llamada fría', 'frío': 'Llamada fría',
+        'negociacion': 'Negociación', 'negociación': 'Negociación',
         'en seguimiento': 'En seguimiento',
+        'nutricion': 'Nutrición', 'nutrición': 'Nutrición',
+        'calificado': 'Lead calificado',
         'cerrado': 'Cerrado', 'cliente': 'Cliente'
     };
     
@@ -100,7 +105,7 @@ async function main() {
         // Supabase anon key cannot insert unless RLS allows it.
         // Wait, does RLS allow inserts? 
         // We will test the first batch
-        const { error } = await supabase.from('leads').upsert(batch, { onConflict: 'company_id, name, phone' }).select();
+        const { error } = await supabase.from('leads').insert(batch).select();
         
         if (error) {
             console.error('Insert error:', error);
