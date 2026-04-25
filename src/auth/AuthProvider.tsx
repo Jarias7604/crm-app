@@ -176,7 +176,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
 
             const { data: mergedPerms } = await supabase.rpc('get_user_permissions', { user_id: userId });
-            let finalProfile = { ...data, permissions: mergedPerms || {} } as Profile;
+            
+            // If the RPC returns null or empty, gracefully fallback to the permissions stored in the profile
+            const activePerms = (mergedPerms && Object.keys(mergedPerms).length > 0) 
+                ? mergedPerms 
+                : (data?.permissions || {});
+
+            let finalProfile = { ...data, permissions: activePerms } as Profile;
 
             // SIMULATION PRIVILEGE CHECK (role-based, no hardcoded IDs)
             // Only super_admin users can use the simulation/testing feature
