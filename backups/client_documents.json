@@ -1,0 +1,44 @@
+[
+  {
+    "id": "641b5ec5-a1eb-4fb3-94ee-1b9808ef6b6c",
+    "company_id": "7a582ba5-f7d0-4ae3-9985-35788deb1c30",
+    "client_id": "473f2931-2efa-4a5e-995f-e36fbb2a50b3",
+    "stage_id": "b03ef8a8-76db-42ed-bebb-5be930db713c",
+    "doc_type_id": "07d0fdd0-d4f6-4d3c-bc34-09e8ee4b88f9",
+    "nombre": "Logo EnSivar.png",
+    "file_path": "clients/7a582ba5-f7d0-4ae3-9985-35788deb1c30/473f2931-2efa-4a5e-995f-e36fbb2a50b3/b03ef8a8-76db-42ed-bebb-5be930db713c/1774483530161-vsozj.png",
+    "file_size": 147930,
+    "file_type": "image/png",
+    "subido_por_cliente": true,
+    "uploaded_by": null,
+    "created_at": "2026-03-26T00:05:30.452439+00:00"
+  },
+  {
+    "id": "e42e68b7-45bf-48dd-966a-3e9bbcd65af0",
+    "company_id": "7a582ba5-f7d0-4ae3-9985-35788deb1c30",
+    "client_id": "473f2931-2efa-4a5e-995f-e36fbb2a50b3",
+    "stage_id": "b03ef8a8-76db-42ed-bebb-5be930db713c",
+    "doc_type_id": "2e3cab8b-2323-4aeb-bc98-92e76a41a466",
+    "nombre": "Propuesta software Alex Umanzor V3.1.pdf",
+    "file_path": "clients/7a582ba5-f7d0-4ae3-9985-35788deb1c30/473f2931-2efa-4a5e-995f-e36fbb2a50b3/b03ef8a8-76db-42ed-bebb-5be930db713c/1774486284999-yx4zr.pdf",
+    "file_size": 1410340,
+    "file_type": "application/pdf",
+    "subido_por_cliente": true,
+    "uploaded_by": null,
+    "created_at": "2026-03-26T00:51:25.253947+00:00"
+  },
+  {
+    "id": "6c1df4c4-799d-4c12-a11c-da37f87ec4c9",
+    "company_id": "7a582ba5-f7d0-4ae3-9985-35788deb1c30",
+    "client_id": "473f2931-2efa-4a5e-995f-e36fbb2a50b3",
+    "stage_id": "25b18724-13ca-483f-a9d5-05133d93380c",
+    "doc_type_id": "cdc1773a-9f68-4a65-8311-b3ea5c2cecb3",
+    "nombre": "Propuesta software Alex Umanzor V3.1.pdf",
+    "file_path": "clients/7a582ba5-f7d0-4ae3-9985-35788deb1c30/473f2931-2efa-4a5e-995f-e36fbb2a50b3/25b18724-13ca-483f-a9d5-05133d93380c/1774486296392-jryse.pdf",
+    "file_size": 1410340,
+    "file_type": "application/pdf",
+    "subido_por_cliente": true,
+    "uploaded_by": null,
+    "created_at": "2026-03-26T00:51:36.684905+00:00"
+  }
+]
