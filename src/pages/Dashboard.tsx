@@ -1046,9 +1046,9 @@ export default function Dashboard() {
                     <div className="flex-grow min-h-[200px]">
                         {priorityData.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={priorityData} layout="vertical" margin={{ left: -20, right: 10 }}>
+                                <BarChart data={priorityData} layout="vertical" margin={{ left: 0, right: 10 }}>
                                     <XAxis type="number" hide />
-                                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 700, fill: '#64748b' }} width={70} />
+                                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 700, fill: '#64748b' }} width={120} />
                                     <Tooltip
                                         cursor={{ fill: 'transparent' }}
                                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
