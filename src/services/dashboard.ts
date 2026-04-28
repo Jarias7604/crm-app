@@ -62,6 +62,7 @@ export const dashboardService = {
                 lossReasons: data?.lossReasons || [],
                 lossStages: data?.lossStages || [],
                 qualityTrend: data?.qualityTrend || [],
+                salesTrend: data?.salesTrend || [],
                 salesKpis: data?.salesKpis || []
             };
         } catch (error) {
