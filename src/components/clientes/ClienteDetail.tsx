@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, CheckCircle2, Circle, Loader2, ChevronRight, Send, MessageSquare, Mail, Phone, UserCircle2, DollarSign, ClipboardList } from 'lucide-react';
+import { X, CheckCircle2, Circle, Loader2, ChevronRight, Send, MessageSquare, Mail, Phone, UserCircle2, DollarSign, ClipboardList, Trash2, AlertTriangle } from 'lucide-react';
 import type { Client, ClientPipelineStage, ClientDocument, ClientStageDocumentType } from '../../types/clients';
 import { clientsService, pipelineStagesService } from '../../services/clients';
 import StageDocumentUpload from './StageDocumentUpload';
@@ -31,6 +31,8 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
   const [savingAssign, setSavingAssign] = useState(false);
   const [reverting, setReverting] = useState(false);
   const [activeTab, setActiveTab] = useState<'pipeline' | 'pagos'>('pipeline');
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     if (!clientId) return;
@@ -118,6 +120,23 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
     finally { setAdvancing(false); }
   };
 
+  const handleDeleteClient = async () => {
+    if (!client || !canManage) return;
+    setDeleting(true);
+    try {
+      await clientsService.delete(client.id);
+      toast.success('Cliente eliminado correctamente');
+      onUpdated();
+      onClose();
+    } catch (err: any) {
+      console.error('Error al eliminar cliente:', err);
+      toast.error(`Error al eliminar: ${err?.message || 'intenta de nuevo'}`);
+    } finally {
+      setDeleting(false);
+      setIsDeleteDialogOpen(false);
+    }
+  };
+
   const handleSendPortalLink = (channel: 'whatsapp' | 'email' | 'telegram') => {
     if (!client) return;
     const link = clientsService.getPortalUrl(client.portal_token);
@@ -197,22 +216,66 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
               </>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            {!loading && client && !client.es_activo && (
-              <span className="px-2 py-0.5 text-[10px] font-black uppercase rounded-full bg-blue-100 text-blue-700">
-                En Proceso
-              </span>
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-2">
+              {!loading && client && !client.es_activo && (
+                <span className="px-2 py-0.5 text-[10px] font-black uppercase rounded-full bg-blue-100 text-blue-700">
+                  En Proceso
+                </span>
+              )}
+              {!loading && client?.es_activo && (
+                <span className="px-2 py-0.5 text-[10px] font-black uppercase rounded-full bg-emerald-100 text-emerald-700">
+                  ✓ Activo
+                </span>
+              )}
+              <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            {!loading && client && canManage && (
+              <button
+                onClick={() => setIsDeleteDialogOpen(true)}
+                className="flex items-center gap-1 text-[10px] font-bold text-gray-400 hover:text-rose-600 hover:bg-rose-50 px-2 py-1 rounded transition-colors"
+                title="Eliminar cliente"
+              >
+                <Trash2 className="w-3 h-3" />
+                Borrar
+              </button>
             )}
-            {!loading && client?.es_activo && (
-              <span className="px-2 py-0.5 text-[10px] font-black uppercase rounded-full bg-emerald-100 text-emerald-700">
-                ✓ Activo
-              </span>
-            )}
-            <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
-              <X className="w-5 h-5" />
-            </button>
           </div>
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        {isDeleteDialogOpen && (
+          <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-in fade-in duration-200">
+            <div className="bg-white border border-rose-100 shadow-2xl rounded-2xl p-6 max-w-sm w-full text-center">
+              <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-black text-gray-900 mb-2">¿Eliminar Cliente?</h3>
+              <p className="text-sm text-gray-500 mb-6">
+                Esta acción es irreversible. Se eliminarán permanentemente todos los datos, documentos y pagos asociados a <strong className="text-gray-700">{client?.nombre}</strong>.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setIsDeleteDialogOpen(false)}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2 bg-gray-100 text-gray-600 hover:bg-gray-200 rounded-xl text-sm font-bold transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleDeleteClient}
+                  disabled={deleting}
+                  className="flex-1 px-4 py-2 bg-rose-600 text-white hover:bg-rose-700 rounded-xl text-sm font-bold shadow-md shadow-rose-200 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Sí, eliminar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Send link bar */}
         {!loading && client && !client.es_activo && canSendPortal && (

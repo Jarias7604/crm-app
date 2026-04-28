@@ -192,6 +192,14 @@ export const clientsService = {
     const base = import.meta.env.VITE_APP_URL || window.location.origin;
     return `${base}/portal/cliente/${portalToken}`;
   },
+
+  async delete(clientId: string): Promise<void> {
+    const { error } = await supabase
+      .from('clients')
+      .delete()
+      .eq('id', clientId);
+    if (error) throw error;
+  },
 };
 
 // ─────────────────────────────────────

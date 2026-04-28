@@ -14,18 +14,36 @@ export const lossReasonsService = {
             const { data, error } = await supabase
                 .from('loss_reasons')
                 .select('*')
-                .not('company_id', 'is', null) // Only get company-specific reasons, not templates
                 .eq('is_active', true)
                 .order('display_order', { ascending: true });
 
             if (error) {
                 logger.error('Failed to fetch loss reasons', error, { action: 'getLossReasons' });
-                return []; // Return empty array instead of throwing
+                return [];
             }
-            return data || [];
+
+            // Deduplicate by reason text (case-insensitive).
+            // Priority: company-specific record wins over global template (00000000) and null company.
+            const GLOBAL_ID = '00000000-0000-0000-0000-000000000000';
+            const seen = new Map<string, LossReason>();
+            for (const item of (data || [])) {
+                const key = item.reason.trim().toLowerCase();
+                const existing = seen.get(key);
+                if (!existing) {
+                    seen.set(key, item);
+                } else {
+                    // Replace with a more specific record: prefer company-specific over global/null
+                    const existingIsGlobal = !existing.company_id || existing.company_id === GLOBAL_ID;
+                    const currentIsGlobal = !item.company_id || item.company_id === GLOBAL_ID;
+                    if (existingIsGlobal && !currentIsGlobal) {
+                        seen.set(key, item);
+                    }
+                }
+            }
+            return Array.from(seen.values());
         } catch (error) {
             logger.error('Failed to fetch loss reasons', error, { action: 'getLossReasons' });
-            return []; // Return empty array on error
+            return [];
         }
     },
 
