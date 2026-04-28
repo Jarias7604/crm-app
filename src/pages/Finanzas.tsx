@@ -76,9 +76,12 @@ export default function Finanzas() {
 
   // Calculations for Utilidad
   const totalCobrado = panorama.reduce((s, r) => s + Number(r.total_cobrado || 0), 0);
+  const totalVentas = panorama.reduce((s, r) => s + Number(r.venta_total || 0), 0);
   const totalGastos = gastos.reduce((s, g) => s + Number(g.monto || 0), 0);
-  const utilidadNeta = totalCobrado - totalGastos;
-  const margen = totalCobrado > 0 ? Math.round((utilidadNeta / totalCobrado) * 100) : 0;
+  
+  // Utilidad basada en VENTAS TOTALES (ya que es SaaS y los tratos están cerrados)
+  const utilidadNeta = totalVentas - totalGastos;
+  const margen = totalVentas > 0 ? Math.round((utilidadNeta / totalVentas) * 100) : 0;
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -142,10 +145,10 @@ export default function Finanzas() {
                     <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
                       <TrendingUp className="w-5 h-5 text-emerald-600" />
                     </div>
-                    <span className="text-sm font-black text-slate-400 uppercase tracking-wider">Ingresos Reales</span>
+                    <span className="text-sm font-black text-slate-400 uppercase tracking-wider">Ingresos Brutos</span>
                   </div>
-                  <p className="text-3xl font-black text-emerald-600 mt-4">${totalCobrado.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-                  <p className="text-xs text-slate-400 font-medium mt-1">Cobrado a clientes</p>
+                  <p className="text-3xl font-black text-emerald-600 mt-4">${totalVentas.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                  <p className="text-xs text-slate-400 font-medium mt-1">Ventas cerradas</p>
                 </div>
 
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
@@ -368,9 +371,9 @@ export default function Finanzas() {
                   <tbody className="divide-y divide-slate-100">
                     {/* INGRESOS */}
                     <tr className="bg-emerald-50/50">
-                      <td className="p-4 pl-6 font-black text-emerald-800 uppercase tracking-wider text-sm">Ingresos Brutos (Cobrados)</td>
+                      <td className="p-4 pl-6 font-black text-emerald-800 uppercase tracking-wider text-sm">Ingresos Brutos (Ventas Cerradas)</td>
                       <td className="p-4 pr-6 text-right font-mono font-black text-emerald-600 text-lg">
-                        ${totalCobrado.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        ${totalVentas.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                       </td>
                     </tr>
                     
