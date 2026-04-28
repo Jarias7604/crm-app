@@ -175,12 +175,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 return;
             }
 
+            // ─────────────────────────────────────────────────────────────────
+            // ENTERPRISE PERMISSION RESOLUTION (Single Source of Truth)
+            // Igual que HubSpot/Salesforce: el ROL es la fuente de verdad.
+            // profiles.permissions NUNCA sobrescribe al custom_role.
+            // ─────────────────────────────────────────────────────────────────
+            let activePerms: Record<string, boolean> = {};
+
+            // 1. Intentar RPC centralizada primero
             const { data: mergedPerms } = await supabase.rpc('get_user_permissions', { user_id: userId });
-            
-            // If the RPC returns null or empty, gracefully fallback to the permissions stored in the profile
-            const activePerms = (mergedPerms && Object.keys(mergedPerms).length > 0) 
-                ? mergedPerms 
-                : (data?.permissions || {});
+
+            if (mergedPerms && Object.keys(mergedPerms).length > 0) {
+                // RPC devolvió permisos consolidados — usar directamente
+                activePerms = mergedPerms;
+            } else if (data?.custom_role_id) {
+                // 2. Si tiene custom_role asignado → el rol es la fuente de verdad TOTAL
+                // profiles.permissions es ignorado completamente (evita el bug crónico de Patricia)
+                const { data: roleData } = await supabase
+                    .from('custom_roles')
+                    .select('permissions')
+                    .eq('id', data.custom_role_id)
+                    .single();
+                activePerms = (roleData?.permissions as Record<string, boolean>) || {};
+                console.info('✅ Permisos cargados desde custom_role (fuente única de verdad)');
+            } else {
+                // 3. Sin rol personalizado → usar permisos del perfil como fallback
+                activePerms = (data?.permissions as Record<string, boolean>) || {};
+            }
 
             let finalProfile = { ...data, permissions: activePerms } as Profile;
 

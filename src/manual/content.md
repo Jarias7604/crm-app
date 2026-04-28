@@ -105,16 +105,45 @@ Planifica y ejecuta campañas masivas de marketing por múltiples canales con an
 
 ---
 
-## 7. Matriz de Seguridad y Permisos Avanzados
+## 7. Sistema de Roles y Permisos — Arquitectura Enterprise
 
-### Descripción
-Panel de control estratégico para crear perfiles de puesto y determinar con precisión a qué datos de la empresa puede acceder cada colaborador.
+### El Principio de Fuente Única de Verdad
+El sistema de permisos de Arias CRM sigue el mismo estándar que HubSpot y Salesforce: **el Rol es la fuente única de verdad**. Los permisos del perfil individual nunca pueden contradecir o bloquear lo que el Rol otorga.
 
-### Funcionalidades clave
-- **RBAC (Roles Personalizados):** Permite crear nombramientos únicos como "Agente Call Center" o "Supervisor Regional".
-- **Permisos Explícitos:** Configuración granular de lectura y escritura por módulo (Ej: Impedir exportación a Excel, o habilitar módulo "Clientes" solo a gerentes).
-- **Supremacía de Permisos:** Si el Administrador aprueba una capacidad desde la "Matriz de Permisos", el usuario tendrá acceso garantizado, sobrepasando los bloqueos por defecto del software.
-- **Aplicación Instantánea:** Los cambios de rol se propagan inmediatamente a la sesión del usuario conectado.
+### Jerarquía de Resolución de Permisos
+
+```
+1. super_admin           → Acceso total a TODO (no se puede bloquear)
+2. Usuario con Rol       → Los permisos del Rol definen TODO
+3. Usuario sin Rol       → Se usan los permisos del perfil como fallback
+```
+
+### Por qué esto importa
+**Problema anterior:** Cuando se editaba un usuario, el sistema guardaba permisos individuales en su perfil con algunos en `false`. Esos permisos bloqueaban módulos aunque el Rol del usuario los tuviera habilitados — causando el problema crónico de "un usuario dejó de ver módulos".
+
+**Solución permanente:** Cuando un usuario tiene un Rol asignado, el sistema ignora completamente los permisos individuales del perfil y usa exclusivamente los del Rol.
+
+### Proceso para Restablecer Accesos de un Usuario
+
+Si un usuario no puede ver módulos que debería ver:
+
+1. Ve a **Admin → Equipo → Miembros**
+2. Verifica que el usuario tenga un **Rol Personalizado** asignado (ej. "Administrador de Empresa")
+3. Si el rol está correcto pero sigue sin acceso, solicita al Administrador del sistema que limpie los permisos del perfil:
+   ```sql
+   UPDATE profiles SET permissions = '{}' WHERE email = 'correo@empresa.com';
+   ```
+4. El usuario debe cerrar sesión y volver a entrar — los permisos del rol se cargarán automáticamente.
+
+### Estructura de Roles Disponibles
+
+| Rol | Descripción | Nivel de Acceso |
+|-----|-------------|-----------------|
+| `super_admin` | Dueño del sistema | Todo sin restricciones |
+| `company_admin` | Administrador de empresa | Todo dentro de su empresa |
+| `sales_manager` | Gerente de ventas | Leads, clientes, reportes, equipo |
+| `sales_agent` | Agente de ventas | Solo sus leads asignados |
+| `support_agent` | Soporte | Tickets y clientes |
 
 ---
 
@@ -149,7 +178,7 @@ El CRM funciona como un motor de recepción automática (Ingestion Engine). Perm
 
 ### Funcionalidades clave
 - **Conexión Meta Leads:** Generación de un endpoint seguro (Webhook) para recibir formularios de anuncios de Facebook.
-- **Deduplicación Automática:** Si un Lead entra por webhook, el CRM verifica si el correo o teléfono ya existe para evitar registros dobles.
+- **Deduplicación Automática:** Si un Lead entra por webhook, el CRM verifica si el correo o teléfono ya existe para evitar registros duples.
 - **Enrutamiento:** Asignación inteligente a los agentes disponibles según reglas de negocio.
 
 ---
@@ -176,4 +205,4 @@ Sí. El sistema es **multi-tenant** con aislamiento completo por Row Level Secur
 
 ---
 
-*Arias CRM Professional — Documentación v2.0 — Actualizada Marzo 2026*
+*Arias CRM Professional — Documentación v3.0 — Actualizada Abril 2026*
