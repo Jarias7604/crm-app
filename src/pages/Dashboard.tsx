@@ -1212,7 +1212,8 @@ export default function Dashboard() {
                                         tickLine={false}
                                         tickFormatter={(val) => {
                                             try {
-                                                return format(new Date(val), 'dd MMM', { locale: es });
+                                                const dateStr = val.includes('T') ? val : `${val}T12:00:00`;
+                                                return format(new Date(dateStr), 'dd MMM', { locale: es });
                                             } catch(e) { return val; }
                                         }}
                                     />
@@ -1229,7 +1230,8 @@ export default function Dashboard() {
                                         itemStyle={{ fontSize: '12px', fontWeight: 800, color: '#10b981' }}
                                         labelFormatter={(val) => {
                                             try {
-                                                return format(new Date(val), 'dd MMM yyyy', { locale: es });
+                                                const dateStr = val.includes('T') ? val : `${val}T12:00:00`;
+                                                return format(new Date(dateStr), 'dd MMM yyyy', { locale: es });
                                             } catch(e) { return val; }
                                         }}
                                         formatter={(value: any) => [`$${value?.toLocaleString() || 0}`, 'Ingresos']}
