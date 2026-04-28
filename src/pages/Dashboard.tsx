@@ -1232,7 +1232,7 @@ export default function Dashboard() {
                                                 return format(new Date(val), 'dd MMM yyyy', { locale: es });
                                             } catch(e) { return val; }
                                         }}
-                                        formatter={(value: number) => [`$${value.toLocaleString()}`, 'Ingresos']}
+                                        formatter={(value: any) => [`$${value?.toLocaleString() || 0}`, 'Ingresos']}
                                     />
                                     <Area type="monotone" dataKey="amount" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorAmount)" activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} />
                                 </AreaChart>

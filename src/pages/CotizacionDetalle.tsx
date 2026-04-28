@@ -262,11 +262,12 @@ export default function CotizacionDetalle() {
             if (errorCot) throw errorCot;
 
             // 2. Actualizar Lead a 'ganado' (Convertir a Cliente)
-            if (cotizacion.lead_id) {
+            const cotizacionAny = cotizacion as any;
+            if (cotizacionAny.lead_id) {
                 const { error: errorLead } = await supabase
                     .from('leads')
                     .update({ status: 'ganado' })
-                    .eq('id', cotizacion.lead_id);
+                    .eq('id', cotizacionAny.lead_id);
                     
                 if (errorLead) {
                     console.warn('No se pudo actualizar el lead a ganado:', errorLead);

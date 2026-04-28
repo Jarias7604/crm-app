@@ -205,7 +205,7 @@ export default function Finanzas() {
                       </tr>
                     ) : (
                       panorama.map(row => {
-                        const isMensual = row.tipo_pago?.toLowerCase() === 'mensual' || row.tipo_pago?.toLowerCase() === 'recurrente' || row.total_cuotas > 0;
+                        const isMensual = row.tipo_pago?.toLowerCase() === 'mensual' || row.tipo_pago?.toLowerCase() === 'recurrente' || (row.total_cuotas || 0) > 0;
                         const pct = Number(row.venta_total) > 0 ? Math.round((Number(row.total_cobrado) / Number(row.venta_total)) * 100) : 0;
                         
                         return (
@@ -231,9 +231,9 @@ export default function Finanzas() {
                             </td>
                             <td className="p-4">
                               <p className="font-mono font-bold text-emerald-600">${Number(row.total_cobrado).toLocaleString()}</p>
-                              {isMensual && row.total_cuotas > 0 && (
+                              {isMensual && (row.total_cuotas || 0) > 0 && (
                                 <p className="text-[10px] font-bold text-emerald-500 mt-1 uppercase tracking-wide">
-                                  {row.cuotas_pagadas} de {row.total_cuotas} Pagos
+                                  {row.cuotas_pagadas || 0} de {row.total_cuotas || 0} Pagos
                                 </p>
                               )}
                             </td>
@@ -272,7 +272,7 @@ export default function Finanzas() {
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-black text-slate-800">Registrar Nuevo Gasto</h3>
-                  <Button variant={isAddingGasto ? "secondary" : "primary"} onClick={() => setIsAddingGasto(!isAddingGasto)}>
+                  <Button variant={isAddingGasto ? "outline" : "default"} onClick={() => setIsAddingGasto(!isAddingGasto)}>
                     {isAddingGasto ? 'Cancelar' : <><Plus className="w-4 h-4 mr-2" /> Nuevo Gasto</>}
                   </Button>
                 </div>
@@ -298,7 +298,7 @@ export default function Finanzas() {
                       <input type="number" required min="0" step="0.01" placeholder="0.00" value={newGasto.monto} onChange={e => setNewGasto({...newGasto, monto: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
                     </div>
                     <div className="flex items-end">
-                      <Button type="submit" variant="primary" className="w-full h-[38px]">
+                      <Button type="submit" variant="default" className="w-full h-[38px]">
                         Guardar
                       </Button>
                     </div>
