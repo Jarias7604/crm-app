@@ -34,11 +34,14 @@ export default function Finanzas() {
     if (!profile?.company_id) return;
     setLoading(true);
     try {
-      const [panoData, gasData, clientesData] = await Promise.all([
-        pagosService.getPanorama(profile.company_id),
-        gastosService.getGastos(profile.company_id),
-        pagosService.getClientesCuentas(profile.company_id),
-      ]);
+      let panoData: PanoramaFinanciero[] = [];
+      let gasData: Gasto[] = [];
+      let clientesData: ClienteCuenta[] = [];
+      
+      try { panoData = await pagosService.getPanorama(profile.company_id); } catch (e) { console.error('Error panorama:', e); }
+      try { gasData = await gastosService.getGastos(profile.company_id); } catch (e) { console.error('Error gastos:', e); }
+      try { clientesData = await pagosService.getClientesCuentas(profile.company_id); } catch (e) { console.error('Error clientesCuentas:', e); }
+      
       setPanorama(panoData);
       setGastos(gasData);
       setClientes(clientesData);
@@ -73,8 +76,8 @@ export default function Finanzas() {
     
     setUploadingGasto(true);
     try {
-      let comprobante_url = null;
-      let comprobante_path = null;
+      let comprobante_url: string | null = null;
+      let comprobante_path: string | null = null;
 
       if (gastoFile) {
         toast.loading('Subiendo comprobante...', { id: 'upload-gasto' });

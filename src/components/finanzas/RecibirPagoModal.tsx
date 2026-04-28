@@ -30,8 +30,8 @@ export function RecibirPagoModal({ cuenta, cuotaEsperada, onClose, onSuccess }: 
     
     setLoading(true);
     try {
-      let comprobante_url = null;
-      let comprobante_path = null;
+      let comprobante_url: string | null = null;
+      let comprobante_path: string | null = null;
 
       if (file) {
         toast.loading('Subiendo comprobante...', { id: 'upload' });
