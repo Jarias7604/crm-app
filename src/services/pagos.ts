@@ -15,6 +15,8 @@ export interface Pago {
   metodo_pago: MetodoPago | null;
   registrado_por: string | null;
   notas: string | null;
+  comprobante_url?: string | null;
+  comprobante_path?: string | null;
   created_at: string;
 }
 
@@ -116,6 +118,124 @@ export const pagosService = {
     return data as PanoramaFinanciero[];
   },
 
+  /**
+   * Cuentas por Cobrar — Vista jerárquica por CLIENTE
+   * Retorna cotizaciones aceptadas con sus pagos recibidos y cuotas esperadas (si las tiene),
+   * agrupadas por nombre_cliente.
+   */
+  async getClientesCuentas(companyId: string): Promise<ClienteCuenta[]> {
+    // 1. Cotizaciones activas con sus pagos ya recibidos
+    const { data: cotizaciones, error: cotError } = await supabase
+      .from('cotizaciones')
+      .select(`
+        id,
+        nombre_cliente,
+        lead_id,
+        plan_nombre,
+        tipo_pago,
+        total_anual,
+        monto_anticipo,
+        cuotas,
+        plazo_meses,
+        estado,
+        created_at,
+        pagos (
+          id, monto, fecha_pago, tipo, metodo_pago, numero_cuota,
+          notas, comprobante_url, comprobante_path, created_at
+        )
+      `)
+      .eq('company_id', companyId)
+      .in('estado', ['aceptada', 'ganado', 'aprobada', 'pagado', 'activo'])
+      .order('created_at', { ascending: false });
+
+    if (cotError) throw cotError;
+
+    // 2. Cuotas esperadas (schedule de amortización) por cotización
+    const cotIds = (cotizaciones || []).map(c => c.id);
+    let cuotasByCot: Record<string, any[]> = {};
+
+    if (cotIds.length > 0) {
+      const { data: planes } = await supabase
+        .from('planes_pago')
+        .select(`id, cotizacion_id, estado, cuotas_esperadas(*)`)
+        .in('cotizacion_id', cotIds)
+        .eq('estado', 'activo');
+
+      (planes || []).forEach(plan => {
+        cuotasByCot[plan.cotizacion_id] = (plan.cuotas_esperadas || []).sort(
+          (a: any, b: any) => a.numero_cuota - b.numero_cuota
+        );
+      });
+    }
+
+    // 3. Construir contratos enriquecidos
+    const contratos: ContratoCuenta[] = (cotizaciones || []).map(cot => {
+      const pagosRecibidos = (cot.pagos || []) as any[];
+      const totalCobrado = pagosRecibidos.reduce((s: number, p: any) => s + Number(p.monto), 0);
+      const totalContrato = Number(cot.total_anual) || 0;
+      const totalPendiente = Math.max(0, totalContrato - totalCobrado);
+      const cuotas = cuotasByCot[cot.id] || [];
+      const tienePlan = cuotas.length > 0;
+
+      return {
+        cotizacion_id: cot.id,
+        nombre_cliente: cot.nombre_cliente,
+        lead_id: cot.lead_id,
+        plan_nombre: cot.plan_nombre,
+        tipo_pago: cot.tipo_pago,
+        total_contrato: totalContrato,
+        total_cobrado: totalCobrado,
+        total_pendiente: totalPendiente,
+        anticipo: Number(cot.monto_anticipo) || 0,
+        cuotas_pactadas: cot.cuotas || 0,
+        plazo_meses: cot.plazo_meses || 0,
+        estado_contrato: cot.estado,
+        fecha_contrato: cot.created_at,
+        pagos_recibidos: pagosRecibidos,
+        schedule: cuotas,
+        tiene_plan_amortizacion: tienePlan,
+      };
+    });
+
+    // 4. Agrupar por cliente
+    const clienteMap: Record<string, ClienteCuenta> = {};
+    contratos.forEach(contrato => {
+      const key = contrato.nombre_cliente;
+      if (!clienteMap[key]) {
+        clienteMap[key] = {
+          nombre_cliente: contrato.nombre_cliente,
+          lead_id: contrato.lead_id,
+          contratos: [],
+          total_cobrado: 0,
+          total_pendiente: 0,
+          total_contratos: 0,
+        };
+      }
+      clienteMap[key].contratos.push(contrato);
+      clienteMap[key].total_cobrado += contrato.total_cobrado;
+      clienteMap[key].total_pendiente += contrato.total_pendiente;
+      clienteMap[key].total_contratos += contrato.total_contrato;
+    });
+
+    return Object.values(clienteMap).sort((a, b) => b.total_pendiente - a.total_pendiente);
+  },
+
+  /** Subir un comprobante (Recibo/Factura) */
+  async uploadComprobante(companyId: string, file: File): Promise<{ url: string; path: string }> {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${companyId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+    const filePath = `${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('receipts')
+      .upload(filePath, file);
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage.from('receipts').getPublicUrl(filePath);
+    return { url: data.publicUrl, path: filePath };
+  },
+
   /** Resumen financiero agregado para KPI cards */
   async getResumen(companyId: string): Promise<{
     ventaTotal: number;
@@ -133,6 +253,36 @@ export const pagosService = {
   },
 };
 
+// ─── Types for hierarchical AR view ───────────────────────────────────────────
+
+export interface ContratoCuenta {
+  cotizacion_id: string;
+  nombre_cliente: string;
+  lead_id: string | null;
+  plan_nombre: string;
+  tipo_pago: string | null;
+  total_contrato: number;
+  total_cobrado: number;
+  total_pendiente: number;
+  anticipo: number;
+  cuotas_pactadas: number;
+  plazo_meses: number;
+  estado_contrato: string;
+  fecha_contrato: string;
+  pagos_recibidos: any[];
+  schedule: any[]; // cuotas_esperadas rows
+  tiene_plan_amortizacion: boolean;
+}
+
+export interface ClienteCuenta {
+  nombre_cliente: string;
+  lead_id: string | null;
+  contratos: ContratoCuenta[];
+  total_cobrado: number;
+  total_pendiente: number;
+  total_contratos: number;
+}
+
 export interface Gasto {
   id: string;
   company_id: string;
@@ -141,6 +291,8 @@ export interface Gasto {
   monto: number;
   fecha: string;
   notas: string | null;
+  comprobante_url?: string | null;
+  comprobante_path?: string | null;
   registrado_por: string | null;
   created_at: string;
 }

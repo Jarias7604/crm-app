@@ -97,11 +97,22 @@ ALTER TABLE public.gastos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.planes_pago ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cuotas_esperadas ENABLE ROW LEVEL SECURITY;
 
--- RLS Policies
-CREATE POLICY "pagos_company_isolation" ON public.pagos FOR ALL USING (company_id = (SELECT company_id FROM public.profiles WHERE id = auth.uid() LIMIT 1));
-CREATE POLICY "gastos_company_isolation" ON public.gastos FOR ALL USING (company_id = (SELECT company_id FROM public.profiles WHERE id = auth.uid() LIMIT 1));
-CREATE POLICY "planes_pago_company_isolation" ON public.planes_pago FOR ALL USING (company_id = (SELECT company_id FROM public.profiles WHERE id = auth.uid() LIMIT 1));
-CREATE POLICY "cuotas_esperadas_company_isolation" ON public.cuotas_esperadas FOR ALL USING (company_id = (SELECT company_id FROM public.profiles WHERE id = auth.uid() LIMIT 1));
+-- RLS Policies (using get_auth_company_id() for consistency + (select ...) for performance)
+CREATE POLICY "pagos_company_isolation" ON public.pagos FOR ALL TO authenticated
+  USING (company_id = (select get_auth_company_id()))
+  WITH CHECK (company_id = (select get_auth_company_id()));
+
+CREATE POLICY "gastos_company_isolation" ON public.gastos FOR ALL TO authenticated
+  USING (company_id = (select get_auth_company_id()))
+  WITH CHECK (company_id = (select get_auth_company_id()));
+
+CREATE POLICY "planes_pago_company_isolation" ON public.planes_pago FOR ALL TO authenticated
+  USING (company_id = (select get_auth_company_id()))
+  WITH CHECK (company_id = (select get_auth_company_id()));
+
+CREATE POLICY "cuotas_esperadas_company_isolation" ON public.cuotas_esperadas FOR ALL TO authenticated
+  USING (company_id = (select get_auth_company_id()))
+  WITH CHECK (company_id = (select get_auth_company_id()));
 
 -- Triggers to auto-update cuotas_esperadas status when a pago is made
 CREATE OR REPLACE FUNCTION public.trg_actualizar_cuota_pago()

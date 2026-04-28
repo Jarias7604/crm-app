@@ -51,10 +51,17 @@ export default function Login() {
 
         const { error } = await supabase.auth.signInWithOtp({
             email,
+            options: {
+                shouldCreateUser: false,
+            },
         });
 
         if (error) {
-            setError(error.message);
+            if (error.message.toLowerCase().includes('rate limit') || error.message.toLowerCase().includes('email rate')) {
+                setError("Límite de envíos alcanzado. Espera unos minutos e intenta de nuevo, o usa tu contraseña para entrar.");
+            } else {
+                setError(error.message);
+            }
         } else {
             setOtpSent(true);
             toast.success("Código enviado. Revisa tu bandeja de entrada.");
