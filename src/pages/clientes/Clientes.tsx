@@ -23,14 +23,16 @@ export default function Clientes() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [clientData, stageData] = await Promise.all([
+      const [clientResult, stageResult] = await Promise.allSettled([
         clientsService.getAll(),
         pipelineStagesService.getAll(),
       ]);
-      setClients(clientData);
-      setStages(stageData);
+      setClients(clientResult.status === 'fulfilled' ? clientResult.value : []);
+      setStages(stageResult.status === 'fulfilled' ? stageResult.value : []);
     } catch {
-      toast.error('Error al cargar clientes');
+      // Silently handle — empty state is shown instead
+      setClients([]);
+      setStages([]);
     } finally {
       setLoading(false);
     }
