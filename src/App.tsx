@@ -56,6 +56,7 @@ const ManualPage        = lazy(() => import('./pages/support/ManualPage'));
 const HelpChat          = lazy(() => import('./components/HelpChat/HelpChat'));
 const PWAInstallPrompt  = lazy(() => import('./components/PWAInstallPrompt').then(m => ({ default: m.PWAInstallPrompt })));
 const FlyerStudio       = lazy(() => import('./pages/marketing/FlyerStudio'));
+const Finanzas          = lazy(() => import('./pages/Finanzas'));
 
 // ─── Skeleton Screen (técnica Netflix) ───────────────────────────────────────
 // Muestra estructura visual inmediatamente mientras carga el JS del módulo.
@@ -190,6 +191,9 @@ function App() {
 
                   {/* Clientes Module */}
                   <Route path="/clientes" element={<Clientes />} />
+
+                  {/* Finanzas Module */}
+                  <Route path="/finanzas" element={<Finanzas />} />
 
                   {/* Support Routes */}
                   <Route path="/support/tickets" element={<Tickets />} />

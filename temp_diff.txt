@@ -1,0 +1,193 @@
+﻿diff --git a/src/App.tsx b/src/App.tsx
+index ffda25b..4c60c60 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -56,6 +56,7 @@ const ManualPage        = lazy(() => import('./pages/support/ManualPage'));
+ const HelpChat          = lazy(() => import('./components/HelpChat/HelpChat'));
+ const PWAInstallPrompt  = lazy(() => import('./components/PWAInstallPrompt').then(m => ({ default: m.PWAInstallPrompt })));
+ const FlyerStudio       = lazy(() => import('./pages/marketing/FlyerStudio'));
++const Finanzas          = lazy(() => import('./pages/Finanzas'));
+ 
+ // ΓöÇΓöÇΓöÇ Skeleton Screen (t├⌐cnica Netflix) ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+ // Muestra estructura visual inmediatamente mientras carga el JS del m├│dulo.
+@@ -191,6 +192,9 @@ function App() {
+                   {/* Clientes Module */}
+                   <Route path="/clientes" element={<Clientes />} />
+ 
++                  {/* Finanzas Module */}
++                  <Route path="/finanzas" element={<Finanzas />} />
++
+                   {/* Support Routes */}
+                   <Route path="/support/tickets" element={<Tickets />} />
+                   <Route path="/support/atrasados" element={<OverdueTickets />} />
+diff --git a/src/components/Sidebar.tsx b/src/components/Sidebar.tsx
+index 7b9d0cf..5c1b2ea 100644
+--- a/src/components/Sidebar.tsx
++++ b/src/components/Sidebar.tsx
+@@ -91,6 +91,10 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
+         navigation.push({ name: 'Cotizaciones', href: '/cotizaciones', icon: FileText, current: location.pathname === '/cotizaciones' });
+     }
+ 
++    if (canAccess('quotes')) { // Assuming if they can access quotes, they can access finances. Or just company_admin. Let's make it for super_admin or company_admin.
++        navigation.push({ name: 'Finanzas', href: '/finanzas', icon: CreditCard, current: location.pathname.startsWith('/finanzas') });
++    }
++
+     if (canAccess('calendar')) {
+         navigation.push({ name: t('sidebar.calendar'), href: '/calendar', icon: Calendar, current: location.pathname.startsWith('/calendar') });
+     }
+diff --git a/src/components/clientes/ClienteDetail.tsx b/src/components/clientes/ClienteDetail.tsx
+index 80ce870..f821c86 100644
+--- a/src/components/clientes/ClienteDetail.tsx
++++ b/src/components/clientes/ClienteDetail.tsx
+@@ -1,8 +1,9 @@
+ import { useState, useEffect, useCallback } from 'react';
+-import { X, CheckCircle2, Circle, Loader2, ChevronRight, Send, MessageSquare, Mail, Phone, UserCircle2 } from 'lucide-react';
++import { X, CheckCircle2, Circle, Loader2, ChevronRight, Send, MessageSquare, Mail, Phone, UserCircle2, DollarSign, ClipboardList } from 'lucide-react';
+ import type { Client, ClientPipelineStage, ClientDocument, ClientStageDocumentType } from '../../types/clients';
+ import { clientsService, pipelineStagesService } from '../../services/clients';
+ import StageDocumentUpload from './StageDocumentUpload';
++import PagosPanel from './PagosPanel';
+ import { usePermissions } from '../../hooks/usePermissions';
+ import { supabase } from '../../services/supabase';
+ import toast from 'react-hot-toast';
+@@ -29,6 +30,7 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
+   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+   const [savingAssign, setSavingAssign] = useState(false);
+   const [reverting, setReverting] = useState(false);
++  const [activeTab, setActiveTab] = useState<'pipeline' | 'pagos'>('pipeline');
+ 
+   const load = useCallback(async () => {
+     if (!clientId) return;
+@@ -232,7 +234,41 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
+           </div>
+         )}
+ 
+-        {/* Stages vertical nav + content */}
++        {/* Tabs: Pipeline / Pagos */}
++        <div className="flex border-b border-gray-100">
++          <button
++            onClick={() => setActiveTab('pipeline')}
++            className={`flex items-center gap-1.5 px-5 py-3 text-xs font-black transition-all border-b-2 ${
++              activeTab === 'pipeline'
++                ? 'border-[#4449AA] text-[#4449AA]'
++                : 'border-transparent text-gray-400 hover:text-gray-600'
++            }`}
++          >
++            <ClipboardList className="w-3.5 h-3.5" />
++            Pipeline
++          </button>
++          <button
++            onClick={() => setActiveTab('pagos')}
++            className={`flex items-center gap-1.5 px-5 py-3 text-xs font-black transition-all border-b-2 ${
++              activeTab === 'pagos'
++                ? 'border-emerald-500 text-emerald-600'
++                : 'border-transparent text-gray-400 hover:text-gray-600'
++            }`}
++          >
++            <DollarSign className="w-3.5 h-3.5" />
++            Pagos
++          </button>
++        </div>
++
++        {/* Pagos Tab */}
++        {activeTab === 'pagos' && client && (
++          <div className="flex-1 overflow-y-auto p-5">
++            <PagosPanel leadId={client.lead_id!} canManage={canManage} />
++          </div>
++        )}
++
++        {/* Pipeline Tab */}
++        {activeTab === 'pipeline' && (
+         <div className="flex flex-1 overflow-hidden">
+           {/* Vertical stepper */}
+           <div className="w-36 border-r border-gray-100 py-4 flex flex-col gap-1 overflow-y-auto flex-shrink-0">
+@@ -339,6 +375,7 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
+             })()}
+           </div>
+         </div>
++        )}
+ 
+         {/* Footer: advance button */}
+         {!loading && client && !client.es_activo && canManage && (
+diff --git a/src/pages/CotizacionDetalle.tsx b/src/pages/CotizacionDetalle.tsx
+index 151131a..f4e4638 100644
+--- a/src/pages/CotizacionDetalle.tsx
++++ b/src/pages/CotizacionDetalle.tsx
+@@ -246,11 +246,12 @@ export default function CotizacionDetalle() {
+ 
+     const handleAceptarPropuesta = async () => {
+         if (!cotizacion) return;
+-        if (!window.confirm('┬┐Deseas marcar esta propuesta como ACEPTADA? Esta acci├│n actualizar├í el estado de la cotizaci├│n.')) return;
++        if (!window.confirm('┬┐Deseas marcar esta propuesta como ACEPTADA? Esta acci├│n actualizar├í el estado de la cotizaci├│n y convertir├í el Lead en Cliente.')) return;
+ 
+         setIsAccepting(true);
+         try {
+-            const { error } = await supabase
++            // 1. Actualizar estado de Cotizaci├│n
++            const { error: errorCot } = await supabase
+                 .from('cotizaciones')
+                 .update({
+                     estado: 'aceptada',
+@@ -258,13 +259,26 @@ export default function CotizacionDetalle() {
+                 })
+                 .eq('id', id);
+ 
+-            if (error) throw error;
++            if (errorCot) throw errorCot;
++
++            // 2. Actualizar Lead a 'ganado' (Convertir a Cliente)
++            if (cotizacion.lead_id) {
++                const { error: errorLead } = await supabase
++                    .from('leads')
++                    .update({ status: 'ganado' })
++                    .eq('id', cotizacion.lead_id);
++                    
++                if (errorLead) {
++                    console.warn('No se pudo actualizar el lead a ganado:', errorLead);
++                }
++            }
+ 
+-            toast.success('┬íPropuesta marcada como ACEPTADA!');
++            toast.success('┬íPropuesta ACEPTADA y convertido a Cliente!');
+             fetchCotizacion(); // Recargar datos
+-        } catch (error) {
++        } catch (error: any) {
+             console.error('Error al aceptar:', error);
+-            toast.error('Error al actualizar el estado');
++            alert('ERROR DE SUPABASE: ' + (error?.message || JSON.stringify(error)));
++            toast.error('Error al actualizar el estado: ' + error?.message);
+         } finally {
+             setIsAccepting(false);
+         }
+diff --git a/src/pages/Dashboard.tsx b/src/pages/Dashboard.tsx
+index e7c6cb9..f807144 100644
+--- a/src/pages/Dashboard.tsx
++++ b/src/pages/Dashboard.tsx
+@@ -25,6 +25,7 @@ import { useDashboardStats } from '../hooks/useDashboard';
+ import { MobileQuickActions } from '../components/MobileQuickActions';
+ import { ManagerLivePulse } from '../components/ManagerLivePulse';
+ import { WeeklyLeaderboard } from '../components/WeeklyLeaderboard';
++import { PanoramaFinancieroWidget } from '../components/financiero/PanoramaFinancieroWidget';
+ import toast from 'react-hot-toast';
+ 
+ const THEME = {
+@@ -1623,7 +1624,18 @@ export default function Dashboard() {
+                 )}
+             </div>
+ 
+-            {/* F4 + F5 ├óΓé¼ΓÇ¥ SIA Intelligence Panel (at the bottom, date-filter aware) */}
++            {/* Widget: Panorama Financiero */}
++            {profile?.company_id && (
++                <div className="relative z-0 mb-3">
++                    <PanoramaFinancieroWidget 
++                        companyId={profile.company_id} 
++                        startDate={dateRange.startDate}
++                        endDate={dateRange.endDate}
++                    />
++                </div>
++            )}
++
++            {/* F4 + F5 ΓÇö SIA Intelligence Panel (at the bottom, date-filter aware) */}
+             {profile?.company_id && (
+                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
+                     {/* F4 ├óΓé¼ΓÇ¥ Manager Live Pulse: admin + simulation mode */}

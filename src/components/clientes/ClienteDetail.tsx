@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, CheckCircle2, Circle, Loader2, ChevronRight, Send, MessageSquare, Mail, Phone, UserCircle2 } from 'lucide-react';
+import { X, CheckCircle2, Circle, Loader2, ChevronRight, Send, MessageSquare, Mail, Phone, UserCircle2, DollarSign, ClipboardList } from 'lucide-react';
 import type { Client, ClientPipelineStage, ClientDocument, ClientStageDocumentType } from '../../types/clients';
 import { clientsService, pipelineStagesService } from '../../services/clients';
 import StageDocumentUpload from './StageDocumentUpload';
+import PagosPanel from './PagosPanel';
 import { usePermissions } from '../../hooks/usePermissions';
 import { supabase } from '../../services/supabase';
 import toast from 'react-hot-toast';
@@ -29,6 +30,7 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [savingAssign, setSavingAssign] = useState(false);
   const [reverting, setReverting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'pipeline' | 'pagos'>('pipeline');
 
   const load = useCallback(async () => {
     if (!clientId) return;
@@ -232,7 +234,41 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
           </div>
         )}
 
-        {/* Stages vertical nav + content */}
+        {/* Tabs: Pipeline / Pagos */}
+        <div className="flex border-b border-gray-100">
+          <button
+            onClick={() => setActiveTab('pipeline')}
+            className={`flex items-center gap-1.5 px-5 py-3 text-xs font-black transition-all border-b-2 ${
+              activeTab === 'pipeline'
+                ? 'border-[#4449AA] text-[#4449AA]'
+                : 'border-transparent text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            <ClipboardList className="w-3.5 h-3.5" />
+            Pipeline
+          </button>
+          <button
+            onClick={() => setActiveTab('pagos')}
+            className={`flex items-center gap-1.5 px-5 py-3 text-xs font-black transition-all border-b-2 ${
+              activeTab === 'pagos'
+                ? 'border-emerald-500 text-emerald-600'
+                : 'border-transparent text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            <DollarSign className="w-3.5 h-3.5" />
+            Pagos
+          </button>
+        </div>
+
+        {/* Pagos Tab */}
+        {activeTab === 'pagos' && client && (
+          <div className="flex-1 overflow-y-auto p-5">
+            <PagosPanel leadId={client.lead_id!} canManage={canManage} />
+          </div>
+        )}
+
+        {/* Pipeline Tab */}
+        {activeTab === 'pipeline' && (
         <div className="flex flex-1 overflow-hidden">
           {/* Vertical stepper */}
           <div className="w-36 border-r border-gray-100 py-4 flex flex-col gap-1 overflow-y-auto flex-shrink-0">
@@ -339,6 +375,7 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
             })()}
           </div>
         </div>
+        )}
 
         {/* Footer: advance button */}
         {!loading && client && !client.es_activo && canManage && (

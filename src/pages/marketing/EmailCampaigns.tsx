@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { 
-    Mail, 
-    Plus, 
-    Search, 
-    Filter, 
-    BarChart3, 
-    CheckCircle2, 
-    Clock, 
+import {
+    Mail,
+    Plus,
+    Search,
+    Filter,
+    BarChart3,
+    CheckCircle2,
+    Clock,
     ArrowLeft,
     Smartphone,
     Send,
@@ -91,7 +91,7 @@ export default function EmailCampaigns() {
         }
     };
 
-    const filteredCampaigns = campaigns.filter(c => 
+    const filteredCampaigns = campaigns.filter(c =>
         c.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
@@ -108,7 +108,7 @@ export default function EmailCampaigns() {
             {/* Header - Compact & Premium */}
             <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <button 
+                    <button
                         onClick={() => navigate('/marketing')}
                         className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl hover:bg-white transition-all text-slate-400 hover:text-indigo-600 shadow-inner"
                     >
@@ -129,7 +129,7 @@ export default function EmailCampaigns() {
                         <div className="w-px h-6 bg-slate-200"></div>
                         <CompactStat label="Clicks" value={campaigns.reduce((acc, c) => acc + (c.stats?.clicked || 0), 0)} color="text-blue-600" />
                     </div>
-                    <Link 
+                    <Link
                         to="/marketing/campaign/new"
                         className="bg-indigo-600 hover:bg-slate-900 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-lg shadow-indigo-600/20 transition-all flex items-center gap-2"
                     >
@@ -143,8 +143,8 @@ export default function EmailCampaigns() {
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
                 <div className="md:col-span-8 relative">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input 
-                        type="text" 
+                    <input
+                        type="text"
                         placeholder="Buscar campañas..."
                         className="w-full bg-white border border-slate-100 rounded-xl pl-11 pr-4 py-2.5 text-sm font-medium focus:ring-2 focus:ring-indigo-500/5 outline-none transition-all shadow-sm"
                         value={searchTerm}
@@ -182,8 +182,8 @@ export default function EmailCampaigns() {
                                 <h3 className="font-bold text-slate-900 truncate tracking-tight text-sm uppercase">{campaign.name}</h3>
                                 <span className={cn(
                                     "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter border",
-                                    campaign.type === 'email' ? 'bg-amber-50 text-amber-600 border-amber-100' : 
-                                    campaign.type === 'whatsapp' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-sky-50 text-sky-600 border-sky-100'
+                                    campaign.type === 'email' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                                        campaign.type === 'whatsapp' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-sky-50 text-sky-600 border-sky-100'
                                 )}>
                                     {campaign.type}
                                 </span>
@@ -220,7 +220,7 @@ export default function EmailCampaigns() {
 
                         {/* Actions */}
                         <div className="flex items-center gap-1">
-                            <button 
+                            <button
                                 onClick={() => navigate(`/marketing/campaign/${campaign.id}/edit`)}
                                 className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 rounded-lg transition-all"
                                 title="Editar"
@@ -228,14 +228,14 @@ export default function EmailCampaigns() {
                                 <Edit className="w-4 h-4" />
                             </button>
                             {campaign.status === 'completed' && (
-                                <button 
+                                <button
                                     onClick={() => handleDuplicate(campaign)}
                                     className="px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-all shadow-sm active:scale-95"
                                 >
                                     Clonar
                                 </button>
                             )}
-                            <button 
+                            <button
                                 onClick={() => handleDelete(campaign.id)}
                                 className="p-2 text-slate-300 hover:text-red-500 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                             >

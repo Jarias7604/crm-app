@@ -246,11 +246,12 @@ export default function CotizacionDetalle() {
 
     const handleAceptarPropuesta = async () => {
         if (!cotizacion) return;
-        if (!window.confirm('¿Deseas marcar esta propuesta como ACEPTADA? Esta acción actualizará el estado de la cotización.')) return;
+        if (!window.confirm('¿Deseas marcar esta propuesta como ACEPTADA? Esta acción actualizará el estado de la cotización y convertirá el Lead en Cliente.')) return;
 
         setIsAccepting(true);
         try {
-            const { error } = await supabase
+            // 1. Actualizar estado de Cotización
+            const { error: errorCot } = await supabase
                 .from('cotizaciones')
                 .update({
                     estado: 'aceptada',
@@ -258,13 +259,26 @@ export default function CotizacionDetalle() {
                 })
                 .eq('id', id);
 
-            if (error) throw error;
+            if (errorCot) throw errorCot;
 
-            toast.success('¡Propuesta marcada como ACEPTADA!');
+            // 2. Actualizar Lead a 'ganado' (Convertir a Cliente)
+            if (cotizacion.lead_id) {
+                const { error: errorLead } = await supabase
+                    .from('leads')
+                    .update({ status: 'ganado' })
+                    .eq('id', cotizacion.lead_id);
+                    
+                if (errorLead) {
+                    console.warn('No se pudo actualizar el lead a ganado:', errorLead);
+                }
+            }
+
+            toast.success('¡Propuesta ACEPTADA y convertido a Cliente!');
             fetchCotizacion(); // Recargar datos
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error al aceptar:', error);
-            toast.error('Error al actualizar el estado');
+            alert('ERROR DE SUPABASE: ' + (error?.message || JSON.stringify(error)));
+            toast.error('Error al actualizar el estado: ' + error?.message);
         } finally {
             setIsAccepting(false);
         }

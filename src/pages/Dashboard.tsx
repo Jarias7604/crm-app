@@ -25,6 +25,7 @@ import { useDashboardStats } from '../hooks/useDashboard';
 import { MobileQuickActions } from '../components/MobileQuickActions';
 import { ManagerLivePulse } from '../components/ManagerLivePulse';
 import { WeeklyLeaderboard } from '../components/WeeklyLeaderboard';
+import { PanoramaFinancieroWidget } from '../components/financiero/PanoramaFinancieroWidget';
 import toast from 'react-hot-toast';
 
 const THEME = {
@@ -1623,7 +1624,18 @@ export default function Dashboard() {
                 )}
             </div>
 
-            {/* F4 + F5 â€” SIA Intelligence Panel (at the bottom, date-filter aware) */}
+            {/* Widget: Panorama Financiero */}
+            {profile?.company_id && (
+                <div className="relative z-0 mb-3">
+                    <PanoramaFinancieroWidget 
+                        companyId={profile.company_id} 
+                        startDate={dateRange.startDate}
+                        endDate={dateRange.endDate}
+                    />
+                </div>
+            )}
+
+            {/* F4 + F5 — SIA Intelligence Panel (at the bottom, date-filter aware) */}
             {profile?.company_id && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
                     {/* F4 â€” Manager Live Pulse: admin + simulation mode */}

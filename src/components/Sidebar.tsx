@@ -91,6 +91,10 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         navigation.push({ name: 'Cotizaciones', href: '/cotizaciones', icon: FileText, current: location.pathname === '/cotizaciones' });
     }
 
+    if (canAccess('quotes')) { // Assuming if they can access quotes, they can access finances. Or just company_admin. Let's make it for super_admin or company_admin.
+        navigation.push({ name: 'Finanzas', href: '/finanzas', icon: CreditCard, current: location.pathname.startsWith('/finanzas') });
+    }
+
     if (canAccess('calendar')) {
         navigation.push({ name: t('sidebar.calendar'), href: '/calendar', icon: Calendar, current: location.pathname.startsWith('/calendar') });
     }
