@@ -50,7 +50,7 @@ export function RegistrarIngresoModal({
 
     setSaving(true);
     try {
-      let cotizacionId = null;
+      let cotizacionId: string = '';
       const { data: cots } = await supabase
         .from('cotizaciones')
         .select('id')
@@ -88,8 +88,8 @@ export function RegistrarIngresoModal({
         lead_id: selectedLead.id,
         monto: Number(monto),
         fecha_pago: fecha,
-        tipo: 'abono',
-        metodo_pago: metodo,
+        tipo: 'otro',
+        metodo_pago: metodo as any,
         notas: notas || null,
       });
 
