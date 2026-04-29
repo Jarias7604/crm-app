@@ -508,11 +508,13 @@ export default function Companies() {
                                                         admin_password: '',
                                                         admin_full_name: ''
                                                     });
-                                                    // Load existing members for this company
+                                                    // Solo cargar ADMINS de la empresa (no colaboradores)
                                                     const { data: members } = await supabase
                                                         .from('profiles')
                                                         .select('id, email, full_name, role, phone, address, created_at')
                                                         .eq('company_id', company.id)
+                                                        .in('role', ['company_admin', 'super_admin'])
+                                                        .eq('status', 'active')
                                                         .order('created_at', { ascending: true });
                                                     setCompanyMembers(members || []);
                                                     setActiveTab('info');
@@ -716,9 +718,10 @@ export default function Companies() {
                                         <div className="space-y-3">
                                             <div className="flex items-center justify-between px-1">
                                                 <div className="flex items-center gap-2">
-                                                    <Users className="w-4 h-4 text-slate-400" />
-                                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Seleccionar Usuario ({companyMembers.length})</h4>
+                                                    <Shield className="w-4 h-4 text-indigo-400" />
+                                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Administradores ({companyMembers.length})</h4>
                                                 </div>
+                                                <span className="text-[9px] text-slate-300 font-bold">Colaboradores → Panel Equipo</span>
                                                 <button
                                                     type="button"
                                                     onClick={() => {
@@ -911,10 +914,9 @@ export default function Companies() {
                                                         onChange={(e) => setMemberEditData(prev => ({ ...prev, role: e.target.value }))}
                                                         className="w-full h-14 px-5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-black text-sm transition-all focus:bg-white text-slate-700 shadow-sm appearance-none cursor-pointer"
                                                     >
-                                                        <option value="company_admin">Admin</option>
-                                                        <option value="sales_rep">Vendedor</option>
-                                                        <option value="viewer">Visor (Solo lectura)</option>
+                                                        <option value="company_admin">🛡️ Administrador de Empresa</option>
                                                     </select>
+                                                    <p className="text-[9px] text-slate-300 font-bold mt-1 ml-1">Colaboradores se gestionan desde el Panel de Equipo</p>
                                                 </div>
                                                 <div className="col-span-2">
                                                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2">Dirección</label>
