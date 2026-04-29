@@ -11,11 +11,14 @@ import { storageService } from '../../services/storage';
 import { supabase } from '../../services/supabase';
 import Switch from '../../components/ui/Switch';
 import { CustomDatePicker } from '../../components/ui/CustomDatePicker';
+import RoleManager from './RoleManager';
 
 
 type TabType = 'general' | 'security';
+type MainTabType = 'team' | 'roles';
 
 export default function Team() {
+    const [mainTab, setMainTab] = useState<MainTabType>('team');
     const { profile: myProfile } = useAuth();
     const [members, setMembers] = useState<Profile[]>([]);
     const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -324,9 +327,38 @@ export default function Team() {
                         <p className="text-[13px] text-gray-400 font-medium">Gestión integral de colaboradores y accesos</p>
                     </div>
                 </div>
+                {/* Main Tab Switcher */}
+                <div className="flex bg-gray-100 p-1 rounded-2xl gap-1">
+                    <button
+                        onClick={() => setMainTab('team')}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                            mainTab === 'team' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                        }`}
+                    >
+                        <Users className="w-3.5 h-3.5" />
+                        Directorio
+                    </button>
+                    <button
+                        onClick={() => setMainTab('roles')}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                            mainTab === 'roles' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                        }`}
+                    >
+                        <Shield className="w-3.5 h-3.5" />
+                        Perfiles de Acceso
+                    </button>
+                </div>
             </header>
 
-            {/* High Density Grid - Senior Fit (3:7 ratio) */}
+            {/* Roles Tab */}
+            {mainTab === 'roles' && (
+                <div className="animate-in fade-in duration-300">
+                    <RoleManager />
+                </div>
+            )}
+
+            {mainTab === 'team' && (
+            <div className="space-y-0">
             <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 items-start">
 
                 {/* Left Column: Admin Control Panel (Sticky Sidebar) */}
@@ -907,6 +939,8 @@ export default function Team() {
                     </div>
                 </div>,
                 document.body
+            )}
+        </div>
             )}
         </div>
     );
