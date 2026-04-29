@@ -729,57 +729,105 @@ export default function Team() {
                                 ) : (
                                     <div className="space-y-8 animate-in fade-in duration-300">
                                         <div className="bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-100/50">
-                                            <div className="flex items-center gap-3 mb-4">
+                                            <div className="flex items-center gap-3 mb-2">
                                                 <Shield className="w-5 h-5 text-indigo-600" />
-                                                <label className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em]">Configuración de Nivel de Acceso</label>
+                                                <label className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em]">Perfil de Acceso</label>
                                             </div>
+                                            <p className="text-[10px] text-gray-400 font-medium mb-4">
+                                                Selecciona qué tipo de colaborador es. Los módulos que puede ver los define el perfil.
+                                            </p>
                                             <select
-                                                className="w-full h-14 rounded-2xl border-white bg-white px-5 font-bold text-sm text-gray-900 shadow-sm outline-none"
+                                                className="w-full h-14 rounded-2xl border-white bg-white px-5 font-bold text-sm text-gray-900 shadow-sm outline-none cursor-pointer"
                                                 value={editingMember.custom_role_id || ''}
                                                 onChange={e => { const val = e.target.value; setEditingMember(prev => prev ? { ...prev, custom_role_id: val } : prev); }}
                                                 disabled={editingMember.id === myProfile?.id}
                                             >
+                                                <option value="">— Sin perfil asignado —</option>
                                                 {customRoles
                                                     .filter(role => myProfile?.role === 'super_admin' || role.base_role !== 'super_admin')
                                                     .map(role => (
                                                         <option key={role.id} value={role.id}>{role.name}</option>
                                                     ))}
                                             </select>
-                                        </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            {allowedPermissions.map(key => {
-                                                // Icon and Title mapping for a premium and consistent UI
-                                                const meta: Record<string, { title: string, icon: any }> = {
-                                                    leads: { title: "Gestión de Leads", icon: Users },
-                                                    quotes: { title: "Cotizaciones", icon: FileText },
-                                                    calendar: { title: "Agenda Global", icon: Calendar },
-                                                    marketing: { title: "Marketing Hub", icon: Megaphone },
-                                                    chat: { title: "Mensajes (Chat)", icon: MessageSquare },
-                                                    branding: { title: "Marca de Empresa", icon: Building },
-                                                    pricing: { title: "Config. Precios", icon: Tag },
-                                                    paquetes: { title: "Gestión Paquetes", icon: Package },
-                                                    items: { title: "Catálogo Items", icon: Layers },
-                                                    financial_rules: { title: "Reglas Financ.", icon: CreditCard },
-                                                    loss_reasons: { title: "Motiv. Pérdida", icon: XCircle }
+
+                                            {/* Read-only preview of what this role allows */}
+                                            {(() => {
+                                                const selectedRole = customRoles.find(r => r.id === editingMember.custom_role_id);
+                                                const perms = (selectedRole as any)?.permissions || {};
+                                                const PERM_LABELS: Record<string, { label: string; icon: any }> = {
+                                                    leads: { label: 'Leads', icon: Users },
+                                                    quotes: { label: 'Cotizaciones', icon: FileText },
+                                                    tickets: { label: 'Tickets', icon: AlertCircle },
+                                                    calendar: { label: 'Agenda', icon: Calendar },
+                                                    chat: { label: 'Chat', icon: MessageSquare },
+                                                    clientes: { label: 'Clientes', icon: Building },
+                                                    marketing: { label: 'Marketing', icon: Megaphone },
+                                                    pricing: { label: 'Precios', icon: Tag },
+                                                    paquetes: { label: 'Paquetes', icon: Package },
+                                                    items: { label: 'Catálogo', icon: Layers },
+                                                    financial_rules: { label: 'Finanzas', icon: CreditCard },
+                                                    loss_reasons: { label: 'Mot. Pérdida', icon: XCircle },
+                                                    dashboard_full: { label: 'Dashboard', icon: Shield },
                                                 };
 
-                                                const item = meta[key] || { title: key.charAt(0).toUpperCase() + key.slice(1), icon: Shield };
+                                                if (!editingMember.custom_role_id) return (
+                                                    <div className="mt-4 flex items-center gap-2 p-3 rounded-xl bg-amber-50 border border-amber-100">
+                                                        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                                                        <p className="text-[10px] font-black text-amber-600">Sin perfil asignado — el colaborador no podrá acceder al sistema.</p>
+                                                    </div>
+                                                );
+
+                                                const active = Object.entries(PERM_LABELS).filter(([k]) => perms[k] === true);
+                                                const inactive = Object.entries(PERM_LABELS).filter(([k]) => perms[k] !== true);
 
                                                 return (
-                                                    <PermissionRow
-                                                        key={key}
-                                                        title={item.title}
-                                                        icon={item.icon}
-                                                        mainKey={key}
-                                                        permissions={editingMember.permissions}
-                                                        onChange={(p: any) => setEditingMember(prev => prev ? { ...prev, permissions: p } : prev)}
-                                                    />
+                                                    <div className="mt-4 space-y-3">
+                                                        {/* Info banner */}
+                                                        <div className="flex items-start gap-2 bg-white/70 rounded-xl p-3 border border-indigo-100">
+                                                            <Shield className="w-3.5 h-3.5 text-indigo-400 mt-0.5 shrink-0" />
+                                                            <p className="text-[10px] text-indigo-500 font-medium leading-snug">
+                                                                Para modificar los permisos ve a la pestaña <span className="font-black">Perfiles de Acceso</span> en la parte superior.
+                                                            </p>
+                                                        </div>
+
+                                                        {active.length === 0 ? (
+                                                            <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-100">
+                                                                <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                                                                <p className="text-[10px] font-black text-red-500">Este perfil no tiene permisos definidos. Edítalo en Perfiles de Acceso.</p>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <div>
+                                                                    <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-2">✅ Tiene acceso a</p>
+                                                                    <div className="flex flex-wrap gap-1.5">
+                                                                        {active.map(([key, { label, icon: Icon }]) => (
+                                                                            <span key={key} className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-100 text-indigo-700 text-[9px] font-black uppercase tracking-wide border border-indigo-200">
+                                                                                <Icon className="w-2.5 h-2.5" />{label}
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                                {inactive.length > 0 && (
+                                                                    <div>
+                                                                        <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-2">🚫 Sin acceso a</p>
+                                                                        <div className="flex flex-wrap gap-1.5">
+                                                                            {inactive.map(([key, { label }]) => (
+                                                                                <span key={key} className="px-2.5 py-1 rounded-lg bg-gray-50 text-gray-300 text-[9px] font-bold uppercase tracking-wide border border-gray-100">
+                                                                                    {label}
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                    </div>
                                                 );
-                                            })}
+                                            })()}
                                         </div>
 
                                         {/* Password Reset History */}
-                                        <div className="mt-6 bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                                        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
                                             <div className="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
                                                 <History className="w-4 h-4 text-gray-400" />
                                                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Historial de Cambios de Contraseña</span>
