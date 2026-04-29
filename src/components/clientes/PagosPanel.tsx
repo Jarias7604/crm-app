@@ -63,6 +63,7 @@ export default function PagosPanel({ leadId, canManage }: Props) {
   const [form, setForm] = useState(EMPTY_FORM);
 
   const load = useCallback(async () => {
+    if (!leadId) { setLoading(false); return; }
     setLoading(true);
     try {
       // Cargar cotizaciones del lead
@@ -93,7 +94,7 @@ export default function PagosPanel({ leadId, canManage }: Props) {
         setCuotasEsperadas(cuotasData);
       }
     } catch {
-      toast.error('Error al cargar pagos');
+      console.error('Error cargando pagos, lead_id:', leadId);
     } finally {
       setLoading(false);
     }
@@ -156,11 +157,16 @@ export default function PagosPanel({ leadId, canManage }: Props) {
     );
   }
 
-  if (cotizaciones.length === 0) {
+  if (!leadId || cotizaciones.length === 0) {
     return (
-      <div className="text-center py-6 text-gray-400">
-        <DollarSign className="w-8 h-8 mx-auto mb-2 opacity-30" />
-        <p className="text-xs font-semibold">Sin cotizaciones asociadas</p>
+      <div className="text-center py-8 px-4">
+        <DollarSign className="w-10 h-10 mx-auto mb-3 text-gray-200" />
+        <p className="text-sm font-black text-gray-400 mb-1">Sin cotización asociada</p>
+        <p className="text-xs text-gray-300 leading-relaxed max-w-[220px] mx-auto">
+          Para registrar pagos, crea una cotización en el módulo{' '}
+          <span className="font-bold text-indigo-400">Cotizaciones</span> y márcala como{' '}
+          <span className="font-bold text-emerald-500">Ganada</span>.
+        </p>
       </div>
     );
   }
