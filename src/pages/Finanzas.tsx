@@ -7,6 +7,7 @@ import { pagosService, gastosService, type PanoramaFinanciero, type Gasto, type 
 import { Button } from '../components/ui/Button';
 import { RecibirPagoModal } from '../components/finanzas/RecibirPagoModal';
 import { CuentasPorCobrar } from '../components/finanzas/CuentasPorCobrar';
+import { RegistrarIngresoModal } from '../components/finanzas/RegistrarIngresoModal';
 import toast from 'react-hot-toast';
 
 export default function Finanzas() {
@@ -23,6 +24,7 @@ export default function Finanzas() {
 
   // Modals — selectedContrato drives RecibirPagoModal
   const [selectedContrato, setSelectedContrato] = useState<ContratoCuenta | null>(null);
+  const [isAddingIngreso, setIsAddingIngreso] = useState(false);
 
   // Gasto Form state
   const [isAddingGasto, setIsAddingGasto] = useState(false);
@@ -137,6 +139,14 @@ export default function Finanzas() {
         <div>
           <h1 className="text-2xl font-black tracking-tight text-slate-900">Módulo Financiero</h1>
           <p className="text-slate-500 mt-1">Control tipo QuickBooks para cash flow, cuentas por cobrar y resultados.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button onClick={() => setIsAddingIngreso(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm border-0 font-bold tracking-wide">
+            <Plus className="w-4 h-4 mr-2" /> Registrar Ingreso
+          </Button>
+          <Button onClick={() => setIsAddingGasto(true)} variant="outline" className="text-slate-700 bg-white shadow-sm font-bold tracking-wide border-slate-200 hover:bg-slate-50">
+            <Plus className="w-4 h-4 mr-2 text-rose-500" /> Registrar Gasto
+          </Button>
         </div>
       </div>
 
@@ -449,6 +459,7 @@ export default function Finanzas() {
         </div>
       )}
 
+      {/* Modals */}
       {selectedContrato && (
         <RecibirPagoModal
           cuenta={{
@@ -472,7 +483,17 @@ export default function Finanzas() {
           onSuccess={() => { setSelectedContrato(null); loadData(); }}
         />
       )}
+
+      {isAddingIngreso && profile?.company_id && (
+        <RegistrarIngresoModal
+          companyId={profile.company_id}
+          onClose={() => setIsAddingIngreso(false)}
+          onSuccess={() => {
+            setIsAddingIngreso(false);
+            loadData();
+          }}
+        />
+      )}
     </div>
   );
 }
-
