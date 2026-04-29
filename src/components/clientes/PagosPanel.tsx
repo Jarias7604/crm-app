@@ -61,12 +61,21 @@ export default function PagosPanel({ leadId, canManage }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [leadData, setLeadData] = useState<any>(null);
 
   const load = useCallback(async () => {
     if (!leadId) { setLoading(false); return; }
     setLoading(true);
     try {
-      // Cargar cotizaciones del lead
+      // 1. Cargar datos básicos del lead
+      const { data: lead } = await supabase
+        .from('leads')
+        .select('name, value, closing_amount, company_name, email, company_id')
+        .eq('id', leadId)
+        .single();
+      setLeadData(lead);
+
+      // 2. Cargar cotizaciones del lead
       const { data: cotsData } = await supabase
         .from('cotizaciones')
         .select('id, plan_nombre, total_anual, estado, tipo_pago, cuotas, monto_anticipo')
@@ -147,6 +156,34 @@ export default function PagosPanel({ leadId, canManage }: Props) {
     }
   };
 
+  const handleQuickQuote = async () => {
+    if (!leadData) return;
+    setSaving(true);
+    try {
+      const amount = leadData.closing_amount || leadData.value || 0;
+      const { error } = await supabase.from('cotizaciones').insert({
+        company_id: leadData.company_id,
+        lead_id: leadId,
+        nombre_cliente: leadData.name || 'Sin Nombre',
+        empresa_cliente: leadData.company_name,
+        email_cliente: leadData.email,
+        plan_nombre: 'Cotización Base (Auto-generada)',
+        total_anual: amount,
+        subtotal_anual: amount,
+        estado: 'ganado',
+        tipo_pago: 'contado',
+        notas: 'Generada automáticamente desde el panel de pagos para iniciar cobranza.'
+      });
+      if (error) throw error;
+      toast.success('Cotización base creada');
+      await load();
+    } catch (e: any) {
+      toast.error('Error al generar cotización: ' + e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-2 py-2">
@@ -158,15 +195,25 @@ export default function PagosPanel({ leadId, canManage }: Props) {
   }
 
   if (!leadId || cotizaciones.length === 0) {
+    const suggestedAmount = leadData ? (leadData.closing_amount || leadData.value || 0) : 0;
+    
     return (
       <div className="text-center py-8 px-4">
         <DollarSign className="w-10 h-10 mx-auto mb-3 text-gray-200" />
         <p className="text-sm font-black text-gray-400 mb-1">Sin cotización asociada</p>
-        <p className="text-xs text-gray-300 leading-relaxed max-w-[220px] mx-auto">
-          Para registrar pagos, crea una cotización en el módulo{' '}
-          <span className="font-bold text-indigo-400">Cotizaciones</span> y márcala como{' '}
-          <span className="font-bold text-emerald-500">Ganada</span>.
+        <p className="text-[10px] text-gray-400 leading-relaxed max-w-[220px] mx-auto mb-4">
+          Para registrar pagos o amortizaciones, necesitas una cotización ganada base.
         </p>
+        {canManage && leadData && (
+          <button
+            onClick={handleQuickQuote}
+            disabled={saving}
+            className="flex items-center justify-center gap-1.5 mx-auto bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-4 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-colors disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calculator className="w-4 h-4" />}
+            Auto-Generar Cotización por ${suggestedAmount.toLocaleString()}
+          </button>
+        )}
       </div>
     );
   }
