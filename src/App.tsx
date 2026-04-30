@@ -26,12 +26,10 @@ const Team              = lazy(() => import('./pages/company/Team'));
 const Permissions       = lazy(() => import('./pages/company/Permissions'));
 const Cotizaciones      = lazy(() => import('./pages/Cotizaciones'));
 const NuevaCotizacion   = lazy(() => import('./pages/NuevaCotizacionDinamica'));
-const PricingConfig     = lazy(() => import('./pages/PricingConfig'));
+const CatalogoProductos   = lazy(() => import('./pages/CatalogoProductos'));
 const FinancialRules    = lazy(() => import('./pages/admin/FinancialRules'));
 const LossReasons       = lazy(() => import('./pages/admin/LossReasons'));
 const Industries        = lazy(() => import('./pages/admin/Industries'));
-const GestionPaquetes   = lazy(() => import('./pages/GestionPaquetes'));
-const GestionItems      = lazy(() => import('./pages/GestionItems'));
 const CotizadorPro      = lazy(() => import('./pages/CotizadorPro'));
 const CotizacionDetalle = lazy(() => import('./pages/CotizacionDetalle'));
 const Branding          = lazy(() => import('./pages/company/Branding'));
@@ -155,12 +153,13 @@ function App() {
                     <Route path="/company/branding" element={<Branding />} />
                     <Route path="/company/teams" element={<Teams />} />
                     <Route path="/company/performance" element={<TeamPerformance />} />
-                    <Route path="/pricing" element={<PricingConfig />} />
+                    <Route path="/catalogo" element={<CatalogoProductos />} />
+                    <Route path="/pricing" element={<Navigate to="/catalogo" replace />} />
+                    <Route path="/paquetes" element={<Navigate to="/catalogo" replace />} />
+                    <Route path="/items" element={<Navigate to="/catalogo" replace />} />
                     <Route path="/financial-rules" element={<FinancialRules />} />
                     <Route path="/loss-reasons" element={<LossReasons />} />
                     <Route path="/industries" element={<Industries />} />
-                    <Route path="/paquetes" element={<GestionPaquetes />} />
-                    <Route path="/items" element={<GestionItems />} />
                     <Route path="/admin/pipeline" element={<PipelineConfig />} />
                     <Route path="/admin/call-bot" element={<CallBot />} />
                   </Route>

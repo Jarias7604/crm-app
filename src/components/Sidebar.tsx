@@ -22,7 +22,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         subItems?: { name: string; href: string; icon: any }[];
     }
     const isCallBotEnabled = import.meta.env.VITE_SHOW_CALL_BOT === 'true';
-    const configPaths = ['/company/branding', '/pricing', '/paquetes', '/items', '/financial-rules', '/loss-reasons', '/industries', '/admin/call-bot'];
+    const configPaths = ['/company/branding', '/catalogo', '/financial-rules', '/loss-reasons', '/industries', '/admin/call-bot'];
     const marketingPaths = ['/marketing', '/marketing/email', '/marketing/lead-hunter', '/marketing/ai-agents', '/marketing/settings', '/marketing/flyers'];
     const teamPaths = ['/company/team', '/company/teams', '/company/performance'];
     const [configOpen, setConfigOpen] = useState(configPaths.some(path => location.pathname === path));
@@ -141,9 +141,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     const configSubItemsRaw = [
         { name: 'Marca de Empresa', href: '/company/branding', icon: Building, current: location.pathname === '/company/branding', permissionKey: 'branding' },
         { name: 'Pipeline Clientes', href: '/admin/pipeline', icon: UserCheck, current: location.pathname === '/admin/pipeline', permissionKey: 'pipeline.admin' },
-        { name: 'Gestión Precios', href: '/pricing', icon: Layers, current: location.pathname === '/pricing', permissionKey: 'pricing' },
-        { name: 'Gestión Paquete', href: '/paquetes', icon: Package, current: location.pathname === '/paquetes', permissionKey: 'paquetes' },
-        { name: 'Gestión Item', href: '/items', icon: Layers, current: location.pathname === '/items', permissionKey: 'items' },
+        { name: 'Catálogo de Productos', href: '/catalogo', icon: Package, current: location.pathname === '/catalogo', permissionKey: 'pricing' },
         { name: 'Gestión Financiera', href: '/financial-rules', icon: CreditCard, current: location.pathname === '/financial-rules', permissionKey: 'financial_rules' },
         { name: 'Motivos de Pérdida', href: '/loss-reasons', icon: XCircle, current: location.pathname === '/loss-reasons', permissionKey: 'loss_reasons' },
         { name: 'Rubros / Industrias', href: '/industries', icon: Building2, current: location.pathname === '/industries', permissionKey: 'loss_reasons' },
