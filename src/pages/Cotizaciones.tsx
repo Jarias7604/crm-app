@@ -593,13 +593,13 @@ export default function Cotizaciones() {
 
                                                                                 {colId === 'volumen_dtes' && (
                                                                                     <span className="text-xs font-black text-slate-500 bg-slate-50 px-2 py-1 rounded-md border border-slate-100 uppercase tracking-tighter">
-                                                                                        {cot.volumen_dtes.toLocaleString()} DTEs
+                                                                                        {(cot.volumen_dtes ?? 0).toLocaleString()} DTEs
                                                                                     </span>
                                                                                 )}
 
                                                                                 {colId === 'total_anual' && (
                                                                                     <span className="text-sm font-black text-slate-900">
-                                                                                        ${cot.total_anual.toLocaleString()}
+                                                                                        ${Number(cot.total_anual ?? 0).toLocaleString()}
                                                                                     </span>
                                                                                 )}
 
