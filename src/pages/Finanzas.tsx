@@ -7,6 +7,7 @@ import { pagosService, gastosService, type Gasto, type Pago, type ClienteCuenta,
 import { Button } from '../components/ui/Button';
 import { RecibirPagoModal } from '../components/finanzas/RecibirPagoModal';
 import { CuentasPorCobrar } from '../components/finanzas/CuentasPorCobrar';
+import { AgingReport } from '../components/finanzas/AgingReport';
 import { RegistrarIngresoModal } from '../components/finanzas/RegistrarIngresoModal';
 import toast from 'react-hot-toast';
 
@@ -35,7 +36,7 @@ function MiniBarChart({ data }: { data: { label: string; ingresos: number; gasto
 export default function Finanzas() {
   const { t } = useTranslation();
   const { profile } = useAuth();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'cuentas' | 'historial' | 'gastos' | 'resultados'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'cuentas' | 'aging' | 'historial' | 'gastos' | 'resultados'>('dashboard');
   const [period, setPeriod] = useState<'1m' | '3m' | '6m' | 'all'>('6m');
 
   // Data states
@@ -211,6 +212,9 @@ export default function Finanzas() {
         <button onClick={() => setActiveTab('cuentas')} className={`flex-none px-5 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'cuentas' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}>
           <Wallet className="w-4 h-4" /> Cuentas por Cobrar
         </button>
+        <button onClick={() => setActiveTab('aging')} className={`flex-none px-5 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'aging' ? 'bg-orange-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}>
+          <TrendingUp className="w-4 h-4" /> Aging AR
+        </button>
         <button onClick={() => setActiveTab('historial')} className={`flex-none px-5 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${activeTab === 'historial' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}>
           <DollarSign className="w-4 h-4" /> Pagos Recibidos
         </button>
@@ -305,11 +309,22 @@ export default function Finanzas() {
           )}
 
 
-          {/* TAB: CUENTAS POR COBRAR — Cliente → Contratos → Cuotas */}
+          {/* TAB: CUENTAS POR COBRAR */}
           {activeTab === 'cuentas' && (
             <CuentasPorCobrar
               clientes={clientes}
-              onRecibirPago={(contrato) => setSelectedContrato(contrato)}
+              onSuccess={loadData}
+            />
+          )}
+
+          {/* TAB: AGING REPORT */}
+          {activeTab === 'aging' && (
+            <AgingReport
+              clientes={clientes}
+              onPagar={(cliente) => {
+                // Navegar a la ficha del cliente en Cuentas por Cobrar
+                setActiveTab('cuentas');
+              }}
             />
           )}
 
