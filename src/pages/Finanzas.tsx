@@ -1,25 +1,48 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Wallet, TrendingUp, TrendingDown, DollarSign, Plus, Trash2, FileText, CreditCard, ExternalLink } from 'lucide-react';
+import { Wallet, TrendingUp, DollarSign, Plus, Trash2, FileText, CreditCard, ExternalLink, BarChart2 } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider';
 import { supabase } from '../services/supabase';
-import { pagosService, gastosService, type PanoramaFinanciero, type Gasto, type Pago, type ClienteCuenta, type ContratoCuenta } from '../services/pagos';
+import { pagosService, gastosService, type Gasto, type Pago, type ClienteCuenta, type ContratoCuenta } from '../services/pagos';
 import { Button } from '../components/ui/Button';
 import { RecibirPagoModal } from '../components/finanzas/RecibirPagoModal';
 import { CuentasPorCobrar } from '../components/finanzas/CuentasPorCobrar';
 import { RegistrarIngresoModal } from '../components/finanzas/RegistrarIngresoModal';
 import toast from 'react-hot-toast';
 
+// ── Inline SVG Bar Chart ──────────────────────────────────────────────────────
+function MiniBarChart({ data }: { data: { label: string; ingresos: number; gastos: number }[] }) {
+  const max = Math.max(...data.flatMap(d => [d.ingresos, d.gastos]), 1);
+  return (
+    <div className="flex items-end justify-between gap-2 h-28 px-2">
+      {data.map(d => (
+        <div key={d.label} className="flex-1 flex flex-col items-center gap-1">
+          <div className="w-full flex items-end justify-center gap-0.5" style={{ height: 96 }}>
+            <div title={`Ingresos $${d.ingresos.toFixed(0)}`}
+              className="flex-1 bg-emerald-500 rounded-t transition-all duration-700"
+              style={{ height: `${Math.max(2, (d.ingresos / max) * 96)}px` }} />
+            <div title={`Gastos $${d.gastos.toFixed(0)}`}
+              className="flex-1 bg-rose-400 rounded-t transition-all duration-700"
+              style={{ height: `${Math.max(2, (d.gastos / max) * 96)}px` }} />
+          </div>
+          <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{d.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function Finanzas() {
   const { t } = useTranslation();
   const { profile } = useAuth();
   const [activeTab, setActiveTab] = useState<'dashboard' | 'cuentas' | 'historial' | 'gastos' | 'resultados'>('dashboard');
-  
+  const [period, setPeriod] = useState<'1m' | '3m' | '6m' | 'all'>('6m');
+
   // Data states
-  const [panorama, setPanorama] = useState<PanoramaFinanciero[]>([]);
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [pagosRecibidos, setPagosRecibidos] = useState<Pago[]>([]);
   const [clientes, setClientes] = useState<ClienteCuenta[]>([]);
+  const [cotizacionesMes, setCotizacionesMes] = useState<{mes: string; total: number}[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Modals — selectedContrato drives RecibirPagoModal
@@ -36,25 +59,32 @@ export default function Finanzas() {
     if (!profile?.company_id) return;
     setLoading(true);
     try {
-      let panoData: PanoramaFinanciero[] = [];
       let gasData: Gasto[] = [];
       let clientesData: ClienteCuenta[] = [];
-      
-      try { panoData = await pagosService.getPanorama(profile.company_id); } catch (e) { console.error('Error panorama:', e); }
+
       try { gasData = await gastosService.getGastos(profile.company_id); } catch (e) { console.error('Error gastos:', e); }
-      try { clientesData = await pagosService.getClientesCuentas(profile.company_id); } catch (e) { console.error('Error clientesCuentas:', e); }
-      
-      setPanorama(panoData);
+      try { clientesData = await pagosService.getClientesCuentas(profile.company_id); } catch (e) { console.error('Error clientes:', e); }
+
       setGastos(gasData);
       setClientes(clientesData);
 
-      // Fetch all payments for history tab
+      // Payments history
       const { data: allPagos } = await supabase
         .from('pagos')
         .select('*, cotizaciones(nombre_cliente)')
         .eq('company_id', profile.company_id)
         .order('fecha_pago', { ascending: false });
       if (allPagos) setPagosRecibidos(allPagos as any);
+
+      // Monthly contracts (last 6 months) for chart
+      const sixAgo = new Date(); sixAgo.setMonth(sixAgo.getMonth() - 5); sixAgo.setDate(1);
+      const { data: cotsMes } = await supabase
+        .from('cotizaciones')
+        .select('created_at, total_anual')
+        .eq('company_id', profile.company_id)
+        .in('estado', ['aceptada', 'ganado', 'aprobada', 'pagado', 'activo'])
+        .gte('created_at', sixAgo.toISOString());
+      if (cotsMes) setCotizacionesMes(cotsMes.map(c => ({ mes: c.created_at.slice(0,7), total: Number(c.total_anual) })));
 
     } catch (error) {
       console.error('[Finanzas] loadData error:', error);
@@ -132,6 +162,21 @@ export default function Finanzas() {
   const utilidadNeta = totalVentas - totalGastos;
   const margen = totalVentas > 0 ? Math.round((utilidadNeta / totalVentas) * 100) : 0;
 
+  // Build last-6-months chart data
+  const chartData = useMemo(() => {
+    const months: { label: string; key: string; ingresos: number; gastos: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleDateString('es', { month: 'short' });
+      const ingresos = cotizacionesMes.filter(c => c.mes === key).reduce((s, c) => s + c.total, 0);
+      const gastosMes = gastos.filter(g => g.fecha.startsWith(key)).reduce((s, g) => s + Number(g.monto), 0);
+      months.push({ label, key, ingresos, gastos: gastosMes });
+    }
+    return months;
+  }, [cotizacionesMes, gastos]);
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       {/* Header */}
@@ -178,54 +223,75 @@ export default function Finanzas() {
           
           {/* TAB: DASHBOARD */}
           {activeTab === 'dashboard' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center">
-                    <TrendingUp className="w-5 h-5 text-indigo-600" />
+            <div className="space-y-4">
+              {/* KPI Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center">
+                      <TrendingUp className="w-5 h-5 text-indigo-600" />
+                    </div>
+                    <span className="text-sm font-black text-slate-400 uppercase tracking-wider">Ventas Totales</span>
                   </div>
-                  <span className="text-sm font-black text-slate-400 uppercase tracking-wider">Ventas Totales</span>
+                  <p className="text-3xl font-black text-slate-800 mt-4">${totalVentas.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                  <p className="text-xs text-slate-400 font-medium mt-1">Cotizaciones aceptadas</p>
                 </div>
-                <p className="text-3xl font-black text-slate-800 mt-4">${totalVentas.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-                <p className="text-xs text-slate-400 font-medium mt-1">Cotizaciones aceptadas</p>
+
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
+                      <DollarSign className="w-5 h-5 text-emerald-600" />
+                    </div>
+                    <span className="text-sm font-black text-slate-400 uppercase tracking-wider">Dinero Cobrado</span>
+                  </div>
+                  <p className="text-3xl font-black text-emerald-600 mt-4">${totalCobrado.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                  <p className="text-xs text-slate-400 font-medium mt-1">Ingreso real a bancos</p>
+                </div>
+
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
+                      <Wallet className="w-5 h-5 text-amber-600" />
+                    </div>
+                    <span className="text-sm font-black text-slate-400 uppercase tracking-wider">Cuentas por Cobrar</span>
+                  </div>
+                  <p className="text-3xl font-black text-amber-600 mt-4">${totalCuentasPorCobrar.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                  <p className="text-xs text-slate-400 font-medium mt-1">Dinero pendiente en la calle</p>
+                </div>
+
+                <div className="bg-slate-900 rounded-2xl shadow-sm border border-slate-800 p-6 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500 rounded-full blur-3xl opacity-20 -mr-10 -mt-10 pointer-events-none"></div>
+                  <div className="flex items-center gap-3 mb-2 relative z-10">
+                    <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
+                      <FileText className="w-5 h-5 text-white" />
+                    </div>
+                    <span className="text-sm font-black text-slate-300 uppercase tracking-wider">Utilidad Neta</span>
+                  </div>
+                  <p className={`text-3xl font-black mt-4 relative z-10 ${utilidadNeta >= 0 ? 'text-white' : 'text-rose-400'}`}>
+                    ${utilidadNeta.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </p>
+                  <span className={`text-xs font-bold mt-2 inline-block px-2 py-0.5 rounded-full ${utilidadNeta >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                    Margen: {margen}%
+                  </span>
+                </div>
               </div>
 
+              {/* Monthly Trend Chart */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center">
-                    <DollarSign className="w-5 h-5 text-emerald-600" />
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <BarChart2 className="w-5 h-5 text-indigo-600" />
+                    <h3 className="font-black text-slate-800">Tendencia Últimos 6 Meses</h3>
                   </div>
-                  <span className="text-sm font-black text-slate-400 uppercase tracking-wider">Dinero Cobrado</span>
-                </div>
-                <p className="text-3xl font-black text-emerald-600 mt-4">${totalCobrado.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-                <p className="text-xs text-slate-400 font-medium mt-1">Ingreso real a bancos</p>
-              </div>
-
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
-                    <Wallet className="w-5 h-5 text-amber-600" />
+                  <div className="flex items-center gap-4 text-xs font-bold">
+                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-emerald-500 inline-block" /> Ventas</span>
+                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-rose-400 inline-block" /> Gastos</span>
                   </div>
-                  <span className="text-sm font-black text-slate-400 uppercase tracking-wider">Cuentas por Cobrar</span>
                 </div>
-                <p className="text-3xl font-black text-amber-600 mt-4">${totalCuentasPorCobrar.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-                <p className="text-xs text-slate-400 font-medium mt-1">Dinero pendiente en la calle</p>
-              </div>
-
-              <div className="bg-slate-900 rounded-2xl shadow-sm border border-slate-800 p-6 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500 rounded-full blur-3xl opacity-20 -mr-10 -mt-10 pointer-events-none"></div>
-                <div className="flex items-center gap-3 mb-2 relative z-10">
-                  <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
-                    <FileText className="w-5 h-5 text-white" />
-                  </div>
-                  <span className="text-sm font-black text-slate-300 uppercase tracking-wider">Utilidad Neta</span>
-                </div>
-                <p className={`text-3xl font-black mt-4 relative z-10 ${utilidadNeta >= 0 ? 'text-white' : 'text-rose-400'}`}>
-                  ${utilidadNeta.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                </p>
-                <span className={`text-xs font-bold mt-2 inline-block px-2 py-0.5 rounded-full ${utilidadNeta >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
-                  Margen: {margen}%
-                </span>
+                <MiniBarChart data={chartData} />
+                {chartData.every(d => d.ingresos === 0 && d.gastos === 0) && (
+                  <p className="text-center text-xs text-slate-400 mt-2">Registra ventas o gastos para ver la tendencia aquí.</p>
+                )}
               </div>
             </div>
           )}
