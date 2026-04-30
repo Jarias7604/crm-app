@@ -59,11 +59,19 @@ export default function Finanzas() {
     if (!profile?.company_id) return;
     setLoading(true);
     try {
+      // Actualizar cuotas vencidas en tiempo real (RPC → función Postgres)
+      pagosService.refreshOverdueCuotas().catch(() => {});
+
       let gasData: Gasto[] = [];
       let clientesData: ClienteCuenta[] = [];
 
       try { gasData = await gastosService.getGastos(profile.company_id); } catch (e) { console.error('Error gastos:', e); }
-      try { clientesData = await pagosService.getClientesCuentas(profile.company_id); } catch (e) { console.error('Error clientes:', e); }
+      try {
+        clientesData = await pagosService.getClientesCuentas(profile.company_id);
+      } catch (e) {
+        console.error('[Finanzas] Error cuentas por cobrar:', e);
+        toast.error('Error cargando cuentas por cobrar');
+      }
 
       setGastos(gasData);
       setClientes(clientesData);

@@ -39,6 +39,7 @@ const EMPTY_FORM = {
   metodo_pago: 'transferencia' as MetodoPago,
   notas: '',
 };
+const EMPTY_CUOTA_CTX = { id: null as string | null, num: null as number | null };
 
 export default function PagosPanel({ leadId, canManage }: Props) {
   const [pagos, setPagos] = useState<Pago[]>([]);
@@ -62,6 +63,7 @@ export default function PagosPanel({ leadId, canManage }: Props) {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [leadData, setLeadData] = useState<any>(null);
+  const [cuotaCtx, setCuotaCtx] = useState(EMPTY_CUOTA_CTX);
 
   const load = useCallback(async () => {
     if (!leadId) { setLoading(false); return; }
@@ -121,25 +123,27 @@ export default function PagosPanel({ leadId, canManage }: Props) {
     e.preventDefault();
     if (!selectedCotizacion) { toast.error('Selecciona una cotización'); return; }
     if (!form.monto || Number(form.monto) <= 0) { toast.error('Monto inválido'); return; }
-
     setSaving(true);
     try {
       await pagosService.create({
         cotizacion_id: selectedCotizacion,
+        cuota_esperada_id: cuotaCtx.id || null,
         lead_id: leadId,
         monto: Number(form.monto),
         fecha_pago: form.fecha_pago,
-        tipo: form.tipo,
-        numero_cuota: form.numero_cuota ? Number(form.numero_cuota) : null,
+        tipo: cuotaCtx.id ? 'cuota' : form.tipo,
+        numero_cuota: cuotaCtx.num ?? (form.numero_cuota ? Number(form.numero_cuota) : null),
         metodo_pago: form.metodo_pago,
         notas: form.notas || null,
       });
-      toast.success('✅ Pago registrado');
+      const label = cuotaCtx.num ? `Cuota #${cuotaCtx.num} registrada` : 'Pago registrado';
+      toast.success(`✅ ${label}`);
       setForm(EMPTY_FORM);
+      setCuotaCtx(EMPTY_CUOTA_CTX);
       setShowForm(false);
       await load();
-    } catch {
-      toast.error('Error al registrar pago');
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al registrar pago');
     } finally {
       setSaving(false);
     }
@@ -438,12 +442,19 @@ export default function PagosPanel({ leadId, canManage }: Props) {
                     </td>
                     <td className="py-2 px-3 text-right">
                       {cuota.estado !== 'pagada' && canManage && (
-                        <button 
+                        <button
                           onClick={() => {
-                            setForm(f => ({ ...f, monto: String(cuota.monto_total_cuota), tipo: 'cuota', numero_cuota: String(cuota.numero_cuota), fecha_pago: new Date().toISOString().split('T')[0] }));
+                            setCuotaCtx({ id: cuota.id, num: cuota.numero_cuota });
+                            setForm(f => ({
+                              ...f,
+                              monto: String(cuota.monto_total_cuota - (cuota.monto_pagado || 0)),
+                              tipo: 'cuota',
+                              numero_cuota: String(cuota.numero_cuota),
+                              fecha_pago: new Date().toISOString().split('T')[0],
+                            }));
                             setShowForm(true);
                           }}
-                          className="text-indigo-600 hover:text-indigo-800 font-black"
+                          className="text-indigo-600 hover:text-indigo-800 font-black text-[10px] bg-indigo-50 px-2 py-1 rounded-lg hover:bg-indigo-100 transition-colors"
                         >
                           Abonar
                         </button>
@@ -555,7 +566,7 @@ export default function PagosPanel({ leadId, canManage }: Props) {
             <div className="flex gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => { setShowForm(false); setForm(EMPTY_FORM); }}
+                onClick={() => { setShowForm(false); setForm(EMPTY_FORM); setCuotaCtx(EMPTY_CUOTA_CTX); }}
                 className="flex-1 py-2 text-xs font-black text-gray-500 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all"
               >
                 Cancelar

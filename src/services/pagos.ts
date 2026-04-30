@@ -7,6 +7,7 @@ export interface Pago {
   id: string;
   company_id: string;
   cotizacion_id: string;
+  cuota_esperada_id?: string | null;
   lead_id: string | null;
   monto: number;
   fecha_pago: string;
@@ -61,9 +62,11 @@ export const pagosService = {
     return data as Pago[];
   },
 
-  /** Registrar un nuevo pago */
+  /** Registrar un nuevo pago. Si incluye cuota_esperada_id, el trigger DB
+   *  actualiza automáticamente el estado de la cuota. Single Source of Truth. */
   async create(pago: {
     cotizacion_id: string;
+    cuota_esperada_id?: string | null;
     lead_id?: string | null;
     monto: number;
     fecha_pago: string;
@@ -81,15 +84,18 @@ export const pagosService = {
 
     const { data, error } = await supabase
       .from('pagos')
-      .insert({
-        ...pago,
-        company_id: profile!.company_id,
-        registrado_por: user!.id,
-      })
+      .insert({ ...pago, company_id: profile!.company_id, registrado_por: user!.id })
       .select()
       .single();
     if (error) throw error;
     return data as Pago;
+  },
+
+  /** Marca cuotas vencidas en tiempo real vía RPC Postgres */
+  async refreshOverdueCuotas(): Promise<number> {
+    const { data, error } = await supabase.rpc('update_overdue_cuotas');
+    if (error) { console.warn('[pagosService] refreshOverdueCuotas:', error.message); return 0; }
+    return data as number;
   },
 
   /** Eliminar un pago (solo admin) */
