@@ -474,6 +474,9 @@ export default function PricingConfig() {
                                             <td className="px-6 py-4">
                                                 <p className="text-sm font-extrabold text-[#4449AA]">{item.nombre}</p>
                                                 <p className="text-[10px] text-gray-400 font-bold mt-0.5">{item.codigo || 'SIN CÓDIGO'}</p>
+                                                {item.descripcion && (
+                                                    <p className="text-[11px] text-gray-500 mt-1 leading-relaxed max-w-[200px] truncate" title={item.descripcion}>{item.descripcion}</p>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <span className="text-sm font-black text-gray-900">${(item.precio_anual || 0).toLocaleString()}</span>
