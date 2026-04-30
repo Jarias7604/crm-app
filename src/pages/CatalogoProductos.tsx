@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Edit, Trash2, Save, X, Search, Box, Layers, Zap, ArrowUpDown, Tag, DollarSign } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, Search, Box, Layers, Zap, ArrowUpDown, Tag, DollarSign, Copy } from 'lucide-react';
 import { pricingService } from '../services/pricing';
 import type { PricingItem } from '../types/pricing';
 import { useAuth } from '../auth/AuthProvider';
@@ -94,10 +94,32 @@ export default function CatalogoProductos() {
     };
 
     const handleEdit = (item: PricingItem) => {
+        // Company admins cannot edit global catalog items (company_id = null)
+        if (!item.company_id && profile?.role !== 'super_admin') {
+            toast.error('Este es un producto del catálogo global. Usa "Clonar" para crear tu propia versión editable.');
+            return;
+        }
         setEditingId(item.id);
         setFormData(item);
         setShowForm(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleClone = async (item: PricingItem) => {
+        if (!canEdit) return toast.error('No tienes permisos');
+        if (!profile?.company_id) return toast.error('Empresa no identificada');
+        try {
+            const { id, created_at, updated_at, company_id, ...cloneData } = item as any;
+            await pricingService.createPricingItem({
+                ...cloneData,
+                nombre: `${cloneData.nombre} (Personalizado)`,
+                company_id: profile.company_id,
+            } as any);
+            toast.success('✅ Producto clonado. Ahora puedes editarlo para tu empresa.');
+            loadItems();
+        } catch (err: any) {
+            toast.error(`Error al clonar: ${err.message}`);
+        }
     };
 
     const handleSave = async () => {
@@ -109,6 +131,12 @@ export default function CatalogoProductos() {
             const { id, created_at, updated_at, ...updateData } = formData as any;
 
             if (editingId) {
+                // Guard: company_admin cannot update global items
+                const original = items.find(i => i.id === editingId);
+                if (!original?.company_id && profile?.role !== 'super_admin') {
+                    toast.error('No puedes editar el catálogo global. Clona el producto primero.');
+                    return;
+                }
                 await pricingService.updatePricingItem(editingId, updateData);
                 toast.success('✅ Producto actualizado exitosamente');
             } else {
@@ -525,15 +553,24 @@ export default function CatalogoProductos() {
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="py-4 px-6 text-right">
+                                        <td className="py-4 px-6">
                                             {canEdit && (
                                                 <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={() => handleEdit(item)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
-                                                        <Edit className="w-4 h-4" />
-                                                    </button>
-                                                    <button onClick={() => handleDelete(item.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
+                                                    {/* Global items: show Clone for company_admin, Edit for super_admin */}
+                                                    {item.company_id || profile?.role === 'super_admin' ? (
+                                                        <button onClick={() => handleEdit(item)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
+                                                            <Edit className="w-4 h-4" />
+                                                        </button>
+                                                    ) : (
+                                                        <button onClick={() => handleClone(item)} className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Clonar para personalizar">
+                                                            <Copy className="w-4 h-4" />
+                                                        </button>
+                                                    )}
+                                                    {(item.company_id || profile?.role === 'super_admin') && (
+                                                        <button onClick={() => handleDelete(item.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Archivar">
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             )}
                                         </td>
