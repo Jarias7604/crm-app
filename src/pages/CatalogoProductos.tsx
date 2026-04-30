@@ -7,6 +7,7 @@ import { usePermissions } from '../hooks/usePermissions';
 import { useItemTypes } from '../hooks/useItemTypes';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { ItemTypesManager } from '../components/catalog/ItemTypesManager';
 import toast from 'react-hot-toast';
 import { useAriasTables } from '../hooks/useAriasTables';
 
@@ -18,6 +19,7 @@ export default function CatalogoProductos() {
     const [loading, setLoading] = useState(true);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [showForm, setShowForm] = useState(false);
+    const [showTypesManager, setShowTypesManager] = useState(false);
     
     // Filters
     const [filterTipo, setFilterTipo] = useState<string>('all');
@@ -155,16 +157,35 @@ export default function CatalogoProductos() {
                     <p className="text-gray-500 font-medium ml-14">Gestión unificada de planes, servicios y módulos para cotizaciones.</p>
                 </div>
                 
-                {canEdit && !showForm && (
-                    <Button
-                        onClick={() => { resetForm(); setShowForm(true); }}
-                        className="mt-6 md:mt-0 bg-[#0f172a] hover:bg-gray-800 text-white shadow-xl shadow-gray-900/20 rounded-xl px-6 py-2.5 relative z-10 transition-all hover:scale-105 active:scale-95"
-                    >
-                        <Plus className="w-5 h-5 mr-2" />
-                        <span className="font-bold">Nuevo Producto</span>
-                    </Button>
+                {canEdit && (
+                    <div className="flex flex-col md:flex-row gap-3 mt-6 md:mt-0 relative z-10">
+                        <Button
+                            onClick={() => { setShowTypesManager(!showTypesManager); setShowForm(false); }}
+                            variant="outline"
+                            className="bg-white/80 backdrop-blur-md border-gray-200 text-gray-700 shadow-sm rounded-xl px-4 py-2.5 transition-all hover:bg-gray-50"
+                        >
+                            <Tag className="w-5 h-5 mr-2" />
+                            <span className="font-bold">Categorías</span>
+                        </Button>
+                        {!showForm && (
+                            <Button
+                                onClick={() => { resetForm(); setShowForm(true); setShowTypesManager(false); }}
+                                className="bg-[#0f172a] hover:bg-gray-800 text-white shadow-xl shadow-gray-900/20 rounded-xl px-6 py-2.5 transition-all hover:scale-105 active:scale-95"
+                            >
+                                <Plus className="w-5 h-5 mr-2" />
+                                <span className="font-bold">Nuevo Producto</span>
+                            </Button>
+                        )}
+                    </div>
                 )}
             </div>
+
+            {/* Administrador de Tipos/Categorías */}
+            {showTypesManager && (
+                <div className="animate-in slide-in-from-top-4 fade-in duration-300">
+                    <ItemTypesManager onChanged={loadItems} />
+                </div>
+            )}
 
             {/* Formulario Inline (Estilo Slide-down Premium) */}
             {showForm && (
