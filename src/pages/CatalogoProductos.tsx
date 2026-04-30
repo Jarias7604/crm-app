@@ -1,25 +1,36 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Edit, Trash2, Save, X, Search, Filter, Box, Layers, Zap, MoreVertical, ArrowUpDown, Tag, DollarSign, Check } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, Search, Box, Layers, Zap, ArrowUpDown, Tag, DollarSign } from 'lucide-react';
 import { pricingService } from '../services/pricing';
 import type { PricingItem } from '../types/pricing';
 import { useAuth } from '../auth/AuthProvider';
 import { usePermissions } from '../hooks/usePermissions';
 import { useItemTypes } from '../hooks/useItemTypes';
+import { itemTypesService, pickColor } from '../services/itemTypes';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { ItemTypesManager } from '../components/catalog/ItemTypesManager';
 import toast from 'react-hot-toast';
 import { useAriasTables } from '../hooks/useAriasTables';
+
+const PRESET_COLORS = [
+    '#8B5CF6', '#3B82F6', '#10B981', '#F97316',
+    '#EF4444', '#14B8A6', '#F59E0B', '#6366F1',
+    '#EC4899', '#84CC16', '#0EA5E9', '#D946EF',
+];
 
 export default function CatalogoProductos() {
     const { profile } = useAuth();
     const { isAdmin } = usePermissions();
-    const { types, getName, getColor } = useItemTypes();
+
     const [items, setItems] = useState<PricingItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [showForm, setShowForm] = useState(false);
-    const [showTypesManager, setShowTypesManager] = useState(false);
+    // Quick-create type modal
+    const [showTypeModal, setShowTypeModal] = useState(false);
+    const [newTypeName, setNewTypeName] = useState('');
+    const [newTypeColor, setNewTypeColor] = useState(PRESET_COLORS[0]);
+    const [savingType, setSavingType] = useState(false);
+    const { types, getName, getColor, reload: reloadTypes } = useItemTypes();
     
     // Filters
     const [filterTipo, setFilterTipo] = useState<string>('all');
@@ -57,6 +68,28 @@ export default function CatalogoProductos() {
             toast.error('Error al cargar el catálogo');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleQuickCreateType = async () => {
+        if (!newTypeName.trim()) return toast.error('Escribe un nombre para la categoría');
+        if (!profile?.company_id) return toast.error('Empresa no identificada');
+        setSavingType(true);
+        try {
+            const created = await itemTypesService.create(
+                { name: newTypeName.trim(), color: newTypeColor, icon: 'tag', is_active: true, sort_order: types.length + 1 },
+                profile.company_id
+            );
+            await reloadTypes();
+            setFormData(prev => ({ ...prev, tipo: created.slug }));
+            setShowTypeModal(false);
+            setNewTypeName('');
+            setNewTypeColor(PRESET_COLORS[0]);
+            toast.success(`✅ Categoría "${created.name}" creada y seleccionada`);
+        } catch (err: any) {
+            toast.error(`Error: ${err.message}`);
+        } finally {
+            setSavingType(false);
         }
     };
 
@@ -157,35 +190,16 @@ export default function CatalogoProductos() {
                     <p className="text-gray-500 font-medium ml-14">Gestión unificada de planes, servicios y módulos para cotizaciones.</p>
                 </div>
                 
-                {canEdit && (
-                    <div className="flex flex-col md:flex-row gap-3 mt-6 md:mt-0 relative z-10">
-                        <Button
-                            onClick={() => { setShowTypesManager(!showTypesManager); setShowForm(false); }}
-                            variant="outline"
-                            className="bg-white/80 backdrop-blur-md border-gray-200 text-gray-700 shadow-sm rounded-xl px-4 py-2.5 transition-all hover:bg-gray-50"
-                        >
-                            <Tag className="w-5 h-5 mr-2" />
-                            <span className="font-bold">Categorías</span>
-                        </Button>
-                        {!showForm && (
-                            <Button
-                                onClick={() => { resetForm(); setShowForm(true); setShowTypesManager(false); }}
-                                className="bg-[#0f172a] hover:bg-gray-800 text-white shadow-xl shadow-gray-900/20 rounded-xl px-6 py-2.5 transition-all hover:scale-105 active:scale-95"
-                            >
-                                <Plus className="w-5 h-5 mr-2" />
-                                <span className="font-bold">Nuevo Producto</span>
-                            </Button>
-                        )}
-                    </div>
+                {canEdit && !showForm && (
+                    <Button
+                        onClick={() => { resetForm(); setShowForm(true); }}
+                        className="mt-6 md:mt-0 bg-[#0f172a] hover:bg-gray-800 text-white shadow-xl shadow-gray-900/20 rounded-xl px-6 py-2.5 relative z-10 transition-all hover:scale-105 active:scale-95"
+                    >
+                        <Plus className="w-5 h-5 mr-2" />
+                        <span className="font-bold">Nuevo Producto</span>
+                    </Button>
                 )}
             </div>
-
-            {/* Administrador de Tipos/Categorías */}
-            {showTypesManager && (
-                <div className="animate-in slide-in-from-top-4 fade-in duration-300">
-                    <ItemTypesManager onChanged={loadItems} />
-                </div>
-            )}
 
             {/* Formulario Inline (Estilo Slide-down Premium) */}
             {showForm && (
@@ -224,18 +238,81 @@ export default function CatalogoProductos() {
                                         />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                                            <Layers className="w-4 h-4 text-gray-400" /> Tipo / Categoría
+                                        <label className="text-sm font-bold text-gray-700 flex items-center justify-between">
+                                            <span className="flex items-center gap-2"><Layers className="w-4 h-4 text-gray-400" /> Tipo / Categoría</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowTypeModal(v => !v)}
+                                                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-bold hover:underline"
+                                            >
+                                                <Plus className="w-3.5 h-3.5" /> Nueva categoría
+                                            </button>
                                         </label>
-                                        <select
-                                            value={formData.tipo}
-                                            onChange={(e) => setFormData({ ...formData, tipo: e.target.value as any })}
-                                            className="w-full h-12 border border-gray-200 rounded-xl px-4 bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-semibold text-gray-700"
-                                        >
-                                            {types.map(t => (
-                                                <option key={t.slug} value={t.slug}>{t.name}</option>
-                                            ))}
-                                        </select>
+                                        <div className="relative">
+                                            <select
+                                                value={formData.tipo}
+                                                onChange={(e) => setFormData({ ...formData, tipo: e.target.value as any })}
+                                                className="w-full h-12 border border-gray-200 rounded-xl px-4 bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-semibold text-gray-700"
+                                            >
+                                                {types.map(t => (
+                                                    <option key={t.slug} value={t.slug}>{t.name}</option>
+                                                ))}
+                                            </select>
+
+                                            {/* Mini-modal crear categoría */}
+                                            {showTypeModal && (
+                                                <div className="absolute top-[calc(100%+8px)] left-0 right-0 z-50 bg-white rounded-2xl border border-indigo-100 shadow-2xl shadow-indigo-900/15 p-5 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                                                    <div className="flex items-center justify-between">
+                                                        <p className="text-sm font-black text-gray-900">Nueva Categoría</p>
+                                                        <button onClick={() => setShowTypeModal(false)} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100">
+                                                            <X className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-gray-600 mb-1.5">Nombre *</label>
+                                                        <Input
+                                                            value={newTypeName}
+                                                            onChange={e => setNewTypeName(e.target.value)}
+                                                            placeholder="Ej. Consultoría, Licencia, Activo..."
+                                                            onKeyDown={e => e.key === 'Enter' && handleQuickCreateType()}
+                                                            autoFocus
+                                                            className="text-sm"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-gray-600 mb-2">Color del badge</label>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {PRESET_COLORS.map(c => (
+                                                                <button
+                                                                    key={c}
+                                                                    type="button"
+                                                                    onClick={() => setNewTypeColor(c)}
+                                                                    className="w-6 h-6 rounded-full transition-transform hover:scale-110 border-2"
+                                                                    style={{
+                                                                        backgroundColor: c,
+                                                                        borderColor: newTypeColor === c ? '#1e293b' : 'transparent',
+                                                                        boxShadow: newTypeColor === c ? '0 0 0 2px white, 0 0 0 3px #1e293b' : 'none',
+                                                                    }}
+                                                                />
+                                                            ))}
+                                                        </div>
+                                                        <div className="mt-2 flex items-center gap-2">
+                                                            <span className="text-xs text-gray-400">Vista previa:</span>
+                                                            <span className="px-2.5 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: `${newTypeColor}20`, color: newTypeColor }}>
+                                                                {newTypeName || 'Mi Tipo'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <Button
+                                                        onClick={handleQuickCreateType}
+                                                        disabled={savingType}
+                                                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl h-10"
+                                                    >
+                                                        {savingType ? 'Creando...' : '+ Crear y Seleccionar'}
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
 
