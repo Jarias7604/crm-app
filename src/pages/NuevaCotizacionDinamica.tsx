@@ -70,10 +70,17 @@ export default function NuevaCotizacionDinamica() {
     const loadPricingData = async () => {
         try {
             setLoadingPricing(true);
-            const config = await pricingService.getPricingConfig();
-            setPlanesDisponibles(config.planes);
-            setModulosDisponibles(config.modulos);
-            setServiciosDisponibles(config.servicios);
+            // Cargar todos los ítems activos de una sola llamada
+            const todosLosItems = await pricingService.getAllPricingItems(false); // false = solo activos
+
+            // Planes Y Paquetes aparecen como opciones seleccionables en Paso 2
+            const planes = todosLosItems.filter(i => i.tipo === 'plan' || i.tipo === 'paquete');
+            const modulos = todosLosItems.filter(i => i.tipo === 'modulo');
+            const servicios = todosLosItems.filter(i => i.tipo === 'servicio');
+
+            setPlanesDisponibles(planes);
+            setModulosDisponibles(modulos);
+            setServiciosDisponibles(servicios);
         } catch (error) {
             console.error('Error loading pricing:', error);
             toast.error('Error al cargar configuración de precios');
@@ -125,20 +132,7 @@ export default function NuevaCotizacionDinamica() {
         }
     }, [leadIdParam, leads, location.state]);
 
-    // SUGERENCIA AUTOMÁTICA DE PLAN SEGÚN DTEs
-    useEffect(() => {
-        if (formData.volumen_dtes > 0 && planesDisponibles.length > 0) {
-            const planSugerido = planesDisponibles.find(
-                p => formData.volumen_dtes >= (p.min_dtes || 0) &&
-                    formData.volumen_dtes <= (p.max_dtes || 999999)
-            );
-
-            if (planSugerido && formData.plan_id !== planSugerido.id) {
-                setFormData(prev => ({ ...prev, plan_id: planSugerido.id }));
-                setPlanSeleccionado(planSugerido);
-            }
-        }
-    }, [formData.volumen_dtes, planesDisponibles]);
+    // (Auto-sugerencia por DTEs removida — el usuario elige el paquete manualmente)
 
     // RECALCULAR TOTALES EN TIEMPO REAL
     useEffect(() => {
@@ -371,7 +365,7 @@ export default function NuevaCotizacionDinamica() {
     const validarPaso = () => {
         switch (pasoActual) {
             case 1:
-                return formData.nombre_cliente.trim() !== '' && formData.volumen_dtes > 0;
+                return formData.nombre_cliente.trim() !== '';
             case 2:
                 return formData.plan_id !== '';
             case 3:
@@ -464,25 +458,8 @@ export default function NuevaCotizacionDinamica() {
                         placeholder="Calle Principal #123, Colonia Las Flores"
                     />
                 </div>
-
-                <div className="md:col-span-2">
-                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                        📊 Volumen Estimado de DTEs al Año *
-                    </label>
-                    <Input
-                        type="number"
-                        value={formData.volumen_dtes || ''}
-                        onChange={(e) => setFormData({ ...formData, volumen_dtes: Number(e.target.value) })}
-                        placeholder="Ej: 3000"
-                        required
-                        min="0"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                        Este dato determina el plan recomendado automáticamente
-                    </p>
-                </div>
             </div>
-        </div >
+        </div>
     );
 
     const renderPaso2 = () => {
@@ -501,10 +478,7 @@ export default function NuevaCotizacionDinamica() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {planesDisponibles.map(plan => {
-                        const esRecomendado = formData.volumen_dtes >= (plan.min_dtes || 0) &&
-                            formData.volumen_dtes <= (plan.max_dtes || 999999);
                         const seleccionado = formData.plan_id === plan.id;
-
                         const caracteristicas = plan.metadata?.caracteristicas || [];
 
                         return (
@@ -516,27 +490,24 @@ export default function NuevaCotizacionDinamica() {
                                     : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
                                     }`}
                             >
-                                {esRecomendado && (
-                                    <div className="absolute -top-3 right-4 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full">
-                                        ⭐ Recomendado
-                                    </div>
-                                )}
-
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-lg font-bold text-[#4449AA]">{plan.nombre}</h3>
                                     {seleccionado && <Check className="w-6 h-6 text-blue-600" />}
                                 </div>
 
-                                <div className="space-y-2 mb-4">
-                                    <p className="text-sm text-gray-600">
-                                        {(plan.min_dtes || 0).toLocaleString()} - {(plan.max_dtes || 0) === 999999 ? '∞' : (plan.max_dtes || 0).toLocaleString()} DTEs/año
-                                    </p>
+                                {plan.descripcion && (
+                                    <p className="text-sm text-gray-500 mb-3">{plan.descripcion}</p>
+                                )}
+
+                                <div className="space-y-1 mb-4">
                                     <p className="text-2xl font-bold text-[#3DCC91]">
                                         ${plan.precio_anual.toLocaleString()}/año
                                     </p>
-                                    <p className="text-sm text-gray-500">
-                                        o ${plan.precio_mensual.toLocaleString()}/mes
-                                    </p>
+                                    {plan.precio_mensual > 0 && (
+                                        <p className="text-sm text-gray-500">
+                                            o ${plan.precio_mensual.toLocaleString()}/mes
+                                        </p>
+                                    )}
                                 </div>
 
                                 {caracteristicas.length > 0 && (
@@ -550,9 +521,11 @@ export default function NuevaCotizacionDinamica() {
                                     </ul>
                                 )}
 
-                                <p className="text-xs text-gray-500 mt-4">
-                                    Implementación: ${plan.costo_unico}
-                                </p>
+                                {plan.costo_unico > 0 && (
+                                    <p className="text-xs text-gray-500 mt-4">
+                                        + ${plan.costo_unico.toLocaleString()} implementación
+                                    </p>
+                                )}
                             </div>
                         );
                     })}
