@@ -101,10 +101,7 @@ export default function GestionPaquetes() {
                 await cotizadorService.updatePaquete(editingId, updateData);
                 toast.success('✅ Paquete actualizado');
             } else {
-                // Si es Company Admin, asignar company_id
-                if (profile?.role === 'company_admin') {
-                    updateData.company_id = profile.company_id;
-                }
+                updateData.company_id = profile?.company_id;
                 await cotizadorService.createPaquete(updateData);
                 toast.success('✅ Paquete creado');
             }
@@ -528,11 +525,6 @@ export default function GestionPaquetes() {
                                                             <p className="text-sm font-bold text-[#4449AA]">
                                                                 {paquete.paquete}
                                                             </p>
-                                                            {paquete.company_id && (
-                                                                <span className="text-xs text-purple-600 font-semibold">
-                                                                    Custom
-                                                                </span>
-                                                            )}
                                                         </div>
                                                     </div>
                                                 </td>
@@ -569,42 +561,27 @@ export default function GestionPaquetes() {
                                                 {canEdit && (
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center justify-center gap-2">
-                                                            {profile?.role === 'super_admin' || paquete.company_id !== null ? (
-                                                                <button
-                                                                    onClick={() => handleEdit(paquete)}
-                                                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                                    title="Editar"
-                                                                >
-                                                                    <Edit className="w-4 h-4" />
-                                                                </button>
-                                                            ) : (
-                                                                <div className="flex items-center gap-1">
-                                                                    <button
-                                                                        disabled
-                                                                        className="p-2 text-gray-300 cursor-not-allowed"
-                                                                        title="No puedes editar paquetes globales"
-                                                                    >
-                                                                        <Edit className="w-4 h-4" />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleClone(paquete)}
-                                                                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                                                        title="Clonar para mi empresa"
-                                                                    >
-                                                                        <Copy className="w-4 h-4" />
-                                                                    </button>
-                                                                </div>
-                                                            )}
-
-                                                            {(profile?.role === 'super_admin' || paquete.company_id !== null) && (
-                                                                <button
-                                                                    onClick={() => handleDelete(paquete.id)}
-                                                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                                    title="Desactivar"
-                                                                >
-                                                                    <Trash2 className="w-4 h-4" />
-                                                                </button>
-                                                            )}
+                                                            <button
+                                                                onClick={() => handleClone(paquete)}
+                                                                className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                                                title="Clonar (Duplicar)"
+                                                            >
+                                                                <Copy className="w-4 h-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleEdit(paquete)}
+                                                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                                title="Editar"
+                                                            >
+                                                                <Edit className="w-4 h-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDelete(paquete.id)}
+                                                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                                title="Desactivar"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
                                                         </div>
                                                     </td>
                                                 )}

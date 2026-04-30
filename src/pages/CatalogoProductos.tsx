@@ -94,11 +94,6 @@ export default function CatalogoProductos() {
     };
 
     const handleEdit = (item: PricingItem) => {
-        // Company admins cannot edit global catalog items (company_id = null)
-        if (!item.company_id && profile?.role !== 'super_admin') {
-            toast.error('Este es un producto del catálogo global. Usa "Clonar" para crear tu propia versión editable.');
-            return;
-        }
         setEditingId(item.id);
         setFormData(item);
         setShowForm(true);
@@ -131,12 +126,6 @@ export default function CatalogoProductos() {
             const { id, created_at, updated_at, ...updateData } = formData as any;
 
             if (editingId) {
-                // Guard: company_admin cannot update global items
-                const original = items.find(i => i.id === editingId);
-                if (!original?.company_id && profile?.role !== 'super_admin') {
-                    toast.error('No puedes editar el catálogo global. Clona el producto primero.');
-                    return;
-                }
                 await pricingService.updatePricingItem(editingId, updateData);
                 toast.success('✅ Producto actualizado exitosamente');
             } else {
@@ -556,21 +545,15 @@ export default function CatalogoProductos() {
                                         <td className="py-4 px-6">
                                             {canEdit && (
                                                 <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    {/* Global items: show Clone for company_admin, Edit for super_admin */}
-                                                    {item.company_id || profile?.role === 'super_admin' ? (
-                                                        <button onClick={() => handleEdit(item)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
-                                                            <Edit className="w-4 h-4" />
-                                                        </button>
-                                                    ) : (
-                                                        <button onClick={() => handleClone(item)} className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Clonar para personalizar">
-                                                            <Copy className="w-4 h-4" />
-                                                        </button>
-                                                    )}
-                                                    {(item.company_id || profile?.role === 'super_admin') && (
-                                                        <button onClick={() => handleDelete(item.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Archivar">
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
-                                                    )}
+                                                    <button onClick={() => handleClone(item)} className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors" title="Clonar (Duplicar)">
+                                                        <Copy className="w-4 h-4" />
+                                                    </button>
+                                                    <button onClick={() => handleEdit(item)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Editar">
+                                                        <Edit className="w-4 h-4" />
+                                                    </button>
+                                                    <button onClick={() => handleDelete(item.id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Archivar">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
                                                 </div>
                                             )}
                                         </td>
