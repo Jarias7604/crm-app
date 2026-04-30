@@ -233,6 +233,14 @@ class CotizadorService {
         await this.updateItem(id, { activo: false });
     }
 
+    async hardDeleteItem(id: string): Promise<void> {
+        const { error } = await supabase
+            .from('cotizador_items')
+            .delete()
+            .eq('id', id);
+        if (error) throw error;
+    }
+
     // =================== CÁLCULOS ===================
 
     // =====================================================

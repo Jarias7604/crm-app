@@ -151,13 +151,13 @@ export default function GestionItems() {
             toast.error('No tienes permisos para realizar esta acción');
             return;
         }
-        if (!confirm('¿Desactivar este item?')) return;
+        if (!confirm('¿Eliminar este ítem permanentemente? Esta acción no se puede deshacer.')) return;
         try {
-            await cotizadorService.deleteItem(id);
-            toast.success('Item desactivado');
+            await cotizadorService.hardDeleteItem(id);
+            toast.success('✅ Ítem eliminado permanentemente');
             loadItems();
         } catch (error) {
-            toast.error('Error al eliminar');
+            toast.error('Error al eliminar el ítem');
         }
     };
 
@@ -522,7 +522,7 @@ export default function GestionItems() {
                                                                 </button>
                                                             )}
                                                             {(profile?.role === 'super_admin' || item.company_id === profile?.company_id) && (
-                                                                <button onClick={() => handleDelete(item.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Desactivar">
+                                                                <button onClick={() => handleDelete(item.id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar permanentemente">
                                                                     <Trash2 className="w-4 h-4" />
                                                                 </button>
                                                             )}
