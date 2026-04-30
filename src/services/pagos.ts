@@ -124,58 +124,71 @@ export const pagosService = {
    * agrupadas por nombre_cliente.
    */
   async getClientesCuentas(companyId: string): Promise<ClienteCuenta[]> {
-    // 1. Cotizaciones activas con sus pagos ya recibidos
+    // 1. Cotizaciones activas (query simple, sin joins anidados para evitar errores silenciosos de FK)
     const { data: cotizaciones, error: cotError } = await supabase
       .from('cotizaciones')
-      .select(`
-        id,
-        nombre_cliente,
-        lead_id,
-        plan_nombre,
-        tipo_pago,
-        total_anual,
-        monto_anticipo,
-        cuotas,
-        plazo_meses,
-        estado,
-        created_at,
-        pagos (
-          id, monto, fecha_pago, tipo, metodo_pago, numero_cuota,
-          notas, comprobante_url, comprobante_path, created_at
-        )
-      `)
+      .select('id, nombre_cliente, lead_id, plan_nombre, tipo_pago, total_anual, monto_anticipo, cuotas, plazo_meses, estado, created_at')
       .eq('company_id', companyId)
       .in('estado', ['aceptada', 'ganado', 'aprobada', 'pagado', 'activo'])
       .order('created_at', { ascending: false });
 
     if (cotError) throw cotError;
+    if (!cotizaciones || cotizaciones.length === 0) return [];
 
-    // 2. Cuotas esperadas (schedule de amortización) por cotización
-    const cotIds = (cotizaciones || []).map(c => c.id);
+    const cotIds = cotizaciones.map(c => c.id);
+
+    // 2. Pagos recibidos por cotización (query separado — más robusto que nested select)
+    const { data: todosLosPagos } = await supabase
+      .from('pagos')
+      .select('id, cotizacion_id, monto, fecha_pago, tipo, metodo_pago, numero_cuota, notas, comprobante_url, comprobante_path, created_at')
+      .in('cotizacion_id', cotIds)
+      .order('fecha_pago', { ascending: false });
+
+    const pagosByCot: Record<string, any[]> = {};
+    (todosLosPagos || []).forEach(p => {
+      if (!pagosByCot[p.cotizacion_id]) pagosByCot[p.cotizacion_id] = [];
+      pagosByCot[p.cotizacion_id].push(p);
+    });
+
+    // 3. Planes de pago activos con sus cuotas esperadas (query separado)
+    const { data: planes } = await supabase
+      .from('planes_pago')
+      .select('id, cotizacion_id, estado, monto_total, plazo_meses, sistema_amortizacion')
+      .in('cotizacion_id', cotIds)
+      .eq('estado', 'activo');
+
+    const planIds = (planes || []).map(p => p.id);
+    const planByCot: Record<string, string> = {};
+    (planes || []).forEach(p => { planByCot[p.cotizacion_id] = p.id; });
+
     let cuotasByCot: Record<string, any[]> = {};
+    if (planIds.length > 0) {
+      const { data: todasLasCuotas } = await supabase
+        .from('cuotas_esperadas')
+        .select('id, plan_pago_id, numero_cuota, fecha_vencimiento, monto_total_cuota, monto_capital, monto_interes, monto_pagado, saldo_restante_capital, estado')
+        .in('plan_pago_id', planIds)
+        .order('numero_cuota', { ascending: true });
 
-    if (cotIds.length > 0) {
-      const { data: planes } = await supabase
-        .from('planes_pago')
-        .select(`id, cotizacion_id, estado, cuotas_esperadas(*)`)
-        .in('cotizacion_id', cotIds)
-        .eq('estado', 'activo');
+      // Mapear cuotas por cotizacion_id (a través del plan)
+      const cotByPlan: Record<string, string> = {};
+      Object.entries(planByCot).forEach(([cotId, planId]) => { cotByPlan[planId] = cotId; });
 
-      (planes || []).forEach(plan => {
-        cuotasByCot[plan.cotizacion_id] = (plan.cuotas_esperadas || []).sort(
-          (a: any, b: any) => a.numero_cuota - b.numero_cuota
-        );
+      (todasLasCuotas || []).forEach(ce => {
+        const cotId = cotByPlan[ce.plan_pago_id];
+        if (cotId) {
+          if (!cuotasByCot[cotId]) cuotasByCot[cotId] = [];
+          cuotasByCot[cotId].push(ce);
+        }
       });
     }
 
-    // 3. Construir contratos enriquecidos
-    const contratos: ContratoCuenta[] = (cotizaciones || []).map(cot => {
-      const pagosRecibidos = (cot.pagos || []) as any[];
+    // 4. Construir contratos enriquecidos
+    const contratos: ContratoCuenta[] = cotizaciones.map(cot => {
+      const pagosRecibidos = pagosByCot[cot.id] || [];
       const totalCobrado = pagosRecibidos.reduce((s: number, p: any) => s + Number(p.monto), 0);
       const totalContrato = Number(cot.total_anual) || 0;
       const totalPendiente = Math.max(0, totalContrato - totalCobrado);
       const cuotas = cuotasByCot[cot.id] || [];
-      const tienePlan = cuotas.length > 0;
 
       return {
         cotizacion_id: cot.id,
@@ -193,11 +206,11 @@ export const pagosService = {
         fecha_contrato: cot.created_at,
         pagos_recibidos: pagosRecibidos,
         schedule: cuotas,
-        tiene_plan_amortizacion: tienePlan,
+        tiene_plan_amortizacion: cuotas.length > 0,
       };
     });
 
-    // 4. Agrupar por cliente
+    // 5. Agrupar por cliente
     const clienteMap: Record<string, ClienteCuenta> = {};
     contratos.forEach(contrato => {
       const key = contrato.nombre_cliente;
@@ -464,6 +477,16 @@ export const planPagoService = {
     const cuotasToInsert = cuotas.map(c => ({ ...c, plan_pago_id: planData.id, company_id: profile!.company_id }));
     const { data: cuotasData, error: cuotasError } = await supabase.from('cuotas_esperadas').insert(cuotasToInsert).select();
     if (cuotasError) throw cuotasError;
+
+    // 4. Sync cotizacion: update tipo_pago, cuotas, plazo_meses so Finanzas module shows it correctly
+    if (plan.cotizacion_id) {
+      await supabase.from('cotizaciones').update({
+        tipo_pago: 'credito',
+        cuotas: plan.plazo_meses,
+        plazo_meses: plan.plazo_meses,
+        monto_anticipo: plan.monto_anticipo || 0,
+      }).eq('id', plan.cotizacion_id);
+    }
 
     return { plan: planData as PlanPago, cuotas: cuotasData as CuotaEsperada[] };
   }
