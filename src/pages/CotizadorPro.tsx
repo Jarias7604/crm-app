@@ -152,11 +152,7 @@ export default function CotizadorPro() {
         };
     }, [showLeadSelector]);
 
-    useEffect(() => {
-        if (formData.volumen_dtes > 0) {
-            buscarPaqueteSugerido();
-        }
-    }, [formData.volumen_dtes]);
+    // Removed volumen_dtes auto-suggest effect
 
     useEffect(() => {
         calcularTotales();
@@ -325,10 +321,6 @@ export default function CotizadorPro() {
             toast.error('Ingresa el nombre del cliente');
             return;
         }
-        if (pasoActual === 1 && formData.volumen_dtes <= 0) {
-            toast.error('Ingresa la cantidad de DTEs');
-            return;
-        }
         if (pasoActual === 2 && !formData.paquete_id) {
             toast.error('Selecciona un paquete');
             return;
@@ -373,11 +365,6 @@ export default function CotizadorPro() {
 
             if (!formData.cliente_nombre) {
                 toast.error('Debe ingresar el nombre del cliente');
-                return;
-            }
-
-            if (!formData.volumen_dtes || formData.volumen_dtes <= 0) {
-                toast.error('Debe ingresar el volumen de DTEs');
                 return;
             }
 
@@ -729,29 +716,6 @@ export default function CotizadorPro() {
                                         className={formData.usar_lead ? 'bg-gray-100 cursor-not-allowed border-gray-100' : ''}
                                     />
                                 </div>
-
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-bold text-gray-700 mb-2">
-                                        Cantidad de DTEs al año *
-                                    </label>
-                                    <Input
-                                        type="number"
-                                        value={formData.volumen_dtes || ''}
-                                        onChange={(e) => setFormData({ ...formData, volumen_dtes: Number(e.target.value) })}
-                                        placeholder="2200"
-                                    />
-                                    <div className="flex justify-between items-center mt-2">
-                                        <p className="text-xs text-gray-500 italic">
-                                            💡 Equivalente a <b>{Math.round(formData.volumen_dtes / 12).toLocaleString()} DTEs mensuales</b> aprox.
-                                        </p>
-                                        {paqueteSugerido && (
-                                            <p className="text-sm text-green-600 font-semibold flex items-center gap-1.5">
-                                                <span className="bg-green-100 text-green-700 w-5 h-5 rounded-full flex items-center justify-center text-[10px]">✓</span>
-                                                Sugerido: {paqueteSugerido.paquete}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     )}
@@ -762,23 +726,12 @@ export default function CotizadorPro() {
                             <h2 className="text-lg font-bold text-[#4449AA]">Seleccionar Paquete Base</h2>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {(() => {
-                                    const filtered = paquetes.filter(p => {
-                                        const maxDtes = Math.max(...paquetes.map(paq => paq.cantidad_dtes));
-                                        if (formData.volumen_dtes > maxDtes) return p.cantidad_dtes === maxDtes;
-                                        return p.cantidad_dtes >= formData.volumen_dtes;
-                                    });
-
-                                    if (filtered.length === 0) {
-                                        return (
-                                            <div className="col-span-full py-10 text-center bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                                                <p className="text-gray-500 font-medium">No se encontraron paquetes compatibles.</p>
-                                                <p className="text-xs text-gray-400 mt-1">Verifique la configuración o intente con otro volumen.</p>
-                                            </div>
-                                        );
-                                    }
-
-                                    return filtered.slice(0, 8).map((paquete) => (
+                                {paquetes.length === 0 ? (
+                                    <div className="col-span-full py-10 text-center bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
+                                        <p className="text-gray-500 font-medium">No se encontraron paquetes.</p>
+                                    </div>
+                                ) : (
+                                    paquetes.map((paquete) => (
                                         <div
                                             key={paquete.id}
                                             onClick={() => setFormData({ ...formData, paquete_id: paquete.id })}
@@ -791,15 +744,7 @@ export default function CotizadorPro() {
                                                 <h3 className="font-bold text-lg text-[#4449AA]">
                                                     {paquete.paquete}
                                                 </h3>
-                                                {paqueteSugerido?.id === paquete.id && (
-                                                    <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full font-bold">
-                                                        ⭐ Sugerido
-                                                    </span>
-                                                )}
                                             </div>
-                                            <p className="text-sm text-gray-600 mb-2">
-                                                {paquete.cantidad_dtes.toLocaleString()} DTEs
-                                            </p>
                                             <p className="text-2xl font-extrabold text-green-600">
                                                 ${paquete.costo_paquete_anual.toFixed(2)}/año
                                             </p>
@@ -807,8 +752,8 @@ export default function CotizadorPro() {
                                                 + ${paquete.costo_implementacion.toFixed(2)} implementación
                                             </p>
                                         </div>
-                                    ));
-                                })()}
+                                    ))
+                                )}
                             </div>
                         </div>
                     )}
