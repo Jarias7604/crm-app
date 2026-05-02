@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, Check, User, FileText, Package, DollarSign } fro
 import { useAuth } from '../auth/AuthProvider';
 import { cotizacionesService } from '../services/cotizaciones';
 import { leadsService } from '../services/leads';
-import { PLANES_FACTURACION, MODULOS_DISPONIBLES, type ModuloAdicional } from '../types/cotizaciones';
+import { PLANES_CRM, MODULOS_DISPONIBLES, type ModuloAdicional } from '../types/cotizaciones';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import toast from 'react-hot-toast';
@@ -82,8 +82,8 @@ export default function NuevaCotizacion() {
 
     useEffect(() => {
         if (formData.volumen_dtes > 0 && !formData.plan_nombre) {
-            const planSugerido = PLANES_FACTURACION.find(
-                p => formData.volumen_dtes >= p.min_dtes && formData.volumen_dtes <= p.max_dtes
+            const planSugerido = PLANES_CRM.find(
+                p => formData.volumen_dtes >= p.min_contactos && formData.volumen_dtes <= p.max_contactos
             );
             if (planSugerido) {
                 setFormData(prev => ({
@@ -150,7 +150,7 @@ export default function NuevaCotizacion() {
     };
 
     const handlePlanChange = (planNombre: string) => {
-        const plan = PLANES_FACTURACION.find(p => p.nombre === planNombre);
+        const plan = PLANES_CRM.find(p => p.nombre === planNombre);
         if (plan) {
             setFormData(prev => ({
                 ...prev,
@@ -295,7 +295,7 @@ export default function NuevaCotizacion() {
 
                 <div className="md:col-span-2">
                     <label className="block text-sm font-bold text-gray-700 mb-2">
-                        📊 Volumen Estimado de DTEs al Año *
+                        📊 Volumen Estimado de Contactos al Año *
                     </label>
                     <Input
                         type="number"
@@ -318,9 +318,9 @@ export default function NuevaCotizacion() {
             <h2 className="text-xl font-bold text-[#4449AA]">🛡️ Selección de Plan</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {PLANES_FACTURACION.map(plan => {
-                    const esRecomendado = formData.volumen_dtes >= plan.min_dtes &&
-                        formData.volumen_dtes <= plan.max_dtes;
+                {PLANES_CRM.map(plan => {
+                    const esRecomendado = formData.volumen_dtes >= plan.min_contactos &&
+                        formData.volumen_dtes <= plan.max_contactos;
                     const seleccionado = formData.plan_nombre === plan.nombre;
 
                     return (
@@ -345,7 +345,7 @@ export default function NuevaCotizacion() {
 
                             <div className="space-y-2 mb-4">
                                 <p className="text-sm text-gray-600">
-                                    {plan.min_dtes.toLocaleString()} - {plan.max_dtes === 999999 ? '∞' : plan.max_dtes.toLocaleString()} DTEs/año
+                                    {plan.min_contactos.toLocaleString()} - {plan.max_contactos === 999999 ? '∞' : plan.max_contactos.toLocaleString()} Contactos/año
                                 </p>
                                 <p className="text-2xl font-bold text-[#3DCC91]">
                                     ${plan.costo_anual.toLocaleString()}/año
@@ -453,9 +453,9 @@ export default function NuevaCotizacion() {
                         />
                         <div className="flex-1">
                             <p className="font-bold text-[#4449AA]">💬 Notificaciones WhatsApp</p>
-                            <p className="text-xs text-gray-600">Envío automático de DTE por WhatsApp</p>
+                            <p className="text-xs text-gray-600">Envío automático de mensajes por WhatsApp</p>
                             <p className="text-sm text-gray-500 mt-1">
-                                ${(formData.volumen_dtes * 0.025).toFixed(2)} (0.025 x {formData.volumen_dtes} DTEs)
+                                ${(formData.volumen_dtes * 0.025).toFixed(2)} (0.025 x {formData.volumen_dtes} Contactos)
                             </p>
                         </div>
                     </label>
@@ -551,7 +551,7 @@ export default function NuevaCotizacion() {
                 <div className="flex items-center justify-between">
                     <div>
                         <p className="text-lg font-bold text-[#4449AA]">{formData.plan_nombre}</p>
-                        <p className="text-sm text-gray-600">{formData.volumen_dtes.toLocaleString()} DTEs/año</p>
+                        <p className="text-sm text-gray-600">{formData.volumen_dtes.toLocaleString()} Contactos/año</p>
                     </div>
                     <div className="text-right">
                         <p className="text-xl font-bold text-[#3DCC91]">${formData.costo_plan_anual.toLocaleString()}</p>
@@ -644,7 +644,7 @@ export default function NuevaCotizacion() {
                 </button>
                 <div>
                     <h1 className="text-2xl font-extrabold text-[#4449AA]">Nueva Cotización</h1>
-                    <p className="text-sm text-gray-500">Asistente de Facturación Electrónica</p>
+                    <p className="text-sm text-gray-500">Asistente de Cotizaciones CRM</p>
                 </div>
             </div>
 

@@ -132,7 +132,7 @@ export default function NuevaCotizacionDinamica() {
         }
     }, [leadIdParam, leads, location.state]);
 
-    // (Auto-sugerencia por DTEs removida — el usuario elige el paquete manualmente)
+    // (Auto-sugerencia por contactos removida — el usuario elige el paquete manualmente)
 
     // RECALCULAR TOTALES EN TIEMPO REAL
     useEffect(() => {
@@ -592,7 +592,7 @@ export default function NuevaCotizacionDinamica() {
                                 let precioTexto = '';
                                 if (servicio.precio_por_dte > 0) {
                                     const costo = formData.volumen_dtes * servicio.precio_por_dte;
-                                    precioTexto = `$${costo.toFixed(2)} (${servicio.precio_por_dte} × ${formData.volumen_dtes} DTEs)`;
+                                    precioTexto = `$${costo.toFixed(2)} (${servicio.precio_por_dte} × ${formData.volumen_dtes} Contactos)`;
                                 } else if (servicio.costo_unico > 0) {
                                     precioTexto = `$${servicio.costo_unico} (Costo único)`;
                                 } else {
@@ -653,7 +653,7 @@ export default function NuevaCotizacionDinamica() {
                     {formData.email_cliente && <p><span className="font-semibold">Email:</span> {formData.email_cliente}</p>}
                     {formData.telefono_cliente && <p><span className="font-semibold">Teléfono:</span> {formData.telefono_cliente}</p>}
                     {formData.direccion_cliente && <p><span className="font-semibold">Dirección:</span> {formData.direccion_cliente}</p>}
-                    <p><span className="font-semibold">Volumen DTEs:</span> {formData.volumen_dtes.toLocaleString()}/año</p>
+                    <p><span className="font-semibold">Volumen de Contactos:</span> {formData.volumen_dtes.toLocaleString()}</p>
                 </div>
             </div>
 

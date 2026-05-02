@@ -342,11 +342,7 @@ export const leadsService = {
     async getFollowUps(leadId: string) {
         const { data, error } = await supabase
             .from('follow_ups')
-            .select(`
-                *,
-                profiles:user_id(email, full_name, avatar_url),
-                assigned_profile:assigned_to(email, full_name, avatar_url)
-            `)
+            .select('*')
             .eq('lead_id', leadId)
             .order('date', { ascending: false });
 
@@ -366,11 +362,7 @@ export const leadsService = {
                 assigned_to: assignedTo || null,
                 action_type: followUp.action_type || 'call'
             })
-            .select(`
-                *,
-                profiles:user_id(email, full_name, avatar_url),
-                assigned_profile:assigned_to(email, full_name, avatar_url)
-            `)
+            .select('*')
             .single();
 
         if (error) throw error;
