@@ -20,16 +20,17 @@ Leer `.agent/PROJECT_IDENTITY.md` para confirmar en qué proyecto estamos trabaj
 
 Verificar:
 - **Ruta:** `c:\Users\jaria\OneDrive\DELL\Desktop\crm-app`
-- **Supabase PRODUCCIÓN:** `ikofyypxphrqkncimszt`
-- **Supabase DEV:** `mtxqqamitglhehaktgxm`
+- **Supabase PRODUCCIÓN:** `mtxqqamitglhehaktgxm` (verificado desde JS bundle 2026-05-03)
+- **Supabase SECUNDARIA:** `ikofyypxphrqkncimszt` (NO es la que usa Vercel prod)
+- **Supabase TESTING:** `ubqscyfefgfbmndnypbp` (solo desarrollo local)
 
 Si el usuario menciona funcionalidades fuera de `PROJECT_IDENTITY.md` → **DETENER y preguntar**.
 
 ## Paso 3: Verificar Project ID de Supabase
 
 Antes de cualquier migración SQL o deploy:
-1. Leer `.env.local` → confirmar `VITE_SUPABASE_URL`
-2. Confirmar que el Project ID es `ikofyypxphrqkncimszt`
+1. La DB de PRODUCCIÓN REAL es `mtxqqamitglhehaktgxm`
+2. Si hay duda, verificar extrayendo la URL del JS bundle de producción
 3. Si hay duda → NO ejecutar. Preguntar primero.
 
 ## Paso 4: ⚠️ OBLIGATORIO — Health Check de Base de Datos

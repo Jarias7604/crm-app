@@ -6,15 +6,18 @@
 **REPOSITORIO:** `Jarias7604/crm-app`
 **RUTA LOCAL:** `c:\Users\jaria\OneDrive\DELL\Desktop\crm-app`
 
-### BASES DE DATOS SUPABASE (INMUTABLES — VERIFICADO VERCEL 2026-03-29)
-| Ambiente | Project ID | Vercel env | .env.local |
+### BASES DE DATOS SUPABASE (CORREGIDO 2026-05-03 — VERIFICADO DESDE JS BUNDLE DE PRODUCCIÓN)
+| Ambiente | Project ID | Nombre en Supabase | Verificación |
 |---|---|---|---|
-| **PRODUCCIÓN** | `ikofyypxphrqkncimszt` | `VITE_SUPABASE_URL` Production | ❌ NO usar |
-| **DESARROLLO** | `mtxqqamitglhehaktgxm` | `VITE_SUPABASE_URL` Pre-Production | ✅ sí |
+| **PRODUCCIÓN** | `mtxqqamitglhehaktgxm` | Arias Fintech / GlobalAds AI | ✅ Confirmado en JS bundle de `crm-app-v2.vercel.app` |
+| **SECUNDARIA** | `ikofyypxphrqkncimszt` | Jarias7604's Project / Arias Defense El Salvador | ⚠️ NO es la que usa Vercel producción |
+| **TESTING** | `ubqscyfefgfbmndnypbp` | Testing | Solo `.env.local` desarrollo local |
 
-> ⚠️ **TRAMPA CONOCIDA:** Supabase muestra el badge "PRODUCTION" en la rama `main` de CUALQUIER proyecto.
-> Ese badge NO indica que sea el proyecto de producción de la app.
-> La fuente de verdad es siempre Vercel → Settings → Environment Variables → Production.
+> 🚨 **INCIDENTE 2026-05-03:** La tabla anterior estaba INVERTIDA desde 2026-03-29.
+> `ikofyy` estaba marcada como PRODUCCIÓN pero Vercel realmente usa `mtxqq`.
+> Esto causó 3+ horas de trabajo en la DB equivocada al intentar sincronizar badges de cotizaciones.
+> **La fuente de verdad DEFINITIVA:** extraer `[a-z0-9]+\.supabase\.co` del JS bundle de producción.
+> Comando: `Invoke-WebRequest "https://crm-app-v2.vercel.app/assets/index-*.js" | Select-String 'supabase\.co'`
 
 ### DEPLOY
 | Plataforma | URL |
