@@ -1798,6 +1798,11 @@ export default function Leads() {
                                         <div className="flex gap-2 items-center flex-wrap">
                                             <StatusBadge status={lead.status} />
                                             <PriorityBadge priority={lead.priority} />
+                                            {lead.document_path && (
+                                                <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-widest rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center gap-1">
+                                                    <FileText className="w-3 h-3" /> Cotizado
+                                                </span>
+                                            )}
                                             {/* F3 — Response Velocity */}
                                             <ResponseVelocityBadge nextFollowupDate={lead.next_followup_date} />
                                         </div>
@@ -1948,6 +1953,11 @@ export default function Leads() {
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <PriorityBadge priority={lead.priority || 'medium'} />
                                             <StatusBadge status={lead.status} />
+                                            {lead.document_path && (
+                                                <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-widest rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center gap-1">
+                                                    <FileText className="w-3 h-3" /> Cotizado
+                                                </span>
+                                            )}
                                             {lead.source && SOURCE_CONFIG[lead.source] && (
                                                 <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${SOURCE_CONFIG[lead.source].bgColor} ${SOURCE_CONFIG[lead.source].color}`}>
                                                     {SOURCE_CONFIG[lead.source].icon} {SOURCE_CONFIG[lead.source].label}
@@ -2131,9 +2141,12 @@ export default function Leads() {
                                     >
                                         <div className="flex items-center justify-between">
                                             <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 mb-1">
+                                                <div className="flex items-center gap-2 mb-1 flex-wrap">
                                                     <h4 className="text-sm font-black text-gray-900 truncate">{lead.name}</h4>
                                                     <StatusBadge status={lead.status} />
+                                                    {lead.document_path && (
+                                                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full border border-blue-100 bg-blue-50 text-blue-600 flex items-center gap-0.5 uppercase tracking-widest"><FileText className="w-2.5 h-2.5" /> Cotizado</span>
+                                                    )}
                                                     {(lead.contact_count || 0) > 0 && (
                                                         <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${(lead.contact_count || 0) >= 6 ? 'bg-red-50 text-red-600' :
                                                             (lead.contact_count || 0) >= 4 ? 'bg-amber-50 text-amber-600' :
@@ -2166,7 +2179,7 @@ export default function Leads() {
                                         className="divide-y divide-gray-50"
                                         style={{
                                             tableLayout: 'fixed',
-                                            width: columnOrder.reduce((sum, id) => sum + (columnWidths[id] ?? DEFAULT_COL_WIDTHS[id] ?? 140), 48 + 100),
+                                            width: columnOrder.reduce((sum, id) => sum + (columnWidths[id] ?? DEFAULT_COL_WIDTHS[id] ?? 140), 48 + 160),
                                         }}
                                     >
                                         <DragDropContext onDragEnd={handleOnDragEnd}>
@@ -2354,7 +2367,7 @@ export default function Leads() {
                                                             ))}
 
                                                             {provided.placeholder}
-                                                            <th scope="col" style={{ width: 100, minWidth: 100 }} className="px-4 py-4 text-center text-xs font-black text-gray-400 uppercase tracking-widest bg-[#FAFAFB]">
+                                                            <th scope="col" style={{ width: 160, minWidth: 160, position: 'sticky', right: 0, zIndex: 4, boxShadow: '-2px 0 6px rgba(0,0,0,0.04)' }} className="px-4 py-4 text-center text-xs font-black text-gray-400 uppercase tracking-widest bg-[#FAFAFB]">
                                                                 Acciones
                                                             </th>
                                                         </tr>
@@ -2390,7 +2403,15 @@ export default function Leads() {
                                                                             )
                                                                         )}
                                                                         <div className="flex flex-col min-w-0">
-                                                                            <span className="text-sm font-bold text-gray-900 group-hover:text-[#4449AA] transition-colors truncate" title={lead.name}>{lead.name}</span>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="text-sm font-bold text-gray-900 group-hover:text-[#4449AA] transition-colors truncate" title={lead.name}>{lead.name}</span>
+                                                                                {lead.document_path && (
+                                                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-blue-50 text-blue-600 border border-blue-100 uppercase tracking-widest shrink-0" title="Cotización Generada">
+                                                                                        <FileText className="w-2.5 h-2.5" />
+                                                                                        Cotizado
+                                                                                    </span>
+                                                                                )}
+                                                                            </div>
                                                                             <span className="text-xs text-blue-600 font-bold truncate" title={lead.company_name || 'Individual'}>{lead.company_name || 'Individual'}</span>
                                                                         </div>
                                                                     </div>
@@ -2483,8 +2504,31 @@ export default function Leads() {
                                                             </td>
                                                         ))}
 
-                                                        <td className="px-4 py-4 overflow-hidden">
+                                                        <td className="px-4 py-4 bg-white" style={{ position: 'sticky', right: 0, zIndex: 2, boxShadow: '-2px 0 6px rgba(0,0,0,0.04)' }}>
                                                             <div className="flex justify-center items-center gap-1.5 transition-all">
+                                                                {lead.document_path && (
+                                                                    <>
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); window.open(lead.document_path as string, '_blank'); }}
+                                                                            className="p-1.5 text-blue-500 hover:text-white hover:bg-blue-600 rounded-lg transition-all shadow-sm bg-blue-50/50"
+                                                                            title="Ver PDF"
+                                                                        >
+                                                                            <FileText className="w-4 h-4" />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                navigate('/marketing/campaign/new', {
+                                                                                    state: { preSelectedLeads: [lead.id], campaignSource: 'leads-resend' }
+                                                                                });
+                                                                            }}
+                                                                            className="p-1.5 text-emerald-500 hover:text-white hover:bg-emerald-600 rounded-lg transition-all shadow-sm bg-emerald-50/50"
+                                                                            title="Re-enviar Cotización"
+                                                                        >
+                                                                            <Send className="w-4 h-4" />
+                                                                        </button>
+                                                                    </>
+                                                                )}
                                                                 <button
                                                                     onClick={(e) => { e.stopPropagation(); openLeadDetail(lead); }}
                                                                     className="p-1.5 text-indigo-400 hover:text-white hover:bg-[#4449AA] rounded-lg transition-all shadow-sm bg-indigo-50/50"

@@ -40,7 +40,7 @@ export interface Cotizacion {
     valida_hasta?: string;
     notas?: string;
 
-    // Términos de Pago (Nuevo)
+    // Términos de Pago
     tipo_pago?: 'contado' | 'credito' | 'anual' | 'mensual';
     plazo_meses?: number;
     cuotas?: number;
@@ -61,41 +61,41 @@ export interface ModuloAdicional {
     costo_mensual: number;
 }
 
-export interface PlanFacturacion {
+export interface PlanCRM {
     nombre: string;
-    min_dtes: number;
-    max_dtes: number;
+    min_contactos: number;
+    max_contactos: number;
     costo_anual: number;
     costo_mensual: number;
     implementacion: number;
     caracteristicas: string[];
 }
 
-export const PLANES_FACTURACION: PlanFacturacion[] = [
+export const PLANES_CRM: PlanCRM[] = [
     {
         nombre: 'BASIC',
-        min_dtes: 0,
-        max_dtes: 500,
+        min_contactos: 0,
+        max_contactos: 500,
         costo_anual: 600,
         costo_mensual: 60,
         implementacion: 50,
         caracteristicas: [
-            'Hasta 500 DTEs/año',
-            'Emisión de Facturas y CCF',
+            'Hasta 500 Contactos',
+            'Gestión de Leads Básica',
             'Portal del Cliente',
             'Soporte por Email'
         ]
     },
     {
         nombre: 'STARTER',
-        min_dtes: 501,
-        max_dtes: 3000,
+        min_contactos: 501,
+        max_contactos: 3000,
         costo_anual: 1200,
         costo_mensual: 120,
         implementacion: 100,
         caracteristicas: [
-            'Hasta 3,000 DTEs/año',
-            'Todos los documentos DTE',
+            'Hasta 3,000 Contactos',
+            'Gestión de Embudo Comercial',
             'Portal del Cliente',
             'Soporte Prioritario',
             'Reportes Básicos'
@@ -103,14 +103,14 @@ export const PLANES_FACTURACION: PlanFacturacion[] = [
     },
     {
         nombre: 'PRO',
-        min_dtes: 3001,
-        max_dtes: 10000,
+        min_contactos: 3001,
+        max_contactos: 10000,
         costo_anual: 2400,
         costo_mensual: 240,
         implementacion: 200,
         caracteristicas: [
-            'Hasta 10,000 DTEs/año',
-            'Todos los documentos DTE',
+            'Hasta 10,000 Contactos',
+            'Automatización de Marketing',
             'Portal del Cliente',
             'Soporte 24/7',
             'Reportes Avanzados',
@@ -119,65 +119,52 @@ export const PLANES_FACTURACION: PlanFacturacion[] = [
     },
     {
         nombre: 'ENTERPRISE',
-        min_dtes: 10001,
-        max_dtes: 999999,
+        min_contactos: 10001,
+        max_contactos: 999999,
         costo_anual: 4800,
         costo_mensual: 480,
         implementacion: 500,
         caracteristicas: [
-            'DTEs Ilimitados',
-            'Todos los documentos DTE',
-            'Múltiples Sucursales',
+            'Contactos Ilimitados',
+            'Agentes IA Multicanal',
+            'Múltiples Equipos',
             'Soporte Dedicado',
             'Reportes Personalizados',
-            'API Completa',
-            'Integración ERP'
+            'API Completa'
         ]
     }
 ];
 
 export const MODULOS_DISPONIBLES: ModuloAdicional[] = [
     {
-        nombre: 'POS',
-        descripcion: 'Punto de Venta Integrado',
+        nombre: 'Cotizador Avanzado',
+        descripcion: 'Motor de cálculo para proyectos complejos',
         costo_anual: 360,
         costo_mensual: 36
     },
     {
-        nombre: 'Compras',
-        descripcion: 'Módulo de Gestión de Compras',
-        costo_anual: 300,
-        costo_mensual: 30
-    },
-    {
-        nombre: 'Inventario',
-        descripcion: 'Control de Inventario Avanzado',
-        costo_anual: 240,
-        costo_mensual: 24
-    },
-    {
-        nombre: 'Contabilidad',
-        descripcion: 'Módulo Contable Integrado',
-        costo_anual: 480,
-        costo_mensual: 48
-    },
-    {
-        nombre: 'Nómina',
-        descripcion: 'Gestión de Planilla y RRHH',
+        nombre: 'Agente IA',
+        descripcion: 'Asistente virtual 24/7 para atención a leads',
         costo_anual: 600,
         costo_mensual: 60
+    },
+    {
+        nombre: 'Marketing Multicanal',
+        descripcion: 'Campañas automatizadas por Email y SMS',
+        costo_anual: 480,
+        costo_mensual: 48
     }
 ];
 
 export const SERVICIOS_ADICIONALES = {
     whatsapp: {
         nombre: 'Notificaciones WhatsApp',
-        descripcion: 'Envío automático de DTE por WhatsApp',
-        costo_por_dte: 0.025
+        descripcion: 'Envío automático de mensajes y cotizaciones por WhatsApp',
+        costo_por_contacto: 0.025
     },
     personalizacion: {
         nombre: 'Personalización de Marca',
-        descripcion: 'Logo y colores personalizados en documentos',
+        descripcion: 'Logo y colores personalizados en portal y documentos',
         costo_unico: 150
     }
 };
