@@ -230,20 +230,34 @@ export default function NuevaCotizacion() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
                     <label className="block text-sm font-bold text-gray-700 mb-2">
-                        Seleccionar Lead (Opcional)
+                        🔗 Vincular a Lead Existente <span className="text-blue-600 font-black">(Recomendado)</span>
                     </label>
                     <select
                         value={formData.lead_id}
                         onChange={(e) => handleLeadChange(e.target.value)}
-                        className="w-full border border-gray-300 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className={`w-full border-2 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-semibold ${
+                            formData.lead_id 
+                                ? 'border-blue-400 bg-blue-50 text-blue-800' 
+                                : 'border-amber-300 bg-amber-50 text-gray-600'
+                        }`}
                     >
-                        <option value="">Nuevo cliente (manual)</option>
+                        <option value="">⚠️ Sin vincular — selecciona un lead</option>
                         {leads.map(lead => (
                             <option key={lead.id} value={lead.id}>
-                                {lead.name} {lead.company_name ? `- ${lead.company_name}` : ''}
+                                {lead.name} {lead.company_name ? `— ${lead.company_name}` : ''}
                             </option>
                         ))}
                     </select>
+                    {!formData.lead_id && (
+                        <p className="text-xs text-amber-600 font-bold mt-1.5">
+                            ⚠️ Sin lead vinculado, esta cotización no aparecerá en la tabla de Leads.
+                        </p>
+                    )}
+                    {formData.lead_id && (
+                        <p className="text-xs text-blue-600 font-bold mt-1.5">
+                            ✅ Cotización vinculada — aparecerá en Leads con badge "Cotizado".
+                        </p>
+                    )}
                 </div>
 
                 <div>
