@@ -2511,8 +2511,9 @@ export default function Leads() {
                                                                         <button
                                                                             onClick={async (e) => {
                                                                                 e.stopPropagation();
-                                                                                if (lead.cotizaciones && lead.cotizaciones.length > 0) {
-                                                                                    navigate(`/cotizaciones/${lead.cotizaciones[0].id}`);
+                                                                                if (lead.document_path?.startsWith('cotizacion:')) {
+                                                                                    const cotId = lead.document_path.replace('cotizacion:', '');
+                                                                                    navigate(`/cotizaciones/${cotId}`);
                                                                                     return;
                                                                                 }
                                                                                 const path = lead.document_path;

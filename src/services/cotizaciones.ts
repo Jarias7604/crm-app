@@ -27,11 +27,11 @@ class CotizacionesService {
                 ? JSON.parse(data.modulos_adicionales)
                 : data.modulos_adicionales;
 
-            // AUTOMATION: Update Lead Value with Quote Total
+            // AUTOMATION: Update Lead Value + stamp badge marker
             if (data.lead_id && data.total_anual !== undefined) {
                 await supabase
                     .from('leads')
-                    .update({ value: data.total_anual })
+                    .update({ value: data.total_anual, document_path: `cotizacion:${data.id}` })
                     .eq('id', data.lead_id);
             }
         }
