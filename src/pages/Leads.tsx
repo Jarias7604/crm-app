@@ -2509,7 +2509,18 @@ export default function Leads() {
                                                                 {(lead.cotizaciones?.length > 0 || lead.document_path) && (
                                                                     <>
                                                                         <button
-                                                                            onClick={(e) => { e.stopPropagation(); window.open((lead.cotizaciones?.[0]?.pdf_url || lead.document_path) as string, '_blank'); }}
+                                                                            onClick={async (e) => {
+                                                                                e.stopPropagation();
+                                                                                const path = (lead.cotizaciones?.[0]?.pdf_url || lead.document_path) as string;
+                                                                                if (path) {
+                                                                                    try {
+                                                                                        const url = await storageService.getDownloadUrl(path);
+                                                                                        window.open(url, '_blank');
+                                                                                    } catch (err) {
+                                                                                        console.error('Error fetching PDF url:', err);
+                                                                                    }
+                                                                                }
+                                                                            }}
                                                                             className="p-1.5 text-blue-500 hover:text-white hover:bg-blue-600 rounded-lg transition-all shadow-sm bg-blue-50/50"
                                                                             title="Ver PDF"
                                                                         >
