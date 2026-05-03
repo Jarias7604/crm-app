@@ -2511,7 +2511,11 @@ export default function Leads() {
                                                                         <button
                                                                             onClick={async (e) => {
                                                                                 e.stopPropagation();
-                                                                                const path = (lead.cotizaciones?.[0]?.pdf_url || lead.document_path) as string;
+                                                                                if (lead.cotizaciones && lead.cotizaciones.length > 0) {
+                                                                                    navigate(`/cotizaciones/${lead.cotizaciones[0].id}`);
+                                                                                    return;
+                                                                                }
+                                                                                const path = lead.document_path;
                                                                                 if (path) {
                                                                                     try {
                                                                                         const url = await storageService.getDownloadUrl(path);

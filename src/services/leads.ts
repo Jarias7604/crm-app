@@ -6,15 +6,29 @@ export const leadsService = {
     // Get all leads for the company - Optimized for performance
     async getLeads(page = 1, pageSize = 1000) {
         try {
-            const { data, count } = await supabase
+            const { data: leads, count } = await supabase
                 .from('leads')
                 .select('*', { count: 'exact' })
                 .order('created_at', { ascending: false });
 
-            if (!data) {
+            if (!leads) {
                 logger.error('Error loading leads', null, { action: 'getLeads', page, pageSize });
                 return { data: [], count: 0 };
             }
+
+            // Manually fetch cotizaciones for these leads to avoid relationship errors
+            const leadIds = leads.map(l => l.id);
+            const { data: cotizaciones } = await supabase
+                .from('cotizaciones')
+                .select('id, lead_id, estado, total_anual')
+                .in('lead_id', leadIds);
+
+            // Attach cotizaciones to leads
+            const data = leads.map(lead => ({
+                ...lead,
+                cotizaciones: cotizaciones?.filter(c => c.lead_id === lead.id) || []
+            }));
+
             return { data, count };
         } catch (err) {
             logger.error('Unhandled error in getLeads', err, { page, pageSize });
