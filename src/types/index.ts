@@ -102,6 +102,7 @@ export interface Lead {
     next_action_notes: string | null;
     address?: string | null;
     document_path?: string | null;
+    cotizaciones?: any[];
     lost_reason_id?: string | null;
     lost_at_stage?: string | null;
     lost_notes?: string | null;

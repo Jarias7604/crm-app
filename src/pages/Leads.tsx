@@ -2405,7 +2405,7 @@ export default function Leads() {
                                                                         <div className="flex flex-col min-w-0">
                                                                             <div className="flex items-center gap-2">
                                                                                 <span className="text-sm font-bold text-gray-900 group-hover:text-[#4449AA] transition-colors truncate" title={lead.name}>{lead.name}</span>
-                                                                                {lead.document_path && (
+                                                                                {(lead.cotizaciones?.length > 0 || lead.document_path) && (
                                                                                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-blue-50 text-blue-600 border border-blue-100 uppercase tracking-widest shrink-0" title="Cotización Generada">
                                                                                         <FileText className="w-2.5 h-2.5" />
                                                                                         Cotizado
@@ -2506,10 +2506,10 @@ export default function Leads() {
 
                                                         <td className="px-4 py-4 bg-white" style={{ position: 'sticky', right: 0, zIndex: 2, boxShadow: '-2px 0 6px rgba(0,0,0,0.04)' }}>
                                                             <div className="flex justify-center items-center gap-1.5 transition-all">
-                                                                {lead.document_path && (
+                                                                {(lead.cotizaciones?.length > 0 || lead.document_path) && (
                                                                     <>
                                                                         <button
-                                                                            onClick={(e) => { e.stopPropagation(); window.open(lead.document_path as string, '_blank'); }}
+                                                                            onClick={(e) => { e.stopPropagation(); window.open((lead.cotizaciones?.[0]?.pdf_url || lead.document_path) as string, '_blank'); }}
                                                                             className="p-1.5 text-blue-500 hover:text-white hover:bg-blue-600 rounded-lg transition-all shadow-sm bg-blue-50/50"
                                                                             title="Ver PDF"
                                                                         >

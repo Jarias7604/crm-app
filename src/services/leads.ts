@@ -8,7 +8,7 @@ export const leadsService = {
         try {
             const { data, count } = await supabase
                 .from('leads')
-                .select('*', { count: 'exact' })
+                .select('*, cotizaciones (id, correlativo, pdf_url, created_at)', { count: 'exact' })
                 .order('created_at', { ascending: false });
 
             if (!data) {
