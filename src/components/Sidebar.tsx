@@ -22,7 +22,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         subItems?: { name: string; href: string; icon: any }[];
     }
     const isCallBotEnabled = import.meta.env.VITE_SHOW_CALL_BOT === 'true';
-    const configPaths = ['/company/branding', '/catalogo', '/financial-rules', '/loss-reasons', '/industries', '/admin/call-bot'];
+    const configPaths = ['/company/branding', '/company/integrations', '/catalogo', '/financial-rules', '/loss-reasons', '/industries', '/admin/call-bot'];
     const marketingPaths = ['/marketing', '/marketing/email', '/marketing/lead-hunter', '/marketing/ai-agents', '/marketing/settings', '/marketing/flyers'];
     const teamPaths = ['/company/team', '/company/teams', '/company/performance'];
     const [configOpen, setConfigOpen] = useState(configPaths.some(path => location.pathname === path));
@@ -99,6 +99,10 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         navigation.push({ name: t('sidebar.calendar'), href: '/calendar', icon: Calendar, current: location.pathname.startsWith('/calendar') });
     }
 
+    if (canAccess('reports') || profile?.role === 'super_admin' || profile?.role === 'company_admin') {
+        navigation.push({ name: 'Reportes BI', href: '/reports', icon: BarChart3, current: location.pathname.startsWith('/reports') });
+    }
+
     // Support Platform
     navigation.push({
         name: 'Service Hub',
@@ -140,6 +144,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
 
     const configSubItemsRaw = [
         { name: 'Marca de Empresa', href: '/company/branding', icon: Building, current: location.pathname === '/company/branding', permissionKey: 'branding' },
+        { name: 'Integraciones', href: '/company/integrations', icon: Network, current: location.pathname.startsWith('/company/integrations'), permissionKey: 'branding' },
         { name: 'Pipeline Clientes', href: '/admin/pipeline', icon: UserCheck, current: location.pathname === '/admin/pipeline', permissionKey: 'pipeline.admin' },
         { name: 'Catálogo de Productos', href: '/catalogo', icon: Package, current: location.pathname === '/catalogo', permissionKey: 'pricing' },
         { name: 'Gestión Financiera', href: '/financial-rules', icon: CreditCard, current: location.pathname === '/financial-rules', permissionKey: 'financial_rules' },
