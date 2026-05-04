@@ -163,23 +163,23 @@ export function GlobalSearch() {
                     ) : isAiMode && aiAnalytics ? (
                         <div className="p-6">
                             <div className={`bg-gradient-to-br border rounded-2xl p-6 shadow-inner relative overflow-hidden ${
-                                aiAnalytics.type === 'followups' && aiAnalytics.aiColor === 'red' ? 'from-red-50 to-orange-50 border-red-200' :
-                                aiAnalytics.type === 'followups' && aiAnalytics.aiColor === 'amber' ? 'from-amber-50 to-orange-50 border-amber-200' :
-                                aiAnalytics.type === 'followups' && aiAnalytics.aiColor === 'emerald' ? 'from-emerald-50 to-teal-50 border-emerald-200' :
+                                (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'red' ? 'from-red-50 to-orange-50 border-red-200' :
+                                (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'amber' ? 'from-amber-50 to-orange-50 border-amber-200' :
+                                (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'emerald' ? 'from-emerald-50 to-teal-50 border-emerald-200' :
                                 'from-purple-50 to-indigo-50 border-purple-100'
                             }`}>
                                 <div className={`absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl ${
-                                    aiAnalytics.type === 'followups' && aiAnalytics.aiColor === 'red' ? 'bg-red-500/10' :
-                                    aiAnalytics.type === 'followups' && aiAnalytics.aiColor === 'amber' ? 'bg-amber-500/10' :
-                                    aiAnalytics.type === 'followups' && aiAnalytics.aiColor === 'emerald' ? 'bg-emerald-500/10' :
+                                    (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'red' ? 'bg-red-500/10' :
+                                    (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'amber' ? 'bg-amber-500/10' :
+                                    (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'emerald' ? 'bg-emerald-500/10' :
                                     'bg-purple-500/10'
                                 }`} />
                                 
                                 <div className="flex items-start gap-4 relative z-10">
                                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-lg ${
-                                        aiAnalytics.type === 'followups' && aiAnalytics.aiColor === 'red' ? 'bg-red-500 shadow-red-500/30' :
-                                        aiAnalytics.type === 'followups' && aiAnalytics.aiColor === 'amber' ? 'bg-amber-500 shadow-amber-500/30' :
-                                        aiAnalytics.type === 'followups' && aiAnalytics.aiColor === 'emerald' ? 'bg-emerald-500 shadow-emerald-500/30' :
+                                        (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'red' ? 'bg-red-500 shadow-red-500/30' :
+                                        (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'amber' ? 'bg-amber-500 shadow-amber-500/30' :
+                                        (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'emerald' ? 'bg-emerald-500 shadow-emerald-500/30' :
                                         'bg-purple-500 shadow-purple-500/30'
                                     }`}>
                                         <Sparkles className="w-6 h-6 text-white" />
@@ -187,38 +187,38 @@ export function GlobalSearch() {
                                     <div className="space-y-4 flex-1">
                                         <div>
                                             <h3 className={`text-sm font-black uppercase tracking-wider mb-1 ${
-                                                aiAnalytics.type === 'followups' && aiAnalytics.aiColor === 'red' ? 'text-red-900' :
-                                                aiAnalytics.type === 'followups' && aiAnalytics.aiColor === 'amber' ? 'text-amber-900' :
-                                                aiAnalytics.type === 'followups' && aiAnalytics.aiColor === 'emerald' ? 'text-emerald-900' :
+                                                (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'red' ? 'text-red-900' :
+                                                (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'amber' ? 'text-amber-900' :
+                                                (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'emerald' ? 'text-emerald-900' :
                                                 'text-purple-900'
                                             }`}>
-                                                AI Consultant {aiAnalytics.type === 'followups' ? '- Seguimientos' : '- Cierres'}
+                                                AI Consultant {(aiAnalytics as any).type === 'followups' ? '- Seguimientos' : '- Cierres'}
                                             </h3>
                                             <p className="text-gray-800 font-medium leading-relaxed">
-                                                {aiAnalytics.aiMessage.split('**').map((part, i) => 
+                                                {(aiAnalytics as any).aiMessage.split('**').map((part, i) => 
                                                     i % 2 === 1 ? <span key={i} className="font-black text-gray-900">{part}</span> : part
                                                 )}
                                             </p>
                                         </div>
 
-                                        {aiAnalytics.type === 'leads' && (
+                                        {(aiAnalytics as any).type === 'leads' && (
                                             <div className="grid grid-cols-2 gap-4 mt-4">
                                                 <div className="bg-white rounded-xl p-4 shadow-sm border border-purple-100/50">
                                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Cierres del Mes</p>
                                                     <div className="flex items-end gap-2">
-                                                        <span className="text-2xl font-black text-gray-900">{aiAnalytics.wonThisMonth}</span>
-                                                        <span className="text-sm font-bold text-gray-400 mb-0.5">/ {aiAnalytics.wonLastMonth} (mes ant.)</span>
+                                                        <span className="text-2xl font-black text-gray-900">{(aiAnalytics as any).wonThisMonth}</span>
+                                                        <span className="text-sm font-bold text-gray-400 mb-0.5">/ {(aiAnalytics as any).wonLastMonth} (mes ant.)</span>
                                                     </div>
-                                                    <div className={`flex items-center gap-1 mt-2 text-xs font-bold ${aiAnalytics.growthPercentage >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                                                        {aiAnalytics.growthPercentage >= 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-                                                        <span>{Math.abs(aiAnalytics.growthPercentage)}% vs mes pasado</span>
+                                                    <div className={`flex items-center gap-1 mt-2 text-xs font-bold ${(aiAnalytics as any).growthPercentage >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                                                        {(aiAnalytics as any).growthPercentage >= 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                                                        <span>{Math.abs((aiAnalytics as any).growthPercentage)}% vs mes pasado</span>
                                                     </div>
                                                 </div>
                                                 
                                                 <div className="bg-white rounded-xl p-4 shadow-sm border border-purple-100/50">
                                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Proyección</p>
                                                     <div className="flex items-end gap-2">
-                                                        <span className="text-2xl font-black text-gray-900">${aiAnalytics.valueThisMonth.toLocaleString()}</span>
+                                                        <span className="text-2xl font-black text-gray-900">${(aiAnalytics as any).valueThisMonth.toLocaleString()}</span>
                                                     </div>
                                                     <div className="flex items-center gap-1 mt-2 text-xs font-bold text-indigo-500">
                                                         <Activity className="w-3.5 h-3.5" />
@@ -228,27 +228,27 @@ export function GlobalSearch() {
                                             </div>
                                         )}
 
-                                        {aiAnalytics.type === 'followups' && (
+                                        {(aiAnalytics as any).type === 'followups' && (
                                             <div className="grid grid-cols-3 gap-4 mt-4">
                                                 <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Vencidos</p>
                                                     <div className="flex items-center gap-2">
-                                                        <AlertTriangle className={`w-4 h-4 ${aiAnalytics.overdue > 0 ? 'text-red-500' : 'text-gray-300'}`} />
-                                                        <span className={`text-2xl font-black ${aiAnalytics.overdue > 0 ? 'text-red-600' : 'text-gray-900'}`}>{aiAnalytics.overdue}</span>
+                                                        <AlertTriangle className={`w-4 h-4 ${(aiAnalytics as any).overdue > 0 ? 'text-red-500' : 'text-gray-300'}`} />
+                                                        <span className={`text-2xl font-black ${(aiAnalytics as any).overdue > 0 ? 'text-red-600' : 'text-gray-900'}`}>{(aiAnalytics as any).overdue}</span>
                                                     </div>
                                                 </div>
                                                 <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Para Hoy</p>
                                                     <div className="flex items-center gap-2">
                                                         <CalendarCheck className="w-4 h-4 text-amber-500" />
-                                                        <span className="text-2xl font-black text-gray-900">{aiAnalytics.today}</span>
+                                                        <span className="text-2xl font-black text-gray-900">{(aiAnalytics as any).today}</span>
                                                     </div>
                                                 </div>
                                                 <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
                                                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Hechos (Semana)</p>
                                                     <div className="flex items-center gap-2">
                                                         <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                                                        <span className="text-2xl font-black text-gray-900">{aiAnalytics.completed}</span>
+                                                        <span className="text-2xl font-black text-gray-900">{(aiAnalytics as any).completed}</span>
                                                     </div>
                                                 </div>
                                             </div>
