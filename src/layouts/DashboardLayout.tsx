@@ -8,6 +8,7 @@ import { cn } from '../lib/utils';
 import { useAuth } from '../auth/AuthProvider';
 import { useTranslation } from 'react-i18next';
 import { UserCircle } from 'lucide-react';
+import { useSessionTimeout } from '../hooks/useSessionTimeout';
 
 export default function DashboardLayout() {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -21,6 +22,9 @@ export default function DashboardLayout() {
         !location.pathname.endsWith('/editar') &&
         location.pathname !== '/cotizaciones/nueva' &&
         location.pathname !== '/cotizaciones/nueva-pro';
+
+    // Initialize session timeout
+    useSessionTimeout();
 
     return (
         <div className="min-h-screen bg-[#F8F9FD]">

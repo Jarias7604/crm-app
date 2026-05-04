@@ -3,23 +3,45 @@ import type { Lead, FollowUp } from '../types';
 import { logger } from '../utils/logger';
 
 export const leadsService = {
-    // Get all leads for the company - Optimized for performance
+    // Get leads with lightweight payload (optimized for List/Kanban views)
     async getLeads(page = 1, pageSize = 1000) {
         try {
+            // Carga Ligera: Traemos solo lo necesario para mostrar tarjetas/filas
+            const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path';
+            
+            const from = (page - 1) * pageSize;
+            const to = from + pageSize - 1;
+
             const { data, count } = await supabase
                 .from('leads')
-                .select('*', { count: 'exact' })
-                .order('created_at', { ascending: false });
+                .select(fields, { count: 'exact' })
+                .order('created_at', { ascending: false })
+                .range(from, to);
 
             if (!data) {
                 logger.error('Error loading leads', null, { action: 'getLeads', page, pageSize });
-                return { data: [], count: 0 };
+                return { data: [] as Lead[], count: 0 };
             }
-            return { data, count };
+            return { data: data as Lead[], count };
         } catch (err) {
             logger.error('Unhandled error in getLeads', err, { page, pageSize });
             throw err;
         }
+    },
+
+    // Get full details for a specific lead (called when opening the panel)
+    async getLeadById(id: string) {
+        const { data, error } = await supabase
+            .from('leads')
+            .select(`
+                *,
+                cotizaciones ( id, numero, total, status, created_at )
+            `)
+            .eq('id', id)
+            .single();
+
+        if (error) throw error;
+        return data as Lead;
     },
 
     // Get lead statistics for Dashboard - Optimized selection

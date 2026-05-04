@@ -110,24 +110,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const fetchProfile = async (userId: string, _userEmail?: string) => {
         try {
-            // 🛑 BYPASS MAESTRO DE EMERGENCIA INTELIGENTE (LOCAL DEV PROTECTION)
-            if (_userEmail === 'jarias7604@gmail.com' || _userEmail === 'jarias@ariasdefense.com') {
-                console.warn('⚡ LIBERANDO INTERFAZ (BYPASS)');
-                setLoading(false); // Libera la carga inmediatamente
+            // FETCH PROFILE (LOGICA NORMAL)
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('id, email, role, company_id, full_name, phone, status, created_at, custom_role_id, permissions, is_platform_owner')
+                .eq('id', userId)
+                .single();
+
+            if (error) {
+                console.error('Error fetching profile:', error);
+                setLoading(false);
+                return;
+            }
+
+            // 🛑 PLATFORM OWNER BYPASS (Reemplaza el antiguo hardcodeo inseguro)
+            if (data?.is_platform_owner) {
+                console.warn('⚡ LIBERANDO INTERFAZ (PLATFORM OWNER BYPASS)');
                 
                 const simRole = localStorage.getItem('simulated_role');
                 const simCompanyId = localStorage.getItem('simulated_company_id');
                 
                 const masterCompanyId = simCompanyId || '7a582ba5-f7d0-4ae3-9985-35788deb1c30';
-                
                 const finalRole = (simRole as any) || 'super_admin';
 
                 const bypassProfile: Profile = {
                     id: userId,
-                    email: _userEmail,
+                    email: _userEmail || data.email,
                     role: finalRole,
                     company_id: masterCompanyId,
-                    full_name: simRole ? `Simulación: ${simRole}` : 'Super Admin (Bypass Local)',
+                    full_name: simRole ? `Simulación: ${simRole}` : 'Platform Owner',
                     phone: '+503 0000-0000',
                     status: 'active',
                     created_at: new Date().toISOString(),
@@ -144,15 +155,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 ];
                 
                 allPerms.forEach(p => { 
-                    // BLOQUEO ESTRICTO: Si no es super_admin, no ve estos módulos.
                     if (finalRole !== 'super_admin' && ['companies', 'audit_log', 'admin_companies', 'admin_audit'].includes(p)) {
                         bypassProfile.permissions![p] = false;
-                    } 
-                    // Bloqueo para Agentes
-                    else if (finalRole === 'collaborator' && ['marketing', 'pricing', 'paquetes', 'financial_rules', 'team_manage'].includes(p)) {
+                    } else if (finalRole === 'collaborator' && ['marketing', 'pricing', 'paquetes', 'financial_rules', 'team_manage'].includes(p)) {
                         bypassProfile.permissions![p] = false;
                     } else {
-                        // Forzamos true para todo lo demás si eres admin simulado
                         bypassProfile.permissions![p] = true; 
                     }
                 });
@@ -162,18 +169,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 return;
             }
 
-            // FETCH PROFILE (LOGICA NORMAL)
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('id, email, role, company_id, full_name, status, created_at, custom_role_id, permissions')
-                .eq('id', userId)
-                .single();
 
-            if (error) {
-                console.error('Error fetching profile:', error);
-                setLoading(false);
-                return;
-            }
 
             // ─────────────────────────────────────────────────────────────────
             // ENTERPRISE PERMISSION RESOLUTION (Single Source of Truth)
