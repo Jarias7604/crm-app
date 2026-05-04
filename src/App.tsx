@@ -55,6 +55,7 @@ const HelpChat          = lazy(() => import('./components/HelpChat/HelpChat'));
 const PWAInstallPrompt  = lazy(() => import('./components/PWAInstallPrompt').then(m => ({ default: m.PWAInstallPrompt })));
 const FlyerStudio       = lazy(() => import('./pages/marketing/FlyerStudio'));
 const Finanzas          = lazy(() => import('./pages/Finanzas'));
+const GlobalSearch      = lazy(() => import('./components/GlobalSearch').then(m => ({ default: m.GlobalSearch })));
 
 // ─── Skeleton Screen (técnica Netflix) ───────────────────────────────────────
 // Muestra estructura visual inmediatamente mientras carga el JS del módulo.
@@ -210,6 +211,7 @@ function App() {
             </Routes>
             <Suspense fallback={null}>
               <HelpChat />
+              <GlobalSearch />
             </Suspense>
           </Suspense>
         </AuthProvider>

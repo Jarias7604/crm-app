@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { LeadTable } from '../components/leads/LeadTable';
 import { LeadDetailPanel } from '../components/leads/LeadDetailPanel';
 import { StatusBadge } from '../components/leads/StatusBadge';
@@ -46,16 +46,24 @@ export default function Leads() {
     const { timezone: rawTimezone } = useTimezone(profile?.company_id);
     const { tableRef: leadsTableRef, wrapperRef: leadsWrapperRef } = useAriasTables();
     const queryClient = useQueryClient();
-    const { data: leadsData, isLoading: loading } = useQuery({
+    const { 
+        data: leadsData, 
+        isLoading: loading,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage
+    } = useInfiniteQuery({
         queryKey: ['leads'],
-        queryFn: async () => {
-            const { data } = await leadsService.getLeads();
-            return data || [];
+        queryFn: async ({ pageParam }) => {
+            const result = await leadsService.getLeadsCursor(1000, pageParam as string | undefined);
+            return result;
         },
+        initialPageParam: undefined,
+        getNextPageParam: (lastPage) => lastPage.nextCursor,
         staleTime: 2 * 60 * 1000,
         gcTime: 10 * 60 * 1000,
     });
-    const leads = leadsData ?? [];
+    const leads = leadsData?.pages.flatMap(page => page.data) ?? [];
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
     const [isDetailOpen, setIsDetailOpen] = useState(false);

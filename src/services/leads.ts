@@ -29,6 +29,194 @@ export const leadsService = {
         }
     },
 
+    // Cursor-based Pagination for ultra-fast performance on millions of rows
+    async getLeadsCursor(limit = 50, cursor?: string) {
+        try {
+            const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path';
+            
+            let query = supabase
+                .from('leads')
+                .select(fields)
+                .order('created_at', { ascending: false })
+                .limit(limit);
+
+            if (cursor) {
+                query = query.lt('created_at', cursor);
+            }
+
+            const { data, error } = await query;
+
+            if (error) throw error;
+            
+            const nextCursor = data && data.length === limit ? data[data.length - 1].created_at : undefined;
+            
+            return { data: data as Lead[], nextCursor };
+        } catch (err) {
+            logger.error('Unhandled error in getLeadsCursor', err, { limit, cursor });
+            throw err;
+        }
+    },
+
+    // Global search leveraging pg_trgm indices (Cmd+K Omni-Search)
+    async searchLeads(query: string, limit = 10) {
+        if (!query || query.trim().length < 2) return [];
+        
+        const searchTerm = `%${query.trim()}%`;
+        const fields = 'id, name, company_name, email, phone, status, priority, value';
+        
+        const { data, error } = await supabase
+            .from('leads')
+            .select(fields)
+            .or(`name.ilike.${searchTerm},company_name.ilike.${searchTerm},email.ilike.${searchTerm},phone.ilike.${searchTerm}`)
+            .limit(limit);
+
+        if (error) {
+            logger.error('Error in searchLeads', error, { query });
+            return [];
+        }
+        return data as Lead[];
+    },
+
+    // AI Analytics: Fast aggregation for Omni-Buscador insights
+    async getLeadsAnalyticsSummary() {
+        try {
+            const now = new Date();
+            const firstDayThisMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+            const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+            
+            // Get all Won (Ganado/Cerrado) leads for the last two months
+            // Using a single query to minimize latency
+            const { data, error } = await supabase
+                .from('leads')
+                .select('id, created_at, status, value')
+                .gte('created_at', firstDayLastMonth);
+
+            if (error) throw error;
+
+            const leads = data || [];
+            
+            // Note: Adjust the exact status name if 'Ganado' is different in your DB
+            const wonStatuses = ['Ganado', 'Cerrado', 'Cerrado Ganado', 'Venta'];
+            
+            let wonThisMonth = 0;
+            let valueThisMonth = 0;
+            let wonLastMonth = 0;
+            let valueLastMonth = 0;
+
+            leads.forEach(lead => {
+                const isWon = wonStatuses.some(s => lead.status?.toLowerCase().includes(s.toLowerCase()));
+                if (!isWon) return;
+
+                if (lead.created_at >= firstDayThisMonth) {
+                    wonThisMonth++;
+                    valueThisMonth += (lead.value || 0);
+                } else {
+                    wonLastMonth++;
+                    valueLastMonth += (lead.value || 0);
+                }
+            });
+
+            // Calculate growth
+            const growthPercentage = wonLastMonth === 0 
+                ? (wonThisMonth > 0 ? 100 : 0) 
+                : Math.round(((wonThisMonth - wonLastMonth) / wonLastMonth) * 100);
+                
+            const valueGrowth = valueLastMonth === 0
+                ? (valueThisMonth > 0 ? 100 : 0)
+                : Math.round(((valueThisMonth - valueLastMonth) / valueLastMonth) * 100);
+
+            let aiMessage = '';
+            if (growthPercentage > 0) {
+                aiMessage = `¡Excelente ritmo! Has cerrado **${wonThisMonth} leads** este mes, lo que representa un crecimiento del **${growthPercentage}%** respecto al mes pasado. La facturación proyectada es de **$${valueThisMonth.toLocaleString()}**. ¡Sigue así!`;
+            } else if (growthPercentage < 0) {
+                aiMessage = `Actualmente has cerrado **${wonThisMonth} leads** este mes, un **${Math.abs(growthPercentage)}% menos** que el mes pasado (${wonLastMonth} leads). Es un buen momento para reactivar seguimientos pendientes y acelerar el pipeline.`;
+            } else {
+                aiMessage = `Mantienes el mismo ritmo del mes pasado con **${wonThisMonth} leads** cerrados. Con un empuje final en los próximos días podrías superar tu meta histórica.`;
+            }
+
+            return {
+                wonThisMonth,
+                wonLastMonth,
+                growthPercentage,
+                valueThisMonth,
+                valueGrowth,
+                aiMessage,
+                type: 'leads'
+            };
+        } catch (err) {
+            logger.error('Error in getLeadsAnalyticsSummary', err);
+            return null;
+        }
+    },
+
+    // AI Analytics: Consultant for Follow-Ups
+    async getFollowUpsAnalyticsSummary() {
+        try {
+            const now = new Date();
+            // Start of today
+            const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+            // End of today
+            const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString();
+            // Start of week
+            const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()).toISOString();
+
+            // 1. Get Overdue (pending and date < todayStart)
+            const { count: overdueCount } = await supabase
+                .from('follow_ups')
+                .select('*', { count: 'exact', head: true })
+                .eq('completed', false)
+                .lt('date', todayStart);
+
+            // 2. Get Pending Today (pending and date >= todayStart and date <= todayEnd)
+            const { count: todayCount } = await supabase
+                .from('follow_ups')
+                .select('*', { count: 'exact', head: true })
+                .eq('completed', false)
+                .gte('date', todayStart)
+                .lte('date', todayEnd);
+
+            // 3. Get Completed This Week
+            const { count: completedWeekCount } = await supabase
+                .from('follow_ups')
+                .select('*', { count: 'exact', head: true })
+                .eq('completed', true)
+                .gte('date', weekStart);
+
+            const overdue = overdueCount || 0;
+            const today = todayCount || 0;
+            const completed = completedWeekCount || 0;
+
+            let aiMessage = '';
+            let aiColor = '';
+
+            if (overdue > 10) {
+                aiColor = 'red';
+                aiMessage = `**¡Alerta Roja!** Tienes **${overdue} seguimientos vencidos**. Tu equipo de ventas está perdiendo el control del pipeline. Te recomiendo tener una reunión urgente y asignar estos leads o marcarlos como perdidos. ¡El dinero se enfría!`;
+            } else if (overdue > 0) {
+                aiColor = 'amber';
+                aiMessage = `**Precaución**: Hay **${overdue} seguimientos atrasados**. Aún estás a tiempo de rescatarlos. Además, tienes **${today} tareas** para hoy. Encomienda al equipo a limpiar los vencidos antes del mediodía.`;
+            } else if (today > 0) {
+                aiColor = 'emerald';
+                aiMessage = `**Excelente control del pipeline**. Cero seguimientos vencidos. Tienes **${today} tareas** programadas para hoy y tu equipo ha completado **${completed} seguimientos** esta semana. ¡El ritmo de contacto es perfecto!`;
+            } else {
+                aiColor = 'blue';
+                aiMessage = `Tu agenda está completamente limpia. **No hay seguimientos vencidos ni pendientes para hoy**. (Se han completado ${completed} esta semana). Es un buen momento para que tu equipo haga prospección en frío o asigne nuevos leads.`;
+            }
+
+            return {
+                overdue,
+                today,
+                completed,
+                aiMessage,
+                aiColor,
+                type: 'followups'
+            };
+        } catch (err) {
+            logger.error('Error in getFollowUpsAnalyticsSummary', err);
+            return null;
+        }
+    },
+
     // Get full details for a specific lead (called when opening the panel)
     async getLeadById(id: string) {
         const { data, error } = await supabase
