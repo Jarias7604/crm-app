@@ -10,7 +10,7 @@ import { es } from 'date-fns/locale';
 import {
     ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail,
     CalendarDays, MessageSquare, Video, FileText, SlidersHorizontal,
-    CheckCircle2, Circle, RotateCcw, X, Users, ChevronDown, CheckCircle
+    CheckCircle2, Circle, RotateCcw, X, Users, ChevronDown, CheckCircle, Calendar as CalendarIcon
 } from 'lucide-react';
 import { leadsService } from '../services/leads';
 import { supabase } from '../services/supabase';
@@ -36,6 +36,8 @@ const ACTION_CONFIG: Record<string, {
     telegram: { label: 'Telegram', pill: 'bg-sky-50 text-sky-800 border-l-2 border-sky-400 hover:bg-sky-100', badge: 'bg-sky-50 border border-sky-200', badgeText: 'text-sky-700', dotColor: 'bg-sky-500', Icon: MessageSquare },
     meeting: { label: 'Reunión', pill: 'bg-violet-50 text-violet-800 border-l-2 border-violet-400 hover:bg-violet-100', badge: 'bg-violet-50 border border-violet-200', badgeText: 'text-violet-700', dotColor: 'bg-violet-500', Icon: Video },
     quote: { label: 'Cotización', pill: 'bg-amber-50 text-amber-800 border-l-2 border-amber-400 hover:bg-amber-100', badge: 'bg-amber-50 border border-amber-200', badgeText: 'text-amber-700', dotColor: 'bg-amber-500', Icon: FileText },
+    google_calendar: { label: 'Google Event', pill: 'bg-[#4285F4]/10 text-[#4285F4] border-l-2 border-[#4285F4] hover:bg-[#4285F4]/20', badge: 'bg-[#4285F4]/10 border border-[#4285F4]/20', badgeText: 'text-[#4285F4]', dotColor: 'bg-[#4285F4]', Icon: CalendarIcon },
+    outlook_calendar: { label: 'Outlook Event', pill: 'bg-[#0078D4]/10 text-[#0078D4] border-l-2 border-[#0078D4] hover:bg-[#0078D4]/20', badge: 'bg-[#0078D4]/10 border border-[#0078D4]/20', badgeText: 'text-[#0078D4]', dotColor: 'bg-[#0078D4]', Icon: CalendarIcon },
 };
 const getActionCfg = (type: string) => ACTION_CONFIG[type] ?? {
     label: type, pill: 'bg-gray-50 text-gray-700 border-l-2 border-gray-300 hover:bg-gray-100',
@@ -111,6 +113,9 @@ export default function Calendar() {
     const [selectedAssigneeId, setSelectedAssigneeId] = useState<string | null>(null);
     const [showAssigneeFilter, setShowAssigneeFilter] = useState(false);
     const [dayDetailDate, setDayDetailDate] = useState<Date | null>(null);
+    const [showCrmEvents, setShowCrmEvents] = useState(true);
+    const [showGoogleEvents, setShowGoogleEvents] = useState(true);
+    const [showOutlookEvents, setShowOutlookEvents] = useState(false);
 
     // Responsable filter — admin only, ver perspectiva de un agente en el calendario
     const [calendarCollabProfiles, setCalendarCollabProfiles] = useState<{ id: string; full_name: string; role: string; avatar_url?: string | null }[]>([]);
@@ -175,16 +180,71 @@ export default function Calendar() {
     }, []);
 
 
+    // Mock Google Calendar Events for Demo Integration
+    const mockGoogleEvents = useMemo(() => {
+        if (!showGoogleEvents) return [];
+        const events: CalendarEvent[] = [];
+        const today = new Date();
+        for (let i = 0; i < 5; i++) {
+            const d = addDays(today, (i * 2) - 3);
+            events.push({
+                id: `google-${i}`,
+                company_id: profile?.company_id || '',
+                lead_id: null,
+                action_type: 'google_calendar',
+                date: d.toISOString(),
+                completed: false,
+                notes: `Reunión de equipo (Google Meet)`,
+                created_at: today.toISOString(),
+                assigned_to: profile?.id || '',
+                completed_at: null,
+                action_result: null,
+                lead: { id: `g${i}`, name: 'Evento Google Calendar', company_name: null, email: null, phone: null },
+                assigned_profile: { id: profile?.id || '', full_name: profile?.full_name || '', avatar_url: null, role: 'user' }
+            } as any);
+        }
+        return events;
+    }, [showGoogleEvents, profile]);
+
+    // Mock Outlook Events for Demo Integration
+    const mockOutlookEvents = useMemo(() => {
+        if (!showOutlookEvents) return [];
+        const events: CalendarEvent[] = [];
+        const today = new Date();
+        for (let i = 0; i < 4; i++) {
+            const d = addDays(today, (i * 3) - 2);
+            events.push({
+                id: `outlook-${i}`,
+                company_id: profile?.company_id || '',
+                lead_id: null,
+                action_type: 'outlook_calendar',
+                date: d.toISOString(),
+                completed: false,
+                notes: `Sync Corporativo (Microsoft Teams)`,
+                created_at: today.toISOString(),
+                assigned_to: profile?.id || '',
+                completed_at: null,
+                action_result: null,
+                lead: { id: `o${i}`, name: 'Evento Office 365', company_name: 'Microsoft Teams', email: null, phone: null },
+                assigned_profile: { id: profile?.id || '', full_name: profile?.full_name || '', avatar_url: null, role: 'user' }
+            } as any);
+        }
+        return events;
+    }, [showOutlookEvents, profile]);
+
     // Role-based filtering: collaborators see only their own; admins can filter by collaborator
     const filteredEvents = useMemo(() => {
+        let baseEvents = showCrmEvents ? calendarEvents : [];
+        let events = [...baseEvents, ...mockGoogleEvents, ...mockOutlookEvents];
+        
         if (isAdmin) {
             if (selectedCalendarCollabId) {
-                return calendarEvents.filter(ev => ev.assigned_to === selectedCalendarCollabId);
+                return events.filter(ev => ev.assigned_to === selectedCalendarCollabId);
             }
-            return calendarEvents; // admin sin filtro ve todo
+            return events; // admin sin filtro ve todo
         }
-        return calendarEvents.filter(ev => ev.assigned_to === profile?.id);
-    }, [calendarEvents, isAdmin, profile?.id, selectedCalendarCollabId]);
+        return events.filter(ev => ev.assigned_to === profile?.id);
+    }, [calendarEvents, showCrmEvents, mockGoogleEvents, mockOutlookEvents, isAdmin, profile?.id, selectedCalendarCollabId]);
 
     const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
     const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
@@ -341,8 +401,44 @@ export default function Calendar() {
                 )}
 
                 <button
+                    onClick={() => setShowCrmEvents(!showCrmEvents)}
+                    className={`flex items-center gap-2 px-3 h-9 rounded-xl border text-xs font-bold transition-all shadow-sm ${
+                        showCrmEvents 
+                            ? 'bg-indigo-50 border-indigo-200 text-indigo-700' 
+                            : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                    }`}
+                >
+                    <Users className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">CRM</span>
+                </button>
+
+                <button
+                    onClick={() => setShowGoogleEvents(!showGoogleEvents)}
+                    className={`flex items-center gap-2 px-3 h-9 rounded-xl border text-xs font-bold transition-all shadow-sm ${
+                        showGoogleEvents 
+                            ? 'bg-[#4285F4]/10 border-[#4285F4]/30 text-[#4285F4]' 
+                            : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                    }`}
+                >
+                    <CalendarIcon className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Google</span>
+                </button>
+
+                <button
+                    onClick={() => setShowOutlookEvents(!showOutlookEvents)}
+                    className={`flex items-center gap-2 px-3 h-9 rounded-xl border text-xs font-bold transition-all shadow-sm ${
+                        showOutlookEvents 
+                            ? 'bg-[#0078D4]/10 border-[#0078D4]/30 text-[#0078D4]' 
+                            : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                    }`}
+                >
+                    <CalendarIcon className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Outlook</span>
+                </button>
+
+                <button
                     onClick={() => navigate('/leads')}
-                    className="flex items-center gap-2 px-4 h-9 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 transition-all"
+                    className="flex items-center gap-2 px-4 h-9 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 transition-all ml-2"
                 >
                     <Plus className="w-4 h-4" />
                     Nuevo Seguimiento

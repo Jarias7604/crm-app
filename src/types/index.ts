@@ -50,6 +50,7 @@ export interface Profile {
     };
     custom_role_id?: string;
     telegram_chat_id?: string | null;
+    is_platform_owner?: boolean;
 }
 
 export interface Company {

@@ -1,0 +1,56 @@
+[
+  {
+    "id": "c8a1071d-fd0c-465a-9012-0fdda854da81",
+    "company_id": "7a582ba5-f7d0-4ae3-9985-35788deb1c30",
+    "name": "P2 - Errores del Sistema",
+    "description": "Trabajo urgente, analisis tecnico inmediato",
+    "color": "#10b981",
+    "sla_hours": 2,
+    "created_at": "2026-02-19T19:58:36.032018+00:00"
+  },
+  {
+    "id": "11c119c5-e1f2-4182-9717-a6baa33e3be9",
+    "company_id": "7a582ba5-f7d0-4ae3-9985-35788deb1c30",
+    "name": "P1 - Hacienda",
+    "description": "Alertas inmediata, trabajo urgente, Atencion prioritaria automatica",
+    "color": "#EF4444",
+    "sla_hours": 24,
+    "created_at": "2026-02-19T19:58:36.032018+00:00"
+  },
+  {
+    "id": "0f5ae2fd-4986-47e8-a481-65d6afe388cf",
+    "company_id": "7a582ba5-f7d0-4ae3-9985-35788deb1c30",
+    "name": "P4 - Mejoras y Ajustes",
+    "description": null,
+    "color": "#ef4444",
+    "sla_hours": 40,
+    "created_at": "2026-02-19T19:58:36.032018+00:00"
+  },
+  {
+    "id": "d73aab4f-8473-4c3c-a7c4-a8f4899903cb",
+    "company_id": "7a582ba5-f7d0-4ae3-9985-35788deb1c30",
+    "name": "P3 -  Soporte Técnico",
+    "description": "Panificacion y ejecucion segun disponibilidad ",
+    "color": "#EF4444",
+    "sla_hours": 24,
+    "created_at": "2026-02-25T15:44:06.998999+00:00"
+  },
+  {
+    "id": "2b9a34a4-b025-4598-9112-66caaa770c44",
+    "company_id": "7a582ba5-f7d0-4ae3-9985-35788deb1c30",
+    "name": "P5 - Inmalux",
+    "description": null,
+    "color": "#8B5CF6",
+    "sla_hours": 120,
+    "created_at": "2026-03-18T15:27:50.357406+00:00"
+  },
+  {
+    "id": "ce4a1636-565d-4824-868b-c8516bc1bd3c",
+    "company_id": "7a582ba5-f7d0-4ae3-9985-35788deb1c30",
+    "name": "P6 - Nuevos Cambios Domingo 29",
+    "description": null,
+    "color": "#F59E0B",
+    "sla_hours": 24,
+    "created_at": "2026-03-28T15:56:30.786173+00:00"
+  }
+]

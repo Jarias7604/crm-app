@@ -56,6 +56,10 @@ const PWAInstallPrompt  = lazy(() => import('./components/PWAInstallPrompt').the
 const FlyerStudio       = lazy(() => import('./pages/marketing/FlyerStudio'));
 const Finanzas          = lazy(() => import('./pages/Finanzas'));
 const GlobalSearch      = lazy(() => import('./components/GlobalSearch').then(m => ({ default: m.GlobalSearch })));
+const OnboardingWizard  = lazy(() => import('./pages/OnboardingWizard'));
+const Observatory       = lazy(() => import('./pages/admin/Observatory'));
+const Integrations      = lazy(() => import('./pages/company/Integrations'));
+const Reports           = lazy(() => import('./pages/Reports'));
 
 // ─── Skeleton Screen (técnica Netflix) ───────────────────────────────────────
 // Muestra estructura visual inmediatamente mientras carga el JS del módulo.
@@ -169,7 +173,16 @@ function App() {
                   <Route element={<RoleProtectedRoute allowedRoles={['super_admin']} />}>
                     <Route path="/admin/companies" element={<Companies />} />
                     <Route path="/admin/audit-log" element={<AuditLog />} />
+                    <Route path="/admin/observatory" element={<Observatory />} />
                   </Route>
+
+                  {/* Company Admin Routes */}
+                  <Route element={<RoleProtectedRoute allowedRoles={['super_admin', 'company_admin']} />}>
+                    <Route path="/company/integrations" element={<Integrations />} />
+                  </Route>
+
+                  {/* Reports (all authenticated) */}
+                  <Route path="/reports" element={<Reports />} />
 
                   {/* Marketing Routes (Protected) */}
                   <Route element={<FeatureProtectedRoute feature="marketing" />}>
@@ -206,6 +219,7 @@ function App() {
               <Route path="/portal/cliente/:token" element={<ClientPortal />} />
               <Route path="/update-password" element={<UpdatePassword />} />
               <Route path="/support/manual" element={<ManualPage />} />
+              <Route path="/onboarding" element={<OnboardingWizard />} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
