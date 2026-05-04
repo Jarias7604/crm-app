@@ -59,6 +59,7 @@ const GlobalSearch      = lazy(() => import('./components/GlobalSearch').then(m 
 const OnboardingWizard  = lazy(() => import('./pages/OnboardingWizard'));
 const Observatory       = lazy(() => import('./pages/admin/Observatory'));
 const Integrations      = lazy(() => import('./pages/company/Integrations'));
+const GoogleCallback    = lazy(() => import('./pages/company/GoogleCallback'));
 const Reports           = lazy(() => import('./pages/Reports'));
 
 // ─── Skeleton Screen (técnica Netflix) ───────────────────────────────────────
@@ -179,6 +180,7 @@ function App() {
                   {/* Company Admin Routes */}
                   <Route element={<RoleProtectedRoute allowedRoles={['super_admin', 'company_admin']} />}>
                     <Route path="/company/integrations" element={<Integrations />} />
+                    <Route path="/integrations/google/callback" element={<GoogleCallback />} />
                   </Route>
 
                   {/* Reports (all authenticated) */}

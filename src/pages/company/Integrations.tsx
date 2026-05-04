@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Calendar, Webhook, Key, CheckCircle, ExternalLink, Plus, Trash2,
   AlertCircle, ChevronRight, Globe, Copy, RefreshCw, X, Check, Mail, Monitor
@@ -29,6 +29,26 @@ export default function Integrations() {
   const { profile } = useAuth();
   const [calendarConnected, setCalendarConnected] = useState(false);
   const [outlookConnected, setOutlookConnected] = useState(false);
+  const [integrationId, setIntegrationId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!profile?.id) return;
+    const fetchIntegrations = async () => {
+        const { data } = await supabase
+            .from('calendar_integrations')
+            .select('*')
+            .eq('user_id', profile.id)
+            .eq('provider', 'google')
+            .single();
+        
+        if (data && data.is_active) {
+            setCalendarConnected(true);
+            setIntegrationId(data.id);
+        }
+    };
+    fetchIntegrations();
+  }, [profile?.id]);
+
   const [webhooks, setWebhooks] = useState<any[]>([]);
   const [apiKeys, setApiKeys] = useState<any[]>([]);
   const [showWebhookModal, setShowWebhookModal] = useState(false);
@@ -38,12 +58,30 @@ export default function Integrations() {
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
   const [tab, setTab] = useState<TabType>('calendar');
 
+  const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
   const handleConnectGoogle = async () => {
+    if (!GOOGLE_CLIENT_ID) {
+        toast.error('Google Client ID no configurado');
+        return;
+    }
     toast.success('Redirigiendo a Google OAuth...');
-    setTimeout(() => {
-      setCalendarConnected(true);
-      toast.success('Google Calendar conectado exitosamente');
-    }, 1500);
+    const redirectUri = `${window.location.origin}/integrations/google/callback`;
+    const scope = encodeURIComponent('https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile');
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}&access_type=offline&prompt=consent`;
+    window.location.href = authUrl;
+  };
+
+  const handleDisconnectGoogle = async () => {
+    if (!integrationId) return;
+    const { error } = await supabase.from('calendar_integrations').delete().eq('id', integrationId);
+    if (error) {
+        toast.error('Error al desconectar');
+    } else {
+        setCalendarConnected(false);
+        setIntegrationId(null);
+        toast.success('Google Calendar desconectado');
+    }
   };
 
   const handleConnectOutlook = async () => {
@@ -180,7 +218,7 @@ export default function Integrations() {
                    Conectar Google Workspace
                  </button>
                ) : (
-                 <button onClick={() => setCalendarConnected(false)} className="bg-white text-red-500 border border-red-200 px-6 py-3 rounded-2xl font-black hover:bg-red-50 transition-all flex items-center gap-2">
+                 <button onClick={handleDisconnectGoogle} className="bg-white text-red-500 border border-red-200 px-6 py-3 rounded-2xl font-black hover:bg-red-50 transition-all flex items-center gap-2">
                    Desconectar
                  </button>
                )}

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
     format, addMonths, subMonths, startOfMonth, endOfMonth,
     startOfWeek, endOfWeek, isSameMonth, isSameDay,
-    eachDayOfInterval, addWeeks, subWeeks, addDays, isToday, isBefore
+    eachDayOfInterval, addWeeks, subWeeks, addDays, subDays, isToday, isBefore
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
@@ -110,6 +110,7 @@ export default function Calendar() {
 
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date());
+    const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
     const [selectedAssigneeId, setSelectedAssigneeId] = useState<string | null>(null);
     const [showAssigneeFilter, setShowAssigneeFilter] = useState(false);
     const [dayDetailDate, setDayDetailDate] = useState<Date | null>(null);
@@ -331,8 +332,13 @@ export default function Calendar() {
                 </p>
             </div>
             <div className="flex items-center gap-2">
+                <div className="flex items-center p-1 bg-gray-100/80 rounded-xl mr-2">
+                    <button onClick={() => setViewMode('month')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'month' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}>Mes</button>
+                    <button onClick={() => { setViewMode('week'); setSelectedDate(startOfWeek(currentDate, { weekStartsOn: 0 })); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'week' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}>Semana</button>
+                    <button onClick={() => setViewMode('day')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'day' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}>Día</button>
+                </div>
                 <button
-                    onClick={() => { setCurrentDate(new Date()); setSelectedDate(new Date()); }}
+                    onClick={() => { setCurrentDate(new Date()); setSelectedDate(new Date()); setViewMode('month'); }}
                     className="px-4 h-9 rounded-xl border-2 border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 transition-all"
                 >
                     Hoy
@@ -823,6 +829,135 @@ export default function Calendar() {
         );
     };
 
+    /* ─── DESKTOP WEEK GRID ────────────────────────── */
+    const renderWeekView = () => {
+        const start = startOfWeek(currentDate, { weekStartsOn: 0 });
+        const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(start, i));
+        const hours = Array.from({ length: 17 }).map((_, i) => i + 6); // 6 AM to 10 PM
+
+        return (
+            <div className="hidden md:flex flex-1 flex-col bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-[800px]">
+                {/* Week day headers */}
+                <div className="grid grid-cols-8 border-b border-gray-100 sticky top-0 bg-white z-10">
+                    <div className="py-3 px-2 border-r border-gray-100 bg-gray-50"></div>
+                    {weekDays.map(d => {
+                        const isDayToday = isToday(d);
+                        const isSelected = isSameDay(d, selectedDate);
+                        return (
+                            <div key={d.toISOString()} onClick={() => setSelectedDate(d)} className={`py-3 text-center flex flex-col items-center justify-center border-r border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors ${isDayToday ? 'bg-indigo-50/30' : ''} ${isSelected ? 'border-b-2 border-b-indigo-500' : ''}`}>
+                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{format(d, 'EEE', { locale: es })}</span>
+                                <span className={`text-lg font-black ${isDayToday ? 'text-indigo-600' : 'text-gray-900'}`}>{format(d, 'd')}</span>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* Week grid (Scrollable) */}
+                <div className="flex-1 overflow-y-auto">
+                    <div className="relative" style={{ minHeight: `${hours.length * 60}px` }}>
+                        {hours.map(h => (
+                            <div key={h} className="grid grid-cols-8 border-b border-gray-50 h-[60px] absolute w-full" style={{ top: `${(h - 6) * 60}px` }}>
+                                <div className="text-[10px] font-bold text-gray-400 text-right pr-2 pt-1 border-r border-gray-100 bg-gray-50">{h}:00</div>
+                                {weekDays.map((d, i) => (
+                                    <div key={i} className="border-r border-gray-50 relative group hover:bg-indigo-50/10 cursor-pointer transition-colors" onClick={() => { setSelectedDate(d); setDayDetailDate(d); }}></div>
+                                ))}
+                            </div>
+                        ))}
+                        {/* Events overlay */}
+                        {weekDays.map((day, dayIdx) => {
+                            const events = getDailyEvents(day);
+                            return events.map((ev, evIdx) => {
+                                const evDate = utcToLocalDate(ev.date, companyTimezone);
+                                const startHour = evDate.getHours();
+                                const startMin = evDate.getMinutes();
+                                if (startHour < 6 || startHour > 22) return null; // out of view bounds
+                                
+                                const top = ((startHour - 6) * 60) + startMin;
+                                const height = 50; // fixed height for event block
+                                const cfg = getActionCfg(ev.action_type);
+                                return (
+                                    <div 
+                                        key={ev.id}
+                                        onClick={(e) => { e.stopPropagation(); ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } }); }}
+                                        className={`absolute rounded-lg p-1.5 text-[9px] leading-tight overflow-hidden cursor-pointer hover:z-20 transition-all hover:ring-2 hover:ring-indigo-300 shadow-sm ${ev.completed ? 'opacity-50 bg-gray-100 border border-gray-200' : cfg.pill}`}
+                                        style={{
+                                            top: `${top}px`,
+                                            height: `${height}px`,
+                                            left: `calc(${(dayIdx + 1) * (100 / 8)}% + 4px)`,
+                                            width: `calc(${100 / 8}% - 8px)`,
+                                            zIndex: 10 + evIdx
+                                        }}
+                                        title={`${ev.lead?.name || 'Evento'} - ${formatTimeInZone(ev.date, companyTimezone)}`}
+                                    >
+                                        <div className="font-bold truncate">{ev.lead?.name || 'Evento'}</div>
+                                        <div className="opacity-80">{formatTimeInZone(ev.date, companyTimezone)}</div>
+                                    </div>
+                                );
+                            });
+                        })}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    /* ─── DESKTOP DAY GRID ─────────────────────────── */
+    const renderDayView = () => {
+        const hours = Array.from({ length: 17 }).map((_, i) => i + 6); // 6 AM to 10 PM
+        const dayEvents = getDailyEvents(selectedDate);
+        return (
+            <div className="hidden md:flex flex-1 flex-col bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden h-[800px]">
+                {/* Header */}
+                <div className="py-4 border-b border-gray-100 bg-gray-50 flex flex-col items-center justify-center relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-white p-1 rounded-xl shadow-sm border border-gray-200">
+                        <button onClick={() => setSelectedDate(subDays(selectedDate, 1))} className="p-1 hover:bg-gray-100 rounded-lg"><ChevronLeft className="w-5 h-5 text-gray-500"/></button>
+                        <button onClick={() => setSelectedDate(addDays(selectedDate, 1))} className="p-1 hover:bg-gray-100 rounded-lg"><ChevronRight className="w-5 h-5 text-gray-500"/></button>
+                    </div>
+                    <span className="text-sm font-black text-gray-500 uppercase tracking-widest">{format(selectedDate, 'EEEE', { locale: es })}</span>
+                    <span className="text-3xl font-black text-gray-900">{format(selectedDate, 'd MMMM', { locale: es })}</span>
+                </div>
+                {/* Day Grid */}
+                <div className="flex-1 overflow-y-auto">
+                    <div className="relative" style={{ minHeight: `${hours.length * 80}px` }}>
+                        {hours.map(h => (
+                            <div key={h} className="flex border-b border-gray-50 h-[80px] absolute w-full" style={{ top: `${(h - 6) * 80}px` }}>
+                                <div className="w-20 text-xs font-bold text-gray-400 text-right pr-3 pt-2 border-r border-gray-100 bg-gray-50 shrink-0">{h}:00</div>
+                                <div className="flex-1 hover:bg-indigo-50/5 transition-colors cursor-pointer" onClick={() => setDayDetailDate(selectedDate)}></div>
+                            </div>
+                        ))}
+                        {/* Events */}
+                        {dayEvents.map((ev, evIdx) => {
+                            const evDate = utcToLocalDate(ev.date, companyTimezone);
+                            const startHour = evDate.getHours();
+                            const startMin = evDate.getMinutes();
+                            if (startHour < 6 || startHour > 22) return null; // out of bounds
+                            const top = ((startHour - 6) * 80) + (startMin / 60 * 80);
+                            const height = 70; 
+                            const cfg = getActionCfg(ev.action_type);
+                            return (
+                                <div 
+                                    key={ev.id}
+                                    onClick={(e) => { e.stopPropagation(); ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } }); }}
+                                    className={`absolute left-24 right-4 rounded-xl p-3 cursor-pointer shadow-sm hover:shadow-md transition-all flex flex-col border-l-4 ${ev.completed ? 'opacity-50 bg-gray-100 border border-gray-200' : cfg.pill}`}
+                                    style={{
+                                        top: `${top}px`,
+                                        height: `${height}px`,
+                                    }}
+                                >
+                                    <div className="flex justify-between items-start">
+                                        <div className="font-bold text-sm truncate text-gray-900">{ev.lead?.name || 'Evento'} {ev.lead?.company_name ? `- ${ev.lead.company_name}` : ''}</div>
+                                        <div className="text-xs font-bold opacity-80">{formatTimeInZone(ev.date, companyTimezone)}</div>
+                                    </div>
+                                    <div className="text-xs mt-1 opacity-90 truncate font-medium">{ev.notes || cfg.label}</div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     /* ─── MOBILE: Week strip + Timeline ──────────── */
     const renderTimelineView = () => {
         const start = startOfWeek(currentDate, { weekStartsOn: 0 });
@@ -1168,7 +1303,9 @@ export default function Calendar() {
                     {/* Desktop layout: sidebar + grid */}
                     <div className="hidden md:flex gap-5 items-start">
                         {renderSidebar()}
-                        {renderMonthView()}
+                        {viewMode === 'month' && renderMonthView()}
+                        {viewMode === 'week' && renderWeekView()}
+                        {viewMode === 'day' && renderDayView()}
                     </div>
 
                     {/* Mobile: timeline */}
