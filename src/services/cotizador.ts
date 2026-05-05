@@ -150,7 +150,7 @@ class CotizadorService {
     }
 
     async updatePaquete(id: string, updates: Partial<CotizadorPaquete>): Promise<CotizadorPaquete> {
-        console.log('[cotizadorService.updatePaquete] Enviando update:', { id, updates });
+
 
         const { data, error } = await supabase
             .from('cotizador_paquetes')
@@ -159,8 +159,7 @@ class CotizadorService {
             .select()
             .maybeSingle();
 
-        console.log('[cotizadorService.updatePaquete] Respuesta:', { data, error });
-        console.log('[cotizadorService.updatePaquete] Descripcion retornada:', data?.descripcion);
+
 
         if (error) throw error;
         if (!data) throw new Error('No se pudo actualizar el paquete. Es posible que no tenga permisos para editar este registro global.');

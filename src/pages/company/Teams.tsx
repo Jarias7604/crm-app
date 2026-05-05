@@ -91,7 +91,7 @@ export default function Teams() {
     };
 
     const handleSaveTeam = async () => {
-        console.log('[Teams] handleSaveTeam called, company_id:', profile?.company_id, 'formData:', formData);
+
         if (!profile?.company_id) {
             console.error('[Teams] No company_id found!');
             toast.error('Error: No se encontró la empresa');
@@ -106,7 +106,7 @@ export default function Teams() {
                 toast.success('Equipo actualizado');
             } else {
                 const result = await teamsService.createTeam(profile.company_id, formData);
-                console.log('[Teams] Team created successfully:', result);
+
                 toast.success('Equipo creado exitosamente');
             }
             setShowCreateModal(false);
