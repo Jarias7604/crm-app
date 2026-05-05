@@ -181,31 +181,48 @@ export default function Calendar() {
     }, []);
 
 
-    // Mock Google Calendar Events for Demo Integration
-    const mockGoogleEvents = useMemo(() => {
-        if (!showGoogleEvents) return [];
-        const events: CalendarEvent[] = [];
-        const today = new Date();
-        for (let i = 0; i < 5; i++) {
-            const d = addDays(today, (i * 2) - 3);
-            events.push({
-                id: `google-${i}`,
+    // Real Google Calendar Events from integration
+    const { data: googleEventsData } = useQuery({
+        queryKey: ['google-calendar-events', profile?.id],
+        queryFn: async () => {
+            if (!profile?.id) return [];
+            // Get integration record
+            const { data: integration } = await supabase
+                .from('calendar_integrations')
+                .select('id')
+                .eq('user_id', profile.id)
+                .eq('provider', 'google')
+                .eq('is_active', true)
+                .single();
+            if (!integration) return [];
+            // Fetch real events from edge function
+            const { data: fn, error } = await supabase.functions.invoke('google-calendar-sync', {
+                body: { action: 'fetch_events', integration_id: integration.id }
+            });
+            if (error || !fn?.events) return [];
+            return (fn.events as any[]).map((ev: any) => ({
+                id: `google-${ev.id}`,
                 company_id: profile?.company_id || '',
                 lead_id: null,
                 action_type: 'google_calendar',
-                date: d.toISOString(),
+                date: ev.start?.dateTime || ev.start?.date || new Date().toISOString(),
                 completed: false,
-                notes: `Reunión de equipo (Google Meet)`,
-                created_at: today.toISOString(),
+                notes: ev.description || ev.location || '',
+                created_at: ev.created || new Date().toISOString(),
                 assigned_to: profile?.id || '',
                 completed_at: null,
                 action_result: null,
-                lead: { id: `g${i}`, name: 'Evento Google Calendar', company_name: null, email: null, phone: null },
+                lead: { id: `g${ev.id}`, name: ev.summary || 'Evento Google', company_name: ev.location || null, email: null, phone: null },
                 assigned_profile: { id: profile?.id || '', full_name: profile?.full_name || '', avatar_url: null, role: 'user' }
-            } as any);
-        }
-        return events;
-    }, [showGoogleEvents, profile]);
+            } as any));
+        },
+        enabled: showGoogleEvents && !!profile?.id,
+        staleTime: 5 * 60 * 1000,
+    });
+    const mockGoogleEvents = useMemo(() => {
+        if (!showGoogleEvents) return [];
+        return googleEventsData ?? [];
+    }, [showGoogleEvents, googleEventsData]);
 
     // Mock Outlook Events for Demo Integration
     const mockOutlookEvents = useMemo(() => {
@@ -755,7 +772,7 @@ export default function Calendar() {
                                         return (
                                             <button
                                                 key={ev.id}
-                                                onClick={(e) => { e.stopPropagation(); ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } }); }}
+                                                onClick={(e) => { e.stopPropagation(); if (ev.action_type === 'google_calendar' || ev.action_type === 'outlook_calendar') { return; } ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } }); }}
                                                 title={`${ev.lead?.name ?? 'Lead'} · ${timeStr}${ev.completed ? ' ✅' : isOverdue ? ' ⚠️ Vencido' : ''}`}
                                                 className={`w-full text-left px-1.5 py-1 rounded-md transition-all flex items-center gap-1 ${
                                                     ev.completed
