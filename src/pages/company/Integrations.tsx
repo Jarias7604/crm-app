@@ -6,6 +6,7 @@ import {
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../services/supabase';
 import toast from 'react-hot-toast';
+import SharedCalendarsManager from '../../components/company/SharedCalendarsManager';
 
 const WEBHOOK_EVENTS = [
   { key: 'lead.created', label: 'Lead Creado', desc: 'Se dispara cuando se crea un nuevo lead' },
@@ -273,6 +274,11 @@ export default function Integrations() {
                )}
             </div>
           </div>
+
+          {/* Calendarios Compartidos (Solo Admin) */}
+          {(profile?.role === 'company_admin' || profile?.role === 'super_admin') && (
+            <SharedCalendarsManager />
+          )}
 
         </div>
       )}
