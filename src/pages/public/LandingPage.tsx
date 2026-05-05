@@ -4,7 +4,6 @@ import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../auth/AuthProvider';
 import LandingNavbar from '../../components/landing/LandingNavbar';
 import LandingFooter from '../../components/landing/LandingFooter';
-import AriasAgent from '../../components/landing/AriasAgent';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../services/supabase';
 
@@ -46,23 +45,16 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             
-            {/* Left: Professional Image */}
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl order-2 lg:order-1 animate-in slide-in-from-left-8 duration-700">
-              <div className="absolute inset-0 bg-gradient-to-tr from-blue-600/20 to-transparent mix-blend-overlay"></div>
-              <img 
-                src="/hero_image_crm.png" 
-                alt="Arias CRM Agentic Enterprise" 
-                className="w-full h-auto object-cover rounded-2xl"
-              />
-              {/* Floating UI Element */}
-              <div className="absolute bottom-6 -right-6 lg:-right-12 bg-white rounded-xl shadow-xl p-4 flex items-center gap-4 animate-bounce-slow">
-                <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center">
-                  <Bot className="w-6 h-6 text-emerald-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-slate-800">Agent Deployed</p>
-                  <p className="text-xs text-slate-500">Task completed successfully</p>
-                </div>
+            {/* Left: Professional Image with Glow */}
+            <div className="relative order-2 lg:order-1 animate-in slide-in-from-left-8 duration-700">
+              <div className="absolute -inset-4 bg-gradient-to-r from-blue-600 to-emerald-500 rounded-3xl blur-2xl opacity-30 mix-blend-screen"></div>
+              <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-white/10">
+                <div className="absolute inset-0 bg-gradient-to-tr from-blue-900/40 to-transparent mix-blend-overlay"></div>
+                <img 
+                  src="/hero_image_crm.png" 
+                  alt="Arias CRM Agentic Enterprise" 
+                  className="w-full h-auto object-cover rounded-2xl scale-105 hover:scale-100 transition-transform duration-1000 ease-out"
+                />
               </div>
             </div>
 
@@ -70,7 +62,7 @@ export default function LandingPage() {
             <div className="order-1 lg:order-2 animate-in slide-in-from-right-8 duration-700">
               <h1 className="text-5xl lg:text-7xl font-extrabold text-white tracking-tight leading-[1.1] mb-6">
                 Welcome to the <br/>
-                <span className="text-blue-400">Agentic Enterprise.</span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">Agentic Enterprise.</span>
               </h1>
               <p className="text-xl text-blue-100 mb-8 max-w-2xl font-medium leading-relaxed">
                 Automate better sales, service, and marketing with humans and AI agents working together on one trusted, agentic CRM platform. See value from day one.
@@ -250,7 +242,6 @@ export default function LandingPage() {
       </section>
 
       <LandingFooter />
-      <AriasAgent />
     </div>
   );
 }
