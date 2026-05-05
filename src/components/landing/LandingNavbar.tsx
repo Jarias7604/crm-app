@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChevronDown, Globe, Phone, Headset, Menu, X, ArrowRight } from 'lucide-react';
+import { ChevronDown, Globe, Phone, Headset, Menu, X } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useTranslation } from 'react-i18next';
 
@@ -9,6 +9,7 @@ export default function LandingNavbar({ onLoginClick }: { onLoginClick: () => vo
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const en = i18n.language !== 'es';
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
@@ -26,11 +27,11 @@ export default function LandingNavbar({ onLoginClick }: { onLoginClick: () => vo
       <div className="hidden lg:flex items-center justify-end px-8 py-1.5 bg-slate-50 text-xs font-medium text-slate-600 border-b border-slate-200 gap-6">
         <button className="flex items-center gap-1.5 hover:text-blue-600 transition-colors">
           <Headset className="w-3.5 h-3.5" />
-          Customer Support
+          {en ? 'Customer Support' : 'Soporte al Cliente'}
         </button>
         <button className="flex items-center gap-1.5 hover:text-blue-600 transition-colors">
           <Phone className="w-3.5 h-3.5" />
-          Contact Sales
+          {en ? 'Contact Sales' : 'Contactar Ventas'}
         </button>
       </div>
 
@@ -52,24 +53,18 @@ export default function LandingNavbar({ onLoginClick }: { onLoginClick: () => vo
             </Link>
 
             <div className="hidden lg:flex items-center gap-8">
-              <div className="group relative">
-                <button className="flex items-center gap-1 text-sm font-semibold text-slate-700 hover:text-blue-600">
-                  Products <ChevronDown className="w-4 h-4 opacity-50" />
-                </button>
-              </div>
-              <div className="group relative">
-                <button className="flex items-center gap-1 text-sm font-semibold text-slate-700 hover:text-blue-600">
-                  Solutions <ChevronDown className="w-4 h-4 opacity-50" />
-                </button>
-              </div>
+              <button className="flex items-center gap-1 text-sm font-semibold text-slate-700 hover:text-blue-600">
+                {en ? 'Products' : 'Productos'} <ChevronDown className="w-4 h-4 opacity-50" />
+              </button>
+              <button className="flex items-center gap-1 text-sm font-semibold text-slate-700 hover:text-blue-600">
+                {en ? 'Solutions' : 'Soluciones'} <ChevronDown className="w-4 h-4 opacity-50" />
+              </button>
               <a href="#pricing" className="text-sm font-semibold text-slate-700 hover:text-blue-600">
-                Pricing
+                {en ? 'Pricing' : 'Precios'}
               </a>
-              <div className="group relative">
-                <button className="flex items-center gap-1 text-sm font-semibold text-slate-700 hover:text-blue-600">
-                  Resources <ChevronDown className="w-4 h-4 opacity-50" />
-                </button>
-              </div>
+              <button className="flex items-center gap-1 text-sm font-semibold text-slate-700 hover:text-blue-600">
+                {en ? 'Resources' : 'Recursos'} <ChevronDown className="w-4 h-4 opacity-50" />
+              </button>
             </div>
           </div>
 
@@ -83,18 +78,15 @@ export default function LandingNavbar({ onLoginClick }: { onLoginClick: () => vo
               {i18n.language === 'es' ? 'EN' : 'ES'}
             </button>
             <Button variant="ghost" onClick={onLoginClick} className="font-semibold">
-              Log In
+              {en ? 'Log In' : 'Iniciar Sesión'}
             </Button>
-            <Button onClick={() => navigate('/register')} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-full px-6 shadow-md shadow-indigo-600/20">
-              Start for free
+            <Button onClick={() => navigate('/register')} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-full px-6 shadow-md shadow-blue-600/20">
+              {en ? 'Start for free' : 'Comenzar gratis'}
             </Button>
           </div>
 
           {/* Mobile menu button */}
-          <button 
-            className="lg:hidden p-2 text-slate-600"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
+          <button className="lg:hidden p-2 text-slate-600" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
             {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
@@ -103,10 +95,10 @@ export default function LandingNavbar({ onLoginClick }: { onLoginClick: () => vo
       {/* Mobile Menu */}
       {mobileMenuOpen && (
         <div className="lg:hidden absolute top-full left-0 w-full bg-white border-b border-slate-200 shadow-xl py-4 px-6 flex flex-col gap-4">
-          <a href="#pricing" className="text-lg font-semibold text-slate-800 py-2 border-b border-slate-100" onClick={() => setMobileMenuOpen(false)}>Pricing</a>
-          <button onClick={() => { onLoginClick(); setMobileMenuOpen(false); }} className="text-lg font-semibold text-slate-800 py-2 border-b border-slate-100 text-left">Log In</button>
-          <Button onClick={() => { navigate('/register'); setMobileMenuOpen(false); }} className="w-full mt-2 bg-indigo-600 hover:bg-indigo-700 text-white">
-            Start for free
+          <a href="#pricing" className="text-lg font-semibold text-slate-800 py-2 border-b border-slate-100" onClick={() => setMobileMenuOpen(false)}>{en ? 'Pricing' : 'Precios'}</a>
+          <button onClick={() => { onLoginClick(); setMobileMenuOpen(false); }} className="text-lg font-semibold text-slate-800 py-2 border-b border-slate-100 text-left">{en ? 'Log In' : 'Iniciar Sesión'}</button>
+          <Button onClick={() => { navigate('/register'); setMobileMenuOpen(false); }} className="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white">
+            {en ? 'Start for free' : 'Comenzar gratis'}
           </Button>
         </div>
       )}
