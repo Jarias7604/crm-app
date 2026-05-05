@@ -169,8 +169,6 @@ export const teamsService = {
     async createTeam(companyId: string, data: CreateTeamData): Promise<Team> {
         const leaderId = data.leader_id && data.leader_id.trim() !== '' ? data.leader_id : null;
 
-        console.log('[teamsService] Creating team:', { companyId, name: data.name, leaderId });
-
         const { data: team, error } = await supabase
             .from('teams')
             .insert({
@@ -185,11 +183,8 @@ export const teamsService = {
             .single();
 
         if (error) {
-            console.error('[teamsService] Error creating team:', error);
             throw error;
         }
-
-        console.log('[teamsService] Team created:', team);
 
         // If leader is specified, also add them as a team member with 'leader' role
         if (leaderId) {
@@ -201,7 +196,7 @@ export const teamsService = {
                     role: 'leader',
                 }, { onConflict: 'team_id,user_id' });
 
-            if (memberError) console.error('[teamsService] Error adding leader as member:', memberError);
+            if (memberError) { /* silently continue - team was created */ }
         }
 
         return team;

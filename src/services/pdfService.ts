@@ -27,9 +27,7 @@ export const pdfService = {
         allPlansForComparison?: PlanForPDF[]
     ): Promise<string> {
         try {
-            console.log('Generating Optimized Premium PDF...');
-
-            const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+        const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
             const pageWidth = doc.internal.pageSize.getWidth();
             const pageHeight = doc.internal.pageSize.getHeight();
             const margin = 15;
@@ -341,9 +339,7 @@ export const pdfService = {
             let financingPlan: { titulo?: string; descripcion?: string; interes_porcentaje?: number; tipo_ajuste?: 'discount' | 'recharge' | 'none' } | undefined;
 
             if (clientSelectedPlan) {
-                // Usar el plan que el prospecto eligió en la vista web
                 financingPlan = clientSelectedPlan;
-                console.log('[PDF] Plan elegido por prospecto:', clientSelectedPlan.titulo);
             } else if (numCuotas && companyId) {
                 // Fallback: buscar en BD el plan que corresponde al plan guardado
                 const { data: planData } = await supabase
@@ -358,7 +354,6 @@ export const pdfService = {
 
                 if (planData) {
                     financingPlan = planData;
-                    console.log('[PDF] Plan de financiamiento encontrado:', planData.titulo, 'Interés:', planData.interes_porcentaje);
                 }
             }
 

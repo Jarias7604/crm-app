@@ -182,8 +182,9 @@ export default function Calendar() {
 
 
     // Real Google Calendar Events from integration
+    // queryKey includes windowStart so navigating months triggers a fresh fetch
     const { data: googleEventsData } = useQuery({
-        queryKey: ['google-calendar-events', profile?.id],
+        queryKey: ['google-calendar-events', profile?.id, windowStart],
         queryFn: async () => {
             if (!profile?.id) return [];
             // Get integration record
@@ -195,7 +196,7 @@ export default function Calendar() {
                 .eq('is_active', true)
                 .single();
             if (!integration) return [];
-            // Fetch real events from edge function
+            // Fetch events from edge function (reads ALL user calendars, not just primary)
             const { data: fn, error } = await supabase.functions.invoke('google-calendar-sync', {
                 body: { action: 'fetch_events', integration_id: integration.id }
             });
@@ -212,7 +213,7 @@ export default function Calendar() {
                 assigned_to: profile?.id || '',
                 completed_at: null,
                 action_result: null,
-                lead: { id: `g${ev.id}`, name: ev.summary || 'Evento Google', company_name: ev.location || null, email: null, phone: null },
+                lead: { id: `g${ev.id}`, name: ev.summary || 'Evento Google', company_name: ev._calendarName || ev.location || null, email: null, phone: null },
                 assigned_profile: { id: profile?.id || '', full_name: profile?.full_name || '', avatar_url: null, role: 'user' }
             } as any));
         },
@@ -224,36 +225,14 @@ export default function Calendar() {
         return googleEventsData ?? [];
     }, [showGoogleEvents, googleEventsData]);
 
-    // Mock Outlook Events for Demo Integration
-    const mockOutlookEvents = useMemo(() => {
-        if (!showOutlookEvents) return [];
-        const events: CalendarEvent[] = [];
-        const today = new Date();
-        for (let i = 0; i < 4; i++) {
-            const d = addDays(today, (i * 3) - 2);
-            events.push({
-                id: `outlook-${i}`,
-                company_id: profile?.company_id || '',
-                lead_id: null,
-                action_type: 'outlook_calendar',
-                date: d.toISOString(),
-                completed: false,
-                notes: `Sync Corporativo (Microsoft Teams)`,
-                created_at: today.toISOString(),
-                assigned_to: profile?.id || '',
-                completed_at: null,
-                action_result: null,
-                lead: { id: `o${i}`, name: 'Evento Office 365', company_name: 'Microsoft Teams', email: null, phone: null },
-                assigned_profile: { id: profile?.id || '', full_name: profile?.full_name || '', avatar_url: null, role: 'user' }
-            } as any);
-        }
-        return events;
-    }, [showOutlookEvents, profile]);
+    // Outlook integration is not yet implemented — return empty array
+    const mockOutlookEvents = useMemo(() => [], []);
 
     // Role-based filtering: collaborators see only their own; admins can filter by collaborator
     const filteredEvents = useMemo(() => {
         let baseEvents = showCrmEvents ? calendarEvents : [];
-        let events = [...baseEvents, ...mockGoogleEvents, ...mockOutlookEvents];
+        // Outlook events are disabled until real Microsoft OAuth is implemented
+        let events = [...baseEvents, ...mockGoogleEvents];
         
         if (isAdmin) {
             if (selectedCalendarCollabId) {
