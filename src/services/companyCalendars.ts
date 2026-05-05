@@ -40,7 +40,7 @@ export const companyCalendarsService = {
         integration:calendar_integrations(id, google_email, is_active),
         accesses:calendar_access(
           user_id, can_view,
-          profile:profiles(id, full_name, avatar_url)
+          profile:profiles!calendar_access_user_id_fkey(id, full_name, avatar_url)
         )
       `)
       .eq('company_id', companyId)
