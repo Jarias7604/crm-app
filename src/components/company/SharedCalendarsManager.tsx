@@ -224,15 +224,17 @@ export default function SharedCalendarsManager() {
       )}
 
       {/* ACCESS MODAL */}
-      {showAccessModal && (
+      {showAccessModal && (() => {
+        const activeCalendar = calendars.find(c => c.id === showAccessModal.id) || showAccessModal;
+        return (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in">
           <div className="bg-white rounded-[2rem] w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
             <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
               <div>
                 <h3 className="font-black text-xl text-gray-900">Accesos</h3>
                 <p className="text-sm text-gray-500 flex items-center gap-2 mt-1">
-                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: showAccessModal.color }}></span>
-                  {showAccessModal.name}
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: activeCalendar.color }}></span>
+                  {activeCalendar.name}
                 </p>
               </div>
               <button onClick={() => setShowAccessModal(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500">
@@ -243,7 +245,7 @@ export default function SharedCalendarsManager() {
             <div className="p-4 overflow-y-auto bg-gray-50/30">
               <div className="space-y-2">
                 {users.map(user => {
-                  const hasAccess = showAccessModal.accesses?.some(a => a.user_id === user.id);
+                  const hasAccess = activeCalendar.accesses?.some(a => a.user_id === user.id);
                   return (
                     <div key={user.id} className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl hover:border-indigo-100 transition-colors">
                       <div className="flex items-center gap-3">
@@ -256,7 +258,7 @@ export default function SharedCalendarsManager() {
                         </div>
                       </div>
                       <button 
-                        onClick={() => handleToggleAccess(showAccessModal.id, user.id, !!hasAccess)}
+                        onClick={() => handleToggleAccess(activeCalendar.id, user.id, !!hasAccess)}
                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${hasAccess ? 'bg-indigo-600' : 'bg-gray-200'}`}
                       >
                         <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${hasAccess ? 'translate-x-6' : 'translate-x-1'}`} />
@@ -268,7 +270,8 @@ export default function SharedCalendarsManager() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
