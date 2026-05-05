@@ -4,7 +4,7 @@ import { ChevronDown, Globe, Phone, Headset, Menu, X, ArrowRight } from 'lucide-
 import { Button } from '../../components/ui/Button';
 import { useTranslation } from 'react-i18next';
 
-export default function LandingNavbar() {
+export default function LandingNavbar({ onLoginClick }: { onLoginClick: () => void }) {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { t, i18n } = useTranslation();
@@ -82,10 +82,10 @@ export default function LandingNavbar() {
               <Globe className="w-4 h-4" />
               {i18n.language === 'es' ? 'EN' : 'ES'}
             </button>
-            <Button variant="ghost" onClick={() => navigate('/login')} className="font-semibold">
+            <Button variant="ghost" onClick={onLoginClick} className="font-semibold">
               Log In
             </Button>
-            <Button onClick={() => navigate('/register')} className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-full px-6 shadow-md shadow-emerald-600/20">
+            <Button onClick={() => navigate('/register')} className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-full px-6 shadow-md shadow-indigo-600/20">
               Start for free
             </Button>
           </div>
@@ -104,8 +104,8 @@ export default function LandingNavbar() {
       {mobileMenuOpen && (
         <div className="lg:hidden absolute top-full left-0 w-full bg-white border-b border-slate-200 shadow-xl py-4 px-6 flex flex-col gap-4">
           <a href="#pricing" className="text-lg font-semibold text-slate-800 py-2 border-b border-slate-100" onClick={() => setMobileMenuOpen(false)}>Pricing</a>
-          <button onClick={() => { navigate('/login'); setMobileMenuOpen(false); }} className="text-lg font-semibold text-slate-800 py-2 border-b border-slate-100 text-left">Log In</button>
-          <Button onClick={() => { navigate('/register'); setMobileMenuOpen(false); }} className="w-full mt-2 bg-emerald-600 hover:bg-emerald-700">
+          <button onClick={() => { onLoginClick(); setMobileMenuOpen(false); }} className="text-lg font-semibold text-slate-800 py-2 border-b border-slate-100 text-left">Log In</button>
+          <Button onClick={() => { navigate('/register'); setMobileMenuOpen(false); }} className="w-full mt-2 bg-indigo-600 hover:bg-indigo-700 text-white">
             Start for free
           </Button>
         </div>

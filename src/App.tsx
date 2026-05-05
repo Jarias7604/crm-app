@@ -51,7 +51,6 @@ const ClientPortal      = lazy(() => import('./pages/clientes/ClientPortal'));
 const PipelineConfig    = lazy(() => import('./pages/admin/PipelineConfig'));
 const CallBot           = lazy(() => import('./pages/admin/CallBot'));
 const ManualPage        = lazy(() => import('./pages/support/ManualPage'));
-const HelpChat          = lazy(() => import('./components/HelpChat/HelpChat'));
 const PWAInstallPrompt  = lazy(() => import('./components/PWAInstallPrompt').then(m => ({ default: m.PWAInstallPrompt })));
 const FlyerStudio       = lazy(() => import('./pages/marketing/FlyerStudio'));
 const Finanzas          = lazy(() => import('./pages/Finanzas'));
@@ -232,7 +231,6 @@ function App() {
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
             <Suspense fallback={null}>
-              <HelpChat />
               <GlobalSearch />
             </Suspense>
           </Suspense>
