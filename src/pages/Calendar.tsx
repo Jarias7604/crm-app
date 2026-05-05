@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { leadsService } from '../services/leads';
 import { supabase } from '../services/supabase';
+import { companyCalendarsService } from '../services/companyCalendars';
 import { useAuth } from '../auth/AuthProvider';
 import { useTimezone } from '../hooks/useTimezone';
 import { formatTimeInZone, utcToLocalDate, DEFAULT_TIMEZONE } from '../utils/timezone';
@@ -186,23 +187,45 @@ export default function Calendar() {
     const { data: googleEventsData } = useQuery({
         queryKey: ['google-calendar-events', profile?.id, windowStart],
         queryFn: async () => {
-            if (!profile?.id) return [];
-            // Get integration record
-            const { data: integration } = await supabase
+            if (!profile?.id || !profile?.company_id) return [];
+            
+            // 1. Get personal integration
+            const { data: personalInt } = await supabase
                 .from('calendar_integrations')
                 .select('id')
                 .eq('user_id', profile.id)
                 .eq('provider', 'google')
                 .eq('is_active', true)
-                .single();
-            if (!integration) return [];
-            // Fetch events from edge function (reads ALL user calendars, not just primary)
+                .maybeSingle();
+
+            // 2. Get shared calendars
+            const sharedCals = await companyCalendarsService.getMyAccessibleCalendars(profile.id);
+
+            // 3. Build sources
+            const sources: any[] = [];
+            if (personalInt) {
+                sources.push({ integration_id: personalInt.id, group_name: 'Mi Calendario', color: '#4285F4' });
+            }
+            sharedCals.forEach((ca: any) => {
+                if (ca.calendar?.integration?.id) {
+                    sources.push({
+                        integration_id: ca.calendar.integration.id,
+                        group_name: ca.calendar.name,
+                        color: ca.calendar.color
+                    });
+                }
+            });
+
+            if (sources.length === 0) return [];
+
+            // 4. Fetch from edge function
             const { data: fn, error } = await supabase.functions.invoke('google-calendar-sync', {
-                body: { action: 'fetch_events', integration_id: integration.id }
+                body: { action: 'fetch_events_multi', integration_sources: sources }
             });
             if (error || !fn?.events) return [];
+            
             return (fn.events as any[]).map((ev: any) => ({
-                id: `google-${ev.id}`,
+                id: `google-${ev.id}-${ev._groupName}`,
                 company_id: profile?.company_id || '',
                 lead_id: null,
                 action_type: 'google_calendar',
@@ -213,8 +236,9 @@ export default function Calendar() {
                 assigned_to: profile?.id || '',
                 completed_at: null,
                 action_result: null,
-                lead: { id: `g${ev.id}`, name: ev.summary || 'Evento Google', company_name: ev._calendarName || ev.location || null, email: null, phone: null },
-                assigned_profile: { id: profile?.id || '', full_name: profile?.full_name || '', avatar_url: null, role: 'user' }
+                lead: { id: `g${ev.id}`, name: ev.summary || 'Evento Google', company_name: ev._groupName || ev._calendarName || null, email: null, phone: null },
+                assigned_profile: { id: profile?.id || '', full_name: profile?.full_name || '', avatar_url: null, role: 'user' },
+                _groupColor: ev._groupColor
             } as any));
         },
         enabled: showGoogleEvents && !!profile?.id,
