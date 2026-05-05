@@ -1,94 +1,82 @@
+import * as Sentry from '@sentry/react';
+
 /**
- * Professional Logger Utility
- * Provides structured logging with environment-aware behavior
+ * Professional Logger — Multi-tenant CRM
+ * Dev: logs to console | Prod: sends errors to Sentry automatically
  */
 
 interface LogContext {
     component?: string;
     action?: string;
     userId?: string;
+    companyId?: string;
     [key: string]: any;
 }
 
 class Logger {
     private isDevelopment = import.meta.env.DEV;
 
-    /**
-     * Debug logs - only in development
-     */
+    /** Debug — only visible in local dev */
     debug(message: string, context?: LogContext): void {
         if (this.isDevelopment) {
             console.log(`[DEBUG] ${message}`, context || '');
         }
     }
 
-    /**
-     * Info logs - only in development
-     */
+    /** Info — only visible in local dev */
     info(message: string, context?: LogContext): void {
         if (this.isDevelopment) {
             console.info(`[INFO] ${message}`, context || '');
         }
     }
 
-    /**
-     * Warning logs - always logged
-     */
+    /** Warning — logged in dev, sent to Sentry in prod */
     warn(message: string, context?: LogContext): void {
-        console.warn(`[WARN] ${message}`, context || '');
-        // TODO: Send to monitoring service (e.g., Sentry) in production
-    }
-
-    /**
-     * Error logs - always logged and sent to monitoring
-     */
-    error(message: string, error?: Error | unknown, context?: LogContext): void {
-        console.error(`[ERROR] ${message}`, {
-            error: error instanceof Error ? {
-                message: error.message,
-                stack: error.stack,
-                name: error.name
-            } : error,
-            context
-        });
-
-        // TODO: Send to error tracking service (e.g., Sentry) in production
-        if (!this.isDevelopment) {
-            this.sendToMonitoring(message, error, context);
-        }
-    }
-
-    /**
-     * Performance measurement
-     */
-    time(label: string): void {
         if (this.isDevelopment) {
-            console.time(label);
+            console.warn(`[WARN] ${message}`, context || '');
         }
+        Sentry.withScope((scope) => {
+            if (context) scope.setExtras(context);
+            scope.setLevel('warning');
+            Sentry.captureMessage(message);
+        });
+    }
+
+    /** Error — always logged, always sent to Sentry */
+    error(message: string, error?: Error | unknown, context?: LogContext): void {
+        if (this.isDevelopment) {
+            console.error(`[ERROR] ${message}`, {
+                error: error instanceof Error
+                    ? { message: error.message, stack: error.stack, name: error.name }
+                    : error,
+                context
+            });
+        }
+
+        Sentry.withScope((scope) => {
+            if (context?.userId) scope.setUser({ id: context.userId });
+            if (context?.companyId) scope.setTag('company_id', context.companyId);
+            if (context?.component) scope.setTag('component', context.component);
+            if (context) scope.setExtras(context);
+            scope.setLevel('error');
+
+            if (error instanceof Error) {
+                Sentry.captureException(error);
+            } else {
+                Sentry.captureMessage(`${message}: ${JSON.stringify(error ?? '')}`);
+            }
+        });
+    }
+
+    /** Performance timing — dev only */
+    time(label: string): void {
+        if (this.isDevelopment) console.time(label);
     }
 
     timeEnd(label: string): void {
-        if (this.isDevelopment) {
-            console.timeEnd(label);
-        }
-    }
-
-    /**
-     * Send errors to monitoring service
-     * @private
-     */
-    private sendToMonitoring(_message: string, _error?: Error | unknown, _context?: LogContext): void {
-        // TODO: Implement Sentry or similar service integration
-        // Example:
-        // Sentry.captureException(error, {
-        //     tags: { component: context?.component },
-        //     extra: context
-        // });
+        if (this.isDevelopment) console.timeEnd(label);
     }
 }
 
-// Export singleton instance
 export const logger = new Logger();
-
-// Export type for use in other files
 export type { LogContext };

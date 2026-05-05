@@ -2,9 +2,25 @@ import { StrictMode, Suspense, Component } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import * as Sentry from '@sentry/react'
 import './index.css'
 import App from './App.tsx'
 import './i18n'
+
+// ── Sentry Error Monitoring ─────────────────────────────────────────────────
+// DSN is set in Vercel environment variables: VITE_SENTRY_DSN
+// Without DSN, Sentry is a no-op (safe to deploy without configuring it first)
+Sentry.init({
+  dsn: import.meta.env.VITE_SENTRY_DSN,
+  environment: import.meta.env.MODE,           // 'production' | 'development'
+  release: import.meta.env.VITE_APP_VERSION,  // optional: tag deploys
+  enabled: import.meta.env.PROD,              // only active in production builds
+  tracesSampleRate: 0.2,                      // capture 20% of transactions for performance
+  replaysOnErrorSampleRate: 1.0,              // full replay on every error
+  integrations: [
+    Sentry.browserTracingIntegration(),
+  ],
+});
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,13 +34,12 @@ const queryClient = new QueryClient({
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then(registration => {
-      console.log('SW registered: ', registration);
-    }).catch(registrationError => {
-      console.log('SW registration failed: ', registrationError);
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // SW registration failed — app still works, just no offline support
     });
   });
 }
+
 
 const STALE_CHUNK_KEY = 'app_chunk_reload_attempted';
 
@@ -39,11 +54,19 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("Uncaught error:", error, errorInfo);
+    // Send all uncaught React errors to Sentry
+    Sentry.captureException(error, {
+      extra: { componentStack: errorInfo.componentStack },
+      tags: {
+        isStaleChunk: String(
+          error.message?.includes('Failed to fetch dynamically imported module') ||
+          error.message?.includes('Importing a module script failed') ||
+          error.message?.includes('error loading dynamically imported module')
+        )
+      }
+    });
 
-    // Detectar "stale chunk" — ocurre cuando Vercel hace deploy mientras
-    // un usuario tiene la app abierta. Los hashes de los chunks cambian
-    // y el browser falla al cargar el módulo antiguo. Solución: recargar una vez.
+    // Stale chunk auto-reload: happens when Vercel deploys while user has app open
     const isStaleChunk =
       error.message?.includes('Failed to fetch dynamically imported module') ||
       error.message?.includes('Importing a module script failed') ||
@@ -53,7 +76,6 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
       const alreadyRetried = sessionStorage.getItem(STALE_CHUNK_KEY);
       if (!alreadyRetried) {
         sessionStorage.setItem(STALE_CHUNK_KEY, 'true');
-        // Recarga forzada limpiando caché del browser
         window.location.reload();
       }
     }
