@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../auth/AuthProvider';
-import { companyCalendarsService, CompanyCalendar } from '../../services/companyCalendars';
+import { companyCalendarsService } from '../../services/companyCalendars';
+import type { CompanyCalendar } from '../../services/companyCalendars';
 import toast from 'react-hot-toast';
-import { Calendar, Plus, Trash2, Users, Check, X, Shield, Settings2 } from 'lucide-react';
+import { Calendar, Plus, Trash2, Users, Check, X, Shield, Settings2, AlertCircle } from 'lucide-react';
 
 export default function SharedCalendarsManager() {
   const { profile } = useAuth();
