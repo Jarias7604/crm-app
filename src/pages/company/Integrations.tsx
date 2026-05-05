@@ -85,11 +85,10 @@ export default function Integrations() {
   };
 
   const handleConnectOutlook = async () => {
-    toast.success('Redirigiendo a Microsoft OAuth...');
-    setTimeout(() => {
-      setOutlookConnected(true);
-      toast.success('Microsoft Outlook conectado exitosamente');
-    }, 1500);
+    toast('📅 Microsoft Outlook — Próximamente disponible. Estamos implementando el OAuth de Azure AD.', {
+      icon: '🔜',
+      duration: 4000,
+    });
   };
 
   const toggleEvent = (key: string) => {
@@ -344,55 +343,18 @@ export default function Integrations() {
               <p className="text-sm text-gray-500 font-medium">Genera credenciales para acceso programático a la API del CRM.</p>
             </div>
           </div>
-          
-          <div className="flex flex-col sm:flex-row gap-4 mb-8">
-            <input
-              placeholder="Nombre de la nueva API Key (ej: ERP Integración)"
-              value={newApiKeyName}
-              onChange={e => setNewApiKeyName(e.target.value)}
-              className="flex-1 px-5 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl font-medium focus:ring-2 focus:ring-amber-500 outline-none transition-all"
-            />
-            <button onClick={generateApiKey} className="bg-amber-500 text-white px-8 py-3.5 rounded-2xl font-black shadow-lg shadow-amber-500/20 hover:bg-amber-600 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 whitespace-nowrap">
-              <Plus className="w-4 h-4" /> Generar Key
-            </button>
-          </div>
 
-          {generatedKey && (
-            <div className="bg-amber-50 p-6 rounded-2xl border border-amber-200 mb-8 animate-in slide-in-from-top-4">
-              <p className="text-amber-900 font-black mb-3 text-sm flex items-center gap-2">
-                <AlertCircle className="w-4 h-4" /> IMPORTANTE: Copia esta clave ahora, no volverá a mostrarse.
-              </p>
-              <div className="flex items-center gap-3 bg-white p-4 rounded-xl border border-amber-100 shadow-sm">
-                <code className="flex-1 font-mono text-sm text-gray-800 break-all">{generatedKey}</code>
-                <button onClick={() => copyKey(generatedKey)} className="bg-amber-100 hover:bg-amber-200 text-amber-800 px-4 py-2 rounded-lg font-bold text-xs transition-colors flex items-center gap-2 shrink-0">
-                  <Copy className="w-3 h-3" /> Copiar
-                </button>
-              </div>
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-20 h-20 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Key className="w-10 h-10 text-amber-300" />
             </div>
-          )}
-
-          <div className="space-y-3">
-             {apiKeys.length === 0 && !generatedKey ? (
-               <div className="text-center py-12">
-                 <p className="text-gray-400 font-medium">No hay API Keys generadas.</p>
-               </div>
-             ) : (
-               apiKeys.map(k => (
-                 <div key={k.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl border border-gray-100 bg-gray-50 hover:bg-white hover:shadow-md transition-all">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center"><Key className="w-4 h-4"/></div>
-                      <div>
-                        <h4 className="font-black text-gray-900">{k.name}</h4>
-                        <p className="text-xs text-gray-500 font-mono mt-0.5">{k.key_prefix}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <span className="px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-lg text-[10px] font-black uppercase tracking-wider">Activa</span>
-                      <span className="text-xs text-gray-400 font-medium">{new Date(k.created_at).toLocaleDateString()}</span>
-                    </div>
-                 </div>
-               ))
-             )}
+            <h3 className="text-xl font-black text-gray-900 mb-2">Próximamente</h3>
+            <p className="text-sm text-gray-500 max-w-sm mx-auto mb-2">
+              El sistema de API Keys con persistencia y control de acceso está en desarrollo.
+            </p>
+            <span className="px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl text-xs font-black uppercase tracking-wider">
+              🔜 En Construcción
+            </span>
           </div>
         </div>
       )}
