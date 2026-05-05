@@ -57,6 +57,7 @@ const FlyerStudio       = lazy(() => import('./pages/marketing/FlyerStudio'));
 const Finanzas          = lazy(() => import('./pages/Finanzas'));
 const GlobalSearch      = lazy(() => import('./components/GlobalSearch').then(m => ({ default: m.GlobalSearch })));
 const OnboardingWizard  = lazy(() => import('./pages/OnboardingWizard'));
+const LandingPage       = lazy(() => import('./pages/public/LandingPage'));
 const Observatory       = lazy(() => import('./pages/admin/Observatory'));
 const Integrations      = lazy(() => import('./pages/company/Integrations'));
 const Billing           = lazy(() => import('./pages/company/Billing'));
@@ -136,6 +137,8 @@ function App() {
           </Suspense>
           <Suspense fallback={<PageSkeleton />}>
             <Routes>
+              <Route path="/" element={<LandingPage />} />
+              
               <Route element={<AuthLayout />}>
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<SignUp />} />
@@ -143,7 +146,6 @@ function App() {
 
               <Route element={<ProtectedRoute />}>
                 <Route element={<DashboardLayout />}>
-                  <Route path="/" element={<Dashboard />} />
                   <Route path="/dashboard" element={<Dashboard />} />
                   <Route path="/leads" element={<Leads />} />
                   <Route path="/cotizaciones" element={<Cotizaciones />} />

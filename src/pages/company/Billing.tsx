@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../auth/AuthProvider';
-import { CreditCard, Zap, AlertTriangle, Package, ExternalLink, Download, FileText, Activity } from 'lucide-react';
+import { CreditCard, Zap, AlertTriangle, Package, ExternalLink, Download, FileText, Activity, CheckCircle2 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useSubscription } from '../../hooks/useSubscription';
+import { supabase } from '../../services/supabase';
 
 // Componente para barras de progreso minimalistas
 const UsageBar = ({ label, current, max, format = (v: number) => v.toString() }: { label: string, current: number, max: number, format?: (v: number) => string }) => {
@@ -33,13 +34,35 @@ const UsageBar = ({ label, current, max, format = (v: number) => v.toString() }:
 export default function Billing() {
   const { profile } = useAuth();
   const { subscription, loading } = useSubscription();
+  const [plans, setPlans] = useState<any[]>([]);
+  const [loadingPlans, setLoadingPlans] = useState(true);
+
+  useEffect(() => {
+    async function fetchPlans() {
+      try {
+        const { data, error } = await supabase
+          .from('saas_plans')
+          .select('*')
+          .eq('is_active', true)
+          .order('price_monthly', { ascending: true });
+        
+        if (error) throw error;
+        setPlans(data || []);
+      } catch (err) {
+        console.error('Error fetching plans:', err);
+      } finally {
+        setLoadingPlans(false);
+      }
+    }
+    fetchPlans();
+  }, []);
 
   const handleStripePortal = () => {
     const portalUrl = import.meta.env.VITE_STRIPE_PORTAL_URL || 'https://billing.stripe.com/p/login/test_8wM6r31QJ1v229W9AA';
     window.open(portalUrl, '_blank');
   };
 
-  if (loading) {
+  if (loading || loadingPlans) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
@@ -172,6 +195,69 @@ export default function Billing() {
               </Button>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Available Plans (SaaS Pricing Tables directly in the billing dashboard) */}
+      <div className="pt-4">
+        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-1.5">
+          <Package className="w-4 h-4 text-[#635BFF]" /> Planes Disponibles
+        </h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {plans.map((plan) => {
+            const isCurrentPlan = subscription?.planSlug === plan.plan_slug;
+            
+            return (
+              <div 
+                key={plan.id} 
+                className={`relative bg-white rounded-xl border flex flex-col p-5 transition-all ${
+                  isCurrentPlan 
+                    ? 'border-[#635BFF] shadow-md shadow-indigo-500/10' 
+                    : 'border-slate-200 hover:border-slate-300 shadow-sm'
+                }`}
+              >
+                {isCurrentPlan && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#635BFF] text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-sm">
+                    Plan Actual
+                  </div>
+                )}
+                
+                <div className="mb-4 text-center mt-2">
+                  <h4 className="text-lg font-bold text-slate-900 capitalize mb-1">{plan.name}</h4>
+                  <div className="flex items-end justify-center gap-1">
+                    <span className="text-2xl font-black text-slate-900">${plan.price_monthly}</span>
+                    <span className="text-xs text-slate-500 font-medium mb-1">/mes</span>
+                  </div>
+                </div>
+
+                <div className="flex-grow space-y-3 mb-6">
+                  {plan.features?.slice(0, 5).map((feature: string, idx: number) => (
+                    <div key={idx} className="flex items-start gap-2">
+                      <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${isCurrentPlan ? 'text-[#635BFF]' : 'text-slate-400'}`} />
+                      <span className="text-xs text-slate-600 font-medium leading-tight">{feature}</span>
+                    </div>
+                  ))}
+                  {plan.features?.length > 5 && (
+                    <div className="text-[10px] text-slate-400 font-medium italic pl-5">
+                      + {plan.features.length - 5} características más
+                    </div>
+                  )}
+                </div>
+
+                <Button 
+                  onClick={handleStripePortal}
+                  className={`w-full text-xs font-bold py-2 shadow-none ${
+                    isCurrentPlan 
+                      ? 'bg-slate-100 text-slate-500 hover:bg-slate-200 cursor-default' 
+                      : 'bg-white border border-[#635BFF] text-[#635BFF] hover:bg-indigo-50'
+                  }`}
+                >
+                  {isCurrentPlan ? 'Plan Activo' : 'Actualizar Plan'}
+                </Button>
+              </div>
+            );
+          })}
         </div>
       </div>
 
