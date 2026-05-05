@@ -36,7 +36,7 @@ export default function Login() {
             setError(error.message);
             setLoading(false);
         } else {
-            navigate('/');
+            navigate('/dashboard');
         }
     };
 
@@ -84,7 +84,7 @@ export default function Login() {
             setError(error.message);
             setLoading(false);
         } else {
-            navigate('/');
+            navigate('/dashboard');
         }
     };
 
