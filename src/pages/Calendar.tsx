@@ -10,7 +10,8 @@ import { es } from 'date-fns/locale';
 import {
     ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail,
     CalendarDays, MessageSquare, Video, FileText, SlidersHorizontal,
-    CheckCircle2, Circle, RotateCcw, X, Users, ChevronDown, CheckCircle, Calendar as CalendarIcon
+    CheckCircle2, Circle, RotateCcw, X, Users, ChevronDown, CheckCircle, Calendar as CalendarIcon,
+    ExternalLink, AlignLeft, UserPlus
 } from 'lucide-react';
 import { leadsService } from '../services/leads';
 import { supabase } from '../services/supabase';
@@ -118,6 +119,9 @@ export default function Calendar() {
     const [showCrmEvents, setShowCrmEvents] = useState(true);
     const [showGoogleEvents, setShowGoogleEvents] = useState(true);
     const [showOutlookEvents, setShowOutlookEvents] = useState(false);
+    
+    // Google Calendar Event Modal
+    const [selectedGoogleEvent, setSelectedGoogleEvent] = useState<any | null>(null);
 
     // Responsable filter — admin only, ver perspectiva de un agente en el calendario
     const [calendarCollabProfiles, setCalendarCollabProfiles] = useState<{ id: string; full_name: string; role: string; avatar_url?: string | null }[]>([]);
@@ -238,7 +242,8 @@ export default function Calendar() {
                 action_result: null,
                 lead: { id: `g${ev.id}`, name: ev.summary || 'Evento Google', company_name: ev._groupName || ev._calendarName || null, email: null, phone: null },
                 assigned_profile: { id: profile?.id || '', full_name: profile?.full_name || '', avatar_url: null, role: 'user' },
-                _groupColor: ev._groupColor
+                _groupColor: ev._groupColor,
+                _rawEvent: ev
             } as any));
         },
         enabled: showGoogleEvents && !!profile?.id,
@@ -775,7 +780,15 @@ export default function Calendar() {
                                         return (
                                             <button
                                                 key={ev.id}
-                                                onClick={(e) => { e.stopPropagation(); if (ev.action_type === 'google_calendar' || ev.action_type === 'outlook_calendar') { return; } ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } }); }}
+                                                onClick={(e) => { 
+                                                    e.stopPropagation(); 
+                                                    if (ev.action_type === 'google_calendar') { 
+                                                        setSelectedGoogleEvent(ev);
+                                                        return; 
+                                                    } 
+                                                    if (ev.action_type === 'outlook_calendar') { return; } 
+                                                    ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } }); 
+                                                }}
                                                 title={`${ev.lead?.name ?? 'Lead'} · ${timeStr}${ev.completed ? ' ✅' : isOverdue ? ' ⚠️ Vencido' : ''}`}
                                                 className={`w-full text-left px-1.5 py-1 rounded-md transition-all flex items-center gap-1 ${
                                                     ev.completed
@@ -898,7 +911,7 @@ export default function Calendar() {
                                 return (
                                     <div 
                                         key={ev.id}
-                                        onClick={(e) => { e.stopPropagation(); ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } }); }}
+                                        onClick={(e) => { e.stopPropagation(); if (ev.action_type === 'google_calendar') { setSelectedGoogleEvent(ev); return; } ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } }); }}
                                         className={`absolute rounded-lg p-1.5 text-[9px] leading-tight overflow-hidden cursor-pointer hover:z-20 transition-all hover:ring-2 hover:ring-indigo-300 shadow-sm ${ev.completed ? 'opacity-50 bg-gray-100 border border-gray-200' : cfg.pill}`}
                                         style={{
                                             top: `${top}px`,
@@ -957,7 +970,7 @@ export default function Calendar() {
                             return (
                                 <div 
                                     key={ev.id}
-                                    onClick={(e) => { e.stopPropagation(); ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } }); }}
+                                    onClick={(e) => { e.stopPropagation(); if (ev.action_type === 'google_calendar') { setSelectedGoogleEvent(ev); return; } ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } }); }}
                                     className={`absolute left-24 right-4 rounded-xl p-3 cursor-pointer shadow-sm hover:shadow-md transition-all flex flex-col border-l-4 ${ev.completed ? 'opacity-50 bg-gray-100 border border-gray-200' : cfg.pill}`}
                                     style={{
                                         top: `${top}px`,
@@ -1403,7 +1416,15 @@ export default function Calendar() {
                                             {/* Info */}
                                             <div className="flex-1 min-w-0">
                                                 <button
-                                                    onClick={() => { setDayDetailDate(null); ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } }); }}
+                                                    onClick={() => { 
+                                                        if (ev.action_type === 'google_calendar') {
+                                                            setDayDetailDate(null);
+                                                            setSelectedGoogleEvent(ev);
+                                                            return;
+                                                        }
+                                                        setDayDetailDate(null); 
+                                                        ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } }); 
+                                                    }}
                                                     className={`text-sm font-bold text-left hover:text-indigo-600 transition-colors ${
                                                         ev.completed ? 'text-emerald-700 line-through opacity-70' : 'text-gray-900'
                                                     }`}
