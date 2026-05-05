@@ -168,6 +168,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     if (profile?.role === 'super_admin') {
         navigation.push({ name: 'Observatory', href: '/admin/observatory', icon: Sparkles, current: location.pathname.startsWith('/admin/observatory') });
         navigation.push({ name: t('sidebar.companies'), href: '/admin/companies', icon: Building, current: location.pathname.startsWith('/admin/companies') });
+        navigation.push({ name: 'SaaS Plans', href: '/admin/plans', icon: Package, current: location.pathname.startsWith('/admin/plans') });
         navigation.push({ name: 'Auditoría', href: '/admin/audit-log', icon: ShieldCheck, current: location.pathname.startsWith('/admin/audit-log') });
     }
 

@@ -63,6 +63,7 @@ const Integrations      = lazy(() => import('./pages/company/Integrations'));
 const Billing           = lazy(() => import('./pages/company/Billing'));
 const GoogleCallback    = lazy(() => import('./pages/company/GoogleCallback'));
 const Reports           = lazy(() => import('./pages/Reports'));
+const PlanManager       = lazy(() => import('./pages/admin/PlanManager'));
 
 // ─── Skeleton Screen (técnica Netflix) ───────────────────────────────────────
 // Muestra estructura visual inmediatamente mientras carga el JS del módulo.
@@ -178,6 +179,7 @@ function App() {
                     <Route path="/admin/companies" element={<Companies />} />
                     <Route path="/admin/audit-log" element={<AuditLog />} />
                     <Route path="/admin/observatory" element={<Observatory />} />
+                    <Route path="/admin/plans" element={<PlanManager />} />
                   </Route>
 
                   {/* Company Admin Routes */}
