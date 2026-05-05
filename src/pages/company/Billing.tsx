@@ -1,39 +1,59 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../auth/AuthProvider';
-import { CreditCard, Zap, AlertTriangle, Package, ExternalLink, Download, FileText, Activity, CheckCircle2 } from 'lucide-react';
+import { CreditCard, Zap, AlertTriangle, Package, ExternalLink, Download, FileText, Activity, CheckCircle2, Clock, XCircle, Shield, ChevronRight } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useSubscription } from '../../hooks/useSubscription';
+import { useBillingData } from '../../hooks/useBillingData';
 import { supabase } from '../../services/supabase';
 
-// Componente para barras de progreso minimalistas
-const UsageBar = ({ label, current, max, format = (v: number) => v.toString() }: { label: string, current: number, max: number, format?: (v: number) => string }) => {
-  const percentage = Math.min(100, Math.max(0, (current / max) * 100));
-  const isDanger = percentage > 90;
-  const isWarning = percentage > 75 && !isDanger;
-
+// ── Usage Progress Bar ──────────────────────────────────────
+const UsageBar = ({ label, current, max, format = (v: number) => v.toString() }: { label: string; current: number; max: number; format?: (v: number) => string }) => {
+  const pct = Math.min(100, Math.max(0, (current / max) * 100));
+  const color = pct > 90 ? 'bg-red-500' : pct > 75 ? 'bg-amber-500' : 'bg-emerald-500';
   return (
-    <div className="space-y-1.5">
-      <div className="flex justify-between text-xs">
-        <span className="font-medium text-slate-600">{label}</span>
-        <span className="text-slate-500">
-          <span className="font-semibold text-slate-900">{format(current)}</span> / {max === 999999 ? '?' : format(max)}
-        </span>
+    <div className="flex-1 min-w-[140px]">
+      <div className="flex justify-between text-xs mb-1.5">
+        <span className="font-semibold text-slate-700">{label}</span>
+        <span className="text-slate-500 tabular-nums"><span className="font-bold text-slate-800">{format(current)}</span> / {max >= 999999 ? '∞' : format(max)}</span>
       </div>
-      <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-        <div 
-          className={`h-full rounded-full transition-all duration-1000 ease-out ${
-            isDanger ? 'bg-red-500' : isWarning ? 'bg-amber-500' : 'bg-[#635BFF]'
-          }`}
-          style={{ width: `${percentage}%` }}
-        />
+      <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full transition-all duration-700 ease-out ${color}`} style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
 };
 
+// ── Invoice Status Badge ────────────────────────────────────
+const StatusBadge = ({ status }: { status: string }) => {
+  const map: Record<string, { dot: string; text: string; label: string }> = {
+    paid:     { dot: 'bg-emerald-500', text: 'text-emerald-700', label: 'Pagado' },
+    pending:  { dot: 'bg-amber-500',   text: 'text-amber-700',  label: 'Pendiente' },
+    failed:   { dot: 'bg-red-500',     text: 'text-red-700',    label: 'Fallido' },
+    refunded: { dot: 'bg-slate-400',   text: 'text-slate-600',  label: 'Reembolsado' },
+    draft:    { dot: 'bg-slate-300',   text: 'text-slate-500',  label: 'Borrador' },
+    void:     { dot: 'bg-slate-300',   text: 'text-slate-400',  label: 'Anulado' },
+  };
+  const c = map[status] || map.draft;
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${c.text}`}>
+      <span className={`w-2 h-2 rounded-full ${c.dot}`} />
+      {c.label}
+    </span>
+  );
+};
+
+// ── Plan Feature Item ───────────────────────────────────────
+const Feature = ({ text, accent }: { text: string; accent: boolean }) => (
+  <div className="flex items-start gap-2 py-0.5">
+    <CheckCircle2 className={`w-4 h-4 shrink-0 mt-0.5 ${accent ? 'text-emerald-500' : 'text-slate-300'}`} />
+    <span className="text-sm text-slate-700 leading-snug">{text}</span>
+  </div>
+);
+
 export default function Billing() {
   const { profile } = useAuth();
   const { subscription, loading } = useSubscription();
+  const { invoices, usage, loading: loadingBilling } = useBillingData();
   const [plans, setPlans] = useState<any[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(true);
 
@@ -45,7 +65,6 @@ export default function Billing() {
           .select('*')
           .eq('is_active', true)
           .order('price_monthly', { ascending: true });
-        
         if (error) throw error;
         setPlans(data || []);
       } catch (err) {
@@ -62,244 +81,280 @@ export default function Billing() {
     window.open(portalUrl, '_blank');
   };
 
-  if (loading || loadingPlans) {
+  const handleDownloadInvoice = (inv: any) => {
+    if (inv.pdfUrl) window.open(inv.pdfUrl, '_blank');
+    else if (inv.stripeHostedUrl) window.open(inv.stripeHostedUrl, '_blank');
+    else handleStripePortal();
+  };
+
+  if (loading || loadingPlans || loadingBilling) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+        <div className="h-7 w-7 animate-spin rounded-full border-[3px] border-emerald-500 border-t-transparent" />
       </div>
     );
   }
 
   const isPro = subscription?.planSlug === 'pro' || subscription?.planSlug === 'enterprise';
 
-  const invoices = [
-    { id: 'INV-2026-004', date: new Date().toISOString(), amount: subscription?.planSlug === 'pro' ? 99.00 : 29.00, status: 'paid' },
-    { id: 'INV-2026-003', date: new Date(Date.now() - 30*24*60*60*1000).toISOString(), amount: subscription?.planSlug === 'pro' ? 99.00 : 29.00, status: 'paid' },
-    { id: 'INV-2026-002', date: new Date(Date.now() - 60*24*60*60*1000).toISOString(), amount: subscription?.planSlug === 'pro' ? 99.00 : 29.00, status: 'paid' },
-  ];
-
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-10">
-      {/* Header Minimalista */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-slate-200 pb-4">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900">Facturación & Suscripción</h1>
-          <p className="text-sm text-slate-500 mt-1">Gestiona tu plan, consumo y métodos de pago.</p>
-        </div>
-        <div className="flex items-center gap-2 mt-4 sm:mt-0">
-          <Button variant="outline" size="sm" onClick={() => window.location.href='/onboarding'} className="hidden md:flex border-slate-200 text-slate-600">
-            <Package className="w-4 h-4 mr-2 text-slate-400" /> Asistente
-          </Button>
-          <Button size="sm" onClick={handleStripePortal} className="bg-[#635BFF] hover:bg-[#4B45C6] text-white shadow-sm">
-            <CreditCard className="w-4 h-4 mr-2" /> Stripe Portal <ExternalLink className="w-3 h-3 ml-2 opacity-70" />
-          </Button>
+    <div className="max-w-6xl mx-auto space-y-8 pb-12 px-1">
+
+      {/* ─── HEADER ─────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+            <CreditCard className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black tracking-tight text-slate-900">Subscription & Billing</h1>
+            <p className="text-sm text-slate-500 mt-0.5">Manage active plan and 501(c)(3) taxpayer status</p>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Plan & Consumo (2/3 de ancho) */}
-        <div className="lg:col-span-2 space-y-6">
-          
-          {/* Tarjeta de Plan Horizontal */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-sm font-bold text-slate-900 capitalize flex items-center gap-1.5">
-                  {subscription?.planSlug || 'Starter'} Plan
-                  {isPro && <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />}
-                </span>
-                {subscription?.status === 'trialing' && (
-                  <span className="px-2 py-0.5 bg-amber-50 text-amber-700 font-semibold text-[10px] rounded-md uppercase tracking-wider flex items-center gap-1 border border-amber-200">
-                    <AlertTriangle className="w-3 h-3" /> Prueba 14 Días
+      {/* ─── PLAN + STRIPE + TAX ROW ────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Plan Card (3/5) */}
+        <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-2">
+                <h2 className="text-2xl font-black text-slate-900 capitalize">
+                  {subscription?.planName || subscription?.planSlug || 'Free'}
+                </h2>
+                {subscription?.isActive && (
+                  <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-700 text-[11px] font-black rounded-full uppercase tracking-wide border border-emerald-200">
+                    Active
                   </span>
                 )}
-                {subscription?.status === 'active' && (
-                  <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 font-semibold text-[10px] rounded-md uppercase tracking-wider border border-emerald-200">
-                    Activo
+                {subscription?.isTrialing && (
+                  <span className="px-2.5 py-0.5 bg-amber-100 text-amber-700 text-[11px] font-black rounded-full uppercase tracking-wide border border-amber-200 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" /> Trial
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-500">
-                {subscription?.maxUsers} asientos · ${subscription?.planSlug === 'pro' ? '99' : '29'} / {subscription?.billingCycle || 'mes'}
+              <div className="flex items-baseline gap-1">
+                <span className="text-lg text-slate-600">\</span>
+                <span className="text-3xl font-black text-slate-900">${subscription?.priceMonthly ?? 0}</span>
+                <span className="text-sm text-slate-500 font-medium">/mo</span>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                Next Billing: {subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' }) : 'N/A'}
               </p>
             </div>
-
-            <div className="flex flex-col sm:items-end">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Próximo Cobro</span>
-              <span className="text-sm font-medium text-slate-900">
-                El {subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : '-'}
-              </span>
-            </div>
+            <button
+              onClick={handleStripePortal}
+              className="flex items-center gap-2.5 bg-[#635BFF] hover:bg-[#4B45C6] text-white font-bold px-6 py-3 rounded-xl shadow-lg shadow-[#635BFF]/25 transition-all transform hover:-translate-y-0.5 active:translate-y-0 shrink-0"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+                <rect width="24" height="24" rx="4" fill="white" fillOpacity="0.2" />
+                <path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.918 3.757 7.11c0 4.46 2.72 6.024 7.156 7.671 2.811 1.05 3.79 1.825 3.79 2.917 0 .979-.758 1.587-2.172 1.587-1.86 0-4.835-.953-6.763-2.2L4.89 22.62C6.907 23.715 9.857 24 12.165 24c2.643 0 4.814-.637 6.34-1.887 1.633-1.337 2.495-3.251 2.495-5.695 0-4.584-2.779-6.104-7.024-7.268z" fill="white"/>
+              </svg>
+              Pay with Stripe
+            </button>
           </div>
-
-          {/* Consumo Minimalista */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
-            <h3 className="text-xs font-semibold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-1.5">
-              <Activity className="w-4 h-4 text-slate-400" /> Uso del Ciclo Actual
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <UsageBar 
-                label="Asientos" 
-                current={Math.floor(Math.random() * 3) + 1} 
-                max={subscription?.maxUsers || 5} 
-              />
-              <UsageBar 
-                label="Leads" 
-                current={Math.floor(Math.random() * 200) + 15} 
-                max={subscription?.maxLeads || 500} 
-              />
-              <UsageBar 
-                label="Tokens IA" 
-                current={Math.floor(Math.random() * 8000) + 1000} 
-                max={subscription?.maxAiTokens || 25000} 
-                format={(v) => (v > 1000 ? `${(v/1000).toFixed(1)}k` : v.toString())}
-              />
-            </div>
-          </div>
-
         </div>
 
-        {/* Panel Lateral (1/3 de ancho) */}
-        <div className="space-y-6">
-          <div className="bg-slate-50 rounded-xl border border-slate-200 p-5">
-            <h3 className="text-xs font-semibold text-slate-800 uppercase tracking-wider mb-4">Detalles de Facturación</h3>
-            
-            <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <span className="text-xs text-slate-500">Método de Pago</span>
-                <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-2 py-1 rounded text-xs font-medium text-slate-700">
-                  <CreditCard className="w-3.5 h-3.5 text-[#635BFF]" />
-                  •••• 4242
-                </div>
-              </div>
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <span className="text-xs text-slate-500">Tenant ID</span>
-                <span className="text-xs font-mono text-slate-600 truncate max-w-[120px]" title={profile?.company_id || ''}>
-                  {profile?.company_id?.split('-')[0] || 'N/A'}...
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-500">Moneda</span>
-                <span className="text-xs font-medium text-slate-700">USD</span>
-              </div>
+        {/* Tax Exemption Card (2/5) */}
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h3 className="text-sm font-black text-slate-800 mb-4 flex items-center gap-2">
+            <Shield className="w-4 h-4 text-slate-500" /> Tax Exemption
+          </h3>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-500">Subject to Standard Tax</span>
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            </div>
+            <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+              <span className="text-xs text-slate-500">Tenant ID</span>
+              <span className="text-xs font-mono text-slate-600 truncate max-w-[140px]" title={profile?.company_id || ''}>
+                {profile?.company_id?.substring(0, 12) || 'N/A'}...
+              </span>
+            </div>
+            <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+              <span className="text-xs text-slate-500">Currency</span>
+              <span className="text-xs font-bold text-slate-700">USD</span>
             </div>
           </div>
-
-          {!isPro && (
-            <div className="bg-[#F6F8FA] rounded-xl border border-slate-200 p-5 text-center">
-              <Zap className="w-6 h-6 text-[#635BFF] mx-auto mb-2" />
-              <h3 className="text-sm font-bold text-slate-900 mb-1">Aumenta tus límites</h3>
-              <p className="text-xs text-slate-500 mb-4">Accede a IA predictiva y reportes avanzados.</p>
-              <Button size="sm" onClick={handleStripePortal} className="w-full bg-white border border-slate-300 text-slate-700 hover:bg-slate-50">
-                Ver Planes
-              </Button>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Available Plans (SaaS Pricing Tables directly in the billing dashboard) */}
-      <div className="pt-4">
-        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-1.5">
-          <Package className="w-4 h-4 text-[#635BFF]" /> Planes Disponibles
+      {/* ─── AVAILABLE PLANS ────────────────────────────────── */}
+      <div>
+        <h3 className="text-lg font-black text-slate-900 mb-5 flex items-center gap-2">
+          <Package className="w-5 h-5 text-emerald-500" /> Available Plans
         </h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+
+        <div className={`grid grid-cols-1 ${plans.length >= 4 ? 'md:grid-cols-2 lg:grid-cols-4' : 'md:grid-cols-3'} gap-5`}>
           {plans.map((plan) => {
-            const isCurrentPlan = subscription?.planSlug === plan.plan_slug;
-            
+            const isCurrent = subscription?.planSlug === plan.slug;
+            const isPopular = plan.slug === 'pro';
             return (
-              <div 
-                key={plan.id} 
-                className={`relative bg-white rounded-xl border flex flex-col p-5 transition-all ${
-                  isCurrentPlan 
-                    ? 'border-[#635BFF] shadow-md shadow-indigo-500/10' 
+              <div
+                key={plan.id}
+                className={`relative bg-white rounded-2xl border-2 flex flex-col transition-all duration-200 ${
+                  isCurrent
+                    ? 'border-emerald-400 shadow-lg shadow-emerald-500/10'
+                    : isPopular
+                    ? 'border-indigo-400 shadow-lg shadow-indigo-500/10'
                     : 'border-slate-200 hover:border-slate-300 shadow-sm'
                 }`}
               >
-                {isCurrentPlan && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#635BFF] text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full shadow-sm">
-                    Plan Actual
+                {/* Current Plan Badge */}
+                {isCurrent && (
+                  <div className="absolute -top-3.5 left-4">
+                    <span className="bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-md">
+                      ★ Current Plan
+                    </span>
                   </div>
                 )}
-                
-                <div className="mb-4 text-center mt-2">
-                  <h4 className="text-lg font-bold text-slate-900 capitalize mb-1">{plan.name}</h4>
-                  <div className="flex items-end justify-center gap-1">
-                    <span className="text-2xl font-black text-slate-900">${plan.price_monthly}</span>
-                    <span className="text-xs text-slate-500 font-medium mb-1">/mes</span>
+
+                <div className="p-6 pb-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Zap className={`w-4 h-4 ${isCurrent ? 'text-emerald-500' : isPopular ? 'text-indigo-500' : 'text-slate-400'}`} />
+                    <h4 className="text-lg font-black text-slate-900">{plan.name}</h4>
+                  </div>
+                  <p className="text-xs text-slate-500 mb-4 min-h-[28px]">{plan.description || `Hasta ${plan.max_users} miembros`}</p>
+                  <div className="flex items-baseline gap-0.5">
+                    <span className="text-3xl font-black text-slate-900">${plan.price_monthly}</span>
+                    <span className="text-sm text-slate-400 font-medium">/mo</span>
                   </div>
                 </div>
 
-                <div className="flex-grow space-y-3 mb-6">
-                  {plan.features?.slice(0, 5).map((feature: string, idx: number) => (
-                    <div key={idx} className="flex items-start gap-2">
-                      <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${isCurrentPlan ? 'text-[#635BFF]' : 'text-slate-400'}`} />
-                      <span className="text-xs text-slate-600 font-medium leading-tight">{feature}</span>
-                    </div>
+                <div className="flex-grow px-6 pb-4 space-y-1.5">
+                  {plan.features?.map((f: string, i: number) => (
+                    <Feature key={i} text={f} accent={isCurrent || isPopular} />
                   ))}
-                  {plan.features?.length > 5 && (
-                    <div className="text-[10px] text-slate-400 font-medium italic pl-5">
-                      + {plan.features.length - 5} características más
-                    </div>
+                  {plan.features?.length > 6 && (
+                    <p className="text-xs text-slate-400 italic pt-1">+ {plan.features.length - 6} more</p>
                   )}
                 </div>
 
-                <Button 
-                  onClick={handleStripePortal}
-                  className={`w-full text-xs font-bold py-2 shadow-none ${
-                    isCurrentPlan 
-                      ? 'bg-slate-100 text-slate-500 hover:bg-slate-200 cursor-default' 
-                      : 'bg-white border border-[#635BFF] text-[#635BFF] hover:bg-indigo-50'
-                  }`}
-                >
-                  {isCurrentPlan ? 'Plan Activo' : 'Actualizar Plan'}
-                </Button>
+                <div className="p-6 pt-3">
+                  {isCurrent ? (
+                    <div className="w-full py-3 rounded-xl text-center text-sm font-bold text-slate-400 bg-slate-50 border border-slate-200 cursor-default flex items-center justify-center gap-1">
+                      <CheckCircle2 className="w-4 h-4" /> Pay ${plan.price_monthly}/mo
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleStripePortal}
+                      className={`w-full py-3 rounded-xl text-center text-sm font-bold transition-all border-2 flex items-center justify-center gap-1 ${
+                        isPopular
+                          ? 'bg-indigo-500 text-white border-indigo-500 hover:bg-indigo-600 shadow-md shadow-indigo-500/20'
+                          : 'bg-white text-emerald-600 border-emerald-400 hover:bg-emerald-50'
+                      }`}
+                    >
+                      ↑ Upgrade to {plan.name}
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* Historial Compacto */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-          <h3 className="text-xs font-semibold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-            <FileText className="w-4 h-4 text-slate-400" /> Historial de Recibos
-          </h3>
+      {/* ─── USAGE METRICS ──────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+        <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider mb-5 flex items-center gap-2">
+          <Activity className="w-4 h-4 text-emerald-500" /> Current Cycle Usage
+        </h3>
+        <div className="flex flex-col sm:flex-row gap-8">
+          <UsageBar label="Seats" current={usage.users} max={subscription?.maxUsers || 5} />
+          <UsageBar label="Leads" current={usage.leads} max={subscription?.maxLeads || 500} />
+          <UsageBar
+            label="AI Tokens"
+            current={usage.aiTokens}
+            max={subscription?.maxAiTokens || 25000}
+            format={(v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v.toString())}
+          />
         </div>
-        <table className="w-full text-left text-sm border-collapse">
-          <thead>
-            <tr className="border-b border-slate-100 text-xs text-slate-500">
-              <th className="px-5 py-2.5 font-medium w-1/3">Factura</th>
-              <th className="px-5 py-2.5 font-medium">Fecha</th>
-              <th className="px-5 py-2.5 font-medium">Monto</th>
-              <th className="px-5 py-2.5 font-medium">Estado</th>
-              <th className="px-5 py-2.5 font-medium text-right">PDF</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoices.map((invoice) => (
-              <tr key={invoice.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition-colors">
-                <td className="px-5 py-2.5 font-medium text-slate-700 text-xs">{invoice.id}</td>
-                <td className="px-5 py-2.5 text-slate-500 text-xs">
-                  {new Date(invoice.date).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' })}
-                </td>
-                <td className="px-5 py-2.5 font-medium text-slate-700 text-xs">${invoice.amount.toFixed(2)}</td>
-                <td className="px-5 py-2.5">
-                  <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-semibold rounded-md border border-emerald-100">
-                    Pagado
-                  </span>
-                </td>
-                <td className="px-5 py-2.5 text-right">
-                  <button onClick={handleStripePortal} className="text-slate-400 hover:text-[#635BFF] transition-colors inline-flex">
-                    <Download className="w-4 h-4" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      </div>
+
+      {/* ─── INVOICE HISTORY TABLE ──────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+            <FileText className="w-5 h-5 text-slate-400" /> SaaS Invoice History
+          </h3>
+          <span className="text-xs text-slate-400 font-semibold bg-slate-100 px-3 py-1 rounded-full">
+            {invoices.length} Payments
+          </span>
+        </div>
+
+        {invoices.length === 0 ? (
+          <div className="py-16 text-center">
+            <FileText className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+            <p className="text-sm font-semibold text-slate-400">No invoices yet</p>
+            <p className="text-xs text-slate-400 mt-1">Invoices will appear here once a payment is processed.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/70">
+                  <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">N° Factura</th>
+                  <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Fecha</th>
+                  <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Plan</th>
+                  <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Período</th>
+                  <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Monto</th>
+                  <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Estado</th>
+                  <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">PDF</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {invoices.map((inv) => (
+                  <tr key={inv.invoiceId} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-6 py-3.5">
+                      <span className="text-sm font-bold text-slate-800">{inv.invoiceNumber}</span>
+                    </td>
+                    <td className="px-6 py-3.5 text-sm text-slate-500">
+                      {new Date(inv.issuedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="px-6 py-3.5">
+                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold capitalize ${
+                        inv.planSlug === 'pro' ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' :
+                        inv.planSlug === 'enterprise' ? 'bg-purple-100 text-purple-700 border border-purple-200' :
+                        'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                      }`}>
+                        {inv.planName || inv.planSlug || 'Starter'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3.5 text-sm text-slate-500">
+                      {inv.billingPeriodStart
+                        ? `${new Date(inv.billingPeriodStart).toLocaleDateString('es-ES', { month: 'short' })} – ${new Date(inv.billingPeriodEnd!).toLocaleDateString('es-ES', { month: 'short', year: 'numeric' })}`
+                        : '-'}
+                    </td>
+                    <td className="px-6 py-3.5">
+                      <span className="text-sm font-black text-slate-900">${inv.amount.toFixed(2)}</span>
+                    </td>
+                    <td className="px-6 py-3.5">
+                      <StatusBadge status={inv.status} />
+                    </td>
+                    <td className="px-6 py-3.5 text-right">
+                      {inv.status === 'pending' || inv.status === 'failed' ? (
+                        <button
+                          onClick={handleStripePortal}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg shadow-sm transition-colors"
+                        >
+                          <CreditCard className="w-3 h-3" /> Pagar ahora
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleDownloadInvoice(inv)}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-slate-400 hover:text-indigo-600 transition-colors"
+                        >
+                          <Download className="w-4 h-4" /> PDF
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

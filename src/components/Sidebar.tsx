@@ -76,7 +76,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     };
 
     const navigation: NavItem[] = [
-        { name: t('sidebar.dashboard'), href: '/', icon: LayoutDashboard, current: location.pathname === '/' }
+        { name: t('sidebar.dashboard'), href: '/dashboard', icon: LayoutDashboard, current: location.pathname === '/' || location.pathname === '/dashboard' }
     ];
 
     if (canAccess('leads')) {

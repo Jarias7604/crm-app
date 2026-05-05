@@ -102,11 +102,11 @@ export default function LandingPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
               {plans.map((plan) => (
                 <div key={plan.id} className={`relative flex flex-col bg-white rounded-3xl p-8 transition-all duration-300 hover:shadow-2xl ${
-                  plan.plan_slug === 'pro' 
+                  plan.slug === 'pro' 
                     ? 'border-2 border-indigo-500 shadow-xl shadow-indigo-500/10 scale-105 z-10' 
                     : 'border border-slate-200 shadow-sm'
                 }`}>
-                  {plan.plan_slug === 'pro' && (
+                  {plan.slug === 'pro' && (
                     <div className="absolute -top-4 left-0 right-0 flex justify-center">
                       <span className="bg-indigo-500 text-white text-xs font-black uppercase tracking-widest py-1.5 px-4 rounded-full shadow-lg shadow-indigo-500/30">
                         Más Popular
@@ -127,7 +127,7 @@ export default function LandingPage() {
                   <div className="flex-grow space-y-4 mb-8">
                     {plan.features?.map((feature: string, idx: number) => (
                       <div key={idx} className="flex items-start gap-3">
-                        <CheckCircle2 className={`w-5 h-5 shrink-0 ${plan.plan_slug === 'pro' ? 'text-indigo-500' : 'text-slate-400'}`} />
+                        <CheckCircle2 className={`w-5 h-5 shrink-0 ${plan.slug === 'pro' ? 'text-indigo-500' : 'text-slate-400'}`} />
                         <span className="text-sm text-slate-700 font-medium">{feature}</span>
                       </div>
                     ))}
@@ -136,7 +136,7 @@ export default function LandingPage() {
                   <Link 
                     to="/register" 
                     className={`w-full py-4 rounded-xl text-center font-bold transition-all ${
-                      plan.plan_slug === 'pro'
+                      plan.slug === 'pro'
                         ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-600/20'
                         : 'bg-slate-50 hover:bg-slate-100 text-slate-900 border border-slate-200'
                     }`}
