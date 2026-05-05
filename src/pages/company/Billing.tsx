@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 export default function Billing() {
   const { profile } = useAuth();
   const { t } = useTranslation();
-  const { subscription, loading, refresh } = useSubscription();
+  const { subscription, loading } = useSubscription();
 
   const handleStripePortal = () => {
     // Placeholder para abrir el portal de Stripe o redireccionar a checkout
@@ -26,7 +26,7 @@ export default function Billing() {
     );
   }
 
-  const isPro = subscription?.plan_slug === 'pro' || subscription?.plan_slug === 'enterprise';
+  const isPro = subscription?.planSlug === 'pro' || subscription?.planSlug === 'enterprise';
 
   return (
     <div className="space-y-6">
@@ -60,7 +60,7 @@ export default function Billing() {
               )}
             </div>
             <h2 className="text-3xl font-black text-slate-900 mb-1 capitalize">
-              {subscription?.plan_slug || 'Starter'}
+              {subscription?.planSlug || 'Starter'}
             </h2>
             <p className="text-slate-500 text-sm mb-6 max-w-md">
               {subscription?.status === 'trialing' 
@@ -71,20 +71,20 @@ export default function Billing() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
               <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
                 <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Usuarios</div>
-                <div className="text-xl font-bold text-slate-800">{subscription?.max_users || 5}</div>
+                <div className="text-xl font-bold text-slate-800">{subscription?.maxUsers || 5}</div>
               </div>
               <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
                 <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Leads</div>
-                <div className="text-xl font-bold text-slate-800">{subscription?.max_leads === 999999 ? 'Ilimitados' : (subscription?.max_leads || 500)}</div>
+                <div className="text-xl font-bold text-slate-800">{subscription?.maxLeads === 999999 ? 'Ilimitados' : (subscription?.maxLeads || 500)}</div>
               </div>
               <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
                 <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Tokens IA</div>
-                <div className="text-xl font-bold text-slate-800">{subscription?.max_ai_tokens?.toLocaleString() || '25k'}</div>
+                <div className="text-xl font-bold text-slate-800">{subscription?.maxAiTokens?.toLocaleString() || '25k'}</div>
               </div>
               <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
                 <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Renovación</div>
                 <div className="text-xl font-bold text-slate-800">
-                  {subscription?.current_period_end ? new Date(subscription.current_period_end).toLocaleDateString() : '-'}
+                  {subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd).toLocaleDateString() : '-'}
                 </div>
               </div>
             </div>
@@ -120,7 +120,7 @@ export default function Billing() {
             <div className="space-y-4">
               <div>
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Empresa</label>
-                <div className="text-sm font-medium text-slate-800 mt-1">{subscription?.company_id ? 'Registrada' : 'N/A'}</div>
+                <div className="text-sm font-medium text-slate-800 mt-1">{profile?.company_id ? 'Registrada' : 'N/A'}</div>
               </div>
               <div>
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Método de Pago</label>
@@ -131,7 +131,7 @@ export default function Billing() {
               </div>
               <div>
                 <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Ciclo</label>
-                <div className="text-sm font-medium text-slate-800 mt-1 capitalize">{subscription?.billing_cycle || 'Mensual'}</div>
+                <div className="text-sm font-medium text-slate-800 mt-1 capitalize">{subscription?.billingCycle || 'Mensual'}</div>
               </div>
             </div>
           </div>
