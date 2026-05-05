@@ -22,7 +22,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         subItems?: { name: string; href: string; icon: any }[];
     }
     const isCallBotEnabled = import.meta.env.VITE_SHOW_CALL_BOT === 'true';
-    const configPaths = ['/company/branding', '/company/integrations', '/catalogo', '/financial-rules', '/loss-reasons', '/industries', '/admin/call-bot'];
+    const configPaths = ['/company/billing', '/company/branding', '/company/integrations', '/catalogo', '/financial-rules', '/loss-reasons', '/industries', '/admin/call-bot'];
     const marketingPaths = ['/marketing', '/marketing/email', '/marketing/lead-hunter', '/marketing/ai-agents', '/marketing/settings', '/marketing/flyers'];
     const teamPaths = ['/company/team', '/company/teams', '/company/performance'];
     const [configOpen, setConfigOpen] = useState(configPaths.some(path => location.pathname === path));
@@ -89,6 +89,10 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
 
     if (canAccess('quotes')) {
         navigation.push({ name: 'Cotizaciones', href: '/cotizaciones', icon: FileText, current: location.pathname === '/cotizaciones' });
+    }
+
+    if (profile?.role === 'super_admin' || profile?.role === 'company_admin') {
+        navigation.push({ name: 'Facturación', href: '/company/billing', icon: CreditCard, current: location.pathname.startsWith('/company/billing') });
     }
 
     if (canAccess('quotes')) { // Assuming if they can access quotes, they can access finances. Or just company_admin. Let's make it for super_admin or company_admin.

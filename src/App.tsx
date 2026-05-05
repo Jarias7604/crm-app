@@ -59,6 +59,7 @@ const GlobalSearch      = lazy(() => import('./components/GlobalSearch').then(m 
 const OnboardingWizard  = lazy(() => import('./pages/OnboardingWizard'));
 const Observatory       = lazy(() => import('./pages/admin/Observatory'));
 const Integrations      = lazy(() => import('./pages/company/Integrations'));
+const Billing           = lazy(() => import('./pages/company/Billing'));
 const GoogleCallback    = lazy(() => import('./pages/company/GoogleCallback'));
 const Reports           = lazy(() => import('./pages/Reports'));
 
@@ -180,6 +181,7 @@ function App() {
                   {/* Company Admin Routes */}
                   <Route element={<RoleProtectedRoute allowedRoles={['super_admin', 'company_admin']} />}>
                     <Route path="/company/integrations" element={<Integrations />} />
+                    <Route path="/company/billing" element={<Billing />} />
                     <Route path="/integrations/google/callback" element={<GoogleCallback />} />
                   </Route>
 
