@@ -10,13 +10,112 @@ const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// --- Helper: Fetch and merge events for ONE integration ---
+async function fetchGoogleEvents(integration: any) {
+    let accessToken = integration.access_token;
+
+    // Refresh token if expired (or within 60s of expiring)
+    const expiresAt = new Date(integration.token_expires_at);
+    const isExpired = expiresAt.getTime() - Date.now() < 60_000;
+
+    if (isExpired) {
+        const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                client_id: GOOGLE_CLIENT_ID!,
+                client_secret: GOOGLE_CLIENT_SECRET!,
+                refresh_token: integration.refresh_token,
+                grant_type: 'refresh_token',
+            })
+        });
+
+        const tokens = await refreshResponse.json();
+        if (!tokens.error) {
+            accessToken = tokens.access_token;
+            await supabase
+                .from('calendar_integrations')
+                .update({
+                    access_token: tokens.access_token,
+                    token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+                    last_synced_at: new Date().toISOString(),
+                })
+                .eq('id', integration.id);
+        } else {
+            await supabase
+                .from('calendar_integrations')
+                .update({ is_active: false })
+                .eq('id', integration.id);
+            throw new Error(`Token expirado para ${integration.google_email}.`);
+        }
+    }
+
+    const timeMin = new Date();
+    timeMin.setDate(timeMin.getDate() - 60);
+    const timeMax = new Date();
+    timeMax.setDate(timeMax.getDate() + 90);
+
+    const allEvents: any[] = [];
+    let calendarsToFetch: Array<{ id: string; summary: string; primary?: boolean }> = [];
+
+    try {
+        const calListResponse = await fetch(
+            'https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=50',
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        const calListData = await calListResponse.json();
+
+        if (!calListData.error && calListData.items) {
+            calendarsToFetch = calListData.items.filter((cal: any) => cal.accessRole !== 'freeBusyReader');
+        } else {
+            calendarsToFetch = [{ id: 'primary', summary: 'Google Calendar', primary: true }];
+        }
+    } catch {
+        calendarsToFetch = [{ id: 'primary', summary: 'Google Calendar', primary: true }];
+    }
+
+    const eventFetches = calendarsToFetch.map(async (cal) => {
+        try {
+            const url = [
+                'https://www.googleapis.com/calendar/v3/calendars/',
+                encodeURIComponent(cal.id),
+                '/events?timeMin=', timeMin.toISOString(),
+                '&timeMax=', timeMax.toISOString(),
+                '&singleEvents=true&orderBy=startTime&maxResults=500'
+            ].join('');
+
+            const eventsResponse = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+            const eventsData = await eventsResponse.json();
+
+            if (!eventsData.error && eventsData.items) {
+                const tagged = eventsData.items.map((ev: any) => ({
+                    ...ev,
+                    _calendarId: cal.id,
+                    _calendarName: cal.summary,
+                    _isPrimary: cal.primary === true,
+                }));
+                allEvents.push(...tagged);
+            }
+        } catch {}
+    });
+
+    await Promise.all(eventFetches);
+
+    // Update last synced
+    await supabase.from('calendar_integrations').update({ last_synced_at: new Date().toISOString() }).eq('id', integration.id);
+
+    return { events: allEvents, calendars_synced: calendarsToFetch.length };
+}
+
+
 serve(async (req) => {
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders });
     }
 
     try {
-        const { action, code, redirect_uri, user_id, company_id, integration_id } = await req.json();
+        const body = await req.json();
+        const { action, code, redirect_uri, user_id, company_id, integration_id, integration_sources } = body;
 
         // ─── ACTION: exchange_code ───────────────────────────────────────────────
         if (action === 'exchange_code') {
@@ -33,18 +132,13 @@ serve(async (req) => {
             });
 
             const tokens = await tokenResponse.json();
-            if (tokens.error) {
-                throw new Error(tokens.error_description || tokens.error);
-            }
+            if (tokens.error) throw new Error(tokens.error_description || tokens.error);
 
-            // Get Google account email
             const profileResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
                 headers: { Authorization: `Bearer ${tokens.access_token}` }
             });
             const googleProfile = await profileResponse.json();
 
-            // Store integration — field names match calendar_integrations schema exactly
-            // UNIQUE constraint: (company_id, user_id, provider)
             const { data, error } = await supabase
                 .from('calendar_integrations')
                 .upsert({
@@ -69,7 +163,7 @@ serve(async (req) => {
             });
         }
 
-        // ─── ACTION: fetch_events ────────────────────────────────────────────────
+        // ─── ACTION: fetch_events (Legacy, single integration) ───────────────────
         if (action === 'fetch_events') {
             const { data: integration, error: intError } = await supabase
                 .from('calendar_integrations')
@@ -79,134 +173,80 @@ serve(async (req) => {
 
             if (intError || !integration) throw new Error('Integration not found');
 
-            let accessToken = integration.access_token;
+            const { events, calendars_synced } = await fetchGoogleEvents(integration);
+            
+            events.sort((a, b) => {
+                const aStart = a.start?.dateTime || a.start?.date || '';
+                const bStart = b.start?.dateTime || b.start?.date || '';
+                return aStart.localeCompare(bStart);
+            });
 
-            // Refresh token if expired (or within 60s of expiring)
-            const expiresAt = new Date(integration.token_expires_at);
-            const isExpired = expiresAt.getTime() - Date.now() < 60_000;
+            return new Response(JSON.stringify({ success: true, events, total: events.length, calendars_synced }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
 
-            if (isExpired) {
-                const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: new URLSearchParams({
-                        client_id: GOOGLE_CLIENT_ID!,
-                        client_secret: GOOGLE_CLIENT_SECRET!,
-                        refresh_token: integration.refresh_token,
-                        grant_type: 'refresh_token',
-                    })
-                });
-
-                const tokens = await refreshResponse.json();
-                if (!tokens.error) {
-                    accessToken = tokens.access_token;
-                    await supabase
-                        .from('calendar_integrations')
-                        .update({
-                            access_token: tokens.access_token,
-                            token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
-                            last_synced_at: new Date().toISOString(),
-                        })
-                        .eq('id', integration.id);
-                } else {
-                    await supabase
-                        .from('calendar_integrations')
-                        .update({ is_active: false })
-                        .eq('id', integration.id);
-                    throw new Error('Token expirado. Por favor reconecta Google Calendar.');
-                }
+        // ─── ACTION: fetch_events_multi ──────────────────────────────────────────
+        if (action === 'fetch_events_multi') {
+            if (!integration_sources || !Array.isArray(integration_sources)) {
+                throw new Error('integration_sources array is required');
             }
 
-            const timeMin = new Date();
-            timeMin.setDate(timeMin.getDate() - 60);
-            const timeMax = new Date();
-            timeMax.setDate(timeMax.getDate() + 90);
+            // integration_sources -> [{ integration_id, group_name, color, calendar_id }]
+            const integrationIds = integration_sources.map((s: any) => s.integration_id).filter(Boolean);
+
+            if (integrationIds.length === 0) {
+                return new Response(JSON.stringify({ success: true, events: [], total: 0 }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            const { data: integrations, error: intError } = await supabase
+                .from('calendar_integrations')
+                .select('*')
+                .in('id', integrationIds)
+                .eq('is_active', true);
+
+            if (intError) throw new Error('Failed to fetch integrations');
 
             const allEvents: any[] = [];
-
-            // ── Strategy: Try to fetch ALL calendars first (requires calendar.readonly scope)
-            // If that fails due to insufficient scope, fall back to primary calendar only.
-            let calendarsToFetch: Array<{ id: string; summary: string; primary?: boolean }> = [];
-
-            try {
-                const calListResponse = await fetch(
-                    'https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=50',
-                    { headers: { Authorization: `Bearer ${accessToken}` } }
-                );
-                const calListData = await calListResponse.json();
-
-                if (!calListData.error && calListData.items) {
-                    // Filter: skip free/busy-only calendars, keep accessible ones
-                    calendarsToFetch = calListData.items.filter(
-                        (cal: any) => cal.accessRole !== 'freeBusyReader'
-                    );
-                } else {
-                    // Scope not granted yet — fall back to primary
-                    calendarsToFetch = [{ id: 'primary', summary: 'Google Calendar', primary: true }];
-                }
-            } catch {
-                // Network error — fall back to primary
-                calendarsToFetch = [{ id: 'primary', summary: 'Google Calendar', primary: true }];
-            }
-
-            // ── Fetch events from all accessible calendars in parallel ──
-            const eventFetches = calendarsToFetch.map(async (cal) => {
+            
+            // Run all integration fetches in parallel
+            const fetchPromises = integrations.map(async (integration) => {
                 try {
-                    const url = [
-                        'https://www.googleapis.com/calendar/v3/calendars/',
-                        encodeURIComponent(cal.id),
-                        '/events?timeMin=', timeMin.toISOString(),
-                        '&timeMax=', timeMax.toISOString(),
-                        '&singleEvents=true&orderBy=startTime&maxResults=500'
-                    ].join('');
-
-                    const eventsResponse = await fetch(url, {
-                        headers: { Authorization: `Bearer ${accessToken}` }
-                    });
-                    const eventsData = await eventsResponse.json();
-
-                    if (!eventsData.error && eventsData.items) {
-                        const tagged = eventsData.items.map((ev: any) => ({
-                            ...ev,
-                            _calendarId: cal.id,
-                            _calendarName: cal.summary,
-                            _isPrimary: cal.primary === true,
-                        }));
-                        allEvents.push(...tagged);
-                    }
-                } catch {
-                    // Skip calendars that fail silently (access revoked, etc.)
+                    const sourceConfig = integration_sources.find((s: any) => s.integration_id === integration.id);
+                    const { events } = await fetchGoogleEvents(integration);
+                    
+                    // Tag each event with the UI group metadata
+                    const tagged = events.map(ev => ({
+                        ...ev,
+                        _groupName: sourceConfig?.group_name || 'Calendario',
+                        _groupColor: sourceConfig?.color || '#4285F4',
+                        _sourceCalendarId: sourceConfig?.calendar_id || 'personal'
+                    }));
+                    
+                    allEvents.push(...tagged);
+                } catch (e) {
+                    console.error(`Failed to fetch for integration ${integration.id}:`, e);
                 }
             });
 
-            await Promise.all(eventFetches);
+            await Promise.all(fetchPromises);
 
-            // Sort all events by start time
+            // Global sort
             allEvents.sort((a, b) => {
                 const aStart = a.start?.dateTime || a.start?.date || '';
                 const bStart = b.start?.dateTime || b.start?.date || '';
                 return aStart.localeCompare(bStart);
             });
 
-            // Update last_synced_at timestamp
-            await supabase
-                .from('calendar_integrations')
-                .update({ last_synced_at: new Date().toISOString() })
-                .eq('id', integration.id);
-
-            return new Response(JSON.stringify({
-                success: true,
-                events: allEvents,
-                total: allEvents.length,
-                calendars_synced: calendarsToFetch.length
-            }), {
+            return new Response(JSON.stringify({ success: true, events: allEvents, total: allEvents.length }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
         }
 
         throw new Error('Invalid action');
-    } catch (error) {
-        // Return 500 so the frontend can detect and display the real error
+    } catch (error: any) {
         return new Response(JSON.stringify({ success: false, error: error.message || 'Error desconocido' }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
