@@ -1459,6 +1459,100 @@ export default function Calendar() {
                     </div>
                 );
             })()}
+
+            {/* GOOGLE EVENT MODAL */}
+            {selectedGoogleEvent && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4" onClick={() => setSelectedGoogleEvent(null)}>
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-[440px] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                        {/* Header Actions */}
+                        <div className="flex items-center justify-end p-2 border-b border-gray-50/50">
+                            <button onClick={() => setSelectedGoogleEvent(null)} className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        <div className="px-6 pb-8 pt-4">
+                            <div className="flex gap-4">
+                                <div className="w-4 h-4 mt-1.5 rounded bg-[#4285F4] shrink-0" style={{ backgroundColor: selectedGoogleEvent._groupColor || '#4285F4' }}></div>
+                                <div className="flex-1 min-w-0">
+                                    <h2 className="text-[22px] font-normal text-slate-800 leading-tight mb-1 break-words">
+                                        {selectedGoogleEvent._rawEvent?.summary || selectedGoogleEvent.lead?.name || 'Evento sin título'}
+                                    </h2>
+                                    <p className="text-[13px] text-slate-600 mb-4">
+                                        {selectedGoogleEvent.date ? format(new Date(selectedGoogleEvent.date), "EEEE, d 'de' MMMM · h:mm a", { locale: es }) : ''}
+                                        {selectedGoogleEvent._rawEvent?.end?.dateTime ? ` - ${format(new Date(selectedGoogleEvent._rawEvent.end.dateTime), "h:mm a", { locale: es })}` : ''}
+                                    </p>
+
+                                    {selectedGoogleEvent._rawEvent?.hangoutLink && (
+                                        <div className="mb-6">
+                                            <a 
+                                                href={selectedGoogleEvent._rawEvent.hangoutLink} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#1a73e8] hover:bg-[#1557b0] text-white rounded-full font-medium text-[13px] transition-colors shadow-sm"
+                                            >
+                                                <Video className="w-4 h-4" />
+                                                Unirse con Google Meet
+                                            </a>
+                                            <div className="text-[11px] text-slate-500 mt-2 truncate w-full max-w-[300px]">
+                                                {selectedGoogleEvent._rawEvent.hangoutLink}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="space-y-4">
+                                        {selectedGoogleEvent._rawEvent?.attendees && selectedGoogleEvent._rawEvent.attendees.length > 0 && (
+                                            <div className="flex items-start gap-4">
+                                                <Users className="w-4 h-4 mt-0.5 text-slate-500" />
+                                                <div>
+                                                    <p className="text-[13px] text-slate-700 font-medium mb-2">
+                                                        {selectedGoogleEvent._rawEvent.attendees.length} invitados
+                                                    </p>
+                                                    <div className="space-y-2">
+                                                        {selectedGoogleEvent._rawEvent.attendees.map((att: any, i: number) => (
+                                                            <div key={i} className="flex items-center gap-2">
+                                                                <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-600 border border-slate-200">
+                                                                    {(att.displayName || att.email || '?').charAt(0).toUpperCase()}
+                                                                </div>
+                                                                <span className="text-[13px] text-slate-700 font-medium truncate max-w-[200px]">{att.displayName || att.email}</span>
+                                                                {att.organizer && <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-medium ml-1">Organizador</span>}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {selectedGoogleEvent._rawEvent?.description && (
+                                            <div className="flex items-start gap-4">
+                                                <AlignLeft className="w-4 h-4 mt-0.5 text-slate-500" />
+                                                <div 
+                                                    className="text-[13px] text-slate-700 prose prose-sm max-w-[300px] break-words" 
+                                                    dangerouslySetInnerHTML={{ __html: selectedGoogleEvent._rawEvent.description }} 
+                                                />
+                                            </div>
+                                        )}
+
+                                        {selectedGoogleEvent._rawEvent?.htmlLink && (
+                                            <div className="flex items-start gap-4 pt-2">
+                                                <CalendarIcon className="w-4 h-4 mt-0.5 text-slate-500" />
+                                                <a 
+                                                    href={selectedGoogleEvent._rawEvent.htmlLink} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    className="text-[13px] text-[#1a73e8] hover:underline flex items-center gap-1 font-medium"
+                                                >
+                                                    Abrir en Google Calendar <ExternalLink className="w-3 h-3" />
+                                                </a>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
