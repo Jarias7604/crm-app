@@ -51,13 +51,14 @@ serve(async (req) => {
                     user_id,
                     company_id,
                     provider: 'google',
-                    google_email: googleProfile.email,       // ← correct field name
+                    provider_account_id: googleProfile.id || googleProfile.email,
+                    google_email: googleProfile.email,
                     access_token: tokens.access_token,
                     refresh_token: tokens.refresh_token,
                     token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
                     is_active: true,
                     last_synced_at: new Date().toISOString(),
-                }, { onConflict: 'company_id,user_id,provider' })  // ← matches UNIQUE constraint
+                }, { onConflict: 'company_id,user_id,provider' })
                 .select()
                 .single();
 
@@ -108,7 +109,6 @@ serve(async (req) => {
                         })
                         .eq('id', integration.id);
                 } else {
-                    // Refresh failed — mark integration inactive so UI prompts reconnection
                     await supabase
                         .from('calendar_integrations')
                         .update({ is_active: false })
@@ -117,27 +117,6 @@ serve(async (req) => {
                 }
             }
 
-            // ── Step 1: Fetch all calendars the user has access to ──────────────
-            const calListResponse = await fetch(
-                'https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=50',
-                { headers: { Authorization: `Bearer ${accessToken}` } }
-            );
-            const calListData = await calListResponse.json();
-
-            if (calListData.error) {
-                throw new Error(calListData.error.message || 'No se pudo obtener la lista de calendarios');
-            }
-
-            const calendars = (calListData.items || []) as Array<{
-                id: string;
-                summary: string;
-                primary?: boolean;
-                selected?: boolean;
-                accessRole?: string;
-            }>;
-
-            // ── Step 2: Fetch events from ALL accessible calendars ──────────────
-            // Range: 60 days back to 90 days forward (wider than UI window for buffer)
             const timeMin = new Date();
             timeMin.setDate(timeMin.getDate() - 60);
             const timeMax = new Date();
@@ -145,36 +124,60 @@ serve(async (req) => {
 
             const allEvents: any[] = [];
 
-            const eventFetches = calendars
-                .filter(cal => cal.accessRole !== 'freeBusyReader') // skip read-only busy calendars
-                .map(async (cal) => {
-                    try {
-                        const url = [
-                            'https://www.googleapis.com/calendar/v3/calendars/',
-                            encodeURIComponent(cal.id),
-                            '/events?timeMin=', timeMin.toISOString(),
-                            '&timeMax=', timeMax.toISOString(),
-                            '&singleEvents=true&orderBy=startTime&maxResults=500'
-                        ].join('');
+            // ── Strategy: Try to fetch ALL calendars first (requires calendar.readonly scope)
+            // If that fails due to insufficient scope, fall back to primary calendar only.
+            let calendarsToFetch: Array<{ id: string; summary: string; primary?: boolean }> = [];
 
-                        const eventsResponse = await fetch(url, {
-                            headers: { Authorization: `Bearer ${accessToken}` }
-                        });
-                        const eventsData = await eventsResponse.json();
+            try {
+                const calListResponse = await fetch(
+                    'https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=50',
+                    { headers: { Authorization: `Bearer ${accessToken}` } }
+                );
+                const calListData = await calListResponse.json();
 
-                        if (!eventsData.error && eventsData.items) {
-                            const tagged = eventsData.items.map((ev: any) => ({
-                                ...ev,
-                                _calendarId: cal.id,
-                                _calendarName: cal.summary,
-                                _isPrimary: cal.primary === true,
-                            }));
-                            allEvents.push(...tagged);
-                        }
-                    } catch {
-                        // Skip calendars that fail silently (access revoked, etc.)
+                if (!calListData.error && calListData.items) {
+                    // Filter: skip free/busy-only calendars, keep accessible ones
+                    calendarsToFetch = calListData.items.filter(
+                        (cal: any) => cal.accessRole !== 'freeBusyReader'
+                    );
+                } else {
+                    // Scope not granted yet — fall back to primary
+                    calendarsToFetch = [{ id: 'primary', summary: 'Google Calendar', primary: true }];
+                }
+            } catch {
+                // Network error — fall back to primary
+                calendarsToFetch = [{ id: 'primary', summary: 'Google Calendar', primary: true }];
+            }
+
+            // ── Fetch events from all accessible calendars in parallel ──
+            const eventFetches = calendarsToFetch.map(async (cal) => {
+                try {
+                    const url = [
+                        'https://www.googleapis.com/calendar/v3/calendars/',
+                        encodeURIComponent(cal.id),
+                        '/events?timeMin=', timeMin.toISOString(),
+                        '&timeMax=', timeMax.toISOString(),
+                        '&singleEvents=true&orderBy=startTime&maxResults=500'
+                    ].join('');
+
+                    const eventsResponse = await fetch(url, {
+                        headers: { Authorization: `Bearer ${accessToken}` }
+                    });
+                    const eventsData = await eventsResponse.json();
+
+                    if (!eventsData.error && eventsData.items) {
+                        const tagged = eventsData.items.map((ev: any) => ({
+                            ...ev,
+                            _calendarId: cal.id,
+                            _calendarName: cal.summary,
+                            _isPrimary: cal.primary === true,
+                        }));
+                        allEvents.push(...tagged);
                     }
-                });
+                } catch {
+                    // Skip calendars that fail silently (access revoked, etc.)
+                }
+            });
 
             await Promise.all(eventFetches);
 
@@ -191,15 +194,21 @@ serve(async (req) => {
                 .update({ last_synced_at: new Date().toISOString() })
                 .eq('id', integration.id);
 
-            return new Response(JSON.stringify({ success: true, events: allEvents, total: allEvents.length }), {
+            return new Response(JSON.stringify({
+                success: true,
+                events: allEvents,
+                total: allEvents.length,
+                calendars_synced: calendarsToFetch.length
+            }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
         }
 
         throw new Error('Invalid action');
     } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
-            status: 400,
+        // Return 500 so the frontend can detect and display the real error
+        return new Response(JSON.stringify({ success: false, error: error.message || 'Error desconocido' }), {
+            status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     }
