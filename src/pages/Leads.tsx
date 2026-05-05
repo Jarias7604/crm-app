@@ -694,9 +694,9 @@ export default function Leads() {
 
                     // Log details for debugging
                     if (results.skipped.length > 0) {
-                        console.log('?? Duplicados omitidos:');
+
                         results.skipped.forEach(({ lead, reason }) => {
-                            console.log(`  - ${lead.name}: ${reason}`);
+
                         });
                     }
                 } else if (results.inserted.length === 0 && results.skipped.length > 0) {

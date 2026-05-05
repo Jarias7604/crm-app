@@ -218,6 +218,7 @@ function App() {
                   {/* Support Routes */}
                   <Route path="/support/tickets" element={<Tickets />} />
                   <Route path="/support/atrasados" element={<OverdueTickets />} />
+                  <Route path="/onboarding" element={<OnboardingWizard />} />
                 </Route>
               </Route>
 
@@ -226,7 +227,6 @@ function App() {
               <Route path="/portal/cliente/:token" element={<ClientPortal />} />
               <Route path="/update-password" element={<UpdatePassword />} />
               <Route path="/support/manual" element={<ManualPage />} />
-              <Route path="/onboarding" element={<OnboardingWizard />} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

@@ -28,7 +28,6 @@ export const pushService = {
     if (!(await pushService.isSupported())) return null;
     try {
       const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-      console.log('[SW] Registered:', reg.scope);
       return reg;
     } catch (err) {
       console.error('[SW] Registration failed:', err);
@@ -46,7 +45,6 @@ export const pushService = {
     try {
       const permission = await pushService.requestPermission();
       if (permission !== 'granted') {
-        console.log('[Push] Permission denied');
         return false;
       }
 
@@ -55,7 +53,6 @@ export const pushService = {
 
       // We skip VAPID for now — in-app polling handles reminders
       // When VAPID_PUBLIC_KEY is ready, subscribe with pushManager.subscribe()
-      console.log('[Push] Service Worker active, in-app notifications enabled');
       return true;
     } catch (err) {
       console.error('[Push] Subscribe error:', err);

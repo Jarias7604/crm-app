@@ -25,7 +25,7 @@ export const aiQuoteService = {
      */
     async processAiQuote(trigger: AiQuoteTrigger) {
         try {
-            console.log('AI Trigger received:', trigger);
+
 
             // 1. Get Pricing Configuration
             const config = await pricingService.getPricingConfig();
@@ -170,14 +170,14 @@ export const aiQuoteService = {
             const primaryPlan = allPlansForPDF[0] || null;
 
             // 8. Generate PDF with both plans ────────────────────────────────────
-            console.log('Generating comparative PDF for auto-quote...');
+
             const pdfUrl = await pdfService.generateAndUploadQuotePDF(
                 newQuote,
                 primaryPlan,
                 allPlansForPDF.length > 0 ? allPlansForPDF : undefined
             );
 
-            console.log('AI: Quote generated with comparative plans:', planesComparativaIds);
+
 
             return {
                 success: true,

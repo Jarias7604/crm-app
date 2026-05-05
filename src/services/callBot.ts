@@ -379,7 +379,7 @@ export const callBotService = {
         const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
         const targetUrl = `${supabaseUrl}/functions/v1/sofia-voice-bot/initiate`;
-        console.log('Enviando petición a:', targetUrl);
+
 
         try {
             const res = await fetch(targetUrl, {

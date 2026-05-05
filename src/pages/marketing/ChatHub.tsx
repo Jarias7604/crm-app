@@ -136,12 +136,12 @@ export default function ChatHub() {
         }
 
         if (candidate) {
-            console.log('Hub: Auto-selecting candidate:', candidate.id);
+
             setSelectedConv(candidate);
             hasAutoSelected.current = location.key; // Mark as done
         } else if (stateLead) {
             // If lead provided but no conversation found in list, use a placeholder
-            console.log('Hub: Setting placeholder for lead:', stateLead.id);
+
             setSelectedConv({
                 id: 'new',
                 channel: location.state.channel || 'telegram',
@@ -207,7 +207,7 @@ export default function ChatHub() {
     useEffect(() => {
         if (!profile?.company_id) return;
 
-        console.log('Hub: Global Auto-Quote Engine Active.');
+
         const globalSub = supabase
             .channel('global_ai_triggers')
             .on(
@@ -227,7 +227,7 @@ export default function ChatHub() {
                         processedTriggers.current.add(msg.id);
 
                         try {
-                            console.log(`Global Engine: Detected Quote Trigger in conversation ${msg.conversation_id}`);
+
 
                             // 1. Fetch Lead ID for this conversation if not available in message
                             const { data: conv } = await supabase

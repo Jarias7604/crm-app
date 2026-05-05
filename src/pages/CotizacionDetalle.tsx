@@ -97,7 +97,7 @@ export default function CotizacionDetalle() {
                     .limit(1)
                     .maybeSingle();
 
-                console.log('[CotizacionDetalle] Buscando plan con cuotas:', numCuotas, 'encontrado:', planData?.titulo);
+
 
                 if (planData) {
                     setFinancingPlan(planData as FinancingPlan);
@@ -122,7 +122,7 @@ export default function CotizacionDetalle() {
 
             // Cargar la descripción del plan desde cotizador_paquetes
             if (data?.plan_nombre) {
-                console.log('[CotizacionDetalle] Buscando descripción para plan:', data.plan_nombre, 'DTEs:', data.volumen_dtes);
+
 
                 // Intento 1: Coincidencia exacta (Nombre + DTEs)
                 let { data: planItem } = await supabase
@@ -136,7 +136,7 @@ export default function CotizacionDetalle() {
 
                 // Intento 2: Fallback - Solo por nombre (buscar cualquier variante que tenga descripción)
                 if (!planItem?.descripcion) {
-                    console.log('[CotizacionDetalle] Coincidencia exacta no encontrada o sin descripción. Probando fallback solo por nombre...');
+
                     const { data: fallbackItem } = await supabase
                         .from('cotizador_paquetes')
                         .select('descripcion')
@@ -150,10 +150,9 @@ export default function CotizacionDetalle() {
                 }
 
                 if (planItem?.descripcion) {
-                    console.log('[CotizacionDetalle] Seteando planDescripcion:', planItem.descripcion.substring(0, 50) + '...');
                     setPlanDescripcion(planItem.descripcion);
                 } else {
-                    console.log('[CotizacionDetalle] No se encontró descripción para el plan (ni siquiera en fallback)');
+
                 }
             }
         } catch (error: any) {
