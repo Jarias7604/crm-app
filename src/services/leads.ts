@@ -411,6 +411,17 @@ export const leadsService = {
             .single();
 
         if (error) throw error;
+
+        // Fire-and-forget: dispatch lead.created webhook to all configured endpoints
+        // No await — never blocks the UI or throws on webhook failures
+        supabase.functions.invoke('dispatch-webhooks', {
+            body: {
+                event_type: 'lead.created',
+                company_id: profile.company_id,
+                payload: { id: data.id, name: data.name, status: data.status, value: data.value }
+            }
+        }).catch(() => {/* webhook errors are silently ignored */});
+
         return data as Lead;
     },
 
@@ -519,7 +530,6 @@ export const leadsService = {
             // Return full results object
             return results;
         } catch (error: any) {
-            console.error('💥 Import service failed:', error);
             logger.error('Lead import service failed', error, { action: 'importLeads' });
             throw error;
         }
@@ -535,6 +545,20 @@ export const leadsService = {
             .single();
 
         if (error) throw error;
+
+        // Dispatch lead.won webhook when a deal is closed
+        const wonStatuses = ['Cerrado', 'Cliente', 'Ganado'];
+        const isNowWon = updates.status && wonStatuses.some(s => updates.status!.toLowerCase().includes(s.toLowerCase()));
+        if (isNowWon && data?.company_id) {
+            supabase.functions.invoke('dispatch-webhooks', {
+                body: {
+                    event_type: 'lead.won',
+                    company_id: data.company_id,
+                    payload: { id: data.id, name: data.name, status: data.status, value: data.closing_amount || data.value }
+                }
+            }).catch(() => {});
+        }
+
         return data as Lead;
     },
 
