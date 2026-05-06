@@ -430,7 +430,7 @@ export function CotizacionesMobileView({ cotizaciones, stats, loading, onDelete 
                                                                 <span>Licencia {sheet.plan_nombre}</span>
                                                                 <span className="font-bold text-slate-700">${Number(sheet.costo_plan_anual).toLocaleString()}</span>
                                                             </div>
-                                                            {!pf.isPagoUnico && pf.recargoMonto > 0 && (plan as any).show_breakdown !== false && (
+                                                            {!pf.isPagoUnico && pf.recargoMonto > 0 && (
                                                                 <div className="flex justify-between text-[10px] text-slate-400 font-medium">
                                                                     <span>Financiamiento {(plan as any).interes_porcentaje}%</span>
                                                                     <span className="text-orange-500">+${pf.recargoMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>

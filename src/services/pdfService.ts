@@ -697,7 +697,7 @@ export const pdfService = {
                     lineY += lineH;
 
                     // Financiamiento (solo si aplica)
-                    if (!pf.isPagoUnico && pf.recargoMonto > 0 && (plan.show_breakdown ?? true)) {
+                    if (!pf.isPagoUnico && pf.recargoMonto > 0) {
                         doc.setTextColor(100, 116, 139);
                         doc.setFont('helvetica', 'normal');
                         doc.text(`Financiamiento ${plan.interes_porcentaje || 0}%`, colX + 5, lineY);
