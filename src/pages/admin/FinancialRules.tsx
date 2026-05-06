@@ -32,6 +32,7 @@ export default function FinancialRules() {
         descripcion: '',
         es_popular: false,
         show_breakdown: true,
+        etiqueta_ajuste: '',
         activo: true,
         orden: 10
     });
@@ -287,6 +288,22 @@ export default function FinancialRules() {
                                             </div>
                                         </div>
 
+                                        {/* Etiqueta personalizada del cargo — solo si hay ajuste */}
+                                        {(newPlan.tipo_ajuste === 'recharge' || newPlan.tipo_ajuste === 'discount') && (
+                                            <div className="md:col-span-12 space-y-1 pt-1">
+                                                <label className={`text-[10px] font-bold uppercase ${newPlan.tipo_ajuste === 'discount' ? 'text-green-600' : 'text-blue-600'}`}>
+                                                    ✏️ Etiqueta en cotización
+                                                </label>
+                                                <Input
+                                                    value={newPlan.etiqueta_ajuste || ''}
+                                                    onChange={e => setNewPlan({ ...newPlan, etiqueta_ajuste: e.target.value })}
+                                                    className="bg-white text-xs"
+                                                    placeholder={newPlan.tipo_ajuste === 'discount' ? 'Ej: Descuento anual, Pronto pago...' : 'Ej: Cargo financiero, Interés, Recargo...'}
+                                                />
+                                                <p className="text-[9px] text-gray-400">Nombre que verá el cliente en la cotización. Vacío = "Financiamiento" por defecto.</p>
+                                            </div>
+                                        )}
+
                                         {/* Opciones y Botones */}
                                         <div className="space-y-3">
                                             <div className="flex items-center gap-3">
@@ -383,6 +400,21 @@ export default function FinancialRules() {
                                                                     <label className="text-[9px] font-bold text-gray-400 block mb-0.5">DESCRIPCIÓN</label>
                                                                     <Input value={editingPlan.descripcion || ''} onChange={e => setEditingPlan({ ...editingPlan, descripcion: e.target.value })} className="h-8 text-xs" />
                                                                 </div>
+
+                                                                {/* Etiqueta personalizada */}
+                                                                {(editingPlan.tipo_ajuste === 'recharge' || editingPlan.tipo_ajuste === 'discount') && (
+                                                                    <div>
+                                                                        <label className={`text-[9px] font-bold block mb-0.5 ${editingPlan.tipo_ajuste === 'discount' ? 'text-green-600' : 'text-blue-600'}`}>
+                                                                            ✏️ ETIQUETA EN COTIZACIÓN
+                                                                        </label>
+                                                                        <Input
+                                                                            value={editingPlan.etiqueta_ajuste || ''}
+                                                                            onChange={e => setEditingPlan({ ...editingPlan, etiqueta_ajuste: e.target.value })}
+                                                                            className="h-8 text-xs"
+                                                                            placeholder={editingPlan.tipo_ajuste === 'discount' ? 'Pronto pago, Descuento anual...' : 'Cargo financiero, Interés...'}
+                                                                        />
+                                                                    </div>
+                                                                )}
 
                                                                 <div className="pt-2 space-y-2">
                                                                     <div className="flex items-center justify-between">

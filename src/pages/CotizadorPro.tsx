@@ -1344,9 +1344,27 @@ export default function CotizadorPro() {
                                                 {(() => {
                                                     const selectedPlan = financingPlans.find(p => p.id === selectedPlanId);
                                                     const showBreakdown = selectedPlan?.show_breakdown ?? true;
+                                                    const etiquetaLabel = selectedPlan?.etiqueta_ajuste?.trim()
+                                                        || (selectedPlan?.tipo_ajuste === 'discount' ? '- Descuento anticipado' : '+ Financiamiento');
                                                     return totales.recargo_mensual_monto > 0 && showBreakdown && (
-                                                        <div className="flex justify-between text-[11px] text-blue-600 font-medium leading-none">
-                                                            <span>+ Financiamiento ({totales.recargo_aplicado_porcentaje}%)</span>
+                                                        <div className="flex justify-between text-[11px] text-blue-600 font-medium leading-none group">
+                                                            <span
+                                                                title="Click para editar etiqueta"
+                                                                className="cursor-pointer hover:underline hover:text-blue-800 transition-colors"
+                                                                onClick={() => {
+                                                                    const newLabel = window.prompt('Etiqueta del cargo en cotización:', selectedPlan?.etiqueta_ajuste || '');
+                                                                    if (newLabel !== null && selectedPlan?.id) {
+                                                                        pricingService.updateFinancingPlan(selectedPlan.id, { etiqueta_ajuste: newLabel.trim() || null } as any)
+                                                                            .then(() => {
+                                                                                setFinancingPlans(prev => prev.map(p =>
+                                                                                    p.id === selectedPlan.id ? { ...p, etiqueta_ajuste: newLabel.trim() || undefined } : p
+                                                                                ));
+                                                                            });
+                                                                    }
+                                                                }}
+                                                            >
+                                                                {etiquetaLabel} ({totales.recargo_aplicado_porcentaje}%) ✏️
+                                                            </span>
                                                             <span className="font-bold">+${totales.recargo_mensual_monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                         </div>
                                                     );

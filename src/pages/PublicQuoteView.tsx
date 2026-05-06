@@ -18,6 +18,7 @@ interface FinancingPlan {
     tipo_ajuste: 'discount' | 'recharge' | 'none';
     es_popular: boolean;
     show_breakdown: boolean;
+    etiqueta_ajuste?: string;
 }
 
 export default function PublicQuoteView() {
@@ -494,14 +495,14 @@ export default function PublicQuoteView() {
                                             {/* Recargo de financiamiento — siempre positivo */}
                                             {!pf.isPagoUnico && pf.recargoMonto > 0 && (
                                                 <div className="flex justify-between text-[10px] text-blue-500 font-medium">
-                                                    <span>+ Financiamiento ({Math.round(pf.ajustePct * 100)}%)</span>
+                                                    <span>+ {plan.etiqueta_ajuste?.trim() || 'Financiamiento'} ({Math.round(pf.ajustePct * 100)}%)</span>
                                                     <span>+${pf.recargoMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                 </div>
                                             )}
                                             {/* Descuento del plan (tipo discount) */}
                                             {!pf.isPagoUnico && pf.tipoAjuste === 'discount' && pf.ajustePct > 0 && (
                                                 <div className="flex justify-between text-[10px] text-emerald-600 font-medium">
-                                                    <span>- Descuento anticipado ({Math.round(pf.ajustePct * 100)}%)</span>
+                                                    <span>- {plan.etiqueta_ajuste?.trim() || 'Descuento anticipado'} ({Math.round(pf.ajustePct * 100)}%)</span>
                                                     <span>-${(pf.licenciaAnual * pf.ajustePct).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                 </div>
                                             )}
