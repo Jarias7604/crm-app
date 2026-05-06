@@ -736,9 +736,11 @@ export const pdfService = {
 
                     // Financiamiento (solo si aplica)
                     if (!pf.isPagoUnico && pf.recargoMonto > 0) {
+                        const etiquetaPDF = (plan as any).etiqueta_ajuste?.trim() || 'Financiamiento';
+                        const pctPDF = plan.interes_porcentaje || 0;
                         doc.setTextColor(100, 116, 139);
                         doc.setFont('helvetica', 'normal');
-                        doc.text(`Financiamiento ${plan.interes_porcentaje || 0}%`, colX + 5, lineY);
+                        doc.text(`${etiquetaPDF} ${pctPDF}%`, colX + 5, lineY);
                         doc.setTextColor(249, 115, 22);
                         doc.setFont('helvetica', 'bold');
                         doc.text(`+$${pf.recargoMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, colX + colW - 5, lineY, { align: 'right' });

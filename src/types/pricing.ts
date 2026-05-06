@@ -76,6 +76,9 @@ export interface FinancingPlan {
     activo: boolean;
     orden: number;
     show_breakdown: boolean;
+    // V4: Etiqueta personalizable para la línea de cargo/descuento en la cotización
+    etiqueta_ajuste?: string;
     created_at: string;
     updated_at: string;
 }
+
