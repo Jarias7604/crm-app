@@ -113,7 +113,7 @@ export default function Leads() {
     // Column order persistence
     const [columnOrder, setColumnOrder] = useState<string[]>(() => {
         const saved = localStorage.getItem('lead_column_order');
-        const defaultCols = ['name', 'email', 'phone', 'status', 'priority', 'source', 'value', 'assigned_to', 'created_at'];
+        const defaultCols = ['name', 'email', 'phone', 'status', 'priority', 'source', 'value', 'assigned_to', 'internal_won_date', 'created_at'];
         if (saved) {
             const parsed = JSON.parse(saved);
             // Add new columns if missing from saved order
@@ -126,7 +126,7 @@ export default function Leads() {
     // Column width persistence
     const DEFAULT_COL_WIDTHS: Record<string, number> = {
         name: 200, email: 180, phone: 140, status: 140,
-        priority: 120, source: 130, value: 110, assigned_to: 140, created_at: 120,
+        priority: 120, source: 130, value: 110, assigned_to: 140, internal_won_date: 130, created_at: 120,
     };
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
         try {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronRight, FileText, Clock, Trash2, Calendar, Phone, MessageSquare, User, Mail } from 'lucide-react';
+import { ChevronRight, FileText, Clock, Trash2, Calendar, Phone, MessageSquare, User, Mail, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { SOURCE_CONFIG } from '../../types';
@@ -81,7 +81,23 @@ export const LeadGrid: React.FC<LeadGridProps> = ({
                                             </p>
                                         </div>
 
-                                        {lead.next_followup_date && (
+                                        {(lead.status === 'Cerrado' || lead.status === 'Cliente') && lead.internal_won_date ? (
+                                            <div className="col-span-2 bg-emerald-50/50 rounded-lg p-2.5 flex items-center justify-between border border-emerald-100/30">
+                                                <div className="flex items-center gap-2">
+                                                    <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                                                    <span className="text-xs font-bold text-emerald-700">Cierre:</span>
+                                                </div>
+                                                <span className="text-xs font-black text-emerald-900 uppercase">
+                                                    {(() => {
+                                                        try {
+                                                            const dateStr = lead.internal_won_date!.split('T')[0];
+                                                            const dateObj = new Date(dateStr + 'T12:00:00');
+                                                            return format(dateObj, 'dd MMM yyyy', { locale: es });
+                                                        } catch (e) { return 'N/A'; }
+                                                    })()}
+                                                </span>
+                                            </div>
+                                        ) : lead.next_followup_date && (
                                             <div className="col-span-2 bg-blue-50/50 rounded-lg p-2.5 flex items-center justify-between border border-blue-100/30">
                                                 <div className="flex items-center gap-2">
                                                     <Clock className="w-3.5 h-3.5 text-blue-500" />
