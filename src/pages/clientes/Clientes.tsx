@@ -185,6 +185,7 @@ export default function Clientes() {
                         stages={stages}
                         currentStageId={client.etapa_actual_id}
                         completedStageIds={completedIds}
+                        stageHistory={client.stage_history ?? []}
                         compact
                       />
                     </div>
