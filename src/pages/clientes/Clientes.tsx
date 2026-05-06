@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { Users, TrendingUp, Clock, CheckCircle2, Search } from 'lucide-react';
 import { clientsService, pipelineStagesService } from '../../services/clients';
 import type { Client, ClientPipelineStage } from '../../types/clients';
@@ -212,7 +214,13 @@ export default function Clientes() {
                   {/* Date + arrow */}
                   <div className="flex items-center gap-3 flex-shrink-0">
                     <span className="text-xs text-gray-400">
-                      {new Date(client.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                      {(() => {
+                        try {
+                           return format(new Date(client.created_at.substring(0, 10) + 'T12:00:00'), 'dd MMM yyyy', { locale: es }).toUpperCase();
+                        } catch {
+                           return new Date(client.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+                        }
+                      })()}
                     </span>
                     <span className="text-gray-300 group-hover:text-[#4449AA] transition-colors text-sm font-bold">→</span>
                   </div>

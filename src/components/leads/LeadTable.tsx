@@ -389,14 +389,14 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                                 {colId === 'created_at' && (
                                                                     <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500">
                                                                         <Calendar className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-                                                                        <span>{(() => { try { return format(new Date(lead.created_at.substring(0, 10) + 'T12:00:00'), 'dd/MM/yyyy'); } catch { return '—'; } })()}</span>
+                                                                        <span>{(() => { try { return format(new Date(lead.created_at.substring(0, 10) + 'T12:00:00'), 'dd MMM yyyy', { locale: es }).toUpperCase(); } catch { return '—'; } })()}</span>
                                                                     </div>
                                                                 )}
 
                                                                 {colId === 'internal_won_date' && (
                                                                     <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500">
                                                                         <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                                                                        <span>{lead.internal_won_date ? (() => { try { return format(new Date(lead.internal_won_date.substring(0, 10) + 'T12:00:00'), 'dd/MM/yyyy'); } catch { return '—'; } })() : '—'}</span>
+                                                                        <span>{lead.internal_won_date ? (() => { try { return format(new Date(lead.internal_won_date.substring(0, 10) + 'T12:00:00'), 'dd MMM yyyy', { locale: es }).toUpperCase(); } catch { return '—'; } })() : '—'}</span>
                                                                     </div>
                                                                 )}
                                                             </td>
