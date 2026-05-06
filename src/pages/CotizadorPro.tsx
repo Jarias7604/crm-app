@@ -1310,17 +1310,36 @@ export default function CotizadorPro() {
                                                 </div>
                                             </div>
                                             <div className="space-y-1.5">
-                                                <div className="flex justify-between text-[11px] text-gray-500 font-medium leading-none">
-                                                    <span>Base Recurrente</span>
-                                                    <span>${(() => {
-                                                        const selectedPlan = financingPlans.find(p => p.id === selectedPlanId);
-                                                        const showBreakdown = selectedPlan?.show_breakdown ?? true;
-                                                        return (showBreakdown
-                                                            ? totales.subtotal_recurrente_base
-                                                            : totales.subtotal_recurrente_base + (totales.recargo_mensual_monto || 0)
-                                                        ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                                                    })()}</span>
-                                                </div>
+                                                {/* Módulos recurrentes — desglose individual o agrupado según show_breakdown */}
+                                                {(() => {
+                                                    const selectedPlan = financingPlans.find(p => p.id === selectedPlanId);
+                                                    const showBreakdown = selectedPlan?.show_breakdown ?? true;
+                                                    const recurrentes = totales.desglose.filter((d: any) => !d.es_pago_unico);
+                                                    if (!showBreakdown) {
+                                                        return (
+                                                            <div className="flex justify-between text-[11px] text-gray-500 font-medium leading-none">
+                                                                <span>Pago recurrente</span>
+                                                                <span>${(totales.subtotal_recurrente_base + (totales.recargo_mensual_monto || 0)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return (
+                                                        <>
+                                                            {recurrentes.map((d: any, i: number) => (
+                                                                <div key={i} className="flex justify-between text-[11px] text-gray-500 font-medium leading-none">
+                                                                    <span className="truncate">{d.nombre}</span>
+                                                                    <span>${d.precio_anual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                </div>
+                                                            ))}
+                                                            {recurrentes.length > 1 && (
+                                                                <div className="flex justify-between text-[11px] text-gray-400 font-medium leading-none pt-1 border-t border-dashed border-gray-200">
+                                                                    <span>Subtotal recurrente</span>
+                                                                    <span>${totales.subtotal_recurrente_base.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                                </div>
+                                                            )}
+                                                        </>
+                                                    );
+                                                })()}
 
                                                 {(() => {
                                                     const selectedPlan = financingPlans.find(p => p.id === selectedPlanId);

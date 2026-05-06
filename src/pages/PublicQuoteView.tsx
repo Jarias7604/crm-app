@@ -456,30 +456,70 @@ export default function PublicQuoteView() {
                                             {pf.isPagoUnico ? 'Pago único adelantado' : `${pf.cuotas} cuotas consecutivas`}
                                         </p>
 
-                                        {/* Desglose */}
+                                        {/* Desglose — módulos individuales + financiamiento */}
                                         <div className="space-y-1.5 mb-5">
+                                            {/* Licencia base del plan */}
                                             <div className="flex justify-between text-[10px] text-slate-500 font-medium">
                                                 <span className="truncate">Licencia {cotizacion.plan_nombre}</span>
                                                 <span className="font-bold text-slate-700 ml-2 flex-shrink-0">${Number(cotizacion.costo_plan_anual).toLocaleString()}</span>
                                             </div>
-                                            {!pf.isPagoUnico && pf.recargoMonto > 0 && (
-                                                <div className="flex justify-between text-[10px] text-slate-400 font-medium">
-                                                    <span>Financiamiento ({Math.round(pf.ajustePct * 100)}%)</span>
-                                                    <span className="text-orange-500">+${pf.recargoMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                            {/* Módulos adicionales recurrentes — uno por línea */}
+                                            {plan.show_breakdown !== false && (cotizacion.modulos_adicionales || [])
+                                                .filter((mod: any) => !(Number(mod.pago_unico) > 0) && (Number(mod.costo_anual || mod.costo) > 0))
+                                                .map((mod: any, modIdx: number) => (
+                                                    <div key={modIdx} className="flex justify-between text-[10px] text-slate-500 font-medium">
+                                                        <span className="truncate">{mod.nombre}</span>
+                                                        <span className="font-bold text-slate-700 ml-2 flex-shrink-0">
+                                                            ${Number(mod.costo_anual || mod.costo || 0).toLocaleString()}
+                                                        </span>
+                                                    </div>
+                                                ))
+                                            }
+                                            {/* WhatsApp si aplica */}
+                                            {plan.show_breakdown !== false && cotizacion.servicio_whatsapp && Number(cotizacion.costo_whatsapp) > 0 && (
+                                                <div className="flex justify-between text-[10px] text-slate-500 font-medium">
+                                                    <span className="truncate">WhatsApp AI</span>
+                                                    <span className="font-bold text-slate-700 ml-2 flex-shrink-0">${Number(cotizacion.costo_whatsapp).toLocaleString()}</span>
                                                 </div>
                                             )}
+                                            {/* Subtotal recurrente — solo si hay módulos adicionales */}
+                                            {plan.show_breakdown !== false && pf.licenciaAnual > Number(cotizacion.costo_plan_anual) && (
+                                                <div className="flex justify-between text-[10px] text-slate-400 font-medium border-t border-slate-100 pt-1">
+                                                    <span>Subtotal recurrente</span>
+                                                    <span className="font-bold text-slate-600 ml-2 flex-shrink-0">
+                                                        ${pf.licenciaAnual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {/* Recargo de financiamiento — siempre positivo */}
+                                            {!pf.isPagoUnico && pf.recargoMonto > 0 && (
+                                                <div className="flex justify-between text-[10px] text-blue-500 font-medium">
+                                                    <span>+ Financiamiento ({Math.round(pf.ajustePct * 100)}%)</span>
+                                                    <span>+${pf.recargoMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                </div>
+                                            )}
+                                            {/* Descuento del plan (tipo discount) */}
+                                            {!pf.isPagoUnico && pf.tipoAjuste === 'discount' && pf.ajustePct > 0 && (
+                                                <div className="flex justify-between text-[10px] text-emerald-600 font-medium">
+                                                    <span>- Descuento anticipado ({Math.round(pf.ajustePct * 100)}%)</span>
+                                                    <span>-${(pf.licenciaAnual * pf.ajustePct).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                </div>
+                                            )}
+                                            {/* Descuento manual del agente */}
                                             {pf.descuentoManualMonto > 0 && (
                                                 <div className="flex justify-between text-[10px] text-emerald-600 font-medium">
-                                                    <span>Descuento ({pf.descuentoManualPct}%)</span>
+                                                    <span>- Descuento ({pf.descuentoManualPct}%)</span>
                                                     <span>-${pf.descuentoManualMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                 </div>
                                             )}
+                                            {/* IVA */}
                                             <div className="flex justify-between text-[10px] text-slate-400 font-medium">
                                                 <span>IVA ({Math.round(pf.ivaPct * 100)}%)</span>
                                                 <span className={pf.isPagoUnico ? 'text-emerald-500' : 'text-blue-500'}>+${pf.ivaLicencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                             </div>
+                                            {/* Total */}
                                             <div className="pt-2 border-t border-slate-100 flex justify-between text-[11px] font-bold text-slate-700">
-                                                <span>Total Plan</span>
+                                                <span>Total {pf.isPagoUnico ? 'a pagar' : `(${pf.cuotas} cuotas)`}</span>
                                                 <span>${pf.totalLicencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                             </div>
                                         </div>
