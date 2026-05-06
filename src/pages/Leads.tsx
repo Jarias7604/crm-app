@@ -482,8 +482,19 @@ export default function Leads() {
                     ? new Date(lead.internal_won_date)
                     : new Date(lead.created_at);
 
-                if (startDateFilter && dateToCompare < new Date(startDateFilter)) return false;
-                if (endDateFilter && dateToCompare > new Date(endDateFilter)) return false;
+                if (startDateFilter) {
+                    const startOfDay = new Date(startDateFilter);
+                    // Add timezone offset to ensure local midnight if parsed as UTC
+                    startOfDay.setMinutes(startOfDay.getMinutes() + startOfDay.getTimezoneOffset());
+                    startOfDay.setHours(0, 0, 0, 0);
+                    if (dateToCompare < startOfDay) return false;
+                }
+                if (endDateFilter) {
+                    const endOfDay = new Date(endDateFilter);
+                    endOfDay.setMinutes(endOfDay.getMinutes() + endOfDay.getTimezoneOffset());
+                    endOfDay.setHours(23, 59, 59, 999);
+                    if (dateToCompare > endOfDay) return false;
+                }
             }
 
             // Filter by minimum contact count (from escalation widget)
