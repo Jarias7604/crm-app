@@ -50,6 +50,7 @@ export interface Client {
   etapa_actual?: ClientPipelineStage;
   assigned_profile?: { id: string; full_name: string | null; email: string };
   documents?: ClientDocument[];
+  stage_history?: { stage_id: string; entered_at: string; exited_at: string | null }[];
 }
 
 export interface ClientDocument {
