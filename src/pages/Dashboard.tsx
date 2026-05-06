@@ -998,7 +998,18 @@ export default function Dashboard() {
                     <div className="flex-grow flex items-center justify-center">
                         <FunnelInfographic
                             data={funnelData}
-                            onStageClick={(status) => navigate('/leads', { state: { status, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
+                            onStageClick={(status) => {
+                                // For Cerrado/Cliente: SQL counts by internal_won_date but Leads filters
+                                // by created_at — sending a date range causes a count mismatch.
+                                // Show ALL closed leads without date restriction.
+                                const isWonStatus = status === 'Cerrado' || status === 'Cliente';
+                                navigate('/leads', {
+                                    state: {
+                                        status,
+                                        ...(isWonStatus ? {} : { startDate: dateRange.startDate, endDate: dateRange.endDate })
+                                    }
+                                });
+                            }}
                             hideClientAmount={!isAdmin}
                         />
                     </div>
