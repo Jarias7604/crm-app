@@ -598,7 +598,12 @@ export const pdfService = {
                 const numCols = Math.min(allPlans.length, 2);
                 const totalW = pageWidth - (margin * 2);
                 const colW = (totalW - 4) / numCols;
-                const colH = 82; // Taller card for full breakdown
+                // Altura dinámica según número de módulos recurrentes
+                const _modulosRecPDF = parseModules(cotizacion.modulos_adicionales)
+                    .filter((m: any) => !(Number(m.pago_unico) > 0) && (Number(m.costo_anual || m.costo) > 0));
+                const _waEnabled = cotizacion.servicio_whatsapp && Number(cotizacion.costo_whatsapp) > 0;
+                const _extraLines = _modulosRecPDF.length + (_waEnabled ? 1 : 0) + (_modulosRecPDF.length + (_waEnabled ? 1 : 0) > 0 ? 1 : 0); // modules + WA + subtotal
+                const colH = 82 + _extraLines * 5; // 5px per extra line
 
                 allPlans.slice(0, numCols).forEach((plan: PlanForPDF, idx: number) => {
                     const colX = margin + idx * (colW + 4);
@@ -687,7 +692,7 @@ export const pdfService = {
                     const lineH = 5;
                     doc.setFontSize(6);
 
-                    // Licencia
+                    // Licencia base
                     doc.setTextColor(100, 116, 139);
                     doc.setFont('helvetica', 'normal');
                     doc.text('Licencia ' + (cotizacion.plan_nombre || ''), colX + 5, lineY);
@@ -695,6 +700,39 @@ export const pdfService = {
                     doc.setFont('helvetica', 'bold');
                     doc.text(`$${licenciaBase.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, colX + colW - 5, lineY, { align: 'right' });
                     lineY += lineH;
+
+                    // Módulos recurrentes adicionales
+                    const _planModulosRec = parseModules(cotizacion.modulos_adicionales)
+                        .filter((m: any) => !(Number(m.pago_unico) > 0) && (Number(m.costo_anual || m.costo) > 0));
+                    const _planWAEnabled = cotizacion.servicio_whatsapp && Number(cotizacion.costo_whatsapp) > 0;
+                    _planModulosRec.forEach((m: any) => {
+                        const monto = Number(m.costo_anual || m.costo) || 0;
+                        doc.setTextColor(100, 116, 139);
+                        doc.setFont('helvetica', 'normal');
+                        doc.text((m.nombre || '').substring(0, 20), colX + 5, lineY);
+                        doc.setTextColor(51, 65, 85);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text(`$${monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, colX + colW - 5, lineY, { align: 'right' });
+                        lineY += lineH;
+                    });
+                    if (_planWAEnabled) {
+                        doc.setTextColor(100, 116, 139);
+                        doc.setFont('helvetica', 'normal');
+                        doc.text('WhatsApp AI', colX + 5, lineY);
+                        doc.setTextColor(51, 65, 85);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text(`$${Number(cotizacion.costo_whatsapp).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, colX + colW - 5, lineY, { align: 'right' });
+                        lineY += lineH;
+                    }
+                    // Subtotal recurrente (si hay más de la licencia base)
+                    if (pf.licenciaAnual > licenciaBase) {
+                        doc.setTextColor(148, 163, 184);
+                        doc.setFont('helvetica', 'italic');
+                        doc.text('Subtotal recurrente', colX + 5, lineY);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text(`$${pf.licenciaAnual.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, colX + colW - 5, lineY, { align: 'right' });
+                        lineY += lineH;
+                    }
 
                     // Financiamiento (solo si aplica)
                     if (!pf.isPagoUnico && pf.recargoMonto > 0) {
