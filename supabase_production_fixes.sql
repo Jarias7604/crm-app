@@ -284,3 +284,14 @@ AFTER INSERT OR UPDATE OF etapa_actual_id ON public.clients
 FOR EACH ROW
 EXECUTE FUNCTION public.log_client_stage_change();
 
+
+ - -   F i x   R L S   f o r   c l i e n t _ s t a g e _ h i s t o r y   t o   s u p p o r t   S u p e r a d m i n   S i m u l a t i o n 
+ D R O P   P O L I C Y   I F   E X I S T S   " U s e r s   c a n   v i e w   h i s t o r y   i n   t h e i r   c o m p a n y "   O N   p u b l i c . c l i e n t _ s t a g e _ h i s t o r y ; 
+ D R O P   P O L I C Y   I F   E X I S T S   " U s e r s   c a n   i n s e r t   h i s t o r y   i n   t h e i r   c o m p a n y "   O N   p u b l i c . c l i e n t _ s t a g e _ h i s t o r y ; 
+ D R O P   P O L I C Y   I F   E X I S T S   " U s e r s   c a n   u p d a t e   h i s t o r y   i n   t h e i r   c o m p a n y "   O N   p u b l i c . c l i e n t _ s t a g e _ h i s t o r y ; 
+ 
+ C R E A T E   P O L I C Y   c o m p a n y _ a c c e s s   O N   p u b l i c . c l i e n t _ s t a g e _ h i s t o r y   F O R   A L L   T O   a u t h e n t i c a t e d 
+         U S I N G   ( c o m p a n y _ i d   =   g e t _ a u t h _ c o m p a n y _ i d ( ) ) 
+         W I T H   C H E C K   ( c o m p a n y _ i d   =   g e t _ a u t h _ c o m p a n y _ i d ( ) ) ; 
+  
+ 
