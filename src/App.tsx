@@ -179,12 +179,12 @@ function App() {
                     <Route path="/admin/audit-log" element={<AuditLog />} />
                     <Route path="/admin/observatory" element={<Observatory />} />
                     <Route path="/admin/plans" element={<PlanManager />} />
+                    <Route path="/company/billing" element={<Billing />} />
                   </Route>
 
                   {/* Company Admin Routes */}
                   <Route element={<RoleProtectedRoute allowedRoles={['super_admin', 'company_admin']} />}>
                     <Route path="/company/integrations" element={<Integrations />} />
-                    <Route path="/company/billing" element={<Billing />} />
                     <Route path="/integrations/google/callback" element={<GoogleCallback />} />
                   </Route>
 
