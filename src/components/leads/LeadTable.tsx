@@ -184,8 +184,21 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                                                             direction: sortConfig?.key === 'created_at' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
                                                                                         })}
                                                                                     >
-                                                                                        Fecha
+                                                                                        Creado el
                                                                                         <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'created_at' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                    </div>
+                                                                                )}
+
+                                                                                {colId === 'internal_won_date' && (
+                                                                                    <div
+                                                                                        className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                        onClick={() => setSortConfig({
+                                                                                            key: 'internal_won_date' as keyof Lead,
+                                                                                            direction: sortConfig?.key === 'internal_won_date' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                        })}
+                                                                                    >
+                                                                                        Fecha Cierre
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'internal_won_date' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
                                                                                     </div>
                                                                                 )}
 
@@ -377,6 +390,13 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                                     <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500">
                                                                         <Calendar className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                                                                         <span>{(() => { try { return format(new Date(lead.created_at.substring(0, 10) + 'T12:00:00'), 'dd/MM/yyyy'); } catch { return '—'; } })()}</span>
+                                                                    </div>
+                                                                )}
+
+                                                                {colId === 'internal_won_date' && (
+                                                                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500">
+                                                                        <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                                                        <span>{lead.internal_won_date ? (() => { try { return format(new Date(lead.internal_won_date.substring(0, 10) + 'T12:00:00'), 'dd/MM/yyyy'); } catch { return '—'; } })() : '—'}</span>
                                                                     </div>
                                                                 )}
                                                             </td>
