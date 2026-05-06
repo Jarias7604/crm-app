@@ -118,7 +118,8 @@ export const clientsService = {
         *,
         etapa_actual:client_pipeline_stages(*),
         assigned_profile:profiles(id, full_name, email),
-        doc_count:client_documents(count)
+        doc_count:client_documents(count),
+        stage_history:client_stage_history(stage_id, entered_at, exited_at)
       `)
       .order('created_at', { ascending: false });
 
@@ -142,7 +143,8 @@ export const clientsService = {
         *,
         etapa_actual:client_pipeline_stages(*, document_types:client_stage_document_types(*)),
         assigned_profile:profiles(id, full_name, email),
-        documents:client_documents(*, doc_type:client_stage_document_types(*), uploader:profiles(full_name, email))
+        documents:client_documents(*, doc_type:client_stage_document_types(*), uploader:profiles(full_name, email)),
+        stage_history:client_stage_history(stage_id, entered_at, exited_at)
       `)
       .eq('id', id)
       .single();
