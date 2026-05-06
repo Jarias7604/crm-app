@@ -307,12 +307,22 @@ export default function Companies() {
         const member = companyMembers.find(m => m.id === editingMemberId);
         setIsResettingPassword(true);
         try {
-            const { data, error } = await supabase.rpc('admin_reset_user_password', {
-                target_user_id: editingMemberId,
-                new_password: newPassword
-            });
-            if (error) throw error;
-            if (data && !data.success) throw new Error(data.error || 'Error desconocido');
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error('No hay sesión activa. Por favor cierra sesión y vuelve a entrar.');
+            const response = await fetch(
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-reset-password`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session.access_token}`,
+                        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                    },
+                    body: JSON.stringify({ target_user_id: editingMemberId, new_password: newPassword, mode: 'direct' })
+                }
+            );
+            const result = await response.json();
+            if (!response.ok || result.error) throw new Error(result.error || 'Error desconocido');
             toast.success(`✅ ¡${member?.full_name?.split(' ')[0] || 'Usuario'} ya puede ingresar con la nueva contraseña!`, { duration: 6000 });
             setShowPasswordPanel(false);
             setNewPassword('');
