@@ -827,19 +827,16 @@ export default function Leads() {
             return;
         }
 
-        // Intercept status change to 'Cerrado' or 'Cliente'
+        // Intercept status change to 'Cerrado' or 'Cliente' — always show date modal
         if ('status' in updates && (updates.status === 'Cerrado' || updates.status === 'Cliente')) {
-            // If already closed with same or different won status, show the date modal to potentially update date
-            if (selectedLead.internal_won_date && currentStatus !== newStatus) {
-                // Switching between Cerrado ↔ Cliente — just update status without changing the date
-                // Fall through to normal update
-            } else if (!selectedLead.internal_won_date) {
-                // First time closing — show date modal
-                setPendingWonStatus(updates.status);
-                setWonData({ won_date: format(new Date(), 'yyyy-MM-dd') });
-                setIsWonModalOpen(true);
-                return;
-            }
+            setPendingWonStatus(updates.status);
+            // Pre-fill with existing date if already closed, else today
+            const existingDate = selectedLead.internal_won_date
+                ? format(new Date(selectedLead.internal_won_date.substring(0, 10) + 'T12:00:00'), 'yyyy-MM-dd')
+                : format(new Date(), 'yyyy-MM-dd');
+            setWonData({ won_date: existingDate });
+            setIsWonModalOpen(true);
+            return;
         }
         try {
             // Clean data - convert empty strings to null for optional fields
