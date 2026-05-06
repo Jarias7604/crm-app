@@ -246,9 +246,15 @@ export default function Leads() {
                 if (state.completedLeadIds) setCompletedLeadIds(state.completedLeadIds);
                 if (state.calendarDate) setCalendarDateLabel(state.calendarDate);
                 if (state.fromCalendar) cameFromRef.current = 'calendar';
-                // Dashboard sends full ISO timestamps — keep them as-is for accurate timezone comparison
-                if (state.startDate) setStartDateFilter(String(state.startDate));
-                if (state.endDate) setEndDateFilter(String(state.endDate));
+                // Dashboard sends full ISO timestamps — normalize to yyyy-MM-dd for date picker compatibility
+                if (state.startDate) {
+                    const sd = String(state.startDate);
+                    setStartDateFilter(sd.length > 10 ? sd.substring(0, 10) : sd);
+                }
+                if (state.endDate) {
+                    const ed = String(state.endDate);
+                    setEndDateFilter(ed.length > 10 ? ed.substring(0, 10) : ed);
+                }
 
                 if (state.leadId) {
                     setFilteredLeadId(state.leadId);
@@ -477,9 +483,11 @@ export default function Leads() {
                     ? new Date(lead.internal_won_date)
                     : new Date(lead.created_at);
 
-                // Direct ISO comparison — both sides are proper ISO strings, no timezone manipulation needed
-                if (startDateFilter && dateToCompare < new Date(startDateFilter)) return false;
-                if (endDateFilter && dateToCompare > new Date(endDateFilter)) return false;
+                // Direct comparison — use T12:00:00 for yyyy-MM-dd to avoid UTC midnight timezone shifts
+                const startBound = startDateFilter ? new Date(startDateFilter + 'T00:00:00') : null;
+                const endBound = endDateFilter ? new Date(endDateFilter + 'T23:59:59') : null;
+                if (startBound && dateToCompare < startBound) return false;
+                if (endBound && dateToCompare > endBound) return false;
             }
 
             // Filter by minimum contact count (from escalation widget)

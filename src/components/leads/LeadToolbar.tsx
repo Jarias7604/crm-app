@@ -883,13 +883,13 @@ export const LeadToolbar: React.FC<LeadToolbarProps> = ({
                         )}
                         {startDateFilter && (
                             <span className="inline-flex items-center gap-1.5 bg-slate-50 text-slate-700 border border-slate-200 px-2.5 py-1 rounded-lg text-xs font-semibold">
-                                Desde: {format(startDateFilter.length === 10 ? new Date(startDateFilter + 'T12:00:00') : new Date(startDateFilter), 'dd/MM/yyyy')}
+                                Desde: {format(new Date(startDateFilter + 'T12:00:00'), 'dd/MM/yyyy')}
                                 <button onClick={() => setStartDateFilter(null)} className="hover:text-slate-900 ml-0.5"><X className="w-3 h-3" /></button>
                             </span>
                         )}
                         {endDateFilter && (
                             <span className="inline-flex items-center gap-1.5 bg-slate-50 text-slate-700 border border-slate-200 px-2.5 py-1 rounded-lg text-xs font-semibold">
-                                Hasta: {format(endDateFilter.length === 10 ? new Date(endDateFilter + 'T12:00:00') : new Date(endDateFilter), 'dd/MM/yyyy')}
+                                Hasta: {format(new Date(endDateFilter + 'T12:00:00'), 'dd/MM/yyyy')}
                                 <button onClick={() => setEndDateFilter(null)} className="hover:text-slate-900 ml-0.5"><X className="w-3 h-3" /></button>
                             </span>
                         )}
