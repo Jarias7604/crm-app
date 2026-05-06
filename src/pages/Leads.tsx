@@ -246,15 +246,10 @@ export default function Leads() {
                 if (state.completedLeadIds) setCompletedLeadIds(state.completedLeadIds);
                 if (state.calendarDate) setCalendarDateLabel(state.calendarDate);
                 if (state.fromCalendar) cameFromRef.current = 'calendar';
-                // Dashboard sends full ISO timestamps — normalize to yyyy-MM-dd
-                if (state.startDate) {
-                    const sd = String(state.startDate);
-                    setStartDateFilter(sd.length > 10 ? sd.substring(0, 10) : sd);
-                }
-                if (state.endDate) {
-                    const ed = String(state.endDate);
-                    setEndDateFilter(ed.length > 10 ? ed.substring(0, 10) : ed);
-                }
+                // Dashboard sends full ISO timestamps — keep them as-is for accurate timezone comparison
+                if (state.startDate) setStartDateFilter(String(state.startDate));
+                if (state.endDate) setEndDateFilter(String(state.endDate));
+
                 if (state.leadId) {
                     setFilteredLeadId(state.leadId);
                     if (viewMode === 'kanban') setViewMode('list');
@@ -472,8 +467,8 @@ export default function Leads() {
 
             // Filter by date range (if provided from dashboard)
             if (startDateFilter || endDateFilter) {
-                // Determine which date to use for comparison
-                // If we are filtering specifically for Won/Client status, we use internal_won_date as primary source of truth
+                // For Cerrado/Cliente: use internal_won_date (matches the SQL that powers the funnel)
+                // For all other statuses: use created_at
                 const isWonFilter = Array.isArray(statusFilter)
                     ? (statusFilter.includes('Cerrado') || statusFilter.includes('Cliente'))
                     : (statusFilter === 'Cerrado' || statusFilter === 'Cliente');
@@ -482,19 +477,9 @@ export default function Leads() {
                     ? new Date(lead.internal_won_date)
                     : new Date(lead.created_at);
 
-                if (startDateFilter) {
-                    const startOfDay = new Date(startDateFilter);
-                    // Add timezone offset to ensure local midnight if parsed as UTC
-                    startOfDay.setMinutes(startOfDay.getMinutes() + startOfDay.getTimezoneOffset());
-                    startOfDay.setHours(0, 0, 0, 0);
-                    if (dateToCompare < startOfDay) return false;
-                }
-                if (endDateFilter) {
-                    const endOfDay = new Date(endDateFilter);
-                    endOfDay.setMinutes(endOfDay.getMinutes() + endOfDay.getTimezoneOffset());
-                    endOfDay.setHours(23, 59, 59, 999);
-                    if (dateToCompare > endOfDay) return false;
-                }
+                // Direct ISO comparison — both sides are proper ISO strings, no timezone manipulation needed
+                if (startDateFilter && dateToCompare < new Date(startDateFilter)) return false;
+                if (endDateFilter && dateToCompare > new Date(endDateFilter)) return false;
             }
 
             // Filter by minimum contact count (from escalation widget)
@@ -809,6 +794,25 @@ export default function Leads() {
     const handleUpdateLead = async (updates: Partial<Lead>) => {
         if (!selectedLead) return;
 
+        // Protect internal_won_date: warn if changing AWAY from Cerrado/Cliente when already closed
+        const currentStatus = selectedLead.status;
+        const newStatus = updates.status as LeadStatus;
+        const isLeavingClosedStatus = 'status' in updates
+            && (currentStatus === 'Cerrado' || currentStatus === 'Cliente')
+            && newStatus !== 'Cerrado' && newStatus !== 'Cliente'
+            && selectedLead.internal_won_date;
+
+        if (isLeavingClosedStatus) {
+            const closedDate = format(new Date(selectedLead.internal_won_date!), 'dd/MM/yyyy');
+            const confirmed = window.confirm(
+                `⚠️ ADVERTENCIA: Este lead tiene una fecha de cierre registrada el ${closedDate}.\n\n` +
+                `Cambiar el estado a "${STATUS_CONFIG[newStatus]?.label || newStatus}" lo removerá del funnel y de las estadísticas del período en que se cerró.\n\n` +
+                `¿Estás seguro de que deseas continuar?`
+            );
+            if (!confirmed) return;
+            // Proceed with the update but preserve internal_won_date (don't erase it)
+        }
+
         // Intercept status change to 'Perdido'
         if ('status' in updates && updates.status === 'Perdido') {
             setIsLossModalOpen(true);
@@ -817,10 +821,17 @@ export default function Leads() {
 
         // Intercept status change to 'Cerrado' or 'Cliente'
         if ('status' in updates && (updates.status === 'Cerrado' || updates.status === 'Cliente')) {
-            setPendingWonStatus(updates.status);
-            setWonData({ won_date: format(new Date(), 'yyyy-MM-dd') });
-            setIsWonModalOpen(true);
-            return;
+            // If already closed with same or different won status, show the date modal to potentially update date
+            if (selectedLead.internal_won_date && currentStatus !== newStatus) {
+                // Switching between Cerrado ↔ Cliente — just update status without changing the date
+                // Fall through to normal update
+            } else if (!selectedLead.internal_won_date) {
+                // First time closing — show date modal
+                setPendingWonStatus(updates.status);
+                setWonData({ won_date: format(new Date(), 'yyyy-MM-dd') });
+                setIsWonModalOpen(true);
+                return;
+            }
         }
         try {
             // Clean data - convert empty strings to null for optional fields
