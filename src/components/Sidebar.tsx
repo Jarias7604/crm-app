@@ -91,7 +91,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         navigation.push({ name: 'Cotizaciones', href: '/cotizaciones', icon: FileText, current: location.pathname === '/cotizaciones' });
     }
 
-    if (profile?.role === 'super_admin' || profile?.role === 'company_admin') {
+    if (profile?.role === 'super_admin') {
         navigation.push({ name: 'Facturación', href: '/company/billing', icon: CreditCard, current: location.pathname.startsWith('/company/billing') });
     }
 
