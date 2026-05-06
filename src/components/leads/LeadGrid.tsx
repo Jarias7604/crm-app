@@ -92,7 +92,7 @@ export const LeadGrid: React.FC<LeadGridProps> = ({
                                                         try {
                                                             const dateStr = lead.internal_won_date!.split('T')[0];
                                                             const dateObj = new Date(dateStr + 'T12:00:00');
-                                                            return format(dateObj, 'dd MMM yyyy', { locale: es });
+                                                            return format(dateObj, 'dd MMM yyyy', { locale: es }).toUpperCase();
                                                         } catch (e) { return 'N/A'; }
                                                     })()}
                                                 </span>
@@ -113,7 +113,7 @@ export const LeadGrid: React.FC<LeadGridProps> = ({
                                                         try {
                                                             const dateStr = lead.next_followup_date.split('T')[0];
                                                             const dateObj = new Date(dateStr + 'T12:00:00');
-                                                            return format(dateObj, 'dd MMM yyyy', { locale: es });
+                                                            return format(dateObj, 'dd MMM yyyy', { locale: es }).toUpperCase();
                                                         } catch (e) { return 'N/A'; }
                                                     })()}
                                                 </span>
