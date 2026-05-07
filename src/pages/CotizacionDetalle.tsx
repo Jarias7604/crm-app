@@ -21,6 +21,7 @@ interface FinancingPlan {
     etiqueta_ajuste?: string;
 }
 
+
 export default function CotizacionDetalle() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -599,6 +600,19 @@ export default function CotizacionDetalle() {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Notas de la cotización */}
+                        {(cotizacion as any).notas && (
+                            <div className="pt-8 px-0 sm:px-8 md:px-12">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <MessageSquare className="w-4 h-4 text-blue-400" />
+                                    <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Notas adicionales</p>
+                                </div>
+                                <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5">
+                                    <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{(cotizacion as any).notas}</p>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Section 4: Summary & Financials - Dynamic Layout */}
                         <div className="pt-8 space-y-8 px-0 sm:px-8 md:px-12">

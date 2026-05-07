@@ -900,7 +900,40 @@ export const pdfService = {
             drawFooter(1);
 
             // ==========================================
-            // PAGE 2: TÉRMINOS Y CONDICIONES
+            // NOTAS ADICIONALES (si existen) — mismo page 1 o page 2
+            // ==========================================
+            const notasText = (cotizacion as any).notas?.trim();
+            if (notasText) {
+                doc.addPage();
+                doc.setFillColor(15, 23, 42);
+                doc.rect(0, 0, pageWidth, 20, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'bold');
+                doc.text('NOTAS ADICIONALES', margin, 13);
+
+                let ny = 35;
+                doc.setFillColor(255, 251, 235); // amber-50
+                doc.setDrawColor(253, 230, 138); // amber-200
+                doc.roundedRect(margin, ny, pageWidth - margin * 2, 10, 3, 3, 'FD');
+
+                const notasLines = doc.splitTextToSize(notasText, pageWidth - margin * 2 - 10);
+                doc.roundedRect(margin, ny, pageWidth - margin * 2, notasLines.length * 5.5 + 10, 3, 3, 'FD');
+
+                ny += 7;
+                doc.setFontSize(9);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(71, 60, 20);
+                notasLines.forEach((line: string) => {
+                    doc.text(line, margin + 5, ny);
+                    ny += 5.5;
+                });
+
+                drawFooter(doc.getNumberOfPages());
+            }
+
+            // ==========================================
+            // PAGE TERMS: TÉRMINOS Y CONDICIONES
             // ==========================================
             const termsText = cotizacion.company?.terminos_condiciones || '';
             if (termsText) {
