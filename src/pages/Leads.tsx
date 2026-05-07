@@ -501,7 +501,7 @@ export default function Leads() {
         });
 
         // Apply pipeline intelligence filter on top of standard filters
-        return applyPipelineFilter(base, pipelineFilter);
+        return applyPipelineFilter(base, pipelineFilter, profile?.company_id);
     }, [leads, canViewAllLeads, profile?.id, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter, minContactCountFilter, pipelineFilter]);
 
     const sortedLeads = useMemo(() => {
@@ -1182,6 +1182,8 @@ export default function Leads() {
                     leads={leads}
                     activeFilter={pipelineFilter}
                     onFilterChange={setPipelineFilter}
+                    companyId={profile?.company_id}
+                    isAdmin={isAdmin}
                 />
 
                 {loading && viewMode !== 'grid' && (
