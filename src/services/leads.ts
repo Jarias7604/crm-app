@@ -7,7 +7,7 @@ export const leadsService = {
     async getLeads(page = 1, pageSize = 1000) {
         try {
             // Carga Ligera: Traemos solo lo necesario para mostrar tarjetas/filas
-            const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date';
+            const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date, contact_count, lost_reason_id, lost_at_stage, lost_notes, next_action_notes, closing_amount, address';
             
             const from = (page - 1) * pageSize;
             const to = from + pageSize - 1;
@@ -32,7 +32,8 @@ export const leadsService = {
     // Cursor-based Pagination for ultra-fast performance on millions of rows
     async getLeadsCursor(limit = 50, cursor?: string) {
         try {
-            const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date';
+            const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date, contact_count, lost_reason_id, lost_at_stage, lost_notes, next_action_notes, closing_amount, address';
+
             
             let query = supabase
                 .from('leads')
