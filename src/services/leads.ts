@@ -32,7 +32,8 @@ export const leadsService = {
     // Cursor-based Pagination for ultra-fast performance on millions of rows
     async getLeadsCursor(limit = 50, cursor?: string) {
         try {
-            const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date, contact_count, lost_reason_id, lost_at_stage, lost_notes, next_action_notes, closing_amount, address';
+            const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date, contact_count, lost_reason_id, lost_at_stage, lost_notes, next_action_notes, closing_amount, address, last_follow_up_at, first_follow_up_at';
+
 
             
             let query = supabase

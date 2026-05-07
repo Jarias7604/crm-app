@@ -38,6 +38,8 @@ import { useAriasTables } from '../hooks/useAriasTables';
 import { ResponseVelocityBadge } from '../components/ui/ResponseVelocityBadge';
 import { useTimezone } from '../hooks/useTimezone';
 import { localToUtcISO, DEFAULT_TIMEZONE } from '../utils/timezone';
+import { PipelineIntelligenceBar, applyPipelineFilter } from '../components/leads/PipelineIntelligenceBar';
+import type { PipelineFilter } from '../components/leads/PipelineIntelligenceBar';
 
 export default function Leads() {
     const { profile } = useAuth();
@@ -201,6 +203,7 @@ export default function Leads() {
     const [startDateFilter, setStartDateFilter] = useState<string | null>(null);
     const [endDateFilter, setEndDateFilter] = useState<string | null>(null);
     const [minContactCountFilter, setMinContactCountFilter] = useState<number | null>(null);
+    const [pipelineFilter, setPipelineFilter] = useState<PipelineFilter>(null);
     const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
     const [isUploading, setIsUploading] = useState(false);
@@ -380,7 +383,8 @@ export default function Leads() {
     };
 
     const filteredLeads = useMemo(() => {
-        return leads.filter(lead => {
+        const base = leads.filter(lead => {
+
             // 🔒 Role-based visibility: collaborators only see their assigned leads
             if (!canViewAllLeads && lead.assigned_to !== profile?.id) return false;
 
@@ -495,7 +499,10 @@ export default function Leads() {
 
             return true;
         });
-    }, [leads, canViewAllLeads, profile?.id, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter, minContactCountFilter]);
+
+        // Apply pipeline intelligence filter on top of standard filters
+        return applyPipelineFilter(base, pipelineFilter);
+    }, [leads, canViewAllLeads, profile?.id, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter, minContactCountFilter, pipelineFilter]);
 
     const sortedLeads = useMemo(() => {
         if (!sortConfig) return filteredLeads;
@@ -1170,7 +1177,15 @@ export default function Leads() {
 
                 {/* Render corresponding view based on viewMode */}
                 {/* Mobile loading indicator for List/Kanban modes */}
+                {/* ─── Pipeline Intelligence Bar ──────────────────────── */}
+                <PipelineIntelligenceBar
+                    leads={leads}
+                    activeFilter={pipelineFilter}
+                    onFilterChange={setPipelineFilter}
+                />
+
                 {loading && viewMode !== 'grid' && (
+
                     <div className="md:hidden flex items-center justify-center py-16">
                         <div className="flex flex-col items-center gap-3">
                             <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />

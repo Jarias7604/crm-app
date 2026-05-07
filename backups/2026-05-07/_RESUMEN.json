@@ -1,0 +1,22 @@
+{
+  "fecha": "2026-05-07",
+  "timestamp": "2026-05-07T16:47:46.156Z",
+  "total_registros": 1570,
+  "por_empresa": {
+    "Sistema Arias Defense": {
+      "leads": 1
+    },
+    "Arias Defense Components LLC El Salvador ": {
+      "leads": 866,
+      "clients": 19,
+      "follow_ups": 375,
+      "cotizaciones": 71,
+      "tickets": 94,
+      "marketing_campaigns": 6,
+      "marketing_conversations": 56
+    },
+    "Ensivar S.A. de C.V.": {
+      "leads": 82
+    }
+  }
+}
