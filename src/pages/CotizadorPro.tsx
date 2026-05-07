@@ -59,7 +59,10 @@ export default function CotizadorPro() {
         meses_pago: 1, // Período de pago: 1, 3, 6, 9, o 12 meses
         recargo_mensual_porcentaje: 20,
         pago_anual_seleccionado: false,
-        pago_mensual_seleccionado: false
+        pago_mensual_seleccionado: false,
+
+        // Notas
+        notas: ''
     });
 
     const [paqueteSugerido, setPaqueteSugerido] = useState<CotizadorPaquete | null>(null);
@@ -484,6 +487,7 @@ export default function CotizadorPro() {
                 descripcion_pago: financingPlans.find(p => p.id === selectedPlanId)?.titulo ||
                     (totales.cuotas > 1 ? `${totales.cuotas} Cuotas` : '1 Solo pago'),
                 planes_comparativa: selectedPlanIds.length >= 2 ? selectedPlanIds : (selectedPlanId ? [selectedPlanId] : undefined),
+                notas: formData.notas?.trim() || undefined,
 
                 incluir_implementacion: formData.incluir_implementacion,
                 estado: 'borrador' as const
@@ -1484,7 +1488,16 @@ export default function CotizadorPro() {
                                 </div>
                             </div>
 
-                            {/* Notas removed */}
+                            {/* Notas de cotización */}
+                            <div className="mt-6">
+                                <label className="block text-[11px] font-black text-gray-700 uppercase tracking-widest mb-2">Notas adicionales de la cotización</label>
+                                <textarea 
+                                    className="w-full text-sm rounded-xl border-gray-200 focus:border-blue-500 focus:ring focus:ring-blue-200 transition-all p-4 resize-none h-24"
+                                    placeholder="Agrega notas, condiciones especiales, o comentarios profesionales para el cliente..."
+                                    value={formData.notas}
+                                    onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
+                                />
+                            </div>
                         </div>
                     )}
 
