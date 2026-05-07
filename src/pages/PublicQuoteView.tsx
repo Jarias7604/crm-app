@@ -397,6 +397,19 @@ export default function PublicQuoteView() {
                     </div>
                 </div>
 
+                {/* ── NOTAS DE LA COTIZACIÓN ──────────────────────────────────── */}
+                {(cotizacion as any).notas && (
+                    <div className="mb-10 px-2">
+                        <div className="flex items-center gap-2 mb-3">
+                            <MessageSquare className="w-4 h-4 text-blue-400" />
+                            <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-[0.3em]">Notas adicionales</h4>
+                        </div>
+                        <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5">
+                            <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{(cotizacion as any).notas}</p>
+                        </div>
+                    </div>
+                )}
+
                 {/* ── PLAN DE PAGO COMPARATIVO ───────────────────────────────── */}
                 <div className="mb-12">
                     <div className="flex items-center gap-2 px-2 mb-5"

@@ -93,7 +93,7 @@ export default function CotizadorPro() {
 
     useEffect(() => {
         const init = async () => {
-            await Promise.all([loadData(), loadLeads()]);
+            const [catalog] = await Promise.all([loadData(), loadLeads()]);
 
             // Si venimos del chat con un lead específico
             if (location.state?.lead) {
@@ -110,35 +110,76 @@ export default function CotizadorPro() {
             }
 
             if (id) {
-                await loadExistingCotizacion(id);
+                await loadExistingCotizacion(id, catalog);
             }
         };
         init();
     }, [id, location.state]);
 
-    const loadExistingCotizacion = async (cotId: string) => {
+    const loadExistingCotizacion = async (cotId: string, catalog?: { paqData: CotizadorPaquete[], modulosData: CotizadorItem[], serviciosData: CotizadorItem[], plansData: FinancingPlan[] }) => {
         try {
             const cot = await cotizacionesService.getCotizacion(cotId);
-            if (cot) {
-                // Mapear datos de la cotización al formulario
-                setFormData(prev => ({
-                    ...prev,
-                    lead_id: cot.lead_id,
-                    cliente_nombre: cot.nombre_cliente,
-                    cliente_empresa: cot.empresa_cliente || '',
-                    cliente_email: cot.email_cliente || '',
-                    cliente_telefono: cot.telefono_cliente || '',
-                    cliente_direccion: cot.direccion_cliente || '',
-                    volumen_dtes: cot.volumen_dtes,
-                    descuento_porcentaje: cot.descuento_porcentaje,
-                    iva_porcentaje: cot.iva_porcentaje,
-                    incluir_implementacion: cot.incluir_implementacion
-                }));
+            if (!cot) return;
 
-                // Re-encontrar paquete_id y IDs de módulos
-                // Nota: Esto requiere que los nombres coincidan
-                // Implementación simplificada: asumimos que encontraremos los IDs por nombre
+            // Usar catálogo pasado (fresco) o el estado actual como fallback
+            const paqList = catalog?.paqData ?? paquetes;
+            const modulosList = catalog?.modulosData ?? modulos;
+            const plansData = catalog?.plansData ?? financingPlans;
+
+            // 1. Restaurar paquete por nombre
+            const paqueteFound = paqList.find((p: CotizadorPaquete) => p.paquete === cot.plan_nombre);
+
+            // 2. Restaurar módulos por nombre
+            const modulosArr = Array.isArray(cot.modulos_adicionales) ? cot.modulos_adicionales : [];
+            const modulosIds = modulosArr
+                .map((m: any) => modulosList.find((mod: CotizadorItem) => mod.nombre === m.nombre)?.id)
+                .filter(Boolean) as string[];
+
+            // 3. Restaurar plan de financiamiento
+            const planesComparativa = (cot as any).planes_comparativa as string[] | null;
+            let primaryPlanId: string | null = null;
+            if (planesComparativa && planesComparativa.length > 0) {
+                primaryPlanId = planesComparativa[0];
+                setSelectedPlanIds(planesComparativa);
+            } else if (cot.cuotas) {
+                const planByQuotas = plansData.find((p: FinancingPlan) =>
+                    Number((p as any).cuotas) === Number(cot.cuotas) ||
+                    Number((p as any).meses) === Number(cot.plazo_meses)
+                );
+                primaryPlanId = planByQuotas?.id ?? null;
             }
+            if (primaryPlanId) setSelectedPlanId(primaryPlanId);
+
+            // 4. Restaurar overrides de precio (del paquete guardado)
+            if (paqueteFound && cot.costo_plan_anual !== paqueteFound.costo_paquete_anual) {
+                setPaqueteOverride(cot.costo_plan_anual);
+            }
+            if (cot.costo_implementacion != null && paqueteFound &&
+                cot.costo_implementacion !== paqueteFound.costo_implementacion) {
+                setImplementationOverride(cot.costo_implementacion);
+            }
+
+            // 5. Restaurar todos los campos del formulario
+            setFormData(prev => ({
+                ...prev,
+                lead_id: cot.lead_id,
+                cliente_nombre: cot.nombre_cliente,
+                cliente_empresa: cot.empresa_cliente || '',
+                cliente_email: cot.email_cliente || '',
+                cliente_telefono: cot.telefono_cliente || '',
+                cliente_direccion: cot.direccion_cliente || '',
+                volumen_dtes: cot.volumen_dtes,
+                descuento_porcentaje: cot.descuento_porcentaje,
+                iva_porcentaje: cot.iva_porcentaje,
+                incluir_implementacion: cot.incluir_implementacion,
+                paquete_id: paqueteFound?.id || prev.paquete_id,
+                modulos_ids: modulosIds,
+                notas: (cot as any).notas || ''
+            }));
+
+            // Saltar directo al paso 4 (resumen) si ya teníamos todos los datos
+            if (paqueteFound) setPasoActual(4);
+
         } catch (error) {
             logger.error('Error loading existing cotizacion', error, { action: 'loadExistingCotizacion', cotId });
             toast.error('Error al cargar la cotización para editar');
@@ -204,20 +245,28 @@ export default function CotizadorPro() {
             }
 
             if (settingsData || defaultPlan) {
-                setFormData(prev => {
-                    const isDiscountPlan = defaultPlan?.tipo_ajuste === 'discount';
-
-                    return {
+                // Solo aplicar defaults si NO estamos editando
+                if (!id) {
+                    setFormData(prev => {
+                        const isDiscountPlan = defaultPlan?.tipo_ajuste === 'discount';
+                        return {
+                            ...prev,
+                            iva_porcentaje: settingsData?.iva_defecto ?? 13,
+                            recargo_mensual_porcentaje: settingsData?.recargo_financiamiento_base ?? 20,
+                            descuento_porcentaje: 0,
+                            forma_pago: isDiscountPlan ? 'anual' : 'mensual',
+                            meses_pago: defaultPlan?.meses ?? 1
+                        };
+                    });
+                } else {
+                    // En modo edición solo actualizar IVA/recargo base si no están ya asignados
+                    setFormData(prev => ({
                         ...prev,
-                        iva_porcentaje: settingsData?.iva_defecto ?? 13,
-                        recargo_mensual_porcentaje: settingsData?.recargo_financiamiento_base ?? 20,
-                        // El descuento manual empieza en 0, el del plan es interno
-                        descuento_porcentaje: 0,
-                        forma_pago: isDiscountPlan ? 'anual' : 'mensual',
-                        meses_pago: defaultPlan?.meses ?? 1
-                    };
-                });
+                        recargo_mensual_porcentaje: settingsData?.recargo_financiamiento_base ?? prev.recargo_mensual_porcentaje
+                    }));
+                }
             }
+            return { paqData, modulosData: itemsData.filter((i: CotizadorItem) => i.tipo === 'modulo'), serviciosData: itemsData.filter((i: CotizadorItem) => i.tipo === 'servicio'), plansData };
         } catch (error) {
             logger.error('Error loading data', error, { action: 'loadData' });
             toast.error('Error al cargar datos dinámicos');
