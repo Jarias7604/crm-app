@@ -620,10 +620,6 @@ export default function CotizacionDetalle() {
                                     .map((mod: any) => ({ nombre: mod.nombre, monto: Number(mod.pago_unico) || 0 }));
                                 return (
                                     <>
-                                        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                                            <p className="text-[9px] font-black text-blue-400 uppercase tracking-[0.2em]">RESUMEN DE INVERSIÓN</p>
-                                        </div>
-
                                         {plansToShow.length > 0 && (
                                             <>
                                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">OPCIONES DE PAGO</p>
