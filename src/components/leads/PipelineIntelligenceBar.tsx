@@ -1,7 +1,11 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { differenceInDays, differenceInHours } from 'date-fns';
-import { Clock, AlertTriangle, Zap, Users, TrendingUp, Settings2, X, ChevronDown, ChevronUp, Save } from 'lucide-react';
-import type { Lead } from '../../types';
+import { Clock, AlertTriangle, Zap, Users, TrendingUp, Settings2, X, ChevronDown, ChevronUp, Save, Check } from 'lucide-react';
+import type { Lead, LeadStatus } from '../../types';
+import { STATUS_CONFIG } from '../../types';
+
+// All selectable lead statuses for at-risk dropdown
+const ALL_STATUSES = Object.keys(STATUS_CONFIG) as LeadStatus[];
 
 export interface PipelineSettings {
   neverContactedDays: number;
@@ -11,7 +15,7 @@ export interface PipelineSettings {
   activeContactDays: number;
   activeLabel: string;
   highPriorityLabel: string;
-  atRiskStatuses: string; // comma-separated
+  atRiskStatuses: string[];  // array of LeadStatus strings
   enableNeverContacted: boolean;
   enableAtRisk: boolean;
   enableHighPriority: boolean;
@@ -26,17 +30,26 @@ const DEFAULT_SETTINGS: PipelineSettings = {
   activeContactDays: 7,
   activeLabel: 'Activos esta semana',
   highPriorityLabel: 'Alta prioridad fríos',
-  atRiskStatuses: 'Cotizado,Negociación,En negociación,Propuesta enviada',
+  atRiskStatuses: ['Cotizado', 'Negociación', 'Lead calificado', 'En seguimiento'],
   enableNeverContacted: true,
   enableAtRisk: true,
   enableHighPriority: true,
   enableActive: true,
 };
 
+// Migrate old comma-string format to array
+function normalizeSettings(raw: any): PipelineSettings {
+  const s = { ...DEFAULT_SETTINGS, ...raw };
+  if (typeof s.atRiskStatuses === 'string') {
+    s.atRiskStatuses = s.atRiskStatuses.split(',').map((x: string) => x.trim()).filter(Boolean);
+  }
+  return s;
+}
+
 function loadSettings(companyId: string): PipelineSettings {
   try {
     const raw = localStorage.getItem(`pipeline_settings_${companyId}`);
-    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    if (raw) return normalizeSettings(JSON.parse(raw));
   } catch {}
   return DEFAULT_SETTINGS;
 }
@@ -88,7 +101,7 @@ export function PipelineIntelligenceBar({ leads, activeFilter, onFilterChange, c
   };
 
   const t = settings;
-  const atRiskStatusList = t.atRiskStatuses.split(',').map(s => s.trim()).filter(Boolean);
+  const atRiskStatusList = Array.isArray(t.atRiskStatuses) ? t.atRiskStatuses : [];
 
   const metrics = useMemo(() => {
     const active = leads.filter(l => !['Cerrado', 'Cliente', 'Perdido'].includes(l.status ?? ''));
@@ -177,61 +190,121 @@ export function PipelineIntelligenceBar({ leads, activeFilter, onFilterChange, c
                     <button onClick={() => setShowSettings(false)} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400"><X className="w-3.5 h-3.5" /></button>
                   </div>
 
-                  <div className="space-y-4 max-h-96 overflow-y-auto pr-1">
-                    {/* Never contacted */}
-                    <div className="p-3 rounded-xl bg-red-50 border border-red-100 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-black text-red-700 flex items-center gap-1.5"><Clock className="w-3 h-3" /> Sin contactar</label>
-                        <input type="checkbox" checked={draft.enableNeverContacted} onChange={e => setDraft(d => ({ ...d, enableNeverContacted: e.target.checked }))} className="w-3.5 h-3.5 accent-red-600" />
+                  <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+
+                    {/* ── Sin contactar ── */}
+                    <div className="rounded-xl border border-red-100 overflow-hidden">
+                      <div className="flex items-center justify-between px-3 py-2 bg-red-50">
+                        <span className="text-[11px] font-black text-red-700 flex items-center gap-1.5"><Clock className="w-3 h-3" /> Sin contactar</span>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <span className="text-[10px] text-red-500">{draft.enableNeverContacted ? 'Activo' : 'Oculto'}</span>
+                          <input type="checkbox" checked={draft.enableNeverContacted} onChange={e => setDraft(d => ({ ...d, enableNeverContacted: e.target.checked }))} className="w-3.5 h-3.5 accent-red-600" />
+                        </label>
                       </div>
-                      <input type="text" value={draft.neverContactedLabel} onChange={e => setDraft(d => ({ ...d, neverContactedLabel: e.target.value }))} placeholder="Nombre del chip" className="w-full text-[11px] px-2.5 py-1.5 rounded-lg border border-red-200 bg-white focus:outline-none focus:ring-1 focus:ring-red-400" />
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-red-600 font-bold shrink-0">Alerta si no hay contacto en:</span>
-                        <input type="number" min={1} max={365} value={draft.neverContactedDays} onChange={e => setDraft(d => ({ ...d, neverContactedDays: +e.target.value }))} className="w-16 text-[11px] px-2 py-1 rounded-lg border border-red-200 bg-white text-center font-black focus:outline-none focus:ring-1 focus:ring-red-400" />
-                        <span className="text-[10px] text-red-600">días</span>
+                      <div className="px-3 py-2.5 bg-white space-y-2">
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-500 mb-1">Texto del chip</p>
+                          <input type="text" value={draft.neverContactedLabel} onChange={e => setDraft(d => ({ ...d, neverContactedLabel: e.target.value }))} placeholder="Ej: Sin contactar" className="w-full text-[11px] px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-red-400" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-500 mb-1">Días sin contacto para activar alerta</p>
+                          <div className="flex items-center gap-2">
+                            <input type="number" min={1} max={365} value={draft.neverContactedDays} onChange={e => setDraft(d => ({ ...d, neverContactedDays: +e.target.value }))} className="w-20 text-sm px-2 py-1.5 rounded-lg border border-gray-200 text-center font-black focus:outline-none focus:ring-1 focus:ring-red-400" />
+                            <span className="text-[11px] text-gray-500 font-bold">días sin contacto</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    {/* At risk quoted */}
-                    <div className="p-3 rounded-xl bg-amber-50 border border-amber-100 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-black text-amber-700 flex items-center gap-1.5"><AlertTriangle className="w-3 h-3" /> En riesgo</label>
-                        <input type="checkbox" checked={draft.enableAtRisk} onChange={e => setDraft(d => ({ ...d, enableAtRisk: e.target.checked }))} className="w-3.5 h-3.5 accent-amber-600" />
+                    {/* ── En riesgo ── */}
+                    <div className="rounded-xl border border-amber-100 overflow-hidden">
+                      <div className="flex items-center justify-between px-3 py-2 bg-amber-50">
+                        <span className="text-[11px] font-black text-amber-700 flex items-center gap-1.5"><AlertTriangle className="w-3 h-3" /> En riesgo</span>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <span className="text-[10px] text-amber-500">{draft.enableAtRisk ? 'Activo' : 'Oculto'}</span>
+                          <input type="checkbox" checked={draft.enableAtRisk} onChange={e => setDraft(d => ({ ...d, enableAtRisk: e.target.checked }))} className="w-3.5 h-3.5 accent-amber-600" />
+                        </label>
                       </div>
-                      <input type="text" value={draft.staleCotizadoLabel} onChange={e => setDraft(d => ({ ...d, staleCotizadoLabel: e.target.value }))} placeholder="Nombre del chip" className="w-full text-[11px] px-2.5 py-1.5 rounded-lg border border-amber-200 bg-white focus:outline-none focus:ring-1 focus:ring-amber-400" />
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-amber-600 font-bold shrink-0">Riesgo si sin contacto en:</span>
-                        <input type="number" min={1} max={720} value={draft.staleCotizadoHours} onChange={e => setDraft(d => ({ ...d, staleCotizadoHours: +e.target.value }))} className="w-16 text-[11px] px-2 py-1 rounded-lg border border-amber-200 bg-white text-center font-black focus:outline-none focus:ring-1 focus:ring-amber-400" />
-                        <span className="text-[10px] text-amber-600">horas</span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-amber-600 font-bold block mb-1">Estados en riesgo (separados por coma):</span>
-                        <input type="text" value={draft.atRiskStatuses} onChange={e => setDraft(d => ({ ...d, atRiskStatuses: e.target.value }))} placeholder="Cotizado,Negociación,..." className="w-full text-[11px] px-2.5 py-1.5 rounded-lg border border-amber-200 bg-white focus:outline-none focus:ring-1 focus:ring-amber-400" />
+                      <div className="px-3 py-2.5 bg-white space-y-2">
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-500 mb-1">Texto del chip</p>
+                          <input type="text" value={draft.staleCotizadoLabel} onChange={e => setDraft(d => ({ ...d, staleCotizadoLabel: e.target.value }))} placeholder="Ej: Cotizados en riesgo" className="w-full text-[11px] px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-amber-400" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-500 mb-1">Horas sin contacto para activar alerta</p>
+                          <div className="flex items-center gap-2">
+                            <input type="number" min={1} max={720} value={draft.staleCotizadoHours} onChange={e => setDraft(d => ({ ...d, staleCotizadoHours: +e.target.value }))} className="w-20 text-sm px-2 py-1.5 rounded-lg border border-gray-200 text-center font-black focus:outline-none focus:ring-1 focus:ring-amber-400" />
+                            <span className="text-[11px] text-gray-500 font-bold">horas sin contacto</span>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-500 mb-1.5">Estados que cuentan como "en riesgo"</p>
+                          <div className="grid grid-cols-2 gap-1">
+                            {ALL_STATUSES.filter(s => !['Cerrado','Cliente','Perdido','Erróneo'].includes(s)).map(status => {
+                              const isSelected = (Array.isArray(draft.atRiskStatuses) ? draft.atRiskStatuses : []).includes(status);
+                              const cfg = STATUS_CONFIG[status];
+                              return (
+                                <button
+                                  key={status}
+                                  type="button"
+                                  onClick={() => setDraft(d => {
+                                    const current = Array.isArray(d.atRiskStatuses) ? d.atRiskStatuses : [];
+                                    return { ...d, atRiskStatuses: isSelected ? current.filter(x => x !== status) : [...current, status] };
+                                  })}
+                                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg border text-[10px] font-bold transition-all text-left ${isSelected ? `${cfg.bgColor} ${cfg.color} border-current` : 'border-gray-100 bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
+                                >
+                                  <span className={`w-3.5 h-3.5 rounded shrink-0 border flex items-center justify-center ${isSelected ? 'bg-current border-current' : 'border-gray-300 bg-white'}`}>
+                                    {isSelected && <Check className="w-2.5 h-2.5 text-white" />}
+                                  </span>
+                                  <span className="truncate">{cfg.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    {/* High priority */}
-                    <div className="p-3 rounded-xl bg-violet-50 border border-violet-100 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-black text-violet-700 flex items-center gap-1.5"><TrendingUp className="w-3 h-3" /> Alta prioridad</label>
-                        <input type="checkbox" checked={draft.enableHighPriority} onChange={e => setDraft(d => ({ ...d, enableHighPriority: e.target.checked }))} className="w-3.5 h-3.5 accent-violet-600" />
+                    {/* ── Alta prioridad ── */}
+                    <div className="rounded-xl border border-violet-100 overflow-hidden">
+                      <div className="flex items-center justify-between px-3 py-2 bg-violet-50">
+                        <span className="text-[11px] font-black text-violet-700 flex items-center gap-1.5"><TrendingUp className="w-3 h-3" /> Alta prioridad fríos</span>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <span className="text-[10px] text-violet-500">{draft.enableHighPriority ? 'Activo' : 'Oculto'}</span>
+                          <input type="checkbox" checked={draft.enableHighPriority} onChange={e => setDraft(d => ({ ...d, enableHighPriority: e.target.checked }))} className="w-3.5 h-3.5 accent-violet-600" />
+                        </label>
                       </div>
-                      <input type="text" value={draft.highPriorityLabel} onChange={e => setDraft(d => ({ ...d, highPriorityLabel: e.target.value }))} placeholder="Nombre del chip" className="w-full text-[11px] px-2.5 py-1.5 rounded-lg border border-violet-200 bg-white focus:outline-none focus:ring-1 focus:ring-violet-400" />
+                      <div className="px-3 py-2.5 bg-white">
+                        <p className="text-[10px] font-bold text-gray-500 mb-1">Texto del chip</p>
+                        <input type="text" value={draft.highPriorityLabel} onChange={e => setDraft(d => ({ ...d, highPriorityLabel: e.target.value }))} placeholder="Ej: Alta prioridad fríos" className="w-full text-[11px] px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-violet-400" />
+                      </div>
                     </div>
 
-                    {/* Active */}
-                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-100 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-black text-emerald-700 flex items-center gap-1.5"><Zap className="w-3 h-3" /> Activos</label>
-                        <input type="checkbox" checked={draft.enableActive} onChange={e => setDraft(d => ({ ...d, enableActive: e.target.checked }))} className="w-3.5 h-3.5 accent-emerald-600" />
+                    {/* ── Activos ── */}
+                    <div className="rounded-xl border border-emerald-100 overflow-hidden">
+                      <div className="flex items-center justify-between px-3 py-2 bg-emerald-50">
+                        <span className="text-[11px] font-black text-emerald-700 flex items-center gap-1.5"><Zap className="w-3 h-3" /> Activos</span>
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <span className="text-[10px] text-emerald-500">{draft.enableActive ? 'Activo' : 'Oculto'}</span>
+                          <input type="checkbox" checked={draft.enableActive} onChange={e => setDraft(d => ({ ...d, enableActive: e.target.checked }))} className="w-3.5 h-3.5 accent-emerald-600" />
+                        </label>
                       </div>
-                      <input type="text" value={draft.activeLabel} onChange={e => setDraft(d => ({ ...d, activeLabel: e.target.value }))} placeholder="Nombre del chip" className="w-full text-[11px] px-2.5 py-1.5 rounded-lg border border-emerald-200 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-400" />
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-emerald-600 font-bold shrink-0">Activo si contactado en:</span>
-                        <input type="number" min={1} max={90} value={draft.activeContactDays} onChange={e => setDraft(d => ({ ...d, activeContactDays: +e.target.value }))} className="w-16 text-[11px] px-2 py-1 rounded-lg border border-emerald-200 bg-white text-center font-black focus:outline-none focus:ring-1 focus:ring-emerald-400" />
-                        <span className="text-[10px] text-emerald-600">días</span>
+                      <div className="px-3 py-2.5 bg-white space-y-2">
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-500 mb-1">Texto del chip</p>
+                          <input type="text" value={draft.activeLabel} onChange={e => setDraft(d => ({ ...d, activeLabel: e.target.value }))} placeholder="Ej: Activos esta semana" className="w-full text-[11px] px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-emerald-400" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-gray-500 mb-1">Lead activo si fue contactado en los últimos</p>
+                          <div className="flex items-center gap-2">
+                            <input type="number" min={1} max={90} value={draft.activeContactDays} onChange={e => setDraft(d => ({ ...d, activeContactDays: +e.target.value }))} className="w-20 text-sm px-2 py-1.5 rounded-lg border border-gray-200 text-center font-black focus:outline-none focus:ring-1 focus:ring-emerald-400" />
+                            <span className="text-[11px] text-gray-500 font-bold">días</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
+
+
                   </div>
 
                   <button
@@ -297,8 +370,9 @@ export function PipelineIntelligenceBar({ leads, activeFilter, onFilterChange, c
 export function applyPipelineFilter(leads: Lead[], filter: PipelineFilter, companyId = 'default'): Lead[] {
   if (!filter) return leads;
   let s: PipelineSettings = DEFAULT_SETTINGS;
-  try { const raw = localStorage.getItem(`pipeline_settings_${companyId}`); if (raw) s = { ...DEFAULT_SETTINGS, ...JSON.parse(raw) }; } catch {}
-  const atRisk = s.atRiskStatuses.split(',').map(x => x.trim()).filter(Boolean);
+  try { const raw = localStorage.getItem(`pipeline_settings_${companyId}`); if (raw) s = normalizeSettings(JSON.parse(raw)); } catch {}
+  const atRisk = Array.isArray(s.atRiskStatuses) ? s.atRiskStatuses : [];
+
   switch (filter) {
     case 'never_contacted': return leads.filter(l => !l.last_follow_up_at && !['Cerrado','Cliente','Perdido'].includes(l.status??'') && daysSince(l.created_at) >= s.neverContactedDays);
     case 'at_risk_quoted': return leads.filter(l => atRisk.some(x => l.status?.toLowerCase().includes(x.toLowerCase())) && hoursSince(l.last_follow_up_at??l.created_at) >= s.staleCotizadoHours);
