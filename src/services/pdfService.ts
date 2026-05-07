@@ -344,7 +344,7 @@ export const pdfService = {
                 // Fallback: buscar en BD el plan que corresponde al plan guardado
                 const { data: planData } = await supabase
                     .from('financing_plans')
-                    .select('titulo, descripcion, interes_porcentaje, tipo_ajuste')
+                    .select('titulo, descripcion, interes_porcentaje, tipo_ajuste, etiqueta_ajuste')
                     .or(`company_id.eq.${companyId},company_id.is.null`)
                     .eq('cuotas', numCuotas)
                     .eq('activo', true)
@@ -362,7 +362,7 @@ export const pdfService = {
             if (allPlans.length === 0 && companyId) {
                 const { data: plansData } = await supabase
                     .from('financing_plans')
-                    .select('titulo, descripcion, cuotas, interes_porcentaje, tipo_ajuste, es_popular')
+                    .select('titulo, descripcion, cuotas, interes_porcentaje, tipo_ajuste, es_popular, etiqueta_ajuste')
                     .eq('company_id', companyId)
                     .eq('activo', true)
                     .order('meses', { ascending: true });

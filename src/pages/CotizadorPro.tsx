@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, FileText, Receipt, Search, X, Package, Globe, Link2, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FileText, Receipt, Search, X, Package, Globe, Link2, ChevronRight, Check, Edit2 } from 'lucide-react';
 import { cotizadorService, type CotizadorPaquete, type CotizadorItem, type CotizacionCalculada } from '../services/cotizador';
 import { pricingService } from '../services/pricing';
 import type { FinancingPlan, PaymentSettings } from '../types/pricing';
@@ -74,6 +74,10 @@ export default function CotizadorPro() {
     const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
     // 🆕 Planes para comparativa: el agente selecciona hasta 2 para mostrar al prospecto
     const [selectedPlanIds, setSelectedPlanIds] = useState<string[]>([]);
+
+    // Estados para edición de etiqueta inline
+    const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
+    const [tempLabelValue, setTempLabelValue] = useState<string>('');
 
     // Permisos: super_admin ya está cubierto dentro de hasPermission(); company_admin necesita fallback
     // explícito porque no tiene entradas en role_permissions.
@@ -1347,24 +1351,63 @@ export default function CotizadorPro() {
                                                     const etiquetaLabel = selectedPlan?.etiqueta_ajuste?.trim()
                                                         || (selectedPlan?.tipo_ajuste === 'discount' ? '- Descuento anticipado' : '+ Financiamiento');
                                                     return totales.recargo_mensual_monto > 0 && showBreakdown && (
-                                                        <div className="flex justify-between text-[11px] text-blue-600 font-medium leading-none group">
-                                                            <span
-                                                                title="Click para editar etiqueta"
-                                                                className="cursor-pointer hover:underline hover:text-blue-800 transition-colors"
-                                                                onClick={() => {
-                                                                    const newLabel = window.prompt('Etiqueta del cargo en cotización:', selectedPlan?.etiqueta_ajuste || '');
-                                                                    if (newLabel !== null && selectedPlan?.id) {
-                                                                        pricingService.updateFinancingPlan(selectedPlan.id, { etiqueta_ajuste: newLabel.trim() || null } as any)
-                                                                            .then(() => {
-                                                                                setFinancingPlans(prev => prev.map(p =>
-                                                                                    p.id === selectedPlan.id ? { ...p, etiqueta_ajuste: newLabel.trim() || undefined } : p
-                                                                                ));
-                                                                            });
-                                                                    }
-                                                                }}
-                                                            >
-                                                                {etiquetaLabel} ({totales.recargo_aplicado_porcentaje}%) ✏️
-                                                            </span>
+                                                        <div className="flex justify-between text-[11px] text-blue-600 font-medium leading-none group items-center">
+                                                            {editingLabelId === selectedPlan?.id ? (
+                                                                <div className="flex items-center gap-1 bg-blue-50/50 rounded pr-1 -ml-1">
+                                                                    <input
+                                                                        type="text"
+                                                                        autoFocus
+                                                                        className="w-36 h-5 text-[10px] bg-white border border-blue-200 rounded px-1.5 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 text-blue-700"
+                                                                        value={tempLabelValue}
+                                                                        onChange={(e) => setTempLabelValue(e.target.value)}
+                                                                        onKeyDown={(e) => {
+                                                                            if (e.key === 'Enter' && selectedPlan?.id) {
+                                                                                const newLabel = tempLabelValue.trim();
+                                                                                pricingService.updateFinancingPlan(selectedPlan.id, { etiqueta_ajuste: newLabel || null } as any)
+                                                                                    .then(() => {
+                                                                                        setFinancingPlans(prev => prev.map(p => p.id === selectedPlan.id ? { ...p, etiqueta_ajuste: newLabel || undefined } : p));
+                                                                                        setEditingLabelId(null);
+                                                                                    });
+                                                                            } else if (e.key === 'Escape') {
+                                                                                setEditingLabelId(null);
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                    <button
+                                                                        className="text-green-600 hover:bg-green-100 p-0.5 rounded transition-colors"
+                                                                        onClick={() => {
+                                                                            if (selectedPlan?.id) {
+                                                                                const newLabel = tempLabelValue.trim();
+                                                                                pricingService.updateFinancingPlan(selectedPlan.id, { etiqueta_ajuste: newLabel || null } as any)
+                                                                                    .then(() => {
+                                                                                        setFinancingPlans(prev => prev.map(p => p.id === selectedPlan.id ? { ...p, etiqueta_ajuste: newLabel || undefined } : p));
+                                                                                        setEditingLabelId(null);
+                                                                                    });
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        <Check className="w-3 h-3" />
+                                                                    </button>
+                                                                    <button
+                                                                        className="text-gray-400 hover:bg-gray-200 p-0.5 rounded transition-colors"
+                                                                        onClick={() => setEditingLabelId(null)}
+                                                                    >
+                                                                        <X className="w-3 h-3" />
+                                                                    </button>
+                                                                </div>
+                                                            ) : (
+                                                                <span
+                                                                    title="Editar etiqueta en cotización"
+                                                                    className="cursor-pointer hover:underline hover:text-blue-800 transition-colors flex items-center gap-1"
+                                                                    onClick={() => {
+                                                                        setEditingLabelId(selectedPlan?.id || null);
+                                                                        setTempLabelValue(selectedPlan?.etiqueta_ajuste || '');
+                                                                    }}
+                                                                >
+                                                                    {etiquetaLabel} ({totales.recargo_aplicado_porcentaje}%)
+                                                                    <Edit2 className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                                </span>
+                                                            )}
                                                             <span className="font-bold">+${totales.recargo_mensual_monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                         </div>
                                                     );
