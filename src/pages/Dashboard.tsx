@@ -132,6 +132,14 @@ export default function Dashboard() {
     const [selectedDateRange, setSelectedDateRange] = useState<DateRange>(
         (localStorage.getItem('dashboard_selected_date_range') as DateRange) || 'all'
     );
+    // Custom date range (when user picks specific start/end)
+    const [isCustomRange, setIsCustomRange] = useState(false);
+    const [customStartDate, setCustomStartDate] = useState<string>(
+        localStorage.getItem('dashboard_custom_start') || ''
+    );
+    const [customEndDate, setCustomEndDate] = useState<string>(
+        localStorage.getItem('dashboard_custom_end') || ''
+    );
     const [refreshKey, setRefreshKey] = useState(Date.now());
 
     // Card-specific filter dropdown state
@@ -277,14 +285,24 @@ export default function Dashboard() {
                 startDate = startOfYear(now).toISOString();
                 endDate = endOfToday().toISOString();
                 break;
+                break;
             case 'all':
                 startDate = undefined;
                 endDate = undefined;
                 break;
         }
 
+        // Custom range overrides preset selection
+        if (isCustomRange && customStartDate && customEndDate) {
+            return {
+                startDate: new Date(customStartDate + 'T00:00:00').toISOString(),
+                endDate: new Date(customEndDate + 'T23:59:59').toISOString(),
+            };
+        }
+
         return { startDate, endDate };
-    }, [selectedDateRange]);
+    }, [selectedDateRange, isCustomRange, customStartDate, customEndDate]);
+
 
     // 🔒 Role-based dashboard: collaborators without dashboard_view_company only see their own stats
     const isAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
@@ -499,23 +517,29 @@ export default function Dashboard() {
         <div className="relative" ref={filterRef}>
             <button
                 onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className="flex items-center space-x-2 bg-white border border-gray-100 text-[#4449AA] px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-all shadow-sm"
+                className={`flex items-center gap-2 border px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm ${isCustomRange && customStartDate && customEndDate ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-gray-100 text-[#4449AA] hover:bg-gray-50'}`}
             >
-                <Calendar className="h-4 w-4 text-[#007BFF]" />
-                <span>{DATE_RANGE_OPTIONS[selectedDateRange].label}</span>
-                <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isFilterOpen ? 'rotate-180' : ''}`} />
+                <Calendar className={`h-4 w-4 ${isCustomRange && customStartDate ? 'text-white' : 'text-[#007BFF]'}`} />
+                <span>
+                    {isCustomRange && customStartDate && customEndDate
+                        ? `${customStartDate} → ${customEndDate}`
+                        : DATE_RANGE_OPTIONS[selectedDateRange].label}
+                </span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${isFilterOpen ? 'rotate-180' : ''} ${isCustomRange ? 'text-white/70' : 'text-gray-400'}`} />
             </button>
 
             {isFilterOpen && (
-                <div className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-50 py-2 animate-in fade-in slide-in-from-top-2">
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-50 py-2 animate-in fade-in slide-in-from-top-2">
+                    {/* Preset options */}
                     {(Object.entries(DATE_RANGE_OPTIONS) as [DateRange, { label: string }][]).map(([key, option]) => (
                         <button
                             key={key}
                             onClick={() => {
                                 setSelectedDateRange(key);
+                                setIsCustomRange(false);
                                 setIsFilterOpen(false);
                             }}
-                            className={`w-full text-left px-4 py-2 text-[11px] transition-colors flex items-center justify-between ${selectedDateRange === key
+                            className={`w-full text-left px-4 py-2 text-[11px] transition-colors flex items-center justify-between ${!isCustomRange && selectedDateRange === key
                                 ? 'bg-indigo-50 text-indigo-600 font-black'
                                 : 'text-slate-600 font-bold hover:bg-gray-50'
                                 }`}
@@ -524,13 +548,80 @@ export default function Dashboard() {
                                 {option.label}
                                 <span className="text-[9px] opacity-30 font-medium">{getDateRangeLabelDisplay(key)}</span>
                             </span>
-                            {selectedDateRange === key && <CheckCircle className="w-4 h-4 text-indigo-600" />}
+                            {!isCustomRange && selectedDateRange === key && <CheckCircle className="w-4 h-4 text-indigo-600" />}
                         </button>
                     ))}
+
+                    {/* Custom range section */}
+                    <div className="border-t border-gray-100 mt-1 pt-2 px-3 pb-2">
+                        <p className={`text-[10px] font-black uppercase tracking-widest mb-2 flex items-center gap-1.5 ${isCustomRange ? 'text-indigo-600' : 'text-gray-400'}`}>
+                            <Calendar className="w-3 h-3" /> Rango personalizado
+                            {isCustomRange && <CheckCircle className="w-3 h-3 ml-auto text-indigo-600" />}
+                        </p>
+                        <div className="space-y-1.5">
+                            <div>
+                                <p className="text-[9px] text-gray-400 font-bold mb-0.5">Desde</p>
+                                <input
+                                    type="date"
+                                    value={customStartDate}
+                                    max={customEndDate || undefined}
+                                    onChange={e => {
+                                        const val = e.target.value;
+                                        setCustomStartDate(val);
+                                        localStorage.setItem('dashboard_custom_start', val);
+                                        if (val && customEndDate) setIsCustomRange(true);
+                                    }}
+                                    className="w-full text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-400 text-slate-700"
+                                />
+                            </div>
+                            <div>
+                                <p className="text-[9px] text-gray-400 font-bold mb-0.5">Hasta</p>
+                                <input
+                                    type="date"
+                                    value={customEndDate}
+                                    min={customStartDate || undefined}
+                                    onChange={e => {
+                                        const val = e.target.value;
+                                        setCustomEndDate(val);
+                                        localStorage.setItem('dashboard_custom_end', val);
+                                        if (customStartDate && val) setIsCustomRange(true);
+                                    }}
+                                    className="w-full text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-1 focus:ring-indigo-400 text-slate-700"
+                                />
+                            </div>
+                            {customStartDate && customEndDate && (
+                                <button
+                                    onClick={() => {
+                                        setIsCustomRange(true);
+                                        setIsFilterOpen(false);
+                                    }}
+                                    className="w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black transition-all"
+                                >
+                                    Aplicar rango
+                                </button>
+                            )}
+                            {isCustomRange && (
+                                <button
+                                    onClick={() => {
+                                        setIsCustomRange(false);
+                                        setCustomStartDate('');
+                                        setCustomEndDate('');
+                                        localStorage.removeItem('dashboard_custom_start');
+                                        localStorage.removeItem('dashboard_custom_end');
+                                        setIsFilterOpen(false);
+                                    }}
+                                    className="w-full py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-500 text-[10px] font-bold transition-all"
+                                >
+                                    Limpiar rango
+                                </button>
+                            )}
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
     );
+
 
     // Si estamos en móvil o tableta y en la ruta raíz (/), mostrar el menú de accesos rápidos por defecto como Home
     if (isMobile && location.pathname === '/') {
@@ -1184,8 +1275,8 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* Row 1.5: Sales Trend over Time */}
-                <div className={`bg-white p-4 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 lg:col-span-12 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative z-0`}>
+                {/* Row 1.5: Sales Trend + Lead Alert KPIs */}
+                <div className="lg:col-span-8 bg-white p-4 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative z-0">
                     <div className="flex justify-between items-center mb-4">
                         <div className="flex flex-col">
                             <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
@@ -1245,7 +1336,94 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* Row 2: Operations Modular Grid (Opportunities + Follow-ups + Conversions) */}
+                {/* ── Lead Alert KPIs: 2 stacked cards ── */}
+                <div className="lg:col-span-4 flex flex-col gap-3">
+
+                    {/* KPI 1: Seguimientos vencidos */}
+                    {(() => {
+                        const overdueLeads = upcomingFollowUps.filter((f: any) => {
+                            try { return new Date(f.next_followup_date) < new Date(); } catch { return false; }
+                        });
+                        const urgentCount = overdueLeads.length;
+                        return (
+                            <div
+                                onClick={() => navigate('/leads', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } })}
+                                className="flex-1 bg-white rounded-2xl border border-slate-200/60 shadow-[0_2px_15px_rgb(0,0,0,0.03)] p-4 cursor-pointer hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 group flex flex-col justify-between min-h-[120px]"
+                            >
+                                <div className="flex items-start justify-between">
+                                    <div>
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1 flex items-center gap-1.5">
+                                            <Clock className="w-3 h-3" /> Seguimientos vencidos
+                                        </p>
+                                        <p className="text-[10px] text-gray-400 font-medium">Pendientes sin atender</p>
+                                    </div>
+                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${ urgentCount > 5 ? 'bg-red-100' : urgentCount > 0 ? 'bg-amber-100' : 'bg-emerald-100' }`}>
+                                        <Clock className={`w-4 h-4 ${ urgentCount > 5 ? 'text-red-600' : urgentCount > 0 ? 'text-amber-600' : 'text-emerald-600' }`} />
+                                    </div>
+                                </div>
+                                <div className="mt-3 flex items-end justify-between">
+                                    <div className="flex items-baseline gap-2">
+                                        <span className={`text-4xl font-black tracking-tighter ${ urgentCount > 5 ? 'text-red-600' : urgentCount > 0 ? 'text-amber-600' : 'text-emerald-600' }`}>{urgentCount}</span>
+                                        <span className="text-[10px] font-bold text-slate-400">leads</span>
+                                    </div>
+                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${ urgentCount > 5 ? 'bg-red-50 text-red-600' : urgentCount > 0 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600' }`}>
+                                        { urgentCount > 5 ? '🔴 Urgente' : urgentCount > 0 ? '⚠️ Revisar' : '✅ Al día' }
+                                    </span>
+                                </div>
+                                <div className="mt-3 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                    <div className={`h-full rounded-full transition-all duration-1000 ${ urgentCount > 5 ? 'bg-red-500' : urgentCount > 0 ? 'bg-amber-500' : 'bg-emerald-500' }`}
+                                        style={{ width: urgentCount > 0 ? `${Math.min(100, (urgentCount / Math.max(upcomingFollowUps.length, 1)) * 100)}%` : '100%' }}
+                                    />
+                                </div>
+                            </div>
+                        );
+                    })()}
+
+                    {/* KPI 2: Leads sin actividad +15d */}
+                    {(() => {
+                        const staleCount = funnelData
+                            .filter((s: any) => !['Cerrado', 'Cliente', 'Perdido', 'Erróneo'].includes(s.key))
+                            .reduce((sum: number, s: any) => sum + (s.value || 0), 0);
+                        const noFollowup = escalationLeads.length;
+                        return (
+                            <div
+                                onClick={() => navigate('/leads')}
+                                className="flex-1 bg-white rounded-2xl border border-slate-200/60 shadow-[0_2px_15px_rgb(0,0,0,0.03)] p-4 cursor-pointer hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 group flex flex-col justify-between min-h-[120px]"
+                            >
+                                <div className="flex items-start justify-between">
+                                    <div>
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1 flex items-center gap-1.5">
+                                            <AlertTriangle className="w-3 h-3" /> Pipeline activo
+                                        </p>
+                                        <p className="text-[10px] text-gray-400 font-medium">Leads en etapas abiertas</p>
+                                    </div>
+                                    <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
+                                        <Target className="w-4 h-4 text-indigo-600" />
+                                    </div>
+                                </div>
+                                <div className="mt-3 flex items-end justify-between">
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="text-4xl font-black tracking-tighter text-indigo-600">{staleCount}</span>
+                                        <span className="text-[10px] font-bold text-slate-400">activos</span>
+                                    </div>
+                                    {noFollowup > 0 && (
+                                        <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-orange-50 text-orange-600">
+                                            ⚠️ {noFollowup} en escalación
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="mt-3 flex items-center gap-2">
+                                    <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                        <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${stats.conversionRate}%` }} />
+                                    </div>
+                                    <span className="text-[9px] font-black text-indigo-600 shrink-0">{stats.conversionRate}% conv.</span>
+                                </div>
+                            </div>
+                        );
+                    })()}
+
+                </div>
+
                 <div className={`lg:col-span-4 bg-white rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'topOpp' ? 'z-[50]' : 'z-0'}`}>
                     <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-white">
                         <div className="flex flex-col">
