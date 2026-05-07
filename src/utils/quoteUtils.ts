@@ -34,7 +34,7 @@ export interface CotizacionData {
     subtotal_anticipo: number;
     iva_anticipo: number;
     total_mensual: number;
-    notes?: string;
+    notas?: string;
     incluir_implementacion: boolean;
     cuotas?: number;
     descripcion_pago?: string; // Para almacenar la firma/confirmación digital
