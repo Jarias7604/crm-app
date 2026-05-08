@@ -77,24 +77,59 @@ export function GlobalSearch() {
                 const targetIds: string[] = action.targetLeadIds || [];
                 if (targetIds.length === 0) throw new Error('No hay destinatarios seleccionados.');
 
-                const messages = targetIds.map((leadId: string) => ({
-                    campaign_id: null,
-                    company_id: companyId,
-                    lead_id: leadId,
-                    channel,
-                    content: action.draftBody,
-                    subject: action.draftSubject || undefined,
-                    status: 'pending',
-                    scheduled_at: new Date().toISOString()
-                }));
+                if (channel === 'telegram') {
+                    // Use the existing conversation/message system (same as the inbox — this is what actually works)
+                    let sentCount = 0;
+                    for (const leadId of targetIds) {
+                        // Find the existing Telegram conversation for this lead
+                        const { data: conv } = await supabase
+                            .from('marketing_conversations')
+                            .select('id, external_id')
+                            .eq('lead_id', leadId)
+                            .eq('company_id', companyId)
+                            .eq('channel', 'telegram')
+                            .maybeSingle();
 
-                const { error } = await supabase.from('marketing_message_queue').insert(messages);
-                if (error) throw error;
+                        if (!conv) {
+                            toast.error(`El lead no tiene conversación de Telegram activa. Debe escribir primero al bot.`);
+                            continue;
+                        }
 
-                // Auto-trigger the queue processor so messages send immediately
-                supabase.functions.invoke('process-message-queue').catch(console.error);
-                
-                toast.success(`¡${targetIds.length} mensajes enviados a la cola! Procesando...`, { id: 'ai-action' });
+                        // Insert as outbound message — the send-telegram-message webhook fires automatically
+                        const { error: msgErr } = await supabase.from('marketing_messages').insert({
+                            conversation_id: conv.id,
+                            direction: 'outbound',
+                            content: action.draftBody,
+                            type: 'text',
+                            status: 'pending',
+                            metadata: { source: 'sofia_ai' }
+                        });
+
+                        if (!msgErr) sentCount++;
+                    }
+                    toast.success(`¡${sentCount} mensaje(s) de Telegram enviados!`, { id: 'ai-action' });
+
+                } else {
+                    // Email / WhatsApp — use the queue
+                    const messages = targetIds.map((leadId: string) => ({
+                        campaign_id: null,
+                        company_id: companyId,
+                        lead_id: leadId,
+                        channel,
+                        content: action.draftBody,
+                        subject: action.draftSubject || undefined,
+                        status: 'pending',
+                        scheduled_at: new Date().toISOString()
+                    }));
+
+                    const { error } = await supabase.from('marketing_message_queue').insert(messages);
+                    if (error) throw error;
+
+                    // Auto-trigger the queue processor so messages send immediately
+                    supabase.functions.invoke('process-message-queue').catch(console.error);
+
+                    toast.success(`¡${targetIds.length} mensajes enviados a la cola! Procesando...`, { id: 'ai-action' });
+                }
             } else {
                 toast.success('¡Acción completada!', { id: 'ai-action' });
             }
