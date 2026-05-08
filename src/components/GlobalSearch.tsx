@@ -95,17 +95,23 @@ export function GlobalSearch() {
                             continue;
                         }
 
-                        // Insert as outbound message — the send-telegram-message webhook fires automatically
-                        const { error: msgErr } = await supabase.from('marketing_messages').insert({
+                        // Insert as outbound message
+                        const { data: newMsg, error: msgErr } = await supabase.from('marketing_messages').insert({
                             conversation_id: conv.id,
                             direction: 'outbound',
                             content: action.draftBody,
                             type: 'text',
                             status: 'pending',
                             metadata: { source: 'sofia_ai' }
-                        });
+                        }).select().single();
 
-                        if (!msgErr) sentCount++;
+                        if (!msgErr && newMsg) {
+                            // Explicitly trigger the send function (DB trigger may not be active)
+                            await supabase.functions.invoke('send-telegram-message', {
+                                body: { record: { ...newMsg, direction: 'outbound' } }
+                            });
+                            sentCount++;
+                        }
                     }
                     toast.success(`¡${sentCount} mensaje(s) de Telegram enviados!`, { id: 'ai-action' });
 
