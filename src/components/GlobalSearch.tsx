@@ -78,7 +78,7 @@ export function GlobalSearch() {
                 if (targetIds.length === 0) throw new Error('No hay destinatarios seleccionados.');
 
                 const messages = targetIds.map((leadId: string) => ({
-                    campaign_id: '00000000-0000-0000-0000-000000000000',
+                    campaign_id: null,
                     company_id: companyId,
                     lead_id: leadId,
                     channel,
