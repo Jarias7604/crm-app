@@ -179,15 +179,47 @@ async function sendMessage(channel: string, message: QueueMessage) {
 }
 
 async function sendTelegram(lead: any, message: QueueMessage) {
-    const { error } = await supabase.functions.invoke('send-telegram-message', {
-        body: {
-            chat_id: lead.phone, // Asumiendo que phone contiene telegram chat_id
+    // Try to get Telegram chat_id from the telegram_contacts table
+    const { data: tgContact } = await supabase
+        .from('telegram_contacts')
+        .select('chat_id, company_id')
+        .eq('lead_id', message.lead_id)
+        .maybeSingle();
+
+    const chatId = tgContact?.chat_id;
+    
+    if (!chatId) {
+        throw new Error(`Lead ${lead.name} no tiene Telegram vinculado. El lead debe enviar un mensaje primero al bot para registrarse.`);
+    }
+
+    // Get the bot token for this company
+    const { data: tgIntegration } = await supabase
+        .from('marketing_integrations')
+        .select('settings')
+        .eq('company_id', message.company_id)
+        .eq('provider', 'telegram')
+        .eq('is_active', true)
+        .maybeSingle();
+
+    const botToken = tgIntegration?.settings?.token;
+    if (!botToken) {
+        throw new Error('No hay un Bot de Telegram configurado para esta empresa. Ve a Marketing > Configuración > Telegram.');
+    }
+
+    const tgRes = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            chat_id: chatId,
             text: message.content,
             parse_mode: 'Markdown'
-        }
+        })
     });
 
-    if (error) throw error;
+    if (!tgRes.ok) {
+        const errBody = await tgRes.text();
+        throw new Error(`Telegram API Error: ${errBody}`);
+    }
 }
 
 async function sendWhatsApp(lead: any, message: QueueMessage) {
@@ -278,7 +310,9 @@ async function updateMessageStatus(
     }
 }
 
-async function updateCampaignStats(campaignId: string, event: 'sent' | 'delivered' | 'opened' | 'clicked') {
+async function updateCampaignStats(campaignId: string | null, event: 'sent' | 'delivered' | 'opened' | 'clicked') {
+    if (!campaignId) return; // AI ad-hoc messages have no campaign
+    
     // Obtener stats actuales
     const { data: campaign } = await supabase
         .from('marketing_campaigns')

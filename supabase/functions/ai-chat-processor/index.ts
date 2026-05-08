@@ -64,11 +64,14 @@ Deno.serve(async (req) => {
         // ===========================================
         // 2. LOAD AI AGENT (with system_prompt from DB)
         // ===========================================
-        const { data: agent } = await supabase.from('marketing_ai_agents')
+        const { data: agents } = await supabase.from('marketing_ai_agents')
             .select('*')
             .eq('company_id', companyId)
             .eq('is_active', true)
-            .maybeSingle();
+            .order('name', { ascending: true })
+            .limit(1);
+
+        const agent = agents?.[0] || null;
 
         if (!agent) {
             console.warn(`[AI-Processor] No active agent found for Company: ${companyId}`);
@@ -148,7 +151,7 @@ ${serviciosInfo || 'Sin servicios'}
             .eq('is_active', true)
             .maybeSingle();
 
-        const apiKey = iconf?.settings?.apiKey;
+        const apiKey = iconf?.settings?.apiKey || Deno.env.get('OPENAI_API_KEY');
         if (!apiKey) {
             log(`OpenAI API Key missing for Company: ${companyId}`);
             throw new Error("OpenAI API Key not found");

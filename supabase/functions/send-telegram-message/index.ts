@@ -67,15 +67,17 @@ Deno.serve(async (req) => {
         const payload = await req.json();
         const record = payload.record;
 
-        // NUEVO: Soporte para llamadas directas (sin record, usado por queue processor)
-        const directInvocation = payload.chat_id && payload.text;
-
-        if (!directInvocation && (!record || record.direction !== 'outbound' || record.status === 'delivered')) {
-            return new Response('Skipped', { status: 200, headers: corsHeaders });
+        // Support for direct invocations from the AI agent
+        if (!record) {
+            return new Response('No record provided', { status: 400, headers: corsHeaders });
         }
 
-        if (!record || record.direction !== 'outbound' || record.status === 'delivered') {
-            return new Response('Skipped', { status: 200, headers: corsHeaders });
+        if (record.direction !== 'outbound') {
+            return new Response('Skipped: not outbound', { status: 200, headers: corsHeaders });
+        }
+
+        if (record.status === 'delivered') {
+            return new Response('Skipped: already delivered', { status: 200, headers: corsHeaders });
         }
 
         const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
