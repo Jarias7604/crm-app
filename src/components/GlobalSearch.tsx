@@ -91,7 +91,10 @@ export function GlobalSearch() {
                 const { error } = await supabase.from('marketing_message_queue').insert(messages);
                 if (error) throw error;
 
-                toast.success(`¡${targetIds.length} mensajes enviados a la cola!`, { id: 'ai-action' });
+                // Auto-trigger the queue processor so messages send immediately
+                supabase.functions.invoke('process-message-queue').catch(console.error);
+                
+                toast.success(`¡${targetIds.length} mensajes enviados a la cola! Procesando...`, { id: 'ai-action' });
             } else {
                 toast.success('¡Acción completada!', { id: 'ai-action' });
             }
