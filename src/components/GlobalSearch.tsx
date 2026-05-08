@@ -45,10 +45,14 @@ export function GlobalSearch() {
             });
 
             if (error) throw error;
+            
+            // Si la función de edge devuelve un error en el cuerpo (status 500)
+            if (data?.error) throw new Error(data.error);
+
             setAiResult(data);
         } catch (err: any) {
             console.error('Error calling AI Agent:', err);
-            toast.error('Hubo un error contactando a Sofía.');
+            toast.error(err.message || 'Hubo un error contactando a Sofía.');
         } finally {
             setIsAiLoading(false);
         }
