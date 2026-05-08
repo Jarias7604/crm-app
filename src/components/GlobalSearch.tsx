@@ -5,6 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 import { leadsService } from '../services/leads';
 import { STATUS_CONFIG, PRIORITY_CONFIG } from '../types';
 import { useDebounce } from '../hooks/useDebounce';
+import { supabase } from '../services/supabase';
+import { toast } from 'react-hot-toast';
 
 export function GlobalSearch() {
     const [isOpen, setIsOpen] = useState(false);
@@ -16,8 +18,9 @@ export function GlobalSearch() {
     // Debounce the search query to avoid spamming the database while typing
     const debouncedQuery = useDebounce(query, 300);
 
-    const isAiMode = debouncedQuery.startsWith('/ai') || debouncedQuery.toLowerCase().includes('resumen') || debouncedQuery.toLowerCase().includes('analisis') || debouncedQuery.toLowerCase().includes('seguimiento');
-    const isAiFollowUps = isAiMode && debouncedQuery.toLowerCase().includes('seguimiento');
+    const isAiMode = debouncedQuery.startsWith('/ai') || query.startsWith('/ai');
+    const [aiResult, setAiResult] = useState<{ message: string; suggestedAction?: any } | null>(null);
+    const [isAiLoading, setIsAiLoading] = useState(false);
 
     const { data: results, isLoading } = useQuery({
         queryKey: ['global-search', debouncedQuery],
@@ -29,21 +32,67 @@ export function GlobalSearch() {
         staleTime: 1000 * 60, // 1 minute cache
     });
 
-    const { data: aiAnalytics, isLoading: isAiLoading } = useQuery({
-        queryKey: ['ai-analytics-summary', debouncedQuery, isAiFollowUps],
-        queryFn: async () => {
-            if (!isAiMode) return null;
-            // Simulated AI delay to show "thinking" effect
-            await new Promise(r => setTimeout(r, 800));
-            if (isAiFollowUps) {
-                return await leadsService.getFollowUpsAnalyticsSummary();
+    const handleAiSubmit = async () => {
+        if (!query.trim()) return;
+        setIsAiLoading(true);
+        setAiResult(null);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', session?.user?.id).single();
+            
+            const { data, error } = await supabase.functions.invoke('dashboard-ai-agent', {
+                body: { prompt: query, companyId: profile?.company_id }
+            });
+
+            if (error) throw error;
+            setAiResult(data);
+        } catch (err: any) {
+            console.error('Error calling AI Agent:', err);
+            toast.error('Hubo un error contactando a Sofía.');
+        } finally {
+            setIsAiLoading(false);
+        }
+    };
+
+    const executeAction = async (action: any) => {
+        try {
+            toast.loading('Ejecutando acción...', { id: 'ai-action' });
+            
+            const { data: { session } } = await supabase.auth.getSession();
+            const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', session?.user?.id).single();
+            const companyId = profile?.company_id;
+
+            if (action.type === 'send_email' || action.type === 'send_whatsapp' || action.type === 'send_telegram') {
+                const channel = action.type.split('_')[1]; // email, whatsapp, telegram
+                const targetIds = action.targetLeadIds || [];
+                
+                if (targetIds.length === 0) throw new Error('No hay destinatarios seleccionados.');
+
+                const messages = targetIds.map((leadId: string) => ({
+                    company_id: companyId,
+                    lead_id: leadId,
+                    channel: channel,
+                    content: action.draftBody,
+                    subject: action.draftSubject || undefined,
+                    status: 'pending',
+                    scheduled_at: new Date().toISOString()
+                }));
+
+                const { error } = await supabase.from('message_queue').insert(messages);
+                if (error) throw error;
+                
+                toast.success(`¡Enviados ${targetIds.length} mensajes a la cola!`, { id: 'ai-action' });
             } else {
-                return await leadsService.getLeadsAnalyticsSummary();
+                toast.success('¡Acción completada!', { id: 'ai-action' });
             }
-        },
-        enabled: isOpen && isAiMode,
-        staleTime: 1000 * 60 * 5, // 5 minutes
-    });
+
+            setAiResult(null);
+            setQuery('');
+        } catch (err: any) {
+            console.error('Action error:', err);
+            toast.error('Error al ejecutar la acción: ' + err.message, { id: 'ai-action' });
+        }
+    };
 
     // Keyboard shortcut to open (Cmd+K or Ctrl+K)
     useEffect(() => {
@@ -96,7 +145,11 @@ export function GlobalSearch() {
             }
             if (e.key === 'Enter') {
                 e.preventDefault();
-                const lead = results[selectedIndex];
+                if (isAiMode && query.trim().length > 0) {
+                    handleAiSubmit();
+                    return;
+                }
+                const lead = results?.[selectedIndex];
                 if (lead) {
                     setIsOpen(false);
                     // Navigate to Leads page and open the specific lead
@@ -130,14 +183,31 @@ export function GlobalSearch() {
                         ref={inputRef}
                         type="text"
                         className="flex-1 bg-transparent border-0 focus:ring-0 text-lg font-medium text-gray-900 placeholder-gray-400 px-4 w-full outline-none"
-                        placeholder="Busca por nombre, empresa, email o teléfono..."
+                        placeholder="Busca un lead o pregunta a la IA usando /ai ..."
                         value={query}
                         onChange={(e) => {
                             setQuery(e.target.value);
                             setSelectedIndex(0);
+                            if (!e.target.value.startsWith('/ai')) {
+                                setAiResult(null);
+                            }
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && isAiMode) {
+                                e.preventDefault();
+                                handleAiSubmit();
+                            }
                         }}
                     />
-                    {isLoading && debouncedQuery.length >= 2 && (
+                    {isAiMode && !isAiLoading && (
+                        <button
+                            onClick={handleAiSubmit}
+                            className="mr-3 px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5"
+                        >
+                            Preguntar <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                    )}
+                    {isLoading && debouncedQuery.length >= 2 && !isAiMode && (
                         <Loader2 className="w-5 h-5 text-gray-400 animate-spin absolute right-16" />
                     )}
                     <button 
@@ -151,106 +221,53 @@ export function GlobalSearch() {
 
                 {/* Results Area */}
                 <div className="max-h-[60vh] overflow-y-auto overscroll-contain">
-                    {(isLoading || isAiLoading) && debouncedQuery.length >= 2 ? (
+                    {(isLoading || isAiLoading) && (debouncedQuery.length >= 2 || isAiMode) ? (
                         <div className="p-12 text-center flex flex-col items-center justify-center">
                             <div className="relative">
                                 {isAiMode && <div className="absolute inset-0 bg-purple-500/20 blur-xl rounded-full animate-pulse" />}
                                 <Loader2 className={`w-10 h-10 animate-spin relative z-10 ${isAiMode ? 'text-purple-500' : 'text-indigo-500'}`} />
                             </div>
-                            <p className="mt-4 font-bold text-gray-900">{isAiMode ? 'La IA está analizando tus datos...' : 'Buscando...'}</p>
-                            {isAiMode && <p className="text-xs text-gray-500 mt-1">Evaluando estado del pipeline...</p>}
+                            <p className="mt-4 font-bold text-gray-900">{isAiMode ? 'Sofía está pensando...' : 'Buscando...'}</p>
+                            {isAiMode && <p className="text-xs text-gray-500 mt-1">Analizando tu base de datos en tiempo real...</p>}
                         </div>
-                    ) : isAiMode && aiAnalytics ? (
+                    ) : isAiMode && aiResult ? (
                         <div className="p-6">
-                            <div className={`bg-gradient-to-br border rounded-2xl p-6 shadow-inner relative overflow-hidden ${
-                                (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'red' ? 'from-red-50 to-orange-50 border-red-200' :
-                                (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'amber' ? 'from-amber-50 to-orange-50 border-amber-200' :
-                                (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'emerald' ? 'from-emerald-50 to-teal-50 border-emerald-200' :
-                                'from-purple-50 to-indigo-50 border-purple-100'
-                            }`}>
-                                <div className={`absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl ${
-                                    (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'red' ? 'bg-red-500/10' :
-                                    (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'amber' ? 'bg-amber-500/10' :
-                                    (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'emerald' ? 'bg-emerald-500/10' :
-                                    'bg-purple-500/10'
-                                }`} />
+                            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-100 rounded-2xl p-6 shadow-inner relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-3xl" />
                                 
                                 <div className="flex items-start gap-4 relative z-10">
-                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-lg ${
-                                        (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'red' ? 'bg-red-500 shadow-red-500/30' :
-                                        (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'amber' ? 'bg-amber-500 shadow-amber-500/30' :
-                                        (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'emerald' ? 'bg-emerald-500 shadow-emerald-500/30' :
-                                        'bg-purple-500 shadow-purple-500/30'
-                                    }`}>
+                                    <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-purple-500/30">
                                         <Sparkles className="w-6 h-6 text-white" />
                                     </div>
                                     <div className="space-y-4 flex-1">
                                         <div>
-                                            <h3 className={`text-sm font-black uppercase tracking-wider mb-1 ${
-                                                (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'red' ? 'text-red-900' :
-                                                (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'amber' ? 'text-amber-900' :
-                                                (aiAnalytics as any).type === 'followups' && (aiAnalytics as any).aiColor === 'emerald' ? 'text-emerald-900' :
-                                                'text-purple-900'
-                                            }`}>
-                                                AI Consultant {(aiAnalytics as any).type === 'followups' ? '- Seguimientos' : '- Cierres'}
+                                            <h3 className="text-sm font-black uppercase tracking-wider mb-1 text-purple-900">
+                                                Sofía AI - Operations Manager
                                             </h3>
                                             <p className="text-gray-800 font-medium leading-relaxed">
-                                                {(aiAnalytics as any).aiMessage.split('**').map((part, i) => 
-                                                    i % 2 === 1 ? <span key={i} className="font-black text-gray-900">{part}</span> : part
-                                                )}
+                                                {aiResult.message}
                                             </p>
                                         </div>
 
-                                        {(aiAnalytics as any).type === 'leads' && (
-                                            <div className="grid grid-cols-2 gap-4 mt-4">
-                                                <div className="bg-white rounded-xl p-4 shadow-sm border border-purple-100/50">
-                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Cierres del Mes</p>
-                                                    <div className="flex items-end gap-2">
-                                                        <span className="text-2xl font-black text-gray-900">{(aiAnalytics as any).wonThisMonth}</span>
-                                                        <span className="text-sm font-bold text-gray-400 mb-0.5">/ {(aiAnalytics as any).wonLastMonth} (mes ant.)</span>
-                                                    </div>
-                                                    <div className={`flex items-center gap-1 mt-2 text-xs font-bold ${(aiAnalytics as any).growthPercentage >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                                                        {(aiAnalytics as any).growthPercentage >= 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-                                                        <span>{Math.abs((aiAnalytics as any).growthPercentage)}% vs mes pasado</span>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div className="bg-white rounded-xl p-4 shadow-sm border border-purple-100/50">
-                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Proyección</p>
-                                                    <div className="flex items-end gap-2">
-                                                        <span className="text-2xl font-black text-gray-900">${(aiAnalytics as any).valueThisMonth.toLocaleString()}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-1 mt-2 text-xs font-bold text-indigo-500">
-                                                        <Activity className="w-3.5 h-3.5" />
-                                                        <span>Tendencia en tiempo real</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {(aiAnalytics as any).type === 'followups' && (
-                                            <div className="grid grid-cols-3 gap-4 mt-4">
-                                                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Vencidos</p>
-                                                    <div className="flex items-center gap-2">
-                                                        <AlertTriangle className={`w-4 h-4 ${(aiAnalytics as any).overdue > 0 ? 'text-red-500' : 'text-gray-300'}`} />
-                                                        <span className={`text-2xl font-black ${(aiAnalytics as any).overdue > 0 ? 'text-red-600' : 'text-gray-900'}`}>{(aiAnalytics as any).overdue}</span>
-                                                    </div>
-                                                </div>
-                                                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Para Hoy</p>
-                                                    <div className="flex items-center gap-2">
-                                                        <CalendarCheck className="w-4 h-4 text-amber-500" />
-                                                        <span className="text-2xl font-black text-gray-900">{(aiAnalytics as any).today}</span>
-                                                    </div>
-                                                </div>
-                                                <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Hechos (Semana)</p>
-                                                    <div className="flex items-center gap-2">
-                                                        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                                                        <span className="text-2xl font-black text-gray-900">{(aiAnalytics as any).completed}</span>
-                                                    </div>
-                                                </div>
+                                        {aiResult.suggestedAction && aiResult.suggestedAction.type !== 'none' && (
+                                            <div className="mt-4 bg-white/80 rounded-xl p-4 border border-purple-100/50 shadow-sm">
+                                                <p className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                                                    <Command className="w-3.5 h-3.5" /> Borrador Sugerido
+                                                </p>
+                                                {aiResult.suggestedAction.draftSubject && (
+                                                    <p className="text-sm font-bold text-gray-900 mb-1">
+                                                        Asunto: {aiResult.suggestedAction.draftSubject}
+                                                    </p>
+                                                )}
+                                                <p className="text-sm text-gray-600 mb-4 whitespace-pre-wrap">
+                                                    {aiResult.suggestedAction.draftBody}
+                                                </p>
+                                                <button
+                                                    onClick={() => executeAction(aiResult.suggestedAction)}
+                                                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+                                                >
+                                                    Ejecutar Acción ({aiResult.suggestedAction.targetLeadIds?.length || 0} leads)
+                                                </button>
                                             </div>
                                         )}
                                     </div>
