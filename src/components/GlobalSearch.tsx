@@ -69,6 +69,7 @@ export function GlobalSearch() {
                 if (targetIds.length === 0) throw new Error('No hay destinatarios seleccionados.');
 
                 const messages = targetIds.map((leadId: string) => ({
+                    campaign_id: '00000000-0000-0000-0000-000000000000', // AI ad-hoc messages
                     company_id: companyId,
                     lead_id: leadId,
                     channel: channel,
@@ -78,7 +79,7 @@ export function GlobalSearch() {
                     scheduled_at: new Date().toISOString()
                 }));
 
-                const { error } = await supabase.from('message_queue').insert(messages);
+                const { error } = await supabase.from('marketing_message_queue').insert(messages);
                 if (error) throw error;
                 
                 toast.success(`¡Enviados ${targetIds.length} mensajes a la cola!`, { id: 'ai-action' });
