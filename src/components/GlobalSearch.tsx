@@ -281,10 +281,24 @@ export function GlobalSearch() {
                             <p className="font-medium text-gray-900">Empieza a escribir para buscar</p>
                             <p className="text-sm mt-1">Soportamos búsquedas de texto e <span className="font-bold text-purple-500">Insights con IA (ej: "/ai resumen")</span>.</p>
                         </div>
-                    ) : displayResults.length === 0 && !isLoading && !isAiMode ? (
-                        <div className="p-12 text-center text-gray-500">
-                            <p className="font-medium text-gray-900">No encontramos resultados para "{query}"</p>
-                            <p className="text-sm mt-1">Revisa la ortografía o intenta con otro término.</p>
+                    ) : isAiMode && !aiResult ? (
+                        <div className="p-12 text-center flex flex-col items-center justify-center bg-gradient-to-b from-transparent to-purple-50/30">
+                            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 relative overflow-hidden">
+                                <div className="absolute inset-0 bg-purple-500/20 blur-md animate-pulse" />
+                                <Sparkles className="w-8 h-8 text-purple-600 relative z-10" />
+                            </div>
+                            <p className="text-gray-900 font-black text-lg">Modo Sofía AI Activado</p>
+                            <p className="text-sm text-gray-500 mt-2 max-w-sm mx-auto">
+                                Presiona <kbd className="px-2 py-1 bg-white border border-gray-200 rounded-md text-xs font-mono font-bold mx-1 shadow-sm">Enter</kbd> para enviarle tu instrucción operativa.
+                            </p>
+                        </div>
+                    ) : debouncedQuery.length >= 2 && results?.length === 0 && !isAiMode ? (
+                        <div className="p-12 text-center">
+                            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Search className="w-8 h-8 text-gray-300" />
+                            </div>
+                            <p className="text-gray-500 font-medium">No encontramos resultados para "{query}"</p>
+                            <p className="text-sm text-gray-400 mt-1">Revisa la ortografía o intenta con otro término.</p>
                         </div>
                     ) : (
                         <div className="p-2 space-y-1">
