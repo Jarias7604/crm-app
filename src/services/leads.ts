@@ -655,20 +655,20 @@ export const leadsService = {
     // Get follow-ups for Calendar view — windowed date range query
     // Uses idx_follow_ups_company_id_date index for fast lookup
     // Only loads events for the visible months (not all 1,100+ records)
-    async getCalendarFollowUps(startDate?: string, endDate?: string) {
+    async getCalendarFollowUps(startDate?: string, endDate?: string, assignedTo?: string) {
         // Default: 1 month back + 2 months forward from today
         const defaultStart = new Date();
         defaultStart.setMonth(defaultStart.getMonth() - 1);
         defaultStart.setDate(1);
 
         const defaultEnd = new Date();
-        defaultEnd.setMonth(defaultEnd.getMonth() + 3);
-        defaultEnd.setDate(0); // Last day of month+2
+        defaultEnd.setMonth(defaultEnd.getMonth() + 2);
+        defaultEnd.setDate(0); // Last day of month+1
 
         const from = startDate ?? defaultStart.toISOString();
         const to   = endDate   ?? defaultEnd.toISOString();
 
-        const { data, error } = await supabase
+        let query = supabase
             .from('follow_ups')
             .select(`
                 id, date, notes, action_type, assigned_to,
@@ -679,7 +679,13 @@ export const leadsService = {
             .gte('date', from)
             .lte('date', to)
             .order('date', { ascending: false })
-            .limit(600);
+            .limit(5000);
+
+        if (assignedTo) {
+            query = query.eq('assigned_to', assignedTo);
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
         return (data || []) as unknown as Array<{

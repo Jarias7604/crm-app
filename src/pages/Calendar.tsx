@@ -131,25 +131,26 @@ export default function Calendar() {
     const calendarCollabRef = useRef<HTMLDivElement>(null);
     const queryClient = useQueryClient();
 
-    // Ventana dinámica: 1 mes atrás + 2 meses adelante de la vista actual
+    // Ventana dinámica: 1 mes atrás + 1 mes adelante de la vista actual
     // Así solo cargamos los eventos del periodo visible, no los 1,100+ registros
     const windowStart = useMemo(() =>
         startOfMonth(subMonths(currentDate, 1)).toISOString(),
         [currentDate]
     );
     const windowEnd = useMemo(() =>
-        endOfMonth(addMonths(currentDate, 2)).toISOString(),
+        endOfMonth(addMonths(currentDate, 1)).toISOString(),
         [currentDate]
     );
 
-    // React Query — cache 5 min por ventana de mes
-    // queryKey incluye fechas: navegar de mes cambia la clave → carga solo lo necesario
+    // React Query — cache 1 min por ventana de mes
+    // queryKey incluye fechas y responsable: navegar cambia la clave → carga solo lo necesario
     const { data: calendarEventsData, isLoading: loading } = useQuery({
-        queryKey: ['calendar-follow-ups', windowStart, windowEnd],
-        queryFn: () => leadsService.getCalendarFollowUps(windowStart, windowEnd),
-        staleTime: 5 * 60 * 1000,
+        queryKey: ['calendar-follow-ups', windowStart, windowEnd, selectedCalendarCollabId],
+        queryFn: () => leadsService.getCalendarFollowUps(windowStart, windowEnd, selectedCalendarCollabId),
+        staleTime: 1 * 60 * 1000,
         gcTime: 15 * 60 * 1000,
         placeholderData: (previousData) => previousData, // muestra mes anterior mientras carga el nuevo
+
     });
     const calendarEvents = calendarEventsData ?? [];
 
