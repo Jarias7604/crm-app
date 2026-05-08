@@ -206,28 +206,51 @@ async function sendEmail(lead: any, message: QueueMessage) {
         throw new Error('Lead has no email');
     }
 
-    // Obtener configuración SMTP de la empresa
-    const { data: integration } = await supabase
+    // 1. Intentar obtener config de Resend del inquilino
+    const { data: tenantResend } = await supabase
         .from('marketing_integrations')
         .select('settings')
         .eq('company_id', message.company_id)
-        .eq('provider', 'smtp')
+        .eq('provider', 'resend')
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
-    if (!integration) {
-        throw new Error('No SMTP configuration found for company');
-    }
+    // 2. Intentar obtener config de Resend de la plataforma (Arias Defense fallback)
+    const { data: platformResend } = await supabase
+        .from('marketing_integrations')
+        .select('settings')
+        .eq('company_id', '7a582ba5-f7d0-4ae3-9985-35788deb1c30')
+        .eq('provider', 'resend')
+        .eq('is_active', true)
+        .maybeSingle();
 
-    // TODO: Implementar envío real de email con SMTP
-    // Por ahora, solo loggear
-    console.log(`📧 Would send email to ${lead.email}:`, {
-        subject: message.subject || 'Notificación',
-        content: message.content
+    const activeResend = tenantResend || platformResend;
+    let resendToken = Deno.env.get("RESEND_API_KEY");
+    
+    if (activeResend?.settings?.apiKey) resendToken = activeResend.settings.apiKey;
+    
+    if (!resendToken) throw new Error('Missing Resend API Key');
+
+    let senderName = activeResend?.settings?.senderName || "CRM Operaciones";
+    let senderEmail = activeResend?.settings?.senderEmail || "ventas@ariasdefense.com";
+    const fromDisplay = `${senderName} <${senderEmail}>`;
+
+    const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${resendToken}` },
+        body: JSON.stringify({ 
+            from: fromDisplay, 
+            to: lead.email, 
+            subject: message.subject || 'Notificación del CRM', 
+            html: message.content 
+        })
     });
 
-    // Temporalmente marcar como enviado para testing
-    // await sendEmailViaSMTP(lead.email, message.subject, message.content, integration.settings);
+    if (!res.ok) { 
+        const e = await res.text(); 
+        console.error("Resend Error:", e); 
+        throw new Error(`Resend Error: ${e}`); 
+    }
 }
 
 async function sendSMS(lead: any, message: QueueMessage) {
