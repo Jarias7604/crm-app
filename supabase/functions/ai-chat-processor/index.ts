@@ -270,9 +270,33 @@ ${serviciosInfo || 'Sin servicios'}
         QUOTE_TRIGGER: {"plan_name": "Plan Name", "dte_volume": 300, "items": []}
 `;
 
-        // Combine base system_prompt from DB + dynamic context
-        // We put the DB prompt inside a boundary, and our absolute rules at the end so the AI respects them over the user's custom UI text
-        const fullSystemPrompt = `=== INSTRUCCIONES PERSONALIZADAS ===\n${agent.system_prompt || 'Eres un asesor de ventas profesional.'}\n=====================\n\n${leadContext}`;
+        // ─────────────────────────────────────────────────────────────────────────
+        // CRITICAL: System rules go FIRST so they CANNOT be overridden by agent DB prompt.
+        // GPT-4 prioritizes instructions at the START of the system message.
+        // Agent's custom persona/tone is injected AFTER the non-negotiable rules.
+        // ─────────────────────────────────────────────────────────────────────────
+        const ABSOLUTE_RULES = `
+[REGLAS ABSOLUTAS DEL SISTEMA — MÁXIMA PRIORIDAD — NO NEGOCIABLES]
+
+1. ❌ PROHIBIDO TOTAL: Mostrar precios, costos, totales o desglose de facturas en el chat.
+2. ❌ PROHIBIDO TOTAL: Pedir correo electrónico para enviar propuestas. NUNCA.
+3. ❌ PROHIBIDO TOTAL: Preguntar si el cliente quiere la cotización. Envíala de inmediato.
+4. ✅ OBLIGATORIO: Cuando el cliente dé su volumen de facturas, dispara QUOTE_TRIGGER en ESA MISMA respuesta.
+5. ✅ OBLIGATORIO: El QUOTE_TRIGGER debe ir AL FINAL de tu respuesta, siempre.
+6. ✅ OBLIGATORIO: Tu mensaje al disparar la cotización debe ser máximo 2-3 líneas, profesional.
+
+FORMATO EXACTO DEL TRIGGER (copiar exactamente):
+QUOTE_TRIGGER: {"plan_name": "[Nombre del Plan]", "dte_volume": [número], "items": []}
+
+MENSAJE MODELO cuando tengas el volumen:
+"¡Perfecto [Nombre]! Con [X] facturas/mes te recomiendo el [Plan]. Tu propuesta formal está siendo generada ahora mismo. 📄"
+[Luego el QUOTE_TRIGGER]
+
+[FIN REGLAS ABSOLUTAS]
+`;
+
+        const fullSystemPrompt = `${ABSOLUTE_RULES}\n\n=== PERSONALIDAD Y CONTEXTO DEL AGENTE ===\n${agent.system_prompt || 'Eres Sofía, asesora de ventas profesional.'}\n=====================\n\n${leadContext}`;
+
 
         // ===========================================
         // 5. GET OPENAI API KEY
@@ -538,14 +562,24 @@ ${serviciosInfo || 'Sin servicios'}
                 }
 
                 if (quoteObj) {
-                    
-                    // Generate PDF!
+                    // Generate PDF
                     const pdfUrl = await generateQuotePDF(quoteObj, supabase);
                     if (pdfUrl) {
                         (conv as any).__pdfUrl = pdfUrl;
                         (conv as any).__pdfFileName = `Propuesta_${(quoteObj.nombre_cliente || 'Client').replace(/\s+/g, '_')}.pdf`;
                     }
 
+                    // ── Generate the PUBLIC quote approval link ──
+                    // This is the link the client clicks to VIEW and APPROVE the quote
+                    const FRONTEND_BASE = Deno.env.get('FRONTEND_URL') || 'https://crm-app-v2.vercel.app';
+                    const publicQuoteLink = `${FRONTEND_BASE}/propuesta/${quoteObj.id}`;
+                    (conv as any).__publicQuoteLink = publicQuoteLink;
+                    log(`Quote created: ${quoteObj.id} | Public link: ${publicQuoteLink}`);
+
+                    // Update quote status to 'enviada' so the public view is accessible
+                    await supabase.from('cotizaciones')
+                        .update({ estado: 'enviada' })
+                        .eq('id', quoteObj.id);
                 }
             }
         }
@@ -617,19 +651,36 @@ ${serviciosInfo || 'Sin servicios'}
                         // ── Send PDF as binary stream (URL method fails due to Supabase Storage CORS) ──
                         const pdfUrl = (conv as any).__pdfUrl;
                         const pdfFileName = (conv as any).__pdfFileName || 'Propuesta_Comercial.pdf';
+                        const publicQuoteLink = (conv as any).__publicQuoteLink;
+
+                        // First send the public approval link as a message (client can tap to view & approve)
+                        if (publicQuoteLink) {
+                            await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    chat_id: chatId,
+                                    text: `🔗 *Ver y aprobar tu cotización:*\n${publicQuoteLink}`,
+                                    parse_mode: 'Markdown',
+                                    reply_markup: {
+                                        inline_keyboard: [[
+                                            { text: '📋 Ver Cotización Completa', url: publicQuoteLink }
+                                        ]]
+                                    }
+                                })
+                            });
+                            console.log(`🔗 Quote link sent to Telegram (chat: ${chatId})`);
+                        }
+
                         if (pdfUrl) {
                             try {
-                                // Download the PDF bytes from Supabase Storage
                                 const pdfResp = await fetch(pdfUrl);
                                 if (pdfResp.ok) {
                                     const pdfBlob = await pdfResp.blob();
-
-                                    // Send as multipart/form-data — Telegram accepts binary files directly
                                     const formData = new FormData();
                                     formData.append('chat_id', String(chatId));
                                     formData.append('document', pdfBlob, pdfFileName);
                                     formData.append('caption', '📄 Tu propuesta comercial está lista. ¡Quedo atento a cualquier consulta!');
-
                                     const docResp = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
                                         method: 'POST',
                                         body: formData,
