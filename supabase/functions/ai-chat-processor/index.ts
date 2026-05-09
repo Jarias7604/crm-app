@@ -614,20 +614,36 @@ ${serviciosInfo || 'Sin servicios'}
                             .eq('id', savedMsg.id);
                         console.log(`✅ Message delivered to Telegram (chat: ${chatId})`);
 
-                        
-                        // ── Send PDF as Document ──────────────
+                        // ── Send PDF as binary stream (URL method fails due to Supabase Storage CORS) ──
                         const pdfUrl = (conv as any).__pdfUrl;
+                        const pdfFileName = (conv as any).__pdfFileName || 'Propuesta_Comercial.pdf';
                         if (pdfUrl) {
-                            await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    chat_id: chatId,
-                                    document: pdfUrl,
-                                    caption: "Aquí está tu propuesta comercial en PDF 📄"
-                                })
-                            });
-                            console.log(`📊 PDF sent to Telegram (chat: ${chatId})`);
+                            try {
+                                // Download the PDF bytes from Supabase Storage
+                                const pdfResp = await fetch(pdfUrl);
+                                if (pdfResp.ok) {
+                                    const pdfBlob = await pdfResp.blob();
+
+                                    // Send as multipart/form-data — Telegram accepts binary files directly
+                                    const formData = new FormData();
+                                    formData.append('chat_id', String(chatId));
+                                    formData.append('document', pdfBlob, pdfFileName);
+                                    formData.append('caption', '📄 Tu propuesta comercial está lista. ¡Quedo atento a cualquier consulta!');
+
+                                    const docResp = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
+                                        method: 'POST',
+                                        body: formData,
+                                    });
+                                    const docResult = await docResp.json();
+                                    if (docResult.ok) {
+                                        console.log(`📊 PDF sent as binary to Telegram (chat: ${chatId})`);
+                                    } else {
+                                        console.error('Telegram sendDocument error:', docResult);
+                                    }
+                                }
+                            } catch (pdfErr) {
+                                console.error('PDF binary send failed:', pdfErr);
+                            }
                         }
 
                     } else {

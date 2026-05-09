@@ -504,6 +504,32 @@ export default function Leads() {
         return applyPipelineFilter(base, pipelineFilter, profile?.company_id);
     }, [leads, canViewAllLeads, profile?.id, priorityFilter, assignedFilter, statusFilter, sourceFilter, lossReasonFilter, lostAtStageFilter, filteredLeadId, filteredLeadIds, searchTerm, startDateFilter, endDateFilter, minContactCountFilter, pipelineFilter]);
 
+    // Leads that have passed ALL filters EXCEPT the pipeline chip filter.
+    // Used so chip counters respect the active date/status/priority filters.
+    const prePipelineLeads = useMemo(() => {
+        return filteredLeads.length > 0 || pipelineFilter === null
+            ? filteredLeads  // if no pipeline filter active, this IS filteredLeads
+            : leads.filter(lead => {
+                if (!lead) return false;
+                if (!canViewAllLeads && lead.assigned_to !== profile?.id) return false;
+                if (filteredLeadId) return lead.id === filteredLeadId;
+                if (filteredLeadIds && !filteredLeadIds.includes(lead.id)) return false;
+                if (startDateFilter || endDateFilter) {
+                    const isWonFilter = Array.isArray(statusFilter)
+                        ? (statusFilter.includes('Cerrado') || statusFilter.includes('Cliente'))
+                        : (statusFilter === 'Cerrado' || statusFilter === 'Cliente');
+                    const dateToCompare = (isWonFilter && (lead.status === 'Cerrado' || lead.status === 'Cliente') && lead.internal_won_date)
+                        ? new Date(lead.internal_won_date)
+                        : new Date(lead.created_at);
+                    const startBound = startDateFilter ? new Date(startDateFilter + 'T00:00:00') : null;
+                    const endBound = endDateFilter ? new Date(endDateFilter + 'T23:59:59') : null;
+                    if (startBound && dateToCompare < startBound) return false;
+                    if (endBound && dateToCompare > endBound) return false;
+                }
+                return true;
+            });
+    }, [filteredLeads, pipelineFilter, leads, canViewAllLeads, profile?.id, filteredLeadId, filteredLeadIds, startDateFilter, endDateFilter, statusFilter]);
+
     const sortedLeads = useMemo(() => {
         if (!sortConfig) return filteredLeads;
         return [...filteredLeads].sort((a, b) => {
@@ -1179,7 +1205,7 @@ export default function Leads() {
                 {/* Mobile loading indicator for List/Kanban modes */}
                 {/* ─── Pipeline Intelligence Bar ──────────────────────── */}
                 <PipelineIntelligenceBar
-                    leads={leads}
+                    leads={prePipelineLeads}
                     activeFilter={pipelineFilter}
                     onFilterChange={setPipelineFilter}
                     companyId={profile?.company_id}
