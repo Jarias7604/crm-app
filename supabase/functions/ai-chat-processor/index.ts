@@ -113,7 +113,47 @@ Deno.serve(async (req) => {
 
     try {
         const body = await req.json().catch(() => ({}));
-        const { conversationId } = body;
+        const { conversationId, isTest, message: testMessage, agent: testAgent } = body;
+
+        // ── SIMULATOR MODE (isTest: true) ─────────────────────────────────────────
+        // Called from the AiAgentsConfig page. No real conversation/lead needed.
+        // Just run the AI with the agent's system_prompt and return the reply.
+        if (isTest) {
+            log('Running in SIMULATOR mode (isTest=true)');
+            const agentPrompt = testAgent?.system_prompt || 'Eres un asesor de ventas profesional.';
+            const companyId = testAgent?.company_id || 'test';
+
+            // Get OpenAI key
+            const { data: iconf } = await supabase.from('marketing_integrations')
+                .select('settings')
+                .eq('company_id', companyId)
+                .eq('provider', 'openai')
+                .eq('is_active', true)
+                .maybeSingle();
+            const apiKey = iconf?.settings?.apiKey || Deno.env.get('OPENAI_API_KEY');
+            if (!apiKey) return new Response(JSON.stringify({ error: 'OpenAI API Key not configured', logs }), { status: 400, headers: corsHeaders });
+
+            const ABSOLUTE_RULES = `[REGLAS ABSOLUTAS]\n1. ❌ NO muestres precios en el chat.\n2. ❌ NO pidas correo electrónico.\n3. ✅ Cuando el cliente dé su volumen, responde en máx 3 líneas y menciona que su propuesta está siendo generada.\n[FIN REGLAS]`;
+
+            const aiResp = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: 'gpt-4o',
+                    messages: [
+                        { role: 'system', content: `${ABSOLUTE_RULES}\n\n${agentPrompt}` },
+                        { role: 'user', content: testMessage || 'Hola' }
+                    ],
+                    temperature: 0.2
+                })
+            });
+            const aiData = await aiResp.json();
+            const reply = aiData.choices?.[0]?.message?.content || 'Sin respuesta';
+            // Strip QUOTE_TRIGGER from simulator display (it won't execute in test mode)
+            const cleanReply = reply.replace(/QUOTE_TRIGGER:[^\n]*/gi, '✅ [Cotización automática se generaría aquí]').trim();
+            return new Response(JSON.stringify({ reply: cleanReply, logs }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        // ── END SIMULATOR MODE ────────────────────────────────────────────────────
 
         if (typeof conversationId !== 'string') {
             log(`Invalid conversationId type: ${typeof conversationId}`);
@@ -142,6 +182,7 @@ Deno.serve(async (req) => {
         const lead = conv.lead;
         const chatId = conv.external_id;
         console.log(`[AI-Processor] Company: ${companyId}, Lead: ${lead?.id}, Chat: ${chatId}`);
+
 
         // ── Enterprise Rate Limiting (10 AI calls/min per company) ──
         const rl = checkRateLimit(companyId, 'ai');
