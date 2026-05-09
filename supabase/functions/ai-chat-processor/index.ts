@@ -325,10 +325,11 @@ ${serviciosInfo || 'Sin servicios'}
         const lastMsg = history?.[0];
         log(`History count: ${history?.length || 0}. Last message direction: ${lastMsg?.direction}`);
 
-        // Skip if last message was outbound (avoid double-response)
-        if (lastMsg?.direction === 'outbound') {
-            console.warn(`[AI-Processor] Skipping: last message was already outbound`);
-            return new Response(JSON.stringify({ skipped: true, reason: "Last message was outbound" }), { headers: corsHeaders });
+        // Skip ONLY if last message was successfully DELIVERED outbound (avoid double-response)
+        // If status is 'pending' or 'failed', we must still respond — the previous attempt didn't reach the client
+        if (lastMsg?.direction === 'outbound' && lastMsg?.status === 'delivered') {
+            console.warn(`[AI-Processor] Skipping: last message was already outbound+delivered`);
+            return new Response(JSON.stringify({ skipped: true, reason: "Last message was outbound+delivered" }), { headers: corsHeaders });
         }
 
         const previousMessages = (history || []).reverse().map((msg: any) => ({
