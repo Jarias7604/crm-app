@@ -390,7 +390,38 @@ ${serviciosInfo || 'Sin servicios'}
                 }
 
                 if (quoteObj) {
-                    cleanText += `\n\n📊 ¡Listo! Aquí está tu cotización oficial:\n${FRONTEND_URL}/propuesta/${quoteObj.id}\n\nPuedes revisarla, firmarla electrónicamente y descargar el PDF. 📋`;
+                    // ── Send quote as a SEPARATE beautiful message ─────────────────────────
+                    // The AI conversation text is clean (no link), quote comes as its own card
+                    const quoteUrl = `${FRONTEND_URL}/propuesta/${quoteObj.id}`;
+                    
+                    // Format totals
+                    const fmt = (n: number) => '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                    
+                    const quoteCard = [
+                        `📊 *Cotización #${quoteObj.id.slice(-6).toUpperCase()}*`,
+                        ``,
+                        `👤 *Cliente:* ${lead?.name || 'Cliente'}`,
+                        `🏢 *Empresa:* ${lead?.company_name || 'No especificada'}`,
+                        ``,
+                        `📋 *Plan:* ${selectedPlan.nombre}`,
+                        `📄 *Volumen:* ${volume.toLocaleString()} DTEs/mes`,
+                        ``,
+                        `💰 *Desglose:*`,
+                        `• Plan anual: ${fmt(baseAnual)}`,
+                        implementation > 0 ? `• Implementación: ${fmt(implementation)}` : null,
+                        dbExtras.length > 0 ? dbExtras.map((e: any) => `• ${e.nombre}: ${fmt(e.costo)}`).join('\n') : null,
+                        `• IVA (13%): ${fmt(iva)}`,
+                        ``,
+                        `💎 *TOTAL: ${fmt(total)}*`,
+                        ``,
+                        `👉 Ver cotización completa, firmar y descargar PDF:`,
+                        quoteUrl,
+                    ].filter(line => line !== null).join('\n');
+                    
+                    // Send the quote card as a second message (after the AI text)
+                    // Store it in a variable to send after the main message is delivered
+                    (conv as any).__quoteCard = quoteCard;
+                    (conv as any).__quoteUrl = quoteUrl;
                 }
             }
         }
@@ -458,6 +489,22 @@ ${serviciosInfo || 'Sin servicios'}
                             .update({ status: 'delivered' })
                             .eq('id', savedMsg.id);
                         console.log(`✅ Message delivered to Telegram (chat: ${chatId})`);
+
+                        // ── Send quote card as SEPARATE message if generated ──────────────
+                        const quoteCard = (conv as any).__quoteCard;
+                        if (quoteCard) {
+                            await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    chat_id: chatId,
+                                    text: quoteCard,
+                                    parse_mode: 'Markdown',
+                                    disable_web_page_preview: false,
+                                })
+                            });
+                            console.log(`📊 Quote card sent to Telegram (chat: ${chatId})`);
+                        }
                     } else {
                         console.error('Telegram API error:', tgResult);
                         // Retry without parse_mode if markdown fails
