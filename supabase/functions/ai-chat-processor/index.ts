@@ -648,14 +648,12 @@ MENSAJE MODELO cuando tengas el volumen:
             .maybeSingle();
 
         if (insertError) {
-            log(`Insert error: ${JSON.stringify(insertError)}`);
-            throw insertError;
+            // Log the error but DO NOT throw — we must still respond to the client on Telegram
+            log(`Insert error (non-fatal, continuing to Telegram): ${JSON.stringify(insertError)}`);
         }
 
-        if (!savedMsg) {
-            log(`Insert succeeded but returned no data. Check triggers.`);
-            throw new Error("Message not saved (Blocked by database policy)");
-        }
+        // NOTE: savedMsg may be null if RLS blocks the insert. That's OK.
+        // Telegram delivery MUST happen regardless of DB state.
 
         // ===========================================
         // 10. SEND TO TELEGRAM (Atomic Transport)
@@ -711,7 +709,7 @@ MENSAJE MODELO cuando tengas el volumen:
                         console.log(`No text to send to Telegram (chat: ${chatId}), proceeding to PDF/Link`);
                     }
 
-                    if (messageSentOk) {
+                    if (messageSentOk && savedMsg?.id) {
                         await supabase.from('marketing_messages')
                             .update({ status: 'delivered' })
                             .eq('id', savedMsg.id);
