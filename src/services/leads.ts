@@ -2,74 +2,51 @@ import { supabase } from './supabase';
 import type { Lead, FollowUp } from '../types';
 import { logger } from '../utils/logger';
 import { calculateLeadScore, persistLeadScore } from './leadScoringService';
+import { safeSelect } from './safeQuery';
 
 export const leadsService = {
     // Get leads with lightweight payload (optimized for List/Kanban views)
-    // SAFETY: If query fails (column doesn't exist in some env), auto-retry with SAFE_FIELDS
+    // PROTECTED by safeSelect — if ANY column is missing, auto-fallback to SELECT *
     async getLeads(page = 1, pageSize = 1000) {
-        // These fields are GUARANTEED to exist in ALL environments (local, testing, production)
-        const SAFE_FIELDS = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date, contact_count, closing_amount, address';
-        // Extended fields — may not exist in all environments
-        const fields = SAFE_FIELDS + ', lost_reason_id, lost_at_stage, lost_notes, next_action_notes';
+        const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date, contact_count, closing_amount, address, lost_reason_id, lost_at_stage, lost_notes, next_action_notes';
         
         const from = (page - 1) * pageSize;
         const to = from + pageSize - 1;
 
-        try {
-            const { data, count, error } = await supabase
-                .from('leads')
-                .select(fields, { count: 'exact' })
-                .order('created_at', { ascending: false })
-                .range(from, to);
+        const result = await safeSelect<Lead>({
+            table: 'leads',
+            fields,
+            count: true,
+            orderBy: 'created_at',
+            orderAsc: false,
+            rangeFrom: from,
+            rangeTo: to,
+        });
 
-            // If query succeeded, return data
-            if (!error && data) {
-                return { data: data as unknown as Lead[], count };
-            }
-
-            // FALLBACK: Query failed (likely missing column) — retry with safe fields only
-            logger.warn('[getLeads] Primary query failed, retrying with SAFE_FIELDS', { error: error?.message });
-            const fallback = await supabase
-                .from('leads')
-                .select(SAFE_FIELDS, { count: 'exact' })
-                .order('created_at', { ascending: false })
-                .range(from, to);
-
-            return { data: (fallback.data || []) as Lead[], count: fallback.count };
-        } catch (err) {
-            logger.error('Unhandled error in getLeads', err, { page, pageSize });
-            throw err;
-        }
+        return { data: result.data, count: result.count };
     },
 
     // Cursor-based Pagination for ultra-fast performance on millions of rows
+    // PROTECTED by safeSelect
     async getLeadsCursor(limit = 50, cursor?: string) {
-        try {
-            const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date, contact_count, lost_reason_id, lost_at_stage, lost_notes, next_action_notes, closing_amount, address, last_follow_up_at, first_follow_up_at';
+        const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date, contact_count, closing_amount, address, lost_reason_id, lost_at_stage, lost_notes, next_action_notes, last_follow_up_at, first_follow_up_at';
 
+        const filters = cursor
+            ? [{ column: 'created_at', op: 'lt' as const, value: cursor }]
+            : undefined;
 
+        const result = await safeSelect<Lead>({
+            table: 'leads',
+            fields,
+            orderBy: 'created_at',
+            orderAsc: false,
+            limit,
+            filters,
+        });
             
-            let query = supabase
-                .from('leads')
-                .select(fields)
-                .order('created_at', { ascending: false })
-                .limit(limit);
-
-            if (cursor) {
-                query = query.lt('created_at', cursor);
-            }
-
-            const { data, error } = await query;
-
-            if (error) throw error;
+        const nextCursor = result.data.length === limit ? result.data[result.data.length - 1].created_at : undefined;
             
-            const nextCursor = data && data.length === limit ? data[data.length - 1].created_at : undefined;
-            
-            return { data: data as Lead[], nextCursor };
-        } catch (err) {
-            logger.error('Unhandled error in getLeadsCursor', err, { limit, cursor });
-            throw err;
-        }
+        return { data: result.data, nextCursor };
     },
 
     // Global search leveraging pg_trgm indices (Cmd+K Omni-Search)
