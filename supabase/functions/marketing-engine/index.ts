@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { checkRateLimit, rateLimitResponse } from "../_shared/rateLimiter.ts";
 
 const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
@@ -51,6 +52,10 @@ Deno.serve(async (req) => {
             .from("marketing_campaigns").select("*").eq("id", campaignId).single();
 
         if (campError || !campaign) throw new Error(`Campaign not found: ${campError?.message}`);
+
+        // ── Enterprise Rate Limiting (20 marketing calls/min per company) ──
+        const rl = checkRateLimit(campaign.company_id, 'marketing');
+        if (!rl.allowed) return rateLimitResponse(rl.resetAt);
 
         const filters = campaign.audience_filters || {};
         let query = supabase.from("leads").select("id, name, email, phone, priority").eq("company_id", campaign.company_id);

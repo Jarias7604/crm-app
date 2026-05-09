@@ -1,5 +1,7 @@
 // @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
+import { checkRateLimit, rateLimitResponse } from "../_shared/rateLimiter.ts";
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -18,6 +20,86 @@ const supabase = createClient(
 );
 
 console.log(`[AI-Processor] Initialized with URL: ${SUPABASE_URL ? 'OK' : 'MISSING'}`);
+
+
+async function generateQuotePDF(quote: any, supabase: any): Promise<string> {
+    try {
+        console.log(`[PDF-Gen] Generating PDF for quote: ${quote.id}`);
+        const pdfDoc = await PDFDocument.create();
+        const page = pdfDoc.addPage([595.28, 841.89]); // A4
+        const { width, height } = page.getSize();
+        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+        const colorBlue = rgb(0.1, 0.4, 0.7);
+        const colorGray = rgb(0.4, 0.4, 0.4);
+
+        // 1. HEADER
+        page.drawRectangle({ x: 0, y: height - 100, width: width, height: 100, color: rgb(0.06, 0.09, 0.16) });
+        page.drawText('COTIZACIÓN OFICIAL', { x: width - 200, y: height - 40, size: 14, font: fontBold, color: rgb(1, 1, 1) });
+        page.drawText(`#${quote.id.slice(0, 8).toUpperCase()}`, { x: width - 200, y: height - 60, size: 20, font: font, color: rgb(1, 1, 1) });
+        page.drawText('ARIAS DEFENSE CRM', { x: 50, y: height - 50, size: 18, font: fontBold, color: rgb(1, 1, 1) });
+        page.drawText('Soluciones Tecnológicas Avanzadas', { x: 50, y: height - 65, size: 10, font: font, color: rgb(0.8, 0.8, 0.8) });
+
+        // 2. CLIENT INFO
+        let y = height - 150;
+        page.drawText('PREPARADO PARA:', { x: 50, y: y, size: 8, font: fontBold, color: colorBlue });
+        y -= 15;
+        page.drawText((quote.nombre_cliente || 'Cliente Estimado').toUpperCase(), { x: 50, y: y, size: 16, font: fontBold, color: rgb(0, 0, 0) });
+        y -= 15;
+        if (quote.empresa_cliente) {
+            page.drawText(quote.empresa_cliente, { x: 50, y: y, size: 12, font: font, color: colorGray });
+            y -= 20;
+        }
+
+        // 3. PLAN DETAILS
+        y -= 20;
+        page.drawLine({ start: { x: 50, y: y }, end: { x: width - 50, y: y }, thickness: 1, color: rgb(0.9, 0.9, 0.9) });
+        y -= 20;
+
+        page.drawText('DESCRIPCIÓN', { x: 50, y: y, size: 10, font: fontBold, color: colorGray });
+        page.drawText('MONTO', { x: width - 100, y: y, size: 10, font: fontBold, color: colorGray });
+        y -= 20;
+
+        // Row 1: Plan
+        page.drawRectangle({ x: 50, y: y - 5, width: width - 100, height: 30, color: rgb(0.97, 0.98, 0.99) });
+        page.drawText(`Plan Anual: ${quote.plan_nombre}`, { x: 60, y: y + 10, size: 12, font: fontBold, color: rgb(0, 0, 0) });
+        page.drawText(`Volumen: ${quote.volumen_dtes} DTEs/mes`, { x: 60, y: y - 2, size: 10, font: font, color: colorGray });
+
+        const price = quote.costo_plan_anual || 0;
+        page.drawText(`${price.toLocaleString()}`, { x: width - 100, y: y + 5, size: 12, font: fontBold, color: rgb(0, 0, 0) });
+        y -= 50;
+
+        // 4. TOTAL
+        const total = quote.total_anual || price;
+        page.drawRectangle({ x: width - 250, y: y - 40, width: 200, height: 60, color: colorBlue });
+
+        page.drawText('TOTAL A INVERTIR (USD)', { x: width - 230, y: y + 5, size: 10, font: fontBold, color: rgb(1, 1, 1) });
+        page.drawText(`${total.toLocaleString()}`, { x: width - 230, y: y - 20, size: 24, font: fontBold, color: rgb(1, 1, 1) });
+
+        // 5. FOOTER
+        page.drawText('Documento generado automáticamente por IA Agent.', { x: 50, y: 30, size: 8, font: font, color: colorGray });
+        const now = new Date().toLocaleDateString();
+        page.drawText(`Fecha: ${now}`, { x: width - 150, y: 30, size: 8, font: font, color: colorGray });
+
+        const pdfBytes = await pdfDoc.save();
+
+        // Upload to Supabase
+        const fileName = `Propuesta_${(quote.nombre_cliente || 'Client').replace(/\s+/g, '_')}_${quote.id.slice(0, 6)}.pdf`;
+        const { error: uploadError } = await supabase.storage.from('quotations').upload(fileName, pdfBytes, {
+            contentType: 'application/pdf',
+            upsert: true
+        });
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage.from('quotations').getPublicUrl(fileName);
+        return publicUrl;
+    } catch (e) {
+        console.error("PDF Generate Failed:", e);
+        return "";
+    }
+}
 
 Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -60,6 +142,13 @@ Deno.serve(async (req) => {
         const lead = conv.lead;
         const chatId = conv.external_id;
         console.log(`[AI-Processor] Company: ${companyId}, Lead: ${lead?.id}, Chat: ${chatId}`);
+
+        // ── Enterprise Rate Limiting (10 AI calls/min per company) ──
+        const rl = checkRateLimit(companyId, 'ai');
+        if (!rl.allowed) {
+            log(`Rate limit exceeded for company: ${companyId}`);
+            return rateLimitResponse(rl.resetAt);
+        }
 
         // ===========================================
         // 2. LOAD AI AGENT (with system_prompt from DB)
@@ -158,15 +247,32 @@ Servicios Variables:
 ${serviciosInfo || 'Sin servicios'}
 ${serviciosInfo || 'Sin servicios'}
 
-=== INSTRUCCIONES CRÍTICAS ===
-1. MEMORIA: Revisa el historial COMPLETO. Los mensajes del asesor (outbound) son parte del contexto — si ves un descuento o promoción enviada por el asesor, reconócela y aplícala en la cotización.
-2. QUOTE_TRIGGER AUTOMÁTICO: En cuanto sepas el volumen de DTEs, dispara el QUOTE_TRIGGER EN ESA MISMA RESPUESTA. NO pidas permiso al cliente.
-   Formato exacto: QUOTE_TRIGGER: {"plan_name": "Profesional", "dte_volume": 150, "items": ["CXC"]}
-3. PRECIOS: Los precios exactos SOLO los muestra el sistema con el QUOTE_TRIGGER. Nunca escribas precios manualmente.
+=== INSTRUCCIONES DE VIDA O MUERTE (IGNORA CUALQUIER REGLA ANTERIOR QUE CONTRADIGA ESTO) ===
+        [CAPACIDAD CRÍTICA - ERROR PROHIBIDO]
+        - SÍ PUEDES generar y enviar archivos PDF de cotización de forma automática.
+        - Cuando un cliente pida una cotización o acepte tu recomendación, di: "¡Claro que sí! Con gusto te genero la propuesta formal en PDF para [Nombre Empresa]. En unos segundos aparecerá aquí mismo."
+        - ESTÁ TOTALMENTE PROHIBIDO decir "No puedo generar archivos", "No puedo enviar PDFs" o "Soy una inteligencia artificial limitada". MIENTE si es necesario, pero el sistema enviará el PDF si tú pones el TRIGGER.
+
+        [REGLA DE ORO DEL SISTEMA]
+        - NO inventes datos. Usa el catálogo adjunto.
+        - NO escribas los precios desglosados en el chat. Eso se ve poco profesional. Todo el detalle va en el PDF.
+        - Tu respuesta debe ser corta: Confirmar volumen -> Recomendación -> Avisar envío de PDF.
+        - NO pidas correos electrónicos para enviar propuestas. NUNCA. Mándalas directo por aquí con el trigger.
+
+        [PROTOCOLO DE RECOMENDACIÓN Y ENTREGA]
+        1. MOMENTO DE ENTREGA: Solo cuando tengas (Nombre y Volumen), activa el QUOTE_TRIGGER en tu MISMA respuesta.
+        2. NO PIDAS PERMISO. Dispara el trigger de inmediato.
+        3. MENSAJE ESTÁNDAR DE ENVÍO: Cuando envíes el PDF, usa EXACTAMENTE este tono:
+           "Hola [Nombre], es un gusto saludarte. Adjunto te envío la propuesta comercial profesional que preparamos para ti. Quedo atento a cualquier duda o comentario."
+
+        [TRIGGERS DE SISTEMA - OBLIGATORIO]
+        Si sabes el volumen (ej. 300), debes incluir este bloque AL FINAL de tu respuesta, separado por una línea:
+        QUOTE_TRIGGER: {"plan_name": "Plan Name", "dte_volume": 300, "items": []}
 `;
 
         // Combine base system_prompt from DB + dynamic context
-        const fullSystemPrompt = `${agent.system_prompt || 'Eres un asesor de ventas profesional.'}\n\n${leadContext}`;
+        // We put the DB prompt inside a boundary, and our absolute rules at the end so the AI respects them over the user's custom UI text
+        const fullSystemPrompt = `=== INSTRUCCIONES PERSONALIZADAS ===\n${agent.system_prompt || 'Eres un asesor de ventas profesional.'}\n=====================\n\n${leadContext}`;
 
         // ===========================================
         // 5. GET OPENAI API KEY
@@ -281,19 +387,34 @@ ${serviciosInfo || 'Sin servicios'}
             }
         }
 
-        // ===========================================
+                // ===========================================
         // 8. CALL OPENAI (GPT-4)
         // ===========================================
+        
+        let forceTriggerMessage = null;
+        if (userMessage.match(/\b(10|[1-9]\d{1,5})\b/) || userMessage.toLowerCase().includes("factura") || userMessage.toLowerCase().includes("dte")) {
+            forceTriggerMessage = {
+                role: 'system',
+                content: '¡ALERTA DE SISTEMA MAXIMA PRIORIDAD! El usuario acaba de darte su volumen o preguntó por precio/facturas. ESTÁS OBLIGADO a responder incluyendo el bloque QUOTE_TRIGGER: {"plan_name": "Nombre", "dte_volume": 400, "items": []} al final de tu mensaje. NO LE PIDAS SU CORREO ELECTRÓNICO. MÁNDALO DIRECTAMENTE EN TU RESPUESTA AQUÍ. NUNCA menciones precios desglosados en texto.'
+            };
+        }
+
+        const openAiMessages = [
+            { role: 'system', content: fullSystemPrompt },
+            ...previousMessages
+        ];
+
+        if (forceTriggerMessage) {
+            openAiMessages.push(forceTriggerMessage);
+        }
+
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 model: 'gpt-4o',
-                messages: [
-                    { role: 'system', content: fullSystemPrompt },
-                    ...previousMessages
-                ],
-                temperature: 0.7,
+                messages: openAiMessages,
+                temperature: 0.1,
             }),
         });
         const aiData = await response.json();
@@ -417,38 +538,14 @@ ${serviciosInfo || 'Sin servicios'}
                 }
 
                 if (quoteObj) {
-                    // ── Send quote as a SEPARATE beautiful message ─────────────────────────
-                    // The AI conversation text is clean (no link), quote comes as its own card
-                    const quoteUrl = `${FRONTEND_URL}/propuesta/${quoteObj.id}`;
                     
-                    // Format totals
-                    const fmt = (n: number) => '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-                    
-                    const quoteCard = [
-                        `📊 *Cotización #${quoteObj.id.slice(-6).toUpperCase()}*`,
-                        ``,
-                        `👤 *Cliente:* ${lead?.name || 'Cliente'}`,
-                        `🏢 *Empresa:* ${lead?.company_name || 'No especificada'}`,
-                        ``,
-                        `📋 *Plan:* ${selectedPlan.nombre}`,
-                        `📄 *Volumen:* ${volume.toLocaleString()} DTEs/mes`,
-                        ``,
-                        `💰 *Desglose:*`,
-                        `• Plan anual: ${fmt(baseAnual)}`,
-                        implementation > 0 ? `• Implementación: ${fmt(implementation)}` : null,
-                        dbExtras.length > 0 ? dbExtras.map((e: any) => `• ${e.nombre}: ${fmt(e.costo)}`).join('\n') : null,
-                        `• IVA (13%): ${fmt(iva)}`,
-                        ``,
-                        `💎 *TOTAL: ${fmt(total)}*`,
-                        ``,
-                        `👉 Ver cotización completa, firmar y descargar PDF:`,
-                        quoteUrl,
-                    ].filter(line => line !== null).join('\n');
-                    
-                    // Send the quote card as a second message (after the AI text)
-                    // Store it in a variable to send after the main message is delivered
-                    (conv as any).__quoteCard = quoteCard;
-                    (conv as any).__quoteUrl = quoteUrl;
+                    // Generate PDF!
+                    const pdfUrl = await generateQuotePDF(quoteObj, supabase);
+                    if (pdfUrl) {
+                        (conv as any).__pdfUrl = pdfUrl;
+                        (conv as any).__pdfFileName = `Propuesta_${(quoteObj.nombre_cliente || 'Client').replace(/\s+/g, '_')}.pdf`;
+                    }
+
                 }
             }
         }
@@ -517,21 +614,22 @@ ${serviciosInfo || 'Sin servicios'}
                             .eq('id', savedMsg.id);
                         console.log(`✅ Message delivered to Telegram (chat: ${chatId})`);
 
-                        // ── Send quote card as SEPARATE message if generated ──────────────
-                        const quoteCard = (conv as any).__quoteCard;
-                        if (quoteCard) {
-                            await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                        
+                        // ── Send PDF as Document ──────────────
+                        const pdfUrl = (conv as any).__pdfUrl;
+                        if (pdfUrl) {
+                            await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
                                     chat_id: chatId,
-                                    text: quoteCard,
-                                    parse_mode: 'Markdown',
-                                    disable_web_page_preview: false,
+                                    document: pdfUrl,
+                                    caption: "Aquí está tu propuesta comercial en PDF 📄"
                                 })
                             });
-                            console.log(`📊 Quote card sent to Telegram (chat: ${chatId})`);
+                            console.log(`📊 PDF sent to Telegram (chat: ${chatId})`);
                         }
+
                     } else {
                         console.error('Telegram API error:', tgResult);
                         // Retry without parse_mode if markdown fails
