@@ -5,25 +5,37 @@ import { calculateLeadScore, persistLeadScore } from './leadScoringService';
 
 export const leadsService = {
     // Get leads with lightweight payload (optimized for List/Kanban views)
+    // SAFETY: If query fails (column doesn't exist in some env), auto-retry with SAFE_FIELDS
     async getLeads(page = 1, pageSize = 1000) {
-        try {
-            // Carga Ligera: Traemos solo lo necesario para mostrar tarjetas/filas
-            const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date, contact_count, lost_reason_id, lost_at_stage, lost_notes, next_action_notes, closing_amount, address';
-            
-            const from = (page - 1) * pageSize;
-            const to = from + pageSize - 1;
+        // These fields are GUARANTEED to exist in ALL environments (local, testing, production)
+        const SAFE_FIELDS = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date, contact_count, closing_amount, address';
+        // Extended fields — may not exist in all environments
+        const fields = SAFE_FIELDS + ', lost_reason_id, lost_at_stage, lost_notes, next_action_notes';
+        
+        const from = (page - 1) * pageSize;
+        const to = from + pageSize - 1;
 
-            const { data, count } = await supabase
+        try {
+            const { data, count, error } = await supabase
                 .from('leads')
                 .select(fields, { count: 'exact' })
                 .order('created_at', { ascending: false })
                 .range(from, to);
 
-            if (!data) {
-                logger.error('Error loading leads', null, { action: 'getLeads', page, pageSize });
-                return { data: [] as Lead[], count: 0 };
+            // If query succeeded, return data
+            if (!error && data) {
+                return { data: data as unknown as Lead[], count };
             }
-            return { data: data as Lead[], count };
+
+            // FALLBACK: Query failed (likely missing column) — retry with safe fields only
+            logger.warn('[getLeads] Primary query failed, retrying with SAFE_FIELDS', { error: error?.message });
+            const fallback = await supabase
+                .from('leads')
+                .select(SAFE_FIELDS, { count: 'exact' })
+                .order('created_at', { ascending: false })
+                .range(from, to);
+
+            return { data: (fallback.data || []) as Lead[], count: fallback.count };
         } catch (err) {
             logger.error('Unhandled error in getLeads', err, { page, pageSize });
             throw err;

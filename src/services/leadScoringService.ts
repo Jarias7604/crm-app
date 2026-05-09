@@ -287,12 +287,14 @@ export async function persistLeadScore(leadId: string, score: number): Promise<v
 
         // Try to persist ai_score too (column may not exist in production)
         // This is fire-and-forget — if it fails, no problem
-        supabase
-            .from('leads')
-            .update({ ai_score: score } as any)
-            .eq('id', leadId)
-            .then(() => {})
-            .catch(() => {});
+        try {
+            await supabase
+                .from('leads')
+                .update({ ai_score: score } as any)
+                .eq('id', leadId);
+        } catch {
+            // silently ignore — ai_score column may not exist
+        }
     } catch (err) {
         // Never throw — scoring failures must never break lead operations
         logger.warn('[LeadScoring] Exception persisting score', { leadId, err });
