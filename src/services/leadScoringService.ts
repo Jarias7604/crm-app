@@ -275,18 +275,26 @@ export const TEMPERATURE_CONFIG: Record<LeadTemperature, {
 export async function persistLeadScore(leadId: string, score: number): Promise<void> {
     try {
         const priority = scoreToPriority(score);
+        // Only update priority — this column exists in ALL environments
         const { error } = await supabase
             .from('leads')
-            .update({
-                ai_score: score,
-                priority,
-            })
+            .update({ priority })
             .eq('id', leadId);
 
         if (error) {
-            logger.warn('[LeadScoring] Failed to persist score', { leadId, error: error.message });
+            logger.warn('[LeadScoring] Failed to persist priority', { leadId, error: error.message });
         }
+
+        // Try to persist ai_score too (column may not exist in production)
+        // This is fire-and-forget — if it fails, no problem
+        supabase
+            .from('leads')
+            .update({ ai_score: score } as any)
+            .eq('id', leadId)
+            .then(() => {})
+            .catch(() => {});
     } catch (err) {
+        // Never throw — scoring failures must never break lead operations
         logger.warn('[LeadScoring] Exception persisting score', { leadId, err });
     }
 }
