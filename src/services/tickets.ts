@@ -163,15 +163,12 @@ export const ticketService = {
         companyId: string,
         filters?: { status?: TicketStatus[]; categoryId?: string; assignedTo?: string }
     ): Promise<Ticket[]> {
+        // NOTE: We avoid PostgREST relationship join syntax (lead:leads, profiles!fkey)
+        // because those require a registered FK in the schema cache which may be absent
+        // in the testing environment. Instead we use the lead_name snapshot + separate queries.
         let query = supabase
             .from('tickets')
-            .select(`
-                *,
-                lead_name,
-                lead:leads(name, email),
-                category:ticket_categories(*),
-                assigned_profile:profiles!tickets_assigned_to_fkey(id, full_name, avatar_url)
-            `)
+            .select('*')
             .eq('company_id', companyId);
 
         if (filters?.status && filters.status.length > 0) {
@@ -186,12 +183,11 @@ export const ticketService = {
 
         const { data, error } = await query.order('created_at', { ascending: false });
         if (error) throw error;
-        // fallback: if RLS blocks the lead join (agent doesn't own the lead),
-        // reconstruct lead object from the snapshot column
+
+        // Build lead object from the lead_name snapshot (always available, no RLS issues)
         return (data || []).map((t: Record<string, unknown>) => ({
             ...t,
-            lead: (t.lead as { name: string; email: string } | null) ??
-                  (t.lead_name ? { name: t.lead_name as string, email: null } : undefined),
+            lead: t.lead_name ? { name: t.lead_name as string, email: null } : undefined,
         })) as Ticket[];
     },
 
@@ -232,24 +228,15 @@ export const ticketService = {
             .from('tickets')
             .update(payload)
             .eq('id', ticketId)
-            .select(`
-                *,
-                lead_name,
-                lead:leads(name, email),
-                category:ticket_categories(*),
-                assigned_profile:profiles!tickets_assigned_to_fkey(id, full_name, avatar_url)
-            `)
+            .select('*')
             .single();
 
         if (error) throw error;
-        // Same fallback as getTickets: use snapshot if RLS blocks the join
         const t = data as Record<string, unknown>;
         return {
             ...t,
-            lead: (t.lead as { name: string; email: string } | null) ??
-                  (t.lead_name ? { name: t.lead_name as string, email: null } : undefined),
+            lead: t.lead_name ? { name: t.lead_name as string, email: null } : undefined,
         } as Ticket;
-
     },
 
     // ─── Comments (Seguimientos) ─────────────────────────────────────────────

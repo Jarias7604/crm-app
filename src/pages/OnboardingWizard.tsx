@@ -1,5 +1,10 @@
 import { useState } from 'react';
-import { Check, Zap, Building2, CreditCard, Palette, PartyPopper, ChevronRight, ArrowRight, Shield, Users, Bot, Webhook, CheckCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Check, Zap, Building2, CreditCard, Palette, PartyPopper, ChevronRight, ArrowRight, Shield, Users, Bot, Webhook, CheckCircle, Loader2 } from 'lucide-react';
+import { supabase } from '../services/supabase';
+import { storageService } from '../services/storage';
+import { useAuth } from '../auth/AuthProvider';
+import toast from 'react-hot-toast';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Plan {
@@ -52,92 +57,7 @@ const STEPS = [
   { id: 5, label: '¡Listo!', icon: PartyPopper },
 ];
 
-// ─── Step Components ──────────────────────────────────────────────────────────
-function Step1Company({ data, onChange, onNext }: any) {
-  return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="mb-8 text-center">
-         <h2 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">
-           Bienvenido a Arias CRM
-         </h2>
-         <p className="text-slate-500 text-sm font-medium max-w-sm mx-auto">
-           Configuremos tu entorno de trabajo. Empezaremos por los datos de tu empresa.
-         </p>
-      </div>
 
-      <div className="space-y-5 max-w-md mx-auto">
-        <div>
-          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Nombre de la empresa *</label>
-          <input
-            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all font-medium text-slate-900"
-            placeholder="Ej: TechSolutions SRL"
-            value={data.companyName}
-            onChange={e => onChange({ ...data, companyName: e.target.value })}
-          />
-        </div>
-        
-        <div>
-          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Industria</label>
-          <select
-            className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all font-medium text-slate-900 appearance-none"
-            value={data.industry}
-            onChange={e => onChange({ ...data, industry: e.target.value })}
-          >
-            <option value="">Selecciona tu industria</option>
-            <option>Tecnología</option>
-            <option>Defensa y Seguridad</option>
-            <option>Salud</option>
-            <option>Educación</option>
-            <option>Retail / Comercio</option>
-            <option>Manufactura</option>
-            <option>Iglesia / Ministerio</option>
-            <option>Servicios Profesionales</option>
-            <option>Otro</option>
-          </select>
-        </div>
-        
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">País</label>
-            <select 
-               className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all font-medium text-slate-900 appearance-none"
-               value={data.country} onChange={e => onChange({ ...data, country: e.target.value })}
-            >
-              <option>El Salvador</option>
-              <option>Guatemala</option>
-              <option>Honduras</option>
-              <option>Costa Rica</option>
-              <option>Panamá</option>
-              <option>México</option>
-              <option>Colombia</option>
-              <option>Otro</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Equipo</label>
-            <select 
-               className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all font-medium text-slate-900 appearance-none"
-               value={data.teamSize} onChange={e => onChange({ ...data, teamSize: e.target.value })}
-            >
-              <option>1-5 personas</option>
-              <option>6-20 personas</option>
-              <option>21-50 personas</option>
-              <option>50+ personas</option>
-            </select>
-          </div>
-        </div>
-
-        <button
-          onClick={onNext}
-          disabled={!data.companyName}
-          className="w-full bg-indigo-600 text-white px-6 py-4 rounded-2xl font-black shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 disabled:opacity-50 mt-6"
-        >
-          Continuar <ArrowRight size={18} />
-        </button>
-      </div>
-    </div>
-  );
-}
 
 function Step2Plan({ selectedPlan, onSelect, billingCycle, onCycleChange, onNext }: any) {
   return (
@@ -269,38 +189,43 @@ function Step3Payment({ onNext }: any) {
   );
 }
 
-function Step4Branding({ data, onChange, onNext }: any) {
+function Step4Branding({ data, onChange, onNext, isSaving }: any) {
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) onChange({ ...data, logoFile: file, logoPreview: URL.createObjectURL(file) });
+  };
+
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-md mx-auto">
       <div className="mb-8 text-center">
-         <h2 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">
-           Personaliza tu CRM
-         </h2>
-         <p className="text-slate-500 text-sm font-medium">
-           Haz que el CRM se sienta tuyo desde el primer día.
-         </p>
+         <h2 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">Personaliza tu CRM</h2>
+         <p className="text-slate-500 text-sm font-medium">Haz que el CRM se sienta tuyo desde el primer día.</p>
       </div>
 
       <div className="space-y-6">
         <div className="bg-white border border-slate-200 rounded-[2rem] p-8 shadow-sm">
           <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-4 text-center">Logo de tu empresa</label>
-          <div className="border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center cursor-pointer hover:bg-slate-50 transition-colors group">
-            <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-               <Palette className="w-8 h-8 text-indigo-400" />
-            </div>
-            <p className="text-slate-600 text-sm font-bold mb-1">
-              Arrastra tu logo aquí o <span className="text-indigo-600">examina</span>
-            </p>
-            <p className="text-slate-400 text-xs font-medium">PNG, SVG o JPG — Máx 2MB</p>
-          </div>
+          <label className="border-2 border-dashed border-slate-200 rounded-2xl p-8 text-center cursor-pointer hover:bg-slate-50 transition-colors group block">
+            <input type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
+            {data.logoPreview ? (
+              <img src={data.logoPreview} className="w-20 h-20 object-contain rounded-xl mx-auto" />
+            ) : (
+              <>
+                <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                  <Palette className="w-8 h-8 text-indigo-400" />
+                </div>
+                <p className="text-slate-600 text-sm font-bold mb-1">Arrastra tu logo o <span className="text-indigo-600">examina</span></p>
+                <p className="text-slate-400 text-xs font-medium">PNG, SVG o JPG — Máx 2MB</p>
+              </>
+            )}
+          </label>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Color de marca</label>
             <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-2xl border border-slate-200">
-              <input type="color" value={data.primaryColor ?? '#4F46E5'} onChange={e => onChange({ ...data, primaryColor: e.target.value })}
-                className="w-10 h-10 border-0 rounded-xl cursor-pointer p-0 bg-transparent" />
+              <input type="color" value={data.primaryColor ?? '#4F46E5'} onChange={e => onChange({ ...data, primaryColor: e.target.value })} className="w-10 h-10 border-0 rounded-xl cursor-pointer p-0 bg-transparent" />
               <input className="flex-1 bg-transparent border-0 outline-none text-sm font-mono text-slate-700 uppercase" value={data.primaryColor ?? '#4F46E5'} onChange={e => onChange({ ...data, primaryColor: e.target.value })} />
             </div>
           </div>
@@ -312,18 +237,60 @@ function Step4Branding({ data, onChange, onNext }: any) {
       </div>
 
       <div className="mt-10 flex gap-4">
-        <button className="flex-1 bg-white text-slate-600 border border-slate-200 px-6 py-4 rounded-2xl font-black hover:bg-slate-50 transition-all" onClick={onNext}>
-          Saltar
-        </button>
-        <button className="flex-[2] bg-indigo-600 text-white px-6 py-4 rounded-2xl font-black shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2" onClick={onNext}>
-          Guardar y continuar <ArrowRight size={18} />
+        <button className="flex-1 bg-white text-slate-600 border border-slate-200 px-6 py-4 rounded-2xl font-black hover:bg-slate-50 transition-all" onClick={onNext} disabled={isSaving}>Saltar</button>
+        <button className="flex-[2] bg-indigo-600 text-white px-6 py-4 rounded-2xl font-black shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2" onClick={onNext} disabled={isSaving}>
+          {isSaving ? <><Loader2 size={18} className="animate-spin" /> Guardando...</> : <>Guardar y continuar <ArrowRight size={18} /></>}
         </button>
       </div>
     </div>
   );
 }
 
-function Step5Done({ companyName }: { companyName: string }) {
+function Step1Company({ data, onChange, onNext, isSaving }: any) {
+  return (
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="mb-8 text-center">
+         <h2 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">Bienvenido a Arias CRM</h2>
+         <p className="text-slate-500 text-sm font-medium max-w-sm mx-auto">Configuremos tu entorno de trabajo. Empezaremos por los datos de tu empresa.</p>
+      </div>
+      <div className="space-y-5 max-w-md mx-auto">
+        <div>
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Nombre de la empresa *</label>
+          <input className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all font-medium text-slate-900" placeholder="Ej: TechSolutions SRL" value={data.companyName} onChange={e => onChange({ ...data, companyName: e.target.value })} />
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Industria</label>
+          <select className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all font-medium text-slate-900 appearance-none" value={data.industry} onChange={e => onChange({ ...data, industry: e.target.value })}>
+            <option value="">Selecciona tu industria</option>
+            <option>Tecnología</option><option>Defensa y Seguridad</option><option>Salud</option>
+            <option>Educación</option><option>Retail / Comercio</option><option>Manufactura</option>
+            <option>Iglesia / Ministerio</option><option>Servicios Profesionales</option><option>Otro</option>
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">País</label>
+            <select className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all font-medium text-slate-900 appearance-none" value={data.country} onChange={e => onChange({ ...data, country: e.target.value })}>
+              <option>El Salvador</option><option>Guatemala</option><option>Honduras</option>
+              <option>Costa Rica</option><option>Panamá</option><option>México</option><option>Colombia</option><option>Otro</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Equipo</label>
+            <select className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all font-medium text-slate-900 appearance-none" value={data.teamSize} onChange={e => onChange({ ...data, teamSize: e.target.value })}>
+              <option>1-5 personas</option><option>6-20 personas</option><option>21-50 personas</option><option>50+ personas</option>
+            </select>
+          </div>
+        </div>
+        <button onClick={onNext} disabled={!data.companyName || isSaving} className="w-full bg-indigo-600 text-white px-6 py-4 rounded-2xl font-black shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 disabled:opacity-50 mt-6">
+          {isSaving ? <><Loader2 size={18} className="animate-spin" /> Guardando...</> : <>Continuar <ArrowRight size={18} /></>}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Step5Done({ companyName, onGoToDashboard }: { companyName: string; onGoToDashboard: () => void }) {
   return (
     <div className="animate-in zoom-in-95 duration-500 text-center max-w-2xl mx-auto">
       <div className="w-24 h-24 bg-gradient-to-tr from-emerald-400 to-emerald-600 rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-emerald-500/30 -rotate-6">
@@ -357,77 +324,121 @@ function Step5Done({ companyName }: { companyName: string }) {
         ))}
       </div>
 
-      <a
-        href="/"
+      <button
+        onClick={onGoToDashboard}
         className="inline-flex items-center gap-2 bg-[#0f172a] text-white px-10 py-4 rounded-2xl font-black shadow-xl shadow-slate-900/20 hover:scale-105 transition-transform"
       >
         Ir a mi Dashboard <ChevronRight size={18} />
-      </a>
+      </button>
     </div>
   );
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function OnboardingWizard() {
+  const { profile } = useAuth();
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
+  const [isSaving, setIsSaving] = useState(false);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
   const [selectedPlan, setSelectedPlan] = useState<string>('pro');
   const [companyData, setCompanyData] = useState({
     companyName: '', industry: '', country: 'El Salvador', teamSize: '1-5 personas',
-    primaryColor: '#4F46E5', shortName: '',
+    primaryColor: '#4F46E5', shortName: '', logoFile: null as File | null, logoPreview: '',
   });
 
-  const goNext = () => setStep(s => Math.min(s + 1, 5));
+  // Step 1: save basic company info to DB
+  const handleStep1Next = async () => {
+    if (!profile?.company_id || !companyData.companyName) { setStep(2); return; }
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('companies')
+        .update({ name: companyData.companyName })
+        .eq('id', profile.company_id);
+      if (error) throw error;
+    } catch {
+      toast.error('No se pudo guardar el nombre. Continúa y edítalo después.');
+    } finally {
+      setIsSaving(false);
+      setStep(2);
+    }
+  };
+
+  // Step 4: save branding (logo + color) to DB
+  // Logo upload is fully non-blocking — if storage fails or no file selected,
+  // the wizard still advances to Step 5 silently. User can upload logo later.
+  const handleStep4Next = async () => {
+    if (!profile?.company_id) { setStep(5); return; }
+
+    // Only attempt upload if user actually selected a file
+    if (companyData.logoFile) {
+      setIsSaving(true);
+      try {
+        const logoUrl = await storageService.uploadLogo(profile.company_id, companyData.logoFile);
+        await supabase
+          .from('companies')
+          .update({ logo_url: logoUrl })
+          .eq('id', profile.company_id);
+        toast.success('✅ Logo guardado correctamente.');
+        // Notify Sidebar to reload company branding immediately
+        window.dispatchEvent(new CustomEvent('company-branding-updated'));
+      } catch {
+        // Silent fail — storage policy may not be configured yet.
+        // User can upload logo from Company → Branding later.
+        console.warn('[Onboarding] Logo upload skipped — configure storage policy in Supabase Dashboard → Storage → avatars → New policy (Allow uploads for authenticated users).');
+      } finally {
+        setIsSaving(false);
+      }
+    }
+
+    setStep(5);
+  };
+
+  const StepHeader = () => (
+    <div className="w-full bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-50">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 bg-indigo-600 rounded-[14px] flex items-center justify-center shadow-md">
+          <Zap size={20} className="text-white" />
+        </div>
+        <span className="text-xl font-black text-slate-900 tracking-tight">Arias CRM</span>
+      </div>
+      <div className="hidden sm:flex items-center gap-8">
+        {STEPS.map((s, i) => {
+          const isActive = step === s.id;
+          const isDone = step > s.id;
+          return (
+            <div key={s.id} className="flex items-center gap-3">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-black transition-all ${
+                isDone ? 'bg-emerald-500 text-white' : isActive ? 'bg-indigo-600 text-white ring-4 ring-indigo-100' : 'bg-slate-100 text-slate-400'
+              }`}>
+                {isDone ? <Check size={14} /> : s.id}
+              </div>
+              <span className={`text-xs font-bold uppercase tracking-wider ${isActive ? 'text-indigo-900' : isDone ? 'text-emerald-700' : 'text-slate-400'}`}>
+                {s.label}
+              </span>
+              {i < STEPS.length - 1 && <div className="w-8 h-px bg-slate-200 ml-5" />}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-slate-50/50 flex flex-col font-sans">
-      {/* Top Header */}
-      <div className="w-full bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-indigo-600 rounded-[14px] flex items-center justify-center shadow-md">
-            <Zap size={20} className="text-white" />
-          </div>
-          <span className="text-xl font-black text-slate-900 tracking-tight">Arias CRM</span>
-        </div>
-        <div className="hidden sm:flex items-center gap-8">
-           {STEPS.map((s, i) => {
-             const isActive = step === s.id;
-             const isDone = step > s.id;
-             return (
-               <div key={s.id} className="flex items-center gap-3">
-                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-black transition-all ${
-                   isDone ? 'bg-emerald-500 text-white' : isActive ? 'bg-indigo-600 text-white ring-4 ring-indigo-100' : 'bg-slate-100 text-slate-400'
-                 }`}>
-                   {isDone ? <Check size={14} /> : s.id}
-                 </div>
-                 <span className={`text-xs font-bold uppercase tracking-wider ${isActive ? 'text-indigo-900' : isDone ? 'text-emerald-700' : 'text-slate-400'}`}>
-                   {s.label}
-                 </span>
-                 {i < STEPS.length - 1 && (
-                   <div className="w-8 h-px bg-slate-200 ml-5" />
-                 )}
-               </div>
-             );
-           })}
-        </div>
-      </div>
-
-      {/* Main Content */}
+      <StepHeader />
       <div className="flex-1 flex flex-col items-center justify-center p-6 md:p-12">
         <div className={`w-full transition-all duration-500 ${step === 2 || step === 5 ? 'max-w-5xl' : 'max-w-xl'}`}>
-          {step === 1 && <Step1Company data={companyData} onChange={setCompanyData} onNext={goNext} />}
-          {step === 2 && <Step2Plan selectedPlan={selectedPlan} onSelect={setSelectedPlan} billingCycle={billingCycle} onCycleChange={setBillingCycle} onNext={goNext} />}
-          {step === 3 && <Step3Payment onNext={goNext} />}
-          {step === 4 && <Step4Branding data={companyData} onChange={setCompanyData} onNext={goNext} />}
-          {step === 5 && <Step5Done companyName={companyData.companyName} />}
+          {step === 1 && <Step1Company data={companyData} onChange={setCompanyData} onNext={handleStep1Next} isSaving={isSaving} />}
+          {step === 2 && <Step2Plan selectedPlan={selectedPlan} onSelect={setSelectedPlan} billingCycle={billingCycle} onCycleChange={setBillingCycle} onNext={() => setStep(3)} />}
+          {step === 3 && <Step3Payment onNext={() => setStep(4)} />}
+          {step === 4 && <Step4Branding data={companyData} onChange={setCompanyData} onNext={handleStep4Next} isSaving={isSaving} />}
+          {step === 5 && <Step5Done companyName={companyData.companyName} onGoToDashboard={() => navigate('/dashboard')} />}
         </div>
       </div>
-      
-      {/* Footer */}
       <div className="py-6 text-center">
-        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">
-          © 2026 Arias Defense · Nivel Empresarial
-        </p>
+        <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">© 2026 Arias Defense · Nivel Empresarial</p>
       </div>
     </div>
   );

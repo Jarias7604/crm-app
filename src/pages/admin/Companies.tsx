@@ -52,6 +52,18 @@ const MODULES_CONFIG = [
     { key: 'loss_reasons', label: 'Motivos de Pérdida', icon: XCircle, color: 'text-slate-600', bg: 'bg-slate-50' },
 ];
 
+// ─── Default module sets by license plan ──────────────────────────────────────
+// When a new company is created, these modules are pre-selected based on their
+// license status. Super admin can still add/remove modules manually.
+// This prevents new tenants from seeing a completely empty CRM.
+const PLAN_DEFAULT_MODULES: Record<string, string[]> = {
+    trial:       ['leads', 'quotes', 'calendar', 'loss_reasons'],
+    active:      ['leads', 'quotes', 'calendar', 'marketing', 'chat', 'loss_reasons', 'pricing', 'paquetes', 'items'],
+    manual_hold: ['leads', 'quotes', 'calendar', 'loss_reasons'],
+    expired:     [],
+    suspended:   [],
+};
+
 export default function Companies() {
     const [companies, setCompanies] = useState<Company[]>([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -63,7 +75,7 @@ export default function Companies() {
         phone: '',
         address: '',
         max_users: 5,
-        allowed_permissions: [] as string[],
+        allowed_permissions: PLAN_DEFAULT_MODULES['active'] as string[],
         admin_email: '',
         admin_password: '',
         admin_full_name: ''
@@ -251,7 +263,7 @@ export default function Companies() {
             phone: '',
             address: '',
             max_users: 5,
-            allowed_permissions: [],
+            allowed_permissions: PLAN_DEFAULT_MODULES['active'],
             admin_email: '',
             admin_password: '',
             admin_full_name: ''
@@ -612,7 +624,18 @@ export default function Companies() {
                                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2">Plan de Suscripción</label>
                                                 <select
                                                     value={formData.license_status}
-                                                    onChange={(e) => setFormData({ ...formData, license_status: e.target.value as LicenseStatus })}
+                                                    onChange={(e) => {
+                                                        const newStatus = e.target.value as LicenseStatus;
+                                                        setFormData(prev => ({
+                                                            ...prev,
+                                                            license_status: newStatus,
+                                                            // Auto-set default modules for NEW companies only
+                                                            // Editing an existing company preserves their current modules
+                                                            ...(!editingCompanyId && {
+                                                                allowed_permissions: PLAN_DEFAULT_MODULES[newStatus] ?? []
+                                                            })
+                                                        }));
+                                                    }}
                                                     className="w-full h-14 px-5 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-black text-sm transition-all focus:bg-white text-slate-700 shadow-sm appearance-none cursor-pointer"
                                                 >
                                                     <option value="active">🟢 ACTIVA (Full Service)</option>

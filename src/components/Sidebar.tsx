@@ -10,7 +10,7 @@ import { supabase } from '../services/supabase';
 import type { Company } from '../types';
 
 export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolean, onToggle: () => void }) {
-    const { profile, signOut, setSimulatedCompanyId, setSimulatedRole } = useAuth();
+    const { profile, signOut, setSimulatedCompanyId, setSimulatedRole, simulatedCompanyId } = useAuth();
     const location = useLocation();
     const { t } = useTranslation();
 
@@ -39,32 +39,38 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     const [debugOpen, setDebugOpen] = useState(false);
 
     useEffect(() => {
-        // Cargar datos de la empresa si hay un company_id
         if (profile?.company_id) {
             loadCompany();
-        } else if (profile?.role === 'super_admin') {
-            // Placeholder para super admin si no tiene empresa vinculada
+        } else if (profile?.role === 'super_admin' && !simulatedCompanyId) {
             setCompany({ name: 'System Administration' } as Company);
         }
-    }, [profile?.company_id, profile?.role]);
+    }, [profile?.company_id, profile?.role, simulatedCompanyId]);
+
+    // Reload branding when wizard or branding page saves changes
+    useEffect(() => {
+        const handleBrandingUpdate = () => loadCompany();
+        window.addEventListener('company-branding-updated', handleBrandingUpdate);
+        return () => window.removeEventListener('company-branding-updated', handleBrandingUpdate);
+    }, [simulatedCompanyId, profile?.company_id]);
 
     const loadCompany = async () => {
         try {
-            const data = await brandingService.getMyCompany();
-            if (data) {
-                setCompany(data);
-            }
+            // CRITICAL FIX: When in simulation mode, load the SIMULATED company's branding,
+            // not the master account's branding. This ensures the correct logo shows.
+            const effectiveCompanyId = simulatedCompanyId || profile?.company_id;
+
+            if (!effectiveCompanyId) return;
+
+            const { data, error } = await supabase
+                .from('companies')
+                .select('*')
+                .eq('id', effectiveCompanyId)
+                .single();
+
+            if (error) throw error;
+            if (data) setCompany(data as Company);
         } catch (error) {
             console.error('Error loading company branding for sidebar:', error);
-            // Intentar fallback si falla el servicio pero tenemos el ID
-            if (profile?.company_id && !company) {
-                const { data: fallbackCompany } = await supabase
-                    .from('companies')
-                    .select('name, logo_url')
-                    .eq('id', profile.company_id)
-                    .single();
-                if (fallbackCompany) setCompany(fallbackCompany as Company);
-            }
         }
     };
 

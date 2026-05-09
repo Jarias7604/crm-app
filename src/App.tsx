@@ -1,8 +1,8 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { lazy, Suspense, useEffect } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './lib/queryClient';
-import { AuthProvider } from './auth/AuthProvider';
+import { AuthProvider, useAuth } from './auth/AuthProvider';
 import AuthLayout from './layouts/AuthLayout';
 import DashboardLayout from './layouts/DashboardLayout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -10,6 +10,7 @@ import RoleProtectedRoute from './components/RoleProtectedRoute';
 import FeatureProtectedRoute from './components/FeatureProtectedRoute';
 import { Toaster } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
+import { supabase } from './services/supabase';
 
 // Auth pages (not lazy — needed immediately on first visit)
 import Login from './pages/Login';
@@ -118,6 +119,40 @@ const PageSkeleton = () => (
   </div>
 );
 
+// ─── New Admin Onboarding Guard ───────────────────────────────────────────────
+// Redirects brand-new company_admins (created < 2h ago) to the onboarding wizard
+// so they don't land on a blank dashboard. Skips super_admins and collaborators.
+function NewAdminOnboardingGuard() {
+  const { profile } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    // Only trigger for company_admin, not super_admin or collaborators
+    if (profile?.role !== 'company_admin') return;
+    // Skip if already in onboarding
+    if (location.pathname === '/onboarding') return;
+    // Skip if user has been around for more than 2 hours
+    const createdAt = new Date(profile.created_at).getTime();
+    const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
+    if (createdAt < twoHoursAgo) return;
+
+    // Check if company has a logo (indicates onboarding was completed)
+    supabase
+      .from('companies')
+      .select('logo_url')
+      .eq('id', profile.company_id)
+      .single()
+      .then(({ data }) => {
+        if (!data?.logo_url) {
+          navigate('/onboarding', { replace: true });
+        }
+      });
+  }, [profile, location.pathname]);
+
+  return null;
+}
+
 function App() {
   const { i18n } = useTranslation();
 
@@ -136,6 +171,7 @@ function App() {
             <PWAInstallPrompt />
           </Suspense>
           <Suspense fallback={<PageSkeleton />}>
+            <NewAdminOnboardingGuard />
             <Routes>
               <Route path="/" element={<LandingPage />} />
               

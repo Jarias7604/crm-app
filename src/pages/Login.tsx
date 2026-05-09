@@ -9,6 +9,33 @@ import toast from 'react-hot-toast';
 
 type LoginMode = 'password' | 'otp';
 
+// ─── Error message translator ─────────────────────────────────────────────────
+// Maps raw Supabase/Auth error messages to friendly Spanish user-facing messages.
+// Always use this instead of exposing raw error.message to the user.
+const translateAuthError = (rawMessage: string): string => {
+    const msg = rawMessage.toLowerCase();
+    if (msg.includes('invalid login credentials') || msg.includes('invalid credentials'))
+        return 'Email o contraseña incorrectos. Verifica tus datos e intenta de nuevo.';
+    if (msg.includes('email not confirmed'))
+        return 'Tu cuenta no está confirmada. Revisa tu bandeja de entrada y haz clic en el enlace de verificación.';
+    if (msg.includes('user not found'))
+        return 'No encontramos una cuenta con ese correo electrónico.';
+    if (msg.includes('rate limit') || msg.includes('email rate') || msg.includes('over_email_send_rate_limit'))
+        return 'Límite de envíos alcanzado. Espera unos minutos e intenta de nuevo, o usa tu contraseña para entrar.';
+    if (msg.includes('user already registered') || msg.includes('already exists'))
+        return 'Ya existe una cuenta con este correo electrónico.';
+    if (msg.includes('password') && msg.includes('short'))
+        return 'La contraseña debe tener al menos 6 caracteres.';
+    if (msg.includes('signup') && msg.includes('disabled'))
+        return 'El registro de nuevas cuentas no está habilitado en este momento.';
+    if (msg.includes('token') || msg.includes('otp') || msg.includes('expired'))
+        return 'El código ingresado no es válido o ha expirado. Solicita uno nuevo.';
+    if (msg.includes('network') || msg.includes('fetch'))
+        return 'Error de conexión. Verifica tu internet e intenta de nuevo.';
+    // Fallback: don't expose raw English error
+    return 'Ocurrió un error inesperado. Por favor intenta de nuevo.';
+};
+
 export default function Login() {
     const { t } = useTranslation();
     const [loginMode, setLoginMode] = useState<LoginMode>('password');
@@ -33,7 +60,7 @@ export default function Login() {
         });
 
         if (error) {
-            setError(error.message);
+            setError(translateAuthError(error.message));
             setLoading(false);
         } else {
             navigate('/dashboard');
@@ -43,7 +70,7 @@ export default function Login() {
     const handleSendOtp = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!email) {
-            setError("Ingresa un correo primero.");
+            setError("Ingresa tu correo electrónico primero.");
             return;
         }
         setLoading(true);
@@ -57,14 +84,10 @@ export default function Login() {
         });
 
         if (error) {
-            if (error.message.toLowerCase().includes('rate limit') || error.message.toLowerCase().includes('email rate')) {
-                setError("Límite de envíos alcanzado. Espera unos minutos e intenta de nuevo, o usa tu contraseña para entrar.");
-            } else {
-                setError(error.message);
-            }
+            setError(translateAuthError(error.message));
         } else {
             setOtpSent(true);
-            toast.success("Código enviado. Revisa tu bandeja de entrada.");
+            toast.success("✅ Código enviado. Revisa tu bandeja de entrada.");
         }
         setLoading(false);
     };
@@ -81,7 +104,7 @@ export default function Login() {
         });
 
         if (error) {
-            setError(error.message);
+            setError(translateAuthError(error.message));
             setLoading(false);
         } else {
             navigate('/dashboard');
@@ -202,7 +225,16 @@ export default function Login() {
                 </Button>
             </form>
 
-            <div className="text-center">
+            <div className="flex flex-col items-center gap-2">
+                {loginMode === 'password' && (
+                    <button
+                        type="button"
+                        onClick={() => { setLoginMode('otp'); setError(null); }}
+                        className="text-sm text-slate-400 hover:text-indigo-600 transition-colors font-medium"
+                    >
+                        ¿Olvidaste tu contraseña? <span className="text-indigo-600 font-bold">Entra con código mágico</span>
+                    </button>
+                )}
                 <Link to="/register" className="text-sm font-medium text-indigo-600 hover:text-indigo-500">
                     {t('auth.registerLink')}
                 </Link>
