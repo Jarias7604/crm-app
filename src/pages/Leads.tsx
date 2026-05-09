@@ -62,7 +62,7 @@ export default function Leads() {
             const result = await leadsService.getLeadsCursor(1000, pageParam as string | undefined);
             return result;
         },
-        initialPageParam: undefined,
+        initialPageParam: undefined as string | undefined,
         getNextPageParam: (lastPage) => lastPage.nextCursor,
         staleTime: 2 * 60 * 1000,
         gcTime: 10 * 60 * 1000,
