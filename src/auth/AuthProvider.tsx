@@ -40,6 +40,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Track previous userId to detect user switches and clear stale cache
     const prevUserIdRef = useRef<string | null>(null);
+    // Track current profile for use in realtime callbacks without stale closure
+    const profileRef = useRef<Profile | null>(null);
 
 
     const handleSetSimulatedCompanyId = (id: string | null) => {
@@ -107,6 +109,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         return () => subscription.unsubscribe();
     }, []);
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // ENTERPRISE REALTIME PERMISSION SYNC
+    // When admin changes role_permissions in DB → silently refresh affected
+    // users' permissions in ~200ms. No F5 required. Same pattern as HubSpot.
+    // ─────────────────────────────────────────────────────────────────────────
+    useEffect(() => {
+        profileRef.current = profile;
+    }, [profile]);
+
+    useEffect(() => {
+        if (!profile?.id || profile.role === 'super_admin') return;
+
+        const roleId = (profile as any).custom_role_id;
+        if (!roleId) return;
+
+        const channel = supabase
+            .channel(`role-permissions:${roleId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'role_permissions',
+                    filter: `role_id=eq.${roleId}`,
+                },
+                async (_payload) => {
+                    // Silently re-fetch permissions from the RPC — no page reload needed
+                    const currentProfile = profileRef.current;
+                    if (!currentProfile?.id) return;
+
+                    const { data: mergedPerms } = await supabase.rpc('get_user_permissions', {
+                        user_id: currentProfile.id
+                    });
+
+                    if (mergedPerms && Object.keys(mergedPerms).length > 0) {
+                        setProfile(prev => prev ? { ...prev, permissions: mergedPerms } : prev);
+                        console.info('✅ Permisos actualizados en tiempo real (Realtime Sync)');
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [profile?.id, (profile as any)?.custom_role_id]);
 
     const fetchProfile = async (userId: string, _userEmail?: string) => {
         try {
