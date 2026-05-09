@@ -82,9 +82,11 @@ export default function CotizadorPro() {
     const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
     const [tempLabelValue, setTempLabelValue] = useState<string>('');
 
-    // Permisos: super_admin ya está cubierto dentro de hasPermission(); company_admin necesita fallback
-    // explícito porque no tiene entradas en role_permissions.
-    const canChangePaymentMethod = hasPermission('cotizaciones.change_payment_method') || profile?.role === 'company_admin';
+    // Permisos de Cotizaciones — controlados desde Matriz de Seguridad (Roles y Permisos).
+    // super_admin y company_admin tienen estos permisos habilitados por defecto vía migration.
+    // Colaboradores los tienen en FALSE por defecto; el admin los activa desde la UI.
+    const canChangePaymentMethod = hasPermission('cotizaciones.change_payment_method');
+    const canEditPrices = hasPermission('cotizaciones.edit_prices');
 
     // Estado para widget de precio
     const [isWidgetOpen, setIsWidgetOpen] = useState(true);
@@ -843,7 +845,7 @@ export default function CotizadorPro() {
                                             <div className="flex items-center gap-4">
                                                 <div className="text-right">
                                                     <div className="text-right flex flex-col items-end">
-                                                        {formData.modulos_ids.includes(modulo.id) && hasPermission('cotizaciones.edit_prices') ? (
+                                                        {formData.modulos_ids.includes(modulo.id) && canEditPrices ? (
                                                             <div className="flex items-center gap-2">
                                                                 <span className="text-xs text-gray-400 font-bold">$</span>
                                                                 <input
@@ -897,7 +899,7 @@ export default function CotizadorPro() {
                                                 </div>
                                             </div>
                                             <div className="text-right flex flex-col items-end">
-                                                {formData.servicios_ids.includes(servicio.id) && hasPermission('cotizaciones.edit_prices') ? (
+                                                {formData.servicios_ids.includes(servicio.id) && canEditPrices ? (
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-xs text-gray-400 font-bold">$</span>
                                                         <input
@@ -1025,7 +1027,7 @@ export default function CotizadorPro() {
                                             </div>
 
                                             <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">
-                                                {(hasPermission('cotizaciones.edit_prices') || profile?.role === 'super_admin' || profile?.role === 'company_admin') ? (() => {
+                                                {canEditPrices ? (() => {
                                                     const itemOriginal = (item.tipo !== 'Implementación' && item.tipo !== 'Paquete')
                                                         ? [...modulos, ...servicios].find(i => i.nombre === item.nombre)
                                                         : null;

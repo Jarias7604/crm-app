@@ -144,5 +144,24 @@ export const permissionsService = {
 
         if (error) throw error;
         return data as RolePermission;
+    },
+
+    async bulkUpdatePermissions(updates: { role_id: string, permission_key: string, is_enabled: boolean }[]) {
+        if (updates.length === 0) return [];
+        
+        const payload = updates.map(u => ({
+            ...u,
+            updated_at: new Date().toISOString()
+        }));
+
+        const { data, error } = await supabase
+            .from('role_permissions')
+            .upsert(payload, {
+                onConflict: 'role_id,permission_key'
+            })
+            .select();
+
+        if (error) throw error;
+        return data as RolePermission[];
     }
 };

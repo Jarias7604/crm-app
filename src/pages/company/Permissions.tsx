@@ -17,6 +17,8 @@ export default function Permissions() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState<string | null>(null);
     const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+    const [pendingChanges, setPendingChanges] = useState<Record<string, boolean>>({});
+    const [isSavingBulk, setIsSavingBulk] = useState(false);
 
     const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
     const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
@@ -86,25 +88,34 @@ export default function Permissions() {
         }
     };
 
-    const handleToggle = async (roleId: string, key: string, currentStatus: boolean) => {
+    const handleToggle = (roleId: string, key: string, currentStatus: boolean) => {
         const toggleId = `${roleId}-${key}`;
-        try {
-            setSaving(toggleId);
-            await permissionsService.updatePermission(roleId, key, !currentStatus);
+        setPendingChanges(prev => ({
+            ...prev,
+            [toggleId]: !currentStatus
+        }));
+    };
 
-            setRolePermissions(prev => {
-                const existing = prev.find(p => p.role_id === roleId && p.permission_key === key);
-                if (existing) {
-                    return prev.map(p => p.role_id === roleId && p.permission_key === key ? { ...p, is_enabled: !currentStatus } : p);
-                } else {
-                    return [...prev, { id: 'temp-' + Date.now(), role_id: roleId, permission_key: key, is_enabled: !currentStatus }];
-                }
-            });
-        } catch (error) {
-            console.error('Error:', error);
-            toast.error('Error al actualizar');
+    const handleSaveChanges = async () => {
+        const updates = Object.entries(pendingChanges).map(([toggleId, is_enabled]) => {
+            const [role_id, permission_key] = toggleId.split('-');
+            return { role_id, permission_key, is_enabled };
+        });
+
+        if (updates.length === 0) return;
+
+        setIsSavingBulk(true);
+        const toastId = toast.loading('Guardando permisos...');
+        try {
+            await permissionsService.bulkUpdatePermissions(updates);
+            toast.success('¡Permisos actualizados con éxito!', { id: toastId });
+            setPendingChanges({});
+            await loadData();
+        } catch (error: any) {
+            console.error('Error bulk updating:', error);
+            toast.error('Hubo un error al guardar los permisos: ' + (error.message || ''), { id: toastId });
         } finally {
-            setSaving(null);
+            setIsSavingBulk(false);
         }
     };
 
@@ -147,6 +158,12 @@ export default function Permissions() {
     const isEnabled = (roleId: string, key: string) => {
         const role = roles.find(r => r.id === roleId);
         if (role?.base_role === 'super_admin') return true;
+        
+        const toggleId = `${roleId}-${key}`;
+        if (pendingChanges[toggleId] !== undefined) {
+            return pendingChanges[toggleId];
+        }
+        
         return rolePermissions.find(p => p.role_id === roleId && p.permission_key === key)?.is_enabled ?? false;
     };
 
@@ -427,6 +444,37 @@ export default function Permissions() {
                     </form>
                 </div>
             </Modal>
+
+            {/* FLOATING SAVE BUTTON */}
+            {Object.keys(pendingChanges).length > 0 && (
+                <div className="fixed bottom-8 right-8 z-50 animate-in slide-in-from-bottom-8 fade-in duration-300">
+                    <div className="bg-white rounded-2xl p-4 shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-100 flex items-center gap-4">
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-black text-[#4449AA] uppercase tracking-widest">Cambios Pendientes</span>
+                            <span className="text-xs text-gray-500 font-bold">{Object.keys(pendingChanges).length} permisos modificados</span>
+                        </div>
+                        <div className="w-px h-8 bg-gray-100 mx-2"></div>
+                        <Button 
+                            onClick={() => setPendingChanges({})}
+                            className="bg-gray-100 hover:bg-gray-200 text-gray-600 border-0 h-10 px-4 text-[10px] font-black uppercase tracking-widest rounded-xl"
+                            disabled={isSavingBulk}
+                        >
+                            Descartar
+                        </Button>
+                        <Button 
+                            onClick={handleSaveChanges}
+                            disabled={isSavingBulk}
+                            className="bg-[#4449AA] hover:bg-[#383d8f] text-white border-0 h-10 px-6 text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg flex items-center gap-2"
+                        >
+                            {isSavingBulk ? (
+                                <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Guardando...</>
+                            ) : (
+                                'Validar y Guardar'
+                            )}
+                        </Button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
