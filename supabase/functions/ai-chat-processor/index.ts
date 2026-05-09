@@ -1,4 +1,4 @@
-﻿// @ts-nocheck
+// @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 import { checkRateLimit, rateLimitResponse } from "../_shared/rateLimiter.ts";
@@ -113,7 +113,29 @@ Deno.serve(async (req) => {
 
     try {
         const body = await req.json().catch(() => ({}));
-        const { conversationId } = body;
+        const { conversationId, isTest, message: testMessage, agent: testAgent } = body;
+
+        // ── SIMULATOR MODE ──────────────────────────────────────────────────────────
+        if (isTest) {
+            log('Running in SIMULATOR mode');
+            const agentPrompt = testAgent?.system_prompt || 'Eres un asesor de ventas profesional.';
+            const companyId = testAgent?.company_id || 'test';
+            const { data: iconf } = await supabase.from('marketing_integrations')
+                .select('settings').eq('company_id', companyId).eq('provider', 'openai').eq('is_active', true).maybeSingle();
+            const apiKey = iconf?.settings?.apiKey || Deno.env.get('OPENAI_API_KEY');
+            if (!apiKey) return new Response(JSON.stringify({ error: 'OpenAI API Key not configured', logs }), { status: 400, headers: corsHeaders });
+            const RULES = `[REGLAS ABSOLUTAS]\n1. NO mostrar precios en el chat.\n2. NO pedir correo electronico.\n3. Cuando tengas el volumen, genera QUOTE_TRIGGER al final.\n[FIN REGLAS]`;
+            const aiResp = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: 'gpt-4o', messages: [{ role: 'system', content: `${RULES}\n\n${agentPrompt}` }, { role: 'user', content: testMessage || 'Hola' }], temperature: 0.2 })
+            });
+            const aiData = await aiResp.json();
+            const reply = (aiData.choices?.[0]?.message?.content || 'Sin respuesta')
+                .replace(/QUOTE_TRIGGER:[^\n]*/gi, '✅ [Cotización automática se generaría aquí]').trim();
+            return new Response(JSON.stringify({ reply, logs }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        // ── END SIMULATOR MODE ───────────────────────────────────────────────────────
 
         if (typeof conversationId !== 'string') {
             log(`Invalid conversationId type: ${typeof conversationId}`);
@@ -538,14 +560,20 @@ ${serviciosInfo || 'Sin servicios'}
                 }
 
                 if (quoteObj) {
-                    
-                    // Generate PDF!
+                    // Mark as 'enviada' so the public view link is immediately accessible
+                    await supabase.from('cotizaciones').update({ estado: 'enviada' }).eq('id', quoteObj.id);
+
+                    // Generate PDF
                     const pdfUrl = await generateQuotePDF(quoteObj, supabase);
                     if (pdfUrl) {
                         (conv as any).__pdfUrl = pdfUrl;
                         (conv as any).__pdfFileName = `Propuesta_${(quoteObj.nombre_cliente || 'Client').replace(/\s+/g, '_')}.pdf`;
                     }
 
+                    // Store public approval link
+                    const FRONTEND_BASE = Deno.env.get('FRONTEND_URL') || 'https://crm-app-v2.vercel.app';
+                    (conv as any).__publicQuoteLink = `${FRONTEND_BASE}/propuesta/${quoteObj.id}`;
+                    log(`Quote ${quoteObj.id} created. Public link: ${(conv as any).__publicQuoteLink}`);
                 }
             }
         }
@@ -572,14 +600,9 @@ ${serviciosInfo || 'Sin servicios'}
             .select()
             .maybeSingle();
 
+        // DB insert is non-blocking — Telegram MUST deliver even if DB fails
         if (insertError) {
-            log(`Insert error: ${JSON.stringify(insertError)}`);
-            throw insertError;
-        }
-
-        if (!savedMsg) {
-            log(`Insert succeeded but returned no data. Check triggers.`);
-            throw new Error("Message not saved (Blocked by database policy)");
+            log(`Insert error (non-fatal): ${JSON.stringify(insertError)}`);
         }
 
         // ===========================================
@@ -597,71 +620,69 @@ ${serviciosInfo || 'Sin servicios'}
             const botToken = tgIntegration?.settings?.token;
             if (botToken) {
                 try {
-                    const tgResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            chat_id: chatId,
-                            text: cleanText,
-                            parse_mode: 'Markdown'
-                        })
-                    });
-                    const tgResult = await tgResponse.json();
-
-                    if (tgResult.ok) {
-                        await supabase.from('marketing_messages')
-                            .update({ status: 'delivered' })
-                            .eq('id', savedMsg.id);
-                        console.log(`Γ£à Message delivered to Telegram (chat: ${chatId})`);
-
-                        // ΓöÇΓöÇ Send PDF as binary stream (URL method fails due to Supabase Storage CORS) ΓöÇΓöÇ
-                        const pdfUrl = (conv as any).__pdfUrl;
-                        const pdfFileName = (conv as any).__pdfFileName || 'Propuesta_Comercial.pdf';
-                        if (pdfUrl) {
-                            try {
-                                // Download the PDF bytes from Supabase Storage
-                                const pdfResp = await fetch(pdfUrl);
-                                if (pdfResp.ok) {
-                                    const pdfBlob = await pdfResp.blob();
-
-                                    // Send as multipart/form-data ΓÇö Telegram accepts binary files directly
-                                    const formData = new FormData();
-                                    formData.append('chat_id', String(chatId));
-                                    formData.append('document', pdfBlob, pdfFileName);
-                                    formData.append('caption', '≡ƒôä Tu propuesta comercial est├í lista. ┬íQuedo atento a cualquier consulta!');
-
-                                    const docResp = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
-                                        method: 'POST',
-                                        body: formData,
-                                    });
-                                    const docResult = await docResp.json();
-                                    if (docResult.ok) {
-                                        console.log(`≡ƒôè PDF sent as binary to Telegram (chat: ${chatId})`);
-                                    } else {
-                                        console.error('Telegram sendDocument error:', docResult);
-                                    }
-                                }
-                            } catch (pdfErr) {
-                                console.error('PDF binary send failed:', pdfErr);
-                            }
-                        }
-
-                    } else {
-                        console.error('Telegram API error:', tgResult);
-                        // Retry without parse_mode if markdown fails
-                        if (tgResult.description?.includes('parse')) {
-                            const retryResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                    // 1. Send text message
+                    let textSent = false;
+                    if (cleanText && cleanText.trim().length > 0) {
+                        const tgResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ chat_id: chatId, text: cleanText, parse_mode: 'Markdown' })
+                        });
+                        const tgResult = await tgResponse.json();
+                        textSent = tgResult.ok;
+                        if (!textSent && tgResult.description?.includes('parse')) {
+                            // Retry plain text if Markdown fails
+                            const r2 = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ chat_id: chatId, text: cleanText })
                             });
-                            const retryResult = await retryResponse.json();
-                            if (retryResult.ok) {
-                                await supabase.from('marketing_messages')
-                                    .update({ status: 'delivered' })
-                                    .eq('id', savedMsg.id);
-                            }
+                            textSent = (await r2.json()).ok;
                         }
+                        if (textSent) console.log(`✅ Text delivered to Telegram (chat: ${chatId})`);
+                        else console.error('Telegram text error:', tgResult);
+                    } else {
+                        textSent = true; // No text (QUOTE_TRIGGER only) — still proceed to PDF
+                    }
+
+                    if (textSent && savedMsg?.id) {
+                        await supabase.from('marketing_messages').update({ status: 'delivered' }).eq('id', savedMsg.id);
+                    }
+
+                    // 2. Send PDF if generated
+                    const pdfUrl = (conv as any).__pdfUrl;
+                    const pdfFileName = (conv as any).__pdfFileName || 'Propuesta_Comercial.pdf';
+                    if (pdfUrl) {
+                        try {
+                            const pdfResp = await fetch(pdfUrl);
+                            if (pdfResp.ok) {
+                                const pdfBlob = await pdfResp.blob();
+                                const formData = new FormData();
+                                formData.append('chat_id', String(chatId));
+                                formData.append('document', pdfBlob, pdfFileName);
+                                formData.append('caption', '📄 Tu propuesta comercial está lista. ¡Quedo atento a cualquier consulta!');
+                                const docResp = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: 'POST', body: formData });
+                                const docResult = await docResp.json();
+                                if (docResult.ok) console.log(`📊 PDF sent to Telegram (chat: ${chatId})`);
+                                else console.error('Telegram sendDocument error:', docResult);
+                            }
+                        } catch (pdfErr) { console.error('PDF send failed:', pdfErr); }
+                    }
+
+                    // 3. Send public approval link if quote was generated
+                    const publicQuoteLink = (conv as any).__publicQuoteLink;
+                    if (publicQuoteLink) {
+                        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                chat_id: chatId,
+                                text: `🔗 *Ver y aprobar tu cotización:*`,
+                                parse_mode: 'Markdown',
+                                reply_markup: { inline_keyboard: [[{ text: '📋 Ver Cotización Completa', url: publicQuoteLink }]] }
+                            })
+                        });
+                        console.log(`🔗 Quote link sent to Telegram`);
                     }
                 } catch (e) {
                     console.error('Telegram send error:', e);
