@@ -89,7 +89,7 @@ export default function Permissions() {
     };
 
     const handleToggle = (roleId: string, key: string, currentStatus: boolean) => {
-        const toggleId = `${roleId}-${key}`;
+        const toggleId = `${roleId}|${key}`;
         setPendingChanges(prev => ({
             ...prev,
             [toggleId]: !currentStatus
@@ -98,7 +98,7 @@ export default function Permissions() {
 
     const handleSaveChanges = async () => {
         const updates = Object.entries(pendingChanges).map(([toggleId, is_enabled]) => {
-            const [role_id, permission_key] = toggleId.split('-');
+            const [role_id, permission_key] = toggleId.split('|');
             return { role_id, permission_key, is_enabled };
         });
 
@@ -159,7 +159,7 @@ export default function Permissions() {
         const role = roles.find(r => r.id === roleId);
         if (role?.base_role === 'super_admin') return true;
         
-        const toggleId = `${roleId}-${key}`;
+        const toggleId = `${roleId}|${key}`;
         if (pendingChanges[toggleId] !== undefined) {
             return pendingChanges[toggleId];
         }
