@@ -6,6 +6,7 @@ import { SOURCE_CONFIG } from '../../types';
 import type { Lead } from '../../types';
 import { StatusBadge } from './StatusBadge';
 import { PriorityBadge } from './PriorityBadge';
+import { LeadScoreBadge } from './LeadScoreBadge';
 import { ResponseVelocityBadge } from '../ui/ResponseVelocityBadge';
 
 interface LeadGridProps {
@@ -48,6 +49,7 @@ export const LeadGrid: React.FC<LeadGridProps> = ({
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <PriorityBadge priority={lead.priority || 'medium'} />
                                             <StatusBadge status={lead.status} />
+                                            <LeadScoreBadge lead={lead} variant="compact" />
                                             {lead.document_path && (
                                                 <span className="px-2 py-0.5 text-[10px] font-black uppercase tracking-widest rounded-full bg-blue-50 text-blue-600 border border-blue-100 flex items-center gap-1">
                                                     <FileText className="w-3 h-3" /> Cotizado

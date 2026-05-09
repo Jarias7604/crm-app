@@ -7,6 +7,7 @@ import { SOURCE_CONFIG } from '../../types';
 import type { Lead } from '../../types';
 import { StatusBadge } from './StatusBadge';
 import { PriorityBadge } from './PriorityBadge';
+import { LeadScoreBadge } from './LeadScoreBadge';
 import { ResponseVelocityBadge } from '../ui/ResponseVelocityBadge';
 
 interface LeadTableProps {
@@ -348,7 +349,12 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                                     </div>
                                                                 )}
 
-                                                                {colId === 'priority' && <PriorityBadge priority={lead.priority} />}
+                                                                {colId === 'priority' && (
+                                                                    <div className="flex items-center gap-2">
+                                                                        <PriorityBadge priority={lead.priority} />
+                                                                        <LeadScoreBadge lead={lead} variant="ring" />
+                                                                    </div>
+                                                                )}
 
                                                                 {colId === 'source' && (
                                                                     lead.source && SOURCE_CONFIG[lead.source] ? (

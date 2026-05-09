@@ -180,16 +180,78 @@ El CRM funciona como un motor de recepción automática (Ingestion Engine). Perm
 - **Conexión Meta Leads:** Generación de un endpoint seguro (Webhook) para recibir formularios de anuncios de Facebook.
 - **Deduplicación Automática:** Si un Lead entra por webhook, el CRM verifica si el correo o teléfono ya existe para evitar registros duples.
 - **Enrutamiento:** Asignación inteligente a los agentes disponibles según reglas de negocio.
+---
+
+## 10. Lead Scoring AI — Inteligencia Artificial de Calificación
+
+### Descripción
+El módulo de **Lead Scoring AI** calcula automáticamente un puntaje de 0 a 100 para cada lead basado en 7 factores de inteligencia. Esto permite que tu equipo de ventas sepa **al instante** quién es un lead caliente (listo para cerrar) y quién necesita más nutrición — sin intervención manual.
+
+> **Ventaja competitiva:** HubSpot cobra $450+/mes por esta funcionalidad. En Arias CRM está incluida nativamente y corre a costo $0 (sin APIs externas).
+
+### Cómo funciona
+Cada vez que un lead se **crea o actualiza**, el motor de scoring analiza automáticamente su perfil y calcula un puntaje. No necesitas hacer nada — es 100% autónomo.
+
+### Los 7 Factores de Scoring
+
+| Factor | Puntos Máx. | Qué mide |
+|--------|:-----------:|----------|
+| **Valor del Deal** | 20 | Cuánto dinero representa la oportunidad |
+| **Datos de Contacto** | 15 | Si tiene email, teléfono, empresa y dirección |
+| **Dominio de Email** | 10 | Email corporativo (serio) vs Gmail/Hotmail (casual) |
+| **Etapa del Pipeline** | 20 | Qué tan avanzado está en el proceso de ventas |
+| **Engagement** | 15 | Cuántos seguimientos/interacciones ha tenido |
+| **Fuente de Origen** | 15 | Referidos y sitio web valen más que llamada fría |
+| **Frescura** | 5 | Leads recientes (< 7 días) puntúan más alto |
+
+### Temperaturas del Lead
+
+El score se traduce automáticamente en una **temperatura** visual:
+
+| Temperatura | Rango | Significado | Acción recomendada |
+|:-----------:|:-----:|-------------|--------------------|
+| 🔥 **Caliente** | 75-100 | Alta probabilidad de cierre | Llamar HOY, prioridad máxima |
+| ☀️ **Tibio** | 40-74 | Buen prospecto, necesita nutrición | Programar seguimiento esta semana |
+| ❄️ **Frío** | 0-39 | Baja prioridad | Seguimiento pasivo, campañas de email |
+
+### Dónde se ve el Score
+
+- **Vista de Tarjetas (Grid):** Un badge con emoji y número aparece junto al estado del lead (ej. `🔥 82`)
+- **Vista de Tabla (List):** Un anillo circular con el puntaje aparece en la columna de Prioridad
+- **Detalle del Lead:** Al abrir un lead, la sección completa muestra cada factor desglosado con barras de progreso
+- **Tooltip Hover:** Al pasar el mouse sobre cualquier badge de score, se despliega un tooltip con el desglose completo de los 7 factores
+
+### Auto-Priorización
+
+El scoring también **ajusta automáticamente la prioridad** del lead:
+
+| Score | Prioridad asignada |
+|:-----:|-------------------|
+| 80-100 | 🔥 Altísima |
+| 60-79 | ⚡ Alta |
+| 40-59 | 💎 Media |
+| 0-39 | 🌊 Baja |
+
+### Preguntas sobre Lead Scoring
+
+**¿Se recalcula el score cuando actualizo un lead?**
+Sí. Cada vez que se edita un lead (cambio de etapa, se agrega teléfono, se actualiza el valor), el score se recalcula automáticamente.
+
+**¿Consume tokens o APIs externas?**
+No. Todo el cálculo se realiza en el frontend con algoritmos propios. Costo: $0.
+
+**¿Puedo ver por qué un lead tiene ese score?**
+Sí. Pasa el mouse sobre el badge de score y aparecerá un tooltip con los 7 factores y sus puntos individuales.
 
 ---
 
-## 10. Preguntas Frecuentes (FAQ)
+## 11. Preguntas Frecuentes (FAQ)
 
 ### ¿Cómo agrego un nuevo lead manualmente?
-Ve a **Leads → Nuevo Lead**, completa el formulario con nombre, teléfono, fuente y etapa inicial, y haz clic en **Guardar**.
+Ve a **Leads → Nuevo Lead**, completa el formulario con nombre, teléfono, fuente y etapa inicial, y haz clic en **Guardar**. El sistema le asignará un AI Score automáticamente.
 
 ### ¿Cómo restablezco mi contraseña?
-En la pantalla de inicio de sesión, haz clic en **¿Olvidaste tu contraseña?**. Recibirás un enlace de recuperación en tu correo registrado.
+En la pantalla de inicio de sesión, haz clic en **¿Olvidaste tu contraseña? Entra con código mágico**. Recibirás un enlace de recuperación en tu correo registrado.
 
 ### ¿Cómo asigno un lead a otro agente?
 Abre el detalle del lead y en el campo **Asignado a**, selecciona el agente deseado del menú desplegable. El sistema notificará automáticamente al agente vía Telegram.
@@ -203,6 +265,9 @@ Ve a **Admin → Pipeline** y arrastra las etapas para reordenarlas, edita sus n
 ### ¿Los datos de cada empresa están separados?
 Sí. El sistema es **multi-tenant** con aislamiento completo por Row Level Security (RLS) en la base de datos. Cada empresa ve únicamente sus propios datos.
 
+### ¿Qué significa el badge 🔥/☀️/❄️ en los leads?
+Es el **AI Lead Score**. Indica qué tan probable es que el lead cierre. 🔥 = llamar hoy, ☀️ = darle seguimiento pronto, ❄️ = baja prioridad. Pasa el mouse sobre el badge para ver el desglose completo.
+
 ---
 
-*Arias CRM Professional — Documentación v3.0 — Actualizada Abril 2026*
+*Arias CRM Professional — Documentación v4.0 — Actualizada Mayo 2026*

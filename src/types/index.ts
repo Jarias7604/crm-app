@@ -112,6 +112,7 @@ export interface Lead {
     industry?: string | null;
     contact_count?: number;
     engagement_score?: number;
+    ai_score?: number | null;        // AI Lead Scoring (0-100)
     call_bot_data?: Record<string, unknown> | null;
     last_follow_up_at?: string | null;    // Last time any follow-up was registered
     first_follow_up_at?: string | null;   // First time a follow-up was registered
