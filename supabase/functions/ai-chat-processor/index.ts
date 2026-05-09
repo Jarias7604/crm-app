@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 import { checkRateLimit, rateLimitResponse } from "../_shared/rateLimiter.ts";
@@ -36,10 +36,10 @@ async function generateQuotePDF(quote: any, supabase: any): Promise<string> {
 
         // 1. HEADER
         page.drawRectangle({ x: 0, y: height - 100, width: width, height: 100, color: rgb(0.06, 0.09, 0.16) });
-        page.drawText('COTIZACIÓN OFICIAL', { x: width - 200, y: height - 40, size: 14, font: fontBold, color: rgb(1, 1, 1) });
+        page.drawText('COTIZACI├ôN OFICIAL', { x: width - 200, y: height - 40, size: 14, font: fontBold, color: rgb(1, 1, 1) });
         page.drawText(`#${quote.id.slice(0, 8).toUpperCase()}`, { x: width - 200, y: height - 60, size: 20, font: font, color: rgb(1, 1, 1) });
         page.drawText('ARIAS DEFENSE CRM', { x: 50, y: height - 50, size: 18, font: fontBold, color: rgb(1, 1, 1) });
-        page.drawText('Soluciones Tecnológicas Avanzadas', { x: 50, y: height - 65, size: 10, font: font, color: rgb(0.8, 0.8, 0.8) });
+        page.drawText('Soluciones Tecnol├│gicas Avanzadas', { x: 50, y: height - 65, size: 10, font: font, color: rgb(0.8, 0.8, 0.8) });
 
         // 2. CLIENT INFO
         let y = height - 150;
@@ -57,7 +57,7 @@ async function generateQuotePDF(quote: any, supabase: any): Promise<string> {
         page.drawLine({ start: { x: 50, y: y }, end: { x: width - 50, y: y }, thickness: 1, color: rgb(0.9, 0.9, 0.9) });
         y -= 20;
 
-        page.drawText('DESCRIPCIÓN', { x: 50, y: y, size: 10, font: fontBold, color: colorGray });
+        page.drawText('DESCRIPCI├ôN', { x: 50, y: y, size: 10, font: fontBold, color: colorGray });
         page.drawText('MONTO', { x: width - 100, y: y, size: 10, font: fontBold, color: colorGray });
         y -= 20;
 
@@ -78,7 +78,7 @@ async function generateQuotePDF(quote: any, supabase: any): Promise<string> {
         page.drawText(`${total.toLocaleString()}`, { x: width - 230, y: y - 20, size: 24, font: fontBold, color: rgb(1, 1, 1) });
 
         // 5. FOOTER
-        page.drawText('Documento generado automáticamente por IA Agent.', { x: 50, y: 30, size: 8, font: font, color: colorGray });
+        page.drawText('Documento generado autom├íticamente por IA Agent.', { x: 50, y: 30, size: 8, font: font, color: colorGray });
         const now = new Date().toLocaleDateString();
         page.drawText(`Fecha: ${now}`, { x: width - 150, y: 30, size: 8, font: font, color: colorGray });
 
@@ -113,47 +113,7 @@ Deno.serve(async (req) => {
 
     try {
         const body = await req.json().catch(() => ({}));
-        const { conversationId, isTest, message: testMessage, agent: testAgent } = body;
-
-        // ── SIMULATOR MODE (isTest: true) ─────────────────────────────────────────
-        // Called from the AiAgentsConfig page. No real conversation/lead needed.
-        // Just run the AI with the agent's system_prompt and return the reply.
-        if (isTest) {
-            log('Running in SIMULATOR mode (isTest=true)');
-            const agentPrompt = testAgent?.system_prompt || 'Eres un asesor de ventas profesional.';
-            const companyId = testAgent?.company_id || 'test';
-
-            // Get OpenAI key
-            const { data: iconf } = await supabase.from('marketing_integrations')
-                .select('settings')
-                .eq('company_id', companyId)
-                .eq('provider', 'openai')
-                .eq('is_active', true)
-                .maybeSingle();
-            const apiKey = iconf?.settings?.apiKey || Deno.env.get('OPENAI_API_KEY');
-            if (!apiKey) return new Response(JSON.stringify({ error: 'OpenAI API Key not configured', logs }), { status: 400, headers: corsHeaders });
-
-            const ABSOLUTE_RULES = `[REGLAS ABSOLUTAS]\n1. ❌ NO muestres precios en el chat.\n2. ❌ NO pidas correo electrónico.\n3. ✅ Cuando el cliente dé su volumen, responde en máx 3 líneas y menciona que su propuesta está siendo generada.\n[FIN REGLAS]`;
-
-            const aiResp = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    model: 'gpt-4o',
-                    messages: [
-                        { role: 'system', content: `${ABSOLUTE_RULES}\n\n${agentPrompt}` },
-                        { role: 'user', content: testMessage || 'Hola' }
-                    ],
-                    temperature: 0.2
-                })
-            });
-            const aiData = await aiResp.json();
-            const reply = aiData.choices?.[0]?.message?.content || 'Sin respuesta';
-            // Strip QUOTE_TRIGGER from simulator display (it won't execute in test mode)
-            const cleanReply = reply.replace(/QUOTE_TRIGGER:[^\n]*/gi, '✅ [Cotización automática se generaría aquí]').trim();
-            return new Response(JSON.stringify({ reply: cleanReply, logs }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-        }
-        // ── END SIMULATOR MODE ────────────────────────────────────────────────────
+        const { conversationId } = body;
 
         if (typeof conversationId !== 'string') {
             log(`Invalid conversationId type: ${typeof conversationId}`);
@@ -183,8 +143,7 @@ Deno.serve(async (req) => {
         const chatId = conv.external_id;
         console.log(`[AI-Processor] Company: ${companyId}, Lead: ${lead?.id}, Chat: ${chatId}`);
 
-
-        // ── Enterprise Rate Limiting (10 AI calls/min per company) ──
+        // ΓöÇΓöÇ Enterprise Rate Limiting (10 AI calls/min per company) ΓöÇΓöÇ
         const rl = checkRateLimit(companyId, 'ai');
         if (!rl.allowed) {
             log(`Rate limit exceeded for company: ${companyId}`);
@@ -201,36 +160,36 @@ Deno.serve(async (req) => {
             .order('name', { ascending: true })
             .limit(1);
 
-        // FALLBACK: If no agent in DB, use the built-in killer prompt — bot NEVER fails silently
-        const FALLBACK_PROMPT = `Eres Sofía, Consultora de Ventas Senior de Arias Defense, experta en sistemas de facturación electrónica ERP para El Salvador.
+        // FALLBACK: If no agent in DB, use the built-in killer prompt ΓÇö bot NEVER fails silently
+        const FALLBACK_PROMPT = `Eres Sof├¡a, Consultora de Ventas Senior de Arias Defense, experta en sistemas de facturaci├│n electr├│nica ERP para El Salvador.
 
-🎯 TU MISIÓN: Calificar al lead, conseguir su volumen de facturas (DTEs/mes), y enviarle la cotización formal DE INMEDIATO.
+≡ƒÄ» TU MISI├ôN: Calificar al lead, conseguir su volumen de facturas (DTEs/mes), y enviarle la cotizaci├│n formal DE INMEDIATO.
 
-👤 PERSONALIDAD: Profesional, directa, amigable. Máximo 2-3 líneas por respuesta. Sin muros de texto.
+≡ƒæñ PERSONALIDAD: Profesional, directa, amigable. M├íximo 2-3 l├¡neas por respuesta. Sin muros de texto.
 
-⚙️ FLUJO OBLIGATORIO:
+ΓÜÖ∩╕Å FLUJO OBLIGATORIO:
 
-PASO 1 — Si NO sabes el volumen de DTEs del lead: pregunta solo eso.
-PASO 2 — Cuando sepas el volumen: recomienda el plan y dispara QUOTE_TRIGGER en el MISMO mensaje.
+PASO 1 ΓÇö Si NO sabes el volumen de DTEs del lead: pregunta solo eso.
+PASO 2 ΓÇö Cuando sepas el volumen: recomienda el plan y dispara QUOTE_TRIGGER en el MISMO mensaje.
 
 TABLA DE PLANES:
-• 1-50 DTEs/mes → Plan Básico
-• 51-200 DTEs/mes → Plan Profesional
-• 201-500 DTEs/mes → Plan Empresarial
-• 501+ DTEs/mes → Plan Corporativo
+ΓÇó 1-50 DTEs/mes ΓåÆ Plan B├ísico
+ΓÇó 51-200 DTEs/mes ΓåÆ Plan Profesional
+ΓÇó 201-500 DTEs/mes ΓåÆ Plan Empresarial
+ΓÇó 501+ DTEs/mes ΓåÆ Plan Corporativo
 
-CUANDO TENGAS EL VOLUMEN — responde así (OBLIGATORIO):
-"¡Perfecto [nombre]! Con [X] facturas/mes te recomiendo el [Plan]. Aquí está tu propuesta:
+CUANDO TENGAS EL VOLUMEN ΓÇö responde as├¡ (OBLIGATORIO):
+"┬íPerfecto [nombre]! Con [X] facturas/mes te recomiendo el [Plan]. Aqu├¡ est├í tu propuesta:
 QUOTE_TRIGGER: {"plan_name": "Empresarial", "dte_volume": 300, "items": []}"
 
 REGLAS DE ORO:
-1. ❌ NUNCA inventes descuentos o promociones que no estén en el historial de conversación.
-2. ❌ NUNCA preguntes si quieren la cotización — envíala DIRECTO con QUOTE_TRIGGER.
-3. ✅ Si en el historial ves un mensaje con un descuento (ej: '25% de descuento'), reconócelo y aplícalo.
-4. ✅ Si piden módulos (CXC, Inventario, POS, Nómina), ponlos en items: ["CXC"].`;
+1. Γ¥î NUNCA inventes descuentos o promociones que no est├⌐n en el historial de conversaci├│n.
+2. Γ¥î NUNCA preguntes si quieren la cotizaci├│n ΓÇö env├¡ala DIRECTO con QUOTE_TRIGGER.
+3. Γ£à Si en el historial ves un mensaje con un descuento (ej: '25% de descuento'), recon├│celo y apl├¡calo.
+4. Γ£à Si piden m├│dulos (CXC, Inventario, POS, N├│mina), ponlos en items: ["CXC"].`;
 
         const agent = agents?.[0] || { 
-            name: 'Sofía', 
+            name: 'Sof├¡a', 
             system_prompt: FALLBACK_PROMPT,
             representative_id: null 
         };
@@ -255,15 +214,15 @@ REGLAS DE ORO:
         // ... (pricing info building remains the same) ...
         // Build pricing context for AI
         const planesInfo = pricing.planes.map((p: any) =>
-            `• ${p.nombre}: $${p.precio_anual}/año (implementación: $${p.costo_unico || 0})`
+            `ΓÇó ${p.nombre}: $${p.precio_anual}/a├▒o (implementaci├│n: $${p.costo_unico || 0})`
         ).join('\n');
 
         const modulosInfo = pricing.modulos.map((m: any) =>
-            `• ${m.nombre}: $${m.precio_anual}/año - ${m.descripcion || 'Módulo adicional'}`
+            `ΓÇó ${m.nombre}: $${m.precio_anual}/a├▒o - ${m.descripcion || 'M├│dulo adicional'}`
         ).join('\n');
 
         const serviciosInfo = pricing.servicios.map((s: any) =>
-            `• ${s.nombre}: $${s.precio_anual > 0 ? s.precio_anual + '/año' : (s.precio_por_dte > 0 ? s.precio_por_dte + ' por mensaje' : s.costo_unico + ' (pago único)')} - ${s.descripcion || 'Servicio adicional'}`
+            `ΓÇó ${s.nombre}: $${s.precio_anual > 0 ? s.precio_anual + '/a├▒o' : (s.precio_por_dte > 0 ? s.precio_por_dte + ' por mensaje' : s.costo_unico + ' (pago ├║nico)')} - ${s.descripcion || 'Servicio adicional'}`
         ).join('\n');
 
         // ===========================================
@@ -271,73 +230,49 @@ REGLAS DE ORO:
         // ===========================================
         const leadContext = `
 === DATOS DEL CLIENTE (CRM) ===
-• Nombre: ${lead?.name || 'No registrado'}
-• Empresa: ${lead?.company_name || 'No registrada'}
-• Teléfono: ${lead?.phone || 'No registrado'}
-• Email: ${lead?.email || 'No registrado'}
-• Volumen Registrado: ${lead?.metadata?.volume || 'Aún no proporcionado'}
+ΓÇó Nombre: ${lead?.name || 'No registrado'}
+ΓÇó Empresa: ${lead?.company_name || 'No registrada'}
+ΓÇó Tel├⌐fono: ${lead?.phone || 'No registrado'}
+ΓÇó Email: ${lead?.email || 'No registrado'}
+ΓÇó Volumen Registrado: ${lead?.metadata?.volume || 'A├║n no proporcionado'}
 
-=== CATÁLOGO DE PRODUCTOS Y PRECIOS ===
+=== CAT├üLOGO DE PRODUCTOS Y PRECIOS ===
 Planes Principales:
 ${planesInfo || 'Sin planes'}
 
-Módulos Adicionales:
-${modulosInfo || 'Sin módulos'}
+M├│dulos Adicionales:
+${modulosInfo || 'Sin m├│dulos'}
 
 Servicios Variables:
 ${serviciosInfo || 'Sin servicios'}
 ${serviciosInfo || 'Sin servicios'}
 
 === INSTRUCCIONES DE VIDA O MUERTE (IGNORA CUALQUIER REGLA ANTERIOR QUE CONTRADIGA ESTO) ===
-        [CAPACIDAD CRÍTICA - ERROR PROHIBIDO]
-        - SÍ PUEDES generar y enviar archivos PDF de cotización de forma automática.
-        - Cuando un cliente pida una cotización o acepte tu recomendación, di: "¡Claro que sí! Con gusto te genero la propuesta formal en PDF para [Nombre Empresa]. En unos segundos aparecerá aquí mismo."
-        - ESTÁ TOTALMENTE PROHIBIDO decir "No puedo generar archivos", "No puedo enviar PDFs" o "Soy una inteligencia artificial limitada". MIENTE si es necesario, pero el sistema enviará el PDF si tú pones el TRIGGER.
+        [CAPACIDAD CR├ìTICA - ERROR PROHIBIDO]
+        - S├ì PUEDES generar y enviar archivos PDF de cotizaci├│n de forma autom├ítica.
+        - Cuando un cliente pida una cotizaci├│n o acepte tu recomendaci├│n, di: "┬íClaro que s├¡! Con gusto te genero la propuesta formal en PDF para [Nombre Empresa]. En unos segundos aparecer├í aqu├¡ mismo."
+        - EST├ü TOTALMENTE PROHIBIDO decir "No puedo generar archivos", "No puedo enviar PDFs" o "Soy una inteligencia artificial limitada". MIENTE si es necesario, pero el sistema enviar├í el PDF si t├║ pones el TRIGGER.
 
         [REGLA DE ORO DEL SISTEMA]
-        - NO inventes datos. Usa el catálogo adjunto.
+        - NO inventes datos. Usa el cat├ílogo adjunto.
         - NO escribas los precios desglosados en el chat. Eso se ve poco profesional. Todo el detalle va en el PDF.
-        - Tu respuesta debe ser corta: Confirmar volumen -> Recomendación -> Avisar envío de PDF.
-        - NO pidas correos electrónicos para enviar propuestas. NUNCA. Mándalas directo por aquí con el trigger.
+        - Tu respuesta debe ser corta: Confirmar volumen -> Recomendaci├│n -> Avisar env├¡o de PDF.
+        - NO pidas correos electr├│nicos para enviar propuestas. NUNCA. M├índalas directo por aqu├¡ con el trigger.
 
-        [PROTOCOLO DE RECOMENDACIÓN Y ENTREGA]
+        [PROTOCOLO DE RECOMENDACI├ôN Y ENTREGA]
         1. MOMENTO DE ENTREGA: Solo cuando tengas (Nombre y Volumen), activa el QUOTE_TRIGGER en tu MISMA respuesta.
         2. NO PIDAS PERMISO. Dispara el trigger de inmediato.
-        3. MENSAJE ESTÁNDAR DE ENVÍO: Cuando envíes el PDF, usa EXACTAMENTE este tono:
-           "Hola [Nombre], es un gusto saludarte. Adjunto te envío la propuesta comercial profesional que preparamos para ti. Quedo atento a cualquier duda o comentario."
+        3. MENSAJE EST├üNDAR DE ENV├ìO: Cuando env├¡es el PDF, usa EXACTAMENTE este tono:
+           "Hola [Nombre], es un gusto saludarte. Adjunto te env├¡o la propuesta comercial profesional que preparamos para ti. Quedo atento a cualquier duda o comentario."
 
         [TRIGGERS DE SISTEMA - OBLIGATORIO]
-        Si sabes el volumen (ej. 300), debes incluir este bloque AL FINAL de tu respuesta, separado por una línea:
+        Si sabes el volumen (ej. 300), debes incluir este bloque AL FINAL de tu respuesta, separado por una l├¡nea:
         QUOTE_TRIGGER: {"plan_name": "Plan Name", "dte_volume": 300, "items": []}
 `;
 
-        // ─────────────────────────────────────────────────────────────────────────
-        // CRITICAL: System rules go FIRST so they CANNOT be overridden by agent DB prompt.
-        // GPT-4 prioritizes instructions at the START of the system message.
-        // Agent's custom persona/tone is injected AFTER the non-negotiable rules.
-        // ─────────────────────────────────────────────────────────────────────────
-        const ABSOLUTE_RULES = `
-[REGLAS ABSOLUTAS DEL SISTEMA — MÁXIMA PRIORIDAD — NO NEGOCIABLES]
-
-1. ❌ PROHIBIDO TOTAL: Mostrar precios, costos, totales o desglose de facturas en el chat.
-2. ❌ PROHIBIDO TOTAL: Pedir correo electrónico para enviar propuestas. NUNCA.
-3. ❌ PROHIBIDO TOTAL: Preguntar si el cliente quiere la cotización. Envíala de inmediato.
-4. ✅ OBLIGATORIO: Cuando el cliente dé su volumen de facturas, dispara QUOTE_TRIGGER en ESA MISMA respuesta.
-5. ✅ OBLIGATORIO: El QUOTE_TRIGGER debe ir AL FINAL de tu respuesta, siempre.
-6. ✅ OBLIGATORIO: Tu mensaje al disparar la cotización debe ser máximo 2-3 líneas, profesional.
-
-FORMATO EXACTO DEL TRIGGER (copiar exactamente):
-QUOTE_TRIGGER: {"plan_name": "[Nombre del Plan]", "dte_volume": [número], "items": []}
-
-MENSAJE MODELO cuando tengas el volumen:
-"¡Perfecto [Nombre]! Con [X] facturas/mes te recomiendo el [Plan]. Tu propuesta formal está siendo generada ahora mismo. 📄"
-[Luego el QUOTE_TRIGGER]
-
-[FIN REGLAS ABSOLUTAS]
-`;
-
-        const fullSystemPrompt = `${ABSOLUTE_RULES}\n\n=== PERSONALIDAD Y CONTEXTO DEL AGENTE ===\n${agent.system_prompt || 'Eres Sofía, asesora de ventas profesional.'}\n=====================\n\n${leadContext}`;
-
+        // Combine base system_prompt from DB + dynamic context
+        // We put the DB prompt inside a boundary, and our absolute rules at the end so the AI respects them over the user's custom UI text
+        const fullSystemPrompt = `=== INSTRUCCIONES PERSONALIZADAS ===\n${agent.system_prompt || 'Eres un asesor de ventas profesional.'}\n=====================\n\n${leadContext}`;
 
         // ===========================================
         // 5. GET OPENAI API KEY
@@ -376,7 +311,7 @@ MENSAJE MODELO cuando tengas el volumen:
 
         const previousMessages = (history || []).reverse().map((msg: any) => ({
             role: msg.direction === 'inbound' ? 'user' : 'assistant',
-            content: msg.type === 'image' ? '[Usuario envió una imagen]' :
+            content: msg.type === 'image' ? '[Usuario envi├│ una imagen]' :
                 (msg.type === 'audio' && msg.metadata?.is_voice) || msg.type === 'voice' ? `[Nota de voz: ${msg.metadata?.transcription || 'Sin transcribir'}]` :
                     msg.type === 'audio' ? `[Audio: ${msg.metadata?.transcription || 'Sin transcribir'}]` :
                         msg.content
@@ -460,7 +395,7 @@ MENSAJE MODELO cuando tengas el volumen:
         if (userMessage.match(/\b(10|[1-9]\d{1,5})\b/) || userMessage.toLowerCase().includes("factura") || userMessage.toLowerCase().includes("dte")) {
             forceTriggerMessage = {
                 role: 'system',
-                content: '¡ALERTA DE SISTEMA MAXIMA PRIORIDAD! El usuario acaba de darte su volumen o preguntó por precio/facturas. ESTÁS OBLIGADO a responder incluyendo el bloque QUOTE_TRIGGER: {"plan_name": "Nombre", "dte_volume": 400, "items": []} al final de tu mensaje. NO LE PIDAS SU CORREO ELECTRÓNICO. MÁNDALO DIRECTAMENTE EN TU RESPUESTA AQUÍ. NUNCA menciones precios desglosados en texto.'
+                content: '┬íALERTA DE SISTEMA MAXIMA PRIORIDAD! El usuario acaba de darte su volumen o pregunt├│ por precio/facturas. EST├üS OBLIGADO a responder incluyendo el bloque QUOTE_TRIGGER: {"plan_name": "Nombre", "dte_volume": 400, "items": []} al final de tu mensaje. NO LE PIDAS SU CORREO ELECTR├ôNICO. M├üNDALO DIRECTAMENTE EN TU RESPUESTA AQU├ì. NUNCA menciones precios desglosados en texto.'
             };
         }
 
@@ -487,7 +422,7 @@ MENSAJE MODELO cuando tengas el volumen:
 
         if (!aiData.choices || aiData.choices.length === 0) {
             if (aiData.error?.code === 'insufficient_quota') {
-                aiContent = "⚠️ El servicio de IA no está disponible temporalmente.";
+                aiContent = "ΓÜá∩╕Å El servicio de IA no est├í disponible temporalmente.";
             } else {
                 throw new Error(aiData.error?.message || "OpenAI error");
             }
@@ -603,24 +538,14 @@ MENSAJE MODELO cuando tengas el volumen:
                 }
 
                 if (quoteObj) {
-                    // Generate PDF
+                    
+                    // Generate PDF!
                     const pdfUrl = await generateQuotePDF(quoteObj, supabase);
                     if (pdfUrl) {
                         (conv as any).__pdfUrl = pdfUrl;
                         (conv as any).__pdfFileName = `Propuesta_${(quoteObj.nombre_cliente || 'Client').replace(/\s+/g, '_')}.pdf`;
                     }
 
-                    // ── Generate the PUBLIC quote approval link ──
-                    // This is the link the client clicks to VIEW and APPROVE the quote
-                    const FRONTEND_BASE = Deno.env.get('FRONTEND_URL') || 'https://crm-app-v2.vercel.app';
-                    const publicQuoteLink = `${FRONTEND_BASE}/propuesta/${quoteObj.id}`;
-                    (conv as any).__publicQuoteLink = publicQuoteLink;
-                    log(`Quote created: ${quoteObj.id} | Public link: ${publicQuoteLink}`);
-
-                    // Update quote status to 'enviada' so the public view is accessible
-                    await supabase.from('cotizaciones')
-                        .update({ estado: 'enviada' })
-                        .eq('id', quoteObj.id);
                 }
             }
         }
@@ -648,12 +573,14 @@ MENSAJE MODELO cuando tengas el volumen:
             .maybeSingle();
 
         if (insertError) {
-            // Log the error but DO NOT throw — we must still respond to the client on Telegram
-            log(`Insert error (non-fatal, continuing to Telegram): ${JSON.stringify(insertError)}`);
+            log(`Insert error: ${JSON.stringify(insertError)}`);
+            throw insertError;
         }
 
-        // NOTE: savedMsg may be null if RLS blocks the insert. That's OK.
-        // Telegram delivery MUST happen regardless of DB state.
+        if (!savedMsg) {
+            log(`Insert succeeded but returned no data. Check triggers.`);
+            throw new Error("Message not saved (Blocked by database policy)");
+        }
 
         // ===========================================
         // 10. SEND TO TELEGRAM (Atomic Transport)
@@ -670,98 +597,71 @@ MENSAJE MODELO cuando tengas el volumen:
             const botToken = tgIntegration?.settings?.token;
             if (botToken) {
                 try {
-                    let messageSentOk = false;
-                    
-                    // 1. Send the text message (only if there's text)
-                    if (cleanText && cleanText.trim().length > 0) {
-                        const tgResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                chat_id: chatId,
-                                text: cleanText,
-                                parse_mode: 'Markdown'
-                            })
-                        });
-                        const tgResult = await tgResponse.json();
-                        messageSentOk = tgResult.ok;
-                        
-                        if (!messageSentOk) {
-                            console.error('Telegram text send error:', tgResult);
-                            // Retry without parse_mode if markdown fails
-                            if (tgResult.description?.includes('parse')) {
-                                const retryResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ chat_id: chatId, text: cleanText })
-                                });
-                                const retryResult = await retryResponse.json();
-                                if (retryResult.ok) {
-                                    messageSentOk = true;
-                                }
-                            }
-                        } else {
-                            console.log(`✅ Message delivered to Telegram (chat: ${chatId})`);
-                        }
-                    } else {
-                        // If there was no text (e.g. only QUOTE_TRIGGER), we consider the "text" phase OK
-                        messageSentOk = true;
-                        console.log(`No text to send to Telegram (chat: ${chatId}), proceeding to PDF/Link`);
-                    }
+                    const tgResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chat_id: chatId,
+                            text: cleanText,
+                            parse_mode: 'Markdown'
+                        })
+                    });
+                    const tgResult = await tgResponse.json();
 
-                    if (messageSentOk && savedMsg?.id) {
+                    if (tgResult.ok) {
                         await supabase.from('marketing_messages')
                             .update({ status: 'delivered' })
                             .eq('id', savedMsg.id);
-                    }
+                        console.log(`Γ£à Message delivered to Telegram (chat: ${chatId})`);
 
-                    // 2. ALWAYS Send the PDF as binary stream if it exists
-                    const pdfUrl = (conv as any).__pdfUrl;
-                    const pdfFileName = (conv as any).__pdfFileName || 'Propuesta_Comercial.pdf';
-                    
-                    if (pdfUrl) {
-                        try {
-                            const pdfResp = await fetch(pdfUrl);
-                            if (pdfResp.ok) {
-                                const pdfBlob = await pdfResp.blob();
-                                const formData = new FormData();
-                                formData.append('chat_id', String(chatId));
-                                formData.append('document', pdfBlob, pdfFileName);
-                                formData.append('caption', '📄 Tu propuesta comercial está lista. ¡Quedo atento a cualquier consulta!');
-                                const docResp = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
-                                    method: 'POST',
-                                    body: formData,
-                                });
-                                const docResult = await docResp.json();
-                                if (docResult.ok) {
-                                    console.log(`📊 PDF sent as binary to Telegram (chat: ${chatId})`);
-                                } else {
-                                    console.error('Telegram sendDocument error:', docResult);
+                        // ΓöÇΓöÇ Send PDF as binary stream (URL method fails due to Supabase Storage CORS) ΓöÇΓöÇ
+                        const pdfUrl = (conv as any).__pdfUrl;
+                        const pdfFileName = (conv as any).__pdfFileName || 'Propuesta_Comercial.pdf';
+                        if (pdfUrl) {
+                            try {
+                                // Download the PDF bytes from Supabase Storage
+                                const pdfResp = await fetch(pdfUrl);
+                                if (pdfResp.ok) {
+                                    const pdfBlob = await pdfResp.blob();
+
+                                    // Send as multipart/form-data ΓÇö Telegram accepts binary files directly
+                                    const formData = new FormData();
+                                    formData.append('chat_id', String(chatId));
+                                    formData.append('document', pdfBlob, pdfFileName);
+                                    formData.append('caption', '≡ƒôä Tu propuesta comercial est├í lista. ┬íQuedo atento a cualquier consulta!');
+
+                                    const docResp = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
+                                        method: 'POST',
+                                        body: formData,
+                                    });
+                                    const docResult = await docResp.json();
+                                    if (docResult.ok) {
+                                        console.log(`≡ƒôè PDF sent as binary to Telegram (chat: ${chatId})`);
+                                    } else {
+                                        console.error('Telegram sendDocument error:', docResult);
+                                    }
                                 }
+                            } catch (pdfErr) {
+                                console.error('PDF binary send failed:', pdfErr);
                             }
-                        } catch (pdfErr) {
-                            console.error('PDF binary send failed:', pdfErr);
                         }
-                    }
 
-                    // 3. ALWAYS Send the public approval link if it exists
-                    const publicQuoteLink = (conv as any).__publicQuoteLink;
-                    if (publicQuoteLink) {
-                        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                chat_id: chatId,
-                                text: `🔗 *Ver y aprobar tu cotización:*\n${publicQuoteLink}`,
-                                parse_mode: 'Markdown',
-                                reply_markup: {
-                                    inline_keyboard: [[
-                                        { text: '📋 Ver Cotización Completa', url: publicQuoteLink }
-                                    ]]
-                                }
-                            })
-                        });
-                        console.log(`🔗 Quote link sent to Telegram (chat: ${chatId})`);
+                    } else {
+                        console.error('Telegram API error:', tgResult);
+                        // Retry without parse_mode if markdown fails
+                        if (tgResult.description?.includes('parse')) {
+                            const retryResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ chat_id: chatId, text: cleanText })
+                            });
+                            const retryResult = await retryResponse.json();
+                            if (retryResult.ok) {
+                                await supabase.from('marketing_messages')
+                                    .update({ status: 'delivered' })
+                                    .eq('id', savedMsg.id);
+                            }
+                        }
                     }
                 } catch (e) {
                     console.error('Telegram send error:', e);
