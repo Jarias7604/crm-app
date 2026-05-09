@@ -71,13 +71,40 @@ Deno.serve(async (req) => {
             .order('name', { ascending: true })
             .limit(1);
 
-        const agent = agents?.[0] || null;
+        // FALLBACK: If no agent in DB, use the built-in killer prompt — bot NEVER fails silently
+        const FALLBACK_PROMPT = `Eres Sofía, Consultora de Ventas Senior de Arias Defense, experta en sistemas de facturación electrónica ERP para El Salvador.
 
-        if (!agent) {
-            console.warn(`[AI-Processor] No active agent found for Company: ${companyId}`);
-            return new Response(JSON.stringify({ skipped: true, reason: "No active agent" }), { headers: corsHeaders });
-        }
-        log(`Using Agent: ${agent.name}`);
+🎯 TU MISIÓN: Calificar al lead, conseguir su volumen de facturas (DTEs/mes), y enviarle la cotización formal DE INMEDIATO.
+
+👤 PERSONALIDAD: Profesional, directa, amigable. Máximo 2-3 líneas por respuesta. Sin muros de texto.
+
+⚙️ FLUJO OBLIGATORIO:
+
+PASO 1 — Si NO sabes el volumen de DTEs del lead: pregunta solo eso.
+PASO 2 — Cuando sepas el volumen: recomienda el plan y dispara QUOTE_TRIGGER en el MISMO mensaje.
+
+TABLA DE PLANES:
+• 1-50 DTEs/mes → Plan Básico
+• 51-200 DTEs/mes → Plan Profesional
+• 201-500 DTEs/mes → Plan Empresarial
+• 501+ DTEs/mes → Plan Corporativo
+
+CUANDO TENGAS EL VOLUMEN — responde así (OBLIGATORIO):
+"¡Perfecto [nombre]! Con [X] facturas/mes te recomiendo el [Plan]. Aquí está tu propuesta:
+QUOTE_TRIGGER: {"plan_name": "Empresarial", "dte_volume": 300, "items": []}"
+
+REGLAS DE ORO:
+1. ❌ NUNCA inventes descuentos o promociones que no estén en el historial de conversación.
+2. ❌ NUNCA preguntes si quieren la cotización — envíala DIRECTO con QUOTE_TRIGGER.
+3. ✅ Si en el historial ves un mensaje con un descuento (ej: '25% de descuento'), reconócelo y aplícalo.
+4. ✅ Si piden módulos (CXC, Inventario, POS, Nómina), ponlos en items: ["CXC"].`;
+
+        const agent = agents?.[0] || { 
+            name: 'Sofía', 
+            system_prompt: FALLBACK_PROMPT,
+            representative_id: null 
+        };
+        log(`Using Agent: ${agent.name} (${agents?.[0] ? 'from DB' : 'FALLBACK built-in'})`)
 
         // ===========================================
         // 3. LOAD PRICING DATA (Plans + Modules)
@@ -129,13 +156,13 @@ ${modulosInfo || 'Sin módulos'}
 
 Servicios Variables:
 ${serviciosInfo || 'Sin servicios'}
+${serviciosInfo || 'Sin servicios'}
 
-=== PROTOCOLO DE RESPUESTA ===
-1. MEMORIA: Revisa el historial. Si ya tienes un dato, no lo vuelvas a preguntar.
-2. FLUJO: Respeta ESTRICTAMENTE las Fases (1, 2, 3...) definidas en tus instrucciones principales.
-3. PRECIOS: NO proporciones precios, estimaciones o cálculos hasta que el cliente haya entregado TODA la información requerida en la Fase 2 (Nombre, Empresa, Teléfono y Volumen).
-4. TRIGGER: Solo usa QUOTE_TRIGGER cuando el cliente acepte recibir una propuesta formal y tengas sus datos.
-   Formato: QUOTE_TRIGGER: { "plan_name": "Nombre", "dte_volume": NUMERO, "items": ["Modulo1"] }
+=== INSTRUCCIONES CRÍTICAS ===
+1. MEMORIA: Revisa el historial COMPLETO. Los mensajes del asesor (outbound) son parte del contexto — si ves un descuento o promoción enviada por el asesor, reconócela y aplícala en la cotización.
+2. QUOTE_TRIGGER AUTOMÁTICO: En cuanto sepas el volumen de DTEs, dispara el QUOTE_TRIGGER EN ESA MISMA RESPUESTA. NO pidas permiso al cliente.
+   Formato exacto: QUOTE_TRIGGER: {"plan_name": "Profesional", "dte_volume": 150, "items": ["CXC"]}
+3. PRECIOS: Los precios exactos SOLO los muestra el sistema con el QUOTE_TRIGGER. Nunca escribas precios manualmente.
 `;
 
         // Combine base system_prompt from DB + dynamic context
