@@ -457,12 +457,27 @@ ${absoluteRules}`;
             }
         }
 
-        // Remove any remaining hallucinated CRM links or PDF mentions from visible text
+        // Aggressive cleanup — remove EVERYTHING the client should never see
         cleanText = cleanText
+            // Remove CRM proposal links
             .replace(/https?:\/\/crm-app[\w.-]*\/propuesta\/[\w-]+/g, '')
-            .replace(/(?:te (?:genero|genero|mando|env[ií]o|adjunto)|adjunto|enviando)[^.]*?(?:pdf|propuesta formal|documento|archivo)[^.]*/gi, '')
+            // Remove any https link that looks like a quote/approval link
+            .replace(/https?:\/\/[\w.-]+\/(propuesta|cotizacion|quote|aprobacion)\/[\w-]+/gi, '')
+            // Remove "Ver y aprobar tu cotización" and similar approval link text
+            .replace(/🔗?\s*\*?Ver y aprobar[^*\n]*/gi, '')
+            .replace(/\*?Ver Cotizaci[oó]n Completa\*?/gi, '')
+            .replace(/Ver y aprobar[^\n]*/gi, '')
+            // Remove PDF/document/proposal mentions
+            .replace(/(?:te (?:genero|mando|env[ií]o|adjunto)|adjunto|enviando)[^.]*?(?:pdf|propuesta formal|documento|archivo)[^.]*/gi, '')
+            .replace(/(?:propuesta formal|cotizaci[oó]n formal)[^.]*\./gi, '')
+            // Remove $XX.XX placeholders (AI following template literally)
+            .replace(/\$XX\.XX/g, '')
+            .replace(/\$XXX/g, '')
+            // Remove triggers
             .replace(/QUOTE_TRIGGER:[\s\S]*/gi, '')
             .replace(/UPDATE_LEAD:[\s\S]*/gi, '')
+            // Clean up extra blank lines
+            .replace(/\n{3,}/g, '\n\n')
             .trim();
 
         // ===========================================
