@@ -112,10 +112,13 @@ export default function AiAgentsConfig() {
         if (!testMessage.trim() || !selectedAgent) return;
         const userMsg = testMessage;
         setTestMessage('');
-        setTestHistory(prev => [...prev, { role: 'user', content: userMsg }]);
+        const newHistory = [...testHistory, { role: 'user' as const, content: userMsg }];
+        setTestHistory(newHistory);
         setIsTesting(true);
         try {
-            const reply = await aiAgentService.testBotResponse(userMsg, selectedAgent);
+            // Map to role format expected by edge function and pass full history for memory
+            const historyForApi = newHistory.map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }));
+            const reply = await aiAgentService.testBotResponse(userMsg, selectedAgent, historyForApi);
             setTestHistory(prev => [...prev, { role: 'bot', content: reply }]);
         } catch (error) {
             toast.error('Error en prueba de IA');

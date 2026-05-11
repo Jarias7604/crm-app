@@ -1,14 +1,11 @@
 // @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
 import { checkRateLimit, rateLimitResponse } from "../_shared/rateLimiter.ts";
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-const FRONTEND_URL = "https://crm-app-v2.vercel.app";
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -19,86 +16,50 @@ const supabase = createClient(
     { auth: { persistSession: false } }
 );
 
-console.log(`[AI-Processor] Initialized with URL: ${SUPABASE_URL ? 'OK' : 'MISSING'}`);
+console.log(`[AI-Processor v50-clean] Initialized`);
 
+// ─── Build rich catalog string from pricing_items ─────────────────────────────
+function buildCatalogContext(pricingItems: any[]): string {
+    const planes = pricingItems.filter(i => i.tipo === 'plan').sort((a, b) => (a.orden ?? 99) - (b.orden ?? 99));
+    const modulos = pricingItems.filter(i => i.tipo === 'modulo');
+    const servicios = pricingItems.filter(i => i.tipo === 'servicio');
 
-async function generateQuotePDF(quote: any, supabase: any): Promise<string> {
-    try {
-        console.log(`[PDF-Gen] Generating PDF for quote: ${quote.id}`);
-        const pdfDoc = await PDFDocument.create();
-        const page = pdfDoc.addPage([595.28, 841.89]); // A4
-        const { width, height } = page.getSize();
-        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-        const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const formatPlan = (p: any) => {
+        const anual = Number(p.precio_anual || 0);
+        const mensual = anual > 0 ? (anual / 12).toFixed(2) : '0';
+        const impl = Number(p.costo_unico || 0);
+        const contado = (anual * 0.80).toFixed(2);
+        const minDte = p.min_dtes ?? 0;
+        const maxDte = p.max_dtes ?? null;
+        const rangoStr = maxDte ? `${minDte}–${maxDte} DTEs/año` : `desde ${minDte} DTEs/año`;
+        return `📦 PLAN: ${p.nombre}
+   Rango: ${rangoStr}
+   💰 Pago anual normal: $${anual}
+   ⭐ Pago único contado (20% OFF): $${contado} — AHORRA $${(anual * 0.20).toFixed(2)}
+   💳 Financiado a 12 meses: $${mensual}/mes
+   🔧 Implementación (1 vez): $${impl}
+   📝 ${p.descripcion || ''}`;
+    };
 
-        const colorBlue = rgb(0.1, 0.4, 0.7);
-        const colorGray = rgb(0.4, 0.4, 0.4);
+    const formatMod = (m: any) => {
+        const anual = Number(m.precio_anual || 0);
+        const contado = (anual * 0.80).toFixed(2);
+        return `  • ${m.nombre}: $${anual}/año (contado: $${contado}) — ${m.descripcion || ''}`;
+    };
 
-        // 1. HEADER
-        page.drawRectangle({ x: 0, y: height - 100, width: width, height: 100, color: rgb(0.06, 0.09, 0.16) });
-        page.drawText('COTIZACI├ôN OFICIAL', { x: width - 200, y: height - 40, size: 14, font: fontBold, color: rgb(1, 1, 1) });
-        page.drawText(`#${quote.id.slice(0, 8).toUpperCase()}`, { x: width - 200, y: height - 60, size: 20, font: font, color: rgb(1, 1, 1) });
-        page.drawText('ARIAS DEFENSE CRM', { x: 50, y: height - 50, size: 18, font: fontBold, color: rgb(1, 1, 1) });
-        page.drawText('Soluciones Tecnol├│gicas Avanzadas', { x: 50, y: height - 65, size: 10, font: font, color: rgb(0.8, 0.8, 0.8) });
+    const formatSvc = (s: any) => {
+        const precio = s.precio_anual > 0 ? `$${s.precio_anual}/año` : s.precio_por_dte > 0 ? `$${s.precio_por_dte} por DTE` : `$${s.costo_unico} (pago único)`;
+        return `  • ${s.nombre}: ${precio} — ${s.descripcion || ''}`;
+    };
 
-        // 2. CLIENT INFO
-        let y = height - 150;
-        page.drawText('PREPARADO PARA:', { x: 50, y: y, size: 8, font: fontBold, color: colorBlue });
-        y -= 15;
-        page.drawText((quote.nombre_cliente || 'Cliente Estimado').toUpperCase(), { x: 50, y: y, size: 16, font: fontBold, color: rgb(0, 0, 0) });
-        y -= 15;
-        if (quote.empresa_cliente) {
-            page.drawText(quote.empresa_cliente, { x: 50, y: y, size: 12, font: font, color: colorGray });
-            y -= 20;
-        }
+    return `=== CATÁLOGO COMPLETO DE PLANES (lee esto para cotizar) ===
+${planes.map(formatPlan).join('\n\n')}
 
-        // 3. PLAN DETAILS
-        y -= 20;
-        page.drawLine({ start: { x: 50, y: y }, end: { x: width - 50, y: y }, thickness: 1, color: rgb(0.9, 0.9, 0.9) });
-        y -= 20;
+=== MÓDULOS ADICIONALES (SIEMPRE ofrecerlos después de cotizar el plan) ===
+${modulos.length ? modulos.map(formatMod).join('\n') : 'Sin módulos registrados'}
 
-        page.drawText('DESCRIPCI├ôN', { x: 50, y: y, size: 10, font: fontBold, color: colorGray });
-        page.drawText('MONTO', { x: width - 100, y: y, size: 10, font: fontBold, color: colorGray });
-        y -= 20;
-
-        // Row 1: Plan
-        page.drawRectangle({ x: 50, y: y - 5, width: width - 100, height: 30, color: rgb(0.97, 0.98, 0.99) });
-        page.drawText(`Plan Anual: ${quote.plan_nombre}`, { x: 60, y: y + 10, size: 12, font: fontBold, color: rgb(0, 0, 0) });
-        page.drawText(`Volumen: ${quote.volumen_dtes} DTEs/mes`, { x: 60, y: y - 2, size: 10, font: font, color: colorGray });
-
-        const price = quote.costo_plan_anual || 0;
-        page.drawText(`${price.toLocaleString()}`, { x: width - 100, y: y + 5, size: 12, font: fontBold, color: rgb(0, 0, 0) });
-        y -= 50;
-
-        // 4. TOTAL
-        const total = quote.total_anual || price;
-        page.drawRectangle({ x: width - 250, y: y - 40, width: 200, height: 60, color: colorBlue });
-
-        page.drawText('TOTAL A INVERTIR (USD)', { x: width - 230, y: y + 5, size: 10, font: fontBold, color: rgb(1, 1, 1) });
-        page.drawText(`${total.toLocaleString()}`, { x: width - 230, y: y - 20, size: 24, font: fontBold, color: rgb(1, 1, 1) });
-
-        // 5. FOOTER
-        page.drawText('Documento generado autom├íticamente por IA Agent.', { x: 50, y: 30, size: 8, font: font, color: colorGray });
-        const now = new Date().toLocaleDateString();
-        page.drawText(`Fecha: ${now}`, { x: width - 150, y: 30, size: 8, font: font, color: colorGray });
-
-        const pdfBytes = await pdfDoc.save();
-
-        // Upload to Supabase
-        const fileName = `Propuesta_${(quote.nombre_cliente || 'Client').replace(/\s+/g, '_')}_${quote.id.slice(0, 6)}.pdf`;
-        const { error: uploadError } = await supabase.storage.from('quotations').upload(fileName, pdfBytes, {
-            contentType: 'application/pdf',
-            upsert: true
-        });
-
-        if (uploadError) throw uploadError;
-
-        const { data: { publicUrl } } = supabase.storage.from('quotations').getPublicUrl(fileName);
-        return publicUrl;
-    } catch (e) {
-        console.error("PDF Generate Failed:", e);
-        return "";
-    }
+=== SERVICIOS ADICIONALES ===
+${servicios.length ? servicios.map(formatSvc).join('\n') : 'Sin servicios registrados'}`;
 }
 
 Deno.serve(async (req) => {
@@ -113,67 +74,104 @@ Deno.serve(async (req) => {
 
     try {
         const body = await req.json().catch(() => ({}));
-        const { conversationId, isTest, message: testMessage, agent: testAgent } = body;
+        const { conversationId, isTest, message: testMessage, agent: testAgent, history: testHistory } = body;
 
-        // ── SIMULATOR MODE ──────────────────────────────────────────────────────────
+        // ── SIMULATOR MODE ──────────────────────────────────────────────────
         if (isTest) {
             log('Running in SIMULATOR mode');
-            const agentPrompt = testAgent?.system_prompt || 'Eres un asesor de ventas profesional.';
             const companyId = testAgent?.company_id || 'test';
             const { data: iconf } = await supabase.from('marketing_integrations')
                 .select('settings').eq('company_id', companyId).eq('provider', 'openai').eq('is_active', true).maybeSingle();
             const apiKey = iconf?.settings?.apiKey || Deno.env.get('OPENAI_API_KEY');
-            if (!apiKey) return new Response(JSON.stringify({ error: 'OpenAI API Key not configured', logs }), { status: 400, headers: corsHeaders });
-            const RULES = `[REGLAS ABSOLUTAS]\n1. NO mostrar precios en el chat.\n2. NO pedir correo electronico.\n3. Cuando tengas el volumen, genera QUOTE_TRIGGER al final.\n[FIN REGLAS]`;
+            if (!apiKey) return new Response(JSON.stringify({ error: 'OpenAI API Key no configurada', logs }), { status: 400, headers: corsHeaders });
+
+            // Load catalog for simulator
+            const { data: pricingItems } = await supabase.from('pricing_items')
+                .select('*').or(`company_id.eq.${companyId},company_id.is.null`).eq('activo', true).order('orden', { ascending: true });
+
+            const catalogCtx = buildCatalogContext(pricingItems || []);
+            const demoUrl = testAgent?.demo_url;
+            const demoSection = demoUrl
+                ? `\n=== ENLACE PARA AGENDAR DEMO ===\nSi el cliente pide reunión o demo, comparte este link exacto: ${demoUrl}`
+                : '';
+
+            const systemPrompt = `=== INSTRUCCIONES MAESTRAS DEL AGENTE ===
+${testAgent?.system_prompt || 'Eres un asesor de ventas profesional de facturación electrónica.'}
+==========================================
+
+${catalogCtx}
+${demoSection}
+
+=== OPCIONES DE PAGO (OBLIGATORIO SIEMPRE MENCIONAR) ===
+- Siempre ofrece AMBAS opciones: pago único contado (20% descuento) Y financiado a 12 meses.
+- Muestra cuánto ahorra el cliente eligiendo el contado.
+- SIEMPRE ofrece módulos adicionales después de la cotización principal.
+- Cuando el cliente diga su volumen, aproxima al rango del plan más cercano y recomienda ese plan.
+
+=== REGLAS DE ORO — NUNCA VIOLAR ===
+- SOLO texto. NUNCA mencionar PDF, propuesta formal, enlace, ni archivo.
+- NUNCA pedir correo electrónico para enviar documentos.
+- Cotiza SIEMPRE en el mismo mensaje de texto, con precios reales del catálogo.
+- Si el cliente dice un volumen aproximado, tómalo tal cual y recomienda el plan correcto.
+- Al final del mensaje (invisible para el cliente), incluye: QUOTE_TRIGGER: {"plan_name": "NOMBRE", "dte_volume": NUMERO, "items": []}`;
+
+            // Build messages with history
+            const historyMessages = (testHistory || []).map((m: any) => ({
+                role: m.role === 'user' ? 'user' : 'assistant',
+                content: m.content
+            }));
+
             const aiResp = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ model: 'gpt-4o', messages: [{ role: 'system', content: `${RULES}\n\n${agentPrompt}` }, { role: 'user', content: testMessage || 'Hola' }], temperature: 0.2 })
+                body: JSON.stringify({
+                    model: 'gpt-4o',
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        ...historyMessages,
+                        { role: 'user', content: testMessage || 'Hola' }
+                    ],
+                    temperature: 0.2
+                })
             });
             const aiData = await aiResp.json();
-            const reply = (aiData.choices?.[0]?.message?.content || 'Sin respuesta')
-                .replace(/QUOTE_TRIGGER:[^\n]*/gi, '✅ [Cotización automática se generaría aquí]').trim();
+            let reply = aiData.choices?.[0]?.message?.content || 'Sin respuesta';
+            reply = reply
+                .replace(/QUOTE_TRIGGER:[\s\S]*/gi, '').trim()
+                .replace(/UPDATE_LEAD:[\s\S]*?(\n|$)/gi, '').trim()
+                .replace(/(?:generar[eé]|enviar[eé]|adjunt[oa]|te mando)[^.]*?(?:pdf|propuesta formal|documento|archivo)[^.]*/gi, '')
+                .trim();
             return new Response(JSON.stringify({ reply, logs }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
-        // ── END SIMULATOR MODE ───────────────────────────────────────────────────────
+        // ── END SIMULATOR MODE ──────────────────────────────────────────────
 
         if (typeof conversationId !== 'string') {
-            log(`Invalid conversationId type: ${typeof conversationId}`);
             return new Response(JSON.stringify({ error: "conversationId must be a string", logs }), { status: 400, headers: corsHeaders });
         }
 
         // ===========================================
         // 1. LOAD CONVERSATION + LEAD DATA
         // ===========================================
-        log(`Starting session for Conv: ${conversationId}`);
+        log(`Starting for Conv: ${conversationId}`);
         const { data: conv, error: convError } = await supabase.from('marketing_conversations')
             .select('*, lead:leads(*)')
             .eq('id', conversationId)
             .maybeSingle();
 
-        if (convError) {
-            log(`DB error loading conversation: ${JSON.stringify(convError)}`);
-            throw convError;
-        }
-        if (!conv) {
-            log(`Conv ${conversationId} not found`);
-            return new Response(JSON.stringify({ error: "Conversation not found", logs }), { status: 404, headers: corsHeaders });
-        }
+        if (convError) throw convError;
+        if (!conv) return new Response(JSON.stringify({ error: "Conversation not found", logs }), { status: 404, headers: corsHeaders });
 
         const companyId = conv.company_id;
         const lead = conv.lead;
         const chatId = conv.external_id;
-        console.log(`[AI-Processor] Company: ${companyId}, Lead: ${lead?.id}, Chat: ${chatId}`);
+        log(`Company: ${companyId}, Lead: ${lead?.id}, Chat: ${chatId}`);
 
-        // ΓöÇΓöÇ Enterprise Rate Limiting (10 AI calls/min per company) ΓöÇΓöÇ
+        // Rate limiting
         const rl = checkRateLimit(companyId, 'ai');
-        if (!rl.allowed) {
-            log(`Rate limit exceeded for company: ${companyId}`);
-            return rateLimitResponse(rl.resetAt);
-        }
+        if (!rl.allowed) return rateLimitResponse(rl.resetAt);
 
         // ===========================================
-        // 2. LOAD AI AGENT (with system_prompt from DB)
+        // 2. LOAD AI AGENT (company-specific)
         // ===========================================
         const { data: agents } = await supabase.from('marketing_ai_agents')
             .select('*')
@@ -182,39 +180,16 @@ Deno.serve(async (req) => {
             .order('name', { ascending: true })
             .limit(1);
 
-        // FALLBACK: If no agent in DB, use the built-in killer prompt ΓÇö bot NEVER fails silently
-        const FALLBACK_PROMPT = `Eres Sof├¡a, Consultora de Ventas Senior de Arias Defense, experta en sistemas de facturaci├│n electr├│nica ERP para El Salvador.
-
-≡ƒÄ» TU MISI├ôN: Calificar al lead, conseguir su volumen de facturas (DTEs/mes), y enviarle la cotizaci├│n formal DE INMEDIATO.
-
-≡ƒæñ PERSONALIDAD: Profesional, directa, amigable. M├íximo 2-3 l├¡neas por respuesta. Sin muros de texto.
-
-ΓÜÖ∩╕Å FLUJO OBLIGATORIO:
-
-PASO 1 — Si NO sabes el volumen de DTEs del lead: pregunta solo eso.
-PASO 2 — Cuando sepas el volumen: recomienda el plan y COTIZA POR TEXTO EN EL MENSAJE.
-
-TABLA DE PLANES:
-ΓÇó 1-50 DTEs/mes ΓåÆ Plan B├ísico
-ΓÇó 51-200 DTEs/mes ΓåÆ Plan Profesional
-ΓÇó 201-500 DTEs/mes ΓåÆ Plan Empresarial
-ΓÇó 501+ DTEs/mes ΓåÆ Plan Corporativo
-
-CUANDO TENGAS EL VOLUMEN — responde así:
-"¡Perfecto [nombre]! Con [X] facturas/mes te recomiendo el [Plan]. La inversión es de $[X] al año. Incluye..."
-
-IMPORTANTE: Justo debajo de tu mensaje de texto, SIEMPRE debes incluir este código exacto para que el sistema registre la cotización en el CRM:
-QUOTE_TRIGGER: {"plan_name": "Empresarial", "dte_volume": 300, "items": []}`;
-
-        const agent = agents?.[0] || { 
-            name: 'Sof├¡a', 
-            system_prompt: FALLBACK_PROMPT,
-            representative_id: null 
+        const agent = agents?.[0] || {
+            name: 'Sofía',
+            system_prompt: 'Eres un asesor experto en facturación electrónica. Tu misión es calificar leads y cotizar por texto.',
+            representative_id: null,
+            demo_url: null
         };
-        log(`Using Agent: ${agent.name} (${agents?.[0] ? 'from DB' : 'FALLBACK built-in'})`)
+        log(`Agent: ${agent.name} (${agents?.[0] ? 'from DB' : 'FALLBACK'})`);
 
         // ===========================================
-        // 3. LOAD PRICING DATA (Plans + Modules)
+        // 3. LOAD PRICING CATALOG (company-specific)
         // ===========================================
         const { data: pricingItems } = await supabase.from('pricing_items')
             .select('*')
@@ -222,81 +197,51 @@ QUOTE_TRIGGER: {"plan_name": "Empresarial", "dte_volume": 300, "items": []}`;
             .eq('activo', true)
             .order('orden', { ascending: true });
 
-        const pricing = {
-            planes: pricingItems?.filter((i: any) => i.tipo === 'plan') || [],
-            modulos: pricingItems?.filter((i: any) => i.tipo === 'modulo') || [],
-            servicios: pricingItems?.filter((i: any) => i.tipo === 'servicio') || []
-        };
         log(`Loaded ${pricingItems?.length || 0} pricing items`);
-
-        // ... (pricing info building remains the same) ...
-        // Build pricing context for AI
-        const planesInfo = pricing.planes.map((p: any) =>
-            `ΓÇó ${p.nombre}: $${p.precio_anual}/a├▒o (implementaci├│n: $${p.costo_unico || 0})`
-        ).join('\n');
-
-        const modulosInfo = pricing.modulos.map((m: any) =>
-            `ΓÇó ${m.nombre}: $${m.precio_anual}/a├▒o - ${m.descripcion || 'M├│dulo adicional'}`
-        ).join('\n');
-
-        const serviciosInfo = pricing.servicios.map((s: any) =>
-            `ΓÇó ${s.nombre}: $${s.precio_anual > 0 ? s.precio_anual + '/a├▒o' : (s.precio_por_dte > 0 ? s.precio_por_dte + ' por mensaje' : s.costo_unico + ' (pago ├║nico)')} - ${s.descripcion || 'Servicio adicional'}`
-        ).join('\n');
+        const catalogContext = buildCatalogContext(pricingItems || []);
 
         // ===========================================
-        // 4. BUILD DYNAMIC CONTEXT (Lead + Pricing)
+        // 4. BUILD UNIFIED SYSTEM PROMPT
         // ===========================================
-        const leadContext = `
-=== DATOS DEL CLIENTE (CRM) ===
-ΓÇó Nombre: ${lead?.name || 'No registrado'}
-ΓÇó Empresa: ${lead?.company_name || 'No registrada'}
-ΓÇó Tel├⌐fono: ${lead?.phone || 'No registrado'}
-ΓÇó Email: ${lead?.email || 'No registrado'}
-ΓÇó Volumen Registrado: ${lead?.metadata?.volume || 'A├║n no proporcionado'}
+        const demoSection = agent.demo_url
+            ? `\n=== ENLACE PARA AGENDAR DEMO ===\nCuando el cliente pida reunión, llamada o demo, comparte este link exacto: ${agent.demo_url}\n`
+            : '';
 
-=== CATÁLOGO DE PRODUCTOS Y PRECIOS ===
-Planes Principales:
-${planesInfo || 'Sin planes'}
+        const leadSection = `=== DATOS DEL CLIENTE EN EL CRM ===
+• Nombre: ${lead?.name || 'No registrado'}
+• Empresa: ${lead?.company_name || 'No registrada'}
+• Teléfono: ${lead?.phone || 'No registrado'}
+• Email: ${lead?.email || 'No registrado'}`;
 
-Módulos Adicionales:
-${modulosInfo || 'Sin módulos'}
+        const absoluteRules = `=== REGLAS ABSOLUTAS DEL SISTEMA — NUNCA VIOLAR ===
+1. SOLO cotizar por texto en el mensaje. NUNCA mencionar PDF, propuesta formal, documento adjunto, ni enlace de aprobación.
+2. NUNCA pedir correo para enviar documentos.
+3. Cotizar SIEMPRE con los precios reales del catálogo de arriba.
+4. SIEMPRE ofrecer las dos opciones de pago: contado (20% OFF) y financiado a 12 meses.
+5. SIEMPRE mostrar cuánto ahorra el cliente eligiendo el pago único.
+6. SIEMPRE ofrecer módulos adicionales después de presentar el plan principal.
+7. Si el cliente da un volumen aproximado de facturas, tómalo y recomienda el plan cuyo rango cubre ese volumen.
+8. Mensajes cortos y conversacionales. Máximo 5-8 líneas.
 
-Servicios Variables:
-${serviciosInfo || 'Sin servicios'}
+=== PROTOCOLO DE TRIGGERS (invisible para el cliente) ===
+- Cuando cotices, incluye AL FINAL: QUOTE_TRIGGER: {"plan_name": "NOMBRE_PLAN", "dte_volume": NUMERO_ANUAL, "items": ["Módulo1", "Módulo2"]}
+- Cuando el cliente dé su nombre/empresa/teléfono: UPDATE_LEAD: {"name": "Nombre", "company_name": "Empresa", "phone": "5555-0000"}
+- Estos códigos NUNCA aparecen en el texto que ve el cliente.`;
 
-=== ENLACE PARA DEMO / AGENDAMIENTO ===
-${agent.demo_url ? `Si el cliente solicita agendar una llamada, reunión o demo, compártele este enlace exactamente como está para que elija su horario: ${agent.demo_url}` : 'Aún no tienes un enlace de agendamiento configurado. Si el cliente pide reunión, dile que un asesor humano lo contactará pronto.'}
+        const fullSystemPrompt = `=== INSTRUCCIONES MAESTRAS DEL AGENTE (tu guía principal) ===
+${agent.system_prompt || 'Eres un asesor de ventas profesional.'}
+==========================================
 
-=== OPCIONES DE PAGO Y DESCUENTOS ===
-- Opciones de pago: Ofrece siempre la opción de "1 Solo Pago" (Contado) con un 20% DE DESCUENTO sobre el total anual.
-- Explica claramente al cliente cuánto dinero se ahorra al elegir el pago único.
+${leadSection}
 
-=== INSTRUCCIONES DE VIDA O MUERTE (IGNORA CUALQUIER REGLA ANTERIOR QUE CONTRADIGA ESTO) ===
-        [CAPACIDAD CRÍTICA - ERROR PROHIBIDO]
-        - ESTÁ TOTALMENTE PROHIBIDO enviar archivos PDF. Todo se envía como texto.
-        - NO generes ni envíes PDFs.
-        - NO intentes usar triggers falsos.
+${catalogContext}
+${demoSection}
+=== OPCIONES DE PAGO — SIEMPRE PRESENTAR AMBAS ===
+- Pago único contado: precio anual con 20% de descuento. Muestra cuánto ahorra.
+- Financiado a 12 meses: divide el precio anual entre 12.
+- SIEMPRE ofrece módulos adicionales después de la cotización principal.
 
-        [REGLA DE ORO DEL SISTEMA]
-        - NO inventes datos. Usa el catálogo adjunto y aplica el descuento del 20% si aplica.
-        - DEBES redactar la cotización en el mensaje de chat de forma amigable y clara, mencionando los precios del plan recomendado.
-        - NO intentes generar archivos PDF. Muestra la información de la cotización directamente en tu respuesta de texto.
-        - Asegúrate de desglosar el precio del plan, implementaciones o módulos extras si el usuario los pide.
-        - NUNCA ofrezcas enviar un PDF ni un enlace al final. TODO se maneja por mensajes de texto.
-
-        [PROTOCOLO DE RECOMENDACIÓN Y CRM]
-        1. Cuando tengas el Nombre y Volumen de facturas, cotiza INMEDIATAMENTE en el texto.
-        2. Para que el CRM registre tu cotización, DEBES incluir al final de tu mensaje este bloque exacto (reemplaza los valores según el plan):
-        QUOTE_TRIGGER: {"plan_name": "Plan Name", "dte_volume": 300, "items": []}
-
-        [ACTUALIZACIÓN DE PROSPECTO]
-        Si el usuario te dice su nombre, nombre de empresa, o número de teléfono, debes incluir este comando al final del mensaje para que el sistema actualice el CRM:
-        UPDATE_LEAD: {"name": "Carlos", "company_name": "Carlito loco", "phone": "7039383733"}
-`;
-
-        // Combine base system_prompt from DB + dynamic context
-        // We put the DB prompt inside a boundary, and our absolute rules at the end so the AI respects them over the user's custom UI text
-        const fullSystemPrompt = `=== INSTRUCCIONES MAESTRAS (DEL USUARIO) ===\n${agent.system_prompt || 'Eres un asesor de ventas profesional.'}\n===========================================\n\n${leadContext}`;
+${absoluteRules}`;
 
         // ===========================================
         // 5. GET OPENAI API KEY
@@ -309,14 +254,11 @@ ${agent.demo_url ? `Si el cliente solicita agendar una llamada, reunión o demo,
             .maybeSingle();
 
         const apiKey = iconf?.settings?.apiKey || Deno.env.get('OPENAI_API_KEY');
-        if (!apiKey) {
-            log(`OpenAI API Key missing for Company: ${companyId}`);
-            throw new Error("OpenAI API Key not found");
-        }
-        log(`Found OpenAI Key: ...${apiKey.slice(-5)}`);
+        if (!apiKey) throw new Error("OpenAI API Key not found");
+        log(`OpenAI Key found: ...${apiKey.slice(-5)}`);
 
         // ===========================================
-        // 6. GET CONVERSATION HISTORY (Last 20 messages)
+        // 6. GET CONVERSATION HISTORY (last 20 messages)
         // ===========================================
         const { data: history } = await supabase.from('marketing_messages')
             .select('content, direction, type, created_at, metadata')
@@ -325,222 +267,161 @@ ${agent.demo_url ? `Si el cliente solicita agendar una llamada, reunión o demo,
             .limit(20);
 
         const lastMsg = history?.[0];
-        log(`History count: ${history?.length || 0}. Last message direction: ${lastMsg?.direction}`);
+        log(`History: ${history?.length || 0} msgs. Last direction: ${lastMsg?.direction}`);
 
-        // Skip ONLY if last message was successfully DELIVERED outbound (avoid double-response)
-        // If status is 'pending' or 'failed', we must still respond — the previous attempt didn't reach the client
         if (lastMsg?.direction === 'outbound' && lastMsg?.status === 'delivered') {
-            console.warn(`[AI-Processor] Skipping: last message was already outbound+delivered`);
-            return new Response(JSON.stringify({ skipped: true, reason: "Last message was outbound+delivered" }), { headers: corsHeaders });
+            log('Skipping — last message was outbound+delivered');
+            return new Response(JSON.stringify({ skipped: true }), { headers: corsHeaders });
         }
 
         const previousMessages = (history || []).reverse().map((msg: any) => ({
             role: msg.direction === 'inbound' ? 'user' : 'assistant',
-            content: msg.type === 'image' ? '[Usuario envió una imagen]' :
-                (msg.type === 'audio' && msg.metadata?.is_voice) || msg.type === 'voice' ? `[Nota de voz: ${msg.metadata?.transcription || 'Sin transcribir'}]` :
-                    msg.type === 'audio' ? `[Audio: ${msg.metadata?.transcription || 'Sin transcribir'}]` :
-                        msg.content
+            content: (msg.type === 'audio' || msg.type === 'voice')
+                ? `[Nota de voz: ${msg.metadata?.transcription || 'sin transcribir'}]`
+                : msg.type === 'image' ? '[El usuario envió una imagen]'
+                : msg.content
         }));
 
         // ===========================================
-        // 7. HANDLE VOICE TRANSCRIPTION (Whisper)
+        // 7. TRANSCRIBE VOICE (Whisper)
         // ===========================================
         let userMessage = lastMsg?.content || "";
         if (lastMsg?.direction === 'inbound' && (lastMsg?.type === 'voice' || lastMsg?.type === 'audio')) {
             const fileId = lastMsg.metadata?.file_id;
             if (fileId && !lastMsg.metadata?.transcription) {
-                log(`Audio detected. Transcribing file_id: ${fileId}`);
-                console.log(`[Whisper] Audio detected. FileID: ${fileId}`);
+                log(`Transcribing audio: ${fileId}`);
                 try {
-                    // Get Telegram Bot Token
-                    const { data: tgIntegration } = await supabase
-                        .from('marketing_integrations')
-                        .select('settings')
-                        .eq('company_id', companyId)
-                        .eq('provider', 'telegram')
-                        .eq('is_active', true)
-                        .maybeSingle();
-
-                    const botToken = tgIntegration?.settings?.token;
+                    const { data: tgInt } = await supabase.from('marketing_integrations')
+                        .select('settings').eq('company_id', companyId).eq('provider', 'telegram').eq('is_active', true).maybeSingle();
+                    const botToken = tgInt?.settings?.token;
                     if (botToken) {
-                        // 1. Get file path from Telegram
                         const fileInfoResp = await fetch(`https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`);
                         const fileInfo = await fileInfoResp.json();
-
                         if (fileInfo.ok && fileInfo.result.file_path) {
-                            const filePath = fileInfo.result.file_path;
-                            const fileUrl = `https://api.telegram.org/file/bot${botToken}/${filePath}`;
-
-                            // 2. Download file
-                            const audioResp = await fetch(fileUrl);
+                            const audioResp = await fetch(`https://api.telegram.org/file/bot${botToken}/${fileInfo.result.file_path}`);
                             const audioBlob = await audioResp.blob();
-
-                            // 3. Send to Whisper
                             const formData = new FormData();
                             formData.append('file', audioBlob, 'audio.ogg');
                             formData.append('model', 'whisper-1');
-
                             const whisperResp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
                                 method: 'POST',
                                 headers: { 'Authorization': `Bearer ${apiKey}` },
                                 body: formData
                             });
-
                             const whisperData = await whisperResp.json();
                             if (whisperData.text) {
-                                log(`Transcription successful: ${whisperData.text}`);
                                 userMessage = whisperData.text;
-
-                                // Update message in DB with transcription
-                                await supabase.from('marketing_messages')
-                                    .update({
-                                        content: `[Nota de voz]: ${whisperData.text}`,
-                                        metadata: { ...lastMsg.metadata, transcription: whisperData.text }
-                                    })
-                                    .eq('id', lastMsg.id);
-
-                                // Update history content for prompt
+                                log(`Transcription: ${userMessage}`);
+                                await supabase.from('marketing_messages').update({
+                                    content: `[Nota de voz]: ${whisperData.text}`,
+                                    metadata: { ...lastMsg.metadata, transcription: whisperData.text }
+                                }).eq('id', lastMsg.id);
                                 previousMessages[previousMessages.length - 1].content = `[Nota de voz]: ${whisperData.text}`;
                             }
                         }
                     }
-                } catch (e) {
-                    log(`Transcription error: ${e.message}`);
-                }
+                } catch (e) { log(`Transcription error: ${e.message}`); }
             } else if (lastMsg.metadata?.transcription) {
                 userMessage = lastMsg.metadata.transcription;
             }
         }
 
-                // ===========================================
-        // 8. CALL OPENAI (GPT-4)
         // ===========================================
-        
-        let forceTriggerMessage = null;
-        if (userMessage.match(/\b(10|[1-9]\d{1,5})\b/) || userMessage.toLowerCase().includes("factura") || userMessage.toLowerCase().includes("dte")) {
-            forceTriggerMessage = {
-                role: 'system',
-                content: '¡ALERTA DE SISTEMA MAXIMA PRIORIDAD! El usuario acaba de darte su volumen o preguntó por precio/facturas. ESTÁS OBLIGADO a responder resumiendo su cotización con los precios del catálogo en TU MENSAJE DE TEXTO. NO le pidas su correo y NO intentes enviar PDFs. OBLIGATORIO incluir QUOTE_TRIGGER: {"plan_name": "Nombre", "dte_volume": 400, "items": []} al final del mensaje.'
-            };
-        }
-
+        // 8. CALL OPENAI GPT-4o
+        // ===========================================
         const openAiMessages = [
             { role: 'system', content: fullSystemPrompt },
             ...previousMessages
         ];
 
-        if (forceTriggerMessage) {
-            openAiMessages.push(forceTriggerMessage);
-        }
-
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: 'gpt-4o',
-                messages: openAiMessages,
-                temperature: 0.1,
-            }),
+            body: JSON.stringify({ model: 'gpt-4o', messages: openAiMessages, temperature: 0.15 }),
         });
         const aiData = await response.json();
         let aiContent = aiData.choices?.[0]?.message?.content || "";
 
-        if (!aiData.choices || aiData.choices.length === 0) {
+        if (!aiData.choices?.length) {
             if (aiData.error?.code === 'insufficient_quota') {
-                aiContent = "ΓÜá∩╕Å El servicio de IA no est├í disponible temporalmente.";
+                aiContent = "⚠️ El servicio de IA no está disponible temporalmente. Por favor intenta en unos minutos.";
             } else {
-                throw new Error(aiData.error?.message || "OpenAI error");
+                throw new Error(aiData.error?.message || "OpenAI API error");
             }
         }
 
-        // Remove any hallucinated URLs
-        let cleanText = aiContent.replace(/https?:\/\/crm-app[\w.-]*\/propuesta\/[\w-]+/g, '');
+        // ===========================================
+        // 9. CLEAN AI RESPONSE
+        // ===========================================
+        // Remove UPDATE_LEAD from visible text first (before QUOTE_TRIGGER removal)
+        let cleanText = aiContent;
 
-        // Parse UPDATE_LEAD trigger
+        // Parse UPDATE_LEAD
         if (cleanText.includes('UPDATE_LEAD:')) {
-            const triggerIndex = cleanText.indexOf('UPDATE_LEAD:');
-            const dataStr = cleanText.substring(triggerIndex + 'UPDATE_LEAD:'.length).trim();
+            const tIdx = cleanText.indexOf('UPDATE_LEAD:');
+            const dStr = cleanText.substring(tIdx + 'UPDATE_LEAD:'.length).trim();
             try {
-                const firstBrace = dataStr.indexOf('{');
-                const lastBrace = dataStr.lastIndexOf('}');
-                if (firstBrace !== -1 && lastBrace !== -1) {
-                    const updateData = JSON.parse(dataStr.substring(firstBrace, lastBrace + 1));
+                const fb = dStr.indexOf('{'), lb = dStr.lastIndexOf('}');
+                if (fb !== -1 && lb !== -1) {
+                    const upd = JSON.parse(dStr.substring(fb, lb + 1));
                     if (lead?.id) {
                         const payload: any = {};
-                        if (updateData.name) payload.name = updateData.name;
-                        if (updateData.company_name) payload.company_name = updateData.company_name;
-                        if (updateData.phone) payload.phone = updateData.phone;
-                        
+                        if (upd.name) payload.name = upd.name;
+                        if (upd.company_name) payload.company_name = upd.company_name;
+                        if (upd.phone) payload.phone = upd.phone;
                         if (Object.keys(payload).length > 0) {
                             await supabase.from('leads').update(payload).eq('id', lead.id);
-                            console.log(`Lead ${lead.id} updated via AI:`, payload);
+                            log(`Lead updated:`, payload);
                         }
                     }
                 }
-            } catch (e) { console.error("JSON parse error for UPDATE_LEAD:", e); }
+            } catch (e) { console.error("UPDATE_LEAD parse error:", e); }
             cleanText = cleanText.replace(/UPDATE_LEAD:[\s\S]*?(?=QUOTE_TRIGGER:|$)/gi, '').trim();
         }
 
         // Parse QUOTE_TRIGGER
         if (cleanText.includes('QUOTE_TRIGGER:')) {
-            let volume = 3000, planNameRequested = "", extraItems: string[] = [];
-            const triggerIndex = cleanText.indexOf('QUOTE_TRIGGER:');
-            const dataStr = cleanText.substring(triggerIndex + 'QUOTE_TRIGGER:'.length).trim();
-
+            let volume = 1200, planNameRequested = "", extraItems: string[] = [];
+            const tIdx = cleanText.indexOf('QUOTE_TRIGGER:');
+            const dStr = cleanText.substring(tIdx + 'QUOTE_TRIGGER:'.length).trim();
             try {
-                const firstBrace = dataStr.indexOf('{');
-                const lastBrace = dataStr.lastIndexOf('}');
-                if (firstBrace !== -1 && lastBrace !== -1) {
-                    const data = JSON.parse(dataStr.substring(firstBrace, lastBrace + 1));
-                    volume = data.dte_volume || 3000;
-                    planNameRequested = data.plan_name || "";
-                    extraItems = data.items || [];
+                const fb = dStr.indexOf('{'), lb = dStr.lastIndexOf('}');
+                if (fb !== -1 && lb !== -1) {
+                    const d = JSON.parse(dStr.substring(fb, lb + 1));
+                    volume = d.dte_volume || 1200;
+                    planNameRequested = d.plan_name || "";
+                    extraItems = d.items || [];
                 }
-            } catch (e) { console.error("JSON parse error:", e); }
+            } catch (e) { console.error("QUOTE_TRIGGER parse error:", e); }
 
-            // Remove trigger from visible text
             cleanText = cleanText.replace(/QUOTE_TRIGGER:[\s\S]*/gi, '').trim();
 
-            // Match plan from DB
-            const planes = pricingItems?.filter((i: any) => i.tipo === 'plan') || [];
-            const modulosYServicios = pricingItems?.filter((i: any) => i.tipo === 'modulo' || i.tipo === 'servicio') || [];
+            const planes = pricingItems?.filter(i => i.tipo === 'plan') || [];
+            const extras = pricingItems?.filter(i => i.tipo === 'modulo' || i.tipo === 'servicio') || [];
 
-            let selectedPlan = planes.find((p: any) =>
+            let selectedPlan = planes.find(p =>
                 p.nombre.toLowerCase().includes(planNameRequested.toLowerCase()) ||
                 planNameRequested.toLowerCase().includes(p.nombre.toLowerCase())
             ) || planes[0];
 
-            if (!selectedPlan) {
-                console.error("No plan found for quote");
-            } else {
-                let baseAnual = Number(selectedPlan.precio_anual || 0);
-                let implementation = Number(selectedPlan.costo_unico || 0);
+            if (selectedPlan) {
+                const baseAnual = Number(selectedPlan.precio_anual || 0);
+                const implementation = Number(selectedPlan.costo_unico || 0);
                 let extrasTotal = 0;
-
                 const dbExtras: any[] = [];
+
                 for (const itemName of extraItems) {
                     const name = typeof itemName === 'string' ? itemName : (itemName as any).name;
-                    const dbItem = modulosYServicios.find((m: any) =>
+                    const dbItem = extras.find(m =>
                         m.nombre.toLowerCase().includes(name.toLowerCase()) ||
                         name.toLowerCase().includes(m.nombre.toLowerCase())
                     );
                     if (dbItem) {
-                        // Calculate cost based on type
-                        let itemCost = Number(dbItem.precio_anual || 0);
-                        if (dbItem.tipo === 'servicio' && dbItem.precio_por_dte > 0) {
-                            // Variable cost per DTE/Message
-                            itemCost = Number(dbItem.precio_por_dte) * volume;
-                        } else if (dbItem.costo_unico > 0 && itemCost === 0) {
-                            itemCost = Number(dbItem.costo_unico);
-                        }
-
-                        dbExtras.push({
-                            nombre: dbItem.nombre,
-                            costo: itemCost,
-                            costo_anual: dbItem.tipo === 'modulo' ? itemCost : 0,
-                            tipo: dbItem.tipo
-                        });
-                        extrasTotal += itemCost;
+                        let cost = Number(dbItem.precio_anual || 0);
+                        if (dbItem.tipo === 'servicio' && dbItem.precio_por_dte > 0) cost = Number(dbItem.precio_por_dte) * volume;
+                        else if (dbItem.costo_unico > 0 && cost === 0) cost = Number(dbItem.costo_unico);
+                        dbExtras.push({ nombre: dbItem.nombre, costo: cost, tipo: dbItem.tipo });
+                        extrasTotal += cost;
                     }
                 }
 
@@ -548,200 +429,116 @@ ${agent.demo_url ? `Si el cliente solicita agendar una llamada, reunión o demo,
                 const iva = subtotal * 0.13;
                 const total = subtotal + iva;
 
-                // Get creator ID
                 let creatorId = agent.representative_id || null;
                 if (!creatorId) {
-                    const { data: profiles } = await supabase
-                        .from('profiles')
-                        .select('id')
-                        .eq('company_id', companyId)
-                        .limit(1);
+                    const { data: profiles } = await supabase.from('profiles').select('id').eq('company_id', companyId).limit(1);
                     if (profiles?.[0]) creatorId = profiles[0].id;
                 }
 
-                // Create quote in database
-                const { data: quoteObj, error: quoteError } = await supabase
-                    .from('cotizaciones')
-                    .insert({
-                        company_id: companyId,
-                        lead_id: lead?.id,
-                        created_by: creatorId,
-                        nombre_cliente: lead?.name || 'Cliente',
-                        volumen_dtes: volume,
-                        plan_nombre: selectedPlan.nombre,
-                        costo_plan_anual: baseAnual,
-                        costo_implementacion: implementation,
-                        modulos_adicionales: dbExtras,
-                        subtotal_anual: subtotal,
-                        total_anual: total,
-                        iva_porcentaje: 13,
-                        iva_monto: iva,
-                        estado: 'borrador'
-                    })
-                    .select()
-                    .single();
+                const { data: quoteObj, error: quoteError } = await supabase.from('cotizaciones').insert({
+                    company_id: companyId,
+                    lead_id: lead?.id,
+                    created_by: creatorId,
+                    nombre_cliente: lead?.name || 'Cliente',
+                    volumen_dtes: volume,
+                    plan_nombre: selectedPlan.nombre,
+                    costo_plan_anual: baseAnual,
+                    costo_implementacion: implementation,
+                    modulos_adicionales: dbExtras,
+                    subtotal_anual: subtotal,
+                    total_anual: total,
+                    iva_porcentaje: 13,
+                    iva_monto: iva,
+                    estado: 'enviada'
+                }).select().single();
 
-                if (quoteError) {
-                    console.error("Quote creation error:", quoteError);
-                }
-
-                if (quoteObj) {
-                    // Mark as 'enviada' so the public view link is immediately accessible
-                    await supabase.from('cotizaciones').update({ estado: 'enviada' }).eq('id', quoteObj.id);
-
-                    // Generate PDF (DISABLED BY USER REQUEST - TEXT QUOTE ONLY)
-                    /* 
-                    const pdfUrl = await generateQuotePDF(quoteObj, supabase);
-                    if (pdfUrl) {
-                        (conv as any).__pdfUrl = pdfUrl;
-                        (conv as any).__pdfFileName = `Propuesta_${(quoteObj.nombre_cliente || 'Client').replace(/\s+/g, '_')}.pdf`;
-                    }
-                    */
-
-                    // Store public approval link
-                    const FRONTEND_BASE = Deno.env.get('FRONTEND_URL') || 'https://crm-app-v2.vercel.app';
-                    (conv as any).__publicQuoteLink = `${FRONTEND_BASE}/propuesta/${quoteObj.id}`;
-                    log(`Quote ${quoteObj.id} created. Public link: ${(conv as any).__publicQuoteLink}`);
-                }
+                if (quoteError) console.error("Quote insert error:", quoteError);
+                if (quoteObj) log(`Quote ${quoteObj.id} saved to DB`);
             }
         }
 
-        // ===========================================
-        // 9. SAVE MESSAGE TO DATABASE
-        // ===========================================
-        const { data: savedMsg, error: insertError } = await supabase
-            .from('marketing_messages')
-            .insert({
-                conversation_id: conversationId,
-                content: cleanText,
-                direction: 'outbound',
-                type: 'text',
-                status: 'pending',
-                metadata: {
-                    isAiGenerated: true,
-                    processed_by: 'edge-function',
-                    version: 'v39-final-fixed',
-                    agentName: agent.name || 'AI',
-                    leadId: lead?.id || null
-                }
-            })
-            .select()
-            .maybeSingle();
+        // Remove any remaining hallucinated CRM links or PDF mentions from visible text
+        cleanText = cleanText
+            .replace(/https?:\/\/crm-app[\w.-]*\/propuesta\/[\w-]+/g, '')
+            .replace(/(?:te (?:genero|genero|mando|env[ií]o|adjunto)|adjunto|enviando)[^.]*?(?:pdf|propuesta formal|documento|archivo)[^.]*/gi, '')
+            .replace(/QUOTE_TRIGGER:[\s\S]*/gi, '')
+            .replace(/UPDATE_LEAD:[\s\S]*/gi, '')
+            .trim();
 
-        // DB insert is non-blocking — Telegram MUST deliver even if DB fails
+        // ===========================================
+        // 10. SAVE MESSAGE TO DATABASE
+        // ===========================================
+        const { data: savedMsg, error: insertError } = await supabase.from('marketing_messages').insert({
+            conversation_id: conversationId,
+            content: cleanText,
+            direction: 'outbound',
+            type: 'text',
+            status: 'pending',
+            metadata: {
+                isAiGenerated: true,
+                processed_by: 'edge-function',
+                version: 'v50-clean',
+                agentName: agent.name || 'AI',
+                leadId: lead?.id || null
+            }
+        }).select().maybeSingle();
+
         if (insertError) {
             log(`Insert error (non-fatal): ${JSON.stringify(insertError)}`);
         } else if (lead?.id) {
-            // ALWAYS update the lead's 'updated_at' so it jumps to the top of the CRM list
             await supabase.from('leads').update({ updated_at: new Date().toISOString() }).eq('id', lead.id);
         }
 
         // ===========================================
-        // 10. SEND TO TELEGRAM (Atomic Transport)
+        // 11. SEND TO TELEGRAM
         // ===========================================
         if (chatId) {
-            const { data: tgIntegration } = await supabase
-                .from('marketing_integrations')
-                .select('settings')
-                .eq('company_id', companyId)
-                .eq('provider', 'telegram')
-                .eq('is_active', true)
-                .maybeSingle();
+            const { data: tgInt } = await supabase.from('marketing_integrations')
+                .select('settings').eq('company_id', companyId).eq('provider', 'telegram').eq('is_active', true).maybeSingle();
+            const botToken = tgInt?.settings?.token;
 
-            const botToken = tgIntegration?.settings?.token;
-            if (botToken) {
+            if (botToken && cleanText?.trim().length > 0) {
                 try {
-                    // 1. Send text message
-                    let textSent = false;
-                    if (cleanText && cleanText.trim().length > 0) {
-                        const tgResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                    const tgResp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ chat_id: chatId, text: cleanText, parse_mode: 'Markdown' })
+                    });
+                    const tgResult = await tgResp.json();
+                    if (!tgResult.ok) {
+                        // Retry without markdown
+                        const r2 = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ chat_id: chatId, text: cleanText, parse_mode: 'Markdown' })
+                            body: JSON.stringify({ chat_id: chatId, text: cleanText })
                         });
-                        const tgResult = await tgResponse.json();
-                        textSent = tgResult.ok;
-                        if (!textSent && tgResult.description?.includes('parse')) {
-                            // Retry plain text if Markdown fails
-                            const r2 = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ chat_id: chatId, text: cleanText })
-                            });
-                            textSent = (await r2.json()).ok;
+                        const r2Result = await r2.json();
+                        if (r2Result.ok && savedMsg?.id) {
+                            await supabase.from('marketing_messages').update({ status: 'delivered' }).eq('id', savedMsg.id);
                         }
-                        if (textSent) console.log(`✅ Text delivered to Telegram (chat: ${chatId})`);
-                        else console.error('Telegram text error:', tgResult);
                     } else {
-                        textSent = true; // No text (QUOTE_TRIGGER only) — still proceed to PDF
+                        if (savedMsg?.id) await supabase.from('marketing_messages').update({ status: 'delivered' }).eq('id', savedMsg.id);
+                        log(`✅ Message delivered to Telegram chat: ${chatId}`);
                     }
-
-                    if (textSent && savedMsg?.id) {
-                        await supabase.from('marketing_messages').update({ status: 'delivered' }).eq('id', savedMsg.id);
-                    }
-
-                    // 2. Send PDF if generated (DISABLED BY USER REQUEST)
-                    /*
-                    const pdfUrl = (conv as any).__pdfUrl;
-                    const pdfFileName = (conv as any).__pdfFileName || 'Propuesta_Comercial.pdf';
-                    if (pdfUrl) {
-                        try {
-                            const pdfResp = await fetch(pdfUrl);
-                            if (pdfResp.ok) {
-                                const pdfBlob = await pdfResp.blob();
-                                const formData = new FormData();
-                                formData.append('chat_id', String(chatId));
-                                formData.append('document', pdfBlob, pdfFileName);
-                                formData.append('caption', '📄 Tu propuesta comercial está lista. ¡Quedo atento a cualquier consulta!');
-                                const docResp = await fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, { method: 'POST', body: formData });
-                                const docResult = await docResp.json();
-                                if (docResult.ok) console.log(`📊 PDF sent to Telegram (chat: ${chatId})`);
-                                else console.error('Telegram sendDocument error:', docResult);
-                            }
-                        } catch (pdfErr) { console.error('PDF send failed:', pdfErr); }
-                    }
-                    */
-
-                    // 3. Send public approval link if quote was generated (DISABLED BY USER REQUEST)
-                    /*
-                    const publicQuoteLink = (conv as any).__publicQuoteLink;
-                    if (publicQuoteLink) {
-                        await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                chat_id: chatId,
-                                text: `🔗 *Ver y aprobar tu cotización:*`,
-                                parse_mode: 'Markdown',
-                                reply_markup: { inline_keyboard: [[{ text: '📋 Ver Cotización Completa', url: publicQuoteLink }]] }
-                            })
-                        });
-                        console.log(`🔗 Quote link sent to Telegram`);
-                    }
-                    */
-                } catch (e) {
-                    console.error('Telegram send error:', e);
-                }
-            } else {
-                console.error('No Telegram bot token found for company:', companyId);
+                } catch (e) { console.error('Telegram send error:', e); }
+            } else if (!botToken) {
+                console.error('No Telegram token for company:', companyId);
             }
         }
 
         return new Response(JSON.stringify({
             success: true,
-            version: 'v40-stable',
+            version: 'v50-clean',
             agent: agent.name,
             leadContext: !!lead
         }), { headers: corsHeaders });
 
     } catch (err: any) {
-        console.error('FATAL ERROR in AI Processor:', err);
+        console.error('FATAL ERROR:', err);
         return new Response(JSON.stringify({
             error: String(err),
             message: err.message,
-            stack: err.stack,
-            at: new Date().toISOString(),
-            execution_logs: logs
+            logs
         }), { status: 500, headers: corsHeaders });
     }
 });

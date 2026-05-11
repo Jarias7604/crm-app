@@ -45,13 +45,14 @@ export const aiAgentService = {
         if (error) throw error;
     },
 
-    async testBotResponse(message: string, agent: AiAgent) {
+    async testBotResponse(message: string, agent: AiAgent, history: { role: string; content: string }[] = []) {
         try {
             const { data, error } = await supabase.functions.invoke('ai-chat-processor', {
                 body: {
                     message,
                     agent,
-                    isTest: true
+                    isTest: true,
+                    history
                 }
             });
 
