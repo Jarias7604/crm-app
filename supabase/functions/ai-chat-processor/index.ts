@@ -277,11 +277,16 @@ ${serviciosInfo || 'Sin servicios'}
         - DEBES redactar la cotización en el mensaje de chat de forma amigable y clara, mencionando los precios del plan recomendado.
         - NO intentes generar archivos PDF. Muestra la información de la cotización directamente en tu respuesta de texto.
         - Asegúrate de desglosar el precio del plan, implementaciones o módulos extras si el usuario los pide.
+        - NUNCA ofrezcas enviar un PDF ni un enlace al final. TODO se maneja por mensajes de texto.
 
         [PROTOCOLO DE RECOMENDACIÓN Y CRM]
         1. Cuando tengas el Nombre y Volumen de facturas, cotiza INMEDIATAMENTE en el texto.
         2. Para que el CRM registre tu cotización, DEBES incluir al final de tu mensaje este bloque exacto (reemplaza los valores según el plan):
         QUOTE_TRIGGER: {"plan_name": "Plan Name", "dte_volume": 300, "items": []}
+
+        [ACTUALIZACIÓN DE PROSPECTO]
+        Si el usuario te dice su nombre, nombre de empresa, o número de teléfono, debes incluir este comando al final del mensaje para que el sistema actualice el CRM:
+        UPDATE_LEAD: {"name": "Carlos", "company_name": "Carlito loco", "phone": "7039383733"}
 `;
 
         // Combine base system_prompt from DB + dynamic context
@@ -443,12 +448,35 @@ ${serviciosInfo || 'Sin servicios'}
             }
         }
 
-        // ===========================================
-        // 8. PROCESS QUOTE TRIGGER (if present)
-        // ===========================================
         // Remove any hallucinated URLs
         let cleanText = aiContent.replace(/https?:\/\/crm-app[\w.-]*\/propuesta\/[\w-]+/g, '');
 
+        // Parse UPDATE_LEAD trigger
+        if (cleanText.includes('UPDATE_LEAD:')) {
+            const triggerIndex = cleanText.indexOf('UPDATE_LEAD:');
+            const dataStr = cleanText.substring(triggerIndex + 'UPDATE_LEAD:'.length).trim();
+            try {
+                const firstBrace = dataStr.indexOf('{');
+                const lastBrace = dataStr.lastIndexOf('}');
+                if (firstBrace !== -1 && lastBrace !== -1) {
+                    const updateData = JSON.parse(dataStr.substring(firstBrace, lastBrace + 1));
+                    if (lead?.id) {
+                        const payload: any = {};
+                        if (updateData.name) payload.name = updateData.name;
+                        if (updateData.company_name) payload.company_name = updateData.company_name;
+                        if (updateData.phone) payload.phone = updateData.phone;
+                        
+                        if (Object.keys(payload).length > 0) {
+                            await supabase.from('leads').update(payload).eq('id', lead.id);
+                            console.log(`Lead ${lead.id} updated via AI:`, payload);
+                        }
+                    }
+                }
+            } catch (e) { console.error("JSON parse error for UPDATE_LEAD:", e); }
+            cleanText = cleanText.replace(/UPDATE_LEAD:[\s\S]*?(?=QUOTE_TRIGGER:|$)/gi, '').trim();
+        }
+
+        // Parse QUOTE_TRIGGER
         if (cleanText.includes('QUOTE_TRIGGER:')) {
             let volume = 3000, planNameRequested = "", extraItems: string[] = [];
             const triggerIndex = cleanText.indexOf('QUOTE_TRIGGER:');
@@ -666,7 +694,8 @@ ${serviciosInfo || 'Sin servicios'}
                     }
                     */
 
-                    // 3. Send public approval link if quote was generated
+                    // 3. Send public approval link if quote was generated (DISABLED BY USER REQUEST)
+                    /*
                     const publicQuoteLink = (conv as any).__publicQuoteLink;
                     if (publicQuoteLink) {
                         await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
@@ -681,6 +710,7 @@ ${serviciosInfo || 'Sin servicios'}
                         });
                         console.log(`🔗 Quote link sent to Telegram`);
                     }
+                    */
                 } catch (e) {
                     console.error('Telegram send error:', e);
                 }
