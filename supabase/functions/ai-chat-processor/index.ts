@@ -626,6 +626,9 @@ ${serviciosInfo || 'Sin servicios'}
         // DB insert is non-blocking — Telegram MUST deliver even if DB fails
         if (insertError) {
             log(`Insert error (non-fatal): ${JSON.stringify(insertError)}`);
+        } else if (lead?.id) {
+            // ALWAYS update the lead's 'updated_at' so it jumps to the top of the CRM list
+            await supabase.from('leads').update({ updated_at: new Date().toISOString() }).eq('id', lead.id);
         }
 
         // ===========================================
