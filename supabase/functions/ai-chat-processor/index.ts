@@ -203,11 +203,8 @@ TABLA DE PLANES:
 CUANDO TENGAS EL VOLUMEN — responde así:
 "¡Perfecto [nombre]! Con [X] facturas/mes te recomiendo el [Plan]. La inversión es de $[X] al año. Incluye..."
 
-REGLAS DE ORO:
-1. NUNCA inventes descuentos o promociones que no estén en el historial de conversación.
-2. NO PIDAS CORREOS y NO GENERES PDFs. Toda la cotización va en texto en el chat.
-3. Si en el historial ves un mensaje con un descuento (ej: '25% de descuento'), reconócelo y aplícalo.
-4. Si piden módulos (CXC, Inventario, POS, Nómina), agrégalos al total.`;
+IMPORTANTE: Justo debajo de tu mensaje de texto, SIEMPRE debes incluir este código exacto para que el sistema registre la cotización en el CRM:
+QUOTE_TRIGGER: {"plan_name": "Empresarial", "dte_volume": 300, "items": []}`;
 
         const agent = agents?.[0] || { 
             name: 'Sof├¡a', 
@@ -278,12 +275,13 @@ ${serviciosInfo || 'Sin servicios'}
         [REGLA DE ORO DEL SISTEMA]
         - NO inventes datos. Usa el catálogo adjunto.
         - DEBES redactar la cotización en el mensaje de chat de forma amigable y clara, mencionando los precios del plan recomendado.
-        - NO intentes generar archivos PDF ni usar triggers. Muestra la información de la cotización directamente en tu respuesta de texto.
+        - NO intentes generar archivos PDF. Muestra la información de la cotización directamente en tu respuesta de texto.
         - Asegúrate de desglosar el precio del plan, implementaciones o módulos extras si el usuario los pide.
 
-        [PROTOCOLO DE RECOMENDACIÓN]
-        1. Cuando tengas el Nombre y Volumen de facturas, procede a cotizar INMEDIATAMENTE en el texto.
-        2. NO PIDAS PERMISO para cotizar. Hazlo de inmediato.
+        [PROTOCOLO DE RECOMENDACIÓN Y CRM]
+        1. Cuando tengas el Nombre y Volumen de facturas, cotiza INMEDIATAMENTE en el texto.
+        2. Para que el CRM registre tu cotización, DEBES incluir al final de tu mensaje este bloque exacto (reemplaza los valores según el plan):
+        QUOTE_TRIGGER: {"plan_name": "Plan Name", "dte_volume": 300, "items": []}
 `;
 
         // Combine base system_prompt from DB + dynamic context
@@ -412,7 +410,7 @@ ${serviciosInfo || 'Sin servicios'}
         if (userMessage.match(/\b(10|[1-9]\d{1,5})\b/) || userMessage.toLowerCase().includes("factura") || userMessage.toLowerCase().includes("dte")) {
             forceTriggerMessage = {
                 role: 'system',
-                content: '¡ALERTA DE SISTEMA MAXIMA PRIORIDAD! El usuario acaba de darte su volumen o preguntó por precio/facturas. ESTÁS OBLIGADO a responder resumiendo su cotización con los precios del catálogo en TU MENSAJE DE TEXTO. Desglosa los precios de forma clara. NO le pidas su correo y NO intentes enviar PDFs.'
+                content: '¡ALERTA DE SISTEMA MAXIMA PRIORIDAD! El usuario acaba de darte su volumen o preguntó por precio/facturas. ESTÁS OBLIGADO a responder resumiendo su cotización con los precios del catálogo en TU MENSAJE DE TEXTO. NO le pidas su correo y NO intentes enviar PDFs. OBLIGATORIO incluir QUOTE_TRIGGER: {"plan_name": "Nombre", "dte_volume": 400, "items": []} al final del mensaje.'
             };
         }
 
@@ -558,12 +556,14 @@ ${serviciosInfo || 'Sin servicios'}
                     // Mark as 'enviada' so the public view link is immediately accessible
                     await supabase.from('cotizaciones').update({ estado: 'enviada' }).eq('id', quoteObj.id);
 
-                    // Generate PDF
+                    // Generate PDF (DISABLED BY USER REQUEST - TEXT QUOTE ONLY)
+                    /* 
                     const pdfUrl = await generateQuotePDF(quoteObj, supabase);
                     if (pdfUrl) {
                         (conv as any).__pdfUrl = pdfUrl;
                         (conv as any).__pdfFileName = `Propuesta_${(quoteObj.nombre_cliente || 'Client').replace(/\s+/g, '_')}.pdf`;
                     }
+                    */
 
                     // Store public approval link
                     const FRONTEND_BASE = Deno.env.get('FRONTEND_URL') || 'https://crm-app-v2.vercel.app';
@@ -644,7 +644,8 @@ ${serviciosInfo || 'Sin servicios'}
                         await supabase.from('marketing_messages').update({ status: 'delivered' }).eq('id', savedMsg.id);
                     }
 
-                    // 2. Send PDF if generated
+                    // 2. Send PDF if generated (DISABLED BY USER REQUEST)
+                    /*
                     const pdfUrl = (conv as any).__pdfUrl;
                     const pdfFileName = (conv as any).__pdfFileName || 'Propuesta_Comercial.pdf';
                     if (pdfUrl) {
@@ -663,6 +664,7 @@ ${serviciosInfo || 'Sin servicios'}
                             }
                         } catch (pdfErr) { console.error('PDF send failed:', pdfErr); }
                     }
+                    */
 
                     // 3. Send public approval link if quote was generated
                     const publicQuoteLink = (conv as any).__publicQuoteLink;
