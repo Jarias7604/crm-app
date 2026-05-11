@@ -11,6 +11,7 @@ export interface AiAgent {
     active_channels: string[];
     system_prompt?: string;
     representative_id?: string | null;
+    demo_url?: string | null;
 }
 
 export const aiAgentService = {
