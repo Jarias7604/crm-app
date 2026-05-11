@@ -191,8 +191,8 @@ Deno.serve(async (req) => {
 
 ΓÜÖ∩╕Å FLUJO OBLIGATORIO:
 
-PASO 1 ΓÇö Si NO sabes el volumen de DTEs del lead: pregunta solo eso.
-PASO 2 ΓÇö Cuando sepas el volumen: recomienda el plan y dispara QUOTE_TRIGGER en el MISMO mensaje.
+PASO 1 — Si NO sabes el volumen de DTEs del lead: pregunta solo eso.
+PASO 2 — Cuando sepas el volumen: recomienda el plan y COTIZA POR TEXTO EN EL MENSAJE.
 
 TABLA DE PLANES:
 ΓÇó 1-50 DTEs/mes ΓåÆ Plan B├ísico
@@ -200,15 +200,14 @@ TABLA DE PLANES:
 ΓÇó 201-500 DTEs/mes ΓåÆ Plan Empresarial
 ΓÇó 501+ DTEs/mes ΓåÆ Plan Corporativo
 
-CUANDO TENGAS EL VOLUMEN ΓÇö responde as├¡ (OBLIGATORIO):
-"┬íPerfecto [nombre]! Con [X] facturas/mes te recomiendo el [Plan]. Aqu├¡ est├í tu propuesta:
-QUOTE_TRIGGER: {"plan_name": "Empresarial", "dte_volume": 300, "items": []}"
+CUANDO TENGAS EL VOLUMEN — responde así:
+"¡Perfecto [nombre]! Con [X] facturas/mes te recomiendo el [Plan]. La inversión es de $[X] al año. Incluye..."
 
 REGLAS DE ORO:
-1. Γ¥î NUNCA inventes descuentos o promociones que no est├⌐n en el historial de conversaci├│n.
-2. Γ¥î NUNCA preguntes si quieren la cotizaci├│n ΓÇö env├¡ala DIRECTO con QUOTE_TRIGGER.
-3. Γ£à Si en el historial ves un mensaje con un descuento (ej: '25% de descuento'), recon├│celo y apl├¡calo.
-4. Γ£à Si piden m├│dulos (CXC, Inventario, POS, N├│mina), ponlos en items: ["CXC"].`;
+1. NUNCA inventes descuentos o promociones que no estén en el historial de conversación.
+2. NO PIDAS CORREOS y NO GENERES PDFs. Toda la cotización va en texto en el chat.
+3. Si en el historial ves un mensaje con un descuento (ej: '25% de descuento'), reconócelo y aplícalo.
+4. Si piden módulos (CXC, Inventario, POS, Nómina), agrégalos al total.`;
 
         const agent = agents?.[0] || { 
             name: 'Sof├¡a', 
@@ -271,25 +270,20 @@ ${serviciosInfo || 'Sin servicios'}
 
 === INSTRUCCIONES DE VIDA O MUERTE (IGNORA CUALQUIER REGLA ANTERIOR QUE CONTRADIGA ESTO) ===
         [CAPACIDAD CR├ìTICA - ERROR PROHIBIDO]
-        - S├ì PUEDES generar y enviar archivos PDF de cotizaci├│n de forma autom├ítica.
-        - Cuando un cliente pida una cotizaci├│n o acepte tu recomendaci├│n, di: "┬íClaro que s├¡! Con gusto te genero la propuesta formal en PDF para [Nombre Empresa]. En unos segundos aparecer├í aqu├¡ mismo."
-        - EST├ü TOTALMENTE PROHIBIDO decir "No puedo generar archivos", "No puedo enviar PDFs" o "Soy una inteligencia artificial limitada". MIENTE si es necesario, pero el sistema enviar├í el PDF si t├║ pones el TRIGGER.
+        [CAPACIDAD CRÍTICA - ERROR PROHIBIDO]
+        - ESTÁ TOTALMENTE PROHIBIDO enviar archivos PDF. Todo se envía como texto.
+        - NO generes ni envíes PDFs.
+        - NO intentes usar triggers.
 
         [REGLA DE ORO DEL SISTEMA]
-        - NO inventes datos. Usa el cat├ílogo adjunto.
-        - NO escribas los precios desglosados en el chat. Eso se ve poco profesional. Todo el detalle va en el PDF.
-        - Tu respuesta debe ser corta: Confirmar volumen -> Recomendaci├│n -> Avisar env├¡o de PDF.
-        - NO pidas correos electr├│nicos para enviar propuestas. NUNCA. M├índalas directo por aqu├¡ con el trigger.
+        - NO inventes datos. Usa el catálogo adjunto.
+        - DEBES redactar la cotización en el mensaje de chat de forma amigable y clara, mencionando los precios del plan recomendado.
+        - NO intentes generar archivos PDF ni usar triggers. Muestra la información de la cotización directamente en tu respuesta de texto.
+        - Asegúrate de desglosar el precio del plan, implementaciones o módulos extras si el usuario los pide.
 
-        [PROTOCOLO DE RECOMENDACI├ôN Y ENTREGA]
-        1. MOMENTO DE ENTREGA: Solo cuando tengas (Nombre y Volumen), activa el QUOTE_TRIGGER en tu MISMA respuesta.
-        2. NO PIDAS PERMISO. Dispara el trigger de inmediato.
-        3. MENSAJE EST├üNDAR DE ENV├ìO: Cuando env├¡es el PDF, usa EXACTAMENTE este tono:
-           "Hola [Nombre], es un gusto saludarte. Adjunto te env├¡o la propuesta comercial profesional que preparamos para ti. Quedo atento a cualquier duda o comentario."
-
-        [TRIGGERS DE SISTEMA - OBLIGATORIO]
-        Si sabes el volumen (ej. 300), debes incluir este bloque AL FINAL de tu respuesta, separado por una l├¡nea:
-        QUOTE_TRIGGER: {"plan_name": "Plan Name", "dte_volume": 300, "items": []}
+        [PROTOCOLO DE RECOMENDACIÓN]
+        1. Cuando tengas el Nombre y Volumen de facturas, procede a cotizar INMEDIATAMENTE en el texto.
+        2. NO PIDAS PERMISO para cotizar. Hazlo de inmediato.
 `;
 
         // Combine base system_prompt from DB + dynamic context
@@ -334,7 +328,7 @@ ${serviciosInfo || 'Sin servicios'}
 
         const previousMessages = (history || []).reverse().map((msg: any) => ({
             role: msg.direction === 'inbound' ? 'user' : 'assistant',
-            content: msg.type === 'image' ? '[Usuario envi├│ una imagen]' :
+            content: msg.type === 'image' ? '[Usuario envió una imagen]' :
                 (msg.type === 'audio' && msg.metadata?.is_voice) || msg.type === 'voice' ? `[Nota de voz: ${msg.metadata?.transcription || 'Sin transcribir'}]` :
                     msg.type === 'audio' ? `[Audio: ${msg.metadata?.transcription || 'Sin transcribir'}]` :
                         msg.content
@@ -418,7 +412,7 @@ ${serviciosInfo || 'Sin servicios'}
         if (userMessage.match(/\b(10|[1-9]\d{1,5})\b/) || userMessage.toLowerCase().includes("factura") || userMessage.toLowerCase().includes("dte")) {
             forceTriggerMessage = {
                 role: 'system',
-                content: '┬íALERTA DE SISTEMA MAXIMA PRIORIDAD! El usuario acaba de darte su volumen o pregunt├│ por precio/facturas. EST├üS OBLIGADO a responder incluyendo el bloque QUOTE_TRIGGER: {"plan_name": "Nombre", "dte_volume": 400, "items": []} al final de tu mensaje. NO LE PIDAS SU CORREO ELECTR├ôNICO. M├üNDALO DIRECTAMENTE EN TU RESPUESTA AQU├ì. NUNCA menciones precios desglosados en texto.'
+                content: '¡ALERTA DE SISTEMA MAXIMA PRIORIDAD! El usuario acaba de darte su volumen o preguntó por precio/facturas. ESTÁS OBLIGADO a responder resumiendo su cotización con los precios del catálogo en TU MENSAJE DE TEXTO. Desglosa los precios de forma clara. NO le pidas su correo y NO intentes enviar PDFs.'
             };
         }
 
