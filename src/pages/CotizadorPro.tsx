@@ -85,8 +85,8 @@ export default function CotizadorPro() {
     // Permisos de Cotizaciones — controlados desde Matriz de Seguridad (Roles y Permisos).
     // super_admin y company_admin tienen estos permisos habilitados por defecto vía migration.
     // Colaboradores los tienen en FALSE por defecto; el admin los activa desde la UI.
-    const canChangePaymentMethod = hasPermission('cotizaciones.change_payment_method');
-    const canEditPrices = hasPermission('cotizaciones.edit_prices');
+    const canChangePaymentMethod = hasPermission('cotizaciones.change_payment_method') || profile?.role === 'super_admin' || profile?.role === 'company_admin';
+    const canEditPrices = hasPermission('cotizaciones.edit_prices') || profile?.role === 'super_admin' || profile?.role === 'company_admin';
 
     // Estado para widget de precio
     const [isWidgetOpen, setIsWidgetOpen] = useState(true);
