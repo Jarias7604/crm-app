@@ -254,26 +254,31 @@ QUOTE_TRIGGER: {"plan_name": "Empresarial", "dte_volume": 300, "items": []}`;
 ΓÇó Email: ${lead?.email || 'No registrado'}
 ΓÇó Volumen Registrado: ${lead?.metadata?.volume || 'A├║n no proporcionado'}
 
-=== CAT├üLOGO DE PRODUCTOS Y PRECIOS ===
+=== CATÁLOGO DE PRODUCTOS Y PRECIOS ===
 Planes Principales:
 ${planesInfo || 'Sin planes'}
 
-M├│dulos Adicionales:
-${modulosInfo || 'Sin m├│dulos'}
+Módulos Adicionales:
+${modulosInfo || 'Sin módulos'}
 
 Servicios Variables:
 ${serviciosInfo || 'Sin servicios'}
-${serviciosInfo || 'Sin servicios'}
+
+=== ENLACE PARA DEMO / AGENDAMIENTO ===
+${agent.demo_url ? `Si el cliente solicita agendar una llamada, reunión o demo, compártele este enlace exactamente como está para que elija su horario: ${agent.demo_url}` : 'Aún no tienes un enlace de agendamiento configurado. Si el cliente pide reunión, dile que un asesor humano lo contactará pronto.'}
+
+=== OPCIONES DE PAGO Y DESCUENTOS ===
+- Opciones de pago: Ofrece siempre la opción de "1 Solo Pago" (Contado) con un 20% DE DESCUENTO sobre el total anual.
+- Explica claramente al cliente cuánto dinero se ahorra al elegir el pago único.
 
 === INSTRUCCIONES DE VIDA O MUERTE (IGNORA CUALQUIER REGLA ANTERIOR QUE CONTRADIGA ESTO) ===
-        [CAPACIDAD CR├ìTICA - ERROR PROHIBIDO]
         [CAPACIDAD CRÍTICA - ERROR PROHIBIDO]
         - ESTÁ TOTALMENTE PROHIBIDO enviar archivos PDF. Todo se envía como texto.
         - NO generes ni envíes PDFs.
-        - NO intentes usar triggers.
+        - NO intentes usar triggers falsos.
 
         [REGLA DE ORO DEL SISTEMA]
-        - NO inventes datos. Usa el catálogo adjunto.
+        - NO inventes datos. Usa el catálogo adjunto y aplica el descuento del 20% si aplica.
         - DEBES redactar la cotización en el mensaje de chat de forma amigable y clara, mencionando los precios del plan recomendado.
         - NO intentes generar archivos PDF. Muestra la información de la cotización directamente en tu respuesta de texto.
         - Asegúrate de desglosar el precio del plan, implementaciones o módulos extras si el usuario los pide.
@@ -291,7 +296,7 @@ ${serviciosInfo || 'Sin servicios'}
 
         // Combine base system_prompt from DB + dynamic context
         // We put the DB prompt inside a boundary, and our absolute rules at the end so the AI respects them over the user's custom UI text
-        const fullSystemPrompt = `=== INSTRUCCIONES PERSONALIZADAS ===\n${agent.system_prompt || 'Eres un asesor de ventas profesional.'}\n=====================\n\n${leadContext}`;
+        const fullSystemPrompt = `=== INSTRUCCIONES MAESTRAS (DEL USUARIO) ===\n${agent.system_prompt || 'Eres un asesor de ventas profesional.'}\n===========================================\n\n${leadContext}`;
 
         // ===========================================
         // 5. GET OPENAI API KEY

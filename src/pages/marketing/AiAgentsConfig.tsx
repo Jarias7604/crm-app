@@ -255,6 +255,11 @@ export default function AiAgentsConfig() {
                             </div>
                         </div>
 
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Enlace para Agendar Demo (Opcional)</label>
+                            <input type="url" placeholder="https://calendly.com/tu-empresa/demo" className="w-full p-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-blue-500/20 outline-none font-bold text-slate-700 text-sm transition-all focus:bg-white shadow-inner" value={selectedAgent?.demo_url || ''} onChange={e => handleInputChange('demo_url', e.target.value)} />
+                        </div>
+
                         <div className="space-y-2">
                             <div className="flex justify-between items-center pl-1">
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Cerebro / Instrucciones</label>
