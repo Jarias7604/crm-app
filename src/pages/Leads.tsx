@@ -1384,19 +1384,19 @@ export default function Leads() {
                                                     <span>{visibleColumns.length}</span>
                                                 </button>
                                                 {showColumnModal && (
-                                                    <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 p-4">
-                                                        <div className="flex items-center justify-between mb-3">
-                                                            <h3 className="text-xs font-black text-gray-800 uppercase tracking-widest">Columnas visibles</h3>
+                                                    <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[999] overflow-hidden">
+                                                        <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-50 bg-gray-50/60">
+                                                            <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Columnas visibles</h3>
                                                             <button
                                                                 onClick={() => {
                                                                     const all = ALL_COLUMNS.map(c => c.id);
                                                                     setVisibleColumns(all);
                                                                     localStorage.setItem('lead_visible_columns', JSON.stringify(all));
                                                                 }}
-                                                                className="text-[9px] font-black text-indigo-500 hover:text-indigo-700"
-                                                            >Mostrar todas</button>
+                                                                className="text-[9px] font-black text-indigo-400 hover:text-indigo-600 transition-colors"
+                                                            >Todas</button>
                                                         </div>
-                                                        <div className="flex flex-wrap gap-2">
+                                                        <div className="py-1">
                                                             {ALL_COLUMNS.map(col => {
                                                                 const isVisible = visibleColumns.includes(col.id);
                                                                 const isRequired = col.id === 'name';
@@ -1405,21 +1405,20 @@ export default function Leads() {
                                                                         key={col.id}
                                                                         onClick={() => toggleColumnVisibility(col.id)}
                                                                         disabled={isRequired}
-                                                                        title={isRequired ? 'Columna obligatoria' : ''}
-                                                                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-bold transition-all ${
-                                                                            isRequired ? 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed'
-                                                                            : isVisible ? 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
-                                                                            : 'border-gray-100 bg-white text-gray-400 hover:border-gray-200 hover:text-gray-600'
-                                                                        }`}
+                                                                        className={`w-full flex items-center gap-3 px-4 py-2 text-left transition-colors group ${isRequired ? 'cursor-not-allowed' : 'hover:bg-indigo-50'}`}
                                                                     >
-                                                                        <span>{col.icon}</span>
-                                                                        <span>{col.label}</span>
-                                                                        {isVisible && !isRequired && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 ml-0.5" />}
+                                                                        <span className={`shrink-0 transition-colors ${isVisible ? 'text-indigo-500' : 'text-gray-200 group-hover:text-gray-400'}`}>
+                                                                            {isVisible ? (
+                                                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                                                                            ) : (
+                                                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                                                            )}
+                                                                        </span>
+                                                                        <span className={`text-[11px] font-bold uppercase tracking-wide flex-1 transition-colors ${isVisible ? 'text-gray-700' : 'text-gray-300'}`}>{col.label}</span>
                                                                     </button>
                                                                 );
                                                             })}
                                                         </div>
-                                                        <p className="text-[9px] text-gray-300 text-center mt-3">Clic para ocultar/mostrar. Se guarda automáticamente.</p>
                                                     </div>
                                                 )}
                                             </div>
