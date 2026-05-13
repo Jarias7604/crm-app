@@ -1,5 +1,5 @@
 # 🤖 Arias Defense AI — Pendientes del Sistema Autónomo
-> Última actualización: 13 Mayo 2026 — Sesión matutina
+> Última actualización: 13 Mayo 2026 — Sesión completa (mañana)
 > Para retomar: "Lee PENDIENTES_AI_SYSTEM.md y procede con el primer ítem de Corto Plazo"
 
 ---
@@ -45,23 +45,11 @@ No es necesario cambiar ningún código — el sistema detecta automáticamente 
 
 ---
 
-## 🟡 MEDIANO PLAZO (próximas semanas)
+## ✅ MEDIANO PLAZO — COMPLETADO (13 Mayo 2026)
 
-### 4. Reporte de conversiones del bot (~2h)
-- Vista en el Cockpit: de X leads que Sofía atendió, Y% cerraron
-- ROI calculado: ingresos generados vs costo del sistema ($0 APIs)
-- Tabla con: lead, plan contratado, fecha cierre, agente que cerró
-
-### 5. A/B testing de templates de seguimiento (~3h)
-- Template A vs Template B en la config de seguimientos
-- Sistema alterna automáticamente entre templates
-- Registra qué template generó más respuestas/cierres
-- Dashboard de estadísticas en FollowupSettings UI
-
-### 6. Panel de análisis de objeciones (~1h)
-- Agrupación automática: "precio" / "necesita aprobación" / "no es prioridad"
-- % de cada tipo que cierra finalmente
-- Gráfico de tendencia por semana
+- [x] **#4 Reporte de Conversiones del Bot** — Nueva pestaña "Conversiones" (verde) en el Cockpit. 4 KPIs: leads atendidos, clientes cerrados, tasa de conversión %, seguimientos promedio. Banner ROI ($0/mes). Tabla detalle con canal, agente, sentiment al cierre.
+- [x] **#5 A/B Testing de Templates** — Panel completo en `/marketing/followup-settings`. Toggle activa la variante B. Stats en vivo con barras de progreso (enviados / respuestas / % respuesta por variante). Botón de reset. Edge function `auto-followup` v3 alterna variantes por UUID hash del lead y registra en `ab_stats` via RPC. Tabla `ai_followup_settings` creada en producción.
+- [x] **#6 Panel de Análisis de Objeciones** — Nueva pestaña "Objeciones" (índigo) en el Cockpit. Categoriza automáticamente: Precio/Costo, Necesita aprobación, No es prioridad, Ya tiene solución, Sin respuesta. KPIs globales + barras de cierre por categoría + insight cards (mejor/peor conversión).
 
 ---
 
