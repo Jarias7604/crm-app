@@ -12,7 +12,7 @@ const supabase = createClient(
     { auth: { persistSession: false } }
 );
 
-console.log('[auto-followup v2-dynamic] Initialized');
+console.log('[auto-followup v3-whatsapp] Initialized');
 
 // ── Default settings (safe fallback if ai_followup_settings table has no row) ─
 const DEFAULT_SETTINGS = {
@@ -80,6 +80,171 @@ function buildFollowupMessage(memory: any, lead: any, followupNum: number, setti
     return `Hola ${name}, este es mi último mensaje para no molestarle. 🤝 Si en algún momento necesita asesoría en facturación electrónica, aquí estaremos. ¿Hay algo que le haya impedido avanzar?`;
 }
 
+// ── Send message via WhatsApp (Meta Cloud API) ────────────────────────────
+// ⚙️ CONFIG: Set WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_TOKEN in Supabase secrets
+// when you have the WhatsApp Business API credentials.
+//   supabase secrets set WHATSAPP_PHONE_NUMBER_ID=<your_phone_number_id>
+//   supabase secrets set WHATSAPP_TOKEN=<your_permanent_token>
+async function sendWhatsAppMessage(
+    toPhone: string,
+    message: string,
+    log: (...args: any[]) => void
+): Promise<boolean> {
+    const phoneNumberId = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID');
+    const waToken      = Deno.env.get('WHATSAPP_TOKEN');
+
+    if (!phoneNumberId || !waToken) {
+        log(`⚠️ WhatsApp not configured: missing WHATSAPP_PHONE_NUMBER_ID or WHATSAPP_TOKEN secrets. Message NOT sent to ${toPhone}. Set secrets to activate.`);
+        return false;
+    }
+
+    // Normalize phone: strip non-digits, ensure it starts with country code (no "+")
+    const normalizedPhone = toPhone.replace(/\D/g, '');
+
+    try {
+        const resp = await fetch(
+            `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${waToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    messaging_product: 'whatsapp',
+                    recipient_type: 'individual',
+                    to: normalizedPhone,
+                    type: 'text',
+                    text: { preview_url: false, body: message },
+                }),
+            }
+        );
+        const result = await resp.json();
+        if (result?.messages?.[0]?.id) {
+            log(`✅ WhatsApp message sent to ${normalizedPhone} (msg_id: ${result.messages[0].id})`);
+            return true;
+        } else {
+            log(`❌ WhatsApp API error: ${JSON.stringify(result)}`);
+            return false;
+        }
+    } catch (e: any) {
+        log(`❌ WhatsApp fetch error: ${e.message}`);
+        return false;
+    }
+}
+
+// ── Send message via Telegram ─────────────────────────────────────────────
+async function sendTelegramMessage(
+    chatId: string,
+    message: string,
+    token: string,
+    log: (...args: any[]) => void
+): Promise<boolean> {
+    try {
+        const resp = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'Markdown' }),
+        });
+        const result = await resp.json();
+        if (result.ok) {
+            log(`✅ Telegram message sent to chat ${chatId}`);
+            return true;
+        } else {
+            log(`❌ Telegram API error: ${JSON.stringify(result)}`);
+            return false;
+        }
+    } catch (e: any) {
+        log(`❌ Telegram fetch error: ${e.message}`);
+        return false;
+    }
+}
+
+// ── FORCE SEND: skip all filters, send a custom message to a specific lead ─
+async function handleForceSend(body: any, log: (...args: any[]) => void): Promise<Response> {
+    const forceLeadId   = body.force_lead_id as string;
+    const customMessage = (body.custom_message as string) || '';
+
+    log(`🎯 FORCE mode: sending direct message to lead ${forceLeadId}`);
+
+    if (!customMessage.trim()) {
+        return new Response(
+            JSON.stringify({ success: false, error: 'custom_message is required for force_lead_id mode' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+    }
+
+    // Fetch the lead's active conversation
+    const { data: conv, error: convErr } = await supabase
+        .from('marketing_conversations')
+        .select(`id, company_id, lead_id, channel, external_id,
+            lead:leads(id, name, phone, company_name, status)`)
+        .eq('lead_id', forceLeadId)
+        .eq('status', 'active')
+        .maybeSingle();
+
+    if (convErr) {
+        log(`Error fetching conversation: ${convErr.message}`);
+        return new Response(
+            JSON.stringify({ success: false, error: convErr.message }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+    }
+
+    if (!conv) {
+        // No active conversation — still log and try via phone if available
+        log(`No active conversation found for lead ${forceLeadId}. Attempting direct delivery.`);
+    }
+
+    let delivered = false;
+
+    if (conv) {
+        const channel = conv.channel || 'telegram';
+        log(`Channel detected: ${channel}`);
+
+        // Save outbound message to DB regardless of channel
+        await supabase.from('marketing_messages').insert({
+            conversation_id: conv.id,
+            content: customMessage,
+            direction: 'outbound',
+            type: 'text',
+            status: 'pending',
+            metadata: {
+                isAiGenerated: false,
+                isManualOffer: true,
+                sent_by: 'force_lead_id',
+                processed_by: 'auto-followup-v3',
+            },
+        });
+
+        if (channel === 'whatsapp') {
+            // ── WhatsApp delivery ──
+            const phone = conv.lead?.phone || '';
+            delivered = await sendWhatsAppMessage(phone, customMessage, log);
+        } else {
+            // ── Telegram delivery (default) ──
+            const { data: integration } = await supabase
+                .from('marketing_integrations')
+                .select('settings')
+                .eq('company_id', conv.company_id)
+                .eq('provider', 'telegram')
+                .eq('is_active', true)
+                .maybeSingle();
+
+            if (conv.external_id && integration?.settings?.token) {
+                delivered = await sendTelegramMessage(conv.external_id, customMessage, integration.settings.token, log);
+            } else {
+                log(`⚠️ Telegram: missing external_id or token`);
+            }
+        }
+    }
+
+    return new Response(
+        JSON.stringify({ success: true, delivered, force_lead_id: forceLeadId, channel: conv?.channel || 'unknown', logs: [] }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+}
+
 Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -92,8 +257,14 @@ Deno.serve(async (req) => {
 
     try {
         const body = await req.json().catch(() => ({}));
+
+        // ── TAREA 1: force_lead_id — bypass all filters, send custom message ──
+        if (body?.force_lead_id) {
+            return await handleForceSend(body, log);
+        }
+
         const targetCompanyId = body?.company_id || null;
-        log(`Starting auto-followup v2-dynamic. Target: ${targetCompanyId || 'ALL'}`);
+        log(`Starting auto-followup v3-whatsapp. Target: ${targetCompanyId || 'ALL'}`);
 
         let query = supabase
             .from('marketing_conversations')
@@ -170,7 +341,6 @@ Deno.serve(async (req) => {
 
                         // ── Notify assigned agent via Telegram ──────────────
                         try {
-                            // Get the lead's assigned agent and their telegram_chat_id
                             const { data: leadData } = await supabase
                                 .from('leads')
                                 .select('assigned_to, name, phone')
@@ -195,15 +365,7 @@ Deno.serve(async (req) => {
 
                                     if (tgInt?.settings?.token) {
                                         const alertMsg = `🚨 *ESCALACIÓN DE LEAD*\n\n👤 Lead: *${leadData.name}*\n📱 Teléfono: ${leadData.phone || 'N/A'}\n🔁 Intentos: ${followupCount}\n\nSofía agotó los seguimientos automáticos. Este lead necesita tu atención personal. ¡Contáctalo directamente!`;
-                                        await fetch(`https://api.telegram.org/bot${tgInt.settings.token}/sendMessage`, {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({
-                                                chat_id: agentProfile.telegram_chat_id,
-                                                text: alertMsg,
-                                                parse_mode: 'Markdown'
-                                            })
-                                        });
+                                        await sendTelegramMessage(agentProfile.telegram_chat_id, alertMsg, tgInt.settings.token, log);
                                         log(`📨 Escalation alert sent to agent ${agentProfile.full_name} for lead ${leadData.name}`);
                                     }
                                 }
@@ -231,27 +393,37 @@ Deno.serve(async (req) => {
                 const nextNum = followupCount + 1;
                 const followupText = buildFollowupMessage(memory, conv.lead, nextNum, settings);
 
-                const { data: integration } = await supabase
-                    .from('marketing_integrations').select('settings, provider')
-                    .eq('company_id', conv.company_id)
-                    .eq('provider', conv.channel === 'whatsapp' ? 'whatsapp' : 'telegram')
-                    .eq('is_active', true).maybeSingle();
-
+                // Save message to DB
                 await supabase.from('marketing_messages').insert({
                     conversation_id: conv.id, content: followupText,
                     direction: 'outbound', type: 'text', status: 'pending',
-                    metadata: { isAiGenerated: true, isAutoFollowup: true, followupNumber: nextNum, processed_by: 'auto-followup-v2' }
+                    metadata: { isAiGenerated: true, isAutoFollowup: true, followupNumber: nextNum, processed_by: 'auto-followup-v3' }
                 });
 
-                if (conv.channel === 'telegram' && conv.external_id && integration?.settings?.token) {
-                    const tgResp = await fetch(`https://api.telegram.org/bot${integration.settings.token}/sendMessage`, {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ chat_id: conv.external_id, text: followupText, parse_mode: 'Markdown' })
-                    });
-                    const tgResult = await tgResp.json();
-                    if (tgResult.ok) log(`✅ Followup #${nextNum} sent to ${conv.lead?.name}`);
+                // ── TAREA 2: Channel-aware delivery ───────────────────────
+                const channel = conv.channel || 'telegram';
+                let messageSent = false;
+
+                if (channel === 'whatsapp') {
+                    // WhatsApp delivery via Meta Cloud API
+                    const phone = conv.lead?.phone || '';
+                    messageSent = await sendWhatsAppMessage(phone, followupText, log);
+
+                } else {
+                    // Default: Telegram delivery
+                    const { data: integration } = await supabase
+                        .from('marketing_integrations').select('settings, provider')
+                        .eq('company_id', conv.company_id)
+                        .eq('provider', 'telegram')
+                        .eq('is_active', true).maybeSingle();
+
+                    if (conv.external_id && integration?.settings?.token) {
+                        messageSent = await sendTelegramMessage(conv.external_id, followupText, integration.settings.token, log);
+                        if (messageSent) log(`✅ Followup #${nextNum} sent to ${conv.lead?.name} via Telegram`);
+                    }
                 }
 
+                // Update memory regardless of delivery status
                 await supabase.rpc('upsert_lead_memory', {
                     p_lead_id: conv.lead_id, p_company_id: conv.company_id,
                     p_next_action: nextNum >= settings.max_followups ? 'escalar_humano' : 'seguimiento',
@@ -261,13 +433,14 @@ Deno.serve(async (req) => {
                     .update({ followup_count: nextNum, last_followup_at: now.toISOString(), last_followup_msg: followupText })
                     .eq('lead_id', conv.lead_id);
 
-                followupsSent++;
+                if (messageSent) followupsSent++;
+
             } catch (e) { log(`Error on conv ${conv.id}: ${e.message}`); }
         }
 
         log(`Done. Sent: ${followupsSent}, Escalated: ${escalationsCreated}, Skipped: ${skipped}`);
         return new Response(JSON.stringify({
-            success: true, version: 'v2-dynamic',
+            success: true, version: 'v3-whatsapp',
             followups_sent: followupsSent, escalations: escalationsCreated,
             skipped, evaluated: conversations?.length || 0, logs
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

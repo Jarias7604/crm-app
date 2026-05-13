@@ -1,5 +1,5 @@
 # 🤖 Arias Defense AI — Pendientes del Sistema Autónomo
-> Última actualización: 12 Mayo 2026 — Sesión nocturna
+> Última actualización: 13 Mayo 2026 — Sesión matutina
 > Para retomar: "Lee PENDIENTES_AI_SYSTEM.md y procede con el primer ítem de Corto Plazo"
 
 ---
@@ -26,29 +26,22 @@
 
 ---
 
-## 🔴 CORTO PLAZO — Próxima sesión (en orden de prioridad)
+## ✅ CORTO PLAZO — COMPLETADO (13 Mayo 2026)
 
-### 1. Fix `force_lead_id` en auto-followup ⚡ (~30 min)
-**Qué es:** El botón "Enviar Oferta" en el panel de objeciones de precio ya existe en el UI, pero el edge function `auto-followup` no maneja el parámetro `force_lead_id` todavía. Sin esto, el botón no funciona completamente.
-**Qué falta:**
-- En `auto-followup/index.ts`: detectar `body.force_lead_id` y `body.custom_message`
-- Si viene `force_lead_id`: saltarse todos los filtros y mandar ese mensaje a ese lead específico
-- **Archivo:** `supabase/functions/auto-followup/index.ts`
+- [x] **Fix `force_lead_id` en auto-followup** — botón "Enviar Oferta" ahora funciona. Edge function detecta `force_lead_id` + `custom_message`, salta todos los filtros y envía el mensaje directo al lead por su canal nativo.
+- [x] **WhatsApp channel detection** — `auto-followup` v3 detecta `conv.channel`. Si es `whatsapp` → llama `sendWhatsAppMessage()` via Meta Cloud API. Si es `telegram` → flujo existente. Código listo, solo falta configurar secrets (ver abajo).
+- [x] **Recálculo de sentiment histórico** — Script SQL en `supabase/migrations/20260513_recalculate_historical_sentiment.sql`. Ejecutar una vez en consola SQL de Supabase.
 
-### 2. WhatsApp channel detection en seguimientos (~1h)
-**Qué es:** El auto-followup solo envía mensajes por Telegram. Leads que entraron por WhatsApp/Meta Ads no reciben seguimientos automáticos porque el sistema no detecta su canal.
-**Qué falta:**
-- En `auto-followup/index.ts`: revisar `conversations.channel` del lead
-- Si canal = `whatsapp` → enviar por Meta/WhatsApp API en vez de Telegram
-- Si canal = `telegram` → seguir como está
-- **Archivo:** `supabase/functions/auto-followup/index.ts`
+### ⚙️ Para activar WhatsApp cuando tengas las credenciales:
+```bash
+# 1. Obtener de Meta Business Manager → WhatsApp → API Setup
+npx supabase secrets set WHATSAPP_PHONE_NUMBER_ID=<tu_phone_number_id> --project-ref ikofyypxphrqkncimszt
+npx supabase secrets set WHATSAPP_TOKEN=<tu_token_permanente> --project-ref ikofyypxphrqkncimszt
 
-### 3. Recalculo de sentiment para leads históricos (~20 min)
-**Qué es:** Los 57 leads actuales tienen sentiment fijo en 50% porque ingresaron antes del nuevo engine. Un script los recalcula usando sus últimos mensajes.
-**Qué falta:**
-- Script SQL o edge function que lea `marketing_conversations` de cada lead
-- Calcule el sentiment en base al último mensaje del lead
-- Lo actualice en `lead_ai_memory.sentiment_score`
+# 2. Redeploy para que tome los nuevos secrets
+npx supabase functions deploy auto-followup --project-ref ikofyypxphrqkncimszt --no-verify-jwt
+```
+No es necesario cambiar ningún código — el sistema detecta automáticamente si los secrets están configurados.
 
 ---
 
