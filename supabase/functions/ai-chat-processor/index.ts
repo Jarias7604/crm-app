@@ -638,8 +638,8 @@ ${technicalRules}`;
             try {
                 const historicalSentiment = leadMemory?.sentiment_score ?? 50;
                 const sentiment = detectSentiment(userMessage, historicalSentiment);
-                const newStage  = detectStage(cleanText, userMessage, leadMemory?.conversation_stage || 'nuevo');
-                const nextAction = detectNextAction(sentiment, newStage, userMessage);
+                let newStage  = detectStage(cleanText, userMessage, leadMemory?.conversation_stage || 'nuevo');
+                let nextAction = detectNextAction(sentiment, newStage, userMessage);
 
                 // Extract new facts from the conversation (basic extraction)
                 const newFacts: Record<string, any> = {};
@@ -652,14 +652,76 @@ ${technicalRules}`;
                     if (match?.[2]) newFacts.empresa_mencionada = match[2].trim();
                 }
 
-                // Detect objections
+                // ── Detect price objection with context ──────────────────
                 let objection: string | null = null;
-                if (userMessage.toLowerCase().includes('caro') || userMessage.toLowerCase().includes('presupuesto')) {
+                const msgLower = userMessage.toLowerCase();
+                const priceObjectionKws = ['caro','costoso','muy caro','no tengo presupuesto','no puedo pagarlo',
+                    'presupuesto limitado','fuera de mi presupuesto','precio alto','no me alcanza','precio elevado'];
+                const hasPriceObjection = priceObjectionKws.some(k => msgLower.includes(k));
+
+                if (hasPriceObjection) {
                     objection = 'precio';
-                } else if (userMessage.toLowerCase().includes('consultar') || userMessage.toLowerCase().includes('equipo')) {
+                    // Capture the exact objection text (first 200 chars)
+                    newFacts.price_objection_text  = userMessage.slice(0, 200);
+                    newFacts.price_objection_at    = new Date().toISOString();
+                    // Preserve last quoted plan/price from memory if available
+                    if (leadMemory?.known_facts?.last_quoted_plan)  newFacts.last_quoted_plan  = leadMemory.known_facts.last_quoted_plan;
+                    if (leadMemory?.known_facts?.last_quoted_price) newFacts.last_quoted_price = leadMemory.known_facts.last_quoted_price;
+                } else if (msgLower.includes('consultar') || msgLower.includes('equipo')) {
                     objection = 'necesita_aprobacion';
-                } else if (userMessage.toLowerCase().includes('luego') || userMessage.toLowerCase().includes('despues')) {
+                } else if (msgLower.includes('luego') || msgLower.includes('despues')) {
                     objection = 'no_es_prioridad';
+                }
+
+                // ── Detect quote trigger — save plan & price in memory ────
+                if (cleanText?.includes('QUOTE_TRIGGER') || cleanText?.includes('Plan') || newStage === 'cotizado') {
+                    const planMatch  = cleanText?.match(/Plan\s+([\w\s]+)/i);
+                    const priceMatch = cleanText?.match(/\$?([\d,]+(?:\.\d{1,2})?)/);
+                    if (planMatch?.[1])  newFacts.last_quoted_plan  = planMatch[1].trim();
+                    if (priceMatch?.[1]) newFacts.last_quoted_price = priceMatch[1].replace(',','');
+                }
+
+                // ── Detect CLOSE signals — lead wants to buy ─────────────
+                const closeSignals = [
+                    'quiero contratar','vamos adelante','cuando empezamos','acepto','de acuerdo',
+                    'como pagamos','donde firmo','lista para contratar','cuanto es la cuenta',
+                    'aceptamos','procesemos','adelante con eso','quiero el plan','voy con ustedes'
+                ];
+                const isClosing = closeSignals.some(s => msgLower.includes(s)) || sentiment >= 82;
+
+                if (isClosing && newStage !== 'cerrado') {
+                    newStage   = 'negociacion';
+                    nextAction = 'cierre_inminente';
+                    newFacts.close_signal_at = new Date().toISOString();
+                    newFacts.close_signal_msg = userMessage.slice(0, 150);
+
+                    // 🚨 Notify assigned sales agent via Telegram
+                    try {
+                        const { data: leadInfo } = await supabase
+                            .from('leads').select('assigned_to, name, phone').eq('id', lead.id).maybeSingle();
+
+                        if (leadInfo?.assigned_to) {
+                            const { data: agentProf } = await supabase
+                                .from('profiles').select('full_name, telegram_chat_id').eq('id', leadInfo.assigned_to).maybeSingle();
+
+                            if (agentProf?.telegram_chat_id) {
+                                const { data: tgI } = await supabase.from('marketing_integrations')
+                                    .select('settings').eq('company_id', companyId)
+                                    .eq('provider','telegram').eq('is_active', true).maybeSingle();
+
+                                if (tgI?.settings?.token) {
+                                    const closeMsg = `🎉 LEAD LISTO PARA CERRAR!\n\n👤 Lead: ${leadInfo.name}\n📱 Tel: ${leadInfo.phone || 'N/A'}\n💬 Mensaje: "${userMessage.slice(0,100)}"\n\n✅ Este lead está listo para proceder. Contáctalo para:\n1. Confirmar el plan seleccionado\n2. Enviar factura / contrato\n3. Iniciar el onboarding\n\n⚡ Actúa ahora — el lead está caliente!`;
+                                    await fetch(`https://api.telegram.org/bot${tgI.settings.token}/sendMessage`, {
+                                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ chat_id: agentProf.telegram_chat_id, text: closeMsg })
+                                    });
+                                    log(`🎉 Close alert sent to agent ${agentProf.full_name} for lead ${leadInfo.name}`);
+                                }
+                            }
+                        }
+                    } catch(closeNotifyErr: any) {
+                        log(`Close notification error (non-fatal): ${closeNotifyErr.message}`);
+                    }
                 }
 
                 await supabase.rpc('upsert_lead_memory', {
@@ -688,10 +750,11 @@ ${technicalRules}`;
                     log(`CRM status synced: ${newStage} → ${crmStatus}`);
                 }
 
-                log(`Lead Brain updated: stage=${newStage}, sentiment=${sentiment}, action=${nextAction}`);
-            } catch(memErr) {
+                log(`Lead Brain updated: stage=${newStage}, sentiment=${sentiment}, action=${nextAction}, objection=${objection}`);
+            } catch(memErr: any) {
                 log(`Lead Brain update error (non-fatal): ${memErr.message}`);
             }
+
         }
 
         // ===========================================

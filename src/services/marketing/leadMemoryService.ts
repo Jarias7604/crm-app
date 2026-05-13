@@ -123,6 +123,32 @@ export const leadMemoryService = {
         return data;
     },
 
+    /** Send a custom price offer to a lead via Telegram */
+    async sendPriceOffer(leadId: string, companyId: string, discountPct: number, originalPrice: number, plan: string) {
+        const finalPrice = (originalPrice * (1 - discountPct / 100)).toFixed(2);
+        const { data, error } = await supabase.functions.invoke('auto-followup', {
+            body: {
+                company_id: companyId,
+                force_lead_id: leadId,
+                custom_message: `Hola, hemos preparado una oferta especial exclusiva para ti 🎁\n\nPlan: *${plan}*\nPrecio original: $${originalPrice}/mes\n✨ *Tu precio especial: $${finalPrice}/mes* (${discountPct}% de descuento)\n\nEsta oferta es válida solo por 48 horas. ¿Te interesa proceder con este precio?`
+            }
+        });
+        if (error) throw error;
+        return data;
+    },
+
+    /** Get price objection leads for a company */
+    async getPriceObjections(companyId: string) {
+        const { data, error } = await supabase
+            .from('lead_ai_memory')
+            .select(`*, lead:leads(id, name, phone, company_name, status, assigned_to)`)
+            .eq('company_id', companyId)
+            .eq('last_objection', 'precio')
+            .order('updated_at', { ascending: false });
+        if (error) throw error;
+        return data || [];
+    },
+
     /** Get leads pending human escalation */
     async getEscalationQueue(companyId: string) {
         const { data, error } = await supabase

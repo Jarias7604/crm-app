@@ -75,8 +75,11 @@ export default function AiAgentCockpit() {
     const [metrics, setMetrics] = useState<CockpitMetrics | null>(null);
     const [memories, setMemories] = useState<(LeadMemory & { lead: any })[]>([]);
     const [escalations, setEscalations] = useState<(LeadMemory & { lead: any })[]>([]);
-    const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'escalations'>('overview');
+    const [priceObjections, setPriceObjections] = useState<(LeadMemory & { lead: any })[]>([]);
+    const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'escalations' | 'precios'>('overview');
     const [stageFilter, setStageFilter] = useState('all');
+    const [discounts, setDiscounts] = useState<Record<string, number>>({});
+    const [sendingOffer, setSendingOffer] = useState<string | null>(null);
     const [isRunning, setIsRunning] = useState(false);
     const [loading, setLoading] = useState(true);
     const [lastRun, setLastRun] = useState<string | null>(null);
@@ -84,14 +87,16 @@ export default function AiAgentCockpit() {
     const loadData = useCallback(async () => {
         if (!profile?.company_id) return;
         try {
-            const [met, mems, escs] = await Promise.all([
+            const [met, mems, escs, priceObjs] = await Promise.all([
                 leadMemoryService.getCockpitMetrics(profile.company_id),
                 leadMemoryService.getCompanyMemories(profile.company_id, { limit: 100 }),
                 leadMemoryService.getEscalationQueue(profile.company_id),
+                leadMemoryService.getPriceObjections(profile.company_id),
             ]);
             setMetrics(met);
             setMemories(mems as any);
             setEscalations(escs as any);
+            setPriceObjections(priceObjs as any);
         } catch (e: any) {
             console.error(e);
         } finally {
@@ -267,16 +272,23 @@ export default function AiAgentCockpit() {
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit mb-6">
+            <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit mb-6 flex-wrap">
                 {[
-                    { id: 'overview', label: 'Resumen', icon: Target },
-                    { id: 'leads', label: 'Leads con Memoria', icon: Brain },
-                    { id: 'escalations', label: `Escalar (${escalations.length})`, icon: AlertTriangle },
+                    { id: 'overview',    label: 'Resumen',                icon: Target },
+                    { id: 'leads',       label: 'Leads con Memoria',      icon: Brain },
+                    { id: 'escalations', label: `Escalar (${escalations.length})`,         icon: AlertTriangle },
+                    { id: 'precios',     label: `Objeciones Precio (${priceObjections.length})`, icon: TrendingUp },
                 ].map(tab => (
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id as any)}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[11px] font-black transition-all ${activeTab === tab.id ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[11px] font-black transition-all ${
+                            activeTab === tab.id
+                                ? tab.id === 'precios' ? 'bg-orange-500 shadow-sm text-white'
+                                : tab.id === 'escalations' ? 'bg-red-500 shadow-sm text-white'
+                                : 'bg-white shadow-sm text-slate-900'
+                                : 'text-slate-500 hover:text-slate-700'
+                        }`}
                     >
                         <tab.icon className="w-3.5 h-3.5" />
                         {tab.label}
@@ -453,6 +465,124 @@ export default function AiAgentCockpit() {
                     </div>
                 </div>
             )}
+
+            {/* ── Objeciones de Precio Tab ─────────────────────────── */}
+            {activeTab === 'precios' && (
+                <div className="space-y-4">
+                    {/* Header explainer */}
+                    <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 flex items-start gap-3">
+                        <TrendingUp className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
+                        <div>
+                            <p className="font-black text-orange-800 text-sm">Control de Objeciones por Precio</p>
+                            <p className="text-[12px] text-orange-600 mt-1">
+                                Leads que dijeron "está caro" o similar. Define un descuento y envía una oferta especial directamente a su Telegram.
+                                El lead recibirá el precio con descuento y una ventana de 48h para decidir.
+                            </p>
+                        </div>
+                    </div>
+
+                    {priceObjections.length === 0 ? (
+                        <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center">
+                            <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-3" />
+                            <p className="font-bold text-slate-700">¡Sin objeciones de precio activas!</p>
+                            <p className="text-sm text-slate-400 mt-1">Cuando un lead diga "está caro" aparecerá aquí.</p>
+                        </div>
+                    ) : (
+                        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                            {priceObjections.map((mem: any, idx) => {
+                                const discount = discounts[mem.lead_id] ?? 10;
+                                const originalPrice = parseFloat(mem.known_facts?.last_quoted_price || '89');
+                                const finalPrice = (originalPrice * (1 - discount / 100)).toFixed(2);
+                                const plan = mem.known_facts?.last_quoted_plan || 'Plan';
+                                const objectionText = mem.known_facts?.price_objection_text || mem.last_objection;
+                                const objectionDate = mem.known_facts?.price_objection_at
+                                    ? new Date(mem.known_facts.price_objection_at).toLocaleDateString('es')
+                                    : '—';
+
+                                return (
+                                    <div key={mem.id} className={`p-5 ${idx < priceObjections.length - 1 ? 'border-b border-slate-100' : ''}`}>
+                                        <div className="flex items-start gap-4">
+                                            {/* Avatar */}
+                                            <div className="w-11 h-11 rounded-xl bg-orange-100 flex items-center justify-center font-black text-orange-600 shrink-0 text-lg">
+                                                {mem.lead?.name?.[0] || '?'}
+                                            </div>
+
+                                            <div className="flex-1 min-w-0">
+                                                {/* Name + date */}
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="font-black text-slate-900 text-sm">{mem.lead?.name || 'Lead'}</span>
+                                                    <span className="text-[10px] text-slate-400">{mem.lead?.company_name}</span>
+                                                    <span className="ml-auto text-[10px] text-slate-300">{objectionDate}</span>
+                                                </div>
+
+                                                {/* What they said */}
+                                                {objectionText && (
+                                                    <div className="bg-slate-50 border border-slate-100 rounded-lg px-3 py-1.5 mb-3">
+                                                        <p className="text-[11px] text-slate-500 italic">"{objectionText}"</p>
+                                                    </div>
+                                                )}
+
+                                                {/* Price control */}
+                                                <div className="flex items-center gap-4 flex-wrap">
+                                                    <div className="flex-1 min-w-[200px]">
+                                                        <div className="flex items-center justify-between mb-1">
+                                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-wide">Descuento a ofrecer</label>
+                                                            <span className="text-[11px] font-black text-orange-600">{discount}%</span>
+                                                        </div>
+                                                        <input
+                                                            type="range" min={5} max={40} step={5}
+                                                            value={discount}
+                                                            onChange={e => setDiscounts(d => ({ ...d, [mem.lead_id]: Number(e.target.value) }))}
+                                                            className="w-full accent-orange-500"
+                                                        />
+                                                        <div className="flex justify-between text-[9px] text-slate-300 mt-0.5">
+                                                            <span>5%</span><span>40%</span>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Price preview */}
+                                                    <div className="text-right shrink-0">
+                                                        <p className="text-[10px] text-slate-400 line-through">${originalPrice}/mes</p>
+                                                        <p className="text-lg font-black text-emerald-600">${finalPrice}/mes</p>
+                                                        <p className="text-[9px] text-slate-400">{plan}</p>
+                                                    </div>
+
+                                                    {/* Send button */}
+                                                    <button
+                                                        disabled={sendingOffer === mem.lead_id}
+                                                        onClick={async () => {
+                                                            setSendingOffer(mem.lead_id);
+                                                            try {
+                                                                await leadMemoryService.sendPriceOffer(
+                                                                    mem.lead_id, profile!.company_id,
+                                                                    discount, originalPrice, plan
+                                                                );
+                                                                toast.success(`✅ Oferta de ${discount}% enviada a ${mem.lead?.name}`);
+                                                            } catch(e: any) {
+                                                                toast.error(e.message);
+                                                            } finally {
+                                                                setSendingOffer(null);
+                                                            }
+                                                        }}
+                                                        className="px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-[10px] font-black transition-all shadow-md shadow-orange-200 flex items-center gap-2 disabled:opacity-50 shrink-0"
+                                                    >
+                                                        {sendingOffer === mem.lead_id
+                                                            ? <RefreshCw className="w-3 h-3 animate-spin" />
+                                                            : <Zap className="w-3 h-3" />
+                                                        }
+                                                        Enviar Oferta
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
+
