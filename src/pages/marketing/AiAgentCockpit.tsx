@@ -40,22 +40,34 @@ function SentimentBar({ score }: { score: number }) {
     );
 }
 
-function MetricCard({ title, value, subtitle, icon: Icon, color, bg }: any) {
+function MetricCard({ title, value, subtitle, icon: Icon, color, bg, tooltip }: any) {
     return (
         <div className={`p-5 rounded-2xl border ${bg} border-transparent relative overflow-hidden`}>
             <div className="flex items-start justify-between">
-                <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">{title}</p>
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 mb-1">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">{title}</p>
+                        {tooltip && (
+                            <div className="relative group/tip">
+                                <span className="w-3.5 h-3.5 rounded-full bg-slate-200 text-slate-500 text-[8px] font-black flex items-center justify-center cursor-help shrink-0">?</span>
+                                <div className="absolute left-0 bottom-full mb-1.5 z-50 hidden group-hover/tip:block w-56 bg-slate-900 text-white text-[10px] font-medium rounded-xl p-3 shadow-xl leading-relaxed pointer-events-none">
+                                    {tooltip}
+                                    <div className="absolute top-full left-3 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-900" />
+                                </div>
+                            </div>
+                        )}
+                    </div>
                     <p className={`text-3xl font-black ${color}`}>{value}</p>
                     {subtitle && <p className="text-[11px] text-slate-500 mt-1 font-medium">{subtitle}</p>}
                 </div>
-                <div className={`w-10 h-10 rounded-xl ${color.replace('text-', 'bg-').replace('600', '100')} flex items-center justify-center`}>
+                <div className={`w-10 h-10 rounded-xl ${color.replace('text-', 'bg-').replace('600', '100')} flex items-center justify-center shrink-0`}>
                     <Icon className={`w-5 h-5 ${color}`} />
                 </div>
             </div>
         </div>
     );
 }
+
 
 export default function AiAgentCockpit() {
     const { profile } = useAuth();
@@ -191,11 +203,22 @@ export default function AiAgentCockpit() {
                 </div>
             </div>
 
-            {/* Metrics Grid */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <MetricCard title="Total Leads Rastreados" value={metrics?.total_leads_tracked || 0} icon={Users} color="text-blue-600" bg="bg-white" subtitle="con memoria activa" />
-                <MetricCard title="En Seguimiento Auto" value={metrics?.en_seguimiento_auto || 0} icon={Activity} color="text-violet-600" bg="bg-white" subtitle="bot activo" />
-                <MetricCard title="Sentiment Promedio" value={`${metrics?.avg_sentiment || 0}%`} icon={Star} color="text-amber-600" bg="bg-white" subtitle="engagement promedio" />
+                <MetricCard
+                    title="Total Leads Rastreados" value={metrics?.total_leads_tracked || 0}
+                    icon={Users} color="text-blue-600" bg="bg-white" subtitle="con memoria activa"
+                    tooltip="Leads que el bot conoce activamente: nombre, empresa, volumen de DTEs, si ya cotizaron y más. El bot los recuerda en cada conversación."
+                />
+                <MetricCard
+                    title="En Seguimiento Auto" value={metrics?.en_seguimiento_auto || 0}
+                    icon={Activity} color="text-violet-600" bg="bg-white" subtitle="bot activo"
+                    tooltip="Leads donde Sofía está enviando mensajes automáticos de seguimiento porque llevan más de 24h sin responder. Si es 55, el bot está persiguiendo 55 prospectos mientras tú duermes."
+                />
+                <MetricCard
+                    title="Sentiment Promedio" value={`${metrics?.avg_sentiment || 0}%`}
+                    icon={Star} color="text-amber-600" bg="bg-white" subtitle="engagement promedio"
+                    tooltip="Estado de ánimo promedio de todos los leads. 70%+ = entusiasmados (listos para cerrar). 40-69% = neutrales. Menos del 40% = fríos o con objeciones de precio."
+                />
                 <MetricCard
                     title="Pendientes Escalar"
                     value={metrics?.pendientes_escalar || 0}
@@ -203,6 +226,7 @@ export default function AiAgentCockpit() {
                     color={metrics?.pendientes_escalar ? 'text-red-600' : 'text-emerald-600'}
                     bg={metrics?.pendientes_escalar ? 'bg-red-50' : 'bg-white'}
                     subtitle="requieren humano"
+                    tooltip="Leads que el bot ya no puede atender solo: agotó sus 3 intentos sin respuesta o detectó que el lead pide atención humana. Revisa la pestaña 'Escalar' para contactarlos."
                 />
             </div>
 

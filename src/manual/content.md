@@ -245,7 +245,107 @@ Sí. Pasa el mouse sobre el badge de score y aparecerá un tooltip con los 7 fac
 
 ---
 
-## 11. Preguntas Frecuentes (FAQ)
+## 11. Cockpit del Agente AI — Centro de Mando Autónomo
+
+### ¿Qué es el Cockpit del Agente AI?
+
+El Cockpit es el **panel de control en tiempo real** donde puedes monitorear, supervisar y controlar todo lo que hace el agente de ventas autónomo (Sofía). Desde aquí ves cuántos leads está trabajando el bot, en qué etapa están, cómo se sienten, y si alguno necesita atención humana.
+
+> **Acceso:** Marketing Hub → Cockpit AI — o directo en `/marketing/cockpit`
+
+---
+
+### 📊 Las 4 Métricas Principales — ¿Qué significa cada una?
+
+| Métrica | Ícono | Qué significa exactamente |
+|---------|-------|----------------------------|
+| **Total Leads Rastreados** | 👥 | Cantidad de leads que tienen "memoria" activa. El bot los conoce: sabe su nombre, empresa, cuántos DTEs emiten, si ya cotizaron, si pusieron objeción de precio, etc. |
+| **En Seguimiento Auto** | ⚡ | Leads donde el bot está enviando mensajes automáticos porque llevan más de 24h sin responder. Si el número es 55, el bot está persiguiendo activamente 55 prospectos mientras tú duermes. |
+| **Sentiment Promedio** | ⭐ | Calificación de 0-100% del "estado de ánimo" promedio de todos los leads. 70%+ = entusiasmados. 40-69% = neutrales. Menos de 40% = fríos o con objeciones. |
+| **Pendientes Escalar** | ⚠️ | Leads que el bot ya no puede manejar solo. Agotó todos sus intentos sin respuesta o detectó una situación compleja. Requieren que tú o tu equipo los contacten directamente. |
+
+**Ejemplo práctico:**
+- Total: 57 → El bot conoce y lleva seguimiento de 57 personas
+- En Seguimiento Auto: 55 → 55 de esas personas están siendo contactadas automáticamente
+- Sentiment: 50% → La mayoría está neutral, hay oportunidad de mejorar el pitch
+- Pendientes Escalar: 0 → ¡Todo bajo control! El bot está manejando todo sin problemas 🎉
+
+---
+
+### 🔄 Pipeline del Bot — Las 7 Etapas
+
+Cada lead en la memoria del bot tiene una **etapa de conversación** que avanza automáticamente según cómo interactúa:
+
+| Etapa | Qué significa | Qué hace el bot |
+|-------|---------------|------------------|
+| **Nuevo** | Primer contacto — el bot no sabe nada del lead aún | Presenta a Sofía, pregunta nombre y empresa |
+| **Calificado** | Ya tiene nombre, empresa y volumen de DTEs | Analiza qué plan le conviene y prepara propuesta |
+| **Cotizado** | Ya recibió el precio y propuesta comercial | Hace seguimiento de la propuesta enviada |
+| **Seguimiento** | Sigue caliente pero sin tomar decisión todavía | Envía recordatorios con urgencia y escasez |
+| **Negociación** | Está discutiendo precio o condiciones | Usa técnicas de cierre y manejo de objeciones |
+| **Cerrado ✓** | Compró o firmó contrato | Celebra y pasa al módulo de Clientes |
+| **Perdido** | No hubo acuerdo — descartado temporalmente | Para el seguimiento automático |
+
+---
+
+### ⚠️ ¿Cuándo un Lead "Requiere Atención Humana"?
+
+Hay 3 situaciones que hacen que el bot levante la bandera roja y pida ayuda humana:
+
+**Situación 1 — Agotó todos los intentos**
+```
+Sofía envía mensaje #1 → Sin respuesta → espera 24h
+Sofía envía mensaje #2 → Sin respuesta → espera 72h
+Sofía envía mensaje #3 → Sin respuesta → espera 168h
+→ El bot SE DETIENE y el lead aparece en "Pendientes Escalar"
+```
+
+**Situación 2 — Objeción compleja detectada**
+Cuando el lead dice cosas como "quiero hablar con el gerente", "manden un vendedor a mi oficina", o "necesito una reunión formal" — el bot detecta que necesita presencia humana.
+
+**Situación 3 — Sentiment muy bajo sin actividad**
+Si el engagement cae y el lead lleva días sin interactuar con ningún mensaje.
+
+**¿Qué pasa cuando escala?**
+1. El lead aparece en la pestaña **"Escalar"** del Cockpit resaltado en rojo
+2. El CRM agrega una nota automática al lead: *"⚠️ IA ESCALÓ: Sin respuesta tras 3 seguimientos. Requiere contacto humano."*
+3. El bot **para de enviar mensajes** — no molesta más al lead
+4. Tú puedes usar **"Abrir Chat"** para retomar la conversación o **"Reiniciar Bot"** para que Sofía intente de nuevo
+
+---
+
+### 🤖 Seguimientos Automáticos — Configuración Dinámica
+
+El sistema de seguimientos es **completamente configurable** sin tocar código. Accede desde el ícono ⚙️ en el Cockpit:
+
+| Configuración | Valor por defecto | Qué controla |
+|---------------|:-----------------:|---------------|
+| 1er seguimiento | **24 horas** | Cuánto tiempo espera antes del primer recordatorio |
+| 2do seguimiento | **72 horas** | Tiempo entre el 1er y 2do mensaje |
+| 3er seguimiento | **168 horas (7 días)** | Tiempo antes del último intento |
+| Máx. intentos | **3** | Cuántos mensajes envía antes de escalar |
+| Solo horario hábil | **Desactivado** | Si activas esto, solo envía Lun-Vie 8am-6pm |
+| Pausar si ya cotizó | **Desactivado** | Pausa el seguimiento automático si ya hay propuesta enviada |
+| Templates custom | **Auto-inteligente** | Deja en blanco para que Sofía genere mensajes según el contexto |
+
+> **Consejo profesional:** Si quieres probar en vez de 24h usar 36h, simplemente cambia el valor y guarda. La próxima ejecución ya usa el nuevo tiempo. No necesitas tocar código.
+
+---
+
+### ▶️ "Ejecutar Seguimientos" — ¿Qué hace exactamente ese botón?
+
+Cuando presionas **EJECUTAR SEGUIMIENTOS**, el sistema:
+1. Revisa TODAS las conversaciones activas (ejemplo: 58 conversaciones)
+2. Para cada una, verifica si pasaron las horas configuradas desde el último contacto
+3. Si el lead no respondió y pasó el tiempo → le envía el mensaje de seguimiento por Telegram/WhatsApp
+4. Actualiza la memoria del bot con el nuevo estado
+5. Te muestra un resumen: *"56 seguimientos enviados, 2 omitidos"*
+
+Este botón también corre automáticamente cada 4 horas en el servidor — no necesitas hacerlo manualmente a menos que quieras un run inmediato.
+
+---
+
+## 12. Preguntas Frecuentes (FAQ)
 
 ### ¿Cómo agrego un nuevo lead manualmente?
 Ve a **Leads → Nuevo Lead**, completa el formulario con nombre, teléfono, fuente y etapa inicial, y haz clic en **Guardar**. El sistema le asignará un AI Score automáticamente.
@@ -270,4 +370,4 @@ Es el **AI Lead Score**. Indica qué tan probable es que el lead cierre. 🔥 = 
 
 ---
 
-*Arias CRM Professional — Documentación v4.0 — Actualizada Mayo 2026*
+*Arias CRM Professional — Documentación v5.0 — Actualizada Mayo 2026*
