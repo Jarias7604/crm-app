@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
     Brain, Zap, Users, TrendingUp, AlertTriangle, CheckCircle2,
@@ -342,7 +342,102 @@ export default function AiAgentCockpit() {
                 ))}
             </div>
 
-            {/* ── Conversiones Tab ─────────────────────────────────── */}
+            {/* Objeciones Tab */}
+            {activeTab === 'objeciones' && (
+                <div className="space-y-6">
+                    <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 flex items-start gap-3">
+                        <PieChart className="w-5 h-5 text-indigo-500 shrink-0 mt-0.5" />
+                        <div>
+                            <p className="font-black text-indigo-800 text-sm">Análisis de Objeciones</p>
+                            <p className="text-[12px] text-indigo-600 mt-1">Agrupación automática. Muestra cuántos leads de cada tipo finalmente cerraron.</p>
+                        </div>
+                    </div>
+                    {objAnalysis.length === 0 ? (
+                        <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center">
+                            <PieChart className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                            <p className="font-bold text-slate-500">Sin datos de objeciones aún</p>
+                            <p className="text-sm text-slate-400 mt-1">Aparecerá cuando Sofía detecte objeciones en conversaciones.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 text-center">
+                                    <p className="text-3xl font-black text-slate-900">{objAnalysis.reduce((s, r) => s + r.count, 0)}</p>
+                                    <p className="text-[10px] text-slate-400 font-black uppercase mt-1">Total con objeción</p>
+                                </div>
+                                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 text-center">
+                                    <p className="text-3xl font-black text-emerald-600">{objAnalysis.reduce((s, r) => s + r.cerrados, 0)}</p>
+                                    <p className="text-[10px] text-slate-400 font-black uppercase mt-1">Cerraron igual</p>
+                                </div>
+                                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 text-center">
+                                    <p className="text-3xl font-black text-violet-600">
+                                        {(() => { const t = objAnalysis.reduce((s,r)=>s+r.count,0); const c = objAnalysis.reduce((s,r)=>s+r.cerrados,0); return t>0?Math.round((c/t)*100):0; })()}%
+                                    </p>
+                                    <p className="text-[10px] text-slate-400 font-black uppercase mt-1">Tasa cierre global</p>
+                                </div>
+                                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 text-center">
+                                    <p className="text-2xl font-black text-red-500">{[...objAnalysis].sort((a,b)=>b.count-a.count)[0]?.emoji}</p>
+                                    <p className="text-[10px] text-slate-400 font-black uppercase mt-1">Tipo más frecuente</p>
+                                </div>
+                            </div>
+                            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                                <div className="px-5 py-4 border-b border-slate-50">
+                                    <h3 className="font-black text-slate-900 flex items-center gap-2 text-sm">
+                                        <PieChart className="w-4 h-4 text-indigo-500" /> Desglose por Categoría
+                                    </h3>
+                                </div>
+                                <div className="p-5 space-y-5">
+                                    {[...objAnalysis].sort((a,b)=>b.count-a.count).map((row) => {
+                                        const rate = row.count > 0 ? Math.round((row.cerrados / row.count) * 100) : 0;
+                                        const maxCount = Math.max(...objAnalysis.map(r => r.count), 1);
+                                        return (
+                                            <div key={row.tipo}>
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-lg">{row.emoji}</span>
+                                                        <span className="text-sm font-bold text-slate-800">{row.tipo}</span>
+                                                        <span className="text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{row.count} leads</span>
+                                                    </div>
+                                                    <span className={`text-[11px] font-black ${rate>=30?'text-emerald-600':rate>=15?'text-amber-600':'text-red-500'}`}>
+                                                        {row.cerrados} cerraron · {rate}%
+                                                    </span>
+                                                </div>
+                                                <div className="h-3 bg-slate-100 rounded-full overflow-hidden relative">
+                                                    <div className={`absolute inset-y-0 left-0 ${row.color} opacity-20 rounded-full`}
+                                                        style={{ width: `${Math.min((row.count/maxCount)*100,100)}%` }} />
+                                                    <div className={`absolute inset-y-0 left-0 ${row.color} rounded-full transition-all`}
+                                                        style={{ width: `${Math.min(rate,100)}%` }} />
+                                                </div>
+                                                <p className="text-[9px] text-slate-300 mt-0.5 text-center">tasa de cierre a pesar de objeción</p>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                            {(() => {
+                                const best  = [...objAnalysis].sort((a,b)=>(b.count>0?b.cerrados/b.count:0)-(a.count>0?a.cerrados/a.count:0))[0];
+                                const worst = [...objAnalysis].filter(r=>r.count>=2).sort((a,b)=>(a.count>0?a.cerrados/a.count:0)-(b.count>0?b.cerrados/b.count:0))[0];
+                                return (
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                                        {best && <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4">
+                                            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">💡 Mejor conversión</p>
+                                            <p className="font-bold text-emerald-800">{best.emoji} {best.tipo}</p>
+                                            <p className="text-[11px] text-emerald-600 mt-1">{best.cerrados}/{best.count} cerraron ({best.count>0?Math.round((best.cerrados/best.count)*100):0}%). Sigue esta estrategia.</p>
+                                        </div>}
+                                        {worst && worst.tipo !== best?.tipo && <div className="bg-red-50 border border-red-100 rounded-2xl p-4">
+                                            <p className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-1">⚠️ Más difícil</p>
+                                            <p className="font-bold text-red-800">{worst.emoji} {worst.tipo}</p>
+                                            <p className="text-[11px] text-red-600 mt-1">Solo {worst.cerrados}/{worst.count} cierran ({worst.count>0?Math.round((worst.cerrados/worst.count)*100):0}%). Necesita estrategia específica.</p>
+                                        </div>}
+                                    </div>
+                                );
+                            })()}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Conversiones Tab */}
             {activeTab === 'conversiones' && (
                 <div className="space-y-6">
                     {/* KPI cards */}
