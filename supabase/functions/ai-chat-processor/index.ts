@@ -18,17 +18,94 @@ const supabase = createClient(
 
 console.log(`[AI-Processor v52-lead-brain] Initialized`);
 
-// ─── Sentiment Detection ──────────────────────────────────────────────────────────────────────────────
-function detectSentiment(text: string): number {
-    const t = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const positive = ['me interesa','quiero','perfecto','excelente','ok','de acuerdo','claro','si','adelante','listo','cuando empezamos','genial','buenisimo'];
-    const negative = ['caro','muy caro','no puedo','no tengo','no me interesa','luego','despues','pensarlo','no por ahora','costoso','presupuesto','no'];
-    const urgent   = ['hacienda','notificacion','multa','urgente','pronto','rapido','ya','hoy','inmediato'];
-    let score = 50;
-    if (positive.some(p => t.includes(p))) score += 20;
-    if (urgent.some(u => t.includes(u))) score += 15;
-    if (negative.some(n => t.includes(n))) score -= 20;
-    return Math.max(0, Math.min(100, score));
+// ─── Sentiment Detection v2 — Multi-factor weighted engine ───────────────────
+function detectSentiment(text: string, historicalScore = 50): number {
+    const t = text.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // strip accents
+        .replace(/[!?¡¿]/g, ' $& ');                        // isolate punctuation
+
+    // ── Positive signals (weighted) ──
+    const strongPositive = [
+        'quiero contratar','vamos adelante','cuando empezamos','lista para contratar',
+        'me convencio','excelente propuesta','perfecto precio','de acuerdo con todo',
+        'donde firmo','como pagamos','cuanto es la cuenta','aceptamos la propuesta'
+    ];
+    const mediumPositive = [
+        'me interesa','muy bueno','que bien','genial','buenisimo','excelente',
+        'perfecto','adelante','listo','claro que si','si quiero','me gusta',
+        'suena bien','lo necesito','urge','lo quiero','vamos','ok suena bien',
+        'si por favor','voy a consultar con','lo vemos','tengamos una llamada'
+    ];
+    const lightPositive = [
+        'ok','si','bien','dale','interesante','cuanto cuesta','cuales son los planes',
+        'como funciona','mandame informacion','enviame','me puedes decir','hola'
+    ];
+
+    // ── Negative signals (weighted) ──
+    const strongNegative = [
+        'no me interesa','no gracias','deje de escribirme','no voy a comprar',
+        'ya tenemos proveedor','no lo necesitamos','no sirve para nosotros',
+        'muy caro no podemos','fuera de presupuesto total','vamos a desistir'
+    ];
+    const mediumNegative = [
+        'muy caro','caro','costoso','no tenemos presupuesto','no puedo',
+        'lo pensare','lo dejamos para despues','despues lo vemos','no por ahora',
+        'luego','mas adelante','no me alcanza','no lo veo viable','no convence',
+        'prefiero otro','ya tengo','mejor lo pienso','voy a consultar precios'
+    ];
+    const lightNegative = [
+        'no','quizas','tal vez','no se','a ver','poco dinero','limitado'
+    ];
+
+    // ── Urgency boost (context-sensitive) ──
+    const urgency = [
+        'hacienda','multa','notificacion','sancion','urgente','ya','hoy mismo',
+        'pronto','rapido','inmediato','necesito ya','cuanto antes','esta semana',
+        'lo necesito hoy','vencimiento','plazo'
+    ];
+
+    // ── Escalation / frustration ──
+    const frustration = [
+        'me tiene cansado','pesado','insistente','deje de molestar',
+        'ya entendi','basta','para','no mas','harto'
+    ];
+
+    // ── Emoji signals ──
+    const positiveEmoji = /[😀😃😄😁🤩😍🙌👍✅🎉🔥💪🚀]/u.test(text);
+    const negativeEmoji = /[😡🤬😤😒👎❌🚫💸]/u.test(text).valueOf();
+
+    let delta = 0;
+
+    // Score accumulation
+    if (strongPositive.some(p => t.includes(p)))  delta += 35;
+    if (mediumPositive.some(p => t.includes(p)))   delta += 18;
+    if (lightPositive.some(p => t.includes(p)))    delta += 7;
+
+    if (strongNegative.some(n => t.includes(n)))   delta -= 35;
+    if (mediumNegative.some(n => t.includes(n)))   delta -= 18;
+    if (lightNegative.some(n => t.includes(n)))    delta -= 5;
+
+    if (urgency.some(u => t.includes(u)))          delta += 12;
+    if (frustration.some(f => t.includes(f)))      delta -= 25;
+
+    if (positiveEmoji)  delta += 8;
+    if (negativeEmoji)  delta -= 8;
+
+    // Question mark = engaged (positive signal)
+    if (t.includes('?') && delta >= 0) delta += 4;
+
+    // Negation reversal: "no me interesa" vs "si me interesa"
+    const hasNegation = /\b(no|nunca|jamas|tampoco)\b/.test(t);
+    if (hasNegation && delta > 0) delta = -Math.abs(delta) * 0.6;
+
+    // Message length bonus — longer = more engaged
+    if (text.length > 80 && delta > 0)  delta += 5;
+    if (text.length < 5)                delta -= 3;  // very short = disengaged
+
+    // ── Smooth blend with historical score (70% history, 30% new signal) ──
+    // Prevents wild swings from one message
+    const newScore = historicalScore + (delta * 0.6);
+    return Math.round(Math.max(5, Math.min(98, newScore)));
 }
 
 function detectStage(aiResponse: string, userMsg: string, currentStage: string): string {
@@ -44,10 +121,12 @@ function detectNextAction(sentiment: number, stage: string, userMsg: string): st
     const u = userMsg.toLowerCase();
     if (u.includes('demo') || u.includes('reunion') || u.includes('hablar')) return 'demo';
     if (stage === 'cotizado' && sentiment >= 70) return 'seguimiento';
-    if (stage === 'cotizado' && sentiment < 40) return 'escalar_humano';
+    if (stage === 'cotizado' && sentiment < 35)  return 'escalar_humano';
+    if (sentiment < 25)                          return 'escalar_humano';
     if (stage === 'calificado') return 'enviar_propuesta';
     return 'seguimiento';
 }
+
 
 // ─── Build rich catalog string from pricing_items ─────────────────────────────
 function buildCatalogContext(pricingItems: any[]): string {
@@ -557,7 +636,8 @@ ${technicalRules}`;
         // ===========================================
         if (lead?.id) {
             try {
-                const sentiment = detectSentiment(userMessage);
+                const historicalSentiment = leadMemory?.sentiment_score ?? 50;
+                const sentiment = detectSentiment(userMessage, historicalSentiment);
                 const newStage  = detectStage(cleanText, userMessage, leadMemory?.conversation_stage || 'nuevo');
                 const nextAction = detectNextAction(sentiment, newStage, userMessage);
 
