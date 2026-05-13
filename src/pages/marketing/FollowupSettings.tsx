@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
     ArrowLeft, Save, Play, Clock, ToggleLeft, ToggleRight,
     MessageSquare, AlertTriangle, RefreshCw, CheckCircle2,
-    ChevronDown, ChevronUp, Zap, Users, Timer
+    ChevronDown, ChevronUp, Zap, Users, Timer, FlaskConical, BarChart2, RotateCcw
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { followupSettingsService, type FollowupSettings, DEFAULT_FOLLOWUP_SETTINGS } from '../../services/marketing/followupSettingsService';
@@ -304,6 +304,98 @@ export default function FollowupSettingsPage() {
                         <TemplateEditor num={1} value={settings.followup_1_template} onChange={v => update('followup_1_template', v)} />
                         <TemplateEditor num={2} value={settings.followup_2_template} onChange={v => update('followup_2_template', v)} />
                         <TemplateEditor num={3} value={settings.followup_3_template} onChange={v => update('followup_3_template', v)} />
+                    </div>
+
+                    {/* ── A/B Testing Panel ─────────────────────────────── */}
+                    <div className="bg-white p-6 rounded-[24px] border border-gray-100 shadow-xl space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-sm font-black text-gray-900 flex items-center gap-2">
+                                <FlaskConical className="w-4 h-4 text-violet-500" />
+                                A/B Testing de Templates
+                                <span className="text-[9px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full ml-1">Experimental</span>
+                            </h2>
+                            <button
+                                onClick={() => update('ab_testing_enabled', !settings.ab_testing_enabled)}
+                                className="ml-4 shrink-0"
+                            >
+                                {settings.ab_testing_enabled
+                                    ? <ToggleRight className="w-8 h-8 text-violet-500" />
+                                    : <ToggleLeft  className="w-8 h-8 text-slate-300" />}
+                            </button>
+                        </div>
+
+                        {settings.ab_testing_enabled ? (
+                            <>
+                                <div className="bg-violet-50 border border-violet-100 rounded-xl p-3 text-[11px] text-violet-700 font-medium leading-relaxed">
+                                    🧪 Sofía alternará automáticamente entre <strong>Template A</strong> (los de arriba) y <strong>Template B</strong> (los de abajo). El sistema registra cuál genera más respuestas.
+                                </div>
+
+                                {/* Template B editors */}
+                                <div className="space-y-3">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Variante B</p>
+                                    {[1, 2, 3].map(num => {
+                                        const key = `followup_${num}_template_b` as keyof typeof settings;
+                                        const val = settings[key] as string | null;
+                                        return (
+                                            <TemplateEditor
+                                                key={`b-${num}`}
+                                                num={num}
+                                                value={val}
+                                                onChange={v => update(key, v)}
+                                            />
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Live A/B Stats */}
+                                <div className="bg-slate-50 rounded-2xl p-4 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+                                            <BarChart2 className="w-3.5 h-3.5" /> Estadísticas en vivo
+                                        </p>
+                                        <button
+                                            onClick={async () => {
+                                                if (!confirm('¿Reiniciar contadores A/B a cero?')) return;
+                                                await followupSettingsService.resetAbStats(settings.company_id);
+                                                update('ab_stats', { a_sent: 0, b_sent: 0, a_responses: 0, b_responses: 0 });
+                                                toast.success('Contadores reiniciados');
+                                            }}
+                                            className="text-[9px] text-slate-400 hover:text-red-500 flex items-center gap-1 transition-colors"
+                                        >
+                                            <RotateCcw className="w-3 h-3" /> Reiniciar
+                                        </button>
+                                    </div>
+                                    {(['a', 'b'] as const).map(variant => {
+                                        const sent      = settings.ab_stats?.[`${variant}_sent`]      || 0;
+                                        const responses = settings.ab_stats?.[`${variant}_responses`] || 0;
+                                        const rate      = sent > 0 ? Math.round((responses / sent) * 100) : 0;
+                                        const barColor  = variant === 'a' ? 'bg-blue-500' : 'bg-violet-500';
+                                        const textColor = variant === 'a' ? 'text-blue-600' : 'text-violet-600';
+                                        return (
+                                            <div key={variant}>
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <span className={`text-[10px] font-black uppercase ${textColor}`}>Variante {variant.toUpperCase()}</span>
+                                                    <span className="text-[10px] text-slate-400">{sent} enviados · {responses} respuestas · <strong className={textColor}>{rate}% respuesta</strong></span>
+                                                </div>
+                                                <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                                                    <div
+                                                        className={`h-full rounded-full transition-all ${barColor}`}
+                                                        style={{ width: `${Math.min(rate, 100)}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                    {(settings.ab_stats?.a_sent || 0) + (settings.ab_stats?.b_sent || 0) === 0 && (
+                                        <p className="text-[10px] text-slate-400 text-center pt-1">Los datos aparecerán cuando Sofía empiece a enviar seguimientos.</p>
+                                    )}
+                                </div>
+                            </>
+                        ) : (
+                            <p className="text-[11px] text-slate-400">
+                                Activa el A/B testing para que Sofía pruebe dos versiones de cada mensaje y descubras cuál convierte mejor.
+                            </p>
+                        )}
                     </div>
                 </div>
 

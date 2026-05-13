@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
     Brain, Zap, Users, TrendingUp, AlertTriangle, CheckCircle2,
     Clock, ArrowLeft, RefreshCw, Play, Pause, ArrowRight,
     MessageSquare, Target, Star, Activity, ChevronRight, Bot, Settings2, Trash2,
-    BarChart2, DollarSign, Percent, Award
+    BarChart2, DollarSign, Percent, Award, PieChart
 } from 'lucide-react';
 import { leadMemoryService, type CockpitMetrics, type LeadMemory, type ConversionReport } from '../../services/marketing/leadMemoryService';
 import { useAuth } from '../../auth/AuthProvider';
@@ -77,9 +77,10 @@ export default function AiAgentCockpit() {
     const [memories, setMemories] = useState<(LeadMemory & { lead: any })[]>([]);
     const [escalations, setEscalations] = useState<(LeadMemory & { lead: any })[]>([]);
     const [priceObjections, setPriceObjections] = useState<(LeadMemory & { lead: any })[]>([]);
-    const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'escalations' | 'precios' | 'conversiones'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'escalations' | 'precios' | 'conversiones' | 'objeciones'>('overview');
     const [convReport, setConvReport] = useState<ConversionReport | null>(null);
     const [loadingReport, setLoadingReport] = useState(false);
+    const [objAnalysis, setObjAnalysis] = useState<{ tipo: string; count: number; cerrados: number; color: string; emoji: string }[]>([]);
     const [stageFilter, setStageFilter] = useState('all');
     const [discounts, setDiscounts] = useState<Record<string, number>>({});
     const [sendingOffer, setSendingOffer] = useState<string | null>(null);
@@ -120,6 +121,29 @@ export default function AiAgentCockpit() {
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [profile?.company_id]);
+
+    // Build objection analysis from priceObjections + all memories
+    useEffect(() => {
+        if (!memories.length) return;
+        const CATEGORIES = [
+            { tipo: 'Precio / Costo',        keywords: ['caro', 'precio', 'expensive', 'costoso', 'barato', 'descuento'], color: 'bg-red-400',    emoji: '💸' },
+            { tipo: 'Necesita aprobación',   keywords: ['jefe', 'aprobación', 'directivo', 'permiso', 'gerente', 'socio'], color: 'bg-amber-400', emoji: '👔' },
+            { tipo: 'No es prioridad',       keywords: ['después', 'luego', 'no es el momento', 'ocupado', 'busy'],        color: 'bg-blue-400',  emoji: '📅' },
+            { tipo: 'Ya tiene solución',     keywords: ['ya tengo', 'ya uso', 'contrato', 'proveedor'],                    color: 'bg-violet-400', emoji: '🔄' },
+            { tipo: 'Sin respuesta',         keywords: [],  color: 'bg-slate-400', emoji: '🔇' },
+        ];
+        const results = CATEGORIES.map(cat => {
+            const matched = cat.keywords.length === 0
+                ? memories.filter(m => !m.last_objection && (m.followup_count || 0) >= 2)
+                : memories.filter(m => {
+                    const obj = (m.last_objection || '').toLowerCase();
+                    return cat.keywords.some(k => obj.includes(k));
+                });
+            const cerrados = matched.filter(m => m.conversation_stage === 'cerrado' || (m as any).lead?.status === 'Cliente').length;
+            return { tipo: cat.tipo, count: matched.length, cerrados, color: cat.color, emoji: cat.emoji };
+        }).filter(r => r.count > 0);
+        setObjAnalysis(results);
+    }, [memories]);
 
     useEffect(() => { loadData(); }, [loadData]);
     useEffect(() => { if (activeTab === 'conversiones' && !convReport) loadConversionReport(); }, [activeTab, convReport, loadConversionReport]);
@@ -295,8 +319,9 @@ export default function AiAgentCockpit() {
                     { id: 'overview',      label: 'Resumen',                              icon: Target },
                     { id: 'leads',         label: 'Leads con Memoria',                    icon: Brain },
                     { id: 'conversiones',  label: 'Conversiones',                         icon: BarChart2 },
+                    { id: 'objeciones',    label: 'Objeciones',                           icon: PieChart },
                     { id: 'escalations',   label: `Escalar (${escalations.length})`,      icon: AlertTriangle },
-                    { id: 'precios',       label: `Objeciones (${priceObjections.length})`, icon: TrendingUp },
+                    { id: 'precios',       label: `Ofertas (${priceObjections.length})`,  icon: TrendingUp },
                 ].map(tab => (
                     <button
                         key={tab.id}
@@ -306,6 +331,7 @@ export default function AiAgentCockpit() {
                                 ? tab.id === 'precios'      ? 'bg-orange-500 shadow-sm text-white'
                                 : tab.id === 'escalations'  ? 'bg-red-500 shadow-sm text-white'
                                 : tab.id === 'conversiones' ? 'bg-emerald-600 shadow-sm text-white'
+                                : tab.id === 'objeciones'   ? 'bg-indigo-600 shadow-sm text-white'
                                 : 'bg-white shadow-sm text-slate-900'
                                 : 'text-slate-500 hover:text-slate-700'
                         }`}
@@ -762,4 +788,5 @@ export default function AiAgentCockpit() {
         </div>
     );
 }
+
 

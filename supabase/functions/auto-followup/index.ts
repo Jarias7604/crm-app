@@ -28,6 +28,11 @@ const DEFAULT_SETTINGS = {
     followup_2_template:   null,
     followup_3_template:   null,
     is_active:             true,
+    // A/B Testing
+    ab_testing_enabled:    false,
+    followup_1_template_b: null,
+    followup_2_template_b: null,
+    followup_3_template_b: null,
 };
 
 // ── Business hours check ───────────────────────────────────────────────────
@@ -43,8 +48,14 @@ function isBusinessHours(tz: string): boolean {
     return !['Sat', 'Sun'].includes(day) && hour >= 8 && hour < 18;
 }
 
-// ── Build followup message (custom template or smart built-in) ────────────
-function buildFollowupMessage(memory: any, lead: any, followupNum: number, settings: typeof DEFAULT_SETTINGS): string {
+// ── Build followup message — supports A/B variant selection ─────────────
+function buildFollowupMessage(
+    memory: any,
+    lead: any,
+    followupNum: number,
+    settings: typeof DEFAULT_SETTINGS,
+    variant: 'a' | 'b' = 'a'
+): string {
     const name      = lead?.name?.split(' ')[0] || 'estimado cliente';
     const stage     = memory?.conversation_stage || 'nuevo';
     const objection = memory?.last_objection || '';
@@ -53,12 +64,19 @@ function buildFollowupMessage(memory: any, lead: any, followupNum: number, setti
     const empresa   = lead?.company_name || facts?.empresa_mencionada || 'su empresa';
     const plan      = facts?.plan_sugerido || 'el plan que le recomendé';
 
-    // Use custom template if admin configured one
-    const templateMap: Record<number, string | null> = {
-        1: settings.followup_1_template,
-        2: settings.followup_2_template,
-        3: settings.followup_3_template,
-    };
+    // Template A (original) or B depending on variant
+    const templateMap: Record<number, string | null> = variant === 'b'
+        ? {
+            1: (settings as any).followup_1_template_b,
+            2: (settings as any).followup_2_template_b,
+            3: (settings as any).followup_3_template_b,
+        }
+        : {
+            1: settings.followup_1_template,
+            2: settings.followup_2_template,
+            3: settings.followup_3_template,
+        };
+
     const tpl = templateMap[followupNum] || null;
     if (tpl) {
         return tpl
@@ -67,7 +85,7 @@ function buildFollowupMessage(memory: any, lead: any, followupNum: number, setti
             .replace(/{plan}/gi, plan);
     }
 
-    // Smart built-in messages
+    // Smart built-in messages (same for both variants unless custom template set)
     if (followupNum === 1) {
         if (stage === 'cotizado') return `Hola ${name} 👋 Solo quería confirmar si tuvo oportunidad de revisar la propuesta. Quedo disponible para cualquier duda — estoy aquí para que la decisión sea más sencilla. 😊`;
         if (objection.includes('caro') || sentiment < 40) return `Hola ${name}! Estuve pensando en su situación y quería comentarle que tenemos un plan de cuotas a 12 meses que hace la inversión mucho más cómoda. ¿Le cuento los detalles?`;
@@ -391,14 +409,27 @@ Deno.serve(async (req) => {
                 }
 
                 const nextNum = followupCount + 1;
-                const followupText = buildFollowupMessage(memory, conv.lead, nextNum, settings);
 
-                // Save message to DB
+                // ── A/B Variant selection (alternates per lead UUID hash) ──
+                const abEnabled = (settings as any).ab_testing_enabled === true;
+                // Use last char of lead UUID to deterministically assign variant
+                const lastChar  = conv.lead_id?.slice(-1) || '0';
+                const variant: 'a' | 'b' = abEnabled && parseInt(lastChar, 16) % 2 === 1 ? 'b' : 'a';
+
+                const followupText = buildFollowupMessage(memory, conv.lead, nextNum, settings, variant);
+
+                // Save message to DB (tag with ab_variant)
                 await supabase.from('marketing_messages').insert({
                     conversation_id: conv.id, content: followupText,
                     direction: 'outbound', type: 'text', status: 'pending',
-                    metadata: { isAiGenerated: true, isAutoFollowup: true, followupNumber: nextNum, processed_by: 'auto-followup-v3' }
+                    metadata: { isAiGenerated: true, isAutoFollowup: true, followupNumber: nextNum, processed_by: 'auto-followup-v3', ab_variant: variant }
                 });
+
+                // Increment A/B sent counter (non-fatal)
+                if (abEnabled) {
+                    supabase.rpc('increment_ab_stat', { p_company_id: conv.company_id, p_variant: variant, p_field: 'sent' }).then(() => {}).catch(() => {});
+                }
+
 
                 // ── TAREA 2: Channel-aware delivery ───────────────────────
                 const channel = conv.channel || 'telegram';

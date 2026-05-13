@@ -15,6 +15,15 @@ export interface FollowupSettings {
     followup_2_template: string | null;
     followup_3_template: string | null;
     is_active: boolean;
+    // A/B Testing
+    ab_testing_enabled:    boolean;
+    followup_1_template_b: string | null;
+    followup_2_template_b: string | null;
+    followup_3_template_b: string | null;
+    ab_stats: {
+        a_sent: number; b_sent: number;
+        a_responses: number; b_responses: number;
+    };
 }
 
 export const DEFAULT_FOLLOWUP_SETTINGS: Omit<FollowupSettings, 'company_id'> = {
@@ -30,6 +39,11 @@ export const DEFAULT_FOLLOWUP_SETTINGS: Omit<FollowupSettings, 'company_id'> = {
     followup_2_template:   null,
     followup_3_template:   null,
     is_active:             true,
+    ab_testing_enabled:    false,
+    followup_1_template_b: null,
+    followup_2_template_b: null,
+    followup_3_template_b: null,
+    ab_stats: { a_sent: 0, b_sent: 0, a_responses: 0, b_responses: 0 },
 };
 
 export const followupSettingsService = {
@@ -63,5 +77,24 @@ export const followupSettingsService = {
         });
         if (error) throw error;
         return data;
+    },
+
+    /** Fetch current A/B stats for a company */
+    async getAbStats(companyId: string) {
+        const { data } = await supabase
+            .from('ai_followup_settings')
+            .select('ab_stats, ab_testing_enabled')
+            .eq('company_id', companyId)
+            .maybeSingle();
+        return data?.ab_stats || { a_sent: 0, b_sent: 0, a_responses: 0, b_responses: 0 };
+    },
+
+    /** Reset A/B stats to zero */
+    async resetAbStats(companyId: string) {
+        const { error } = await supabase
+            .from('ai_followup_settings')
+            .update({ ab_stats: { a_sent: 0, b_sent: 0, a_responses: 0, b_responses: 0 } })
+            .eq('company_id', companyId);
+        if (error) throw error;
     }
 };
