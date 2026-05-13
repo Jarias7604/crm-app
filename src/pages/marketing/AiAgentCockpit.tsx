@@ -316,12 +316,12 @@ export default function AiAgentCockpit() {
             {/* Tabs */}
             <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit mb-6 flex-wrap">
                 {[
-                    { id: 'overview',      label: 'Resumen',                              icon: Target },
-                    { id: 'leads',         label: 'Leads con Memoria',                    icon: Brain },
-                    { id: 'conversiones',  label: 'Conversiones',                         icon: BarChart2 },
-                    { id: 'objeciones',    label: 'Objeciones',                           icon: PieChart },
-                    { id: 'escalations',   label: `Escalar (${escalations.length})`,      icon: AlertTriangle },
-                    { id: 'precios',       label: `Ofertas (${priceObjections.length})`,  icon: TrendingUp },
+                    { id: 'overview',      label: 'Resumen',                                                                  icon: Target },
+                    { id: 'leads',         label: `Leads con Memoria (${memories.length})`,                                   icon: Brain },
+                    { id: 'conversiones',  label: `Conversiones${convReport ? ` (${convReport.total_closed})` : ''}`,         icon: BarChart2 },
+                    { id: 'objeciones',    label: `Objeciones${objAnalysis.length ? ` (${objAnalysis.reduce((s,r)=>s+r.count,0)})` : ''}`, icon: PieChart },
+                    { id: 'escalations',   label: `Escalar (${escalations.length})`,                                          icon: AlertTriangle },
+                    { id: 'precios',       label: `Ofertas (${priceObjections.length})`,                                      icon: TrendingUp },
                 ].map(tab => (
                     <button
                         key={tab.id}

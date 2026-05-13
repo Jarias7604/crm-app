@@ -1,4 +1,4 @@
-import { supabase } from '../supabase';
+﻿import { supabase } from '../supabase';
 
 export interface LeadMemory {
     id: string;
@@ -200,42 +200,43 @@ export const leadMemoryService = {
             return { total_attended: 0, total_closed: 0, conversion_rate: 0, avg_followups_to_close: 0, rows: [] };
         }
 
-        // 2. Leads that closed (status = 'Cliente' or conversation_stage = 'cerrado')
+        // 2. Leads that closed
         const { data: closedLeads, error: leadErr } = await supabase
             .from('leads')
-            .select(`
-                id, name, company_name, status, updated_at,
-                assigned_profile:profiles!leads_assigned_to_fkey(full_name)
-            `)
+            .select('id, name, company_name, status, updated_at, assigned_to')
             .in('id', attendedIds)
             .in('status', ['Cliente', 'cerrado', 'Cerrado', 'Ganado']);
         if (leadErr) throw leadErr;
 
-        const closedIds = (closedLeads || []).map(l => l.id);
+        const closedIds = (closedLeads || []).map((l: any) => l.id);
 
-        // 3. Get channels for closed leads
+        // 3. Fetch agent names safely
+        const assignedIds = [...new Set((closedLeads || []).map((l: any) => l.assigned_to).filter(Boolean))];
+        const agentMap: Record<string, string> = {};
+        if (assignedIds.length > 0) {
+            const { data: agents } = await supabase.from('profiles').select('id, full_name').in('id', assignedIds);
+            (agents || []).forEach((a: any) => { agentMap[a.id] = a.full_name; });
+        }
+
+        // 4. Get channels for closed leads
         const { data: convData } = await supabase
-            .from('marketing_conversations')
-            .select('lead_id, channel')
+            .from('marketing_conversations').select('lead_id, channel')
             .in('lead_id', closedIds.length > 0 ? closedIds : ['00000000-0000-0000-0000-000000000000']);
-
         const channelMap: Record<string, string> = {};
         (convData || []).forEach(c => { channelMap[c.lead_id] = c.channel; });
 
-        // 4. Build memory map for extra fields
+        // 5. Build memory map
         const memoryMap: Record<string, typeof allMemory[0]> = {};
         (allMemory || []).forEach(m => { memoryMap[m.lead_id] = m; });
 
-        const rows: ConversionReportRow[] = (closedLeads || []).map(lead => {
+        const rows: ConversionReportRow[] = (closedLeads || []).map((lead: any) => {
             const mem = memoryMap[lead.id];
-            const agentData = lead.assigned_profile as any;
             return {
-                lead_id: lead.id,
-                lead_name: lead.name,
+                lead_id: lead.id, lead_name: lead.name,
                 company_name: lead.company_name || null,
-                plan: mem?.conversation_stage === 'cerrado' ? 'Bot cerró' : null,
+                plan: mem?.conversation_stage === 'cerrado' ? 'Bot cerro' : null,
                 closed_at: lead.updated_at || null,
-                assigned_agent: agentData?.full_name || null,
+                assigned_agent: agentMap[lead.assigned_to] || null,
                 sentiment_at_close: mem?.sentiment_score || 50,
                 followup_count: mem?.followup_count || 0,
                 channel: channelMap[lead.id] || 'desconocido',
