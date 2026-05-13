@@ -92,10 +92,14 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                                                 // .arias-table thead th already acts as positioning ancestor
                                                                                 // for our absolute resize handle.
                                                                             }}
-                                                                            className={`px-4 py-4 text-left text-xs font-black text-gray-400 uppercase tracking-widest transition-colors ${snapshot.isDragging ? 'bg-indigo-50/80 shadow-sm z-50' : 'bg-[#FAFAFB]'}`}
+                                                                            className={`px-4 py-4 text-left text-xs font-black uppercase tracking-widest transition-colors relative select-none ${
+                                                                                snapshot.isDragging
+                                                                                    ? 'bg-[#4449AA] text-white shadow-2xl shadow-indigo-400/40 rounded-lg opacity-95 z-50'
+                                                                                    : 'bg-[#FAFAFB] text-gray-400'
+                                                                            }`}
                                                                         >
                                                                             <div className="flex items-center gap-2">
-                                                                                <div {...provided.dragHandleProps} className="cursor-move text-gray-300 hover:text-[#4449AA]">
+                                                                                <div {...provided.dragHandleProps} className={`cursor-grab active:cursor-grabbing transition-colors ${snapshot.isDragging ? 'text-white/70' : 'text-gray-300 hover:text-[#4449AA]'}`}>
                                                                                     <GripVertical className="w-3 h-3" />
                                                                                 </div>
 
