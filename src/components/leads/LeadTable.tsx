@@ -62,7 +62,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                         }}
                                     >
                                         <DragDropContext
-                                            onDragStart={() => { document.body.style.cursor = 'grabbing'; document.body.style.userSelect = 'none'; }}
+                                            onDragStart={() => { document.body.style.cursor = 'move'; document.body.style.userSelect = 'none'; }}
                                             onDragEnd={(result) => { document.body.style.cursor = ''; document.body.style.userSelect = ''; handleOnDragEnd(result); }}
                                         >
                                             <Droppable droppableId="columns" direction="horizontal">
@@ -102,7 +102,16 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                                             }`}
                                                                         >
                                                                             <div className="flex items-center gap-2">
-                                                                                <div {...provided.dragHandleProps} className={`cursor-grab active:cursor-grabbing transition-colors flex items-center ${snapshot.isDragging ? 'text-white/80' : 'text-gray-300 hover:text-[#4449AA]'}`}>
+                                                                                <div
+                                                                                    {...provided.dragHandleProps}
+                                                                                    title="Arrastra para reordenar"
+                                                                                    style={{ cursor: 'move' }}
+                                                                                    className={`transition-all flex items-center rounded p-0.5 ${
+                                                                                        snapshot.isDragging
+                                                                                            ? 'text-white/90 bg-white/10'
+                                                                                            : 'text-gray-300 hover:text-[#4449AA] hover:bg-indigo-50'
+                                                                                    }`}
+                                                                                >
                                                                                     <GripVertical className="w-4 h-4" />
                                                                                 </div>
 
