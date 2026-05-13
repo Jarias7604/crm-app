@@ -61,7 +61,10 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                             width: columnOrder.reduce((sum, id) => sum + (columnWidths[id] ?? DEFAULT_COL_WIDTHS[id] ?? 140), 48 + 160),
                                         }}
                                     >
-                                        <DragDropContext onDragEnd={handleOnDragEnd}>
+                                        <DragDropContext
+                                            onDragStart={() => { document.body.style.cursor = 'grabbing'; document.body.style.userSelect = 'none'; }}
+                                            onDragEnd={(result) => { document.body.style.cursor = ''; document.body.style.userSelect = ''; handleOnDragEnd(result); }}
+                                        >
                                             <Droppable droppableId="columns" direction="horizontal">
                                                 {(provided) => (
                                                     <thead className="bg-[#FAFAFB]">
@@ -99,8 +102,8 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                                             }`}
                                                                         >
                                                                             <div className="flex items-center gap-2">
-                                                                                <div {...provided.dragHandleProps} className={`cursor-grab active:cursor-grabbing transition-colors ${snapshot.isDragging ? 'text-white/70' : 'text-gray-300 hover:text-[#4449AA]'}`}>
-                                                                                    <GripVertical className="w-3 h-3" />
+                                                                                <div {...provided.dragHandleProps} className={`cursor-grab active:cursor-grabbing transition-colors flex items-center ${snapshot.isDragging ? 'text-white/80' : 'text-gray-300 hover:text-[#4449AA]'}`}>
+                                                                                    <GripVertical className="w-4 h-4" />
                                                                                 </div>
 
                                                                                 {colId === 'name' && (
