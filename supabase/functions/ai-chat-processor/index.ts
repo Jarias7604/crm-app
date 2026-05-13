@@ -16,7 +16,38 @@ const supabase = createClient(
     { auth: { persistSession: false } }
 );
 
-console.log(`[AI-Processor v50-clean] Initialized`);
+console.log(`[AI-Processor v52-lead-brain] Initialized`);
+
+// ─── Sentiment Detection ──────────────────────────────────────────────────────────────────────────────
+function detectSentiment(text: string): number {
+    const t = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const positive = ['me interesa','quiero','perfecto','excelente','ok','de acuerdo','claro','si','adelante','listo','cuando empezamos','genial','buenisimo'];
+    const negative = ['caro','muy caro','no puedo','no tengo','no me interesa','luego','despues','pensarlo','no por ahora','costoso','presupuesto','no'];
+    const urgent   = ['hacienda','notificacion','multa','urgente','pronto','rapido','ya','hoy','inmediato'];
+    let score = 50;
+    if (positive.some(p => t.includes(p))) score += 20;
+    if (urgent.some(u => t.includes(u))) score += 15;
+    if (negative.some(n => t.includes(n))) score -= 20;
+    return Math.max(0, Math.min(100, score));
+}
+
+function detectStage(aiResponse: string, userMsg: string, currentStage: string): string {
+    const combined = (aiResponse + ' ' + userMsg).toLowerCase();
+    if (combined.includes('quote_trigger') || combined.includes('propuesta') || combined.includes('cotizacion')) return 'cotizado';
+    if (combined.includes('demo') || combined.includes('reunion') || combined.includes('llamada')) return 'seguimiento';
+    if (combined.includes('dtes') || combined.includes('facturas') || combined.includes('volumen')) return 'calificado';
+    if (currentStage === 'nuevo') return 'calificado';
+    return currentStage || 'calificado';
+}
+
+function detectNextAction(sentiment: number, stage: string, userMsg: string): string {
+    const u = userMsg.toLowerCase();
+    if (u.includes('demo') || u.includes('reunion') || u.includes('hablar')) return 'demo';
+    if (stage === 'cotizado' && sentiment >= 70) return 'seguimiento';
+    if (stage === 'cotizado' && sentiment < 40) return 'escalar_humano';
+    if (stage === 'calificado') return 'enviar_propuesta';
+    return 'seguimiento';
+}
 
 // ─── Build rich catalog string from pricing_items ─────────────────────────────
 function buildCatalogContext(pricingItems: any[]): string {
@@ -189,6 +220,30 @@ ${demoSection}
         log(`Agent: ${agent.name} (${agents?.[0] ? 'from DB' : 'FALLBACK'})`);
 
         // ===========================================
+        // 2B. LOAD LEAD BRAIN — Persistent Memory
+        // ===========================================
+        let leadMemory: any = null;
+        if (lead?.id) {
+            const { data: mem } = await supabase
+                .from('lead_ai_memory')
+                .select('*')
+                .eq('lead_id', lead.id)
+                .maybeSingle();
+            leadMemory = mem;
+            log(`Lead Brain: stage=${mem?.conversation_stage || 'nuevo'}, sentiment=${mem?.sentiment_score || 50}, facts=${JSON.stringify(mem?.known_facts || {})}`);
+        }
+
+        // Build memory context for system prompt
+        const memorySection = leadMemory ? `
+=== MEMORIA DEL CLIENTE (lo que ya sabes de conversaciones anteriores) ===
+• Etapa actual: ${leadMemory.conversation_stage || 'nuevo'}
+• Lo que sabes: ${JSON.stringify(leadMemory.known_facts || {}, null, 2)}
+${leadMemory.last_objection ? `• Última objección: ${leadMemory.last_objection}` : ''}
+${leadMemory.followup_count > 0 ? `• Seguimientos enviados: ${leadMemory.followup_count} (no menciones esto al cliente)` : ''}
+• Siguiente acción recomendada: ${leadMemory.next_action || 'calificar'}
+USA esta memoria para personalizar tu respuesta. NO preguntes lo que ya sabes.` : '';
+
+        // ===========================================
         // 3. LOAD PRICING CATALOG (company-specific)
         // ===========================================
         const { data: pricingItems } = await supabase.from('pricing_items')
@@ -213,35 +268,29 @@ ${demoSection}
 • Teléfono: ${lead?.phone || 'No registrado'}
 • Email: ${lead?.email || 'No registrado'}`;
 
-        const absoluteRules = `=== REGLAS ABSOLUTAS DEL SISTEMA — NUNCA VIOLAR ===
-1. SOLO cotizar por texto en el mensaje. NUNCA mencionar PDF, propuesta formal, documento adjunto, ni enlace de aprobación.
-2. NUNCA pedir correo para enviar documentos.
-3. Cotizar SIEMPRE con los precios reales del catálogo de arriba.
-4. SIEMPRE ofrecer las dos opciones de pago: contado (20% OFF) y financiado a 12 meses.
-5. SIEMPRE mostrar cuánto ahorra el cliente eligiendo el pago único.
-6. SIEMPRE ofrecer módulos adicionales después de presentar el plan principal.
-7. Si el cliente da un volumen aproximado de facturas, tómalo y recomienda el plan cuyo rango cubre ese volumen.
-8. Mensajes cortos y conversacionales. Máximo 5-8 líneas.
+        // Technical-only rules — business logic lives entirely in agent.system_prompt (DB)
+        const technicalRules = `=== REGLAS TÉCNICAS DEL SISTEMA (NO NEGOCIABLES) ===
+1. NUNCA menciones PDF, propuesta formal, documento adjunto, ni links internos del CRM.
+2. NUNCA pidas correo electrónico para enviar documentos.
+3. Usa SIEMPRE los precios reales del catálogo inyectado arriba — nunca inventes precios.
+4. Mensajes máximo 5-6 líneas. Nunca hagas listas largas en un solo mensaje.
+5. Si el agente tiene enlace de demo configurado, úsalo cuando el cliente pida reunión o llamada.
 
-=== PROTOCOLO DE TRIGGERS (invisible para el cliente) ===
-- Cuando cotices, incluye AL FINAL: QUOTE_TRIGGER: {"plan_name": "NOMBRE_PLAN", "dte_volume": NUMERO_ANUAL, "items": ["Módulo1", "Módulo2"]}
-- Cuando el cliente dé su nombre/empresa/teléfono: UPDATE_LEAD: {"name": "Nombre", "company_name": "Empresa", "phone": "5555-0000"}
-- Estos códigos NUNCA aparecen en el texto que ve el cliente.`;
+=== PROTOCOLO DE TRIGGERS — NUNCA VISIBLES PARA EL CLIENTE ===
+- Al cotizar formalmente, agrega AL FINAL del mensaje: QUOTE_TRIGGER: {"plan_name": "NOMBRE_PLAN", "dte_volume": NUMERO_ANUAL, "items": ["Módulo1"]}
+- Al capturar datos del lead, agrega AL FINAL: UPDATE_LEAD: {"name": "Nombre", "company_name": "Empresa", "phone": "7000-0000", "email": "correo@empresa.com"}
+- Estos códigos son invisibles para el cliente. NUNCA los menciones ni expliques.`;
 
-        const fullSystemPrompt = `=== INSTRUCCIONES MAESTRAS DEL AGENTE (tu guía principal) ===
-${agent.system_prompt || 'Eres un asesor de ventas profesional.'}
-==========================================
+        const fullSystemPrompt = `=== INSTRUCCIONES MAESTRAS DEL AGENTE (SIGUE ESTO EXACTAMENTE) ===
+${agent.system_prompt || 'Eres un asesor de ventas profesional. Califica al lead antes de cotizar.'}
+=====================================================================
 
 ${leadSection}
+${memorySection}
 
 ${catalogContext}
 ${demoSection}
-=== OPCIONES DE PAGO — SIEMPRE PRESENTAR AMBAS ===
-- Pago único contado: precio anual con 20% de descuento. Muestra cuánto ahorra.
-- Financiado a 12 meses: divide el precio anual entre 12.
-- SIEMPRE ofrece módulos adicionales después de la cotización principal.
-
-${absoluteRules}`;
+${technicalRules}`;
 
         // ===========================================
         // 5. GET OPENAI API KEY
@@ -457,12 +506,11 @@ ${absoluteRules}`;
             }
         }
 
-        // Aggressive cleanup — remove EVERYTHING the client should never see
+        // Cleanup — remove internal CRM links and triggers, but KEEP external links (demo, calendly, etc.)
         cleanText = cleanText
-            // Remove CRM proposal links
+            // Remove CRM-internal proposal/approval links only (never external links like calendly)
             .replace(/https?:\/\/crm-app[\w.-]*\/propuesta\/[\w-]+/g, '')
-            // Remove any https link that looks like a quote/approval link
-            .replace(/https?:\/\/[\w.-]+\/(propuesta|cotizacion|quote|aprobacion)\/[\w-]+/gi, '')
+            .replace(/https?:\/\/[\w.-]*(?:crm-app|vercel\.app)[\w.-]*\/(propuesta|cotizacion|quote|aprobacion)\/[\w-]+/gi, '')
             // Remove "Ver y aprobar tu cotización" and similar approval link text
             .replace(/🔗?\s*\*?Ver y aprobar[^*\n]*/gi, '')
             .replace(/\*?Ver Cotizaci[oó]n Completa\*?/gi, '')
@@ -492,7 +540,7 @@ ${absoluteRules}`;
             metadata: {
                 isAiGenerated: true,
                 processed_by: 'edge-function',
-                version: 'v50-clean',
+                version: 'v51-demo-fix',
                 agentName: agent.name || 'AI',
                 leadId: lead?.id || null
             }
@@ -502,6 +550,68 @@ ${absoluteRules}`;
             log(`Insert error (non-fatal): ${JSON.stringify(insertError)}`);
         } else if (lead?.id) {
             await supabase.from('leads').update({ updated_at: new Date().toISOString() }).eq('id', lead.id);
+        }
+
+        // ===========================================
+        // 10B. UPDATE LEAD BRAIN — Persistent Memory
+        // ===========================================
+        if (lead?.id) {
+            try {
+                const sentiment = detectSentiment(userMessage);
+                const newStage  = detectStage(cleanText, userMessage, leadMemory?.conversation_stage || 'nuevo');
+                const nextAction = detectNextAction(sentiment, newStage, userMessage);
+
+                // Extract new facts from the conversation (basic extraction)
+                const newFacts: Record<string, any> = {};
+                if (userMessage.match(/(\d+)\s*(dtes?|facturas?|documentos?)/i)) {
+                    const match = userMessage.match(/(\d+)/);
+                    if (match) newFacts.volumen_dtes = parseInt(match[1]);
+                }
+                if (userMessage.match(/(empresa|negocio|compañía)\s+(?:se llama|es|:)?\s+([\w\s]+)/i)) {
+                    const match = userMessage.match(/(empresa|negocio|compañía)\s+(?:se llama|es|:)?\s+([\w\s]+)/i);
+                    if (match?.[2]) newFacts.empresa_mencionada = match[2].trim();
+                }
+
+                // Detect objections
+                let objection: string | null = null;
+                if (userMessage.toLowerCase().includes('caro') || userMessage.toLowerCase().includes('presupuesto')) {
+                    objection = 'precio';
+                } else if (userMessage.toLowerCase().includes('consultar') || userMessage.toLowerCase().includes('equipo')) {
+                    objection = 'necesita_aprobacion';
+                } else if (userMessage.toLowerCase().includes('luego') || userMessage.toLowerCase().includes('despues')) {
+                    objection = 'no_es_prioridad';
+                }
+
+                await supabase.rpc('upsert_lead_memory', {
+                    p_lead_id:     lead.id,
+                    p_company_id:  companyId,
+                    p_facts:       Object.keys(newFacts).length > 0 ? newFacts : null,
+                    p_stage:       newStage,
+                    p_objection:   objection,
+                    p_sentiment:   sentiment,
+                    p_next_action: nextAction
+                });
+
+                // ── Sync AI stage → CRM leads.status so both views match ──
+                const stageToStatus: Record<string, string> = {
+                    'nuevo':        'Prospecto',
+                    'calificado':   'En seguimiento',
+                    'cotizado':     'En seguimiento',
+                    'seguimiento':  'En seguimiento',
+                    'negociacion':  'En negociación',
+                    'cerrado':      'Cliente',
+                    'perdido':      'Perdido',
+                };
+                const crmStatus = stageToStatus[newStage];
+                if (crmStatus) {
+                    await supabase.from('leads').update({ status: crmStatus }).eq('id', lead.id);
+                    log(`CRM status synced: ${newStage} → ${crmStatus}`);
+                }
+
+                log(`Lead Brain updated: stage=${newStage}, sentiment=${sentiment}, action=${nextAction}`);
+            } catch(memErr) {
+                log(`Lead Brain update error (non-fatal): ${memErr.message}`);
+            }
         }
 
         // ===========================================
@@ -543,9 +653,10 @@ ${absoluteRules}`;
 
         return new Response(JSON.stringify({
             success: true,
-            version: 'v50-clean',
+            version: 'v52-lead-brain',
             agent: agent.name,
-            leadContext: !!lead
+            leadContext: !!lead,
+            memoryUpdated: !!lead?.id
         }), { headers: corsHeaders });
 
     } catch (err: any) {
