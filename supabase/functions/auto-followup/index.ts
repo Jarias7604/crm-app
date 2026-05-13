@@ -167,6 +167,51 @@ Deno.serve(async (req) => {
                             notes: `⚠️ IA ESCALÓ: Sin respuesta tras ${settings.max_followups} seguimientos. Requiere contacto humano. Última interacción: ${new Date(conv.last_message_at).toLocaleDateString('es')}`,
                             status: 'En seguimiento', updated_at: new Date().toISOString()
                         }).eq('id', conv.lead_id);
+
+                        // ── Notify assigned agent via Telegram ──────────────
+                        try {
+                            // Get the lead's assigned agent and their telegram_chat_id
+                            const { data: leadData } = await supabase
+                                .from('leads')
+                                .select('assigned_to, name, phone')
+                                .eq('id', conv.lead_id)
+                                .maybeSingle();
+
+                            if (leadData?.assigned_to) {
+                                const { data: agentProfile } = await supabase
+                                    .from('profiles')
+                                    .select('full_name, telegram_chat_id')
+                                    .eq('id', leadData.assigned_to)
+                                    .maybeSingle();
+
+                                if (agentProfile?.telegram_chat_id) {
+                                    const { data: tgInt } = await supabase
+                                        .from('marketing_integrations')
+                                        .select('settings')
+                                        .eq('company_id', conv.company_id)
+                                        .eq('provider', 'telegram')
+                                        .eq('is_active', true)
+                                        .maybeSingle();
+
+                                    if (tgInt?.settings?.token) {
+                                        const alertMsg = `🚨 *ESCALACIÓN DE LEAD*\n\n👤 Lead: *${leadData.name}*\n📱 Teléfono: ${leadData.phone || 'N/A'}\n🔁 Intentos: ${followupCount}\n\nSofía agotó los seguimientos automáticos. Este lead necesita tu atención personal. ¡Contáctalo directamente!`;
+                                        await fetch(`https://api.telegram.org/bot${tgInt.settings.token}/sendMessage`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                chat_id: agentProfile.telegram_chat_id,
+                                                text: alertMsg,
+                                                parse_mode: 'Markdown'
+                                            })
+                                        });
+                                        log(`📨 Escalation alert sent to agent ${agentProfile.full_name} for lead ${leadData.name}`);
+                                    }
+                                }
+                            }
+                        } catch (notifyErr: any) {
+                            log(`Escalation notification error (non-fatal): ${notifyErr.message}`);
+                        }
+
                         escalationsCreated++;
                     }
                     continue;

@@ -96,6 +96,15 @@ export const leadMemoryService = {
         if (error) throw error;
     },
 
+    /** Completely wipe a lead's memory so Sofía starts fresh */
+    async resetMemory(leadId: string) {
+        const { error } = await supabase
+            .from('lead_ai_memory')
+            .delete()
+            .eq('lead_id', leadId);
+        if (error) throw error;
+    },
+
     /** Manually update the next action */
     async setNextAction(leadId: string, action: string) {
         const { error } = await supabase

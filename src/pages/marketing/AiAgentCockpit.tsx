@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
     Brain, Zap, Users, TrendingUp, AlertTriangle, CheckCircle2,
     Clock, ArrowLeft, RefreshCw, Play, Pause, ArrowRight,
-    MessageSquare, Target, Star, Activity, ChevronRight, Bot, Settings2
+    MessageSquare, Target, Star, Activity, ChevronRight, Bot, Settings2, Trash2
 } from 'lucide-react';
 import { leadMemoryService, type CockpitMetrics, type LeadMemory } from '../../services/marketing/leadMemoryService';
 import { useAuth } from '../../auth/AuthProvider';
@@ -135,6 +135,17 @@ export default function AiAgentCockpit() {
         try {
             await leadMemoryService.resetFollowups(leadId);
             toast.success('Contador reiniciado');
+            await loadData();
+        } catch (e: any) {
+            toast.error(e.message);
+        }
+    };
+
+    const handleResetMemory = async (leadId: string, leadName: string) => {
+        if (!confirm(`⚠️ ¿Borrar TODA la memoria de Sofía sobre ${leadName}?\n\nEsto elimina el historial de conversación, etapa, objeciones y seguimientos. Sofía tratará a este lead como nuevo.`)) return;
+        try {
+            await leadMemoryService.resetMemory(leadId);
+            toast.success('🧠 Memoria borrada — Sofía empezará desde cero');
             await loadData();
         } catch (e: any) {
             toast.error(e.message);
@@ -369,6 +380,13 @@ export default function AiAgentCockpit() {
                                             title="Abrir chat"
                                         >
                                             <MessageSquare className="w-3 h-3" />
+                                        </button>
+                                        <button
+                                            onClick={() => handleResetMemory(mem.lead_id, mem.lead?.name)}
+                                            className="p-2 rounded-lg bg-white border border-slate-100 text-slate-400 hover:text-red-500 hover:border-red-200 transition-all"
+                                            title="Borrar memoria — Sofía empezará desde cero con este lead"
+                                        >
+                                            <Trash2 className="w-3 h-3" />
                                         </button>
                                     </div>
                                 </div>
