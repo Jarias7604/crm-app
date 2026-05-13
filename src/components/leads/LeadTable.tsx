@@ -1,7 +1,7 @@
 import React from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { GripVertical, ArrowUpDown, Shield, ChevronRight, Trash2, CheckCircle, Target, FileText, Mail, Phone, Calendar, Send, User, ChevronDown, ChevronUp } from 'lucide-react';
-import { format } from 'date-fns';
+import { GripVertical, ArrowUpDown, Shield, ChevronRight, Trash2, CheckCircle, Target, FileText, Mail, Phone, Calendar, Send, User, ChevronDown, ChevronUp, Clock } from 'lucide-react';
+import { format, differenceInHours, differenceInDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { SOURCE_CONFIG } from '../../types';
 import type { Lead } from '../../types';
@@ -216,6 +216,19 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                                                     </div>
                                                                                 )}
 
+                                                                                {colId === 'last_follow_up_at' && (
+                                                                                    <div
+                                                                                        className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                        onClick={() => setSortConfig({
+                                                                                            key: 'last_follow_up_at' as keyof Lead,
+                                                                                            direction: sortConfig?.key === 'last_follow_up_at' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
+                                                                                        })}
+                                                                                    >
+                                                                                        Último Seguimiento
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'last_follow_up_at' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                    </div>
+                                                                                )}
+
                                                                                 {colId === 'assigned_to' && (
                                                                                     <div
                                                                                         className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
@@ -391,6 +404,34 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                                         );
                                                                     })() : <span className="text-gray-300">-</span>
                                                                 )}
+
+                                                                {colId === 'last_follow_up_at' && (() => {
+                                                                    const d = lead.last_follow_up_at;
+                                                                    if (!d) return (
+                                                                        <span className="text-[10px] text-gray-300 font-bold">—</span>
+                                                                    );
+                                                                    const date = new Date(d);
+                                                                    const hoursAgo = differenceInHours(new Date(), date);
+                                                                    const daysAgo  = differenceInDays(new Date(), date);
+                                                                    const relLabel = hoursAgo < 1 ? 'Hace menos de 1h'
+                                                                        : hoursAgo < 24 ? `Hace ${hoursAgo}h`
+                                                                        : daysAgo === 1 ? 'Ayer'
+                                                                        : `Hace ${daysAgo}d`;
+                                                                    const badgeColor = hoursAgo < 24
+                                                                        ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                                                        : hoursAgo < 48
+                                                                        ? 'bg-amber-50 text-amber-600 border-amber-100'
+                                                                        : 'bg-red-50 text-red-500 border-red-100';
+                                                                    return (
+                                                                        <div className="flex flex-col gap-0.5">
+                                                                            <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500">
+                                                                                <Clock className="w-3 h-3 text-indigo-400 shrink-0" />
+                                                                                <span>{(() => { try { return format(new Date(d.substring(0,10)+'T12:00:00'), 'dd MMM yyyy', { locale: es }).toUpperCase(); } catch { return '—'; } })()}</span>
+                                                                            </div>
+                                                                            <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full border w-fit ${badgeColor}`}>{relLabel}</span>
+                                                                        </div>
+                                                                    );
+                                                                })()}
 
                                                                 {colId === 'created_at' && (
                                                                     <div className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500">

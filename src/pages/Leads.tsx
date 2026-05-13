@@ -112,23 +112,67 @@ export default function Leads() {
     const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
     const [sortConfig, setSortConfig] = useState<{ key: keyof Lead | 'value'; direction: 'asc' | 'desc' } | null>(null);
 
+    // All available columns with labels
+    const ALL_COLUMNS: { id: string; label: string; icon: string }[] = [
+        { id: 'name',              label: 'Nombre / Empresa',    icon: '👤' },
+        { id: 'email',             label: 'Email',               icon: '✉️' },
+        { id: 'phone',             label: 'Teléfono',            icon: '📞' },
+        { id: 'status',            label: 'Estado',              icon: '🏷️' },
+        { id: 'priority',          label: 'Prioridad',           icon: '⭐' },
+        { id: 'source',            label: 'Fuente',              icon: '📡' },
+        { id: 'value',             label: 'Valor',               icon: '💰' },
+        { id: 'assigned_to',       label: 'Asignado',            icon: '👥' },
+        { id: 'last_follow_up_at', label: 'Último Seguimiento',  icon: '🕐' },
+        { id: 'internal_won_date', label: 'Fecha Cierre',        icon: '✅' },
+        { id: 'created_at',        label: 'Creado el',           icon: '📅' },
+    ];
+
     // Column order persistence
     const [columnOrder, setColumnOrder] = useState<string[]>(() => {
         const saved = localStorage.getItem('lead_column_order');
-        const defaultCols = ['name', 'email', 'phone', 'status', 'priority', 'source', 'value', 'assigned_to', 'internal_won_date', 'created_at'];
+        const defaultCols = ['name', 'email', 'phone', 'status', 'priority', 'source', 'value', 'assigned_to', 'last_follow_up_at', 'internal_won_date', 'created_at'];
         if (saved) {
             const parsed = JSON.parse(saved);
-            // Add new columns if missing from saved order
             const newCols = defaultCols.filter(c => !parsed.includes(c));
             return newCols.length > 0 ? [...parsed.slice(0, 1), ...newCols, ...parsed.slice(1)] : parsed;
         }
         return defaultCols;
     });
 
+    // Column visibility — persists per device
+    const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem('lead_visible_columns');
+            if (saved) return JSON.parse(saved);
+        } catch {}
+        return ['name', 'email', 'phone', 'status', 'priority', 'source', 'value', 'assigned_to', 'last_follow_up_at', 'internal_won_date', 'created_at'];
+    });
+    const [showColumnModal, setShowColumnModal] = useState(false);
+    const columnModalRef = useRef<HTMLDivElement>(null);
+
+    const toggleColumnVisibility = (colId: string) => {
+        if (colId === 'name') return; // name is always required
+        setVisibleColumns(prev => {
+            const next = prev.includes(colId) ? prev.filter(c => c !== colId) : [...prev, colId];
+            localStorage.setItem('lead_visible_columns', JSON.stringify(next));
+            return next;
+        });
+    };
+
+    // Close column modal on outside click
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (columnModalRef.current && !columnModalRef.current.contains(e.target as Node)) setShowColumnModal(false);
+        };
+        if (showColumnModal) document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [showColumnModal]);
+
     // Column width persistence
     const DEFAULT_COL_WIDTHS: Record<string, number> = {
         name: 200, email: 180, phone: 140, status: 140,
-        priority: 120, source: 130, value: 110, assigned_to: 140, internal_won_date: 130, created_at: 120,
+        priority: 120, source: 130, value: 110, assigned_to: 140,
+        last_follow_up_at: 145, internal_won_date: 130, created_at: 120,
     };
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
         try {
@@ -1305,10 +1349,68 @@ export default function Leads() {
                         </div>
                         {/* Desktop Table */}
                         <div className="hidden md:block bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/80 overflow-hidden transition-all duration-300">
+                            {/* Column visibility toggle bar */}
+                            <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-50 bg-[#FAFAFB]/80">
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{sortedLeads.length} leads</p>
+                                <div className="relative" ref={columnModalRef}>
+                                    <button
+                                        onClick={() => setShowColumnModal(!showColumnModal)}
+                                        title="Configurar columnas visibles"
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[10px] font-black transition-all ${
+                                            showColumnModal ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-200 text-gray-400 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50'
+                                        }`}
+                                    >
+                                        <SlidersHorizontal className="w-3 h-3" />
+                                        Columnas
+                                        <span className="ml-0.5 bg-white/20 text-inherit px-1 py-0.5 rounded text-[9px] font-black">{visibleColumns.length}</span>
+                                    </button>
+                                    {showColumnModal && (
+                                        <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 p-4">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h3 className="text-xs font-black text-gray-800 uppercase tracking-widest">Columnas visibles</h3>
+                                                <button
+                                                    onClick={() => {
+                                                        const all = ALL_COLUMNS.map(c => c.id);
+                                                        setVisibleColumns(all);
+                                                        localStorage.setItem('lead_visible_columns', JSON.stringify(all));
+                                                    }}
+                                                    className="text-[9px] font-black text-indigo-500 hover:text-indigo-700"
+                                                >Mostrar todas</button>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {ALL_COLUMNS.map(col => {
+                                                    const isVisible = visibleColumns.includes(col.id);
+                                                    const isRequired = col.id === 'name';
+                                                    return (
+                                                        <button
+                                                            key={col.id}
+                                                            onClick={() => toggleColumnVisibility(col.id)}
+                                                            disabled={isRequired}
+                                                            title={isRequired ? 'Esta columna es obligatoria' : ''}
+                                                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-bold transition-all ${
+                                                                isRequired
+                                                                    ? 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed'
+                                                                    : isVisible
+                                                                    ? 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                                                                    : 'border-gray-100 bg-white text-gray-400 hover:border-gray-200 hover:text-gray-600'
+                                                            }`}
+                                                        >
+                                                            <span>{col.icon}</span>
+                                                            <span>{col.label}</span>
+                                                            {isVisible && !isRequired && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 ml-0.5" />}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                            <p className="text-[9px] text-gray-300 text-center mt-3">Haz clic en una columna para ocultarla/mostrarla. Se guarda automáticamente.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                             <div ref={leadsWrapperRef} className="arias-table-wrapper">
                                 <div ref={leadsTableRef} className="arias-table">
                                     <LeadTable 
-                                        columnOrder={columnOrder}
+                                        columnOrder={columnOrder.filter(c => visibleColumns.includes(c))}
                                         columnWidths={columnWidths}
                                         DEFAULT_COL_WIDTHS={DEFAULT_COL_WIDTHS}
                                         handleOnDragEnd={handleOnDragEnd}
