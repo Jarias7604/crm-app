@@ -1349,64 +1349,6 @@ export default function Leads() {
                         </div>
                         {/* Desktop Table */}
                         <div className="hidden md:block bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/80 overflow-hidden transition-all duration-300">
-                            {/* Column visibility toggle bar */}
-                            <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-50 bg-[#FAFAFB]/80">
-                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{sortedLeads.length} leads</p>
-                                <div className="relative" ref={columnModalRef}>
-                                    <button
-                                        onClick={() => setShowColumnModal(!showColumnModal)}
-                                        title="Configurar columnas visibles"
-                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[10px] font-black transition-all ${
-                                            showColumnModal ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-200 text-gray-400 hover:text-indigo-600 hover:border-indigo-200 hover:bg-indigo-50'
-                                        }`}
-                                    >
-                                        <SlidersHorizontal className="w-3 h-3" />
-                                        Columnas
-                                        <span className="ml-0.5 bg-white/20 text-inherit px-1 py-0.5 rounded text-[9px] font-black">{visibleColumns.length}</span>
-                                    </button>
-                                    {showColumnModal && (
-                                        <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 p-4">
-                                            <div className="flex items-center justify-between mb-3">
-                                                <h3 className="text-xs font-black text-gray-800 uppercase tracking-widest">Columnas visibles</h3>
-                                                <button
-                                                    onClick={() => {
-                                                        const all = ALL_COLUMNS.map(c => c.id);
-                                                        setVisibleColumns(all);
-                                                        localStorage.setItem('lead_visible_columns', JSON.stringify(all));
-                                                    }}
-                                                    className="text-[9px] font-black text-indigo-500 hover:text-indigo-700"
-                                                >Mostrar todas</button>
-                                            </div>
-                                            <div className="flex flex-wrap gap-2">
-                                                {ALL_COLUMNS.map(col => {
-                                                    const isVisible = visibleColumns.includes(col.id);
-                                                    const isRequired = col.id === 'name';
-                                                    return (
-                                                        <button
-                                                            key={col.id}
-                                                            onClick={() => toggleColumnVisibility(col.id)}
-                                                            disabled={isRequired}
-                                                            title={isRequired ? 'Esta columna es obligatoria' : ''}
-                                                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-bold transition-all ${
-                                                                isRequired
-                                                                    ? 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed'
-                                                                    : isVisible
-                                                                    ? 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
-                                                                    : 'border-gray-100 bg-white text-gray-400 hover:border-gray-200 hover:text-gray-600'
-                                                            }`}
-                                                        >
-                                                            <span>{col.icon}</span>
-                                                            <span>{col.label}</span>
-                                                            {isVisible && !isRequired && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 ml-0.5" />}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                            <p className="text-[9px] text-gray-300 text-center mt-3">Haz clic en una columna para ocultarla/mostrarla. Se guarda automáticamente.</p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
                             <div ref={leadsWrapperRef} className="arias-table-wrapper">
                                 <div ref={leadsTableRef} className="arias-table">
                                     <LeadTable 
@@ -1429,6 +1371,59 @@ export default function Leads() {
                                         handleDeleteLead={handleDeleteLead}
                                         storageService={storageService}
                                         navigate={navigate}
+                                        columnToggle={
+                                            <div className="relative" ref={columnModalRef}>
+                                                <button
+                                                    onClick={() => setShowColumnModal(!showColumnModal)}
+                                                    title="Configurar columnas"
+                                                    className={`flex items-center gap-1 px-1.5 py-1 rounded-md border text-[9px] font-black transition-all ${
+                                                        showColumnModal ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-200 text-gray-400 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50'
+                                                    }`}
+                                                >
+                                                    <SlidersHorizontal className="w-2.5 h-2.5" />
+                                                    <span>{visibleColumns.length}</span>
+                                                </button>
+                                                {showColumnModal && (
+                                                    <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 p-4">
+                                                        <div className="flex items-center justify-between mb-3">
+                                                            <h3 className="text-xs font-black text-gray-800 uppercase tracking-widest">Columnas visibles</h3>
+                                                            <button
+                                                                onClick={() => {
+                                                                    const all = ALL_COLUMNS.map(c => c.id);
+                                                                    setVisibleColumns(all);
+                                                                    localStorage.setItem('lead_visible_columns', JSON.stringify(all));
+                                                                }}
+                                                                className="text-[9px] font-black text-indigo-500 hover:text-indigo-700"
+                                                            >Mostrar todas</button>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {ALL_COLUMNS.map(col => {
+                                                                const isVisible = visibleColumns.includes(col.id);
+                                                                const isRequired = col.id === 'name';
+                                                                return (
+                                                                    <button
+                                                                        key={col.id}
+                                                                        onClick={() => toggleColumnVisibility(col.id)}
+                                                                        disabled={isRequired}
+                                                                        title={isRequired ? 'Columna obligatoria' : ''}
+                                                                        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[10px] font-bold transition-all ${
+                                                                            isRequired ? 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed'
+                                                                            : isVisible ? 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                                                                            : 'border-gray-100 bg-white text-gray-400 hover:border-gray-200 hover:text-gray-600'
+                                                                        }`}
+                                                                    >
+                                                                        <span>{col.icon}</span>
+                                                                        <span>{col.label}</span>
+                                                                        {isVisible && !isRequired && <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 ml-0.5" />}
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                        <p className="text-[9px] text-gray-300 text-center mt-3">Clic para ocultar/mostrar. Se guarda automáticamente.</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        }
                                     />
                                 </div>
                             </div>

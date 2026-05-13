@@ -30,6 +30,7 @@ interface LeadTableProps {
     handleDeleteLead: (id: string, name: string) => void;
     storageService: any;
     navigate: any;
+    columnToggle?: React.ReactNode;
 }
 
 export const LeadTable: React.FC<LeadTableProps> = ({
@@ -51,7 +52,8 @@ export const LeadTable: React.FC<LeadTableProps> = ({
     isAdmin,
     handleDeleteLead,
     storageService,
-    navigate
+    navigate,
+    columnToggle,
 }) => {
     return (
         <table
@@ -273,7 +275,10 @@ export const LeadTable: React.FC<LeadTableProps> = ({
 
                                                             {provided.placeholder}
                                                             <th scope="col" style={{ width: 160, minWidth: 160, position: 'sticky', right: 0, zIndex: 4, boxShadow: '-2px 0 6px rgba(0,0,0,0.04)' }} className="px-4 py-4 text-center text-xs font-black text-gray-400 uppercase tracking-widest bg-[#FAFAFB]">
-                                                                Acciones
+                                                                <div className="flex items-center justify-center gap-2">
+                                                                    <span>Acciones</span>
+                                                                    {columnToggle && <span onClick={e => e.stopPropagation()}>{columnToggle}</span>}
+                                                                </div>
                                                             </th>
                                                         </tr>
                                                     </thead>
