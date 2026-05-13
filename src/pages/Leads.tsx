@@ -1493,7 +1493,8 @@ export default function Leads() {
                                     </div>
                                 </div>
                             )}
-                        </div>
+                            </div>{/* /bg-white card */}
+                        </div>{/* /relative hidden md:block */}
 
                         {/* Floating Bulk Actions Bar */}
                         {selectedLeadIds.length > 0 && (
