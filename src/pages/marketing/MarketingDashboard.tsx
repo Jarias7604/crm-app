@@ -10,7 +10,8 @@ import {
     Target,
     Sparkles,
     BarChart3,
-    ArrowRight
+    ArrowRight,
+    Brain
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
@@ -83,10 +84,11 @@ export default function MarketingDashboard() {
             </div>
 
             {/* Quick Actions */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
                 <QuickAction to="/marketing/email" icon={Zap} label="Campañas" desc="Omnicanal" color="text-indigo-600" bg="bg-indigo-50" />
                 <QuickAction to="/marketing/flyers" icon={Sparkles} label="Studio" desc="Imagen IA" color="text-pink-600" bg="bg-pink-50" tag="Pro" />
                 <QuickAction to="/marketing/ai-agents" icon={Bot} label="Agentes" desc="Chat IA" color="text-blue-600" bg="bg-blue-50" />
+                <QuickAction to="/marketing/cockpit" icon={Brain} label="Cockpit AI" desc="Lead Brain" color="text-violet-600" bg="bg-violet-50" tag="NEW" />
                 <QuickAction to="/marketing/lead-hunter" icon={Search} label="Lead Hunter" desc="Descubrimiento" color="text-amber-600" bg="bg-amber-50" />
                 <QuickAction to="/marketing/settings" icon={MessageSquare} label="Canales" desc="Configurar" color="text-emerald-600" bg="bg-emerald-50" />
             </div>
