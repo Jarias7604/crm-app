@@ -3,9 +3,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
     Brain, Zap, Users, TrendingUp, AlertTriangle, CheckCircle2,
     Clock, ArrowLeft, RefreshCw, Play, Pause, ArrowRight,
-    MessageSquare, Target, Star, Activity, ChevronRight, Bot, Settings2, Trash2
+    MessageSquare, Target, Star, Activity, ChevronRight, Bot, Settings2, Trash2,
+    BarChart2, DollarSign, Percent, Award
 } from 'lucide-react';
-import { leadMemoryService, type CockpitMetrics, type LeadMemory } from '../../services/marketing/leadMemoryService';
+import { leadMemoryService, type CockpitMetrics, type LeadMemory, type ConversionReport } from '../../services/marketing/leadMemoryService';
 import { useAuth } from '../../auth/AuthProvider';
 import toast from 'react-hot-toast';
 
@@ -76,7 +77,9 @@ export default function AiAgentCockpit() {
     const [memories, setMemories] = useState<(LeadMemory & { lead: any })[]>([]);
     const [escalations, setEscalations] = useState<(LeadMemory & { lead: any })[]>([]);
     const [priceObjections, setPriceObjections] = useState<(LeadMemory & { lead: any })[]>([]);
-    const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'escalations' | 'precios'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'escalations' | 'precios' | 'conversiones'>('overview');
+    const [convReport, setConvReport] = useState<ConversionReport | null>(null);
+    const [loadingReport, setLoadingReport] = useState(false);
     const [stageFilter, setStageFilter] = useState('all');
     const [discounts, setDiscounts] = useState<Record<string, number>>({});
     const [sendingOffer, setSendingOffer] = useState<string | null>(null);
@@ -104,7 +107,22 @@ export default function AiAgentCockpit() {
         }
     }, [profile?.company_id]);
 
+    const loadConversionReport = useCallback(async () => {
+        if (!profile?.company_id) return;
+        setLoadingReport(true);
+        try {
+            const report = await leadMemoryService.getConversionReport(profile.company_id);
+            setConvReport(report);
+        } catch (e: any) {
+            console.error(e);
+        } finally {
+            setLoadingReport(false);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [profile?.company_id]);
+
     useEffect(() => { loadData(); }, [loadData]);
+    useEffect(() => { if (activeTab === 'conversiones' && !convReport) loadConversionReport(); }, [activeTab, convReport, loadConversionReport]);
 
     const handleRunFollowups = async () => {
         if (!profile?.company_id) return;
@@ -274,18 +292,20 @@ export default function AiAgentCockpit() {
             {/* Tabs */}
             <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit mb-6 flex-wrap">
                 {[
-                    { id: 'overview',    label: 'Resumen',                icon: Target },
-                    { id: 'leads',       label: 'Leads con Memoria',      icon: Brain },
-                    { id: 'escalations', label: `Escalar (${escalations.length})`,         icon: AlertTriangle },
-                    { id: 'precios',     label: `Objeciones Precio (${priceObjections.length})`, icon: TrendingUp },
+                    { id: 'overview',      label: 'Resumen',                              icon: Target },
+                    { id: 'leads',         label: 'Leads con Memoria',                    icon: Brain },
+                    { id: 'conversiones',  label: 'Conversiones',                         icon: BarChart2 },
+                    { id: 'escalations',   label: `Escalar (${escalations.length})`,      icon: AlertTriangle },
+                    { id: 'precios',       label: `Objeciones (${priceObjections.length})`, icon: TrendingUp },
                 ].map(tab => (
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id as any)}
                         className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[11px] font-black transition-all ${
                             activeTab === tab.id
-                                ? tab.id === 'precios' ? 'bg-orange-500 shadow-sm text-white'
-                                : tab.id === 'escalations' ? 'bg-red-500 shadow-sm text-white'
+                                ? tab.id === 'precios'      ? 'bg-orange-500 shadow-sm text-white'
+                                : tab.id === 'escalations'  ? 'bg-red-500 shadow-sm text-white'
+                                : tab.id === 'conversiones' ? 'bg-emerald-600 shadow-sm text-white'
                                 : 'bg-white shadow-sm text-slate-900'
                                 : 'text-slate-500 hover:text-slate-700'
                         }`}
@@ -295,6 +315,163 @@ export default function AiAgentCockpit() {
                     </button>
                 ))}
             </div>
+
+            {/* ── Conversiones Tab ─────────────────────────────────── */}
+            {activeTab === 'conversiones' && (
+                <div className="space-y-6">
+                    {/* KPI cards */}
+                    {loadingReport ? (
+                        <div className="flex items-center justify-center py-16">
+                            <RefreshCw className="w-6 h-6 text-emerald-500 animate-spin" />
+                            <span className="ml-3 text-slate-400 font-medium text-sm">Calculando conversiones...</span>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Leads Atendidos</p>
+                                        <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center">
+                                            <Users className="w-4 h-4 text-blue-600" />
+                                        </div>
+                                    </div>
+                                    <p className="text-3xl font-black text-blue-600">{convReport?.total_attended ?? '—'}</p>
+                                    <p className="text-[11px] text-slate-400 mt-1">por Sofía</p>
+                                </div>
+                                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Clientes Cerrados</p>
+                                        <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center">
+                                            <Award className="w-4 h-4 text-emerald-600" />
+                                        </div>
+                                    </div>
+                                    <p className="text-3xl font-black text-emerald-600">{convReport?.total_closed ?? '—'}</p>
+                                    <p className="text-[11px] text-slate-400 mt-1">leads convertidos</p>
+                                </div>
+                                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Tasa de Conversión</p>
+                                        <div className="w-8 h-8 rounded-xl bg-violet-50 flex items-center justify-center">
+                                            <Percent className="w-4 h-4 text-violet-600" />
+                                        </div>
+                                    </div>
+                                    <p className="text-3xl font-black text-violet-600">{convReport?.conversion_rate ?? '—'}%</p>
+                                    <p className="text-[11px] text-slate-400 mt-1">de atendidos → clientes</p>
+                                </div>
+                                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Seguimientos Promedio</p>
+                                        <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center">
+                                            <DollarSign className="w-4 h-4 text-amber-600" />
+                                        </div>
+                                    </div>
+                                    <p className="text-3xl font-black text-amber-600">{convReport?.avg_followups_to_close ?? '—'}</p>
+                                    <p className="text-[11px] text-slate-400 mt-1">msgs hasta el cierre</p>
+                                </div>
+                            </div>
+
+                            {/* ROI banner */}
+                            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-2xl p-5 text-white flex items-center justify-between">
+                                <div>
+                                    <p className="text-[11px] font-black uppercase tracking-widest opacity-70">ROI del Sistema</p>
+                                    <p className="text-2xl font-black mt-1">Costo APIs: $0/mes</p>
+                                    <p className="text-[12px] opacity-80 mt-0.5">
+                                        Sofía trabaja 24/7 sin costo por mensaje · {convReport?.total_closed ?? 0} cierres asistidos
+                                    </p>
+                                </div>
+                                <CheckCircle2 className="w-12 h-12 opacity-30" />
+                            </div>
+
+                            {/* Closed leads table */}
+                            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                                <div className="px-5 py-4 border-b border-slate-50 flex items-center justify-between">
+                                    <h3 className="font-black text-slate-900 flex items-center gap-2">
+                                        <BarChart2 className="w-4 h-4 text-emerald-600" />
+                                        Detalle de Conversiones
+                                    </h3>
+                                    <button
+                                        onClick={loadConversionReport}
+                                        className="p-2 hover:bg-slate-50 rounded-lg transition-colors text-slate-400 hover:text-emerald-600"
+                                        title="Refrescar"
+                                    >
+                                        <RefreshCw className="w-4 h-4" />
+                                    </button>
+                                </div>
+                                {!convReport?.rows?.length ? (
+                                    <div className="p-12 text-center">
+                                        <BarChart2 className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                                        <p className="font-bold text-slate-500">Aún no hay cierres registrados</p>
+                                        <p className="text-sm text-slate-400 mt-1">Cuando un lead cambie a estado "Cliente" aparecerá aquí.</p>
+                                    </div>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="bg-slate-50">
+                                                    <th className="text-left px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Lead</th>
+                                                    <th className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Canal</th>
+                                                    <th className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Agente</th>
+                                                    <th className="text-center px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Seguimientos</th>
+                                                    <th className="text-center px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Sentiment</th>
+                                                    <th className="text-left px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Fecha Cierre</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {convReport.rows.map((row, idx) => (
+                                                    <tr key={row.lead_id} className={`border-t border-slate-50 hover:bg-slate-50/60 transition-colors ${idx % 2 === 0 ? '' : 'bg-slate-50/30'}`}>
+                                                        <td className="px-5 py-3">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-black text-sm shrink-0">
+                                                                    {row.lead_name?.[0] || '?'}
+                                                                </div>
+                                                                <div>
+                                                                    <p className="font-bold text-slate-900 text-[13px]">{row.lead_name}</p>
+                                                                    {row.company_name && <p className="text-[10px] text-slate-400">{row.company_name}</p>}
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <span className={`px-2 py-1 rounded-full text-[9px] font-black uppercase ${
+                                                                row.channel === 'whatsapp' ? 'bg-green-100 text-green-700'
+                                                                : row.channel === 'telegram' ? 'bg-blue-100 text-blue-700'
+                                                                : 'bg-slate-100 text-slate-500'
+                                                            }`}>
+                                                                {row.channel || '—'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-[12px] text-slate-600 font-medium">{row.assigned_agent || '—'}</td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <span className="text-[11px] font-black text-violet-600">{row.followup_count}</span>
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden min-w-[40px]">
+                                                                    <div
+                                                                        className={`h-full rounded-full ${
+                                                                            row.sentiment_at_close >= 70 ? 'bg-emerald-500'
+                                                                            : row.sentiment_at_close >= 50 ? 'bg-amber-400'
+                                                                            : 'bg-red-400'
+                                                                        }`}
+                                                                        style={{ width: `${row.sentiment_at_close}%` }}
+                                                                    />
+                                                                </div>
+                                                                <span className="text-[10px] font-bold text-slate-400">{row.sentiment_at_close}%</span>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-[11px] text-slate-400">
+                                                            {row.closed_at ? new Date(row.closed_at).toLocaleDateString('es', { day: '2-digit', month: 'short', year: '2-digit' }) : '—'}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    )}
+                </div>
+            )}
 
             {/* Escalations Tab */}
             {activeTab === 'escalations' && (

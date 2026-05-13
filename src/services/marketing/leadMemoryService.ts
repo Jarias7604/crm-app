@@ -33,6 +33,26 @@ export interface CockpitMetrics {
     last_activity: string;
 }
 
+export interface ConversionReportRow {
+    lead_id: string;
+    lead_name: string;
+    company_name: string | null;
+    plan: string | null;
+    closed_at: string | null;
+    assigned_agent: string | null;
+    sentiment_at_close: number;
+    followup_count: number;
+    channel: string | null;
+}
+
+export interface ConversionReport {
+    total_attended: number;       // leads Sofía touched (has memory)
+    total_closed: number;         // leads.status = 'Cliente' | 'cerrado'
+    conversion_rate: number;      // %
+    avg_followups_to_close: number;
+    rows: ConversionReportRow[];
+}
+
 export const leadMemoryService = {
     /** Get memory for a specific lead */
     async getLeadMemory(leadId: string): Promise<LeadMemory | null> {
@@ -162,5 +182,72 @@ export const leadMemoryService = {
             .order('updated_at', { ascending: false });
         if (error) throw error;
         return data || [];
+    },
+
+    /** Build the bot conversion report for a company */
+    async getConversionReport(companyId: string): Promise<ConversionReport> {
+        // 1. All leads Sofía touched (has memory)
+        const { data: allMemory, error: memErr } = await supabase
+            .from('lead_ai_memory')
+            .select('lead_id, followup_count, sentiment_score, conversation_stage')
+            .eq('company_id', companyId);
+        if (memErr) throw memErr;
+
+        const total_attended = allMemory?.length || 0;
+        const attendedIds = (allMemory || []).map(m => m.lead_id);
+
+        if (attendedIds.length === 0) {
+            return { total_attended: 0, total_closed: 0, conversion_rate: 0, avg_followups_to_close: 0, rows: [] };
+        }
+
+        // 2. Leads that closed (status = 'Cliente' or conversation_stage = 'cerrado')
+        const { data: closedLeads, error: leadErr } = await supabase
+            .from('leads')
+            .select(`
+                id, name, company_name, status, updated_at,
+                assigned_profile:profiles!leads_assigned_to_fkey(full_name)
+            `)
+            .in('id', attendedIds)
+            .in('status', ['Cliente', 'cerrado', 'Cerrado', 'Ganado']);
+        if (leadErr) throw leadErr;
+
+        const closedIds = (closedLeads || []).map(l => l.id);
+
+        // 3. Get channels for closed leads
+        const { data: convData } = await supabase
+            .from('marketing_conversations')
+            .select('lead_id, channel')
+            .in('lead_id', closedIds.length > 0 ? closedIds : ['00000000-0000-0000-0000-000000000000']);
+
+        const channelMap: Record<string, string> = {};
+        (convData || []).forEach(c => { channelMap[c.lead_id] = c.channel; });
+
+        // 4. Build memory map for extra fields
+        const memoryMap: Record<string, typeof allMemory[0]> = {};
+        (allMemory || []).forEach(m => { memoryMap[m.lead_id] = m; });
+
+        const rows: ConversionReportRow[] = (closedLeads || []).map(lead => {
+            const mem = memoryMap[lead.id];
+            const agentData = lead.assigned_profile as any;
+            return {
+                lead_id: lead.id,
+                lead_name: lead.name,
+                company_name: lead.company_name || null,
+                plan: mem?.conversation_stage === 'cerrado' ? 'Bot cerró' : null,
+                closed_at: lead.updated_at || null,
+                assigned_agent: agentData?.full_name || null,
+                sentiment_at_close: mem?.sentiment_score || 50,
+                followup_count: mem?.followup_count || 0,
+                channel: channelMap[lead.id] || 'desconocido',
+            };
+        });
+
+        const total_closed = rows.length;
+        const conversion_rate = total_attended > 0 ? Math.round((total_closed / total_attended) * 100) : 0;
+        const avg_followups_to_close = total_closed > 0
+            ? Math.round(rows.reduce((sum, r) => sum + r.followup_count, 0) / total_closed)
+            : 0;
+
+        return { total_attended, total_closed, conversion_rate, avg_followups_to_close, rows };
     }
 };
