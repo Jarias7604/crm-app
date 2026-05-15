@@ -49,44 +49,48 @@ export default function AutonomyToggle({ companyId }: Props) {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="flex flex-col gap-3">
                 <button
                     onClick={() => handleSelect('copilot')}
-                    className={`relative p-4 rounded-2xl text-left transition-all border-2 ${
+                    className={`relative p-4 rounded-2xl text-left transition-all border-2 flex items-start gap-4 ${
                         level === 'copilot' 
                         ? 'border-indigo-600 bg-indigo-50/50 shadow-md shadow-indigo-600/10' 
                         : 'border-gray-100 bg-white hover:border-indigo-200'
                     }`}
                 >
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-3 transition-colors ${level === 'copilot' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                        <UserCheck className="w-4 h-4" />
+                    <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center transition-colors ${level === 'copilot' ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/30' : 'bg-gray-100 text-gray-400'}`}>
+                        <UserCheck className="w-5 h-5" />
                     </div>
-                    <h4 className={`text-sm font-bold ${level === 'copilot' ? 'text-indigo-900' : 'text-gray-700'}`}>1. Copiloto</h4>
-                    <p className="text-xs text-gray-500 font-medium mt-1 leading-relaxed">
-                        La IA analiza y propone acciones. Tú apruebas manualmente cada una antes de ejecutarse.
-                    </p>
+                    <div>
+                        <h4 className={`text-sm font-bold ${level === 'copilot' ? 'text-indigo-900' : 'text-gray-700'}`}>1. Copiloto</h4>
+                        <p className="text-[11px] text-gray-500 font-medium mt-0.5 leading-relaxed">
+                            La IA analiza y propone acciones. Tú apruebas manualmente cada una.
+                        </p>
+                    </div>
                 </button>
 
                 <button
                     onClick={() => handleSelect('semi')}
-                    className={`relative p-4 rounded-2xl text-left transition-all border-2 ${
+                    className={`relative p-4 rounded-2xl text-left transition-all border-2 flex items-start gap-4 ${
                         level === 'semi' 
                         ? 'border-fuchsia-500 bg-fuchsia-50/50 shadow-md shadow-fuchsia-500/10' 
                         : 'border-gray-100 bg-white hover:border-fuchsia-200'
                     }`}
                 >
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-3 transition-colors ${level === 'semi' ? 'bg-fuchsia-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                        <Zap className="w-4 h-4" />
+                    <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center transition-colors ${level === 'semi' ? 'bg-fuchsia-500 text-white shadow-sm shadow-fuchsia-500/30' : 'bg-gray-100 text-gray-400'}`}>
+                        <Zap className="w-5 h-5" />
                     </div>
-                    <h4 className={`text-sm font-bold ${level === 'semi' ? 'text-fuchsia-900' : 'text-gray-700'}`}>2. Semi-Autónomo</h4>
-                    <p className="text-xs text-gray-500 font-medium mt-1 leading-relaxed">
-                        La IA ejecuta seguimientos y correos de bajo riesgo sola. Propone solo campañas masivas.
-                    </p>
+                    <div>
+                        <h4 className={`text-sm font-bold ${level === 'semi' ? 'text-fuchsia-900' : 'text-gray-700'}`}>2. Semi-Autónomo</h4>
+                        <p className="text-[11px] text-gray-500 font-medium mt-0.5 leading-relaxed">
+                            La IA ejecuta tareas de bajo riesgo sola. Propone campañas complejas.
+                        </p>
+                    </div>
                 </button>
 
                 <button
                     onClick={() => handleSelect('autopilot')}
-                    className={`relative p-4 rounded-2xl text-left transition-all border-2 overflow-hidden ${
+                    className={`relative p-4 rounded-2xl text-left transition-all border-2 overflow-hidden flex items-start gap-4 ${
                         level === 'autopilot' 
                         ? 'border-emerald-500 bg-emerald-50/50 shadow-md shadow-emerald-500/10' 
                         : 'border-gray-100 bg-white hover:border-emerald-200'
@@ -95,13 +99,15 @@ export default function AutonomyToggle({ companyId }: Props) {
                     {level === 'autopilot' && (
                         <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/10 to-transparent pointer-events-none"></div>
                     )}
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-3 transition-colors ${level === 'autopilot' ? 'bg-emerald-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
-                        <Bot className="w-4 h-4" />
+                    <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center transition-colors ${level === 'autopilot' ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/30' : 'bg-gray-100 text-gray-400'}`}>
+                        <Bot className="w-5 h-5" />
                     </div>
-                    <h4 className={`text-sm font-bold ${level === 'autopilot' ? 'text-emerald-900' : 'text-gray-700'}`}>3. Full Autopilot</h4>
-                    <p className="text-xs text-gray-500 font-medium mt-1 leading-relaxed">
-                        Nivel Dios. El CRM trabaja 24/7 solo. Envía campañas, negocia y reacciona. Tú solo lees reportes.
-                    </p>
+                    <div>
+                        <h4 className={`text-sm font-bold ${level === 'autopilot' ? 'text-emerald-900' : 'text-gray-700'}`}>3. Full Autopilot</h4>
+                        <p className="text-[11px] text-gray-500 font-medium mt-0.5 leading-relaxed">
+                            Nivel Dios. El CRM trabaja 24/7 solo enviando campañas. Tú solo revisas reportes.
+                        </p>
+                    </div>
                 </button>
             </div>
         </div>
