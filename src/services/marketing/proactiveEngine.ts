@@ -18,60 +18,83 @@ export interface AiTask {
 
 export const proactiveEngineService = {
     /**
-     * Get the current autonomy setting for the company
+     * Get the current autonomy setting for the company.
+     * Returns 'copilot' as safe default on any error (including schema cache miss).
      */
     async getAutonomyLevel(companyId: string): Promise<AutonomyLevel> {
-        const { data, error } = await supabase
-            .from('ai_autonomy_settings')
-            .select('autonomy_level')
-            .eq('company_id', companyId)
-            .single();
+        try {
+            const { data, error } = await supabase
+                .from('ai_autonomy_settings')
+                .select('autonomy_level')
+                .eq('company_id', companyId)
+                .single();
 
-        if (error) {
-            // Default to copilot if not set
-            if (error.code === 'PGRST116') return 'copilot';
-            console.error('Error fetching autonomy level:', error);
+            if (error) {
+                // PGRST116 = no row found (expected for first time use)
+                // All other errors (schema cache, RLS, etc.) → safe default
+                return 'copilot';
+            }
+            return data.autonomy_level as AutonomyLevel;
+        } catch {
             return 'copilot';
         }
-
-        return data.autonomy_level as AutonomyLevel;
     },
 
     /**
-     * Update the autonomy setting for the company
+     * Update the autonomy setting for the company.
+     * Throws a user-friendly message on failure.
      */
     async setAutonomyLevel(companyId: string, level: AutonomyLevel): Promise<void> {
-        const { error } = await supabase
-            .from('ai_autonomy_settings')
-            .upsert({ company_id: companyId, autonomy_level: level });
+        try {
+            const { error } = await supabase
+                .from('ai_autonomy_settings')
+                .upsert({ company_id: companyId, autonomy_level: level });
 
-        if (error) throw error;
+            if (error) {
+                console.error('setAutonomyLevel error:', error);
+                throw new Error('No se pudo guardar. Verifica tu conexión e intenta de nuevo.');
+            }
+        } catch (err: any) {
+            throw new Error(err.message || 'Error al guardar configuración');
+        }
     },
 
     /**
-     * Fetch pending AI tasks from the queue
+     * Fetch pending AI tasks from the queue.
+     * Returns empty array on any error (schema cache, RLS, etc.)
      */
     async getPendingTasks(companyId: string): Promise<AiTask[]> {
-        const { data, error } = await supabase
-            .from('ai_tasks')
-            .select('*')
-            .eq('company_id', companyId)
-            .eq('status', 'pending')
-            .order('confidence', { ascending: false });
+        try {
+            const { data, error } = await supabase
+                .from('ai_tasks')
+                .select('*')
+                .eq('company_id', companyId)
+                .eq('status', 'pending')
+                .order('confidence', { ascending: false });
 
-        if (error) throw error;
-        return data as AiTask[];
+            if (error) {
+                console.error('getPendingTasks error:', error);
+                return [];
+            }
+            return data as AiTask[];
+        } catch {
+            return [];
+        }
     },
 
     /**
      * Approve or reject a task
      */
     async resolveTask(taskId: string, status: 'approved' | 'rejected'): Promise<void> {
-        const { error } = await supabase
-            .from('ai_tasks')
-            .update({ status, executed_at: status === 'approved' ? new Date().toISOString() : null })
-            .eq('id', taskId);
+        try {
+            const { error } = await supabase
+                .from('ai_tasks')
+                .update({ status, executed_at: status === 'approved' ? new Date().toISOString() : null })
+                .eq('id', taskId);
 
-        if (error) throw error;
+            if (error) throw new Error(error.message);
+        } catch (err: any) {
+            throw new Error(err.message || 'Error al procesar tarea');
+        }
     }
 };
