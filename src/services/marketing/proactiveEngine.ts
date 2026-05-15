@@ -24,17 +24,13 @@ export const proactiveEngineService = {
     async getAutonomyLevel(companyId: string): Promise<AutonomyLevel> {
         try {
             const { data, error } = await supabase
-                .from('ai_autonomy_settings')
-                .select('autonomy_level')
-                .eq('company_id', companyId)
-                .single();
+                .rpc('get_autonomy_level', { p_company_id: companyId });
 
             if (error) {
-                // PGRST116 = no row found (expected for first time use)
-                // All other errors (schema cache, RLS, etc.) → safe default
+                console.error('getAutonomyLevel rpc error:', error);
                 return 'copilot';
             }
-            return data.autonomy_level as AutonomyLevel;
+            return (data as AutonomyLevel) || 'copilot';
         } catch {
             return 'copilot';
         }
@@ -47,11 +43,10 @@ export const proactiveEngineService = {
     async setAutonomyLevel(companyId: string, level: AutonomyLevel): Promise<void> {
         try {
             const { error } = await supabase
-                .from('ai_autonomy_settings')
-                .upsert({ company_id: companyId, autonomy_level: level });
+                .rpc('set_autonomy_level', { p_company_id: companyId, p_level: level });
 
             if (error) {
-                console.error('setAutonomyLevel error:', error);
+                console.error('setAutonomyLevel rpc error:', error);
                 throw new Error('No se pudo guardar. Verifica tu conexión e intenta de nuevo.');
             }
         } catch (err: any) {
