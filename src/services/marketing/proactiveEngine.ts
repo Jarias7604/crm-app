@@ -47,7 +47,8 @@ export const proactiveEngineService = {
 
             if (error) {
                 console.error('setAutonomyLevel rpc error:', error);
-                throw new Error('No se pudo guardar. Verifica tu conexión e intenta de nuevo.');
+                // Show actual server error for debugging
+                throw new Error(error.message || 'Error al guardar configuración');
             }
         } catch (err: any) {
             throw new Error(err.message || 'Error al guardar configuración');
