@@ -39,6 +39,21 @@ const DEFAULT_CONFIG: NurtureConfig = {
   },
 };
 
+// ── SVG Illustrations ─────────────────────────────────────────────────────────
+const StepIllustration = ({ step }: { step: number }) => {
+  const illustrations = [
+    // Step 1: Product — box with sparkle
+    <svg key="p" viewBox="0 0 120 100" fill="none" className="w-full h-full"><rect x="30" y="25" width="60" height="50" rx="8" stroke="#3b82f6" strokeWidth="2" fill="#eff6ff"/><path d="M45 50h30M60 37v26" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round"/><circle cx="85" cy="22" r="3" fill="#f59e0b"/><path d="M85 15v3M85 25v3M78 22h3M88 22h3" stroke="#f59e0b" strokeWidth="1.5" strokeLinecap="round"/><path d="M30 40l30-15 30 15" stroke="#3b82f6" strokeWidth="2" fill="none"/></svg>,
+    // Step 2: Tone — chat bubbles
+    <svg key="t" viewBox="0 0 120 100" fill="none" className="w-full h-full"><rect x="15" y="20" width="55" height="32" rx="10" fill="#eff6ff" stroke="#3b82f6" strokeWidth="2"/><path d="M25 48l-5 10 12-5" fill="#eff6ff" stroke="#3b82f6" strokeWidth="2"/><rect x="28" y="30" width="30" height="3" rx="1.5" fill="#93c5fd"/><rect x="28" y="37" width="20" height="3" rx="1.5" fill="#bfdbfe"/><rect x="50" y="48" width="55" height="28" rx="10" fill="#f0fdf4" stroke="#22c55e" strokeWidth="2"/><path d="M95 76l5 8-12-4" fill="#f0fdf4" stroke="#22c55e" strokeWidth="2"/><rect x="60" y="56" width="30" height="3" rx="1.5" fill="#86efac"/><rect x="60" y="63" width="18" height="3" rx="1.5" fill="#bbf7d0"/></svg>,
+    // Step 3: CTA — phone with arrow
+    <svg key="c" viewBox="0 0 120 100" fill="none" className="w-full h-full"><rect x="38" y="10" width="44" height="80" rx="10" stroke="#3b82f6" strokeWidth="2" fill="#eff6ff"/><rect x="44" y="22" width="32" height="50" rx="4" fill="white" stroke="#e2e8f0" strokeWidth="1"/><circle cx="60" cy="82" r="4" stroke="#3b82f6" strokeWidth="2"/><rect x="52" y="14" width="16" height="3" rx="1.5" fill="#cbd5e1"/><path d="M55 42l10 8-10 8" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>,
+    // Step 4: Channels — network nodes
+    <svg key="n" viewBox="0 0 120 100" fill="none" className="w-full h-full"><circle cx="60" cy="50" r="14" fill="#eff6ff" stroke="#3b82f6" strokeWidth="2"/><circle cx="25" cy="25" r="10" fill="#f0fdf4" stroke="#22c55e" strokeWidth="2"/><circle cx="95" cy="25" r="10" fill="#fef3c7" stroke="#f59e0b" strokeWidth="2"/><circle cx="25" cy="80" r="10" fill="#fce7f3" stroke="#ec4899" strokeWidth="2"/><circle cx="95" cy="80" r="10" fill="#f5f3ff" stroke="#8b5cf6" strokeWidth="2"/><path d="M48 42l-15-12M72 42l15-12M48 58l-15 16M72 58l15 16" stroke="#94a3b8" strokeWidth="1.5" strokeDasharray="3 3"/><path d="M55 47h10M60 44v12" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round"/></svg>,
+  ];
+  return <div className="w-24 h-20 mx-auto mb-4 opacity-80">{illustrations[step]}</div>;
+};
+
 // ── Wizard steps ──────────────────────────────────────────────────────────────
 const WIZARD_STEPS = [
   { id: 'product', label: 'Producto', question: '¿Cuál es tu producto o servicio principal?', placeholder: 'Ej: Facturación Electrónica DTE, ERP empresarial' },
@@ -68,7 +83,7 @@ function StepCard({ label, badge, step, onChange }: { label: string; badge: stri
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button onClick={() => onChange({ ...step, enabled: !step.enabled })} className="text-slate-400 hover:text-blue-600 transition-colors">
-            {step.enabled ? <ToggleRight className="w-5 h-5 text-blue-600" /> : <ToggleLeft className="w-5 h-5" />}
+            {step.enabled ? <ToggleRight className="w-8 h-8 text-blue-600" /> : <ToggleLeft className="w-8 h-8" />}
           </button>
           <button onClick={() => setExpanded(!expanded)} className="p-1.5 hover:bg-slate-50 rounded-lg transition-colors text-slate-400">
             {expanded ? <ChevronDown className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />}
@@ -224,6 +239,7 @@ export default function SalesEngineConfig() {
               <h2 className="text-lg font-black text-slate-900">{WIZARD_STEPS[wizardStep].question}</h2>
             </div>
             <div className="p-6">
+              <StepIllustration step={wizardStep} />
               {wizardStep === 0 && (
                 <input value={config.product} onChange={e => setConfig(c => ({ ...c, product: e.target.value }))}
                   placeholder={WIZARD_STEPS[0].placeholder}
@@ -263,8 +279,8 @@ export default function SalesEngineConfig() {
                         <p className="text-[11px] text-slate-400">{opt.desc}</p>
                       </div>
                       {config.channels[opt.key as keyof typeof config.channels]
-                        ? <ToggleRight className="w-5 h-5 text-blue-600 shrink-0" />
-                        : <ToggleLeft className="w-5 h-5 text-slate-400 shrink-0" />}
+                        ? <ToggleRight className="w-8 h-8 text-blue-600 shrink-0" />
+                        : <ToggleLeft className="w-8 h-8 text-slate-400 shrink-0" />}
                     </button>
                   ))}
                 </div>
@@ -319,12 +335,23 @@ export default function SalesEngineConfig() {
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+              <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Contacto CTA</h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">WhatsApp</label>
+                  <input value={config.whatsapp} onChange={e => setConfig(c => ({ ...c, whatsapp: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-100 rounded-xl focus:outline-none focus:border-blue-300 font-medium text-slate-800" />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
               <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Sin Email</h3>
               <div className="space-y-2">
                 <button onClick={() => setConfig(c => ({ ...c, channels: { ...c.channels, agent_task: !c.channels.agent_task } }))}
                   className={`w-full flex items-center justify-between p-3 rounded-xl border transition-all ${config.channels.agent_task ? 'border-blue-200 bg-blue-50' : 'border-slate-100'}`}>
                   <span className="text-sm font-bold text-slate-800">Tarea al agente</span>
-                  {config.channels.agent_task ? <ToggleRight className="w-5 h-5 text-blue-600" /> : <ToggleLeft className="w-5 h-5 text-slate-300" />}
+                  {config.channels.agent_task ? <ToggleRight className="w-8 h-8 text-blue-600" /> : <ToggleLeft className="w-8 h-8 text-slate-300" />}
                 </button>
               </div>
             </div>
