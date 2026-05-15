@@ -329,7 +329,7 @@ export default function SalesEngineConfig() {
               </div>
             </div>
 
-            <button onClick={() => setConfig(c => ({ ...c, wizard_done: false })); setWizardStep(0)}
+            <button onClick={() => { setConfig(c => ({ ...c, wizard_done: false })); setWizardStep(0); }}
               className="w-full py-2.5 text-[11px] font-black text-slate-400 hover:text-blue-600 border border-slate-100 rounded-xl hover:border-blue-200 transition-all bg-white flex items-center justify-center gap-2">
               <Settings2 className="w-3.5 h-3.5" /> Reconfigurar Wizard
             </button>
