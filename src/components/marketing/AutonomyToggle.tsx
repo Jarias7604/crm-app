@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { UserCheck, Zap, Bot, ShieldAlert, Eye } from 'lucide-react';
+import { UserCheck, Zap, Bot, ShieldAlert } from 'lucide-react';
 import { proactiveEngineService, type AutonomyLevel } from '../../services/marketing/proactiveEngine';
-import { useAuth } from '../../auth/AuthProvider';
 import toast from 'react-hot-toast';
 
 interface Props {
@@ -11,9 +10,6 @@ interface Props {
 export default function AutonomyToggle({ companyId }: Props) {
     const [level, setLevel] = useState<AutonomyLevel>('copilot');
     const [isLoading, setIsLoading] = useState(true);
-    const { simulatedCompanyId, simulatedRole } = useAuth();
-    // Block writes if ANY simulation is active (role OR company)
-    const isSimulating = !!simulatedCompanyId || !!simulatedRole;
 
     useEffect(() => {
         if (companyId) {
@@ -25,11 +21,6 @@ export default function AutonomyToggle({ companyId }: Props) {
     }, [companyId]);
 
     const handleSelect = async (newLevel: AutonomyLevel) => {
-        // Guard: cannot save in simulation mode — JWT is real user, company_id is simulated
-        if (isSimulating) {
-            toast.error('Sal del modo Simulación para cambiar esta configuración.', { icon: '🔒' });
-            return;
-        }
         setIsLoading(true);
         try {
             await proactiveEngineService.setAutonomyLevel(companyId, newLevel);
@@ -58,13 +49,6 @@ export default function AutonomyToggle({ companyId }: Props) {
                     <p className="text-xs text-gray-500 font-medium mt-1">Configura qué tanta libertad tiene el motor autónomo.</p>
                 </div>
             </div>
-
-            {isSimulating && (
-                <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-                    <Eye className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                    <p className="text-[11px] font-bold text-amber-700">Modo solo lectura — Sal de Simulación para editar</p>
-                </div>
-            )}
 
             <div className="flex flex-col gap-3">
                 <button
