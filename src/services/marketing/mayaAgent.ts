@@ -40,7 +40,6 @@ export const mayaAgent = {
         // Log the decision
         auditTrailService.logDecision({
             companyId,
-            leadId: null,
             agentName: 'maya',
             decisionType: 'content_generated',
             reasoning: `Maya generó copy para campaña sobre "${request.topic}" usando tono ${request.tone} para el canal ${request.channel}.`,
@@ -70,7 +69,6 @@ export const mayaAgent = {
 
         auditTrailService.logDecision({
             companyId,
-            leadId: null,
             agentName: 'maya',
             decisionType: 'content_generated',
             reasoning: `Maya mejoró un template de texto. Objetivo: ${goal || 'General'}`,
