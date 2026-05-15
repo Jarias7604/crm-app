@@ -9,6 +9,17 @@ It resets `verify_jwt` to `true` by default, which BREAKS functions that need pu
 
 ## ALWAYS use MCP `deploy_edge_function` with correct `verify_jwt` setting
 
+## ⚠️ ARQUITECTURA DUAL — DOS PROYECTOS SUPABASE
+
+| Proyecto | ID | Uso |
+|---|---|---|
+| **crm-app** | `mtxqqamitglhehaktgxm` | Frontend auth + datos del CRM (lo que ve el usuario en el browser) |
+| **Jarias7604's Project** | `ikofyypxphrqkncimszt` | Edge Functions + Telegram bot + AI engine |
+| **crm-app-testing** | `ubqscyfefgfbmndnypbp` | Testing/desarrollo |
+
+> Deploy de Edge Functions SIEMPRE va a `ikofyypxphrqkncimszt`
+> Cambios de Auth/Email templates van a `mtxqqamitglhehaktgxm`
+
 ## Edge Function Registry (MASTER LIST)
 
 | Function | verify_jwt | Secrets Required |

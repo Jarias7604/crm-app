@@ -40,6 +40,7 @@ const EmailCampaigns    = lazy(() => import('./pages/marketing/EmailCampaigns'))
 const CampaignBuilder   = lazy(() => import('./pages/marketing/CampaignBuilder'));
 const AiAgentsConfig    = lazy(() => import('./pages/marketing/AiAgentsConfig'));
 const FollowupSettings  = lazy(() => import('./pages/marketing/FollowupSettings'));
+const SalesEngineConfig = lazy(() => import('./pages/marketing/SalesEngineConfig'));
 const AiAgentCockpit    = lazy(() => import('./pages/marketing/AiAgentCockpit'));
 const MarketingSettings = lazy(() => import('./pages/marketing/MarketingSettings'));
 const ChatHub           = lazy(() => import('./pages/marketing/ChatHub'));
@@ -241,6 +242,7 @@ function App() {
                     <Route path="/marketing/ai-agents" element={<AiAgentsConfig />} />
                     <Route path="/marketing/cockpit" element={<AiAgentCockpit />} />
                     <Route path="/marketing/followup-settings" element={<FollowupSettings />} />
+                    <Route path="/marketing/engine-config" element={<SalesEngineConfig />} />
                     <Route path="/marketing/settings" element={<MarketingSettings />} />
                     <Route path="/marketing/flyers" element={<FlyerStudio />} />
                   </Route>

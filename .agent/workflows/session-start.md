@@ -20,11 +20,11 @@ Leer `.agent/PROJECT_IDENTITY.md` para confirmar en qué proyecto estamos trabaj
 
 Verificar:
 - **Ruta:** `c:\Users\jaria\OneDrive\DELL\Desktop\crm-app`
-- **Supabase PRODUCCIÓN:** `mtxqqamitglhehaktgxm` (verificado desde JS bundle 2026-05-03)
-- **Supabase SECUNDARIA:** `ikofyypxphrqkncimszt` (NO es la que usa Vercel prod)
-- **Supabase TESTING:** `ubqscyfefgfbmndnypbp` (solo desarrollo local)
+- **Supabase PRODUCCIÓN (TODO):** `ikofyypxphrqkncimszt` — frontend, edge functions, auth, datos reales
+- **Supabase ANTERIOR (ignorar):** `mtxqqamitglhehaktgxm` — era producción antes de mayo 2026, YA NO SE USA
+- **Supabase TESTING:** `ubqscyfefgfbmndnypbp` — solo desarrollo local
 
-Si el usuario menciona funcionalidades fuera de `PROJECT_IDENTITY.md` → **DETENER y preguntar**.
+> ⚠️ REGLA: TODO va a `ikofyypxphrqkncimszt`. Nunca a `mtxqqamitglhehaktgxm`.
 
 ## Paso 3: Verificar Project ID de Supabase
 

@@ -497,6 +497,7 @@ ${technicalRules}`;
                         if (upd.name) payload.name = upd.name;
                         if (upd.company_name) payload.company_name = upd.company_name;
                         if (upd.phone) payload.phone = upd.phone;
+                        if (upd.email) payload.email = upd.email; // ✅ 1B: capture email
                         if (Object.keys(payload).length > 0) {
                             await supabase.from('leads').update(payload).eq('id', lead.id);
                             log(`Lead updated:`, payload);
@@ -581,9 +582,29 @@ ${technicalRules}`;
                 }).select().single();
 
                 if (quoteError) console.error("Quote insert error:", quoteError);
-                if (quoteObj) log(`Quote ${quoteObj.id} saved to DB`);
-            }
-        }
+                if (quoteObj) {
+                    log(`Quote ${quoteObj.id} saved to DB`);
+                    // ✅ 1B: Save quote timestamp so auto-followup can track 48h expiry
+                    await supabase.from('lead_ai_memory')
+                        .update({
+                            known_facts: supabase.rpc ? undefined : undefined, // trigger merge via upsert below
+                        })
+                        .eq('lead_id', lead?.id);
+                    await supabase.rpc('upsert_lead_memory', {
+                        p_lead_id:    lead?.id,
+                        p_company_id: companyId,
+                        p_facts: {
+                            quote_created_at:  new Date().toISOString(),
+                            quote_id:          quoteObj.id,
+                            last_quoted_plan:  selectedPlan.nombre,
+                            last_quoted_price: String(total.toFixed(2)),
+                        },
+                        p_stage: 'cotizado',
+                    });
+                    log(`✅ quote_created_at saved to Lead Brain`);
+                }
+            } // end if (selectedPlan)
+        } // end if (cleanText.includes('QUOTE_TRIGGER:'))
 
         // Cleanup — remove internal CRM links and triggers, but KEEP external links (demo, calendly, etc.)
         cleanText = cleanText
@@ -679,15 +700,56 @@ ${technicalRules}`;
                     const priceMatch = cleanText?.match(/\$?([\d,]+(?:\.\d{1,2})?)/);
                     if (planMatch?.[1])  newFacts.last_quoted_plan  = planMatch[1].trim();
                     if (priceMatch?.[1]) newFacts.last_quoted_price = priceMatch[1].replace(',','');
+                    // quote_created_at already saved in QUOTE_TRIGGER block above
+                }
+
+                // ✅ 1B: Detect demo scheduling — extract date and save to memory
+                const demoKeywords = ['demo', 'reunión', 'reunion', 'llamada', 'cita', 'agendar', 'agendado', 'agendamos', 'calendly', 'citas'];
+                const hasDemoContext = demoKeywords.some(k => (cleanText + ' ' + userMessage).toLowerCase().includes(k));
+                if (hasDemoContext && !leadMemory?.known_facts?.demo_scheduled_at) {
+                    // Try to extract a date/time from the AI response or user message
+                    const combined = cleanText + ' ' + userMessage;
+                    // Match patterns: "mañana", "el lunes", "el 15", "15 de mayo", "15/05"
+                    const datePatterns = [
+                        /\b(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?)/,          // 15/05 or 15/05/2026
+                        /\b(\d{1,2})\s+de\s+(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i,
+                        /\b(lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)\b/i,
+                        /\b(mañana|pasado mañana|hoy)\b/i,
+                    ];
+                    let demoDateStr: string | null = null;
+                    for (const pat of datePatterns) {
+                        const m = combined.match(pat);
+                        if (m) { demoDateStr = m[0]; break; }
+                    }
+                    if (demoDateStr) {
+                        // Store as text — auto-followup uses it for reminder logic
+                        newFacts.demo_scheduled_at_text = demoDateStr;
+                        // Store ISO if it's a simple date pattern
+                        newFacts.demo_scheduled_at = new Date().toISOString(); // approximation — refined when Calendly integration is added
+                        newFacts.demo_reminder_sent = false;
+                        log(`✅ Demo scheduled detected: "${demoDateStr}" → saved to Lead Brain`);
+                    } else {
+                        // Demo mentioned but no specific date — flag it
+                        newFacts.demo_in_progress = true;
+                        log(`ℹ️ Demo context detected but no date extracted`);
+                    }
+                    // Update AI stage to reflect demo was scheduled
+                    newStage = 'seguimiento';
+                    nextAction = 'demo';
                 }
 
                 // ── Detect CLOSE signals — lead wants to buy ─────────────
-                const closeSignals = [
+                const systemCommands = ['/start', '/help', '/menu', '/info', '/stop', '/reset'];
+                const isSystemCommand = systemCommands.some(cmd => userMessage.trim().toLowerCase().startsWith(cmd));
+
+                const closeSignalKeywords = [
                     'quiero contratar','vamos adelante','cuando empezamos','acepto','de acuerdo',
                     'como pagamos','donde firmo','lista para contratar','cuanto es la cuenta',
                     'aceptamos','procesemos','adelante con eso','quiero el plan','voy con ustedes'
                 ];
-                const isClosing = closeSignals.some(s => msgLower.includes(s)) || sentiment >= 82;
+                const hasCloseKeyword = closeSignalKeywords.some(s => msgLower.includes(s));
+                // Require explicit keyword — high sentiment alone is NOT enough to avoid false positives
+                const isClosing = !isSystemCommand && hasCloseKeyword;
 
                 if (isClosing && newStage !== 'cerrado') {
                     newStage   = 'negociacion';
@@ -744,10 +806,10 @@ ${technicalRules}`;
                     'cerrado':      'Cliente',
                     'perdido':      'Perdido',
                 };
-                const crmStatus = stageToStatus[newStage];
-                if (crmStatus) {
-                    await supabase.from('leads').update({ status: crmStatus }).eq('id', lead.id);
-                    log(`CRM status synced: ${newStage} → ${crmStatus}`);
+                const leadCrmStatus = stageToStatus[newStage];
+                if (leadCrmStatus) {
+                    await supabase.from('leads').update({ status: leadCrmStatus }).eq('id', lead.id);
+                    log(`CRM status synced: ${newStage} → ${leadCrmStatus}`);
                 }
 
                 log(`Lead Brain updated: stage=${newStage}, sentiment=${sentiment}, action=${nextAction}, objection=${objection}`);
