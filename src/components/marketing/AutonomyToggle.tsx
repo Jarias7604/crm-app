@@ -11,8 +11,9 @@ interface Props {
 export default function AutonomyToggle({ companyId }: Props) {
     const [level, setLevel] = useState<AutonomyLevel>('copilot');
     const [isLoading, setIsLoading] = useState(true);
-    const { simulatedCompanyId } = useAuth();
-    const isSimulating = !!simulatedCompanyId;
+    const { simulatedCompanyId, simulatedRole } = useAuth();
+    // Block writes if ANY simulation is active (role OR company)
+    const isSimulating = !!simulatedCompanyId || !!simulatedRole;
 
     useEffect(() => {
         if (companyId) {
