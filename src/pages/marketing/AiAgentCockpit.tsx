@@ -11,6 +11,8 @@ import { useAuth } from '../../auth/AuthProvider';
 import toast from 'react-hot-toast';
 import PredictiveBoard from './PredictiveBoard';
 import AuditLogViewer from './AuditLogViewer';
+import AutonomyToggle from '../../components/marketing/AutonomyToggle';
+import AiTaskInbox from './AiTaskInbox';
 
 const STAGE_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
     nuevo:        { label: 'Nuevo',        color: 'text-slate-600', bg: 'bg-slate-100' },
@@ -262,6 +264,18 @@ export default function AiAgentCockpit() {
                     </button>
                 </div>
             </div>
+
+            {/* FASE 3: AI Task Queue & Autonomy Control */}
+            {profile?.company_id && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                    <div className="lg:col-span-2">
+                        <AiTaskInbox companyId={profile.company_id} />
+                    </div>
+                    <div className="lg:col-span-1">
+                        <AutonomyToggle companyId={profile.company_id} />
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 <MetricCard
