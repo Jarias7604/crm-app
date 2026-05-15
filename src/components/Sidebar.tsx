@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthProvider';
-import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft, Zap, Search, Bot, XCircle, Network, BarChart3, UserCircle, Headset, TicketIcon, AlertTriangle, UserCheck, BookOpen, PhoneCall, Sparkles, Brain } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft, Zap, Search, Bot, XCircle, Network, BarChart3, UserCircle, Headset, TicketIcon, AlertTriangle, UserCheck, BookOpen, PhoneCall, Sparkles, Brain, Target } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { brandingService } from '../services/branding';
@@ -23,7 +23,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     }
     const isCallBotEnabled = import.meta.env.VITE_SHOW_CALL_BOT === 'true';
     const configPaths = ['/company/billing', '/company/branding', '/company/integrations', '/catalogo', '/financial-rules', '/loss-reasons', '/industries', '/admin/call-bot'];
-    const marketingPaths = ['/marketing', '/marketing/email', '/marketing/lead-hunter', '/marketing/ai-agents', '/marketing/settings', '/marketing/flyers', '/marketing/cockpit', '/marketing/engine-config'];
+    const marketingPaths = ['/marketing', '/marketing/email', '/marketing/lead-hunter', '/marketing/ai-agents', '/marketing/settings', '/marketing/flyers', '/marketing/cockpit', '/marketing/engine-config', '/marketing/predictions'];
     const teamPaths = ['/company/team', '/company/teams', '/company/performance'];
     const [configOpen, setConfigOpen] = useState(configPaths.some(path => location.pathname === path));
 
@@ -138,6 +138,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                 { name: 'Lead Hunter', href: '/marketing/lead-hunter', icon: Search },
                 { name: 'Agentes AI', href: '/marketing/ai-agents', icon: Bot },
                 { name: '🧠 Cockpit AI', href: '/marketing/cockpit', icon: Brain },
+                { name: '🎯 Oracle AI', href: '/marketing/predictions', icon: Target },
                 { name: 'Motor de Ventas', href: '/marketing/engine-config', icon: Zap },
                 { name: '🎨 Flyer Studio', href: '/marketing/flyers', icon: Sparkles },
                 { name: 'Configuración', href: '/marketing/settings', icon: Settings },

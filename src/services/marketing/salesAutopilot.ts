@@ -19,6 +19,7 @@
 import { supabase } from '../supabase';
 import { logger } from '../../utils/logger';
 import { massMessagingService } from './massMessagingService';
+import { auditTrailService } from './auditTrail';
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
@@ -259,7 +260,7 @@ export function analyzeAndDecide(ctx: AutopilotContext): AutopilotAction | null 
             const matched = playbook.keywords.some(kw => combinedText.includes(kw));
             if (matched && daysSinceLost >= playbook.waitDays) {
                 const message = playbook.generateMessage(ctx);
-                return {
+                const action: AutopilotAction = {
                     type: playbook.strategy,
                     channel: playbook.channel,
                     priority: 1,
@@ -268,6 +269,23 @@ export function analyzeAndDecide(ctx: AutopilotContext): AutopilotAction | null 
                     internalNote: `🤖 AI Autopilot: Detecté razón "${lossReason}". ${playbook.reasoning} Han pasado ${daysSinceLost} días desde la pérdida.`,
                     reasoning: playbook.reasoning,
                 };
+
+                // 🔍 Audit Trail — log the decision with reasoning
+                auditTrailService.logDecision({
+                    companyId: lead.id, // will be overridden by caller with real companyId
+                    leadId: lead.id,
+                    agentName: 'autopilot',
+                    decisionType: playbook.strategy === 'send_discount_offer' ? 'discount_offered'
+                        : playbook.strategy === 'send_testimonial' ? 'message_sent'
+                        : playbook.strategy === 'reactivate_lead' ? 'lead_reactivated'
+                        : playbook.strategy === 'switch_channel' ? 'channel_switched'
+                        : 'message_sent',
+                    reasoning: `Razón de pérdida: "${lossReason}". ${playbook.reasoning} Días desde pérdida: ${daysSinceLost}.`,
+                    contextSnapshot: { lossReason, daysSinceLost, strategy: playbook.strategy, channel: playbook.channel },
+                    confidence: 75,
+                });
+
+                return action;
             }
         }
     }
@@ -386,6 +404,21 @@ export async function executeAction(
                 action,
                 message_preview: finalMessage.substring(0, 200),
             }
+        });
+
+        // 🔍 Audit Trail — log execution result
+        auditTrailService.logDecision({
+            companyId: companyId,
+            leadId: lead.id,
+            agentName: 'autopilot',
+            decisionType: action.type === 'send_discount_offer' ? 'discount_offered'
+                : action.type === 'escalate_to_human' ? 'escalated_to_human'
+                : action.type === 'send_quote_link' ? 'quote_generated'
+                : action.type === 'schedule_followup' ? 'followup_scheduled'
+                : 'message_sent',
+            reasoning: `Ejecutado: ${action.type} vía ${action.channel}. ${action.reasoning}`,
+            contextSnapshot: { actionType: action.type, channel: action.channel, discount: action.discount },
+            confidence: 80,
         });
 
         return { success: true, channel: action.channel };

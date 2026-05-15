@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useParams } from 'react-router-dom';
-import { Save, Send, ArrowLeft, Users, FileText, Eye, X, Zap, Mail, Smartphone, Info, ChevronLeft, ChevronRight, Smartphone as WhatsAppIcon, ExternalLink, ShieldCheck, ShieldAlert, Check, Search, MailX, UserCheck, UserX } from 'lucide-react';
+import { Save, Send, ArrowLeft, Users, FileText, Eye, X, Zap, Mail, Smartphone, Info, ChevronLeft, ChevronRight, Smartphone as WhatsAppIcon, ExternalLink, ShieldCheck, ShieldAlert, Check, Search, MailX, UserCheck, UserX, Sparkles, RefreshCw } from 'lucide-react';
 import { campaignService } from '../../services/marketing/campaignService';
+import { mayaAgent } from '../../services/marketing/mayaAgent';
 import { supabase } from '../../services/supabase';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../auth/AuthProvider';
@@ -122,6 +123,13 @@ export default function CampaignBuilder() {
     const [currentLeadIndex, setCurrentLeadIndex] = useState(0);
     const [excludedLeadIds, setExcludedLeadIds] = useState<Set<string>>(new Set());
     const [audienceSearch, setAudienceSearch] = useState('');
+
+    // Maya Agent State
+    const [showMayaModal, setShowMayaModal] = useState(false);
+    const [mayaTopic, setMayaTopic] = useState('');
+    const [mayaTone, setMayaTone] = useState('Profesional y Persuasivo');
+    const [mayaAudience, setMayaAudience] = useState('Prospectos Generales');
+    const [isGeneratingMaya, setIsGeneratingMaya] = useState(false);
 
     // Auto-update audience preview when filters change
     useEffect(() => {
@@ -294,8 +302,99 @@ export default function CampaignBuilder() {
         }
     };
 
+    const handleGenerateMaya = async () => {
+        if (!profile?.company_id || !mayaTopic) return;
+        setIsGeneratingMaya(true);
+        try {
+            const result = await mayaAgent.generateCampaignContent(profile.company_id, {
+                topic: mayaTopic,
+                tone: mayaTone,
+                audience: mayaAudience,
+                channel: selectedChannel
+            });
+            setFormData(prev => ({
+                ...prev,
+                subject: result.subject || prev.subject,
+                content: result.body
+            }));
+            setShowMayaModal(false);
+            toast.success('✨ Contenido generado por Maya');
+        } catch (error: any) {
+            toast.error(error.message);
+        } finally {
+            setIsGeneratingMaya(false);
+        }
+    };
+
     return (
         <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
+            {/* Maya Agent Modal */}
+            {showMayaModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col border border-indigo-100">
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gradient-to-r from-indigo-50 to-white">
+                            <div>
+                                <h3 className="text-lg font-black text-indigo-900 flex items-center gap-2">
+                                    <Sparkles className="w-5 h-5 text-indigo-500" />
+                                    Maya — Content Agent
+                                </h3>
+                                <p className="text-xs text-indigo-600/70 font-medium mt-1">Generación autónoma de copy persuasivo</p>
+                            </div>
+                            <button onClick={() => setShowMayaModal(false)} className="p-2 bg-white hover:bg-gray-50 rounded-full transition-colors border border-gray-200 text-gray-400 hover:text-gray-600">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-5">
+                            <div>
+                                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">¿De qué trata la campaña?</label>
+                                <textarea
+                                    className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-medium text-sm text-gray-700 min-h-[100px]"
+                                    placeholder="Ej: Oferta de Black Friday, 20% de descuento en el plan Pro. Mencionar que la promo termina este viernes."
+                                    value={mayaTopic}
+                                    onChange={e => setMayaTopic(e.target.value)}
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Tono</label>
+                                    <select
+                                        className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-xs font-bold text-gray-700"
+                                        value={mayaTone}
+                                        onChange={e => setMayaTone(e.target.value)}
+                                    >
+                                        <option value="Profesional y Persuasivo">Profesional y Persuasivo</option>
+                                        <option value="Directo y de Urgencia">Directo y Urgente</option>
+                                        <option value="Amigable y Cercano">Amigable y Cercano</option>
+                                        <option value="Educativo y de Valor">Educativo y de Valor</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Audiencia</label>
+                                    <input
+                                        type="text"
+                                        className="w-full p-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-xs font-bold text-gray-700"
+                                        placeholder="Ej: Leads fríos"
+                                        value={mayaAudience}
+                                        onChange={e => setMayaAudience(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="p-6 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+                            <button onClick={() => setShowMayaModal(false)} className="px-5 py-2.5 text-xs font-bold text-gray-500 hover:text-gray-700 transition">Cancelar</button>
+                            <button
+                                onClick={handleGenerateMaya}
+                                disabled={isGeneratingMaya || !mayaTopic}
+                                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-black uppercase tracking-widest transition shadow-md shadow-indigo-600/20 flex items-center gap-2"
+                            >
+                                {isGeneratingMaya ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                                Generar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <div className="flex items-center gap-4 mb-8 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
                 <button
@@ -358,10 +457,18 @@ export default function CampaignBuilder() {
                     </div>
 
                     <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
-                        <h2 className="text-xl font-bold flex items-center gap-2 text-gray-900 border-b border-gray-100 pb-4">
-                            <FileText className="w-6 h-6 text-blue-500" />
-                            Contenido del Mensaje
-                        </h2>
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                            <h2 className="text-xl font-bold flex items-center gap-2 text-gray-900">
+                                <FileText className="w-6 h-6 text-blue-500" />
+                                Contenido del Mensaje
+                            </h2>
+                            <button
+                                onClick={() => setShowMayaModal(true)}
+                                className="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-2 border border-indigo-100"
+                            >
+                                <Sparkles className="w-4 h-4 text-indigo-500" /> Generar con Maya
+                            </button>
+                        </div>
 
                         <div className="space-y-6">
                             <div>

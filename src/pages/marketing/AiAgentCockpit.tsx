@@ -4,11 +4,13 @@ import {
     Brain, Zap, Users, TrendingUp, AlertTriangle, CheckCircle2,
     Clock, ArrowLeft, RefreshCw, Play, Pause, ArrowRight,
     MessageSquare, Target, Star, Activity, ChevronRight, Bot, Settings2, Trash2,
-    BarChart2, DollarSign, Percent, Award, PieChart
+    BarChart2, DollarSign, Percent, Award, PieChart, ShieldCheck
 } from 'lucide-react';
 import { leadMemoryService, type CockpitMetrics, type LeadMemory, type ConversionReport } from '../../services/marketing/leadMemoryService';
 import { useAuth } from '../../auth/AuthProvider';
 import toast from 'react-hot-toast';
+import PredictiveBoard from './PredictiveBoard';
+import AuditLogViewer from './AuditLogViewer';
 
 const STAGE_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
     nuevo:        { label: 'Nuevo',        color: 'text-slate-600', bg: 'bg-slate-100' },
@@ -77,7 +79,7 @@ export default function AiAgentCockpit() {
     const [memories, setMemories] = useState<(LeadMemory & { lead: any })[]>([]);
     const [escalations, setEscalations] = useState<(LeadMemory & { lead: any })[]>([]);
     const [priceObjections, setPriceObjections] = useState<(LeadMemory & { lead: any })[]>([]);
-    const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'escalations' | 'precios' | 'conversiones' | 'objeciones'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'escalations' | 'precios' | 'conversiones' | 'objeciones' | 'predicciones' | 'decision_log'>('overview');
     const [convReport, setConvReport] = useState<ConversionReport | null>(null);
     const [loadingReport, setLoadingReport] = useState(false);
     const [objAnalysis, setObjAnalysis] = useState<{ tipo: string; count: number; cerrados: number; color: string; emoji: string }[]>([]);
@@ -317,6 +319,8 @@ export default function AiAgentCockpit() {
             <div className="flex gap-1 bg-slate-100 p-1 rounded-xl w-fit mb-6 flex-wrap">
                 {[
                     { id: 'overview',      label: 'Resumen',                                                                  icon: Target },
+                    { id: 'predicciones',  label: 'Oracle AI',                                                                icon: Zap },
+                    { id: 'decision_log',  label: 'Decision Log',                                                             icon: ShieldCheck },
                     { id: 'leads',         label: `Leads con Memoria (${memories.length})`,                                   icon: Brain },
                     { id: 'conversiones',  label: `Conversiones${convReport ? ` (${convReport.total_closed})` : ''}`,         icon: BarChart2 },
                     { id: 'objeciones',    label: `Objeciones${objAnalysis.length ? ` (${objAnalysis.reduce((s,r)=>s+r.count,0)})` : ''}`, icon: PieChart },
@@ -332,6 +336,8 @@ export default function AiAgentCockpit() {
                                 : tab.id === 'escalations'  ? 'bg-red-500 shadow-sm text-white'
                                 : tab.id === 'conversiones' ? 'bg-emerald-600 shadow-sm text-white'
                                 : tab.id === 'objeciones'   ? 'bg-indigo-600 shadow-sm text-white'
+                                : tab.id === 'predicciones' ? 'bg-teal-600 shadow-sm text-white'
+                                : tab.id === 'decision_log' ? 'bg-slate-900 shadow-sm text-white'
                                 : 'bg-white shadow-sm text-slate-900'
                                 : 'text-slate-500 hover:text-slate-700'
                         }`}
@@ -341,6 +347,20 @@ export default function AiAgentCockpit() {
                     </button>
                 ))}
             </div>
+
+            {/* Predicciones Tab */}
+            {activeTab === 'predicciones' && (
+                <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <PredictiveBoard isEmbedded />
+                </div>
+            )}
+
+            {/* Decision Log Tab */}
+            {activeTab === 'decision_log' && (
+                <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <AuditLogViewer />
+                </div>
+            )}
 
             {/* Objeciones Tab */}
             {activeTab === 'objeciones' && (
