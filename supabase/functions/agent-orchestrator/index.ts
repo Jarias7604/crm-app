@@ -106,6 +106,149 @@ Responde SOLO el texto del mensaje, sin comillas.`
     return `Hola ${firstName} 👋 ¿Cómo va todo? Quería retomar nuestra conversación sobre sus necesidades de facturación. ¿Tiene un momento?`;
 }
 
+// ── COMPANY PROCESSOR ─────────────────────────────────────────────────────────
+async function processCompany(companyId: string, log: (...args: any[]) => void) {
+    // ── STEP 1: Get autonomy level ────────────────────────────────────────
+    const { data: autonomyRow } = await supabase
+        .from('ai_autonomy_settings')
+        .select('autonomy_level')
+        .eq('company_id', companyId)
+        .maybeSingle();
+
+    const autonomyLevel = autonomyRow?.autonomy_level || 'copilot';
+
+    // ── STEP 2: Get OpenAI key for this company ───────────────────────────
+    const { data: openaiInt } = await supabase
+        .from('marketing_integrations')
+        .select('settings')
+        .eq('company_id', companyId)
+        .eq('provider', 'openai')
+        .eq('is_active', true)
+        .maybeSingle();
+
+    const apiKey = openaiInt?.settings?.apiKey || Deno.env.get('OPENAI_API_KEY') || null;
+
+    // ── STEP 3: Oracle — fetch leads and score them ───────────────────────
+    const { data: leads, error: leadsError } = await supabase
+        .from('leads')
+        .select(LEAD_FIELDS)
+        .eq('company_id', companyId)
+        .not('status', 'in', '("Cerrado","Cliente","Perdido")')
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+    if (leadsError) {
+        log(`Leads error for ${companyId}: ${leadsError.message}`);
+        return { company_id: companyId, error: leadsError.message };
+    }
+
+    const now = new Date();
+    const scored = (leads || [])
+        .map(lead => {
+            const lastContact = lead.next_followup_date
+                ? new Date(lead.next_followup_date)
+                : new Date(lead.created_at);
+            const daysSince = (now.getTime() - lastContact.getTime()) / (1000 * 60 * 60 * 24);
+            const score = oracleScore(lead, daysSince);
+            const atlas = atlasCheck(lead);
+            return { lead, score, daysSince: Math.round(daysSince), atlas };
+        })
+        .filter(item => item.score >= 40 && item.atlas.ok) // Only actionable leads
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 10); // Top 10 priority leads
+
+    // ── STEP 4: Check existing pending tasks to avoid duplicates ──────────
+    const { data: existingTasks } = await supabase
+        .from('ai_tasks')
+        .select('id')
+        .eq('company_id', companyId)
+        .eq('status', 'pending')
+        .eq('task_type', 'send_followup');
+
+    const existingCount = existingTasks?.length || 0;
+    if (existingCount >= 20) {
+        return {
+            company_id: companyId,
+            success: true,
+            message: `Queue has ${existingCount} pending tasks. No new tasks created.`,
+            autonomy_level: autonomyLevel,
+            skipped: true
+        };
+    }
+
+    // ── STEP 5: Maya + Task Queue ─────────────────────────────────────────
+    let tasksCreated = 0;
+    let tasksAutoExecuted = 0;
+
+    for (const { lead, score, daysSince, atlas } of scored) {
+        try {
+            // Generate message with Maya
+            const message = await mayaGenerate(lead, apiKey);
+
+            // Determine task status based on autonomy level
+            let taskStatus: string;
+            if (autonomyLevel === 'autopilot') {
+                taskStatus = 'autopilot';
+            } else if (autonomyLevel === 'semi' && score < 75) {
+                taskStatus = 'autopilot';
+            } else {
+                taskStatus = 'pending';
+            }
+
+            // Insert task into ai_tasks queue
+            const { error: taskErr } = await supabase
+                .from('ai_tasks')
+                .insert({
+                    company_id: companyId,
+                    agent_name: 'sofia',
+                    task_type: 'send_followup',
+                    title: `Seguimiento a ${lead.name}`,
+                    description: `Oracle score: ${score}/100 · ${daysSince} días sin contacto · ${lead.status || 'Prospecto'} · ${lead.company_name || 'Sin empresa'}`,
+                    payload: {
+                        lead_id: lead.id,
+                        lead_name: lead.name,
+                        lead_phone: lead.phone,
+                        lead_email: lead.email,
+                        message,
+                        oracle_score: score,
+                        days_since_contact: daysSince,
+                        channel: lead.phone ? 'whatsapp' : 'email',
+                    },
+                    status: taskStatus,
+                    confidence: score,
+                    impact_estimate: lead.value ? `$${Number(lead.value).toLocaleString()} en pipeline` : 'Sin valor asignado',
+                    executed_at: taskStatus === 'autopilot' ? now.toISOString() : null,
+                });
+
+            if (taskErr) continue;
+
+            tasksCreated++;
+            if (taskStatus === 'autopilot') {
+                tasksAutoExecuted++;
+            }
+        } catch (e: any) {
+            log(`Error processing lead ${lead.id}: ${e.message}`);
+        }
+    }
+
+    // ── STEP 6: Summary ───────────────────────────────────────────────────
+    return {
+        company_id: companyId,
+        success: true,
+        autonomy_level: autonomyLevel,
+        leads_evaluated: leads?.length || 0,
+        leads_selected: scored.length,
+        tasks_created: tasksCreated,
+        tasks_auto_executed: tasksAutoExecuted,
+        tasks_pending_approval: tasksCreated - tasksAutoExecuted,
+        message: autonomyLevel === 'autopilot'
+            ? `✅ Full Autopilot: ${tasksAutoExecuted} mensajes ejecutados automáticamente`
+            : autonomyLevel === 'semi'
+            ? `⚡ Semi-Auto: ${tasksAutoExecuted} auto-ejecutados, ${tasksCreated - tasksAutoExecuted} esperando aprobación`
+            : `🤝 Copiloto: ${tasksCreated} tareas listas para tu aprobación en el Cockpit`
+    };
+}
+
 // ── MAIN HANDLER ──────────────────────────────────────────────────────────────
 Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -119,179 +262,63 @@ Deno.serve(async (req) => {
 
     try {
         const body = await req.json().catch(() => ({}));
-        const companyId = body?.company_id;
-        if (!companyId) {
-            return new Response(JSON.stringify({ error: 'company_id required' }), {
-                status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        let companyIds: string[] = [];
+
+        if (body?.company_id) {
+            companyIds = [body.company_id];
+        } else {
+            // Global run for all active companies (Cron Mode)
+            const { data: companies } = await supabase
+                .from('ai_autonomy_settings')
+                .select('company_id');
+            if (companies) {
+                companyIds = companies.map(c => c.company_id);
+            }
+        }
+
+        if (companyIds.length === 0) {
+            return new Response(JSON.stringify({ success: true, message: 'No companies to process' }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
         }
 
-        log(`[agent-orchestrator v1] Starting for company: ${companyId}`);
+        log(`[agent-orchestrator v1] Starting for ${companyIds.length} companies`);
 
-        // ── STEP 1: Get autonomy level ────────────────────────────────────────
-        const { data: autonomyRow } = await supabase
-            .from('ai_autonomy_settings')
-            .select('autonomy_level')
-            .eq('company_id', companyId)
-            .maybeSingle();
+        const results = [];
+        let totalTasks = 0;
+        let totalEvaluated = 0;
 
-        const autonomyLevel = autonomyRow?.autonomy_level || 'copilot';
-        log(`Autonomy level: ${autonomyLevel}`);
-
-        // ── STEP 2: Get OpenAI key for this company ───────────────────────────
-        const { data: openaiInt } = await supabase
-            .from('marketing_integrations')
-            .select('settings')
-            .eq('company_id', companyId)
-            .eq('provider', 'openai')
-            .eq('is_active', true)
-            .maybeSingle();
-
-        const apiKey = openaiInt?.settings?.apiKey || Deno.env.get('OPENAI_API_KEY') || null;
-
-        // ── STEP 3: Oracle — fetch leads and score them ───────────────────────
-        const { data: leads, error: leadsError } = await supabase
-            .from('leads')
-            .select(LEAD_FIELDS)
-            .eq('company_id', companyId)
-            .not('status', 'in', '("Cerrado","Cliente","Perdido")')
-            .order('created_at', { ascending: false })
-            .limit(200);
-
-        if (leadsError) {
-            log(`Leads error: ${leadsError.message}`);
-            return new Response(JSON.stringify({ error: leadsError.message, logs }), {
-                status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-            });
+        for (const companyId of companyIds) {
+            try {
+                const result = await processCompany(companyId, log);
+                results.push(result);
+                if (result.tasks_created) totalTasks += result.tasks_created;
+                if (result.leads_evaluated) totalEvaluated += result.leads_evaluated;
+            } catch (err: any) {
+                log(`Failed company ${companyId}: ${err.message}`);
+                results.push({ company_id: companyId, error: err.message });
+            }
         }
 
-        log(`Oracle: evaluating ${leads?.length || 0} leads`);
+        const finalSummary = {
+            success: true,
+            message: `✅ Orchestrator finished: ${totalTasks} tareas generadas · ${totalEvaluated} leads evaluados`,
+            tasks_created: totalTasks,
+            leads_evaluated: totalEvaluated,
+            results,
+            logs
+        };
 
-        const now = new Date();
-        const scored = (leads || [])
-            .map(lead => {
-                const lastContact = lead.next_followup_date
-                    ? new Date(lead.next_followup_date)
-                    : new Date(lead.created_at);
-                const daysSince = (now.getTime() - lastContact.getTime()) / (1000 * 60 * 60 * 24);
-                const score = oracleScore(lead, daysSince);
-                const atlas = atlasCheck(lead);
-                return { lead, score, daysSince: Math.round(daysSince), atlas };
-            })
-            .filter(item => item.score >= 40 && item.atlas.ok) // Only actionable leads
-            .sort((a, b) => b.score - a.score)
-            .slice(0, 10); // Top 10 priority leads
-
-        log(`Oracle selected ${scored.length} actionable leads (score >= 40, data quality OK)`);
-
-        // ── STEP 4: Check existing pending tasks to avoid duplicates ──────────
-        const { data: existingTasks } = await supabase
-            .from('ai_tasks')
-            .select('id')
-            .eq('company_id', companyId)
-            .eq('status', 'pending')
-            .eq('task_type', 'send_followup');
-
-        const existingCount = existingTasks?.length || 0;
-        if (existingCount >= 20) {
-            log(`Already ${existingCount} pending tasks. Skipping to avoid queue overflow.`);
+        // If a specific company was requested (Cockpit UI trigger), return its specific message format
+        if (body?.company_id && results.length === 1 && !results[0].error) {
             return new Response(JSON.stringify({
-                success: true,
-                message: `Queue has ${existingCount} pending tasks. No new tasks created.`,
-                autonomy_level: autonomyLevel,
+                ...finalSummary,
+                ...results[0], // Override with the specific company result for the UI
                 logs
             }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
-        // ── STEP 5: Maya + Task Queue ─────────────────────────────────────────
-        let tasksCreated = 0;
-        let tasksAutoExecuted = 0;
-
-        for (const { lead, score, daysSince, atlas } of scored) {
-            try {
-                // Generate message with Maya
-                const message = await mayaGenerate(lead, apiKey);
-                log(`Maya generated message for ${lead.name} (score: ${score})`);
-
-                // Determine task status based on autonomy level
-                // copilot = pending (needs approval)
-                // semi = autopilot for low-risk (score < 75), pending for high-value
-                // autopilot = always auto-execute
-                let taskStatus: string;
-                if (autonomyLevel === 'autopilot') {
-                    taskStatus = 'autopilot';
-                } else if (autonomyLevel === 'semi' && score < 75) {
-                    taskStatus = 'autopilot';
-                } else {
-                    taskStatus = 'pending';
-                }
-
-                // Insert task into ai_tasks queue
-                const { error: taskErr } = await supabase
-                    .from('ai_tasks')
-                    .insert({
-                        company_id: companyId,
-                        agent_name: 'sofia',
-                        task_type: 'send_followup',
-                        title: `Seguimiento a ${lead.name}`,
-                        description: `Oracle score: ${score}/100 · ${daysSince} días sin contacto · ${lead.status || 'Prospecto'} · ${lead.company_name || 'Sin empresa'}`,
-                        payload: {
-                            lead_id: lead.id,
-                            lead_name: lead.name,
-                            lead_phone: lead.phone,
-                            lead_email: lead.email,
-                            message,
-                            oracle_score: score,
-                            days_since_contact: daysSince,
-                            channel: lead.phone ? 'whatsapp' : 'email',
-                        },
-                        status: taskStatus,
-                        confidence: score,
-                        impact_estimate: lead.value ? `$${Number(lead.value).toLocaleString()} en pipeline` : 'Sin valor asignado',
-                        executed_at: taskStatus === 'autopilot' ? now.toISOString() : null,
-                    });
-
-                if (taskErr) {
-                    log(`Task insert error for ${lead.name}: ${taskErr.message}`);
-                    continue;
-                }
-
-                tasksCreated++;
-                if (taskStatus === 'autopilot') {
-                    tasksAutoExecuted++;
-                    // TODO: In Full Autopilot mode, actually send the message
-                    // For now: task is marked as executed and logged
-                    // Next iteration: call auto-followup edge function directly
-                    log(`🚀 AUTO-EXECUTED task for ${lead.name}`);
-                } else {
-                    log(`📋 QUEUED task for ${lead.name} (awaiting approval in Cockpit)`);
-                }
-
-            } catch (e: any) {
-                log(`Error processing lead ${lead.id}: ${e.message}`);
-            }
-        }
-
-        // ── STEP 6: Summary ───────────────────────────────────────────────────
-        const summary = {
-            success: true,
-            autonomy_level: autonomyLevel,
-            leads_evaluated: leads?.length || 0,
-            leads_selected: scored.length,
-            tasks_created: tasksCreated,
-            tasks_auto_executed: tasksAutoExecuted,
-            tasks_pending_approval: tasksCreated - tasksAutoExecuted,
-            message: autonomyLevel === 'autopilot'
-                ? `✅ Full Autopilot: ${tasksAutoExecuted} mensajes ejecutados automáticamente`
-                : autonomyLevel === 'semi'
-                ? `⚡ Semi-Auto: ${tasksAutoExecuted} auto-ejecutados, ${tasksCreated - tasksAutoExecuted} esperando aprobación`
-                : `🤝 Copiloto: ${tasksCreated} tareas listas para tu aprobación en el Cockpit`,
-            logs
-        };
-
-        log(`Done: ${JSON.stringify({ tasks_created: tasksCreated, auto_executed: tasksAutoExecuted })}`);
-
-        return new Response(JSON.stringify(summary), {
+        return new Response(JSON.stringify(finalSummary), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
 
