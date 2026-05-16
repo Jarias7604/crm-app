@@ -157,6 +157,58 @@ async function processCompany(companyId: string, log: (...args: any[]) => void) 
         .sort((a, b) => b.score - a.score)
         .slice(0, 10); // Top 10 priority leads
 
+    log(`📊 Oracle scored ${leads?.length || 0} leads → ${scored.length} selected for action`);
+
+    // ── STEP 3.5: Auto-create conversations for leads without one ─────────
+    // This ensures 100% of leads (including manually-entered ones) enter the flow
+    {
+        const leadIds = scored.map(s => s.lead.id);
+        const { data: existingConvs } = await supabase
+            .from('marketing_conversations')
+            .select('lead_id')
+            .in('lead_id', leadIds)
+            .eq('status', 'active');
+
+        const existingLeadIds = new Set((existingConvs || []).map((c: any) => c.lead_id));
+        const leadsWithoutConv = scored.filter(s => !existingLeadIds.has(s.lead.id));
+
+        if (leadsWithoutConv.length > 0) {
+            log(`🔗 Auto-creating conversations for ${leadsWithoutConv.length} leads without active channel`);
+
+            // Get Telegram integration for this company
+            const { data: tgInt } = await supabase
+                .from('marketing_integrations')
+                .select('settings')
+                .eq('company_id', companyId)
+                .eq('provider', 'telegram')
+                .eq('is_active', true)
+                .maybeSingle();
+
+            for (const { lead } of leadsWithoutConv) {
+                // Determine best channel: WA if phone, Telegram if integration exists, else 'manual'
+                const channel = lead.phone ? 'whatsapp' : (tgInt ? 'telegram' : 'manual');
+                const { error: convErr } = await supabase
+                    .from('marketing_conversations')
+                    .insert({
+                        company_id: companyId,
+                        lead_id: lead.id,
+                        channel,
+                        status: 'active',
+                        last_message: `[Conversación iniciada automáticamente por Orchestrator · Oracle score: ${oracleScore(lead, 0)}]`,
+                        last_message_at: new Date().toISOString(),
+                        external_id: null, // Will be set when lead actually responds
+                    });
+                if (!convErr) {
+                    log(`✅ Conversation created for ${lead.name} via ${channel}`);
+                } else {
+                    log(`⚠️  Conv creation failed for ${lead.name}: ${convErr.message}`);
+                }
+            }
+        } else {
+            log(`✅ All selected leads already have active conversations`);
+        }
+    }
+
     // ── STEP 4: Dedup — get leads that already have an active task today ────
     const { data: activeTasks } = await supabase
         .from('ai_tasks')
@@ -335,6 +387,7 @@ Deno.serve(async (req) => {
         const results = [];
         let totalTasks = 0;
         let totalEvaluated = 0;
+        let totalMessages = 0;
 
         for (const companyId of companyIds) {
             try {
@@ -342,6 +395,7 @@ Deno.serve(async (req) => {
                 results.push(result);
                 if (result.tasks_created) totalTasks += result.tasks_created;
                 if (result.leads_evaluated) totalEvaluated += result.leads_evaluated;
+                if (result.messages_sent) totalMessages += (result.messages_sent as number);
             } catch (err: any) {
                 log(`Failed company ${companyId}: ${err.message}`);
                 results.push({ company_id: companyId, error: err.message });
@@ -350,20 +404,19 @@ Deno.serve(async (req) => {
 
         const finalSummary = {
             success: true,
-            message: `✅ Orchestrator finished: ${totalTasks} tareas generadas · ${totalEvaluated} leads evaluados`,
+            message: `✅ Orchestrator: ${totalMessages} mensajes enviados · ${totalTasks} tareas · ${totalEvaluated} leads evaluados`,
             tasks_created: totalTasks,
+            messages_sent: totalMessages,
             leads_evaluated: totalEvaluated,
-            results,
+            companies: results,
             logs
         };
 
-        // If a specific company was requested (Cockpit UI trigger), return its specific message format
+        // Single company request (Cockpit UI): return its detailed result
         if (body?.company_id && results.length === 1 && !results[0].error) {
-            return new Response(JSON.stringify({
-                ...finalSummary,
-                ...results[0], // Override with the specific company result for the UI
-                logs
-            }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            return new Response(JSON.stringify({ ...results[0], logs }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
         }
 
         return new Response(JSON.stringify(finalSummary), {
