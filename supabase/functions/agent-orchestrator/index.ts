@@ -157,31 +157,46 @@ async function processCompany(companyId: string, log: (...args: any[]) => void) 
         .sort((a, b) => b.score - a.score)
         .slice(0, 10); // Top 10 priority leads
 
-    // ── STEP 4: Check existing pending tasks to avoid duplicates ──────────
-    const { data: existingTasks } = await supabase
+    // ── STEP 4: Dedup — get leads that already have an active task today ────
+    const { data: activeTasks } = await supabase
         .from('ai_tasks')
-        .select('id')
+        .select('payload')
         .eq('company_id', companyId)
-        .eq('status', 'pending')
-        .eq('task_type', 'send_followup');
+        .in('status', ['pending', 'autopilot'])
+        .eq('task_type', 'send_followup')
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
-    const existingCount = existingTasks?.length || 0;
-    if (existingCount >= 20) {
+    const activeLeadIds = new Set(
+        (activeTasks || []).map((t: any) => t.payload?.lead_id).filter(Boolean)
+    );
+
+    // Stop if queue already has 20+ tasks
+    if (activeLeadIds.size >= 20) {
         return {
             company_id: companyId,
             success: true,
-            message: `Queue has ${existingCount} pending tasks. No new tasks created.`,
+            message: `Queue has ${activeLeadIds.size} active tasks in last 24h. No new tasks created.`,
             autonomy_level: autonomyLevel,
             skipped: true
         };
     }
 
-    // ── STEP 5: Maya + Task Queue ─────────────────────────────────────────
+    // ── STEP 5: Maya + Task Queue + Real Dispatch ─────────────────────────
     let tasksCreated = 0;
     let tasksAutoExecuted = 0;
+    let messagesSent = 0;
 
-    for (const { lead, score, daysSince, atlas } of scored) {
+    // Get the auto-followup URL for real dispatch
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+
+    for (const { lead, score, daysSince } of scored) {
         try {
+            // Skip if this lead already has an active task in the last 24h
+            if (activeLeadIds.has(lead.id)) {
+                log(`⏭️  Skipping ${lead.name} — already has active task`);
+                continue;
+            }
+
             // Generate message with Maya
             const message = await mayaGenerate(lead, apiKey);
 
@@ -212,7 +227,7 @@ async function processCompany(companyId: string, log: (...args: any[]) => void) 
                         message,
                         oracle_score: score,
                         days_since_contact: daysSince,
-                        channel: lead.phone ? 'whatsapp' : 'email',
+                        channel: lead.phone ? 'whatsapp' : 'telegram',
                     },
                     status: taskStatus,
                     confidence: score,
@@ -220,12 +235,44 @@ async function processCompany(companyId: string, log: (...args: any[]) => void) 
                     executed_at: taskStatus === 'autopilot' ? now.toISOString() : null,
                 });
 
-            if (taskErr) continue;
+            if (taskErr) {
+                log(`Task insert error for ${lead.name}: ${taskErr.message}`);
+                continue;
+            }
 
             tasksCreated++;
-            if (taskStatus === 'autopilot') {
+            activeLeadIds.add(lead.id); // Prevent re-processing same lead in this run
+
+            // ── REAL DISPATCH in Autopilot mode ───────────────────────────
+            if (taskStatus === 'autopilot' && supabaseUrl) {
+                try {
+                    log(`🚀 AUTOPILOT: Dispatching message to ${lead.name} via auto-followup`);
+                    const dispatchResp = await fetch(`${supabaseUrl}/functions/v1/auto-followup`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''}`,
+                        },
+                        body: JSON.stringify({
+                            force_lead_id: lead.id,
+                            custom_message: message,
+                        }),
+                    });
+                    const dispatchResult = await dispatchResp.json();
+                    if (dispatchResult?.delivered) {
+                        messagesSent++;
+                        log(`✅ Message delivered to ${lead.name}`);
+                    } else {
+                        log(`⚠️  Message not delivered to ${lead.name}: ${JSON.stringify(dispatchResult)}`);
+                    }
+                } catch (dispatchErr: any) {
+                    log(`❌ Dispatch error for ${lead.name}: ${dispatchErr.message}`);
+                }
                 tasksAutoExecuted++;
+            } else if (taskStatus === 'pending') {
+                log(`📋 QUEUED task for ${lead.name} (awaiting approval in Cockpit)`);
             }
+
         } catch (e: any) {
             log(`Error processing lead ${lead.id}: ${e.message}`);
         }
@@ -240,9 +287,10 @@ async function processCompany(companyId: string, log: (...args: any[]) => void) 
         leads_selected: scored.length,
         tasks_created: tasksCreated,
         tasks_auto_executed: tasksAutoExecuted,
+        messages_sent: messagesSent,
         tasks_pending_approval: tasksCreated - tasksAutoExecuted,
         message: autonomyLevel === 'autopilot'
-            ? `✅ Full Autopilot: ${tasksAutoExecuted} mensajes ejecutados automáticamente`
+            ? `✅ Full Autopilot: ${messagesSent} mensajes enviados, ${tasksAutoExecuted} tareas ejecutadas`
             : autonomyLevel === 'semi'
             ? `⚡ Semi-Auto: ${tasksAutoExecuted} auto-ejecutados, ${tasksCreated - tasksAutoExecuted} esperando aprobación`
             : `🤝 Copiloto: ${tasksCreated} tareas listas para tu aprobación en el Cockpit`
