@@ -45,7 +45,7 @@ export default function AutonomyPulse({ companyId }: Props) {
                 const auto = todayTasks?.filter(t => t.status === 'autopilot' || t.status === 'completed').length || 0;
 
                 let lastRunText = 'Esperando primer ciclo...';
-                let lastRunDate = null;
+                let lastRunDate: Date | null = null;
                 
                 if (latest) {
                     lastRunDate = new Date(latest.created_at);

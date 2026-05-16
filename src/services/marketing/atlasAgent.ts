@@ -128,20 +128,16 @@ export const atlasAgentService = {
                 ? Math.round(reports.reduce((s, r) => s + r.completeness_score, 0) / reports.length)
                 : 0;
 
-            // Log Atlas decision — fire-and-forget, wrapped so it NEVER throws
             try {
-                const logPromise = auditTrailService.logDecision({
+                auditTrailService.logDecision({
                     companyId,
                     agentName: 'atlas',
-                    decisionType: 'data_enrichment',
+                    decisionType: 'data_enriched',
                     title: 'Análisis de calidad de datos',
                     reasoning: `Analizados ${reports.length} leads. Score promedio: ${avg_score}%. Críticos: ${critical}. Atención: ${needs_attention}.`,
                     confidence: 95,
                     affectedLeadsCount: reports.length,
                 });
-                if (logPromise && typeof logPromise.catch === 'function') {
-                    logPromise.catch(() => {});
-                }
             } catch { /* audit log errors are silent */ }
 
             return { total_leads: reports.length, healthy, needs_attention, critical, avg_score, reports };
