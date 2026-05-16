@@ -4,7 +4,7 @@ import {
     Brain, Zap, Users, TrendingUp, AlertTriangle, CheckCircle2,
     Clock, ArrowLeft, RefreshCw, Play, Pause, ArrowRight,
     MessageSquare, Target, Star, Activity, ChevronRight, Bot, Settings2, Trash2,
-    BarChart2, DollarSign, Percent, Award, PieChart, ShieldCheck
+    BarChart2, DollarSign, Percent, Award, PieChart, ShieldCheck, Radio
 } from 'lucide-react';
 import { leadMemoryService, type CockpitMetrics, type LeadMemory, type ConversionReport } from '../../services/marketing/leadMemoryService';
 import { useAuth } from '../../auth/AuthProvider';
@@ -272,6 +272,14 @@ export default function AiAgentCockpit() {
                             <Clock className="w-3 h-3" /> Último run: {lastRun}
                         </span>
                     )}
+                    <Link
+                        to="/marketing/agent-network"
+                        className="px-3 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-slate-300 hover:text-white hover:border-indigo-500 transition-all shadow-sm text-[11px] font-black uppercase tracking-widest flex items-center gap-2"
+                        title="Ver Red de Agentes"
+                    >
+                        <Radio className="w-4 h-4 text-emerald-400" />
+                        Red AI
+                    </Link>
                     <Link
                         to="/marketing/followup-settings"
                         className="p-2.5 bg-white border border-slate-100 rounded-xl text-slate-500 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm"
