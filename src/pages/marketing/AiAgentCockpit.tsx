@@ -156,20 +156,51 @@ export default function AiAgentCockpit() {
         if (!profile?.company_id) return;
         try {
             setIsRunning(true);
-            toast.loading('Ejecutando seguimientos automáticos...', { id: 'followup-run' });
-            const result = await leadMemoryService.triggerFollowupRun(profile.company_id);
+            toast.loading('🤖 Orquestador ejecutando: Oracle → Atlas → Maya...', { id: 'followup-run' });
+
+            // Call the new Agent Orchestrator edge function
+            const { data, error } = await (await import('../../services/supabase')).supabase.functions.invoke('agent-orchestrator', {
+                body: { company_id: profile.company_id }
+            });
+
+            if (error) throw new Error(error.message);
+
+            const result = data as {
+                success: boolean;
+                message: string;
+                leads_evaluated: number;
+                leads_selected: number;
+                tasks_created: number;
+                tasks_auto_executed: number;
+                tasks_pending_approval: number;
+                autonomy_level: string;
+            };
+
             toast.success(
-                `✅ ${result.followups_sent} seguimientos enviados · ${result.escalations} escalaciones`,
-                { id: 'followup-run', duration: 5000 }
+                result.message || `✅ ${result.tasks_created} tareas generadas · ${result.leads_evaluated} leads evaluados`,
+                { id: 'followup-run', duration: 6000 }
             );
             setLastRun(new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }));
             await loadData();
         } catch (e: any) {
-            toast.error('Error: ' + e.message, { id: 'followup-run' });
+            // Fallback: run the original auto-followup if orchestrator not deployed yet
+            try {
+                toast.loading('Ejecutando seguimientos...', { id: 'followup-run' });
+                const result = await leadMemoryService.triggerFollowupRun(profile.company_id);
+                toast.success(
+                    `✅ ${result.followups_sent} seguimientos · ${result.escalations} escalaciones`,
+                    { id: 'followup-run', duration: 5000 }
+                );
+                setLastRun(new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }));
+                await loadData();
+            } catch (fallbackErr: any) {
+                toast.error('Error: ' + (e.message || fallbackErr.message), { id: 'followup-run' });
+            }
         } finally {
             setIsRunning(false);
         }
     };
+
 
     const handleTogglePause = async (leadId: string, paused: boolean) => {
         try {
