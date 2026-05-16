@@ -161,14 +161,15 @@ export default function AiAgentCockpit() {
             setIsRunning(true);
             toast.loading('🤖 Orquestador ejecutando: Oracle → Atlas → Maya...', { id: 'followup-run' });
 
-            // Direct fetch to the Edge Functions project (ikofyypxphrqkncimszt)
-            // This is separate from the production DB project
+            // ✅ ALWAYS calls ikofyypxphrqkncimszt (Edge Functions project)
+            // DB project is mtxqqamitglhehaktgxm — these are TWO different Supabase projects
             const EDGE_URL = 'https://ikofyypxphrqkncimszt.supabase.co/functions/v1/agent-orchestrator';
+            const EDGE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlrb2Z5eXB4cGhycWtuY2ltc3p0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NjU5OTUsImV4cCI6MjA4NDM0MTk5NX0.pSXAndXDDYOdfHqX0LK9l9LNHcW5U73veFM3ybp-jdU';
             const resp = await fetch(EDGE_URL, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || ''}`,
+                    'Authorization': `Bearer ${EDGE_ANON_KEY}`,
                 },
                 body: JSON.stringify({ company_id: profile.company_id }),
             });
