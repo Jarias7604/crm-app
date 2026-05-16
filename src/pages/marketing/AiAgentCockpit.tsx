@@ -161,33 +161,48 @@ export default function AiAgentCockpit() {
             setIsRunning(true);
             toast.loading('🤖 Orquestador ejecutando: Oracle → Atlas → Maya...', { id: 'followup-run' });
 
-            // Call the new Agent Orchestrator edge function
-            const { data, error } = await (await import('../../services/supabase')).supabase.functions.invoke('agent-orchestrator', {
-                body: { company_id: profile.company_id }
+            // Direct fetch to the Edge Functions project (ikofyypxphrqkncimszt)
+            // This is separate from the production DB project
+            const EDGE_URL = 'https://ikofyypxphrqkncimszt.supabase.co/functions/v1/agent-orchestrator';
+            const resp = await fetch(EDGE_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || ''}`,
+                },
+                body: JSON.stringify({ company_id: profile.company_id }),
             });
 
-            if (error) throw new Error(error.message);
+            if (!resp.ok) {
+                const errText = await resp.text();
+                throw new Error(`Orchestrator HTTP ${resp.status}: ${errText.substring(0, 200)}`);
+            }
 
-            const result = data as {
+            const result = await resp.json() as {
                 success: boolean;
                 message: string;
-                leads_evaluated: number;
-                leads_selected: number;
-                tasks_created: number;
-                tasks_auto_executed: number;
-                tasks_pending_approval: number;
-                messages_sent: number;
-                autonomy_level: string;
+                leads_evaluated?: number;
+                leads_selected?: number;
+                tasks_created?: number;
+                tasks_auto_executed?: number;
+                tasks_pending_approval?: number;
+                messages_sent?: number;
+                autonomy_level?: string;
                 logs?: string[];
-                companies?: Array<{ message: string; tasks_created: number; messages_sent: number; logs?: string[] }>;
+                skipped?: boolean;
             };
 
-            // Collect logs from all companies or single run
-            const allLogs: string[] = result.logs || [];
-            if (result.companies) {
-                result.companies.forEach((c: any) => { if (c.logs) allLogs.push(...c.logs); });
+            const logs = result.logs || [];
+            // Add a synthetic summary line if no logs returned
+            if (logs.length === 0) {
+                logs.push(`✅ Ejecución completada`);
+                if (result.leads_evaluated !== undefined) logs.push(`📊 ${result.leads_evaluated} leads evaluados`);
+                if (result.tasks_created !== undefined) logs.push(`📋 ${result.tasks_created} tareas creadas`);
+                if (result.messages_sent !== undefined) logs.push(`🚀 ${result.messages_sent} mensajes enviados`);
+                if (result.skipped) logs.push(`⏭️  Cola llena — no se crearon tareas nuevas`);
             }
-            setExecLog({ logs: allLogs, result });
+
+            setExecLog({ logs, result });
 
             toast.success(
                 result.message || `✅ ${result.tasks_created ?? 0} tareas · ${result.messages_sent ?? 0} mensajes enviados`,
@@ -196,23 +211,31 @@ export default function AiAgentCockpit() {
             setLastRun(new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }));
             await loadData();
         } catch (e: any) {
-            // Fallback: run the original auto-followup if orchestrator not deployed yet
+            console.error('Orchestrator error:', e);
+            // Show error in log panel instead of silent fallback
+            const errLogs = [
+                `❌ Error al llamar al Orchestrator: ${e.message}`,
+                `⚠️  Intentando fallback con auto-followup...`,
+            ];
             try {
-                toast.loading('Ejecutando seguimientos...', { id: 'followup-run' });
+                toast.loading('Ejecutando seguimientos (fallback)...', { id: 'followup-run' });
                 const result = await leadMemoryService.triggerFollowupRun(profile.company_id);
+                errLogs.push(`✅ Fallback OK: ${result.followups_sent} seguimientos · ${result.escalations} escalaciones`);
+                setExecLog({ logs: errLogs, result: { followups_sent: result.followups_sent, escalations: result.escalations } });
                 toast.success(
                     `✅ ${result.followups_sent} seguimientos · ${result.escalations} escalaciones`,
                     { id: 'followup-run', duration: 5000 }
                 );
-                setLastRun(new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }));
-                await loadData();
             } catch (fallbackErr: any) {
-                toast.error('Error: ' + (e.message || fallbackErr.message), { id: 'followup-run' });
+                errLogs.push(`❌ Fallback también falló: ${fallbackErr.message}`);
+                setExecLog({ logs: errLogs, result: {} });
+                toast.error('Error: ' + e.message, { id: 'followup-run' });
             }
+            setLastRun(new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }));
+            await loadData();
         } finally {
             setIsRunning(false);
         }
-    };
 
 
     const handleTogglePause = async (leadId: string, paused: boolean) => {
@@ -261,6 +284,7 @@ export default function AiAgentCockpit() {
     );
 
     return (
+        <>
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/20 to-violet-50/20 p-6 font-sans">
             {/* Header */}
             <div className="flex items-center justify-between mb-8">
@@ -1055,6 +1079,7 @@ export default function AiAgentCockpit() {
                 </div>
             </div>
         )}
+        </>
     );
 }
 
