@@ -13,10 +13,9 @@ description: Reglas de seguridad para NO romper producción — LEER ANTES DE CA
 
 | Ambiente | Supabase URL | Project Ref | Uso |
 |----------|-------------|-------------|-----|
-| **LOCAL** | `ubqscyfefgfbmndnypbp.supabase.co` | `ubqscyfefgfbmndnypbp` | Dev local. Activo en `.env.local` |
-| **TESTING** | `ubqscyfefgfbmndnypbp.supabase.co` | `ubqscyfefgfbmndnypbp` | Mismo que local |
-| **PRODUCCIÓN** | `mtxqqamitglhehaktgxm.supabase.co` | `mtxqqamitglhehaktgxm` | Datos reales. Máximo cuidado |
-| **PROHIBIDO** | `ikofyypxphrqkncimszt` | ❌ NO TOCAR | Proyecto personal sin relación con CRM |
+| **Edge Functions / AI** | `ikofyypxphrqkncimszt` | `ikofyypxphrqkncimszt` | Sofía, Telegram, Orchestrator, todas las Edge Fn |
+| **CRM Producción** | `mtxqqamitglhehaktgxm.supabase.co` | `mtxqqamitglhehaktgxm` | Datos reales: leads, usuarios, cotizaciones |
+| **Testing / Local** | `ubqscyfefgfbmndnypbp.supabase.co` | `ubqscyfefgfbmndnypbp` | Activo en `.env.local`. Dev y pruebas |
 
 **ANTES de ejecutar cualquier SQL en Supabase: abrir `.env.local` y confirmar el URL.**
 Si el project ref no está en esta tabla → NO PROCEDER.
