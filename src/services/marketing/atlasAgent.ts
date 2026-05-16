@@ -133,10 +133,9 @@ export const atlasAgentService = {
                     companyId,
                     agentName: 'atlas',
                     decisionType: 'data_enriched',
-                    title: 'Análisis de calidad de datos',
                     reasoning: `Analizados ${reports.length} leads. Score promedio: ${avg_score}%. Críticos: ${critical}. Atención: ${needs_attention}.`,
                     confidence: 95,
-                    affectedLeadsCount: reports.length,
+                    contextSnapshot: { total: reports.length, critical, needs_attention, avg_score },
                 });
             } catch { /* audit log errors are silent */ }
 
