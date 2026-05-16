@@ -11,6 +11,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import toast from 'react-hot-toast';
 import PredictiveBoard from './PredictiveBoard';
 import AuditLogViewer from './AuditLogViewer';
+import AutonomyPulse from '../../components/marketing/AutonomyPulse';
 import AutonomyToggle from '../../components/marketing/AutonomyToggle';
 import AiTaskInbox from './AiTaskInbox';
 
@@ -302,7 +303,8 @@ export default function AiAgentCockpit() {
                     <div className="lg:col-span-2">
                         <AiTaskInbox companyId={profile.company_id} />
                     </div>
-                    <div className="lg:col-span-1">
+                    <div className="lg:col-span-1 space-y-6">
+                        <AutonomyPulse companyId={profile.company_id} />
                         <AutonomyToggle companyId={profile.company_id} />
                     </div>
                 </div>
