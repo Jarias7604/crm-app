@@ -92,6 +92,7 @@ export default function AiAgentCockpit() {
     const [isRunning, setIsRunning] = useState(false);
     const [loading, setLoading] = useState(true);
     const [lastRun, setLastRun] = useState<string | null>(null);
+    const [execLog, setExecLog] = useState<{ logs: string[]; result: any } | null>(null);
 
     const loadData = useCallback(async () => {
         if (!profile?.company_id) return;
@@ -159,44 +160,68 @@ export default function AiAgentCockpit() {
             setIsRunning(true);
             toast.loading('🤖 Orquestador ejecutando: Oracle → Atlas → Maya...', { id: 'followup-run' });
 
-            // Call the new Agent Orchestrator edge function
-            const { data, error } = await (await import('../../services/supabase')).supabase.functions.invoke('agent-orchestrator', {
-                body: { company_id: profile.company_id }
+            // ✅ ALWAYS calls ikofyypxphrqkncimszt (Edge Functions project)
+            const EDGE_URL = 'https://ikofyypxphrqkncimszt.supabase.co/functions/v1/agent-orchestrator';
+            const EDGE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlrb2Z5eXB4cGhycWtuY2ltc3p0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NjU5OTUsImV4cCI6MjA4NDM0MTk5NX0.pSXAndXDDYOdfHqX0LK9l9LNHcW5U73veFM3ybp-jdU';
+            
+            const resp = await fetch(EDGE_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${EDGE_ANON_KEY}`,
+                },
+                body: JSON.stringify({ company_id: profile.company_id }),
             });
 
-            if (error) throw new Error(error.message);
+            if (!resp.ok) {
+                const errText = await resp.text();
+                throw new Error(`Orchestrator HTTP ${resp.status}: ${errText.substring(0, 200)}`);
+            }
 
-            const result = data as {
-                success: boolean;
-                message: string;
-                leads_evaluated: number;
-                leads_selected: number;
-                tasks_created: number;
-                tasks_auto_executed: number;
-                tasks_pending_approval: number;
-                autonomy_level: string;
+            const result = await resp.json() as {
+                success: boolean; message: string;
+                leads_evaluated?: number; leads_selected?: number;
+                tasks_created?: number; tasks_auto_executed?: number;
+                tasks_pending_approval?: number; messages_sent?: number;
+                autonomy_level?: string; logs?: string[]; skipped?: boolean;
             };
 
+            const logs = result.logs || [];
+            if (logs.length === 0) {
+                logs.push(`✅ Ejecución completada`);
+                if (result.leads_evaluated !== undefined) logs.push(`📊 ${result.leads_evaluated} leads evaluados`);
+                if (result.tasks_created !== undefined) logs.push(`📋 ${result.tasks_created} tareas creadas`);
+                if (result.messages_sent !== undefined) logs.push(`🚀 ${result.messages_sent} mensajes enviados`);
+                if (result.skipped) logs.push(`⏭️  Cola llena — no se crearon tareas nuevas`);
+            }
+
+            setExecLog({ logs, result });
+
             toast.success(
-                result.message || `✅ ${result.tasks_created} tareas generadas · ${result.leads_evaluated} leads evaluados`,
-                { id: 'followup-run', duration: 6000 }
+                result.message || `✅ ${result.tasks_created ?? 0} tareas · ${result.messages_sent ?? 0} mensajes enviados`,
+                { id: 'followup-run', duration: 4000 }
             );
             setLastRun(new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }));
             await loadData();
         } catch (e: any) {
-            // Fallback: run the original auto-followup if orchestrator not deployed yet
+            console.error('Orchestrator error:', e);
+            const errLogs = [
+                `❌ Error al llamar al Orchestrator: ${e.message}`,
+                `⚠️  Intentando fallback con auto-followup...`,
+            ];
             try {
-                toast.loading('Ejecutando seguimientos...', { id: 'followup-run' });
+                toast.loading('Ejecutando fallback...', { id: 'followup-run' });
                 const result = await leadMemoryService.triggerFollowupRun(profile.company_id);
-                toast.success(
-                    `✅ ${result.followups_sent} seguimientos · ${result.escalations} escalaciones`,
-                    { id: 'followup-run', duration: 5000 }
-                );
-                setLastRun(new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }));
-                await loadData();
+                errLogs.push(`✅ Fallback OK: ${result.followups_sent} seguimientos · ${result.escalations} escalaciones`);
+                setExecLog({ logs: errLogs, result: { followups_sent: result.followups_sent, escalations: result.escalations } });
+                toast.success(`✅ Fallback ejecutado`, { id: 'followup-run', duration: 5000 });
             } catch (fallbackErr: any) {
-                toast.error('Error: ' + (e.message || fallbackErr.message), { id: 'followup-run' });
+                errLogs.push(`❌ Fallback también falló: ${fallbackErr.message}`);
+                setExecLog({ logs: errLogs, result: {} });
+                toast.error('Error: ' + e.message, { id: 'followup-run' });
             }
+            setLastRun(new Date().toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }));
+            await loadData();
         } finally {
             setIsRunning(false);
         }
@@ -945,6 +970,93 @@ export default function AiAgentCockpit() {
                             })}
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* ── EXECUTION LOG MODAL ─────────────────────────────────────────── */}
+            {execLog && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+                    <div className="bg-slate-900 border border-slate-700 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800">
+                            <div>
+                                <h2 className="text-base font-black text-white flex items-center gap-2">
+                                    <Activity className="w-5 h-5 text-emerald-400" />
+                                    Log de Ejecución — Orquestador IA
+                                </h2>
+                                <p className="text-xs text-slate-400 mt-0.5">
+                                    Modo: <span className="font-bold text-indigo-400 uppercase">{execLog.result?.autonomy_level || 'copilot'}</span>
+                                    {execLog.result?.leads_evaluated !== undefined && ` · ${execLog.result.leads_evaluated} leads evaluados`}
+                                    {execLog.result?.tasks_created !== undefined && ` · ${execLog.result.tasks_created} tareas creadas`}
+                                    {execLog.result?.messages_sent !== undefined && ` · ${execLog.result.messages_sent} mensajes enviados`}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setExecLog(null)}
+                                className="p-2 hover:bg-slate-800 rounded-xl transition-colors text-slate-400 hover:text-white"
+                            >
+                                <span className="text-lg font-bold">✕</span>
+                            </button>
+                        </div>
+
+                        {/* Stats bar */}
+                        <div className="grid grid-cols-3 divide-x divide-slate-800 border-b border-slate-800">
+                            <div className="px-5 py-3 text-center">
+                                <div className="text-xl font-black text-white">{execLog.result?.leads_evaluated ?? '—'}</div>
+                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Evaluados</div>
+                            </div>
+                            <div className="px-5 py-3 text-center">
+                                <div className="text-xl font-black text-indigo-400">{execLog.result?.tasks_created ?? '—'}</div>
+                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Tareas</div>
+                            </div>
+                            <div className="px-5 py-3 text-center">
+                                <div className="text-xl font-black text-emerald-400">{execLog.result?.messages_sent ?? '—'}</div>
+                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Enviados</div>
+                            </div>
+                        </div>
+
+                        {/* Log terminal */}
+                        <div className="flex-1 overflow-y-auto p-5 font-mono text-xs space-y-1.5 bg-slate-950/50">
+                            {execLog.logs.length === 0 ? (
+                                <div className="text-slate-500 text-center py-8">
+                                    <CheckCircle2 className="w-8 h-8 text-slate-700 mx-auto mb-2" />
+                                    No hay logs detallados disponibles. El orquestador corrió sin errores.
+                                </div>
+                            ) : (
+                                execLog.logs.map((line, i) => {
+                                    const isSuccess = line.includes('✅') || line.includes('Message delivered') || line.includes('sent');
+                                    const isError = line.includes('❌') || line.includes('error') || line.includes('Error');
+                                    const isWarn = line.includes('⚠️') || line.includes('Skipping') || line.includes('not delivered');
+                                    const isInfo = line.includes('📊') || line.includes('🔗') || line.includes('🚀') || line.includes('📋');
+                                    return (
+                                        <div key={i} className={`flex items-start gap-2 py-0.5 ${
+                                            isError ? 'text-red-400' :
+                                            isSuccess ? 'text-emerald-400' :
+                                            isWarn ? 'text-amber-400' :
+                                            isInfo ? 'text-indigo-400' :
+                                            'text-slate-400'
+                                        }`}>
+                                            <span className="text-slate-600 tabular-nums shrink-0 mt-0.5">{String(i + 1).padStart(2, '0')}</span>
+                                            <span className="break-all leading-relaxed">{line.replace(/\[\d{4}-\d{2}-\d{2}T[\d:.Z]+\]\s*/, '')}</span>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-6 py-4 border-t border-slate-800 flex justify-between items-center">
+                            <span className="text-xs text-slate-500">
+                                {execLog.logs.length} líneas de log · {new Date().toLocaleTimeString('es')}
+                            </span>
+                            <button
+                                onClick={() => setExecLog(null)}
+                                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
