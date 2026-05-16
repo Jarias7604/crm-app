@@ -43,6 +43,7 @@ const FollowupSettings  = lazy(() => import('./pages/marketing/FollowupSettings'
 const SalesEngineConfig = lazy(() => import('./pages/marketing/SalesEngineConfig'));
 const AiAgentCockpit    = lazy(() => import('./pages/marketing/AiAgentCockpit'));
 const PredictiveBoard   = lazy(() => import('./pages/marketing/PredictiveBoard'));
+const DataHygiene       = lazy(() => import('./pages/marketing/DataHygiene'));
 const MarketingSettings = lazy(() => import('./pages/marketing/MarketingSettings'));
 const ChatHub           = lazy(() => import('./pages/marketing/ChatHub'));
 const PublicQuoteView   = lazy(() => import('./pages/PublicQuoteView'));
@@ -247,6 +248,7 @@ function App() {
                     <Route path="/marketing/settings" element={<MarketingSettings />} />
                     <Route path="/marketing/flyers" element={<FlyerStudio />} />
                     <Route path="/marketing/predictions" element={<PredictiveBoard />} />
+                    <Route path="/marketing/data-hygiene" element={<DataHygiene />} />
                   </Route>
 
                   <Route element={<FeatureProtectedRoute feature="chat" />}>

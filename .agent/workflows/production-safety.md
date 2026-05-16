@@ -2,60 +2,95 @@
 description: Reglas de seguridad para NO romper producción — LEER ANTES DE CADA CAMBIO
 ---
 
-# 🛡️ Reglas de Seguridad de Producción — OBLIGATORIAS
+# Reglas de Seguridad — OBLIGATORIAS EN CADA SESIÓN
 
-## REGLA #1: NUNCA agregar columnas nuevas a queries de SELECT
+> STOP. Antes de escribir una sola línea de código, lee estas reglas.
+> Cada regla existe porque costó horas reales de tiempo del cliente.
 
-**EL ERROR QUE SIEMPRE NOS MATA:**
-Si agregas una columna al `SELECT` de Supabase (ej: `ai_score`), y esa columna NO existe
-en la base de datos de PRODUCCIÓN, la query ENTERA falla con 400 y la tabla se ve VACÍA.
+---
 
-**ANTES de agregar CUALQUIER columna a un `.select()` en un service:**
-1. Verificar si la columna existe en PRODUCCIÓN (`ikofyypxphrqkncimszt`)
-2. Si NO existe → NO agregarla al select. Calcularla client-side.
-3. Si la agregas → SIEMPRE usar el patrón SAFE_FIELDS + fallback
+## MAPA DE PROYECTOS — VERIFICAR SIEMPRE CONTRA ESTE ARCHIVO
 
-## REGLA #2: Patrón SAFE_FIELDS obligatorio
+| Ambiente | Supabase URL | Project Ref | Uso |
+|----------|-------------|-------------|-----|
+| **LOCAL** | `ubqscyfefgfbmndnypbp.supabase.co` | `ubqscyfefgfbmndnypbp` | Dev local. Activo en `.env.local` |
+| **TESTING** | `ubqscyfefgfbmndnypbp.supabase.co` | `ubqscyfefgfbmndnypbp` | Mismo que local |
+| **PRODUCCIÓN** | `mtxqqamitglhehaktgxm.supabase.co` | `mtxqqamitglhehaktgxm` | Datos reales. Máximo cuidado |
+| **PROHIBIDO** | `ikofyypxphrqkncimszt` | ❌ NO TOCAR | Proyecto personal sin relación con CRM |
 
-Toda query crítica (getLeads, getTickets, etc.) DEBE tener:
+**ANTES de ejecutar cualquier SQL en Supabase: abrir `.env.local` y confirmar el URL.**
+Si el project ref no está en esta tabla → NO PROCEDER.
+
+---
+
+## REGLA 1 — Sin RPC sin función SQL definida
+
+**PROHIBIDO:** `supabase.rpc('nombre_funcion')` si esa función no existe en el SQL de migración.
+
+**OBLIGATORIO:** Antes de escribir cualquier `.rpc()`, verificar que el `CREATE FUNCTION` correspondiente esté en la migración. Si no existe → usar `upsert()`, `select()`, `update()` directo.
+
+Costo del incumplimiento: Error en runtime que TypeScript no detecta. La feature se ve "lista" y rompe en producción.
+
+---
+
+## REGLA 2 — No declarar "listo" sin verificar en browser
+
+**PROHIBIDO:** Responder "funciona" o "listo" sin haber visto el resultado en pantalla.
+
+**OBLIGATORIO:** Después de cualquier cambio a servicios o DB, navegar al browser y confirmar:
+- Sin errores en consola
+- Sin toast rojo
+- La acción del usuario produce el resultado esperado
+
+Si el browser no confirma → NO es listo.
+
+---
+
+## REGLA 3 — Verificar columnas antes de agregarlas a SELECT
+
+Si agregas una columna a `.select()`, verificar que existe en producción antes de hacer push.
+Columnas que no existen en DB causan que la query ENTERA falle con 400 — la tabla se ve vacía.
+
+**Patrón SAFE_FIELDS obligatorio para queries críticas:**
 ```typescript
-const SAFE_FIELDS = '...columnas que EXISTEN en producción...';
-const fields = SAFE_FIELDS + ', nuevas_columnas';
-
-const { data, error } = await supabase.from('table').select(fields);
-
-// Si falla, reintentar con SAFE_FIELDS
-if (error) {
-    const fallback = await supabase.from('table').select(SAFE_FIELDS);
-    return fallback.data;
-}
+const SAFE_FIELDS = '...columnas verificadas en prod...';
+const { data, error } = await supabase.from('table').select(SAFE_FIELDS);
+if (error) return fallback; // NUNCA dejar que el error rompa la UI
 ```
 
-## REGLA #3: persistLeadScore y similares
+---
 
-Cualquier función que haga UPDATE a columnas nuevas (`ai_score`, etc.):
-- DEBE ser fire-and-forget (`.catch(() => {})`)
-- NUNCA debe estar en el path crítico de crear/actualizar leads
-- Si falla, NO rompe nada
+## REGLA 4 — Si un approach falla 2 veces, cambiar approach
 
-## REGLA #4: Antes de push a main
+Si el mismo comando o técnica falla dos veces seguidas → PARAR y usar el método más directo disponible.
+No seguir golpeando el CLI si falla. Ir al dashboard. No seguir con RPCs si fallan. Ir a upsert directo.
 
-Checklist mental obligatorio:
-- [ ] ¿Agregué alguna columna nueva a un SELECT? → ¿Existe en prod?
-- [ ] ¿Agregué un UPDATE a una columna nueva? → ¿Es fire-and-forget?
-- [ ] ¿Las queries tienen fallback si la columna no existe?
+---
 
-## Bases de datos por ambiente
+## REGLA 5 — Nuevas columnas/tablas en DB → migración SQL PRIMERO
 
-| Ambiente | Supabase Project ID | Notas |
-|----------|-------------------|-------|
-| **PRODUCCIÓN** | `ikofyypxphrqkncimszt` | 532+ leads reales. NO TOCAR. |
-| **TESTING/DEV** | `ubqscyfefgfbmndnypbp` | Base de pruebas. OK experimentar. |
-| **LOCAL** | Usa TESTING via `.env` | Comparte DB con testing. |
+El orden correcto es:
+1. Escribir la migración SQL con las tablas/columnas
+2. Aplicarla en testing (vía dashboard Supabase)
+3. Verificar que funciona en local
+4. Aplicarla en producción
+5. ENTONCES escribir el código que las usa
+
+**NUNCA al revés.** El código que usa tablas que no existen rompe en runtime.
+
+---
+
+## REGLA 6 — No navegar a proyectos Supabase sin verificar identidad
+
+Antes de abrir cualquier URL de Supabase dashboard, confirmar el project ref en esta tabla.
+Si la URL no coincide con un proyecto de la tabla → cerrar esa pestaña.
+
+---
 
 ## Historial de incidentes
 
-| Fecha | Causa | Impacto | Fix |
-|-------|-------|---------|-----|
-| 2026-05-08 | `ai_score` en SELECT | Leads desaparecen en PROD | Removed from query, added fallback |
-| (sesión anterior) | 24 columnas faltantes en testing | Leads no cargan en LOCAL | Added columns via SQL migration |
+| Fecha | Causa | Horas perdidas | Regla que lo previene |
+|-------|-------|---------------|----------------------|
+| 2026-05-15 | RPC `set_autonomy_level` sin función SQL | ~5 horas | Regla 1 |
+| 2026-05-15 | Navegó a proyecto `ikofyypxphrqkncimszt` incorrecto | incluidas arriba | Regla 6 |
+| 2026-05-08 | `ai_score` en SELECT sin existir en prod | desconocido | Regla 3 |
