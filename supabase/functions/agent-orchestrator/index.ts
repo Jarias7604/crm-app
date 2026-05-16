@@ -196,7 +196,7 @@ async function processCompany(companyId: string, log: (...args: any[]) => void) 
                         status: 'active',
                         last_message: `[Conversación iniciada automáticamente por Orchestrator · Oracle score: ${oracleScore(lead, 0)}]`,
                         last_message_at: new Date().toISOString(),
-                        external_id: null, // Will be set when lead actually responds
+                        external_id: `manual-${lead.id}`, // Fulfill not-null constraint
                     });
                 if (!convErr) {
                     log(`✅ Conversation created for ${lead.name} via ${channel}`);
