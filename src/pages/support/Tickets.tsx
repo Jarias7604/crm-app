@@ -144,7 +144,7 @@ export default function Tickets() {
     const [agentFilter, setAgentFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState<TicketStatus[]>(['new', 'open', 'pending']);
     const [search, setSearch] = useState('');
-    const [newT, setNewT] = useState({ title: '', description: '', category_id: '', priority: 'medium' as TicketPriority, due_date: '', lead_id: '' });
+    const [newT, setNewT] = useState({ title: '', description: '', category_id: '', priority: 'medium' as TicketPriority, due_date: '', lead_id: '', created_by: '' });
     const [attachFiles, setAttachFiles] = useState<File[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
     // Advanced filters
@@ -209,12 +209,12 @@ export default function Tickets() {
                 category_id: newT.category_id || null, priority: newT.priority, status: 'new',
                 lead_id: newT.lead_id || null, assigned_to: null,
                 metadata: attachments.length > 0 ? { attachments } : {},
-                created_by: profile.id,
+                created_by: newT.created_by || profile.id,
                 due_date: newT.due_date ? new Date(newT.due_date).toISOString() : null,
             });
             toast.success('Ticket creado', { id: tid });
             setIsCreateOpen(false);
-            setNewT({ title: '', description: '', category_id: '', priority: 'medium', due_date: '', lead_id: '' });
+            setNewT({ title: '', description: '', category_id: '', priority: 'medium', due_date: '', lead_id: '', created_by: '' });
             setAttachFiles([]);
             setLeadSearch('');
             load();
@@ -503,6 +503,7 @@ export default function Tickets() {
                         <table className="w-full text-left">
                             <thead><tr className="border-b border-gray-50 bg-gray-50/40">
                                 <th className="px-5 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Ticket</th>
+                                <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Solicitante</th>
                                 <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Categoría</th>
                                 <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">SLA</th>
                                 <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Estado</th>
@@ -537,6 +538,19 @@ export default function Tickets() {
                                                 </div>
                                                 <p className={`text-sm font-black ${isSelected ? 'text-indigo-700' : 'text-gray-900 group-hover:text-indigo-600'} transition-colors`}>{ticket.title}</p>
                                                 <p className="text-[9px] text-gray-300 mt-0.5">{formatDistanceToNow(new Date(ticket.created_at), { addSuffix: true, locale: es })}</p>
+                                            </td>
+                                            <td className="px-4 py-3.5">
+                                                {(() => {
+                                                    const creator = agents.find(a => a.id === ticket.created_by);
+                                                    return creator ? (
+                                                        <div className="flex items-center gap-1.5">
+                                                            <AgentAvatar agent={creator} />
+                                                            <span className="text-[10px] font-bold text-gray-600 truncate max-w-[80px]">{creator.full_name}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-[10px] text-gray-300 italic">Desconocido</span>
+                                                    );
+                                                })()}
                                             </td>
                                             <td className="px-4 py-3.5">
                                                 {cat ? <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color }} /><span className="text-[10px] font-bold text-gray-600">{cat.name}</span></div> : <span className="text-[10px] text-gray-300">—</span>}
@@ -637,7 +651,14 @@ export default function Tickets() {
                                     </div>
 
                                     {/* 3 columns: Category, Priority, Due Date */}
-                                    <div className="grid grid-cols-3 gap-4 mb-4">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                        <div>
+                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Solicitante</label>
+                                            <select className="mt-1.5 w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition appearance-none"
+                                                value={newT.created_by || profile?.id || ''} onChange={e => setNewT(p => ({ ...p, created_by: e.target.value }))}>
+                                                {agents.map(a => <option key={a.id} value={a.id}>{a.full_name}</option>)}
+                                            </select>
+                                        </div>
                                         <div>
                                             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Categoría</label>
                                             <select className="mt-1.5 w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-300 transition appearance-none"
