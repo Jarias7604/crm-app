@@ -173,6 +173,7 @@ export default function Dashboard() {
     const [salesTrendData, setSalesTrendData] = useState<any[]>([]);
     const [escalationLeads, setEscalationLeads] = useState<any[]>([]);
     const [showEscalation, setShowEscalation] = useState<boolean | 'expanded'>(true);
+    const [hotLeads, setHotLeads] = useState<any[]>([]);
 
 
     const navigate = useNavigate();
@@ -412,6 +413,25 @@ export default function Dashboard() {
         escalationQuery.then(({ data }) => {
                 setEscalationLeads(data || []);
             });
+
+        // 🔥 Load hot leads (cierre_inminente) for dashboard card
+        if (profile?.company_id) {
+            supabase
+                .from('lead_memories')
+                .select('lead_id, sentiment_score, leads!inner(id, name, company_name, phone)')
+                .eq('company_id', profile.company_id)
+                .eq('next_action', 'cierre_inminente')
+                .limit(5)
+                .then(({ data }) => {
+                    setHotLeads((data || []).map((m: any) => ({
+                        id: m.lead_id,
+                        name: m.leads?.name,
+                        company_name: m.leads?.company_name,
+                        phone: m.leads?.phone,
+                        sentiment_score: m.sentiment_score,
+                    })));
+                });
+        }
     }, [dashboardData, dashboardAssignedTo]);
 
     useEffect(() => {
@@ -749,6 +769,46 @@ export default function Dashboard() {
     // CRM DASHBOARD VIEW
     return (
         <div className="w-full max-w-[1580px] mx-auto pb-4 space-y-3 animate-in fade-in duration-700">
+
+            {/* 💰 HOT LEADS — Cierres Inminentes Banner */}
+            {hotLeads.length > 0 && (
+                <div className="bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 rounded-2xl p-5 shadow-xl shadow-emerald-500/20 border border-emerald-400 animate-in fade-in slide-in-from-top-2 duration-500">
+                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center text-2xl shrink-0 animate-bounce">
+                                💰
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-black text-white flex items-center gap-2">
+                                    {hotLeads.length} Lead{hotLeads.length > 1 ? 's' : ''} listo{hotLeads.length > 1 ? 's' : ''} para cerrar
+                                    <span className="text-[10px] bg-white/20 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-widest animate-pulse">ACCIÓN INMEDIATA</span>
+                                </h3>
+                                <p className="text-emerald-50 text-xs font-medium mt-0.5">El bot detectó intención de compra confirmada. Contáctalos ahora para enviar factura o link de pago.</p>
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            {hotLeads.slice(0, 3).map(lead => (
+                                <button
+                                    key={lead.id}
+                                    onClick={() => navigate('/leads', { state: { leadId: lead.id } })}
+                                    className="flex items-center gap-2 bg-white/15 hover:bg-white/25 border border-white/20 rounded-xl px-3 py-1.5 transition-all"
+                                >
+                                    <div className="w-6 h-6 rounded-full bg-white/30 flex items-center justify-center text-[10px] font-black text-white shrink-0">
+                                        {lead.name?.[0] || '?'}
+                                    </div>
+                                    <span className="text-white text-[11px] font-bold truncate max-w-[100px]">{lead.name}</span>
+                                </button>
+                            ))}
+                            <button
+                                onClick={() => navigate('/marketing/cockpit')}
+                                className="px-4 py-1.5 bg-white text-emerald-700 rounded-xl text-[11px] font-black shadow-md hover:bg-emerald-50 transition-all shrink-0"
+                            >
+                                Ver Todos →
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h2 className="text-2xl font-extrabold text-[#4449AA] leading-tight tracking-tight">{t('dashboard.crm.title')}</h2>

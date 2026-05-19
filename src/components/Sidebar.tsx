@@ -19,7 +19,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         href: string;
         icon: any;
         current: boolean;
-        subItems?: { name: string; href: string; icon: any }[];
+        subItems?: { name: string; href: string; icon: any; badge?: number }[];
     }
     const isCallBotEnabled = import.meta.env.VITE_SHOW_CALL_BOT === 'true';
     const configPaths = ['/company/billing', '/company/branding', '/company/integrations', '/catalogo', '/financial-rules', '/loss-reasons', '/industries', '/admin/call-bot'];
@@ -37,6 +37,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     const [openAccordion, setOpenAccordion] = useState<string | null>(getInitialAccordion());
     const [company, setCompany] = useState<Company | null>(null);
     const [debugOpen, setDebugOpen] = useState(false);
+    const [hotLeadCount, setHotLeadCount] = useState(0);
 
     useEffect(() => {
         if (profile?.company_id) {
@@ -45,6 +46,24 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
             setCompany({ name: 'System Administration' } as Company);
         }
     }, [profile?.company_id, profile?.role, simulatedCompanyId]);
+
+    // 🔥 Poll hot leads (cierre_inminente) every 60s for sidebar badge
+    useEffect(() => {
+        if (!profile?.company_id) return;
+        const fetchHotLeads = async () => {
+            try {
+                const { count } = await supabase
+                    .from('lead_memories')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('company_id', profile.company_id)
+                    .eq('next_action', 'cierre_inminente');
+                setHotLeadCount(count || 0);
+            } catch { /* silently ignore */ }
+        };
+        fetchHotLeads();
+        const interval = setInterval(fetchHotLeads, 60000);
+        return () => clearInterval(interval);
+    }, [profile?.company_id]);
 
     // Reload branding when wizard or branding page saves changes
     useEffect(() => {
@@ -137,7 +156,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                 { name: 'Campañas', href: '/marketing/email', icon: Zap },
                 { name: 'Lead Hunter', href: '/marketing/lead-hunter', icon: Search },
                 { name: 'Agentes AI', href: '/marketing/ai-agents', icon: Bot },
-                { name: '🧠 Cockpit AI', href: '/marketing/cockpit', icon: Brain },
+                { name: '🧠 Cockpit AI', href: '/marketing/cockpit', icon: Brain, badge: hotLeadCount },
                 { name: '🎯 Oracle AI', href: '/marketing/predictions', icon: Target },
                 { name: 'Motor de Ventas', href: '/marketing/engine-config', icon: Zap },
                 { name: '🎨 Flyer Studio', href: '/marketing/flyers', icon: Sparkles },
@@ -396,14 +415,21 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                                                     to={sub.href}
                                                     className={cn(
                                                         location.pathname === sub.href ? 'text-blue-400 bg-blue-500/5' : 'text-gray-500 hover:text-gray-300 hover:bg-[#1e293b]/50',
-                                                        'group flex items-center rounded-lg transition-all duration-200 px-3 py-2 text-xs font-bold'
+                                                        'group flex items-center justify-between rounded-lg transition-all duration-200 px-3 py-2 text-xs font-bold'
                                                     )}
                                                 >
-                                                    <sub.icon className={cn(
-                                                        location.pathname === sub.href ? 'text-blue-400' : 'text-gray-600 group-hover:text-gray-300',
-                                                        "h-4 w-4 mr-3"
-                                                    )} />
-                                                    <span className="truncate">{sub.name}</span>
+                                                    <div className="flex items-center">
+                                                        <sub.icon className={cn(
+                                                            location.pathname === sub.href ? 'text-blue-400' : 'text-gray-600 group-hover:text-gray-300',
+                                                            "h-4 w-4 mr-3"
+                                                        )} />
+                                                        <span className="truncate">{sub.name}</span>
+                                                    </div>
+                                                    {sub.badge && sub.badge > 0 && (
+                                                        <span className="ml-2 shrink-0 bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] text-center animate-pulse shadow-sm shadow-emerald-500/50">
+                                                            {sub.badge}
+                                                        </span>
+                                                    )}
                                                 </Link>
                                             ))}
                                         </div>
