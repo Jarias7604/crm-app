@@ -25,12 +25,13 @@ const STAGE_CONFIG: Record<string, { label: string; color: string; bg: string }>
     perdido:      { label: 'Perdido',      color: 'text-red-600',   bg: 'bg-red-100' },
 };
 
-const ACTION_CONFIG: Record<string, { label: string; icon: string; color: string }> = {
+const ACTION_CONFIG: Record<string, { label: string; icon: string; color: string; bg?: string }> = {
     calificar:         { label: 'Calificar',       icon: '🎯', color: 'text-blue-600' },
     enviar_propuesta:  { label: 'Enviar Propuesta', icon: '📋', color: 'text-violet-600' },
     seguimiento:       { label: 'Seguimiento',      icon: '⏰', color: 'text-amber-600' },
     demo:              { label: 'Agendar Demo',     icon: '📅', color: 'text-indigo-600' },
     escalar_humano:    { label: '⚠️ Escalar',       icon: '🚨', color: 'text-red-600' },
+    cierre_inminente:  { label: '¡CIERRE INMINENTE!', icon: '💰', color: 'text-emerald-700', bg: 'bg-emerald-100 border border-emerald-300 shadow-sm animate-pulse' },
 };
 
 function SentimentBar({ score }: { score: number }) {
@@ -334,6 +335,28 @@ export default function AiAgentCockpit() {
                     </div>
                 </div>
             )}
+
+            {/* 🔥 Hot Leads Banner (Cierre Inminente) */}
+            {(() => {
+                const hotLeads = memories.filter(m => m.next_action === 'cierre_inminente');
+                if (hotLeads.length === 0) return null;
+                return (
+                    <div className="bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl p-5 mb-8 text-white shadow-xl shadow-emerald-500/20 flex flex-col md:flex-row items-center justify-between gap-4 border border-emerald-400">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center text-2xl animate-bounce shrink-0">
+                                💰
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black flex items-center gap-2 text-white">¡Atención! {hotLeads.length} Lead{hotLeads.length > 1 ? 's' : ''} listo{hotLeads.length > 1 ? 's' : ''} para pagar</h3>
+                                <p className="text-sm text-emerald-50 font-medium mt-0.5">El bot ha detectado intención de compra confirmada. El equipo humano debe contactarlos de inmediato para enviar el link de pago o cerrar el proceso.</p>
+                            </div>
+                        </div>
+                        <button onClick={() => { setActiveTab('leads'); setStageFilter('negociacion'); }} className="px-5 py-2.5 bg-white text-emerald-700 rounded-xl text-xs font-black shadow-md hover:bg-emerald-50 transition-all shrink-0">
+                            Ver Leads Calientes
+                        </button>
+                    </div>
+                );
+            })()}
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
                 <MetricCard
@@ -764,9 +787,11 @@ export default function AiAgentCockpit() {
                                         <SentimentBar score={mem.sentiment_score || 50} />
                                     </div>
                                     <div className="text-right shrink-0">
-                                        <p className={`text-[10px] font-black ${actionCfg.color} mb-1`}>{actionCfg.icon} {actionCfg.label}</p>
+                                        <div className={`inline-flex items-center gap-1 text-[10px] font-black ${actionCfg.color} mb-1 ${actionCfg.bg ? actionCfg.bg + ' px-2.5 py-1 rounded-full' : ''}`}>
+                                            <span>{actionCfg.icon}</span> <span>{actionCfg.label}</span>
+                                        </div>
                                         {mem.last_objection && <p className="text-[9px] text-slate-400">Objeción: {mem.last_objection}</p>}
-                                        <p className="text-[9px] text-slate-300">Flws: {mem.followup_count}</p>
+                                        <p className="text-[9px] text-slate-300 mt-0.5">Flws: {mem.followup_count}</p>
                                     </div>
                                     <div className="flex gap-1.5 shrink-0">
                                         <button
