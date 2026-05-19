@@ -53,7 +53,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         const fetchHotLeads = async () => {
             try {
                 const { count } = await supabase
-                    .from('lead_memories')
+                    .from('lead_ai_memory')
                     .select('id', { count: 'exact', head: true })
                     .eq('company_id', profile.company_id)
                     .eq('next_action', 'cierre_inminente');

@@ -417,7 +417,7 @@ export default function Dashboard() {
         // 🔥 Load hot leads (cierre_inminente) for dashboard card
         if (profile?.company_id) {
             supabase
-                .from('lead_memories')
+                .from('lead_ai_memory')
                 .select('lead_id, sentiment_score, leads!inner(id, name, company_name, phone)')
                 .eq('company_id', profile.company_id)
                 .eq('next_action', 'cierre_inminente')
