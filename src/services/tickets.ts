@@ -68,10 +68,10 @@ export interface Ticket {
     updated_at: string;
     created_by: string | null;
 
-    // Resolution Report fields
-    findings: string | null;
-    root_cause: string | null;
-    solution: string | null;
+    // Resolution Report fields (optional — filled when closing a ticket)
+    findings?: string | null;
+    root_cause?: string | null;
+    solution?: string | null;
 
     // Joined data
     lead_name?: string | null;       // snapshot — always readable, even for restricted agents
