@@ -43,6 +43,13 @@ export interface TicketComment {
     };
 }
 
+export interface ResolutionAttachment {
+    url: string;
+    name: string;
+    type: string;
+    size: number;
+}
+
 export interface Ticket {
     id: string;
     company_id: string;
@@ -60,6 +67,11 @@ export interface Ticket {
     created_at: string;
     updated_at: string;
     created_by: string | null;
+
+    // Resolution Report fields
+    findings: string | null;
+    root_cause: string | null;
+    solution: string | null;
 
     // Joined data
     lead_name?: string | null;       // snapshot — always readable, even for restricted agents
@@ -211,7 +223,7 @@ export const ticketService = {
 
     async updateTicket(
         ticketId: string,
-        updates: Partial<Pick<Ticket, 'status' | 'priority' | 'assigned_to' | 'title' | 'description' | 'category_id' | 'due_date' | 'lead_id'>>
+        updates: Partial<Pick<Ticket, 'status' | 'priority' | 'assigned_to' | 'title' | 'description' | 'category_id' | 'due_date' | 'lead_id' | 'findings' | 'root_cause' | 'solution'>> & { metadata?: Record<string, unknown> }
     ): Promise<Ticket> {
         const payload: Record<string, unknown> = {
             ...updates,

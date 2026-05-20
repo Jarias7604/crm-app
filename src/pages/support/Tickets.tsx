@@ -607,7 +607,7 @@ export default function Tickets() {
                     {/* Backdrop */}
                     <div className="fixed inset-0 bg-black/20 backdrop-blur-[1px] z-40" onClick={() => setSelected(null)} />
                     {/* Panel */}
-                    <div className="fixed top-0 right-0 bottom-0 w-[380px] z-50 shadow-2xl animate-in slide-in-from-right duration-300">
+                    <div className="fixed top-0 right-0 bottom-0 w-[580px] z-50 shadow-2xl animate-in slide-in-from-right duration-300">
                         <TicketPanel ticket={selected} categories={categories} agents={agents} leads={leads} companyId={profile?.company_id || ''} authorId={profile?.id || ''} onClose={() => setSelected(null)} onUpdate={handleUpdated} onDelete={handleDeleted} />
                     </div>
                 </>

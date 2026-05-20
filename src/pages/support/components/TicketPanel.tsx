@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Edit2, Save, RefreshCw, ChevronRight, UserCheck, MessageSquare, Lock, CalendarDays, Activity, ShieldCheck, CheckCircle2, Send, Search, Trash2, AlertTriangle, Clock, Paperclip, Image, FileVideo, ExternalLink } from 'lucide-react';
-import { ticketService, type Ticket, type TicketCategory, type TicketStatus, type TicketPriority, type CompanyAgent, type TicketComment, type TicketLead } from '../../../services/tickets';
+import { X, Edit2, Save, RefreshCw, ChevronRight, UserCheck, MessageSquare, Lock, CalendarDays, Activity, ShieldCheck, CheckCircle2, Send, Search, Trash2, AlertTriangle, Clock, Paperclip, Image, FileVideo, ExternalLink, Microscope, Lightbulb, SearchCode, FileUp, FileBadge2, UploadCloud } from 'lucide-react';
+import { storageService } from '../../../services/storage';
+import { ticketService, type Ticket, type TicketCategory, type TicketStatus, type TicketPriority, type CompanyAgent, type TicketComment, type TicketLead, type ResolutionAttachment } from '../../../services/tickets';
 import { formatDistanceToNow, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import toast from 'react-hot-toast';
@@ -134,7 +135,7 @@ function CommentThread({ ticketId, companyId, authorId, agents }: { ticketId: st
     );
 }
 
-type PanelTab = 'info' | 'edit' | 'comments' | 'sla';
+type PanelTab = 'info' | 'edit' | 'comments' | 'sla' | 'resolution';
 
 interface PanelProps {
     ticket: Ticket; categories: TicketCategory[]; agents: CompanyAgent[]; leads: TicketLead[];
@@ -157,6 +158,18 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
         lead_id: ticket.lead_id || '',
     });
 
+    // Resolution Report state
+    const [resForm, setResForm] = useState({
+        findings: ticket.findings || '',
+        root_cause: ticket.root_cause || '',
+        solution: ticket.solution || '',
+    });
+    const [resFiles, setResFiles] = useState<File[]>([]);
+    const [resUploading, setResUploading] = useState(false);
+    const [resSaving, setResSaving] = useState(false);
+    const resFileRef = useRef<HTMLInputElement>(null);
+    const existingResAttachments: ResolutionAttachment[] = (ticket.metadata?.resolution_attachments as ResolutionAttachment[]) || [];
+
     useEffect(() => {
         setForm({
             status: ticket.status as TicketStatus, priority: ticket.priority as TicketPriority,
@@ -165,9 +178,40 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
             due_date: ticket.due_date ? ticket.due_date.slice(0, 16) : '',
             lead_id: ticket.lead_id || '',
         });
+        setResForm({
+            findings: ticket.findings || '',
+            root_cause: ticket.root_cause || '',
+            solution: ticket.solution || '',
+        });
+        setResFiles([]);
         setLeadSearch('');
         setEditingDate(false);
     }, [ticket]);
+
+    async function handleSaveResolution() {
+        setResSaving(true);
+        try {
+            let newAttachments: ResolutionAttachment[] = [...existingResAttachments];
+            if (resFiles.length > 0) {
+                setResUploading(true);
+                const uploaded = await Promise.all(
+                    resFiles.map(f => storageService.uploadTicketAttachment(companyId, f))
+                );
+                newAttachments = [...newAttachments, ...uploaded];
+                setResUploading(false);
+            }
+            const updated = await ticketService.updateTicket(ticket.id, {
+                findings: resForm.findings || null,
+                root_cause: resForm.root_cause || null,
+                solution: resForm.solution || null,
+                metadata: { ...ticket.metadata, resolution_attachments: newAttachments },
+            });
+            onUpdate(updated);
+            setResFiles([]);
+            toast.success('Reporte de resolución guardado ✓');
+        } catch { toast.error('Error al guardar el reporte'); }
+        finally { setResSaving(false); setResUploading(false); }
+    }
 
     async function handleSave() {
         setSaving(true);
@@ -200,6 +244,7 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
         { key: 'edit' as PanelTab, label: 'Editar', icon: <Edit2 className="w-3 h-3" /> },
         { key: 'comments' as PanelTab, label: 'Notas', icon: <MessageSquare className="w-3 h-3" /> },
         { key: 'sla' as PanelTab, label: 'SLA', icon: <ShieldCheck className="w-3 h-3" /> },
+        { key: 'resolution' as PanelTab, label: 'Resolución', icon: <FileBadge2 className="w-3 h-3" /> },
     ];
 
     return (
@@ -495,6 +540,157 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
 
                 {tab === 'comments' && <CommentThread ticketId={ticket.id} companyId={companyId} authorId={authorId} agents={agents} />}
 
+                {tab === 'resolution' && (
+                    <div className="space-y-5">
+                        {/* ── Header Banner ── */}
+                        <div className="bg-gradient-to-br from-violet-50 to-indigo-50 border border-violet-100 rounded-2xl p-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-200">
+                                    <FileBadge2 className="w-5 h-5 text-white" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-black text-gray-900">Reporte de Resolución</p>
+                                    <p className="text-[10px] text-violet-500 font-bold">Documenta hallazgos para evitar recurrencia</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ── Findings ── */}
+                        <div className="space-y-1.5">
+                            <label className="flex items-center gap-2 text-[10px] font-black text-gray-500 uppercase tracking-wider">
+                                <div className="w-5 h-5 rounded-md bg-blue-100 flex items-center justify-center">
+                                    <Microscope className="w-3 h-3 text-blue-600" />
+                                </div>
+                                Findings / Hallazgos
+                            </label>
+                            <textarea
+                                rows={3}
+                                placeholder="¿Qué encontró el técnico? Describe el estado del sistema, síntomas observados..."
+                                className="w-full px-4 py-3 bg-blue-50/50 border border-blue-100 rounded-xl text-xs font-medium text-gray-700 focus:ring-2 focus:ring-blue-300/40 focus:border-blue-200 resize-none transition-all placeholder:text-gray-300"
+                                value={resForm.findings}
+                                onChange={e => setResForm(p => ({ ...p, findings: e.target.value }))}
+                            />
+                        </div>
+
+                        {/* ── Root Cause ── */}
+                        <div className="space-y-1.5">
+                            <label className="flex items-center gap-2 text-[10px] font-black text-gray-500 uppercase tracking-wider">
+                                <div className="w-5 h-5 rounded-md bg-amber-100 flex items-center justify-center">
+                                    <SearchCode className="w-3 h-3 text-amber-600" />
+                                </div>
+                                Causa Raíz / Root Cause
+                            </label>
+                            <textarea
+                                rows={3}
+                                placeholder="¿Cuál fue la causa raíz del problema? Ej: configuración incorrecta, falla de hardware, bug de software..."
+                                className="w-full px-4 py-3 bg-amber-50/50 border border-amber-100 rounded-xl text-xs font-medium text-gray-700 focus:ring-2 focus:ring-amber-300/40 focus:border-amber-200 resize-none transition-all placeholder:text-gray-300"
+                                value={resForm.root_cause}
+                                onChange={e => setResForm(p => ({ ...p, root_cause: e.target.value }))}
+                            />
+                        </div>
+
+                        {/* ── Solution ── */}
+                        <div className="space-y-1.5">
+                            <label className="flex items-center gap-2 text-[10px] font-black text-gray-500 uppercase tracking-wider">
+                                <div className="w-5 h-5 rounded-md bg-emerald-100 flex items-center justify-center">
+                                    <Lightbulb className="w-3 h-3 text-emerald-600" />
+                                </div>
+                                Solución Aplicada
+                            </label>
+                            <textarea
+                                rows={4}
+                                placeholder="¿Qué se hizo para resolver el problema y evitar que vuelva a ocurrir? Incluye pasos específicos..."
+                                className="w-full px-4 py-3 bg-emerald-50/50 border border-emerald-100 rounded-xl text-xs font-medium text-gray-700 focus:ring-2 focus:ring-emerald-300/40 focus:border-emerald-200 resize-none transition-all placeholder:text-gray-300"
+                                value={resForm.solution}
+                                onChange={e => setResForm(p => ({ ...p, solution: e.target.value }))}
+                            />
+                        </div>
+
+                        {/* ── Adjuntos existentes ── */}
+                        {existingResAttachments.length > 0 && (
+                            <div className="space-y-2">
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                                    <Paperclip className="w-3 h-3" />Adjuntos guardados ({existingResAttachments.length})
+                                </p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {existingResAttachments.map((att, idx) => {
+                                        const isImage = att.type?.startsWith('image/');
+                                        const sizeKB = Math.round((att.size || 0) / 1024);
+                                        const sizeLabel = sizeKB > 1024 ? `${(sizeKB / 1024).toFixed(1)} MB` : `${sizeKB} KB`;
+                                        return (
+                                            <a key={idx} href={att.url} target="_blank" rel="noopener noreferrer"
+                                                className="group relative bg-gray-50 border border-gray-100 rounded-xl overflow-hidden hover:border-indigo-200 hover:shadow-sm transition-all">
+                                                {isImage
+                                                    ? <img src={att.url} alt={att.name} className="w-full h-20 object-cover" />
+                                                    : <div className="w-full h-20 bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center"><FileUp className="w-7 h-7 text-gray-300" /></div>
+                                                }
+                                                <div className="px-2.5 py-2">
+                                                    <p className="text-[9px] font-bold text-gray-600 truncate">{att.name}</p>
+                                                    <p className="text-[8px] text-gray-300">{sizeLabel}</p>
+                                                </div>
+                                                <div className="absolute inset-0 bg-indigo-600/0 group-hover:bg-indigo-600/10 transition-colors flex items-center justify-center">
+                                                    <ExternalLink className="w-5 h-5 text-white opacity-0 group-hover:opacity-80 drop-shadow-lg transition-opacity" />
+                                                </div>
+                                            </a>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── Upload nuevos adjuntos ── */}
+                        <div className="space-y-2">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <UploadCloud className="w-3 h-3" />Adjuntar Documentos
+                            </p>
+                            <input
+                                ref={resFileRef} type="file" multiple
+                                accept="image/*,.pdf,.doc,.docx,.xlsx,.txt"
+                                className="hidden"
+                                onChange={e => { if (e.target.files) { setResFiles(p => [...p, ...Array.from(e.target.files!)]); e.target.value = ''; } }}
+                            />
+                            <div
+                                onClick={() => resFileRef.current?.click()}
+                                onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('border-violet-400', 'bg-violet-50/50'); }}
+                                onDragLeave={e => e.currentTarget.classList.remove('border-violet-400', 'bg-violet-50/50')}
+                                onDrop={e => { e.preventDefault(); e.currentTarget.classList.remove('border-violet-400', 'bg-violet-50/50'); if (e.dataTransfer.files) setResFiles(p => [...p, ...Array.from(e.dataTransfer.files)]); }}
+                                className="border-2 border-dashed border-gray-200 rounded-xl p-5 text-center cursor-pointer hover:border-violet-300 hover:bg-violet-50/20 transition-all group"
+                            >
+                                <UploadCloud className="w-7 h-7 text-gray-200 group-hover:text-violet-400 mx-auto mb-2 transition-colors" />
+                                <p className="text-xs font-bold text-gray-400">Arrastra o <span className="text-violet-500">selecciona</span></p>
+                                <p className="text-[9px] text-gray-300 mt-0.5">Fotos, PDF, Word, Excel</p>
+                            </div>
+
+                            {resFiles.length > 0 && (
+                                <div className="grid grid-cols-2 gap-2 mt-2">
+                                    {resFiles.map((file, idx) => {
+                                        const isImage = file.type.startsWith('image/');
+                                        const sizeKB = Math.round(file.size / 1024);
+                                        const sizeLabel = sizeKB > 1024 ? `${(sizeKB / 1024).toFixed(1)} MB` : `${sizeKB} KB`;
+                                        return (
+                                            <div key={idx} className="relative group/f bg-violet-50 border border-violet-100 rounded-xl overflow-hidden">
+                                                {isImage
+                                                    ? <img src={URL.createObjectURL(file)} alt="" className="w-full h-20 object-cover" />
+                                                    : <div className="w-full h-20 flex items-center justify-center"><FileUp className="w-7 h-7 text-violet-300" /></div>
+                                                }
+                                                <div className="px-2 py-1.5">
+                                                    <p className="text-[9px] font-bold text-violet-700 truncate">{file.name}</p>
+                                                    <p className="text-[8px] text-violet-400">{sizeLabel}</p>
+                                                </div>
+                                                <button type="button"
+                                                    onClick={() => setResFiles(p => p.filter((_, i) => i !== idx))}
+                                                    className="absolute top-1 right-1 w-5 h-5 bg-red-500/80 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover/f:opacity-100 transition-opacity">
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 {tab === 'sla' && (
                     <div className="space-y-4">
                         <div className="bg-gradient-to-br from-indigo-50 to-violet-50 border border-indigo-100 rounded-2xl p-4 space-y-3">
@@ -524,11 +720,25 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
                 )}
             </div>
 
-            {/* ── Save Button ── */}
+            {/* ── Save Button (Edit tab) ── */}
             {tab === 'edit' && (
                 <div className="px-5 py-4 border-t border-gray-100 bg-gradient-to-t from-gray-50/80 to-white">
                     <button onClick={handleSave} disabled={saving} className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-indigo-200/50 disabled:opacity-60 transition-all">
                         {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}{saving ? 'Guardando...' : 'Guardar Cambios'}
+                    </button>
+                </div>
+            )}
+
+            {/* ── Save Button (Resolution tab) ── */}
+            {tab === 'resolution' && (
+                <div className="px-5 py-4 border-t border-violet-100 bg-gradient-to-t from-violet-50/60 to-white">
+                    <button
+                        onClick={handleSaveResolution}
+                        disabled={resSaving || resUploading}
+                        className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-violet-200/50 disabled:opacity-60 transition-all"
+                    >
+                        {resSaving ? <RefreshCw className="w-4 h-4 animate-spin" /> : resUploading ? <UploadCloud className="w-4 h-4 animate-pulse" /> : <FileBadge2 className="w-4 h-4" />}
+                        {resSaving ? 'Guardando...' : resUploading ? 'Subiendo archivos...' : 'Guardar Reporte'}
                     </button>
                 </div>
             )}
