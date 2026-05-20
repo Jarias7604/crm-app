@@ -119,7 +119,8 @@ export const clientsService = {
         etapa_actual:client_pipeline_stages(*),
         assigned_profile:profiles(id, full_name, email),
         doc_count:client_documents(count),
-        stage_history:client_stage_history(stage_id, entered_at, exited_at)
+        stage_history:client_stage_history(stage_id, entered_at, exited_at),
+        lead:leads(fecha_cierre)
       `)
       .order('created_at', { ascending: false });
 
@@ -130,9 +131,11 @@ export const clientsService = {
     const { data, error } = await q;
     if (error) throw error;
     // Flatten doc_count from [{count: N}] to a number
+    // Expose lead.fecha_cierre as fecha_cierre_lead for the list display
     return ((data || []) as any[]).map(c => ({
       ...c,
       doc_count: c.doc_count?.[0]?.count ?? 0,
+      fecha_cierre_lead: c.lead?.fecha_cierre ?? null,
     })) as unknown as Client[];
   },
 

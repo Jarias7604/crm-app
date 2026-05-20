@@ -216,10 +216,14 @@ export default function Clientes() {
                   <div className="flex items-center gap-3 flex-shrink-0">
                     <span className="text-xs text-gray-400">
                       {(() => {
+                        // Usar fecha_cierre_lead (fecha real del trato) si existe, si no created_at
+                        const rawDate = (client as any).fecha_cierre_lead || client.created_at;
+                        const label = (client as any).fecha_cierre_lead ? 'Cierre' : '';
                         try {
-                           return format(new Date(client.created_at.substring(0, 10) + 'T12:00:00'), 'dd MMM yyyy', { locale: es }).toUpperCase();
+                          const formatted = format(new Date(rawDate.substring(0, 10) + 'T12:00:00'), 'dd MMM yyyy', { locale: es }).toUpperCase();
+                          return label ? `${label}: ${formatted}` : formatted;
                         } catch {
-                           return new Date(client.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+                          return new Date(rawDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
                         }
                       })()}
                     </span>

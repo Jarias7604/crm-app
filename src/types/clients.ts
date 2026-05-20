@@ -51,6 +51,8 @@ export interface Client {
   assigned_profile?: { id: string; full_name: string | null; email: string };
   documents?: ClientDocument[];
   stage_history?: { stage_id: string; entered_at: string; exited_at: string | null }[];
+  // fecha real de cierre del trato (viene del lead asociado)
+  fecha_cierre_lead?: string | null;
 }
 
 export interface ClientDocument {
