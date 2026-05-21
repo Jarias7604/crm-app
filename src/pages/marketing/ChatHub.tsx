@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
     MoreVertical, Send, FileText, Smartphone, Layers,
     Paperclip, TrendingUp, Eye, Zap, Smile, Mail, Phone as PhoneIcon,
-    Send as TelegramIcon, MessageSquare, Trash2, UserPlus, Search, X as CloseIcon, ChevronRight, ChevronLeft, Loader2
+    Send as TelegramIcon, MessageSquare, Trash2, UserPlus, Search, X as CloseIcon, ChevronRight, ChevronLeft, Loader2, Mic
 } from 'lucide-react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { chatService, type ChatConversation, type ChatMessage } from '../../services/marketing/chatService';
@@ -595,171 +595,213 @@ export default function ChatHub() {
                 accept="application/pdf,image/*"
             />
 
-            <div className={`w-full md:w-[380px] ${selectedConv ? 'hidden md:flex' : 'flex'} flex-col bg-white/60 backdrop-blur-3xl border-r border-slate-100 shrink-0 relative overflow-hidden h-full`}>
-                <div className="p-6 pb-2 space-y-4 relative z-10">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <h2 className="text-2xl font-black text-slate-900 tracking-tighter">Inbox</h2>
-                            <button
-                                onClick={() => setShowNewChatModal(true)}
-                                className="p-2.5 rounded-full bg-blue-50 border border-blue-100 text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
-                                title="Nueva conversación con Lead"
-                            >
-                                <UserPlus className="w-5 h-5" />
-                            </button>
-                        </div>
-                        <div className="flex gap-1.5 bg-slate-100 p-1.5 rounded-xl w-[180px]">
-                            <FilterButton icon={Layers} active={filter === 'all'} onClick={() => setFilter('all')} />
-                            <FilterButton icon={Smartphone} active={filter === 'whatsapp'} onClick={() => setFilter('whatsapp')} activeColor="bg-emerald-500 text-white shadow-emerald-500/30" />
-                            <FilterButton icon={TelegramIcon} active={filter === 'telegram'} onClick={() => setFilter('telegram')} activeColor="bg-blue-500 text-white shadow-blue-500/30" />
-                        </div>
+            {/* ===== CONVERSATION LIST — Telegram iOS Native Style ===== */}
+            <div className={`w-full md:w-[380px] ${selectedConv ? 'hidden md:flex' : 'flex'} flex-col bg-[#f2f2f7] border-r border-black/5 shrink-0 relative overflow-hidden h-full`}>
+
+                {/* HEADER */}
+                <div className="px-4 pt-5 pb-2">
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-[13px] font-semibold text-indigo-500 cursor-pointer hover:text-indigo-700">Editar</span>
+                        <h1 className="text-[18px] font-bold text-slate-900 tracking-tight">Chats</h1>
+                        <button
+                            onClick={() => setShowNewChatModal(true)}
+                            className="w-8 h-8 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-600 hover:bg-indigo-100 transition-colors"
+                            title="Nueva conversación"
+                        >
+                            <UserPlus className="w-4 h-4" />
+                        </button>
                     </div>
 
-                    <div className="relative group">
+                    {/* SEARCH BAR */}
+                    <div className="relative">
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Buscar cliente..."
-                            className="w-full pl-5 pr-5 py-3.5 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-700 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-blue-500/20 transition-all shadow-inner"
+                            placeholder="Buscar"
+                            className="w-full pl-10 pr-4 py-2.5 bg-white rounded-xl text-[15px] text-slate-700 placeholder:text-slate-400 outline-none border border-black/5 shadow-sm focus:border-indigo-300 transition-all"
                         />
+                    </div>
+
+                    {/* CHANNEL FILTER PILLS */}
+                    <div className="flex gap-2 mt-3 pb-1">
+                        <button onClick={() => setFilter('all')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold transition-all ${ filter === 'all' ? 'bg-indigo-500 text-white shadow-sm' : 'bg-white text-slate-500 border border-black/5'}`}>
+                            <Layers className="w-3 h-3" /> Todos
+                        </button>
+                        <button onClick={() => setFilter('whatsapp')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold transition-all ${ filter === 'whatsapp' ? 'bg-emerald-500 text-white shadow-sm' : 'bg-white text-slate-500 border border-black/5'}`}>
+                            <Smartphone className="w-3 h-3" /> WhatsApp
+                        </button>
+                        <button onClick={() => setFilter('telegram')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-semibold transition-all ${ filter === 'telegram' ? 'bg-sky-500 text-white shadow-sm' : 'bg-white text-slate-500 border border-black/5'}`}>
+                            <TelegramIcon className="w-3 h-3" /> Telegram
+                        </button>
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-2 custom-scrollbar">
-                    {filteredConversations.map(conv => (
-                        <div
-                            key={conv.id}
-                            onClick={() => setSelectedConv(conv)}
-                            className={`p-4 rounded-[20px] cursor-pointer transition-all duration-300 border relative group overflow-hidden ${selectedConv?.id === conv.id
-                                ? 'bg-blue-600 border-blue-500 shadow-xl shadow-blue-900/20 translate-x-2'
-                                : 'bg-white border-transparent hover:bg-white hover:border-slate-100 hover:shadow-lg hover:shadow-slate-200/50 hover:translate-x-1'
-                                }`}
-                        >
-                            <div className="flex gap-4 relative z-10">
-                                <div className="relative shrink-0">
-                                    <div className={`w-12 h-12 rounded-[16px] flex items-center justify-center font-black text-lg transition-transform group-hover:scale-105 ${selectedConv?.id === conv.id ? 'bg-white text-blue-600 shadow-lg' : 'bg-slate-100 text-slate-500'}`}>
-                                        {conv.lead?.name?.[0] || '?'}
+                {/* CONVERSATION LIST */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar bg-white mt-2 rounded-t-2xl">
+                    {filteredConversations.map((conv, idx) => {
+                        // Generate a consistent gradient color from the name
+                        const colors = [
+                            'from-indigo-500 to-purple-600',
+                            'from-emerald-500 to-teal-600',
+                            'from-orange-400 to-pink-500',
+                            'from-sky-500 to-blue-600',
+                            'from-rose-500 to-red-600',
+                            'from-amber-400 to-orange-500',
+                            'from-violet-500 to-indigo-600',
+                            'from-teal-500 to-emerald-600',
+                        ];
+                        const colorIdx = (conv.lead?.name?.charCodeAt(0) || 0) % colors.length;
+                        const gradient = colors[colorIdx];
+                        const isSelected = selectedConv?.id === conv.id;
+                        return (
+                            <div key={conv.id}>
+                                <div
+                                    onClick={() => setSelectedConv(conv)}
+                                    className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors relative group ${ isSelected ? 'bg-indigo-50' : 'hover:bg-gray-50' }`}
+                                >
+                                    {/* AVATAR */}
+                                    <div className="relative shrink-0">
+                                        <div className={`w-[54px] h-[54px] rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-white text-[22px] font-bold shadow-sm`}>
+                                            {conv.lead?.name?.[0]?.toUpperCase() || '?'}
+                                        </div>
+                                        {/* Channel badge */}
+                                        <div className={`absolute -bottom-0.5 -right-0.5 w-[18px] h-[18px] rounded-full flex items-center justify-center ring-2 ring-white ${ conv.channel === 'telegram' ? 'bg-sky-500' : 'bg-emerald-500' }`}>
+                                            {conv.channel === 'telegram'
+                                                ? <TelegramIcon className="w-2.5 h-2.5 text-white" />
+                                                : <Smartphone className="w-2 h-2 text-white" />}
+                                        </div>
                                     </div>
-                                    <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center ring-2 ring-white shadow-sm ${conv.channel === 'telegram' ? 'bg-sky-500' : 'bg-emerald-500'}`}>
-                                        {conv.channel === 'telegram' ? <TelegramIcon className="w-2.5 h-2.5 text-white" /> : <Smartphone className="w-2.5 h-2.5 text-white" />}
-                                    </div>
-                                </div>
-                                <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                    <div className="flex justify-between items-baseline mb-1">
-                                        <h3 className={`text-sm font-black truncate tracking-tight ${selectedConv?.id === conv.id ? 'text-white' : 'text-slate-800'}`}>
-                                            {conv.lead?.name || 'Prospecto'}
-                                        </h3>
-                                        <span className={`text-[9px] font-bold ${selectedConv?.id === conv.id ? 'text-blue-200' : 'text-slate-400'} flex items-center gap-2`}>
-                                            {conv.unread_count > 0 && selectedConv?.id !== conv.id && (
-                                                <span className="flex h-2 w-2 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50 animate-pulse" title={`${conv.unread_count} sin leer`} />
-                                            )}
-                                            {formatTime(conv.last_message_at)}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between items-end">
-                                        <p className={`text-xs truncate max-w-[180px] font-medium ${selectedConv?.id === conv.id ? 'text-blue-100' : 'text-slate-500'}`}>
-                                            {conv.last_message
-                                                ? (conv.last_message.replace(/<[^>]*>?/gm, '').replace(/\s+/g, ' ').trim() || 'Archivo/Imagen')
-                                                : 'Nueva conversación'}
-                                        </p>
 
-                                        {/* ADMIN ACTIONS: DELETE CONVERSATION */}
-                                        {isAdmin() && (
-                                            <button
-                                                onClick={(e) => handleDeleteConversation(e, conv.id)}
-                                                className={`p-1.5 rounded-full hover:bg-red-500 hover:text-white transition-all opacity-0 group-hover:opacity-100 ${selectedConv?.id === conv.id ? 'text-white/50 hover:bg-white/20 hover:text-white' : 'text-slate-300'}`}
-                                                title="Eliminar conversación completa"
-                                            >
-                                                <Trash2 className="w-3 h-3" />
-                                            </button>
-                                        )}
+                                    {/* CONTENT */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-baseline justify-between">
+                                            <h3 className="text-[16px] font-semibold text-slate-900 truncate leading-tight">
+                                                {conv.lead?.name || 'Prospecto'}
+                                            </h3>
+                                            <span className="text-[12px] text-slate-400 ml-2 shrink-0">
+                                                {formatTime(conv.last_message_at)}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between mt-0.5">
+                                            <p className="text-[14px] text-slate-500 truncate leading-tight">
+                                                {conv.last_message
+                                                    ? conv.last_message.replace(/<[^>]*>?/gm, '').replace(/\s+/g, ' ').trim() || 'Archivo'
+                                                    : 'Nueva conversación'}
+                                            </p>
+                                            {conv.unread_count > 0 && !isSelected && (
+                                                <span className="ml-2 shrink-0 min-w-[20px] h-5 px-1.5 bg-indigo-500 text-white text-[11px] font-bold rounded-full flex items-center justify-center">
+                                                    {conv.unread_count > 99 ? '99+' : conv.unread_count}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
+
+                                    {/* Delete button (admin) */}
+                                    {isAdmin() && (
+                                        <button
+                                            onClick={(e) => handleDeleteConversation(e, conv.id)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full text-slate-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    )}
                                 </div>
+                                {/* Separator */}
+                                {idx < filteredConversations.length - 1 && (
+                                    <div className="ml-[76px] h-px bg-black/5" />
+                                )}
                             </div>
+                        );
+                    })}
+                    {filteredConversations.length === 0 && (
+                        <div className="flex flex-col items-center justify-center py-20 text-center">
+                            <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mb-4">
+                                <MessageSquare className="w-8 h-8 text-slate-300" />
+                            </div>
+                            <p className="text-[13px] font-semibold text-slate-400">Sin conversaciones</p>
                         </div>
-                    ))}
+                    )}
                 </div>
             </div>
 
-            <div className={`flex-1 ${selectedConv ? 'flex' : 'hidden md:flex'} flex-col bg-white/80 backdrop-blur-xl rounded-none md:rounded-[32px] shadow-2xl border border-white/50 overflow-hidden relative isolate min-h-0`}>
-                <div className="absolute inset-0 z-[-1] opacity-40" style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
-                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-100/30 rounded-full blur-[100px] -z-10 translate-x-1/3 -translate-y-1/3"></div>
+            <div className={`flex-1 ${selectedConv ? 'flex' : 'hidden md:flex'} flex-col bg-[#e5ddd5] rounded-none md:rounded-[32px] overflow-hidden relative isolate min-h-0`}>
 
                 {selectedConv ? (
                     <>
-                        <header className="px-3 md:px-8 py-3 md:py-5 flex items-center justify-between border-b border-white/50 bg-white/60 backdrop-blur-md sticky top-0 z-30">
-                            <div className="flex items-center gap-2 md:gap-5 min-w-0">
+                        {/* HEADER — Telegram/WhatsApp native style */}
+                        <header className="px-3 md:px-5 py-3 flex items-center justify-between bg-[#1f2937] sticky top-0 z-30 shrink-0">
+                            <div className="flex items-center gap-2 md:gap-4 min-w-0">
                                 <button
                                     onClick={() => setSelectedConv(null)}
-                                    className="md:hidden p-2 rounded-full hover:bg-slate-100 text-slate-600 transition-colors shrink-0"
+                                    className="md:hidden p-1.5 rounded-full text-white/70 hover:text-white transition-colors shrink-0"
                                 >
-                                    <ChevronLeft className="w-6 h-6" />
+                                    <ChevronLeft className="w-5 h-5" />
                                 </button>
                                 <div className="relative shrink-0">
-                                    <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-[20px] bg-slate-900 flex items-center justify-center text-white text-base md:text-xl font-black shadow-2xl shadow-slate-900/20 overflow-hidden">
+                                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-lg font-black shadow-lg overflow-hidden">
                                         {selectedConv.lead?.name?.[0]}
-                                        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/20" />
                                     </div>
-                                    <div className="absolute -bottom-1 -right-1 w-3 h-3 md:w-4 md:h-4 bg-emerald-500 border-2 md:border-[3px] border-white rounded-full animate-pulse shadow-sm" />
+                                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 border-2 border-[#1f2937] rounded-full" />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="flex items-center gap-1.5 md:gap-3">
-                                        <h2 className="text-sm md:text-xl font-black text-slate-900 tracking-tight truncate max-w-[120px] sm:max-w-[200px]">{selectedConv.lead?.name}</h2>
-                                        <span className="px-1.5 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-[8px] font-black uppercase text-slate-500 tracking-widest">{selectedConv.channel}</span>
+                                    <div className="flex items-center gap-2">
+                                        <h2 className="text-[15px] md:text-[17px] font-bold text-white tracking-tight truncate max-w-[140px] sm:max-w-[240px]">{selectedConv.lead?.name}</h2>
+                                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${selectedConv.channel === 'whatsapp' ? 'bg-emerald-500/20 text-emerald-400' : selectedConv.channel === 'telegram' ? 'bg-sky-500/20 text-sky-400' : 'bg-indigo-500/20 text-indigo-400'}`}>{selectedConv.channel}</span>
                                     </div>
-                                    <p className="text-[10px] md:text-xs font-medium text-slate-500 flex items-center gap-1 mt-0.5">
-                                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full inline-block" /> En línea
+                                    <p className="text-[11px] text-white/50 font-medium mt-0.5 flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full inline-block" /> en línea
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex gap-1.5 md:gap-3 items-center shrink-0">
+                            <div className="flex gap-1.5 items-center shrink-0">
                                 {selectedConv.lead?.phone && (
                                     <>
                                         <a
                                             href={`tel:${selectedConv.lead.phone}`}
-                                            className="h-9 w-9 md:h-11 md:w-11 flex items-center justify-center rounded-lg md:rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all shadow-sm shrink-0"
-                                            title="Llamar por teléfono"
+                                            className="h-9 w-9 flex items-center justify-center rounded-full text-white/60 hover:text-white hover:bg-white/10 transition-all"
+                                            title="Llamar"
                                         >
-                                            <PhoneIcon className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                                            <PhoneIcon className="w-4 h-4" />
                                         </a>
                                         <a
                                             href={`https://wa.me/${selectedConv.lead.phone.replace(/\D/g, '')}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="h-9 w-9 md:h-11 md:w-11 flex items-center justify-center rounded-lg md:rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-600 hover:text-white hover:bg-emerald-600 hover:border-emerald-600 transition-all shadow-sm shrink-0"
-                                            title="Abrir en WhatsApp"
+                                            className="h-9 w-9 flex items-center justify-center rounded-full text-emerald-400 hover:text-white hover:bg-emerald-500/20 transition-all"
+                                            title="WhatsApp"
                                         >
-                                            <Smartphone className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                                            <Smartphone className="w-4 h-4" />
                                         </a>
                                     </>
                                 )}
                                 <button
                                     onClick={() => handleAiProcess()}
                                     disabled={isAiProcessing || !agentStatus}
-                                    title="Pedir respuesta a la IA"
-                                    className={`h-9 w-9 md:h-11 md:w-11 flex items-center justify-center rounded-lg md:rounded-xl border transition-all ${isAiProcessing ? 'bg-slate-50 text-slate-300' : 'bg-white text-slate-600 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50'}`}
+                                    title="IA"
+                                    className={`h-9 w-9 flex items-center justify-center rounded-full transition-all ${isAiProcessing ? 'text-white/20' : 'text-white/60 hover:text-white hover:bg-white/10'}`}
                                 >
-                                    <Zap className={`w-3.5 h-3.5 md:w-4 md:h-4 ${isAiProcessing ? 'animate-pulse' : ''}`} />
+                                    <Zap className={`w-4 h-4 ${isAiProcessing ? 'animate-pulse' : ''}`} />
                                 </button>
                                 <button
                                     onClick={() => navigate('/cotizaciones/nueva-pro', { state: { lead: selectedConv.lead, conversation_id: selectedConv.id, fromChat: true } })}
-                                    className="h-9 px-3 md:h-11 md:px-6 bg-slate-900 text-white rounded-lg md:rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 hover:shadow-lg hover:shadow-blue-600/30 transition-all flex items-center gap-1 md:gap-2 group"
+                                    className="h-9 px-3 bg-indigo-600 text-white rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500 transition-all flex items-center gap-1.5"
                                 >
-                                    <TrendingUp className="w-3.5 h-3.5 md:w-4 md:h-4 text-blue-400 group-hover:text-white transition-colors" />
+                                    <TrendingUp className="w-3.5 h-3.5" />
                                     <span className="hidden sm:inline">Cotizar</span>
                                 </button>
                                 <div className="relative group">
                                     <button
                                         onClick={() => setShowDetails(!showDetails)}
-                                        className={`w-9 h-9 md:w-11 md:h-11 rounded-lg md:rounded-xl flex items-center justify-center transition-all ${showDetails ? 'bg-slate-200 text-slate-900' : 'bg-white border border-slate-200 text-slate-400 hover:text-slate-900'}`}
+                                        className="w-9 h-9 rounded-full flex items-center justify-center transition-all text-white/60 hover:text-white hover:bg-white/10"
                                     >
-                                        <MoreVertical className="w-4 h-4 md:w-5 md:h-5" />
+                                        <MoreVertical className="w-4 h-4" />
                                     </button>
-                                    <div className="absolute top-12 right-0 w-48 bg-white rounded-xl shadow-xl border border-slate-100 p-1 hidden group-hover:block z-50">
+                                    <div className="absolute top-12 right-0 w-48 bg-[#1f2937] rounded-xl shadow-2xl border border-white/10 p-1 hidden group-hover:block z-50">
                                         {isAdmin() && (
                                             <button
                                                 onClick={(e) => handleDeleteConversation(e, selectedConv.id)}
-                                                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-[11px] font-bold text-red-500 hover:bg-red-50 hover:text-red-700 transition-colors"
+                                                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-[11px] font-bold text-red-400 hover:bg-red-500/10 transition-colors"
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                                 ELIMINAR CHAT
@@ -772,11 +814,13 @@ export default function ChatHub() {
 
                         <div
                             ref={scrollRef}
-                            className={`flex-1 overflow-y-auto px-3 md:px-6 py-4 md:py-8 space-y-4 md:space-y-6 custom-scrollbar scroll-smooth relative transition-colors duration-500 ${
-                                selectedConv.channel === 'whatsapp' ? 'bg-[#efeae2]' :
-                                selectedConv.channel === 'telegram' ? 'bg-[#dee5eb]' :
-                                'bg-slate-50'
-                            }`}
+                            className="flex-1 overflow-y-auto px-3 md:px-5 py-5 space-y-2 custom-scrollbar scroll-smooth relative"
+                            style={{
+                                backgroundColor: selectedConv.channel === 'whatsapp' ? '#e5ddd5' : selectedConv.channel === 'telegram' ? '#e6ebee' : '#eef2ff',
+                                backgroundImage: selectedConv.channel === 'whatsapp'
+                                    ? `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400' viewBox='0 0 400 400'%3E%3Cg opacity='0.06' fill='%23000'%3E%3Ccircle cx='50' cy='50' r='4'/%3E%3Ccircle cx='150' cy='80' r='3'/%3E%3Ccircle cx='280' cy='40' r='5'/%3E%3Ccircle cx='350' cy='120' r='3'/%3E%3Ccircle cx='80' cy='180' r='4'/%3E%3Ccircle cx='220' cy='160' r='3'/%3E%3Ccircle cx='320' cy='200' r='4'/%3E%3Ccircle cx='40' cy='270' r='3'/%3E%3Ccircle cx='180' cy='300' r='5'/%3E%3Ccircle cx='310' cy='280' r='3'/%3E%3Ccircle cx='100' cy='350' r='4'/%3E%3Ccircle cx='250' cy='370' r='3'/%3E%3C/g%3E%3C/svg%3E")`
+                                    : 'none'
+                            }}
                         >
                             {/* SVG wallpaper overlay for WhatsApp / Telegram native feeling */}
                             {selectedConv.channel === 'whatsapp' && (
@@ -789,18 +833,16 @@ export default function ChatHub() {
                             {messages.map((msg, idx) => (
                                 <div key={msg.id || idx} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'} group w-full animate-in fade-in slide-in-from-bottom-2 duration-300 relative z-10`}>
                                     <div className={`flex flex-col gap-1 ${msg.direction === 'outbound' ? 'items-end' : 'items-start'} max-w-[85%] md:max-w-[75%]`}>
-                                        <div className={`px-3 md:px-4 py-2 md:py-2.5 rounded-2xl shadow-sm relative transition-all group-hover:shadow-md ${
+                                        <div className={`px-4 py-2.5 rounded-2xl shadow-sm relative ${
                                             msg.direction === 'outbound'
                                                 ? (selectedConv.channel === 'whatsapp'
-                                                    ? 'bg-[#d9fdd3] text-slate-800 border border-[#c3f2ba]/40 rounded-tr-none'
+                                                    ? 'bg-[#d9fdd3] text-slate-800 rounded-tr-sm'
                                                     : selectedConv.channel === 'telegram'
-                                                        ? 'bg-[#2b5278] text-white rounded-tr-none'
-                                                        : 'bg-indigo-600 text-white rounded-tr-none shadow-indigo-200/50')
-                                                : (selectedConv.channel === 'whatsapp'
-                                                    ? 'bg-white text-slate-800 border border-slate-100 rounded-tl-none'
-                                                    : 'bg-white text-slate-700 border border-slate-100 rounded-tl-none shadow-slate-200/40')
+                                                        ? 'bg-[#effdde] text-slate-800 rounded-tr-sm'
+                                                        : 'bg-indigo-100 text-slate-800 rounded-tr-sm')
+                                                : 'bg-white text-slate-800 rounded-tl-sm shadow-sm'
                                         }`}>
-                                            <div className="text-[13.5px] md:text-[14.5px] font-medium leading-[1.5] pr-12 pb-1 relative">
+                                            <div className="text-[15px] font-normal leading-[1.5] pr-14 pb-1 relative">
                                                 {msg.content.startsWith('__QUOTE__') ? (
                                                     <div className="w-fit max-w-[80%] min-w-[200px] mb-1">
                                                         <div className="flex items-center gap-4 mb-3 pb-3 border-b border-white/10">
@@ -883,7 +925,7 @@ export default function ChatHub() {
                                                 )}
 
                                                 {/* NATIVE TIME & DOUBLE CHECK MARK ALIGNED INSIDE BUBBLE */}
-                                                <div className={`absolute bottom-0 right-0 flex items-center gap-0.5 text-[9px] font-black tracking-tight select-none opacity-60 pointer-events-none translate-y-1.5 translate-x-3.5 ${msg.direction === 'outbound' && selectedConv.channel !== 'whatsapp' ? 'text-white/80' : 'text-slate-400'}`}>
+                                                <div className={`absolute bottom-1 right-2 flex items-center gap-0.5 text-[10px] select-none pointer-events-none ${msg.direction === 'outbound' ? 'text-slate-500' : 'text-slate-400'}`}>
                                                     <span>{formatTime(msg.sent_at)}</span>
                                                     {msg.direction === 'outbound' && (
                                                         <span className="flex shrink-0">
@@ -947,68 +989,93 @@ export default function ChatHub() {
                             </div>
                         )}
 
-                        <div className="px-3 md:px-8 pb-3 md:pb-8 pt-2 md:pt-4 bg-gradient-to-t from-white via-white to-transparent">
-                            {/* QUICK SUGGESTIONS CAROUSEL */}
-                            <div className="flex gap-2 overflow-x-auto pb-3 pt-1 px-1 custom-scrollbar shrink-0 scroll-smooth snap-x snap-mandatory mb-2">
+                        {/* INPUT BAR — Telegram native style */}
+                        <div className="px-3 pb-3 pt-2 bg-[#f2f2f7] border-t border-black/5">
+                            {/* QUICK SUGGESTIONS */}
+                            <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
                                 {QUICK_RESPONSES.map((resp, i) => (
                                     <button
                                         key={i}
                                         type="button"
                                         onClick={() => setNewMessage(resp.text)}
-                                        className="shrink-0 px-3 py-1.5 bg-slate-50 hover:bg-indigo-50 border border-slate-100 hover:border-indigo-100 text-slate-600 hover:text-indigo-600 rounded-full text-[11px] font-bold tracking-tight transition-all active:scale-95 shadow-sm snap-start"
+                                        className="shrink-0 px-3 py-1 bg-white border border-black/8 text-slate-600 rounded-full text-[12px] font-medium transition-all active:scale-95 shadow-sm hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200"
                                     >
                                         {resp.label}
                                     </button>
                                 ))}
                             </div>
 
-                            {/* ATTACHMENT PREVIEW */}
+                            {/* FILE PREVIEW */}
                             {pendingFile && (
-                                <div className="mb-4 animate-in slide-in-from-bottom-2 duration-300">
-                                    <div className="relative inline-block group">
-                                        <div className="bg-slate-50 rounded-2xl border-2 border-indigo-100 p-2 shadow-sm overflow-hidden">
+                                <div className="mb-2 animate-in slide-in-from-bottom-2 duration-300">
+                                    <div className="relative inline-block">
+                                        <div className="bg-white rounded-2xl border border-black/8 p-2 shadow-sm overflow-hidden">
                                             {previewUrl ? (
-                                                <img src={previewUrl} className="h-32 w-auto rounded-xl object-contain border border-slate-100" alt="Preview" />
+                                                <img src={previewUrl} className="h-28 w-auto rounded-xl object-contain" alt="Preview" />
                                             ) : (
-                                                <div className="h-20 w-48 flex items-center gap-3 px-4">
+                                                <div className="h-16 w-44 flex items-center gap-3 px-3">
                                                     <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
-                                                        <FileText className="w-5 h-5" />
+                                                        <FileText className="w-4 h-4" />
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <p className="text-[10px] font-black text-slate-800 uppercase tracking-wider truncate">{pendingFile.name}</p>
-                                                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{(pendingFile.size / (1024 * 1024)).toFixed(2)} MB</p>
+                                                        <p className="text-[12px] font-semibold text-slate-800 truncate">{pendingFile.name}</p>
+                                                        <p className="text-[11px] text-slate-400">{(pendingFile.size / (1024 * 1024)).toFixed(2)} MB</p>
                                                     </div>
                                                 </div>
                                             )}
-                                            <button
-                                                type="button"
-                                                onClick={removePendingFile}
-                                                className="absolute -top-2 -right-2 p-1 bg-white text-slate-400 hover:text-red-500 rounded-full shadow-md border border-slate-100 transition-all hover:scale-110 z-10"
-                                            >
-                                                <CloseIcon className="w-4 h-4" />
-                                            </button>
                                         </div>
+                                        <button
+                                            type="button"
+                                            onClick={removePendingFile}
+                                            className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-slate-700 text-white rounded-full flex items-center justify-center shadow-md hover:bg-red-500 transition-colors z-10"
+                                        >
+                                            <CloseIcon className="w-3 h-3" />
+                                        </button>
                                     </div>
                                 </div>
                             )}
 
-                            <form onSubmit={handleSendMessage} className="bg-white rounded-xl md:rounded-[1.5rem] p-1.5 md:p-2 flex items-center gap-1.5 md:gap-2 border border-slate-200/60 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.08)] focus-within:ring-4 focus-within:ring-indigo-100/50 focus-within:border-indigo-200 transition-all duration-300">
-                                <button type="button" className="p-2 md:p-3 text-slate-400 hover:text-indigo-600 transition-all hover:scale-110 shrink-0"><Smile className="w-5 h-5" /></button>
-                                <textarea
-                                    value={newMessage}
-                                    onChange={e => setNewMessage(e.target.value)}
-                                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(e as any); } }}
-                                    placeholder="Escribe un mensaje..."
-                                    className="flex-1 bg-transparent py-2 md:py-3 text-[13.5px] md:text-[14px] font-semibold text-slate-700 outline-none resize-none max-h-32 custom-scrollbar placeholder:text-slate-300"
-                                    rows={1}
-                                />
-                                <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 md:p-3 text-slate-400 hover:text-indigo-600 transition-all hover:scale-110 shrink-0"><Paperclip className="w-5 h-5" /></button>
+                            {/* MESSAGE INPUT ROW */}
+                            <form onSubmit={handleSendMessage} className="flex items-end gap-2">
+                                {/* Attachment */}
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="w-9 h-9 shrink-0 flex items-center justify-center rounded-full bg-white border border-black/8 text-slate-500 hover:text-indigo-600 hover:border-indigo-200 transition-all shadow-sm mb-0.5"
+                                >
+                                    <Paperclip className="w-4 h-4" />
+                                </button>
+
+                                {/* Pill Input */}
+                                <div className="flex-1 bg-white rounded-[22px] border border-black/8 shadow-sm flex items-end px-4 py-2 gap-2 min-h-[44px]">
+                                    <textarea
+                                        value={newMessage}
+                                        onChange={e => setNewMessage(e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(e as any); } }}
+                                        placeholder="Mensaje"
+                                        className="flex-1 bg-transparent text-[16px] text-slate-800 outline-none resize-none max-h-32 custom-scrollbar placeholder:text-slate-400 leading-snug self-center"
+                                        rows={1}
+                                    />
+                                    <button type="button" className="text-slate-400 hover:text-amber-500 transition-colors shrink-0 mb-0.5">
+                                        <Smile className="w-5 h-5" />
+                                    </button>
+                                </div>
+
+                                {/* Send / Mic */}
                                 <button
                                     type="submit"
-                                    disabled={(!newMessage.trim() && !pendingFile) || isSending}
-                                    className={`h-10 w-10 md:h-12 md:w-12 flex items-center justify-center bg-indigo-600 text-white rounded-lg md:rounded-2xl transition-all shadow-xl shadow-indigo-600/20 active:scale-95 shrink-0 ${((!newMessage.trim() && !pendingFile) || isSending) ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-indigo-700 hover:-translate-y-0.5'}`}
+                                    disabled={((!newMessage.trim() && !pendingFile) || isSending)}
+                                    className={`w-10 h-10 shrink-0 flex items-center justify-center rounded-full transition-all shadow-sm mb-0.5 ${
+                                        newMessage.trim() || pendingFile
+                                            ? 'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 shadow-indigo-200'
+                                            : 'bg-white border border-black/8 text-slate-400 hover:text-indigo-600'
+                                    }`}
                                 >
-                                    {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                                    {isSending
+                                        ? <Loader2 className="w-5 h-5 animate-spin" />
+                                        : newMessage.trim() || pendingFile
+                                        ? <Send className="w-4 h-4" />
+                                        : <Mic className="w-4 h-4" />}
                                 </button>
                             </form>
                         </div>
