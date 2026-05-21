@@ -8,7 +8,7 @@ import { StatusBadge } from '../components/leads/StatusBadge';
 import { PriorityBadge } from '../components/leads/PriorityBadge';
 import { supabase } from '../services/supabase';
 import toast from 'react-hot-toast';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { leadsService } from '../services/leads';
 import type { Lead, LeadStatus, LeadPriority, FollowUp, LossReason, Industry } from '../types';
 import { PRIORITY_CONFIG, STATUS_CONFIG, ACTION_TYPES, SOURCE_CONFIG, SOURCE_OPTIONS } from '../types';
@@ -50,6 +50,7 @@ export default function Leads() {
     const { timezone: rawTimezone } = useTimezone(profile?.company_id);
     const { tableRef: leadsTableRef, wrapperRef: leadsWrapperRef } = useAriasTables();
     const queryClient = useQueryClient();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { 
         data: leadsData, 
         isLoading: loading,
@@ -622,6 +623,32 @@ export default function Leads() {
         loadLossReasons();
         loadIndustries();
     }, []);
+
+    // ── "Listos para Comprar" URL param handler ────────────────────────────
+    // Triggered by the sidebar button which navigates to /leads?ready=1
+    // Finds all distinct status values that contain buying-intent keywords
+    // and sets them as the active status filter.
+    useEffect(() => {
+        if (searchParams.get('ready') !== '1') return;
+        if (leads.length === 0) return; // wait until data loads
+
+        const BUYING_KEYWORDS = ['negoci', 'cotiz', 'propuesta', 'demo', 'reunion', 'reuni', 'meeting', 'presentac', 'oferta', 'lista', 'listo'];
+        const distinctStatuses = [...new Set(leads.map(l => l.status).filter(Boolean))];
+        const hotStatuses = distinctStatuses.filter(s =>
+            BUYING_KEYWORDS.some(kw => s?.toLowerCase().includes(kw))
+        ) as LeadStatus[];
+
+        // If we found matching stages, apply them; otherwise fall back to Cotizado
+        const toApply = hotStatuses.length > 0 ? hotStatuses : ['Cotizado'] as LeadStatus[];
+        setStatusFilter(toApply);
+
+        // Clear the ?ready=1 from the URL without re-navigating
+        setSearchParams(prev => {
+            const next = new URLSearchParams(prev);
+            next.delete('ready');
+            return next;
+        }, { replace: true });
+    }, [searchParams, leads.length]);
 
     const loadLossReasons = async () => {
         try {

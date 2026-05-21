@@ -119,9 +119,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                     href: '/leads',
                     icon: Target,
                     badge: hotLeadCount,
-                    onClick: () => navigate('/leads', {
-                        state: { status: ['Negociación', 'Cotizado', 'Propuesta Enviada'], _t: Date.now() }
-                    })
+                    onClick: () => navigate('/leads?ready=1')
                 } as any,
             ]
         });
