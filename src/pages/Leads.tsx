@@ -625,30 +625,58 @@ export default function Leads() {
     }, []);
 
     // ── "Listos para Comprar" URL param handler ────────────────────────────
-    // Triggered by the sidebar button which navigates to /leads?ready=1
-    // Finds all distinct status values that contain buying-intent keywords
-    // and sets them as the active status filter.
+    // Triggered by the sidebar button (/leads?ready=1)
+    // Queries lead_ai_memory for leads the AI flagged as cierre_inminente
+    // — the same source used by the sidebar badge, so badge=1 means list=1 lead.
     useEffect(() => {
         if (searchParams.get('ready') !== '1') return;
-        if (leads.length === 0) return; // wait until data loads
 
-        const BUYING_KEYWORDS = ['negoci', 'cotiz', 'propuesta', 'demo', 'reunion', 'reuni', 'meeting', 'presentac', 'oferta', 'lista', 'listo'];
-        const distinctStatuses = [...new Set(leads.map(l => l.status).filter(Boolean))];
-        const hotStatuses = distinctStatuses.filter(s =>
-            BUYING_KEYWORDS.some(kw => s?.toLowerCase().includes(kw))
-        ) as LeadStatus[];
+        const applyReadyFilter = async () => {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('company_id')
+                    .eq('id', user?.id)
+                    .single();
 
-        // If we found matching stages, apply them; otherwise fall back to Cotizado
-        const toApply: LeadStatus[] = hotStatuses.length > 0 ? hotStatuses : (['Cotizado'] as unknown as LeadStatus[]);
-        setStatusFilter(toApply);
+                if (!profile?.company_id) return;
 
-        // Clear the ?ready=1 from the URL without re-navigating
-        setSearchParams(prev => {
-            const next = new URLSearchParams(prev);
-            next.delete('ready');
-            return next;
-        }, { replace: true });
-    }, [searchParams, leads.length]);
+                const { data: aiLeads } = await supabase
+                    .from('lead_ai_memory')
+                    .select('lead_id')
+                    .eq('company_id', profile.company_id)
+                    .eq('next_action', 'cierre_inminente');
+
+                const hotIds = (aiLeads || []).map((r: any) => r.lead_id).filter(Boolean);
+
+                if (hotIds.length > 0) {
+                    // Show exactly the AI-flagged leads
+                    setFilteredLeadIds(hotIds);
+                    setStatusFilter('all');
+                    if (viewMode === 'kanban') setViewMode('list');
+                } else {
+                    // No AI leads yet — fall back to high-intent status filter
+                    const BUYING_KEYWORDS = ['negoci', 'cotiz', 'propuesta', 'demo', 'oferta'];
+                    const distinctStatuses = [...new Set(leads.map(l => l.status).filter(Boolean))];
+                    const hotStatuses = distinctStatuses.filter(s =>
+                        BUYING_KEYWORDS.some(kw => s?.toLowerCase().includes(kw))
+                    ) as LeadStatus[];
+                    setStatusFilter(hotStatuses.length > 0 ? hotStatuses : (['Cotizado'] as unknown as LeadStatus[]));
+                }
+            } catch {
+                // silently ignore
+            } finally {
+                setSearchParams(prev => {
+                    const next = new URLSearchParams(prev);
+                    next.delete('ready');
+                    return next;
+                }, { replace: true });
+            }
+        };
+
+        applyReadyFilter();
+    }, [searchParams]);
 
     const loadLossReasons = async () => {
         try {
