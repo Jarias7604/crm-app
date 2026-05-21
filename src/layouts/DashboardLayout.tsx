@@ -17,11 +17,12 @@ export default function DashboardLayout() {
     const { t, i18n } = useTranslation();
     const location = useLocation();
 
-    // Check if we are in a quote detail view (not editing)
-    const isQuoteDetail = location.pathname.startsWith('/cotizaciones/') &&
+    // Check if we are in an immersive page (no global header or container padding/max-width)
+    const isImmersiveView = (location.pathname.startsWith('/cotizaciones/') &&
         !location.pathname.endsWith('/editar') &&
         location.pathname !== '/cotizaciones/nueva' &&
-        location.pathname !== '/cotizaciones/nueva-pro';
+        location.pathname !== '/cotizaciones/nueva-pro') ||
+        location.pathname === '/marketing/chat';
 
     // Initialize session timeout
     useSessionTimeout();
@@ -42,8 +43,8 @@ export default function DashboardLayout() {
                 "transition-all duration-300 ease-in-out flex flex-col min-h-screen pb-20 md:pb-0",
                 sidebarCollapsed ? "md:pl-20" : "md:pl-64"
             )}>
-                {/* Optimized Global Header - Hidden on Quote Detail for immersion */}
-                {!isQuoteDetail && (
+                {/* Optimized Global Header - Hidden on Quote Detail & Chat for immersion */}
+                {!isImmersiveView && (
                     <header className="w-full px-4 md:px-8 pt-4 pb-6">
                         <div className="max-w-[1580px] mx-auto flex items-center justify-between">
                             <div className="flex flex-col items-start gap-0 group cursor-default">
@@ -88,7 +89,7 @@ export default function DashboardLayout() {
                 {/* Main Content Area - Clean separation */}
                 <main className={cn(
                     "flex-1 w-full pb-8 transition-all",
-                    !isQuoteDetail ? "max-w-[1580px] mx-auto px-4 md:px-8" : "pt-0 px-0"
+                    !isImmersiveView ? "max-w-[1580px] mx-auto px-4 md:px-8" : "pt-0 px-0 pb-0"
                 )}>
                     <Outlet />
                 </main>
