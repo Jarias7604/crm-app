@@ -119,9 +119,8 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                     href: '/leads',
                     icon: Target,
                     badge: hotLeadCount,
-                    // Special: navigates with pre-filter state
                     onClick: () => navigate('/leads', {
-                        state: { status: ['Negociación', 'Cotizado', 'Propuesta Enviada'] }
+                        state: { status: ['Negociación', 'Cotizado', 'Propuesta Enviada'], _t: Date.now() }
                     })
                 } as any,
             ]

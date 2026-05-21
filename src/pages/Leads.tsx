@@ -276,7 +276,9 @@ export default function Leads() {
     useEffect(() => {
         if (location.state) {
             const state = location.state as any;
-            const stateKey = JSON.stringify(state);
+            // Build dedup key ignoring _t (timestamp added by "Listos para Comprar" to force re-apply)
+            const { _t, ...stateWithout_t } = state;
+            const stateKey = JSON.stringify(stateWithout_t) + (_t ? `-${_t}` : '');
 
             // Only apply filters once per state change to allow manual clearing
             if (processedStateRef.current !== stateKey) {
