@@ -12,6 +12,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import {
     teamPerformanceService,
     getDateRange,
+    getPreviousPeriodFilters,
     type UserPerformance,
     type TeamPerformance,
     type PerformanceFilters,
@@ -90,6 +91,7 @@ export default function TeamPerformancePage() {
     const [profileNames, setProfileNames] = useState<Record<string, string>>({});
     const [profileAvatars, setProfileAvatars] = useState<Record<string, string | null>>({});
     const [companySummary, setCompanySummary] = useState<CompanySummary>({ totalLeads: 0, wonDeals: 0, lostDeals: 0, totalValue: 0, totalClosing: 0 });
+    const [previousPerformance, setPreviousPerformance] = useState<UserPerformance[] | null>(null);
 
     // Call Activity KPIs
     const [callSummary, setCallSummary] = useState<CallActivitySummary[]>([]);
@@ -138,6 +140,16 @@ export default function TeamPerformancePage() {
             setGoals(goalsData);
             setCompanySummary(summaryData);
 
+            // Load previous period for trend arrows (non-blocking)
+            const prevFilters = getPreviousPeriodFilters(filters);
+            if (prevFilters) {
+                teamPerformanceService.getUserPerformance(profile.company_id, prevFilters)
+                    .then(setPreviousPerformance)
+                    .catch(() => setPreviousPerformance(null));
+            } else {
+                setPreviousPerformance(null);
+            }
+
             const names: Record<string, string> = {};
             const avatars: Record<string, string | null> = {};
             userData.forEach((u) => {
@@ -179,9 +191,12 @@ export default function TeamPerformancePage() {
     // === COMPUTED (company-wide totals from companySummary for KPI parity with Dashboard) ===
     const totalLeads = companySummary.totalLeads;
     const totalWon = companySummary.wonDeals;
+    const totalLost = companySummary.lostDeals;
     const totalClosing = companySummary.totalClosing;
     const totalValue = companySummary.totalValue;
-    const overallWinRate = totalLeads > 0 ? (totalWon / totalLeads) * 100 : 0;
+    // Win rate = won / (won + lost) — Salesforce/HubSpot standard
+    const decidedTotal = totalWon + totalLost;
+    const overallWinRate = decidedTotal > 0 ? (totalWon / decidedTotal) * 100 : 0;
     const topUser = userPerformance.length > 0 ? userPerformance[0] : null;
 
     const scale = getGoalScale(filters.period);
@@ -378,7 +393,7 @@ export default function TeamPerformancePage() {
 
             {/* Content */}
             {activeTab === 'users' ? (
-                <UserPerformanceTable data={userPerformance} getUserGoal={getUserGoal} periodLabel={periodLabel} companySummary={companySummary} />
+                <UserPerformanceTable data={userPerformance} getUserGoal={getUserGoal} periodLabel={periodLabel} companySummary={companySummary} previousData={previousPerformance} />
             ) : activeTab === 'teams' ? (
                 <TeamPerformanceGrid data={teamPerformance} profileNames={profileNames} profileAvatars={profileAvatars} getTeamGoal={getTeamGoal} periodLabel={periodLabel} />
             ) : activeTab === 'calls' ? (
@@ -460,11 +475,12 @@ function GoalProgressBar({ actual, goal, type = 'number' }: { actual: number; go
     );
 }
 
-function UserPerformanceTable({ data, getUserGoal, periodLabel, companySummary }: {
+function UserPerformanceTable({ data, getUserGoal, periodLabel, companySummary, previousData }: {
     data: UserPerformance[];
     getUserGoal: (userId: string) => { leads: number; value: number } | null;
     periodLabel: string;
     companySummary?: CompanySummary;
+    previousData?: UserPerformance[] | null;
 }) {
     const navigate = useNavigate();
     if (data.length === 0) {
@@ -490,17 +506,23 @@ function UserPerformanceTable({ data, getUserGoal, periodLabel, companySummary }
             )}
             <div className="grid grid-cols-12 gap-2 px-6 py-3 bg-gray-50/80 border-b border-gray-100 text-[8px] font-black text-gray-400 uppercase tracking-widest">
                 <div className="col-span-1 text-center">#</div>
-                <div className="col-span-3">Vendedor</div>
+                <div className="col-span-2">Vendedor</div>
                 <div className="col-span-1 text-center">Leads</div>
                 <div className="col-span-1 text-center">Ganados</div>
                 <div className="col-span-1 text-center">Perdidos</div>
                 <div className="col-span-1 text-center">Tasa</div>
-                <div className="col-span-2 text-right">Valor Pipeline</div>
+                <div className="col-span-1 text-center">Días/Cierre</div>
+                <div className="col-span-1 text-right">Avg Deal</div>
+                <div className="col-span-1 text-right">Pipeline</div>
                 <div className="col-span-2 text-right">Monto Cerrado</div>
             </div>
             <div className="divide-y divide-gray-50">
                 {data.map((user, index) => {
                     const goal = getUserGoal(user.user_id);
+                    const prev = previousData?.find(p => p.user_id === user.user_id);
+                    // Trend helpers
+                    const wonDiff = prev != null ? user.leads_won - prev.leads_won : null;
+                    const closingDiff = prev != null ? user.total_closing_amount - prev.total_closing_amount : null;
                     return (
                         <div key={user.user_id} className="grid grid-cols-12 gap-2 px-6 py-4 items-center hover:bg-gray-50/50 transition-colors group">
                             {/* Rank */}
@@ -515,13 +537,13 @@ function UserPerformanceTable({ data, getUserGoal, periodLabel, companySummary }
                                     <span className="text-[11px] font-bold text-gray-300">{index + 1}</span>
                                 )}
                             </div>
-                            {/* User Info */}
-                            <div className="col-span-3 flex items-center gap-3 min-w-0">
-                                <div className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden shrink-0">
+                            {/* User Info — col-span-2 to make room for new columns */}
+                            <div className="col-span-2 flex items-center gap-2 min-w-0">
+                                <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden shrink-0">
                                     {user.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover" alt="" /> : <Users className="w-4 h-4 text-gray-300" />}
                                 </div>
                                 <div className="min-w-0">
-                                    <p className="text-[12px] font-black text-gray-800 uppercase tracking-tight truncate">{user.full_name}</p>
+                                    <p className="text-[11px] font-black text-gray-800 uppercase tracking-tight truncate">{user.full_name}</p>
                                     <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                                         {user.team_names.length > 0 ? user.team_names.map((name, i) => (
                                             <span key={name} className="px-1.5 py-0.5 rounded text-[7px] font-black uppercase text-white" style={{ backgroundColor: user.team_colors[i] || '#999' }}>{name}</span>
@@ -535,11 +557,18 @@ function UserPerformanceTable({ data, getUserGoal, periodLabel, companySummary }
                                     <span className="text-[13px] font-black text-gray-700 cursor-pointer hover:text-blue-600 hover:underline transition-colors" onClick={(e) => { e.stopPropagation(); navigate('/leads', { state: { assignedFilter: user.user_id } }); }}>{user.total_leads}</span>
                                 ) : <span className="text-[13px] font-black text-gray-700">{user.total_leads}</span>}
                             </div>
-                            {/* Won */}
+                            {/* Won + Trend */}
                             <div className="col-span-1 text-center">
-                                {user.leads_won > 0 ? (
-                                    <span className="text-[13px] font-black text-emerald-600 cursor-pointer hover:text-emerald-800 hover:underline transition-colors" onClick={(e) => { e.stopPropagation(); navigate('/leads', { state: { assignedFilter: user.user_id, status: ['Cerrado', 'Cliente'] } }); }}>{user.leads_won}</span>
-                                ) : <span className="text-[13px] font-black text-emerald-600">{user.leads_won}</span>}
+                                <div className="flex items-center justify-center gap-1">
+                                    {user.leads_won > 0 ? (
+                                        <span className="text-[13px] font-black text-emerald-600 cursor-pointer hover:text-emerald-800 hover:underline transition-colors" onClick={(e) => { e.stopPropagation(); navigate('/leads', { state: { assignedFilter: user.user_id, status: ['Cerrado', 'Cliente'] } }); }}>{user.leads_won}</span>
+                                    ) : <span className="text-[13px] font-black text-emerald-600">{user.leads_won}</span>}
+                                    {wonDiff !== null && wonDiff !== 0 && (
+                                        <span className={`text-[8px] font-black ${wonDiff > 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                                            {wonDiff > 0 ? `+${wonDiff}` : wonDiff}
+                                        </span>
+                                    )}
+                                </div>
                                 {goal && goal.leads > 0 && <GoalProgressBar actual={user.leads_won} goal={goal.leads} />}
                             </div>
                             {/* Lost */}
@@ -552,17 +581,39 @@ function UserPerformanceTable({ data, getUserGoal, periodLabel, companySummary }
                             <div className="col-span-1 text-center">
                                 <WinRateBadge rate={user.win_rate} />
                             </div>
-                            {/* Pipeline Value */}
-                            <div className="col-span-2 text-right">
-                                <span className="text-[12px] font-black text-gray-600">{formatCurrency(user.total_value)}</span>
+                            {/* Días/Cierre */}
+                            <div className="col-span-1 text-center">
+                                {user.avg_days_to_close > 0 ? (
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-[12px] font-black text-violet-600">{user.avg_days_to_close}d</span>
+                                        <span className="text-[7px] text-gray-400 font-bold">prom. cierre</span>
+                                    </div>
+                                ) : <span className="text-[11px] text-gray-300 font-bold">—</span>}
                             </div>
-                            {/* Closing Amount */}
+                            {/* Avg Deal */}
+                            <div className="col-span-1 text-right">
+                                {user.avg_deal_size > 0 ? (
+                                    <div className="flex flex-col items-end">
+                                        <span className="text-[11px] font-black text-amber-600">{formatCurrency(user.avg_deal_size)}</span>
+                                        <span className="text-[7px] text-gray-400 font-bold">avg deal</span>
+                                    </div>
+                                ) : <span className="text-[11px] text-gray-300">—</span>}
+                            </div>
+                            {/* Pipeline Value */}
+                            <div className="col-span-1 text-right">
+                                <span className="text-[11px] font-black text-gray-500">{formatCurrency(user.total_value)}</span>
+                            </div>
+                            {/* Closing Amount + Trend */}
                             <div className="col-span-2 text-right">
-                                <span className="text-[13px] font-black text-[#4449AA]">{formatCurrency(user.total_closing_amount)}</span>
+                                <div className="flex items-center justify-end gap-1">
+                                    <span className="text-[13px] font-black text-[#4449AA]">{formatCurrency(user.total_closing_amount)}</span>
+                                    {closingDiff !== null && closingDiff !== 0 && (
+                                        <span className={`text-[8px] font-black ${closingDiff > 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                                            {closingDiff > 0 ? `+${formatCurrency(closingDiff)}` : formatCurrency(closingDiff)}
+                                        </span>
+                                    )}
+                                </div>
                                 {goal && goal.value > 0 && <GoalProgressBar actual={user.total_closing_amount} goal={goal.value} type="currency" />}
-                                {user.avg_deal_size > 0 && !goal && (
-                                    <p className="text-[8px] text-gray-400 font-bold mt-0.5">Avg: {formatCurrency(user.avg_deal_size)}</p>
-                                )}
                             </div>
                         </div>
                     );

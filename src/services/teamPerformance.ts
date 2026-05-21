@@ -18,6 +18,7 @@ export interface UserPerformance {
     total_value: number;
     total_closing_amount: number;
     avg_deal_size: number;
+    avg_days_to_close: number; // Average days from lead creation to won
 }
 
 export interface TeamPerformance {
@@ -34,6 +35,7 @@ export interface TeamPerformance {
     total_value: number;
     total_closing_amount: number;
     avg_deal_size: number;
+    avg_days_to_close: number;
     top_performer: string | null;
 }
 
@@ -95,6 +97,39 @@ export function getDateRange(filters: PerformanceFilters): { start: Date | null;
     }
 
     return { start, end };
+}
+
+/**
+ * Returns filters for the previous comparable period (used for trend arrows).
+ * Returns null if no comparison is meaningful (e.g. 'all' or 'custom').
+ */
+export function getPreviousPeriodFilters(filters: PerformanceFilters): PerformanceFilters | null {
+    if (filters.period === 'all' || filters.period === 'custom') return null;
+    const now = new Date();
+    switch (filters.period) {
+        case 'week': {
+            const s = new Date(now); s.setDate(s.getDate() - 14);
+            const e = new Date(now); e.setDate(e.getDate() - 7);
+            return { period: 'custom', date_from: s.toISOString().split('T')[0], date_to: e.toISOString().split('T')[0] };
+        }
+        case 'month': {
+            const s = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const e = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+            return { period: 'custom', date_from: s.toISOString().split('T')[0], date_to: e.toISOString().split('T')[0] };
+        }
+        case 'quarter': {
+            const qM = Math.floor(now.getMonth() / 3) * 3;
+            const s = new Date(now.getFullYear(), qM - 3, 1);
+            const e = new Date(now.getFullYear(), qM, 0, 23, 59, 59);
+            return { period: 'custom', date_from: s.toISOString().split('T')[0], date_to: e.toISOString().split('T')[0] };
+        }
+        case 'year': {
+            const s = new Date(now.getFullYear() - 1, 0, 1);
+            const e = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59);
+            return { period: 'custom', date_from: s.toISOString().split('T')[0], date_to: e.toISOString().split('T')[0] };
+        }
+        default: return null;
+    }
 }
 
 // === SERVICE ===
@@ -264,11 +299,12 @@ export const teamPerformanceService = {
         const userStats: Record<string, {
             total: number; won: number; lost: number; active: number; erroneous: number;
             totalValue: number; totalClosing: number;
+            totalDaysToClose: number; wonWithDate: number;
         }> = {};
 
         const ensureUser = (uid: string) => {
             if (!userStats[uid]) {
-                userStats[uid] = { total: 0, won: 0, lost: 0, active: 0, erroneous: 0, totalValue: 0, totalClosing: 0 };
+                userStats[uid] = { total: 0, won: 0, lost: 0, active: 0, erroneous: 0, totalValue: 0, totalClosing: 0, totalDaysToClose: 0, wonWithDate: 0 };
             }
         };
 
@@ -300,6 +336,14 @@ export const teamPerformanceService = {
 
             userStats[uid].won++;
             userStats[uid].totalClosing += Number(lead.closing_amount || lead.value || 0);
+            // Calculate days from creation to close (only when internal_won_date is set)
+            if (lead.internal_won_date && lead.created_at) {
+                const days = (new Date(lead.internal_won_date).getTime() - new Date(lead.created_at).getTime()) / 86400000;
+                if (days >= 0) {
+                    userStats[uid].totalDaysToClose += days;
+                    userStats[uid].wonWithDate++;
+                }
+            }
         });
 
         // Lost metrics from lost_date query
@@ -314,12 +358,12 @@ export const teamPerformanceService = {
         // 5. Build results
         return profiles
             .map(p => {
-                const stats = userStats[p.id] || { total: 0, won: 0, lost: 0, active: 0, erroneous: 0, totalValue: 0, totalClosing: 0 };
+                const stats = userStats[p.id] || { total: 0, won: 0, lost: 0, active: 0, erroneous: 0, totalValue: 0, totalClosing: 0, totalDaysToClose: 0, wonWithDate: 0 };
                 // Win rate = won / (won + lost) — only decided deals, same logic as Salesforce/HubSpot
-                // This is a more meaningful metric than won/total_leads
                 const decidedDeals = stats.won + stats.lost;
                 const winRate = decidedDeals > 0 ? (stats.won / decidedDeals) * 100 : 0;
                 const avgDeal = stats.won > 0 ? stats.totalClosing / stats.won : 0;
+                const avgDaysToClose = stats.wonWithDate > 0 ? Math.round(stats.totalDaysToClose / stats.wonWithDate) : 0;
                 const teams = userTeams[p.id] || { names: [], colors: [] };
 
                 return {
@@ -339,6 +383,7 @@ export const teamPerformanceService = {
                     total_value: stats.totalValue,
                     total_closing_amount: stats.totalClosing,
                     avg_deal_size: Math.round(avgDeal * 100) / 100,
+                    avg_days_to_close: avgDaysToClose,
                 };
             })
             .sort((a, b) => b.leads_won - a.leads_won || b.win_rate - a.win_rate);
@@ -452,6 +497,7 @@ export const teamPerformanceService = {
         return teams.map(team => {
             const members = teamUsers[team.id] || [];
             let totalLeads = 0, won = 0, lost = 0, totalValue = 0, totalClosing = 0;
+            let totalDaysToClose = 0, wonWithDate = 0;
             let topPerformer = '';
             let topWins = 0;
 
@@ -474,6 +520,10 @@ export const teamPerformanceService = {
                     won++;
                     totalClosing += Number(lead.closing_amount || lead.value || 0);
                     userWins[userId] = (userWins[userId] || 0) + 1;
+                    if (lead.internal_won_date && lead.created_at) {
+                        const days = (new Date(lead.internal_won_date).getTime() - new Date(lead.created_at).getTime()) / 86400000;
+                        if (days >= 0) { totalDaysToClose += days; wonWithDate++; }
+                    }
                 });
 
                 // Lost metrics from lost_date
@@ -493,6 +543,7 @@ export const teamPerformanceService = {
             const decidedDeals = won + lost;
             const winRate = decidedDeals > 0 ? (won / decidedDeals) * 100 : 0;
             const avgDeal = won > 0 ? totalClosing / won : 0;
+            const avgDaysToClose = wonWithDate > 0 ? Math.round(totalDaysToClose / wonWithDate) : 0;
 
             return {
                 team_id: team.id,
@@ -508,6 +559,7 @@ export const teamPerformanceService = {
                 total_value: totalValue,
                 total_closing_amount: totalClosing,
                 avg_deal_size: Math.round(avgDeal * 100) / 100,
+                avg_days_to_close: avgDaysToClose,
                 top_performer: topPerformer || null,
             };
         }).sort((a, b) => b.leads_won - a.leads_won);
