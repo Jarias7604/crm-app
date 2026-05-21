@@ -336,7 +336,18 @@ export default function MarketingSettings() {
                             )}
 
                             {selectedProvider === 'telegram' && (
-                                <InputBlock label="Bot Token" type="password" value={formData.token} onChange={(v: string) => setFormData({ ...formData, token: v })} placeholder="123456789:ABCDEF..." hint="Obtenlo hablando con @BotFather en Telegram." />
+                                <>
+                                    <InputBlock label="Bot Token" type="password" value={formData.token} onChange={(v: string) => setFormData({ ...formData, token: v })} placeholder="123456789:ABCDEF..." hint="Obtenlo hablando con @BotFather en Telegram." />
+                                    <InputBlock
+                                        label="ID de Chat de Alertas (Grupo o Administrador)"
+                                        type="text"
+                                        value={formData.alertChatId}
+                                        onChange={(v: string) => setFormData({ ...formData, alertChatId: v })}
+                                        placeholder="Ej: -100123456789 o tu Chat ID personal"
+                                        hint="Opcional. Chat ID de Telegram donde se enviarán las alertas de leads calificados o listos para cerrar cuando el lead no tenga un agente asignado con Telegram."
+                                        required={false}
+                                    />
+                                </>
                             )}
 
                             {selectedProvider === 'openai' && (
@@ -414,7 +425,7 @@ function ProviderButton({ icon: Icon, color, title, desc, onClick }: any) {
     );
 }
 
-function InputBlock({ label, type, value, onChange, placeholder, hint }: any) {
+function InputBlock({ label, type, value, onChange, placeholder, hint, required = true }: any) {
     return (
         <div>
             <label className="block text-sm font-bold text-gray-700 mb-2">{label}</label>
@@ -422,7 +433,7 @@ function InputBlock({ label, type, value, onChange, placeholder, hint }: any) {
                 type={type}
                 className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-medium"
                 placeholder={placeholder}
-                required
+                required={required}
                 value={value || ''}
                 onChange={e => onChange(e.target.value)}
             />

@@ -757,28 +757,54 @@ ${technicalRules}`;
                     newFacts.close_signal_at = new Date().toISOString();
                     newFacts.close_signal_msg = userMessage.slice(0, 150);
 
-                    // 🚨 Notify assigned sales agent via Telegram
+                    // 🚨 Notify assigned sales agent or fallback alertChatId via Telegram
                     try {
-                        const { data: leadInfo } = await supabase
-                            .from('leads').select('assigned_to, name, phone').eq('id', lead.id).maybeSingle();
+                        const { data: tgI } = await supabase.from('marketing_integrations')
+                            .select('settings').eq('company_id', companyId)
+                            .eq('provider','telegram').eq('is_active', true).maybeSingle();
 
-                        if (leadInfo?.assigned_to) {
-                            const { data: agentProf } = await supabase
-                                .from('profiles').select('full_name, telegram_chat_id').eq('id', leadInfo.assigned_to).maybeSingle();
+                        if (tgI?.settings?.token) {
+                            const { data: leadInfo } = await supabase
+                                .from('leads').select('assigned_to, name, phone').eq('id', lead.id).maybeSingle();
 
-                            if (agentProf?.telegram_chat_id) {
-                                const { data: tgI } = await supabase.from('marketing_integrations')
-                                    .select('settings').eq('company_id', companyId)
-                                    .eq('provider','telegram').eq('is_active', true).maybeSingle();
+                            let targetChatId = tgI.settings.alertChatId || null;
+                            let recipientName = "Fallback/Configured Alert Chat";
 
-                                if (tgI?.settings?.token) {
-                                    const closeMsg = `🎉 LEAD LISTO PARA CERRAR!\n\n👤 Lead: ${leadInfo.name}\n📱 Tel: ${leadInfo.phone || 'N/A'}\n💬 Mensaje: "${userMessage.slice(0,100)}"\n\n✅ Este lead está listo para proceder. Contáctalo para:\n1. Confirmar el plan seleccionado\n2. Enviar factura / contrato\n3. Iniciar el onboarding\n\n⚡ Actúa ahora — el lead está caliente!`;
-                                    await fetch(`https://api.telegram.org/bot${tgI.settings.token}/sendMessage`, {
-                                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ chat_id: agentProf.telegram_chat_id, text: closeMsg })
-                                    });
-                                    log(`🎉 Close alert sent to agent ${agentProf.full_name} for lead ${leadInfo.name}`);
+                            if (leadInfo?.assigned_to) {
+                                const { data: agentProf } = await supabase
+                                    .from('profiles').select('full_name, telegram_chat_id').eq('id', leadInfo.assigned_to).maybeSingle();
+
+                                if (agentProf?.telegram_chat_id) {
+                                    targetChatId = agentProf.telegram_chat_id;
+                                    recipientName = agentProf.full_name;
                                 }
+                            }
+
+                            // If no target Chat ID yet, try to find any admin in the company with registered telegram_chat_id
+                            if (!targetChatId) {
+                                const { data: fallbackAdmin } = await supabase
+                                    .from('profiles')
+                                    .select('full_name, telegram_chat_id')
+                                    .eq('company_id', companyId)
+                                    .not('telegram_chat_id', 'is', null)
+                                    .limit(1)
+                                    .maybeSingle();
+
+                                if (fallbackAdmin?.telegram_chat_id) {
+                                    targetChatId = fallbackAdmin.telegram_chat_id;
+                                    recipientName = `${fallbackAdmin.full_name} (Admin Fallback)`;
+                                }
+                            }
+
+                            if (targetChatId) {
+                                const closeMsg = `🎉 LEAD LISTO PARA CERRAR!\n\n👤 Lead: ${leadInfo?.name || 'Prospecto'}\n📱 Tel: ${leadInfo?.phone || 'N/A'}\n💬 Mensaje: "${userMessage.slice(0,100)}"\n\n✅ Este lead está listo para proceder. Contáctalo para:\n1. Confirmar el plan seleccionado\n2. Enviar factura / contrato\n3. Iniciar el onboarding\n\n⚡ Actúa ahora — el lead está caliente!`;
+                                await fetch(`https://api.telegram.org/bot${tgI.settings.token}/sendMessage`, {
+                                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ chat_id: targetChatId, text: closeMsg })
+                                });
+                                log(`🎉 Close alert sent to ${recipientName} (chat_id: ${targetChatId}) for lead ${leadInfo?.name}`);
+                            } else {
+                                log(`⚠️ No recipient found for close alert. No agent assigned, no default alertChatId, and no admin with telegram_chat_id.`);
                             }
                         }
                     } catch(closeNotifyErr: any) {
