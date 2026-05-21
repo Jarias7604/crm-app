@@ -767,7 +767,10 @@ export default function ChatHub() {
                                         )}
                                     </div>
                                 </div>
-                              <div
+                            </div>
+                        </header>
+
+                        <div
                             ref={scrollRef}
                             className={`flex-1 overflow-y-auto px-3 md:px-6 py-4 md:py-8 space-y-4 md:space-y-6 custom-scrollbar scroll-smooth relative transition-colors duration-500 ${
                                 selectedConv.channel === 'whatsapp' ? 'bg-[#efeae2]' :
