@@ -13,7 +13,8 @@ import { subMonths, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-    PieChart as RechartsPie, Pie, Cell, Legend, RadialBarChart, RadialBar
+    PieChart as RechartsPie, Pie, Cell, Legend, RadialBarChart, RadialBar,
+    AreaChart, Area
 } from 'recharts';
 import { campaignService, type Campaign } from '../services/marketing/campaignService';
 import { marketingStatsService, type HeatmapLead } from '../services/marketing/marketingStats';
@@ -564,6 +565,76 @@ export default function Reports() {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* ── Revenue Trend ── */}
+                            {(dashboardData?.salesTrend || []).length > 0 && (
+                                <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <div className="flex items-center gap-2">
+                                            <TrendingUp className="w-5 h-5 text-emerald-500" />
+                                            <h3 className="text-lg font-black text-gray-900">Tendencia de Ingresos</h3>
+                                        </div>
+                                        <span className="text-xs text-gray-400 font-medium">Valor cerrado por período</span>
+                                    </div>
+                                    <div className="h-[280px]">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <AreaChart data={dashboardData?.salesTrend || []} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                                                <defs>
+                                                    <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#10B981" stopOpacity={0.15}/>
+                                                        <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                                                    </linearGradient>
+                                                    <linearGradient id="pipelineGrad" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.12}/>
+                                                        <stop offset="95%" stopColor="#4F46E5" stopOpacity={0}/>
+                                                    </linearGradient>
+                                                </defs>
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                                <XAxis dataKey="period" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 700 }} />
+                                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={(v) => `$${v >= 1000 ? (v/1000).toFixed(0)+'k' : v}`} />
+                                                <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: 12 }} formatter={(val: any) => [`$${Number(val).toLocaleString()}`, '']} />
+                                                <Legend wrapperStyle={{ fontSize: 12, fontWeight: 700, paddingTop: 12 }} />
+                                                <Area type="monotone" dataKey="won_amount" name="Ingresos Cerrados" stroke="#10B981" strokeWidth={2.5} fill="url(#revenueGrad)" dot={{ r: 4, fill: '#10B981', strokeWidth: 0 }} />
+                                                <Area type="monotone" dataKey="pipeline_value" name="Pipeline Total" stroke="#4F46E5" strokeWidth={2} fill="url(#pipelineGrad)" strokeDasharray="5 4" dot={false} />
+                                            </AreaChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ── Agent Performance Comparison ── */}
+                            {(dashboardData?.salesKpis || []).length > 0 && (
+                                <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <div className="flex items-center gap-2">
+                                            <Users className="w-5 h-5 text-indigo-500" />
+                                            <h3 className="text-lg font-black text-gray-900">Rendimiento por Agente</h3>
+                                        </div>
+                                        <span className="text-xs text-gray-400 font-medium">Leads ganados · Monto cerrado</span>
+                                    </div>
+                                    <div className="h-[300px]">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart
+                                                data={(dashboardData?.salesKpis || []).slice(0, 8).map((k: any) => ({
+                                                    name: (k.agent_name || 'Sin nombre').split(' ')[0],
+                                                    'Leads Ganados': k.won_count || 0,
+                                                    'Monto ($k)': Math.round((k.won_amount || 0) / 1000),
+                                                }))}
+                                                margin={{ top: 5, right: 10, left: -10, bottom: 5 }}
+                                            >
+                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b', fontWeight: 700 }} />
+                                                <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                                                <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={(v) => `$${v}k`} />
+                                                <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: 12 }} />
+                                                <Legend wrapperStyle={{ fontSize: 12, fontWeight: 700, paddingTop: 12 }} />
+                                                <Bar yAxisId="left" dataKey="Leads Ganados" fill="#818CF8" radius={[4,4,0,0]} barSize={24} />
+                                                <Bar yAxisId="right" dataKey="Monto ($k)" fill="#10B981" radius={[4,4,0,0]} barSize={24} />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
+                            )}
                         </>
                     )}
                 </div>
