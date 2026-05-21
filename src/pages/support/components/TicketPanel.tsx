@@ -156,6 +156,7 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
         title: ticket.title, description: ticket.description || '',
         due_date: ticket.due_date ? ticket.due_date.slice(0, 16) : '',
         lead_id: ticket.lead_id || '',
+        created_by: ticket.created_by || '',
     });
 
     // Resolution Report state
@@ -177,6 +178,7 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
             title: ticket.title, description: ticket.description || '',
             due_date: ticket.due_date ? ticket.due_date.slice(0, 16) : '',
             lead_id: ticket.lead_id || '',
+            created_by: ticket.created_by || '',
         });
         setResForm({
             findings: ticket.findings || '',
@@ -221,6 +223,7 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
                 category_id: form.category_id || null, title: form.title, description: form.description,
                 due_date: form.due_date ? new Date(form.due_date).toISOString() : null,
                 lead_id: form.lead_id || null,
+                created_by: form.created_by || null,
             });
             onUpdate(updated); setTab('info'); toast.success('Ticket actualizado ✓');
         } catch { toast.error('Error al actualizar'); } finally { setSaving(false); }
@@ -389,9 +392,19 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
                                 </div>
                             </div>
                         )}
-                        <div className="text-[10px] text-gray-400 pt-3 border-t border-gray-100 space-y-1">
-                            <p className="flex items-center gap-1.5"><Clock className="w-3 h-3" />Creado: <span className="font-bold text-gray-600">{format(new Date(ticket.created_at), "dd MMM yyyy · HH:mm", { locale: es })}</span></p>
-                            {ticket.resolved_at && <p className="flex items-center gap-1.5"><CheckCircle2 className="w-3 h-3 text-emerald-400" />Resuelto: <span className="font-bold text-emerald-600">{format(new Date(ticket.resolved_at), "dd MMM yyyy · HH:mm", { locale: es })}</span></p>}
+                        <div className="pt-3 border-t border-gray-100 space-y-2">
+                            <p className="text-[10px] text-gray-400 flex items-center gap-1.5">
+                                <Clock className="w-3 h-3" />Creado: <span className="font-bold text-gray-600">{format(new Date(ticket.created_at), "dd MMM yyyy · HH:mm", { locale: es })}</span>
+                            </p>
+                            {ticket.resolved_at && (
+                                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                                    <div>
+                                        <p className="text-[9px] font-black text-emerald-600 uppercase tracking-wider">Fecha de Cierre</p>
+                                        <p className="text-sm font-black text-emerald-700">{format(new Date(ticket.resolved_at), "dd 'de' MMMM yyyy · HH:mm", { locale: es })}</p>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </>
                 )}
@@ -401,6 +414,18 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
                         <div>
                             <label className="text-[9px] font-black text-gray-400 uppercase">Título</label>
                             <input className="mt-1 w-full px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100 text-sm font-bold focus:ring-2 focus:ring-indigo-400/30 focus:border-indigo-200 transition-all" value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} />
+                        </div>
+                        {/* ── Solicitante ── */}
+                        <div>
+                            <label className="text-[9px] font-black text-gray-400 uppercase flex items-center gap-1"><UserCheck className="w-3 h-3" />Solicitante</label>
+                            <select
+                                className="mt-1 w-full px-3 py-2.5 bg-gray-50 rounded-xl border border-gray-100 text-xs font-bold focus:ring-2 focus:ring-indigo-400/30"
+                                value={form.created_by}
+                                onChange={e => setForm(p => ({ ...p, created_by: e.target.value }))}
+                            >
+                                <option value="">— Sin asignar —</option>
+                                {agents.map(a => <option key={a.id} value={a.id}>{a.full_name}</option>)}
+                            </select>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <div>

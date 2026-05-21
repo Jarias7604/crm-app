@@ -556,7 +556,16 @@ export default function Tickets() {
                                                 {cat ? <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color }} /><span className="text-[10px] font-bold text-gray-600">{cat.name}</span></div> : <span className="text-[10px] text-gray-300">—</span>}
                                             </td>
                                             <td className="px-4 py-3.5 min-w-[160px]">
-                                                {resolved ? (<div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-500" /><span className="text-xs font-bold text-emerald-600">Completado</span></div>)
+                                                {resolved ? (
+                                                    <div>
+                                                        <div className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-500" /><span className="text-xs font-bold text-emerald-600">Completado</span></div>
+                                                        {ticket.resolved_at && (
+                                                            <p className="text-[9px] text-emerald-500 font-bold mt-0.5 ml-5">
+                                                                {format(new Date(ticket.resolved_at), "dd MMM · HH:mm", { locale: es })}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                )
                                                     : (<div className="space-y-1.5">
                                                         {/* % + label row */}
                                                         <div className="flex items-center justify-between">

@@ -1,13 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Users, TrendingUp, Clock, CheckCircle2, Search } from 'lucide-react';
+import { Users, TrendingUp, Clock, CheckCircle2, Search, CalendarCheck } from 'lucide-react';
 import { clientsService, pipelineStagesService } from '../../services/clients';
 import type { Client, ClientPipelineStage } from '../../types/clients';
 import OnboardingPipeline from '../../components/clientes/OnboardingPipeline';
 import ClienteDetail from '../../components/clientes/ClienteDetail';
 import { usePermissions } from '../../hooks/usePermissions';
-import toast from 'react-hot-toast';
 
 type Tab = 'pipeline' | 'activos';
 
@@ -21,6 +20,7 @@ export default function Clientes() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -32,7 +32,6 @@ export default function Clientes() {
       setClients(clientResult.status === 'fulfilled' ? clientResult.value : []);
       setStages(stageResult.status === 'fulfilled' ? stageResult.value : []);
     } catch {
-      // Silently handle — empty state is shown instead
       setClients([]);
       setStages([]);
     } finally {
@@ -41,6 +40,9 @@ export default function Clientes() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Reset stage filter when switching tabs
+  useEffect(() => { setSelectedStageId(null); }, [tab]);
 
   if (!canView) {
     return (
@@ -58,14 +60,24 @@ export default function Clientes() {
   });
 
   const displayed = tab === 'pipeline' ? inPipeline : activos;
-  const filtered = displayed.filter(c =>
+
+  const searchFiltered = displayed.filter(c =>
     c.nombre.toLowerCase().includes(search.toLowerCase()) ||
     (c.contacto || '').toLowerCase().includes(search.toLowerCase())
   );
 
+  // Stage chip counts — from the full tab list (not search-filtered, so counts stay consistent)
   const sorted = [...stages].sort((a, b) => a.orden - b.orden);
+  const stageCounts = sorted.reduce((acc, stage) => {
+    acc[stage.id] = inPipeline.filter(c => c.etapa_actual_id === stage.id).length;
+    return acc;
+  }, {} as Record<string, number>);
 
-  // La etapa actual es la current, las anteriores están completadas
+  // Apply stage filter on top of search
+  const filtered = selectedStageId
+    ? searchFiltered.filter(c => c.etapa_actual_id === selectedStageId)
+    : searchFiltered;
+
   const getCompletedIds = (client: Client) => {
     const idx = sorted.findIndex(s => s.id === client.etapa_actual_id);
     return sorted.slice(0, idx).map(s => s.id);
@@ -76,6 +88,19 @@ export default function Clientes() {
 
   const avatarColors = ['#6366f1', '#f59e0b', '#10b981', '#ec4899', '#0ea5e9', '#8b5cf6'];
   const getColor = (name: string) => avatarColors[name.charCodeAt(0) % avatarColors.length];
+
+  const formatFechaCierre = (client: Client): string => {
+    const rawDate = (client as any).fecha_cierre_lead || client.created_at;
+    try {
+      return format(
+        new Date(rawDate.substring(0, 10) + 'T12:00:00'),
+        'dd MMM yyyy',
+        { locale: es }
+      ).toUpperCase();
+    } catch {
+      return new Date(rawDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -133,6 +158,56 @@ export default function Clientes() {
         </div>
       </div>
 
+      {/* Stage filter chips — only in pipeline tab */}
+      {tab === 'pipeline' && sorted.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* "Todos" chip */}
+          <button
+            onClick={() => setSelectedStageId(null)}
+            className={`relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${
+              !selectedStageId
+                ? 'bg-[#4449AA] text-white border-[#4449AA] shadow-sm'
+                : 'bg-white text-gray-500 border-gray-200 hover:border-[#4449AA]/40 hover:text-[#4449AA]'
+            }`}
+          >
+            Todos
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+              !selectedStageId ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+            }`}>
+              {inPipeline.length}
+            </span>
+          </button>
+
+          {/* One chip per stage that has clients */}
+          {sorted.map(stage => {
+            const count = stageCounts[stage.id] ?? 0;
+            if (count === 0) return null;
+            const isActive = selectedStageId === stage.id;
+            return (
+              <button
+                key={stage.id}
+                onClick={() => setSelectedStageId(isActive ? null : stage.id)}
+                className={`relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${
+                  isActive
+                    ? 'bg-[#4449AA] text-white border-[#4449AA] shadow-sm'
+                    : 'bg-white text-gray-500 border-gray-200 hover:border-[#4449AA]/40 hover:text-[#4449AA]'
+                }`}
+              >
+                <span>{stage.icono}</span>
+                <span>{stage.nombre}</span>
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                  isActive
+                    ? 'bg-white/20 text-white'
+                    : 'bg-[#4449AA]/10 text-[#4449AA]'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* List */}
       <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
         {loading ? (
@@ -151,13 +226,20 @@ export default function Clientes() {
         ) : filtered.length === 0 ? (
           <div className="py-16 text-center">
             <p className="text-gray-400 text-sm font-medium">
-              {search ? 'Sin resultados para tu búsqueda.' : tab === 'pipeline' ? 'No hay clientes en proceso.' : 'No hay clientes activos aún.'}
+              {selectedStageId
+                ? 'No hay clientes en esta etapa.'
+                : search
+                  ? 'Sin resultados para tu búsqueda.'
+                  : tab === 'pipeline'
+                    ? 'No hay clientes en proceso.'
+                    : 'No hay clientes activos aún.'}
             </p>
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
             {filtered.map(client => {
               const completedIds = getCompletedIds(client);
+              const hasFechaCierre = !!(client as any).fecha_cierre_lead;
               return (
                 <button
                   key={client.id}
@@ -212,20 +294,13 @@ export default function Clientes() {
                     );
                   })()}
 
-                  {/* Date + arrow */}
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className="text-xs text-gray-400">
-                      {(() => {
-                        // Usar fecha_cierre_lead (fecha real del trato) si existe, si no created_at
-                        const rawDate = (client as any).fecha_cierre_lead || client.created_at;
-                        const label = (client as any).fecha_cierre_lead ? 'Cierre' : '';
-                        try {
-                          const formatted = format(new Date(rawDate.substring(0, 10) + 'T12:00:00'), 'dd MMM yyyy', { locale: es }).toUpperCase();
-                          return label ? `${label}: ${formatted}` : formatted;
-                        } catch {
-                          return new Date(rawDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
-                        }
-                      })()}
+                  {/* Fecha cierre + arrow */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className={`flex items-center gap-1 text-xs font-semibold ${
+                      hasFechaCierre ? 'text-[#4449AA]' : 'text-gray-400'
+                    }`}>
+                      <CalendarCheck className="w-3.5 h-3.5 flex-shrink-0" />
+                      {formatFechaCierre(client)}
                     </span>
                     <span className="text-gray-300 group-hover:text-[#4449AA] transition-colors text-sm font-bold">→</span>
                   </div>

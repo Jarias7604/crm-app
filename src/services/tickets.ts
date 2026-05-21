@@ -223,7 +223,7 @@ export const ticketService = {
 
     async updateTicket(
         ticketId: string,
-        updates: Partial<Pick<Ticket, 'status' | 'priority' | 'assigned_to' | 'title' | 'description' | 'category_id' | 'due_date' | 'lead_id' | 'findings' | 'root_cause' | 'solution'>> & { metadata?: Record<string, unknown> }
+        updates: Partial<Pick<Ticket, 'status' | 'priority' | 'assigned_to' | 'title' | 'description' | 'category_id' | 'due_date' | 'lead_id' | 'findings' | 'root_cause' | 'solution' | 'created_by'>> & { metadata?: Record<string, unknown> }
     ): Promise<Ticket> {
         const payload: Record<string, unknown> = {
             ...updates,
