@@ -150,6 +150,8 @@ export default function Tickets() {
     // Advanced filters
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
+    const [closedFrom, setClosedFrom] = useState('');
+    const [closedTo, setClosedTo] = useState('');
     const [priorityFilter, setPriorityFilter] = useState<TicketPriority[]>([]);
     const [showFilters, setShowFilters] = useState(false);
     // Sorting
@@ -245,6 +247,12 @@ export default function Tickets() {
             if (priorityFilter.length && !priorityFilter.includes(t.priority)) return false;
             if (dateFrom && new Date(t.created_at) < new Date(dateFrom)) return false;
             if (dateTo && new Date(t.created_at) > new Date(dateTo + 'T23:59:59')) return false;
+            // Closed date range filter
+            if (closedFrom || closedTo) {
+                if (!t.resolved_at) return false;
+                if (closedFrom && new Date(t.resolved_at) < new Date(closedFrom)) return false;
+                if (closedTo && new Date(t.resolved_at) > new Date(closedTo + 'T23:59:59')) return false;
+            }
             return true;
         });
         list.sort((a, b) => {
@@ -255,7 +263,7 @@ export default function Tickets() {
             return sortAsc ? d : -d;
         });
         return list;
-    }, [tickets, search, priorityFilter, dateFrom, dateTo, sortKey, sortAsc]);
+    }, [tickets, search, priorityFilter, dateFrom, dateTo, closedFrom, closedTo, sortKey, sortAsc]);
 
     // Agent compliance: uses ALL tickets (incl. resolved/closed) — not the table's filtered state
     const agentCompliance = useMemo(() => {
@@ -420,19 +428,19 @@ export default function Tickets() {
                                 </div>
                                 <div className="h-4 w-px bg-gray-200" />
                                 {/* Expand/collapse advanced filters */}
-                                <button onClick={() => setShowFilters(p => !p)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black uppercase transition-all ${showFilters ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                                 <button onClick={() => setShowFilters(p => !p)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black uppercase transition-all ${showFilters ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                                     }`}>
                                     <Filter className="w-3.5 h-3.5" />
                                     Filtros
-                                    {(priorityFilter.length > 0 || dateFrom || dateTo) && (
+                                    {(priorityFilter.length > 0 || dateFrom || dateTo || closedFrom || closedTo) && (
                                         <span className="w-4 h-4 bg-indigo-600 text-white rounded-full text-[8px] font-black flex items-center justify-center">
-                                            {priorityFilter.length + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0)}
+                                            {priorityFilter.length + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (closedFrom ? 1 : 0) + (closedTo ? 1 : 0)}
                                         </span>
                                     )}
                                 </button>
                                 {/* Clear all */}
-                                {(catFilter || agentFilter || priorityFilter.length || dateFrom || dateTo) && (
-                                    <button onClick={() => { setCatFilter(''); setAgentFilter(''); setPriorityFilter([]); setDateFrom(''); setDateTo(''); }}
+                                {(catFilter || agentFilter || priorityFilter.length || dateFrom || dateTo || closedFrom || closedTo) && (
+                                    <button onClick={() => { setCatFilter(''); setAgentFilter(''); setPriorityFilter([]); setDateFrom(''); setDateTo(''); setClosedFrom(''); setClosedTo(''); }}
                                         className="flex items-center gap-1 text-[9px] font-black text-red-400 hover:text-red-600 uppercase px-2 py-1.5 rounded-lg hover:bg-red-50">
                                         <X className="w-3 h-3" /> Limpiar
                                     </button>
@@ -460,25 +468,41 @@ export default function Tickets() {
 
                         {/* Advanced filters row (collapsible) */}
                         {showFilters && (
-                            <div className="pt-2 border-t border-gray-50 grid grid-cols-2 md:grid-cols-4 gap-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                                {/* Date from */}
-                                <div>
-                                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1 mb-1">
-                                        <CalendarRange className="w-3 h-3" /> Creado desde
-                                    </label>
-                                    <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                                        className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500/20" />
+                            <div className="pt-2 border-t border-gray-50 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                                {/* Row 1: Creation date range */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                    <div>
+                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1 mb-1">
+                                            <CalendarRange className="w-3 h-3" /> Creado desde
+                                        </label>
+                                        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                                            className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500/20" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1 mb-1">
+                                            <CalendarRange className="w-3 h-3" /> Creado hasta
+                                        </label>
+                                        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                                            className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500/20" />
+                                    </div>
+                                    {/* Row 1 col 3-4: Closed date range */}
+                                    <div>
+                                        <label className="text-[9px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-1 mb-1">
+                                            <CheckCircle2 className="w-3 h-3" /> Cerrado desde
+                                        </label>
+                                        <input type="date" value={closedFrom} onChange={e => setClosedFrom(e.target.value)}
+                                            className="w-full px-3 py-2 bg-emerald-50 border border-emerald-100 rounded-xl text-xs font-bold focus:ring-2 focus:ring-emerald-400/30" />
+                                    </div>
+                                    <div>
+                                        <label className="text-[9px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-1 mb-1">
+                                            <CheckCircle2 className="w-3 h-3" /> Cerrado hasta
+                                        </label>
+                                        <input type="date" value={closedTo} onChange={e => setClosedTo(e.target.value)}
+                                            className="w-full px-3 py-2 bg-emerald-50 border border-emerald-100 rounded-xl text-xs font-bold focus:ring-2 focus:ring-emerald-400/30" />
+                                    </div>
                                 </div>
-                                {/* Date to */}
+                                {/* Row 2: Priority pills */}
                                 <div>
-                                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1 mb-1">
-                                        <CalendarRange className="w-3 h-3" /> Creado hasta
-                                    </label>
-                                    <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-                                        className="w-full px-3 py-2 bg-gray-50 border-none rounded-xl text-xs font-bold focus:ring-2 focus:ring-indigo-500/20" />
-                                </div>
-                                {/* Priority pills */}
-                                <div className="col-span-2">
                                     <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1 mb-1">
                                         <AlertTriangle className="w-3 h-3" /> Prioridad
                                     </label>
@@ -510,13 +534,14 @@ export default function Tickets() {
                                 <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Prioridad</th>
                                 <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Asignado</th>
                                 <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Vence</th>
+                                <th className="px-4 py-3 text-[9px] font-black text-emerald-500 uppercase tracking-widest">✓ Cerrado</th>
                                 <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Acción</th>
                             </tr></thead>
                             <tbody className="divide-y divide-gray-50">
                                 {loading ? Array.from({ length: 4 }).map((_, i) => (
-                                    <tr key={i} className="animate-pulse">{[0, 1, 2, 3, 4, 5, 6, 7].map(j => <td key={j} className="px-4 py-4"><div className="h-3 bg-gray-100 rounded-full" /></td>)}</tr>
+                                    <tr key={i} className="animate-pulse">{[0,1,2,3,4,5,6,7,8,9].map(j => <td key={j} className="px-4 py-4"><div className="h-3 bg-gray-100 rounded-full" /></td>)}</tr>
                                 )) : filtered.length === 0 ? (
-                                    <tr><td colSpan={8} className="py-16 text-center"><TicketIcon className="w-10 h-10 text-gray-100 mx-auto mb-3" /><p className="text-sm font-bold text-gray-300">No hay tickets</p></td></tr>
+                                    <tr><td colSpan={10} className="py-16 text-center"><TicketIcon className="w-10 h-10 text-gray-100 mx-auto mb-3" /><p className="text-sm font-bold text-gray-300">No hay tickets</p></td></tr>
                                 ) : filtered.map(ticket => {
                                     const isSelected = selected?.id === ticket.id;
                                     const cat = categories.find(c => c.id === ticket.category_id);
@@ -542,14 +567,23 @@ export default function Tickets() {
                                             <td className="px-4 py-3.5">
                                                 {(() => {
                                                     const creator = agents.find(a => a.id === ticket.created_by);
-                                                    return creator ? (
+                                                    if (creator) return (
                                                         <div className="flex items-center gap-1.5">
                                                             <AgentAvatar agent={creator} />
                                                             <span className="text-[10px] font-bold text-gray-600 truncate max-w-[80px]">{creator.full_name}</span>
                                                         </div>
-                                                    ) : (
-                                                        <span className="text-[10px] text-gray-300 italic">Desconocido</span>
                                                     );
+                                                    // Fallback: show lead_name snapshot as requester
+                                                    const fallbackName = ticket.lead?.name || ticket.lead_name;
+                                                    if (fallbackName) return (
+                                                        <div className="flex items-center gap-1.5">
+                                                            <div className="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center text-[10px] font-black text-indigo-600 shrink-0">
+                                                                {fallbackName.charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <span className="text-[10px] font-bold text-gray-600 truncate max-w-[80px]">{fallbackName}</span>
+                                                        </div>
+                                                    );
+                                                    return <span className="text-[10px] text-gray-300 italic">—</span>;
                                                 })()}
                                             </td>
                                             <td className="px-4 py-3.5">
@@ -591,6 +625,19 @@ export default function Tickets() {
                                             </td>
                                             <td className="px-4 py-3.5">
                                                 {ticket.due_date ? <span className={`text-[10px] font-bold ${overdue ? 'text-red-500' : 'text-gray-500'}`}>{format(new Date(ticket.due_date), 'dd MMM', { locale: es })}{overdue && ' ⚠️'}</span> : <span className="text-[10px] text-gray-200">—</span>}
+                                            </td>
+                                            {/* ── Fecha de Cierre ── */}
+                                            <td className="px-4 py-3.5">
+                                                {ticket.resolved_at ? (
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[10px] font-black text-emerald-600">
+                                                            {format(new Date(ticket.resolved_at), 'dd MMM', { locale: es })}
+                                                        </span>
+                                                        <span className="text-[9px] text-emerald-400 font-bold">
+                                                            {format(new Date(ticket.resolved_at), 'HH:mm', { locale: es })}
+                                                        </span>
+                                                    </div>
+                                                ) : <span className="text-[10px] text-gray-200">—</span>}
                                             </td>
                                             <td className="px-4 py-3.5 text-right">
                                                 <button onClick={e => { e.stopPropagation(); setSelected(isSelected ? null : ticket); }} className={`p-1.5 rounded-lg transition-all ${isSelected ? 'bg-indigo-100 text-indigo-600' : 'hover:bg-gray-100 text-gray-400'}`}><Edit2 className="w-3.5 h-3.5" /></button>

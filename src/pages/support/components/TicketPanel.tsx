@@ -157,6 +157,7 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
         due_date: ticket.due_date ? ticket.due_date.slice(0, 16) : '',
         lead_id: ticket.lead_id || '',
         created_by: ticket.created_by || '',
+        resolved_at: ticket.resolved_at ? ticket.resolved_at.slice(0, 16) : '',
     });
 
     // Resolution Report state
@@ -179,6 +180,7 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
             due_date: ticket.due_date ? ticket.due_date.slice(0, 16) : '',
             lead_id: ticket.lead_id || '',
             created_by: ticket.created_by || '',
+            resolved_at: ticket.resolved_at ? ticket.resolved_at.slice(0, 16) : '',
         });
         setResForm({
             findings: ticket.findings || '',
@@ -224,6 +226,7 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
                 due_date: form.due_date ? new Date(form.due_date).toISOString() : null,
                 lead_id: form.lead_id || null,
                 created_by: form.created_by || null,
+                resolved_at: form.resolved_at ? new Date(form.resolved_at).toISOString() : null,
             });
             onUpdate(updated); setTab('info'); toast.success('Ticket actualizado ✓');
         } catch { toast.error('Error al actualizar'); } finally { setSaving(false); }
@@ -555,6 +558,71 @@ export function TicketPanel({ ticket, categories, agents, leads, companyId, auth
                                 )}
                             </div>
                         </div>
+
+                        {/* ── Fecha de Cierre (editable) — only for resolved/closed ── */}
+                        {(['resolved', 'closed'] as TicketStatus[]).includes(form.status) && (
+                            <div>
+                                <label className="text-[9px] font-black text-gray-400 uppercase flex items-center gap-1">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-500" />Fecha de Cierre
+                                </label>
+                                {form.resolved_at ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setForm(p => ({ ...p, resolved_at: '' }))}
+                                        className="mt-1 w-full flex items-center gap-2.5 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 rounded-xl px-3.5 py-2.5 group hover:border-red-200 hover:from-red-50 hover:to-red-50 transition-all text-left"
+                                        title="Click para cambiar o quitar la fecha"
+                                    >
+                                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-sm shrink-0">
+                                            <CheckCircle2 className="w-4 h-4 text-white" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-black text-emerald-800">
+                                                {format(new Date(form.resolved_at), "dd 'de' MMMM yyyy", { locale: es })}
+                                            </p>
+                                            <p className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+                                                <Clock className="w-3 h-3" />{format(new Date(form.resolved_at), 'HH:mm', { locale: es })} hrs
+                                            </p>
+                                        </div>
+                                        <div
+                                            onClick={(e) => { e.stopPropagation(); setForm(p => ({ ...p, resolved_at: '' })); }}
+                                            className="w-6 h-6 rounded-full bg-emerald-100 hover:bg-red-100 text-emerald-400 hover:text-red-500 flex items-center justify-center transition-colors shrink-0 cursor-pointer"
+                                            title="Quitar fecha de cierre"
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </div>
+                                    </button>
+                                ) : (
+                                    <div className="mt-1 space-y-2">
+                                        <CustomDatePicker
+                                            value={form.resolved_at ? form.resolved_at.substring(0, 10) : ''}
+                                            onChange={(dateStr) => {
+                                                const time = form.resolved_at ? form.resolved_at.substring(11, 16) : '09:00';
+                                                setForm(p => ({ ...p, resolved_at: dateStr ? `${dateStr}T${time}` : '' }));
+                                            }}
+                                            placeholder="Seleccionar fecha de cierre"
+                                            variant="light"
+                                            forceOpenUp
+                                            alignRight
+                                        />
+                                        {form.resolved_at && (
+                                            <div className="flex items-center gap-2 bg-emerald-50 rounded-xl border border-emerald-100 px-3 py-2.5">
+                                                <Clock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                                <span className="text-[9px] font-black text-emerald-400 uppercase tracking-wider">Hora:</span>
+                                                <input
+                                                    type="time"
+                                                    className="flex-1 bg-transparent border-none text-sm font-bold text-emerald-800 focus:outline-none focus:ring-0"
+                                                    value={form.resolved_at.substring(11, 16)}
+                                                    onChange={e => {
+                                                        const dateOnly = form.resolved_at.substring(0, 10);
+                                                        setForm(p => ({ ...p, resolved_at: `${dateOnly}T${e.target.value}` }));
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         <div>
                             <label className="text-[9px] font-black text-gray-400 uppercase">Descripción</label>

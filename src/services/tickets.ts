@@ -223,7 +223,7 @@ export const ticketService = {
 
     async updateTicket(
         ticketId: string,
-        updates: Partial<Pick<Ticket, 'status' | 'priority' | 'assigned_to' | 'title' | 'description' | 'category_id' | 'due_date' | 'lead_id' | 'findings' | 'root_cause' | 'solution' | 'created_by'>> & { metadata?: Record<string, unknown> }
+        updates: Partial<Pick<Ticket, 'status' | 'priority' | 'assigned_to' | 'title' | 'description' | 'category_id' | 'due_date' | 'lead_id' | 'findings' | 'root_cause' | 'solution' | 'created_by' | 'resolved_at'>> & { metadata?: Record<string, unknown> }
     ): Promise<Ticket> {
         const payload: Record<string, unknown> = {
             ...updates,
@@ -232,8 +232,11 @@ export const ticketService = {
 
         if (updates.status) {
             payload.last_status_change_at = new Date().toISOString();
-            const isResolved = ['resolved', 'closed'].includes(updates.status);
-            payload.resolved_at = isResolved ? new Date().toISOString() : null;
+            // Only auto-set resolved_at if not explicitly provided
+            if (!('resolved_at' in updates)) {
+                const isResolved = ['resolved', 'closed'].includes(updates.status);
+                payload.resolved_at = isResolved ? new Date().toISOString() : null;
+            }
         }
 
         const { data, error } = await supabase
