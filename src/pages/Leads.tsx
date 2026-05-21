@@ -639,7 +639,7 @@ export default function Leads() {
         ) as LeadStatus[];
 
         // If we found matching stages, apply them; otherwise fall back to Cotizado
-        const toApply = hotStatuses.length > 0 ? hotStatuses : ['Cotizado'] as LeadStatus[];
+        const toApply: LeadStatus[] = hotStatuses.length > 0 ? hotStatuses : (['Cotizado'] as unknown as LeadStatus[]);
         setStatusFilter(toApply);
 
         // Clear the ?ready=1 from the URL without re-navigating
