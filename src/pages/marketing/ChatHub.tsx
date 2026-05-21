@@ -1052,7 +1052,7 @@ export default function ChatHub() {
                     <div className="space-y-4">
                         <div className="space-y-3">
                             <InfoItem icon={Mail} label="EMAIL" value={selectedConv.lead?.email || 'No identificado'} />
-                            <InfoItem icon={PhoneIcon} label="TEL\u00C9FONO" value={selectedConv.lead?.phone || 'Sin n\u00FAmero'} />
+                            <InfoItem icon={PhoneIcon} label="TELÉFONO" value={selectedConv.lead?.phone || 'Sin número'} />
                         </div>
                         <button onClick={() => navigate('/leads', { state: { leadId: selectedConv.lead?.id } })} className="w-full py-3 rounded-xl border-2 border-slate-100 font-black text-[9px] uppercase tracking-widest text-slate-500 hover:border-slate-300 hover:text-slate-900 transition-all">Ver Perfil</button>
                     </div>
@@ -1064,7 +1064,7 @@ export default function ChatHub() {
                     <div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300" style={{ width: '700px', height: '650px', maxWidth: '95vw', display: 'flex', flexDirection: 'column' }}>
                         <div className="p-8 border-b border-slate-50 flex items-center justify-between">
                             <div>
-                                <h3 className="text-2xl font-black text-slate-900 tracking-tighter">Nueva Conversaci\u00F3n</h3>
+                                <h3 className="text-2xl font-black text-slate-900 tracking-tighter">Nueva Conversación</h3>
                                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Busca un lead para chatear</p>
                             </div>
                             <button onClick={() => setShowNewChatModal(false)} className="p-2 rounded-full hover:bg-slate-100 transition-colors text-slate-400"><CloseIcon className="w-6 h-6" /></button>
@@ -1096,7 +1096,7 @@ export default function ChatHub() {
                                 <input
                                     autoFocus
                                     type="text"
-                                    placeholder="Nombre del cliente o tel\u00E9fono..."
+                                    placeholder="Nombre del cliente o teléfono..."
                                     value={leadSearch}
                                     onChange={(e) => searchLeads(e.target.value)}
                                     className="w-full pl-14 pr-6 py-4.5 bg-slate-50 border-2 border-transparent rounded-[20px] text-sm font-bold text-slate-700 placeholder:text-slate-400 focus:bg-white focus:border-blue-500/20 focus:ring-4 focus:ring-blue-500/5 transition-all"
@@ -1122,7 +1122,7 @@ export default function ChatHub() {
                                                             {lead.status || 'Nuevo'}
                                                         </span>
                                                     </div>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{lead.phone || 'Sin tel\u00E9fono'}</p>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{lead.phone || 'Sin teléfono'}</p>
                                                 </div>
                                             </div>
                                             <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500 translate-x-0 group-hover:translate-x-1 transition-all" />
