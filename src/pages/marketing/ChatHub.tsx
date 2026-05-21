@@ -922,7 +922,7 @@ export default function ChatHub() {
                                     <div className="p-5">
                                         <div className="flex justify-between items-start mb-4">
                                             <div>
-                                                <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide">Proceso de Cotizaci\u00F3n</h4>
+                                                <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide">Proceso de Cotización</h4>
                                                 <p className="text-[11px] text-slate-400 font-medium mt-0.5">Editando propuesta para {pendingQuote.nombre_cliente}</p>
                                             </div>
                                             <div className="bg-blue-50 text-blue-600 px-2 py-1 rounded text-[9px] font-black uppercase tracking-wider border border-blue-100">
@@ -932,7 +932,7 @@ export default function ChatHub() {
 
                                         <div className="flex gap-3 mt-4">
                                             <button onClick={handleEditPendingQuote} className="px-4 py-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors">
-                                                \u2190 Editar
+                                                ← Editar
                                             </button>
                                             <button onClick={handlePreviewQuote} className="flex-1 py-3 bg-white border-2 border-slate-100 hover:border-blue-200 text-slate-700 hover:text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 group">
                                                 <Eye className="w-4 h-4 text-slate-400 group-hover:text-blue-500" />
@@ -1019,7 +1019,7 @@ export default function ChatHub() {
                             <MessageSquare className="w-14 h-14 text-slate-200" />
                         </div>
                         <h2 className="text-4xl font-black text-slate-900 mb-6 tracking-tighter">Inbox Centralizado</h2>
-                        <p className="text-[12px] text-slate-400 max-w-sm leading-loose font-black uppercase tracking-[0.25em]">Selecciona una conversaci\u00F3n o lead para ver los detalles y mensajes.</p>
+                        <p className="text-[12px] text-slate-400 max-w-sm leading-loose font-black uppercase tracking-[0.25em]">Selecciona una conversación o lead para ver los detalles y mensajes.</p>
                     </div>
                 )}
             </div>
