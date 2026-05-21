@@ -295,7 +295,7 @@ export const teamPerformanceService = {
             ensureUser(uid);
 
             userStats[uid].won++;
-            userStats[uid].totalClosing += Number(lead.closing_amount || 0);
+            userStats[uid].totalClosing += Number(lead.closing_amount || lead.value || 0);
         });
 
         // Lost metrics from lost_date query
@@ -463,7 +463,7 @@ export const teamPerformanceService = {
                 const uWon = userWonLeads[userId] || [];
                 uWon.forEach(lead => {
                     won++;
-                    totalClosing += Number(lead.closing_amount || 0);
+                    totalClosing += Number(lead.closing_amount || lead.value || 0);
                     userWins[userId] = (userWins[userId] || 0) + 1;
                 });
 
