@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthProvider';
 import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft, Zap, Search, Bot, XCircle, Network, BarChart3, UserCircle, Headset, TicketIcon, AlertTriangle, UserCheck, BookOpen, PhoneCall, Sparkles, Brain, Target } from 'lucide-react';
@@ -12,6 +12,7 @@ import type { Company } from '../types';
 export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolean, onToggle: () => void }) {
     const { profile, signOut, setSimulatedCompanyId, setSimulatedRole, simulatedCompanyId } = useAuth();
     const location = useLocation();
+    const navigate = useNavigate();
     const { t } = useTranslation();
 
     interface NavItem {
@@ -32,6 +33,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         if (marketingPaths.some(path => location.pathname.startsWith(path) && !location.pathname.startsWith('/marketing/chat'))) return 'Marketing Hub';
         if (location.pathname.startsWith('/support')) return 'Service Hub';
         if (teamPaths.some(path => location.pathname.startsWith(path))) return 'Equipo';
+        if (location.pathname.startsWith('/leads')) return 'Leads';
         return null;
     };
     const [openAccordion, setOpenAccordion] = useState<string | null>(getInitialAccordion());
@@ -105,7 +107,25 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     ];
 
     if (canAccess('leads')) {
-        navigation.push({ name: t('sidebar.leads'), href: '/leads', icon: Users, current: location.pathname.startsWith('/leads') });
+        navigation.push({
+            name: t('sidebar.leads'),
+            href: '/leads',
+            icon: Users,
+            current: location.pathname.startsWith('/leads'),
+            subItems: [
+                { name: 'Todos los Leads', href: '/leads', icon: Users },
+                {
+                    name: '🔥 Listos para Comprar',
+                    href: '/leads',
+                    icon: Target,
+                    badge: hotLeadCount,
+                    // Special: navigates with pre-filter state
+                    onClick: () => navigate('/leads', {
+                        state: { status: ['Negociación', 'Cotizado', 'Propuesta Enviada'] }
+                    })
+                } as any,
+            ]
+        });
     }
 
     if (canAccess('clientes.view') || profile?.role === 'super_admin' || profile?.role === 'company_admin') {
@@ -408,30 +428,32 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                                         {openAccordion === item.name ? <ChevronDown className="h-4 w-4 opacity-50" /> : <ChevronRight className="h-4 w-4 opacity-50" />}
                                     </button>
                                     {openAccordion === item.name && (
-                                        <div className="ml-4 pl-4 border-l border-gray-800/50 pt-1 space-y-1">
-                                            {item.subItems.map((sub) => (
-                                                <Link
-                                                    key={sub.name}
-                                                    to={sub.href}
-                                                    className={cn(
-                                                        location.pathname === sub.href ? 'text-blue-400 bg-blue-500/5' : 'text-gray-500 hover:text-gray-300 hover:bg-[#1e293b]/50',
-                                                        'group flex items-center justify-between rounded-lg transition-all duration-200 px-3 py-2 text-xs font-bold'
-                                                    )}
-                                                >
-                                                    <div className="flex items-center">
-                                                        <sub.icon className={cn(
-                                                            location.pathname === sub.href ? 'text-blue-400' : 'text-gray-600 group-hover:text-gray-300',
-                                                            "h-4 w-4 mr-3"
-                                                        )} />
-                                                        <span className="truncate">{sub.name}</span>
-                                                    </div>
-                                                    {sub.badge && sub.badge > 0 && (
-                                                        <span className="ml-2 shrink-0 bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] text-center animate-pulse shadow-sm shadow-emerald-500/50">
-                                                            {sub.badge}
-                                                        </span>
-                                                    )}
-                                                </Link>
-                                            ))}
+                                    <div className="ml-4 pl-4 border-l border-gray-800/50 pt-1 space-y-1">
+                                            {item.subItems.map((sub) => {
+                                                const isActive = location.pathname === sub.href && !(sub as any).onClick;
+                                                const baseClass = cn(
+                                                    isActive ? 'text-blue-400 bg-blue-500/5' : 'text-gray-500 hover:text-gray-300 hover:bg-[#1e293b]/50',
+                                                    'group flex items-center justify-between rounded-lg transition-all duration-200 px-3 py-2 text-xs font-bold w-full text-left'
+                                                );
+                                                const inner = (
+                                                    <>
+                                                        <div className="flex items-center">
+                                                            <sub.icon className={cn(isActive ? 'text-blue-400' : 'text-gray-600 group-hover:text-gray-300', "h-4 w-4 mr-3")} />
+                                                            <span className="truncate">{sub.name}</span>
+                                                        </div>
+                                                        {sub.badge != null && sub.badge > 0 && (
+                                                            <span className="ml-2 shrink-0 bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full min-w-[18px] text-center animate-pulse shadow-sm shadow-emerald-500/50">
+                                                                {sub.badge}
+                                                            </span>
+                                                        )}
+                                                    </>
+                                                );
+                                                return (sub as any).onClick ? (
+                                                    <button key={sub.name} onClick={(sub as any).onClick} className={baseClass}>{inner}</button>
+                                                ) : (
+                                                    <Link key={sub.name} to={sub.href} className={baseClass}>{inner}</Link>
+                                                );
+                                            })}
                                         </div>
                                     )}
                                 </>
