@@ -2,9 +2,8 @@ import { useState, useEffect } from 'react';
 import { bookingService, type BookingLink } from '../../services/bookingService';
 import { useAuth } from '../../auth/AuthProvider';
 import {
-    Link2, Copy, Check, Clock, Calendar, MapPin, Palette,
-    Save, Loader2, ExternalLink, Toggle, ToggleRight, Users,
-    Plus, Trash2, Edit2
+    Link2, Copy, Check, Clock, Calendar, MapPin,
+    Save, Loader2, ExternalLink, Users
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -231,7 +230,7 @@ export default function BookingSettings() {
                                 {COLORS.map(c => (
                                     <button key={c} onClick={() => setColor(c)}
                                         className={`w-8 h-8 rounded-xl transition-all ${color === c ? 'ring-2 ring-offset-2 scale-110' : 'hover:scale-105'}`}
-                                        style={{ backgroundColor: c, ringColor: c }} />
+                                        style={{ backgroundColor: c }} />
                                 ))}
                             </div>
                         </div>
