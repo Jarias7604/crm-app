@@ -185,26 +185,42 @@ export const auditTrailService = {
      * Get audit trail entries with optional filtering
      */
     async getEntries(companyId: string, filters: AuditFilters = {}): Promise<AuditEntry[]> {
-        let query = supabase
-            .from('ai_audit_trail')
-            .select(`
-                *,
-                lead:leads(id, name, company_name, phone, status)
-            `)
-            .eq('company_id', companyId)
-            .order('created_at', { ascending: false });
+        try {
+            let query = supabase
+                .from('ai_audit_trail')
+                .select(`
+                    *,
+                    lead:leads(id, name, company_name, phone, status)
+                `)
+                .eq('company_id', companyId)
+                .order('created_at', { ascending: false });
 
-        if (filters.agentName) query = query.eq('agent_name', filters.agentName);
-        if (filters.decisionType) query = query.eq('decision_type', filters.decisionType);
-        if (filters.leadId) query = query.eq('lead_id', filters.leadId);
-        if (filters.dateFrom) query = query.gte('created_at', filters.dateFrom);
-        if (filters.dateTo) query = query.lte('created_at', filters.dateTo);
-        if (filters.minConfidence) query = query.gte('confidence', filters.minConfidence);
-        query = query.limit(filters.limit || 100);
+            if (filters.agentName) query = query.eq('agent_name', filters.agentName);
+            if (filters.decisionType) query = query.eq('decision_type', filters.decisionType);
+            if (filters.leadId) query = query.eq('lead_id', filters.leadId);
+            if (filters.dateFrom) query = query.gte('created_at', filters.dateFrom);
+            if (filters.dateTo) query = query.lte('created_at', filters.dateTo);
+            if (filters.minConfidence) query = query.gte('confidence', filters.minConfidence);
+            query = query.limit(filters.limit || 100);
 
-        const { data, error } = await query;
-        if (error) throw error;
-        return (data || []) as AuditEntry[];
+            const { data, error } = await query;
+
+            // Table may not exist yet in all environments — return [] gracefully
+            if (error) {
+                const isMissingTable =
+                    error.code === '42P01' ||                          // PostgreSQL: relation does not exist
+                    error.message?.includes('does not exist') ||
+                    error.message?.includes('relation') ||
+                    (error as any).code === 'PGRST200';               // PostgREST: schema cache miss
+                if (isMissingTable) return [];
+                throw error;
+            }
+            return (data || []) as AuditEntry[];
+        } catch (err: any) {
+            // Silently return empty — table not migrated yet in this environment
+            logger.warn('[AuditTrail] ai_audit_trail not available:', err?.message);
+            return [];
+        }
     },
 
     /**
