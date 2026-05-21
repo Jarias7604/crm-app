@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
     MoreVertical, Send, FileText, Smartphone, Layers,
     Paperclip, TrendingUp, Eye, Zap, Smile, Mail, Phone as PhoneIcon,
-    Send as TelegramIcon, MessageSquare, Trash2, UserPlus, Search, X as CloseIcon, ChevronRight, Loader2
+    Send as TelegramIcon, MessageSquare, Trash2, UserPlus, Search, X as CloseIcon, ChevronRight, ChevronLeft, Loader2
 } from 'lucide-react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { chatService, type ChatConversation, type ChatMessage } from '../../services/marketing/chatService';
@@ -576,7 +576,7 @@ export default function ChatHub() {
     });
 
     return (
-        <div className="flex h-[calc(100vh-140px)] bg-[#F8FAFC] rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] border border-white/20 overflow-hidden font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900 relative animate-in fade-in duration-700">
+        <div className="flex h-[calc(100vh-120px)] md:h-[calc(100vh-140px)] bg-[#F8FAFC] rounded-none md:rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] border border-white/20 overflow-hidden font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900 relative animate-in fade-in duration-700">
             {/* Soft decorative light */}
             <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-indigo-50/20 to-transparent pointer-events-none"></div>
 
@@ -588,7 +588,7 @@ export default function ChatHub() {
                 accept="application/pdf,image/*"
             />
 
-            <div className="w-[380px] flex flex-col bg-white/60 backdrop-blur-3xl border-r border-slate-100 shrink-0 relative overflow-hidden h-full">
+            <div className={`w-full md:w-[380px] ${selectedConv ? 'hidden md:flex' : 'flex'} flex-col bg-white/60 backdrop-blur-3xl border-r border-slate-100 shrink-0 relative overflow-hidden h-full`}>
                 <div className="p-6 pb-2 space-y-4 relative z-10">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
@@ -674,56 +674,60 @@ export default function ChatHub() {
                 </div>
             </div>
 
-            <div className="flex-1 flex flex-col bg-white/80 backdrop-blur-xl rounded-[32px] shadow-2xl border border-white/50 overflow-hidden relative isolate min-h-0">
+            <div className={`flex-1 ${selectedConv ? 'flex' : 'hidden md:flex'} flex-col bg-white/80 backdrop-blur-xl rounded-none md:rounded-[32px] shadow-2xl border border-white/50 overflow-hidden relative isolate min-h-0`}>
                 <div className="absolute inset-0 z-[-1] opacity-40" style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
                 <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-100/30 rounded-full blur-[100px] -z-10 translate-x-1/3 -translate-y-1/3"></div>
 
                 {selectedConv ? (
                     <>
-                        <header className="px-8 py-5 flex items-center justify-between border-b border-white/50 bg-white/60 backdrop-blur-md sticky top-0 z-30">
-                            <div className="flex items-center gap-5">
-                                <div className="relative">
-                                    <div className="w-14 h-14 rounded-[20px] bg-slate-900 flex items-center justify-center text-white text-xl font-black shadow-2xl shadow-slate-900/20 overflow-hidden">
+                        <header className="px-3 md:px-8 py-3 md:py-5 flex items-center justify-between border-b border-white/50 bg-white/60 backdrop-blur-md sticky top-0 z-30">
+                            <div className="flex items-center gap-2 md:gap-5 min-w-0">
+                                <button
+                                    onClick={() => setSelectedConv(null)}
+                                    className="md:hidden p-2 rounded-full hover:bg-slate-100 text-slate-600 transition-colors shrink-0"
+                                >
+                                    <ChevronLeft className="w-6 h-6" />
+                                </button>
+                                <div className="relative shrink-0">
+                                    <div className="w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-[20px] bg-slate-900 flex items-center justify-center text-white text-base md:text-xl font-black shadow-2xl shadow-slate-900/20 overflow-hidden">
                                         {selectedConv.lead?.name?.[0]}
                                         <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-white/20" />
                                     </div>
-                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-[3px] border-white rounded-full animate-pulse shadow-sm" />
+                                    <div className="absolute -bottom-1 -right-1 w-3 h-3 md:w-4 md:h-4 bg-emerald-500 border-2 md:border-[3px] border-white rounded-full animate-pulse shadow-sm" />
                                 </div>
-                                <div>
-                                    <div className="flex items-center gap-3">
-                                        <h2 className="text-xl font-black text-slate-900 tracking-tight">{selectedConv.lead?.name}</h2>
-                                        <span className="px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-[9px] font-black uppercase text-slate-500 tracking-widest">{selectedConv.channel}</span>
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5 md:gap-3">
+                                        <h2 className="text-sm md:text-xl font-black text-slate-900 tracking-tight truncate max-w-[120px] sm:max-w-[200px]">{selectedConv.lead?.name}</h2>
+                                        <span className="px-1.5 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-[8px] font-black uppercase text-slate-500 tracking-widest">{selectedConv.channel}</span>
                                     </div>
-                                    <p className="text-xs font-medium text-slate-500 flex items-center gap-1.5 mt-0.5">
+                                    <p className="text-[10px] md:text-xs font-medium text-slate-500 flex items-center gap-1 mt-0.5">
                                         <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full inline-block" /> En línea
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex gap-3 items-center">
+                            <div className="flex gap-1.5 md:gap-3 items-center shrink-0">
                                 <button
                                     onClick={() => handleAiProcess()}
                                     disabled={isAiProcessing || !agentStatus}
                                     title="Pedir respuesta a la IA"
-                                    className={`h-11 w-11 flex items-center justify-center rounded-xl border transition-all ${isAiProcessing ? 'bg-slate-50 text-slate-300' : 'bg-white text-slate-600 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50'}`}
+                                    className={`h-9 w-9 md:h-11 md:w-11 flex items-center justify-center rounded-lg md:rounded-xl border transition-all ${isAiProcessing ? 'bg-slate-50 text-slate-300' : 'bg-white text-slate-600 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50'}`}
                                 >
-                                    <Zap className={`w-4 h-4 ${isAiProcessing ? 'animate-pulse' : ''}`} />
+                                    <Zap className={`w-3.5 h-3.5 md:w-4 md:h-4 ${isAiProcessing ? 'animate-pulse' : ''}`} />
                                 </button>
                                 <button
                                     onClick={() => navigate('/cotizaciones/nueva-pro', { state: { lead: selectedConv.lead, conversation_id: selectedConv.id, fromChat: true } })}
-                                    className="h-11 px-6 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 hover:shadow-lg hover:shadow-blue-600/30 transition-all flex items-center gap-2 group"
+                                    className="h-9 px-3 md:h-11 md:px-6 bg-slate-900 text-white rounded-lg md:rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 hover:shadow-lg hover:shadow-blue-600/30 transition-all flex items-center gap-1 md:gap-2 group"
                                 >
-                                    <TrendingUp className="w-4 h-4 text-blue-400 group-hover:text-white transition-colors" />
-                                    Cotizar
+                                    <TrendingUp className="w-3.5 h-3.5 md:w-4 md:h-4 text-blue-400 group-hover:text-white transition-colors" />
+                                    <span className="hidden sm:inline">Cotizar</span>
                                 </button>
                                 <div className="relative group">
                                     <button
                                         onClick={() => setShowDetails(!showDetails)}
-                                        className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all ${showDetails ? 'bg-slate-200 text-slate-900' : 'bg-white border border-slate-200 text-slate-400 hover:text-slate-900'}`}
+                                        className={`w-9 h-9 md:w-11 md:h-11 rounded-lg md:rounded-xl flex items-center justify-center transition-all ${showDetails ? 'bg-slate-200 text-slate-900' : 'bg-white border border-slate-200 text-slate-400 hover:text-slate-900'}`}
                                     >
-                                        <MoreVertical className="w-5 h-5" />
+                                        <MoreVertical className="w-4 h-4 md:w-5 md:h-5" />
                                     </button>
-
-                                    {/* DROPDOWN MENU */}
                                     <div className="absolute top-12 right-0 w-48 bg-white rounded-xl shadow-xl border border-slate-100 p-1 hidden group-hover:block z-50">
                                         {isAdmin() && (
                                             <button
@@ -739,15 +743,15 @@ export default function ChatHub() {
                             </div>
                         </header>
 
-                        <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-10 space-y-8 custom-scrollbar scroll-smooth">
+                        <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 md:px-6 py-4 md:py-10 space-y-4 md:space-y-6 custom-scrollbar scroll-smooth">
                             {messages.map((msg, idx) => (
                                 <div key={msg.id || idx} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'} group w-full animate-in fade-in slide-in-from-bottom-2 duration-300`}>
-                                    <div className={`flex flex-col gap-2 ${msg.direction === 'outbound' ? 'items-end' : 'items-start'} max-w-[85%]`}>
-                                        <div className={`px-5 py-3.5 rounded-[1.5rem] shadow-sm relative transition-all group-hover:shadow-md ${msg.direction === 'outbound'
+                                    <div className={`flex flex-col gap-1.5 md:gap-2 ${msg.direction === 'outbound' ? 'items-end' : 'items-start'} max-w-[88%] md:max-w-[85%]`}>
+                                        <div className={`px-3.5 md:px-5 py-2.5 md:py-3.5 rounded-[1.25rem] md:rounded-[1.5rem] shadow-sm relative transition-all group-hover:shadow-md ${msg.direction === 'outbound'
                                             ? (selectedConv.channel === 'email' || msg.type === 'image' || msg.type === 'file' ? 'bg-white text-slate-900 border border-slate-200' : 'bg-indigo-600 text-white shadow-indigo-200/50')
                                             : 'bg-white text-slate-700 border border-slate-100 rounded-bl-none shadow-slate-200/40'
                                             } ${msg.direction === 'outbound' && (selectedConv.channel === 'email' || msg.type === 'image' || msg.type === 'file') ? 'rounded-br-none' : msg.direction === 'outbound' ? 'rounded-br-none' : ''}`}>
-                                            <div className="text-[14.5px] font-medium leading-[1.6]">
+                                            <div className="text-[13.5px] md:text-[14.5px] font-medium leading-[1.6]">
                                                 {msg.content.startsWith('__QUOTE__') ? (
                                                     <div className="w-fit max-w-[80%] min-w-[200px]">
                                                         <div className="flex items-center gap-4 mb-3 pb-3 border-b border-white/10">
@@ -873,7 +877,7 @@ export default function ChatHub() {
                             </div>
                         )}
 
-                        <div className="px-8 pb-8 pt-4 bg-gradient-to-t from-white via-white to-transparent">
+                        <div className="px-3 md:px-8 pb-3 md:pb-8 pt-2 md:pt-4 bg-gradient-to-t from-white via-white to-transparent">
                             {/* ATTACHMENT PREVIEW */}
                             {pendingFile && (
                                 <div className="mb-4 animate-in slide-in-from-bottom-2 duration-300">
@@ -904,21 +908,21 @@ export default function ChatHub() {
                                 </div>
                             )}
 
-                            <form onSubmit={handleSendMessage} className="bg-white rounded-[1.5rem] p-2 flex items-center gap-2 border border-slate-200/60 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.08)] focus-within:ring-4 focus-within:ring-indigo-100/50 focus-within:border-indigo-200 transition-all duration-300">
-                                <button type="button" className="p-3 text-slate-400 hover:text-indigo-600 transition-all hover:scale-110"><Smile className="w-5 h-5" /></button>
+                            <form onSubmit={handleSendMessage} className="bg-white rounded-xl md:rounded-[1.5rem] p-1.5 md:p-2 flex items-center gap-1.5 md:gap-2 border border-slate-200/60 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.08)] focus-within:ring-4 focus-within:ring-indigo-100/50 focus-within:border-indigo-200 transition-all duration-300">
+                                <button type="button" className="p-2 md:p-3 text-slate-400 hover:text-indigo-600 transition-all hover:scale-110 shrink-0"><Smile className="w-5 h-5" /></button>
                                 <textarea
                                     value={newMessage}
                                     onChange={e => setNewMessage(e.target.value)}
                                     onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(e as any); } }}
-                                    placeholder="Escribe un mensaje para tu cliente..."
-                                    className="flex-1 bg-transparent py-3 text-[14px] font-semibold text-slate-700 outline-none resize-none max-h-32 custom-scrollbar placeholder:text-slate-300"
+                                    placeholder="Escribe un mensaje..."
+                                    className="flex-1 bg-transparent py-2 md:py-3 text-[13.5px] md:text-[14px] font-semibold text-slate-700 outline-none resize-none max-h-32 custom-scrollbar placeholder:text-slate-300"
                                     rows={1}
                                 />
-                                <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 text-slate-400 hover:text-indigo-600 transition-all hover:scale-110"><Paperclip className="w-5 h-5" /></button>
+                                <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 md:p-3 text-slate-400 hover:text-indigo-600 transition-all hover:scale-110 shrink-0"><Paperclip className="w-5 h-5" /></button>
                                 <button
                                     type="submit"
                                     disabled={(!newMessage.trim() && !pendingFile) || isSending}
-                                    className={`h-12 w-12 flex items-center justify-center bg-indigo-600 text-white rounded-2xl transition-all shadow-xl shadow-indigo-600/20 active:scale-95 ${((!newMessage.trim() && !pendingFile) || isSending) ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-indigo-700 hover:-translate-y-0.5'}`}
+                                    className={`h-10 w-10 md:h-12 md:w-12 flex items-center justify-center bg-indigo-600 text-white rounded-lg md:rounded-2xl transition-all shadow-xl shadow-indigo-600/20 active:scale-95 shrink-0 ${((!newMessage.trim() && !pendingFile) || isSending) ? 'opacity-40 cursor-not-allowed grayscale' : 'hover:bg-indigo-700 hover:-translate-y-0.5'}`}
                                 >
                                     {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                                 </button>
@@ -937,7 +941,7 @@ export default function ChatHub() {
             </div>
 
             {selectedConv && showDetails && (
-                <div className="w-[260px] bg-white rounded-[32px] border border-slate-100 shadow-sm flex flex-col overflow-y-auto shrink-0 p-5 space-y-6">
+                <div className="hidden lg:flex w-[260px] bg-white rounded-[32px] border border-slate-100 shadow-sm flex-col overflow-y-auto shrink-0 p-5 space-y-6">
                     <div className="text-center space-y-3">
                         <div className="relative inline-block">
                             <div className="w-20 h-20 rounded-[24px] bg-slate-50 mx-auto flex items-center justify-center text-4xl font-black text-slate-900 shadow-inner border border-white">
