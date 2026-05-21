@@ -215,26 +215,30 @@ export const teamPerformanceService = {
         const { data: leads, error: leadsError } = await leadsQuery;
         if (leadsError) throw leadsError;
 
-        // 3b. Get leads WON in the period (by internal_won_date, not created_at)
-        // This captures deals closed this month even if the lead was created months ago
+        // 3b. Get leads WON in the period.
+        // Uses COALESCE(internal_won_date, created_at) to match Dashboard logic:
+        // - If internal_won_date exists, use it (captures deals closed this month even if created months ago)
+        // - If internal_won_date is null (manually moved to Cliente/Cerrado), fall back to created_at
+        // We fetch ALL won leads broadly and filter in JS — same strategy as getCompanySummary.
         let wonQuery = supabase
             .from('leads')
-            .select('id, assigned_to, status, value, closing_amount, internal_won_date')
+            .select('id, assigned_to, status, value, closing_amount, internal_won_date, created_at')
             .eq('company_id', companyId)
-            .in('status', ['Cerrado', 'Cliente'])
-            .not('internal_won_date', 'is', null);
+            .in('status', ['Cerrado', 'Cliente']);
 
-        if (start) {
-            wonQuery = wonQuery.gte('internal_won_date', start.toISOString());
-        }
-        if (end) {
-            wonQuery = wonQuery.lte('internal_won_date', end.toISOString());
-        }
         if (teamUserIds) {
             wonQuery = wonQuery.in('assigned_to', teamUserIds);
         }
 
-        const { data: wonLeads } = await wonQuery;
+        const { data: allWonLeads } = await wonQuery;
+
+        // Filter by date using COALESCE: prefer internal_won_date, fall back to created_at
+        const wonLeads = (allWonLeads || []).filter(lead => {
+            const effectiveDate = lead.internal_won_date || lead.created_at;
+            if (start && effectiveDate < start.toISOString()) return false;
+            if (end && effectiveDate > end.toISOString()) return false;
+            return true;
+        });
 
         // 3c. Get leads LOST in the period (by lost_date)
         let lostQuery = supabase
@@ -379,22 +383,23 @@ export const teamPerformanceService = {
 
         const { data: leads } = await leadsQuery;
 
-        // 3b. Get leads WON in period (by internal_won_date)
+        // 3b. Get leads WON in period.
+        // Uses COALESCE(internal_won_date, created_at) — same logic as getUserPerformance and getCompanySummary.
         let wonQuery = supabase
             .from('leads')
-            .select('id, assigned_to, status, value, closing_amount, internal_won_date')
+            .select('id, assigned_to, status, value, closing_amount, internal_won_date, created_at')
             .eq('company_id', companyId)
-            .in('status', ['Cerrado', 'Cliente'])
-            .not('internal_won_date', 'is', null);
+            .in('status', ['Cerrado', 'Cliente']);
 
-        if (start) {
-            wonQuery = wonQuery.gte('internal_won_date', start.toISOString());
-        }
-        if (end) {
-            wonQuery = wonQuery.lte('internal_won_date', end.toISOString());
-        }
+        const { data: allWonLeadsTeam } = await wonQuery;
 
-        const { data: wonLeads } = await wonQuery;
+        // Filter by date in JS using COALESCE: prefer internal_won_date, fall back to created_at
+        const wonLeads = (allWonLeadsTeam || []).filter(lead => {
+            const effectiveDate = lead.internal_won_date || lead.created_at;
+            if (start && effectiveDate < start.toISOString()) return false;
+            if (end && effectiveDate > end.toISOString()) return false;
+            return true;
+        });
 
         // 3c. Get leads LOST in period (by lost_date)
         let lostQuery = supabase
