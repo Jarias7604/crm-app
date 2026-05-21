@@ -273,18 +273,22 @@ export const teamPerformanceService = {
         };
 
         // Pipeline metrics from created_at query (total, active, erroneous, pipeline value)
+        // totalValue = ONLY active leads in pipeline (not won/lost — those go to totalClosing)
         (leads || []).forEach(lead => {
             const uid = lead.assigned_to;
             if (!uid) return;
             ensureUser(uid);
 
             userStats[uid].total++;
-            userStats[uid].totalValue += Number(lead.value || 0);
 
             if (lead.status === 'Erróneo') {
                 userStats[uid].erroneous++;
-            } else if (lead.status !== 'Cerrado' && lead.status !== 'Cliente' && lead.status !== 'Perdido') {
+            } else if (lead.status === 'Cerrado' || lead.status === 'Cliente' || lead.status === 'Perdido') {
+                // Won/Lost leads DO count toward total leads but NOT toward pipeline value
+            } else {
+                // Active pipeline leads only
                 userStats[uid].active++;
+                userStats[uid].totalValue += Number(lead.value || 0);
             }
         });
 
@@ -311,8 +315,10 @@ export const teamPerformanceService = {
         return profiles
             .map(p => {
                 const stats = userStats[p.id] || { total: 0, won: 0, lost: 0, active: 0, erroneous: 0, totalValue: 0, totalClosing: 0 };
-                const validLeads = stats.total - stats.erroneous;
-                const winRate = validLeads > 0 ? (stats.won / validLeads) * 100 : 0;
+                // Win rate = won / (won + lost) — only decided deals, same logic as Salesforce/HubSpot
+                // This is a more meaningful metric than won/total_leads
+                const decidedDeals = stats.won + stats.lost;
+                const winRate = decidedDeals > 0 ? (stats.won / decidedDeals) * 100 : 0;
                 const avgDeal = stats.won > 0 ? stats.totalClosing / stats.won : 0;
                 const teams = userTeams[p.id] || { names: [], colors: [] };
 
@@ -452,11 +458,14 @@ export const teamPerformanceService = {
             const userWins: Record<string, number> = {};
 
             members.forEach(userId => {
-                // Pipeline metrics from created_at
+                // Pipeline metrics from created_at — only active leads contribute to pipeline value
                 const uLeads = userLeads[userId] || [];
                 uLeads.forEach(lead => {
                     totalLeads++;
-                    totalValue += Number(lead.value || 0);
+                    // Only active leads (not won/lost) count toward pipeline value
+                    if (lead.status !== 'Cerrado' && lead.status !== 'Cliente' && lead.status !== 'Perdido' && lead.status !== 'Erróneo') {
+                        totalValue += Number(lead.value || 0);
+                    }
                 });
 
                 // Won metrics from internal_won_date
@@ -480,8 +489,9 @@ export const teamPerformanceService = {
                 }
             });
 
-            const validLeads = totalLeads;
-            const winRate = validLeads > 0 ? (won / validLeads) * 100 : 0;
+            // Win rate = won / (won + lost) — only decided deals (same as Salesforce/HubSpot standard)
+            const decidedDeals = won + lost;
+            const winRate = decidedDeals > 0 ? (won / decidedDeals) * 100 : 0;
             const avgDeal = won > 0 ? totalClosing / won : 0;
 
             return {
