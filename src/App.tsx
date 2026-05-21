@@ -70,6 +70,8 @@ const Billing           = lazy(() => import('./pages/company/Billing'));
 const GoogleCallback    = lazy(() => import('./pages/company/GoogleCallback'));
 const Reports           = lazy(() => import('./pages/Reports'));
 const PlanManager       = lazy(() => import('./pages/admin/PlanManager'));
+const BookingSettings   = lazy(() => import('./pages/calendar/BookingSettings'));
+const PublicBookingPage = lazy(() => import('./pages/public/PublicBookingPage'));
 
 // ─── Skeleton Screen (técnica Netflix) ───────────────────────────────────────
 // Muestra estructura visual inmediatamente mientras carga el JS del módulo.
@@ -196,6 +198,7 @@ function App() {
                   <Route path="/cotizaciones/:id/editar" element={<CotizadorPro />} />
                   <Route path="/cotizaciones/:id" element={<CotizacionDetalle />} />
                   <Route path="/calendar" element={<Calendar />} />
+                  <Route path="/calendar/booking" element={<BookingSettings />} />
 
                   {/* Company & Config Routes (Admin only) */}
                   <Route element={<RoleProtectedRoute allowedRoles={['super_admin', 'company_admin']} />}>
@@ -273,6 +276,7 @@ function App() {
               {/* Public routes (no auth required) */}
               <Route path="/propuesta/:id" element={<PublicQuoteView />} />
               <Route path="/portal/cliente/:token" element={<ClientPortal />} />
+              <Route path="/book/:slug" element={<PublicBookingPage />} />
               <Route path="/update-password" element={<UpdatePassword />} />
               <Route path="/support/manual" element={<ManualPage />} />
 
