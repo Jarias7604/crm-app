@@ -117,7 +117,7 @@ export default function Calendar() {
     const [showAssigneeFilter, setShowAssigneeFilter] = useState(false);
     const [dayDetailDate, setDayDetailDate] = useState<Date | null>(null);
     const [showCrmEvents, setShowCrmEvents] = useState(true);
-    const [showGoogleEvents, setShowGoogleEvents] = useState(true);
+    const [showGoogleEvents, setShowGoogleEvents] = useState(false); // Off by default — prevents edge function blocking calendar load
     const [showOutlookEvents, setShowOutlookEvents] = useState(false);
     
     // Google Calendar Event Modal
@@ -266,7 +266,10 @@ export default function Calendar() {
             } as any));
         },
         enabled: showGoogleEvents && !!profile?.id,
-        staleTime: 5 * 60 * 1000,
+        staleTime: 10 * 60 * 1000,   // 10 min — edge function is slow, avoid redundant calls
+        gcTime: 30 * 60 * 1000,
+        refetchOnWindowFocus: false,   // Never re-fire the edge function on tab switch
+        refetchOnMount: false,          // Use cache on re-mount (navigating back to calendar)
     });
     const mockGoogleEvents = useMemo(() => {
         if (!showGoogleEvents) return [];

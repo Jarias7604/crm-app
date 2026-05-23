@@ -709,7 +709,7 @@ export const leadsService = {
         const from = startDate ?? defaultStart.toISOString();
         const to   = endDate   ?? defaultEnd.toISOString();
 
-        let query = supabase
+        let followUpsQuery = supabase
             .from('follow_ups')
             .select(`
                 id, date, notes, action_type, assigned_to,
@@ -719,38 +719,28 @@ export const leadsService = {
             .gte('date', from)
             .lte('date', to)
             .order('date', { ascending: false })
-            .limit(5000);
+            .limit(2000); // Reduced from 5000 — a month window never exceeds this
 
         if (assignedTo) {
-            query = query.eq('assigned_to', assignedTo);
+            followUpsQuery = followUpsQuery.eq('assigned_to', assignedTo);
         }
 
-        const { data, error } = await query;
-        if (error) throw error;
+        // ─── Parallel fetch — follow_ups + profiles run simultaneously ──────────
+        // Profiles is tiny (team members only, filtered by RLS automatically).
+        // Fetching all of them in parallel is faster than waiting for follow_ups
+        // to complete first, extracting IDs, then doing a second sequential query.
+        const [followUpsResult, profilesResult] = await Promise.all([
+            followUpsQuery,
+            supabase.from('profiles').select('id, full_name, avatar_url')
+        ]);
 
-        // Perform memory join on profiles to remain 100% database-agnostic and immune to missing FKs in testing/dev environments.
-        const followUps = data || [];
-        const uniqueAssignedIds = Array.from(
-            new Set(followUps.map(item => item.assigned_to).filter(Boolean))
-        ) as string[];
+        if (followUpsResult.error) throw followUpsResult.error;
 
+        const followUps = followUpsResult.data || [];
         const profilesMap = new Map<string, { id: string; full_name: string | null; avatar_url: string | null }>();
 
-        if (uniqueAssignedIds.length > 0) {
-            try {
-                const { data: profilesData } = await supabase
-                    .from('profiles')
-                    .select('id, full_name, avatar_url')
-                    .in('id', uniqueAssignedIds);
-
-                if (profilesData) {
-                    profilesData.forEach(p => {
-                        profilesMap.set(p.id, p);
-                    });
-                }
-            } catch (err) {
-                console.warn('Failed to fetch assigned profiles:', err);
-            }
+        if (profilesResult.data) {
+            profilesResult.data.forEach(p => profilesMap.set(p.id, p));
         }
 
         return followUps.map(item => ({
