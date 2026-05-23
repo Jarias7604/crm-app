@@ -588,10 +588,25 @@ export const leadsService = {
     // Auto-marks previous follow-ups for the same lead as completed
     async createFollowUp(followUp: Partial<FollowUp>, assignedTo?: string) {
         const { data: { user } } = await supabase.auth.getUser();
+
+        // Resolve company_id — required by RLS CHECK (company_id = get_auth_company_id()).
+        // If not explicitly passed, fetch from the user's profile so the INSERT
+        // is never rejected by RLS and the record is visible in calendar queries.
+        let companyId = followUp.company_id;
+        if (!companyId && user?.id) {
+            const { data: p } = await supabase
+                .from('profiles')
+                .select('company_id')
+                .eq('id', user.id)
+                .single();
+            companyId = p?.company_id ?? undefined;
+        }
+
         const { data, error } = await supabase
             .from('follow_ups')
             .insert({
                 ...followUp,
+                company_id: companyId,
                 user_id: user?.id,
                 assigned_to: assignedTo || null,
                 action_type: followUp.action_type || 'call'
