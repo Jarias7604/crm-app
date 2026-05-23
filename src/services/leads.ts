@@ -714,8 +714,7 @@ export const leadsService = {
             .select(`
                 id, date, notes, action_type, assigned_to,
                 completed, completed_at,
-                lead:leads(id, name, company_name, phone, email, status),
-                assigned_profile:assigned_to(id, full_name, avatar_url)
+                lead:leads(id, name, company_name, phone, email, status)
             `)
             .gte('date', from)
             .lte('date', to)
@@ -727,9 +726,44 @@ export const leadsService = {
         }
 
         const { data, error } = await query;
-
         if (error) throw error;
-        return (data || []) as unknown as Array<{
+
+        // Perform memory join on profiles to remain 100% database-agnostic and immune to missing FKs in testing/dev environments.
+        const followUps = data || [];
+        const uniqueAssignedIds = Array.from(
+            new Set(followUps.map(item => item.assigned_to).filter(Boolean))
+        ) as string[];
+
+        const profilesMap = new Map<string, { id: string; full_name: string | null; avatar_url: string | null }>();
+
+        if (uniqueAssignedIds.length > 0) {
+            try {
+                const { data: profilesData } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, avatar_url')
+                    .in('id', uniqueAssignedIds);
+
+                if (profilesData) {
+                    profilesData.forEach(p => {
+                        profilesMap.set(p.id, p);
+                    });
+                }
+            } catch (err) {
+                console.warn('Failed to fetch assigned profiles:', err);
+            }
+        }
+
+        return followUps.map(item => ({
+            id: item.id,
+            date: item.date,
+            notes: item.notes,
+            action_type: item.action_type,
+            assigned_to: item.assigned_to,
+            completed: item.completed,
+            completed_at: item.completed_at,
+            lead: item.lead,
+            assigned_profile: item.assigned_to ? (profilesMap.get(item.assigned_to) || null) : null
+        })) as unknown as Array<{
             id: string;
             date: string;
             notes: string | null;
@@ -751,6 +785,7 @@ export const leadsService = {
                 avatar_url: string | null;
             } | null;
         }>;
+
     },
 
     // Mark a follow-up as completed (quick action from Calendar)
