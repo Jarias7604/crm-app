@@ -86,6 +86,9 @@ export interface CallBotConfig {
 
     // ── URLs ──────────────────────────────────────────────────────────────
     demo_calendar_url: string;
+
+    // ── Mode ──────────────────────────────────────────────────────────────
+    call_mode: 'manual' | 'auto';  // manual = you decide who to call; auto = cron dispatches
 }
 
 export const DEFAULT_CALL_BOT_CONFIG: CallBotConfig = {
@@ -139,6 +142,7 @@ FLUJO:
     },
 
     demo_calendar_url: '',
+    call_mode: 'manual',
 };
 
 export interface CallBotStats {

@@ -224,6 +224,8 @@ export default function CallBot() {
     const [stats, setStats]   = useState<CallBotStats | null>(null);
     const [queue, setQueue]   = useState<CallQueueItem[]>([]);
     const [stages, setStages] = useState<string[]>([]);
+    const [callableLeads, setCallableLeads] = useState<{ id: string; name: string; phone: string; status: string }[]>([]);
+    const [callingLeads, setCallingLeads] = useState<Record<string, boolean>>({});
     const [saving, setSaving] = useState(false);
     const [tab, setTab]       = useState<'dashboard' | 'config' | 'queue'>('dashboard');
     const [loading, setLoading] = useState(true);
@@ -233,13 +235,14 @@ export default function CallBot() {
     const load = useCallback(async () => {
         if (!profile?.company_id) return;
         try {
-            const [cfg, st, q, sg] = await Promise.all([
+            const [cfg, st, q, sg, cl] = await Promise.all([
                 callBotService.getConfig(profile.company_id),
                 callBotService.getStats(profile.company_id),
                 callBotService.getQueue(profile.company_id, 20),
                 callBotService.getPipelineStages(profile.company_id),
+                callBotService.getCallableLeads(profile.company_id, 15),
             ]);
-            setConfig(cfg); setStats(st); setQueue(q); setStages(sg);
+            setConfig(cfg); setStats(st); setQueue(q); setStages(sg); setCallableLeads(cl);
         } catch (e) { console.error(e); }
         finally { setLoading(false); }
     }, [profile?.company_id]);
@@ -282,6 +285,35 @@ export default function CallBot() {
         }
     };
 
+    const toggleMode = async () => {
+        const nextMode = config.call_mode === 'manual' ? 'auto' : 'manual';
+        const next = { ...config, call_mode: nextMode };
+        setConfig(next);
+        if (profile?.company_id) {
+            await callBotService.saveConfig(profile.company_id, next);
+            toast.success(nextMode === 'auto' ? '🤖 Modo AUTO activado — Sofía llamará sola' : '🎮 Modo MANUAL — tú decides quién llama');
+        }
+    };
+
+    const handleCallNow = async (lead: { id: string; name: string; phone: string }) => {
+        if (!profile?.company_id) return;
+        setCallingLeads(prev => ({ ...prev, [lead.id]: true }));
+        try {
+            const queueId = await callBotService.queueCall(profile.company_id, lead.id);
+            const result  = await callBotService.triggerCall(queueId);
+            if (result.success) {
+                toast.success(`📞 Sofía está llamando a ${lead.name}`);
+                await load();
+            } else {
+                toast.error(result.error || 'Error al iniciar llamada');
+            }
+        } catch (e: any) {
+            toast.error(e.message || 'Error al llamar');
+        } finally {
+            setCallingLeads(prev => ({ ...prev, [lead.id]: false }));
+        }
+    };
+
     const upd = (key: keyof CallBotConfig, val: unknown) =>
         setConfig(prev => ({ ...prev, [key]: val }));
 
@@ -319,18 +351,34 @@ export default function CallBot() {
                             </p>
                         </div>
                     </div>
-                    <button
-                        onClick={toggleEnabled}
-                        disabled={!isConfigured}
-                        className={`flex items-center gap-3 px-5 py-3 rounded-2xl font-black text-sm transition-all border shadow-lg ${
-                            config.enabled
-                                ? 'bg-emerald-500 border-emerald-400 text-white hover:bg-emerald-600 shadow-emerald-500/30'
-                                : 'bg-white/10 border-white/20 text-white hover:bg-white/20 disabled:opacity-40'
-                        }`}
-                    >
-                        {config.enabled ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
-                        {config.enabled ? 'Sofía Activa' : isConfigured ? 'Activar Sofía' : 'Configura primero'}
-                    </button>
+                    <div className="flex items-center gap-3">
+                        {/* Manual / Auto toggle */}
+                        <button
+                            onClick={toggleMode}
+                            disabled={!isConfigured}
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-black text-xs transition-all border shadow ${
+                                config.call_mode === 'auto'
+                                    ? 'bg-amber-500 border-amber-400 text-white shadow-amber-500/30'
+                                    : 'bg-white/10 border-white/20 text-white hover:bg-white/20'
+                            } disabled:opacity-40`}
+                        >
+                            {config.call_mode === 'auto' ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                            {config.call_mode === 'auto' ? '🤖 AUTO' : '🎮 MANUAL'}
+                        </button>
+                        {/* Enable/Disable Sofía */}
+                        <button
+                            onClick={toggleEnabled}
+                            disabled={!isConfigured}
+                            className={`flex items-center gap-3 px-5 py-3 rounded-2xl font-black text-sm transition-all border shadow-lg ${
+                                config.enabled
+                                    ? 'bg-emerald-500 border-emerald-400 text-white hover:bg-emerald-600 shadow-emerald-500/30'
+                                    : 'bg-white/10 border-white/20 text-white hover:bg-white/20 disabled:opacity-40'
+                            }`}
+                        >
+                            {config.enabled ? <ToggleRight className="w-5 h-5" /> : <ToggleLeft className="w-5 h-5" />}
+                            {config.enabled ? 'Sofía Activa' : isConfigured ? 'Activar Sofía' : 'Configura primero'}
+                        </button>
+                    </div>
                 </div>
 
                 {/* KPIs */}
@@ -569,36 +617,98 @@ export default function CallBot() {
 
             {/* QUEUE */}
             {tab === 'queue' && (
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h3 className="text-base font-black text-gray-900">Cola de llamadas en vivo</h3>
-                            <p className="text-xs text-gray-500">{queue.length} registros</p>
+                <div className="space-y-6">
+
+                    {/* ── CALLABLE LEADS (Manual Call) ── */}
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
+                            <div>
+                                <h3 className="text-sm font-black text-gray-900">📋 Listos para llamar</h3>
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                    {config.call_mode === 'manual'
+                                        ? 'Modo MANUAL — haz click en 📞 para que Sofía llame ahora'
+                                        : 'Modo AUTO — Sofía llamará automáticamente según tu configuración'}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className={`text-[10px] font-black px-3 py-1 rounded-full border ${
+                                    config.call_mode === 'auto'
+                                        ? 'bg-amber-50 border-amber-200 text-amber-700'
+                                        : 'bg-violet-50 border-violet-200 text-violet-700'
+                                }`}>
+                                    {config.call_mode === 'auto' ? '🤖 AUTO' : '🎮 MANUAL'}
+                                </span>
+                                <button onClick={load} className="flex items-center gap-1.5 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-100 transition">
+                                    <RefreshCw className="w-3.5 h-3.5" /> Actualizar
+                                </button>
+                            </div>
                         </div>
-                        <button onClick={load} className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition shadow-sm">
-                            <RefreshCw className="w-3.5 h-3.5" /> Actualizar
-                        </button>
-                    </div>
-                    {queue.length === 0 ? (
-                        <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
-                            <div className="text-4xl mb-3">📭</div>
-                            <p className="text-sm font-bold text-gray-500">Cola vacía</p>
-                            <p className="text-xs text-gray-400 mt-1">Los leads aparecerán cuando Sofía empiece a llamar</p>
-                        </div>
-                    ) : (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
-                            {queue.map(item => (
-                                <div key={item.id} className="p-3">
-                                    <QueueCard item={item} />
-                                    {item.summary && (
-                                        <div className="mt-2 ml-5 bg-gray-50 rounded-xl px-3 py-2 text-xs text-gray-600">
-                                            <span className="font-bold text-violet-600">Sofía: </span>{item.summary}
+                        {callableLeads.length === 0 ? (
+                            <div className="p-10 text-center">
+                                <div className="text-3xl mb-2">✅</div>
+                                <p className="text-sm font-bold text-gray-400">Sin leads pendientes de llamar</p>
+                                <p className="text-xs text-gray-300 mt-1">Todos los leads han sido contactados hoy</p>
+                            </div>
+                        ) : (
+                            <div className="divide-y divide-gray-50">
+                                {callableLeads.map(lead => (
+                                    <div key={lead.id} className="flex items-center justify-between px-5 py-3.5 hover:bg-gray-50/70 transition-colors">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-9 h-9 bg-violet-100 rounded-xl flex items-center justify-center text-violet-700 font-black text-sm">
+                                                {lead.name.charAt(0).toUpperCase()}
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-bold text-gray-900">{lead.name}</p>
+                                                <p className="text-xs text-gray-400 font-mono">{lead.phone || '—'}</p>
+                                            </div>
                                         </div>
-                                    )}
-                                </div>
-                            ))}
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded-lg">{lead.status || 'Prospecto'}</span>
+                                            <button
+                                                onClick={() => handleCallNow(lead)}
+                                                disabled={callingLeads[lead.id] || !isConfigured}
+                                                className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white font-black text-xs rounded-xl hover:bg-violet-700 transition shadow-sm shadow-violet-200 disabled:opacity-50"
+                                            >
+                                                {callingLeads[lead.id]
+                                                    ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Llamando...</>
+                                                    : <><PhoneCall className="w-3.5 h-3.5" /> Llamar</>}
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* ── LIVE CALL QUEUE ── */}
+                    <div>
+                        <div className="flex items-center justify-between mb-3">
+                            <div>
+                                <h3 className="text-base font-black text-gray-900">📡 Cola en vivo</h3>
+                                <p className="text-xs text-gray-500">{queue.length} registros</p>
+                            </div>
                         </div>
-                    )}
+                        {queue.length === 0 ? (
+                            <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
+                                <div className="text-4xl mb-3">📭</div>
+                                <p className="text-sm font-bold text-gray-500">Cola vacía</p>
+                                <p className="text-xs text-gray-400 mt-1">Los leads aparecerán aquí cuando Sofía empiece a llamar</p>
+                            </div>
+                        ) : (
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
+                                {queue.map(item => (
+                                    <div key={item.id} className="p-3">
+                                        <QueueCard item={item} />
+                                        {item.summary && (
+                                            <div className="mt-2 ml-5 bg-gray-50 rounded-xl px-3 py-2 text-xs text-gray-600">
+                                                <span className="font-bold text-violet-600">Sofía: </span>{item.summary}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
         </div>
