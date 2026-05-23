@@ -124,6 +124,7 @@ export interface FollowUp {
     id: string;
     lead_id: string;
     user_id: string;
+    company_id?: string;
     date: string;
     notes: string | null;
     action_type: FollowUpActionType;

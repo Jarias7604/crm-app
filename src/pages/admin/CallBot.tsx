@@ -286,7 +286,7 @@ export default function CallBot() {
     };
 
     const toggleMode = async () => {
-        const nextMode = config.call_mode === 'manual' ? 'auto' : 'manual';
+        const nextMode: 'auto' | 'manual' = config.call_mode === 'manual' ? 'auto' : 'manual';
         const next = { ...config, call_mode: nextMode };
         setConfig(next);
         if (profile?.company_id) {
