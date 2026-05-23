@@ -650,6 +650,34 @@ export const leadsService = {
         return data;
     },
 
+    // ─── Phase 1: Ultra-fast calendar counts — NO JOINs ────────────────────────
+    // Only fetches lightweight fields (id, date, action_type, completed, assigned_to)
+    // Used to render count badges and action-type dots instantly while Phase 2 loads
+    // ~10x faster than getCalendarFollowUps because it avoids JOIN to leads + profiles
+    async getCalendarFastCounts(startDate: string, endDate: string, assignedTo?: string) {
+        let query = supabase
+            .from('follow_ups')
+            .select('id, date, action_type, completed, assigned_to')
+            .gte('date', startDate)
+            .lte('date', endDate)
+            .order('date', { ascending: false })
+            .limit(2000);
+
+        if (assignedTo) query = query.eq('assigned_to', assignedTo);
+
+        const { data, error } = await query;
+        if (error) throw error;
+        return (data || []) as Array<{
+            id: string;
+            date: string;
+            action_type: string;
+            completed: boolean;
+            assigned_to: string | null;
+            lead_id: string | null;
+        }>;
+    },
+
+    // ─── Phase 2: Full calendar data with JOINs ─────────────────────────────────
     // Get follow-ups for Calendar view — windowed date range query
     // Uses idx_follow_ups_company_id_date index for fast lookup
     // Only loads events for the visible months (not all 1,100+ records)

@@ -14,6 +14,7 @@ interface AuthContextType {
     setSimulatedCompanyId: (id: string | null) => void;
     simulatedRole: Role | null;
     setSimulatedRole: (role: Role | null) => void;
+    revertSimulation: () => void; // Clears both role + company atomically
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -25,7 +26,8 @@ const AuthContext = createContext<AuthContextType>({
     simulatedCompanyId: null,
     setSimulatedCompanyId: () => { },
     simulatedRole: null,
-    setSimulatedRole: () => { }
+    setSimulatedRole: () => { },
+    revertSimulation: () => { }
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -45,29 +47,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 
     const handleSetSimulatedCompanyId = (id: string | null) => {
-        try {
-            setSimulatedCompanyId(id);
-            if (id) localStorage.setItem('simulated_company_id', id);
-            else localStorage.removeItem('simulated_company_id');
-            // Redirección forzada para limpiar estado de React y forzar re-inicialización
-            window.location.href = '/';
-        } catch (e) {
-            console.error('Simulation sync error:', e);
-            window.location.reload();
-        }
+        setSimulatedCompanyId(id);
+        if (id) localStorage.setItem('simulated_company_id', id);
+        else localStorage.removeItem('simulated_company_id');
+        // Re-fetch profile in-memory — no page reload, no logout
+        // fetchProfile already reads simulated_role/simulated_company_id from localStorage
+        if (user?.id) fetchProfile(user.id, user.email);
     };
 
     const handleSetSimulatedRole = (role: Role | null) => {
-        try {
-            setSimulatedRole(role);
-            if (role) localStorage.setItem('simulated_role', role);
-            else localStorage.removeItem('simulated_role');
-            // Redirección forzada
-            window.location.href = '/';
-        } catch (e) {
-            console.error('Simulation sync error:', e);
-            window.location.reload();
-        }
+        setSimulatedRole(role);
+        if (role) localStorage.setItem('simulated_role', role);
+        else localStorage.removeItem('simulated_role');
+        // Re-fetch profile in-memory — instant role switch, no redirect
+        if (user?.id) fetchProfile(user.id, user.email);
+    };
+
+    // ─── Revertir simulación completa (atomic) ───────────────────────────────
+    // Clears BOTH simulated role AND company in one operation — single in-memory update.
+    const handleRevertSimulation = () => {
+        localStorage.removeItem('simulated_role');
+        localStorage.removeItem('simulated_company_id');
+        setSimulatedRole(null);
+        setSimulatedCompanyId(null);
+        // Re-fetch as real super_admin — instant, no logout
+        if (user?.id) fetchProfile(user.id, user.email);
     };
 
     useEffect(() => {
@@ -179,7 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const simRole = localStorage.getItem('simulated_role');
                 const simCompanyId = localStorage.getItem('simulated_company_id');
                 
-                const masterCompanyId = simCompanyId || '7a582ba5-f7d0-4ae3-9985-35788deb1c30';
+                const masterCompanyId = simCompanyId || data.company_id || '7a582ba5-f7d0-4ae3-9985-35788deb1c30';
                 const finalRole = (simRole as any) || 'super_admin';
 
                 const bypassProfile: Profile = {
@@ -366,7 +370,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         <AuthContext.Provider value={{
             session, user, profile, loading, signOut,
             simulatedCompanyId, setSimulatedCompanyId: handleSetSimulatedCompanyId,
-            simulatedRole, setSimulatedRole: handleSetSimulatedRole
+            simulatedRole, setSimulatedRole: handleSetSimulatedRole,
+            revertSimulation: handleRevertSimulation
         }}>
             {children}
         </AuthContext.Provider>

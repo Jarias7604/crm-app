@@ -131,30 +131,48 @@ export default function Calendar() {
     const calendarCollabRef = useRef<HTMLDivElement>(null);
     const queryClient = useQueryClient();
 
-    // Ventana dinámica: 1 mes atrás + 1 mes adelante de la vista actual
-    // Así solo cargamos los eventos del periodo visible, no los 1,100+ registros
+    // Ventana = mes actual exacto (66% menos datos que ventana ±1 mes)
     const windowStart = useMemo(() =>
-        startOfMonth(subMonths(currentDate, 1)).toISOString(),
+        startOfMonth(currentDate).toISOString(),
         [currentDate]
     );
     const windowEnd = useMemo(() =>
-        endOfMonth(addMonths(currentDate, 1)).toISOString(),
+        endOfMonth(currentDate).toISOString(),
         [currentDate]
     );
 
-    // React Query — cache 1 min por ventana de mes
-    // queryKey incluye fechas y responsable: navegar cambia la clave → carga solo lo necesario
+    // Meses adyacentes para prefetch silencioso
+    const prevMonthStart = useMemo(() => startOfMonth(subMonths(currentDate, 1)).toISOString(), [currentDate]);
+    const prevMonthEnd   = useMemo(() => endOfMonth(subMonths(currentDate, 1)).toISOString(),   [currentDate]);
+    const nextMonthStart = useMemo(() => startOfMonth(addMonths(currentDate, 1)).toISOString(), [currentDate]);
+    const nextMonthEnd   = useMemo(() => endOfMonth(addMonths(currentDate, 1)).toISOString(),   [currentDate]);
+
+    // Query principal — full data con JOINs, ventana = mes actual
     const { data: calendarEventsData, isLoading: loading } = useQuery({
         queryKey: ['calendar-follow-ups', windowStart, windowEnd, selectedCalendarCollabId],
         queryFn: () => leadsService.getCalendarFollowUps(windowStart, windowEnd, selectedCalendarCollabId),
         staleTime: 1 * 60 * 1000,
         gcTime: 15 * 60 * 1000,
-        placeholderData: (previousData) => previousData, // muestra mes anterior mientras carga el nuevo
-
+        placeholderData: (previousData) => previousData,
     });
     const calendarEvents = calendarEventsData ?? [];
 
-    // Realtime: invalidar cache de todas las ventanas cuando cambia un follow-up
+    // Prefetch silencioso de meses adyacentes — navegación sin spinner
+    useEffect(() => {
+        const prefetch = (start: string, end: string) =>
+            queryClient.prefetchQuery({
+                queryKey: ['calendar-follow-ups', start, end, selectedCalendarCollabId],
+                queryFn: () => leadsService.getCalendarFollowUps(start, end, selectedCalendarCollabId),
+                staleTime: 5 * 60 * 1000,
+            });
+        const timer = setTimeout(() => {
+            prefetch(prevMonthStart, prevMonthEnd);
+            prefetch(nextMonthStart, nextMonthEnd);
+        }, 1000);
+        return () => clearTimeout(timer);
+    }, [currentDate, queryClient, prevMonthStart, prevMonthEnd, nextMonthStart, nextMonthEnd, selectedCalendarCollabId]);
+
+    // Realtime: invalidar cache cuando cambia un follow-up
     useEffect(() => {
         const channel = supabase.channel('calendar-live')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'follow_ups' },
@@ -258,20 +276,16 @@ export default function Calendar() {
     // Outlook integration is not yet implemented — return empty array
     const mockOutlookEvents = useMemo(() => [], []);
 
-    // Role-based filtering: collaborators see only their own; admins can filter by collaborator
+    // Role-based filtering: collaborators ven solo los suyos; admins pueden filtrar
     const filteredEvents = useMemo(() => {
         let baseEvents = showCrmEvents ? calendarEvents : [];
-        // Outlook events are disabled until real Microsoft OAuth is implemented
         let events = [...baseEvents, ...mockGoogleEvents];
-        
         if (isAdmin) {
-            if (selectedCalendarCollabId) {
-                return events.filter(ev => ev.assigned_to === selectedCalendarCollabId);
-            }
-            return events; // admin sin filtro ve todo
+            if (selectedCalendarCollabId) return events.filter(ev => ev.assigned_to === selectedCalendarCollabId);
+            return events;
         }
         return events.filter(ev => ev.assigned_to === profile?.id);
-    }, [calendarEvents, showCrmEvents, mockGoogleEvents, mockOutlookEvents, isAdmin, profile?.id, selectedCalendarCollabId]);
+    }, [calendarEvents, showCrmEvents, mockGoogleEvents, isAdmin, profile?.id, selectedCalendarCollabId]);
 
     const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
     const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
@@ -718,10 +732,10 @@ export default function Calendar() {
                 <div className="grid grid-cols-7 flex-1 divide-x divide-y divide-gray-100">
                     {days.map((day) => {
                         const dayEvents = getDailyEvents(day);
+                        const { total, completed, isPast } = getDayProgress(day);
                         const inMonth = isSameMonth(day, monthStart);
                         const isDayToday = isToday(day);
                         const MAX_VISIBLE = 4;
-
                         const isDaySelected = isSameDay(day, selectedDate);
                         return (
                             <div
@@ -744,7 +758,6 @@ export default function Calendar() {
                                         {format(day, 'd')}
                                     </span>
                                     {dayEvents.length > 0 && (() => {
-                                        const { total, completed, isPast } = getDayProgress(day);
                                         const pct = total > 0 ? (completed / total) * 100 : 0;
                                         const bgColor = pct === 100 ? 'bg-emerald-100 text-emerald-700' : isPast && pct < 100 ? 'bg-red-100 text-red-700' : 'bg-indigo-100 text-indigo-700';
                                         return (
@@ -781,14 +794,11 @@ export default function Calendar() {
                                         return (
                                             <button
                                                 key={ev.id}
-                                                onClick={(e) => { 
-                                                    e.stopPropagation(); 
-                                                    if (ev.action_type === 'google_calendar') { 
-                                                        setSelectedGoogleEvent(ev);
-                                                        return; 
-                                                    } 
-                                                    if (ev.action_type === 'outlook_calendar') { return; } 
-                                                    ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } }); 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (ev.action_type === 'google_calendar') { setSelectedGoogleEvent(ev); return; }
+                                                    if (ev.action_type === 'outlook_calendar') { return; }
+                                                    ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } });
                                                 }}
                                                 title={`${ev.lead?.name ?? 'Lead'} · ${timeStr}${ev.completed ? ' ✅' : isOverdue ? ' ⚠️ Vencido' : ''}`}
                                                 className={`w-full text-left px-1.5 py-1 rounded-md transition-all flex items-center gap-1 ${
@@ -826,6 +836,7 @@ export default function Calendar() {
                         );
                     })}
                 </div>
+
             </div>
         );
     };

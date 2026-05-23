@@ -10,7 +10,7 @@ import { supabase } from '../services/supabase';
 import type { Company } from '../types';
 
 export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolean, onToggle: () => void }) {
-    const { profile, signOut, setSimulatedCompanyId, setSimulatedRole, simulatedCompanyId } = useAuth();
+    const { profile, signOut, setSimulatedCompanyId, setSimulatedRole, simulatedCompanyId, revertSimulation } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
     const { t } = useTranslation();
@@ -316,7 +316,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                             </div>
                             {localStorage.getItem('simulated_role') && (
                                 <button
-                                    onClick={() => setSimulatedRole(null)}
+                                    onClick={revertSimulation}
                                     className="text-[8px] font-black text-amber-500/60 hover:text-amber-500 uppercase tracking-[0.2em] transition-all"
                                 >
                                     [ Revertir Maestro ]
