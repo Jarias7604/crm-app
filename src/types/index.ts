@@ -129,8 +129,15 @@ export interface FollowUp {
     notes: string | null;
     action_type: FollowUpActionType;
     created_at: string;
+    completed?: boolean;
+    completed_at?: string | null;
+    assigned_to?: string | null;
+    google_event_id?: string | null;   // Google Calendar event ID
+    meet_link?: string | null;          // Google Meet link
+    calendar_html_link?: string | null; // Link to event in Google Calendar
     profiles?: { email: string; full_name?: string | null; avatar_url?: string | null };
 }
+
 
 export interface LossReason {
     id: string;

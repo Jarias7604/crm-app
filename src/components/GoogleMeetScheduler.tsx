@@ -1,0 +1,553 @@
+import { useState, useEffect, useMemo } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { format, addMinutes, parseISO, setHours, setMinutes } from 'date-fns';
+import { es } from 'date-fns/locale';
+import {
+    X, Video, Calendar, Clock, Users, Mail, Copy,
+    ExternalLink, Check, Loader2, AlertCircle, Link2,
+    ChevronDown, Plus
+} from 'lucide-react';
+import { supabase } from '../services/supabase';
+import { leadsService } from '../services/leads';
+import { useAuth } from '../auth/AuthProvider';
+import toast from 'react-hot-toast';
+
+interface GoogleMeetSchedulerProps {
+    onClose: () => void;
+    initialDate?: Date;
+    initialLeadId?: string;
+    initialLeadName?: string;
+    initialLeadEmail?: string | null;
+}
+
+const DURATION_OPTIONS = [
+    { label: '15 min', value: 15 },
+    { label: '30 min', value: 30 },
+    { label: '45 min', value: 45 },
+    { label: '1 hora', value: 60 },
+    { label: '1.5h', value: 90 },
+    { label: '2 horas', value: 120 },
+];
+
+export default function GoogleMeetScheduler({
+    onClose,
+    initialDate,
+    initialLeadId,
+    initialLeadName,
+    initialLeadEmail,
+}: GoogleMeetSchedulerProps) {
+    const { profile } = useAuth();
+    const queryClient = useQueryClient();
+
+    // Form state
+    const [title, setTitle] = useState(
+        initialLeadName ? `Reunión con ${initialLeadName}` : 'Nueva Reunión'
+    );
+    const [date, setDate] = useState(
+        format(initialDate || new Date(), 'yyyy-MM-dd')
+    );
+    const [startTime, setStartTime] = useState(() => {
+        const d = initialDate || new Date();
+        // Round up to next 30-min slot
+        const mins = d.getMinutes() < 30 ? 30 : 0;
+        const hrs = d.getMinutes() < 30 ? d.getHours() : d.getHours() + 1;
+        return `${String(hrs % 24).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    });
+    const [duration, setDuration] = useState(30);
+    const [description, setDescription] = useState('');
+    const [attendeeInput, setAttendeeInput] = useState('');
+    const [attendees, setAttendees] = useState<string[]>(
+        initialLeadEmail ? [initialLeadEmail] : []
+    );
+    const [addMeetLink, setAddMeetLink] = useState(true);
+    const [sendInvites, setSendInvites] = useState(true);
+    const [copied, setCopied] = useState(false);
+    const [createdMeet, setCreatedMeet] = useState<{
+        meet_link: string | null;
+        html_link: string;
+    } | null>(null);
+
+    // Check if user has Google Calendar connected
+    const { data: googleIntegration, isLoading: checkingIntegration } = useQuery({
+        queryKey: ['google-integration-check', profile?.id],
+        queryFn: async () => {
+            if (!profile?.id) return null;
+            const { data } = await supabase
+                .from('calendar_integrations')
+                .select('id, google_email')
+                .eq('user_id', profile.id)
+                .eq('provider', 'google')
+                .eq('is_active', true)
+                .maybeSingle();
+            return data;
+        },
+        enabled: !!profile?.id,
+        staleTime: 5 * 60 * 1000,
+    });
+
+    // Load team members for attendee suggestions
+    const { data: teamMembers } = useQuery({
+        queryKey: ['team-members', profile?.company_id],
+        queryFn: () => leadsService.getTeamMembers(),
+        staleTime: 10 * 60 * 1000,
+        enabled: !!profile?.id,
+    });
+
+    // Compute end time from start + duration
+    const endTime = useMemo(() => {
+        const [h, m] = startTime.split(':').map(Number);
+        const start = setMinutes(setHours(new Date(), h), m);
+        const end = addMinutes(start, duration);
+        return format(end, 'HH:mm');
+    }, [startTime, duration]);
+
+    // Build ISO datetimes
+    const startISO = useMemo(() => {
+        const [h, m] = startTime.split(':').map(Number);
+        const d = parseISO(date);
+        return setMinutes(setHours(d, h), m).toISOString();
+    }, [date, startTime]);
+
+    const endISO = useMemo(() => {
+        const [h, m] = endTime.split(':').map(Number);
+        const d = parseISO(date);
+        return setMinutes(setHours(d, h), m).toISOString();
+    }, [date, endTime]);
+
+    // Add attendee
+    const addAttendee = (email: string) => {
+        const trimmed = email.trim().toLowerCase();
+        if (!trimmed || !trimmed.includes('@')) return;
+        if (!attendees.includes(trimmed)) setAttendees(prev => [...prev, trimmed]);
+        setAttendeeInput('');
+    };
+
+    const removeAttendee = (email: string) =>
+        setAttendees(prev => prev.filter(e => e !== email));
+
+    // Mutation — create follow-up + optionally Google Meet event
+    const mutation = useMutation({
+        mutationFn: async () => {
+            // Step 1: Create follow-up in CRM
+            const followUp = await leadsService.createFollowUp({
+                lead_id: initialLeadId,
+                date: startISO,
+                notes: description || `Reunión: ${title}`,
+                action_type: 'meeting',
+                company_id: profile?.company_id,
+            }, profile?.id);
+
+            // Step 2: If Google connected and meet link requested
+            if (googleIntegration && addMeetLink) {
+                const result = await leadsService.createGoogleMeeting({
+                    integrationId: googleIntegration.id,
+                    followUpId: followUp.id,
+                    title,
+                    description,
+                    start: startISO,
+                    end: endISO,
+                    attendees,
+                    addMeetLink: true,
+                    sendInvites,
+                    timezone: profile?.company_id ? undefined : 'America/El_Salvador',
+                });
+                return { followUp, meetResult: result };
+            }
+
+            return { followUp, meetResult: null };
+        },
+        onSuccess: ({ meetResult }) => {
+            queryClient.invalidateQueries({ queryKey: ['calendar-follow-ups'] });
+            if (meetResult?.meet_link) {
+                setCreatedMeet(meetResult);
+            } else {
+                toast.success('✅ Reunión agendada en el calendario');
+                onClose();
+            }
+        },
+        onError: (err: any) => {
+            toast.error(`Error: ${err.message || 'No se pudo crear la reunión'}`);
+        }
+    });
+
+    const copyMeetLink = () => {
+        if (createdMeet?.meet_link) {
+            navigator.clipboard.writeText(createdMeet.meet_link);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+            toast.success('📋 Link copiado');
+        }
+    };
+
+    // ─── SUCCESS SCREEN ───────────────────────────────────────────────────────
+    if (createdMeet) {
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+                <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden">
+                    {/* Success header */}
+                    <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-8 text-center">
+                        <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                            <Check className="w-8 h-8 text-white" strokeWidth={2.5} />
+                        </div>
+                        <h2 className="text-2xl font-black text-white">¡Reunión creada!</h2>
+                        <p className="text-emerald-100 mt-1 text-sm font-medium">
+                            {format(parseISO(startISO), "EEEE d 'de' MMMM · HH:mm", { locale: es })} — {endTime}
+                        </p>
+                    </div>
+
+                    <div className="p-6 space-y-4">
+                        {/* Meet link */}
+                        {createdMeet.meet_link && (
+                            <div className="bg-[#4285F4]/5 border border-[#4285F4]/20 rounded-2xl p-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Video className="w-4 h-4 text-[#4285F4]" />
+                                    <span className="text-xs font-black text-[#4285F4] uppercase tracking-wide">
+                                        Google Meet Link
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <code className="flex-1 text-sm text-gray-700 font-mono bg-gray-50 rounded-xl px-3 py-2 truncate">
+                                        {createdMeet.meet_link}
+                                    </code>
+                                    <button
+                                        onClick={copyMeetLink}
+                                        className={`p-2.5 rounded-xl transition-all ${
+                                            copied
+                                                ? 'bg-emerald-100 text-emerald-600'
+                                                : 'bg-gray-100 hover:bg-[#4285F4]/10 text-gray-500 hover:text-[#4285F4]'
+                                        }`}
+                                        title="Copiar link"
+                                    >
+                                        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                                    </button>
+                                    <a
+                                        href={createdMeet.meet_link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="p-2.5 rounded-xl bg-[#4285F4] text-white hover:bg-[#3367d6] transition-all"
+                                        title="Abrir Meet"
+                                    >
+                                        <ExternalLink className="w-4 h-4" />
+                                    </a>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Calendar link */}
+                        {createdMeet.html_link && (
+                            <a
+                                href={createdMeet.html_link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 px-4 py-3 rounded-xl border border-gray-200 hover:border-[#4285F4]/40 hover:bg-[#4285F4]/5 transition-all text-sm font-semibold text-gray-700 hover:text-[#4285F4]"
+                            >
+                                <Calendar className="w-4 h-4" />
+                                Ver en Google Calendar
+                                <ExternalLink className="w-3.5 h-3.5 ml-auto" />
+                            </a>
+                        )}
+
+                        {sendInvites && attendees.length > 0 && (
+                            <div className="flex items-center gap-2 text-xs text-emerald-600 font-medium">
+                                <Check className="w-3.5 h-3.5" />
+                                Invitaciones enviadas a {attendees.length} asistente{attendees.length !== 1 ? 's' : ''}
+                            </div>
+                        )}
+
+                        <button
+                            onClick={onClose}
+                            className="w-full py-3 rounded-xl bg-gray-900 hover:bg-gray-700 text-white font-bold text-sm transition-all"
+                        >
+                            Listo
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // ─── MAIN FORM ────────────────────────────────────────────────────────────
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+            <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+
+                {/* Header */}
+                <div className="bg-gradient-to-br from-[#4285F4] to-[#1a73e8] p-6 flex items-start justify-between shrink-0">
+                    <div>
+                        <div className="flex items-center gap-2 mb-1">
+                            <Video className="w-5 h-5 text-white/90" />
+                            <h2 className="text-xl font-black text-white">Nueva Reunión</h2>
+                        </div>
+                        <p className="text-blue-100 text-sm font-medium">
+                            {googleIntegration
+                                ? `Conectado como ${googleIntegration.google_email}`
+                                : 'Sin Google Calendar conectado'}
+                        </p>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+
+                {/* No Google Integration warning */}
+                {!checkingIntegration && !googleIntegration && (
+                    <div className="mx-6 mt-4 flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-3 shrink-0">
+                        <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                            <p className="text-xs font-bold text-amber-800">Google Calendar no conectado</p>
+                            <p className="text-xs text-amber-700 mt-0.5">
+                                La reunión se agendará en el CRM sin Meet link.{' '}
+                                <a href="/settings?tab=integrations" className="underline font-bold">
+                                    Conectar Google →
+                                </a>
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Scrollable form body */}
+                <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+
+                    {/* Title */}
+                    <div>
+                        <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-1.5">
+                            Título de la reunión
+                        </label>
+                        <input
+                            value={title}
+                            onChange={e => setTitle(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#4285F4] focus:ring-2 focus:ring-[#4285F4]/20 outline-none text-sm font-semibold text-gray-800 transition-all"
+                            placeholder="ej. Demo con Carlos Rodríguez"
+                        />
+                    </div>
+
+                    {/* Date + Time */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-1.5">
+                                Fecha
+                            </label>
+                            <div className="relative">
+                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                <input
+                                    type="date"
+                                    value={date}
+                                    onChange={e => setDate(e.target.value)}
+                                    className="w-full pl-9 pr-3 py-3 rounded-xl border border-gray-200 focus:border-[#4285F4] focus:ring-2 focus:ring-[#4285F4]/20 outline-none text-sm font-semibold text-gray-800 transition-all"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-1.5">
+                                Hora inicio
+                            </label>
+                            <div className="relative">
+                                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                <input
+                                    type="time"
+                                    value={startTime}
+                                    onChange={e => setStartTime(e.target.value)}
+                                    className="w-full pl-9 pr-3 py-3 rounded-xl border border-gray-200 focus:border-[#4285F4] focus:ring-2 focus:ring-[#4285F4]/20 outline-none text-sm font-semibold text-gray-800 transition-all"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Duration quick buttons */}
+                    <div>
+                        <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-1.5">
+                            Duración · Termina a las {endTime}
+                        </label>
+                        <div className="flex gap-2 flex-wrap">
+                            {DURATION_OPTIONS.map(opt => (
+                                <button
+                                    key={opt.value}
+                                    onClick={() => setDuration(opt.value)}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                                        duration === opt.value
+                                            ? 'bg-[#4285F4] text-white shadow-md shadow-[#4285F4]/30'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                    }`}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Attendees */}
+                    <div>
+                        <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-1.5">
+                            Asistentes
+                        </label>
+
+                        {/* Current attendees */}
+                        {attendees.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mb-2">
+                                {attendees.map(email => (
+                                    <span
+                                        key={email}
+                                        className="flex items-center gap-1.5 px-3 py-1 bg-[#4285F4]/10 text-[#4285F4] rounded-full text-xs font-bold"
+                                    >
+                                        <Mail className="w-3 h-3" />
+                                        {email}
+                                        <button
+                                            onClick={() => removeAttendee(email)}
+                                            className="hover:text-red-500 transition-colors ml-0.5"
+                                        >
+                                            <X className="w-3 h-3" />
+                                        </button>
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Add attendee input */}
+                        <div className="flex gap-2">
+                            <div className="relative flex-1">
+                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                <input
+                                    value={attendeeInput}
+                                    onChange={e => setAttendeeInput(e.target.value)}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter' || e.key === ',') {
+                                            e.preventDefault();
+                                            addAttendee(attendeeInput);
+                                        }
+                                    }}
+                                    placeholder="email@ejemplo.com"
+                                    className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-gray-200 focus:border-[#4285F4] focus:ring-2 focus:ring-[#4285F4]/20 outline-none text-sm transition-all"
+                                />
+                            </div>
+                            <button
+                                onClick={() => addAttendee(attendeeInput)}
+                                className="p-2.5 rounded-xl bg-gray-100 hover:bg-[#4285F4]/10 text-gray-500 hover:text-[#4285F4] transition-all"
+                            >
+                                <Plus className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        {/* Team member quick-add */}
+                        {teamMembers && teamMembers.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                                {teamMembers
+                                    .filter(m => m.email && !attendees.includes(m.email))
+                                    .slice(0, 5)
+                                    .map(m => (
+                                        <button
+                                            key={m.id}
+                                            onClick={() => m.email && addAttendee(m.email)}
+                                            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-100 hover:bg-indigo-50 hover:text-indigo-700 text-xs font-medium text-gray-600 transition-all"
+                                        >
+                                            <Users className="w-3 h-3" />
+                                            {m.full_name || m.email}
+                                        </button>
+                                    ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Description */}
+                    <div>
+                        <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-1.5">
+                            Agenda (opcional)
+                        </label>
+                        <textarea
+                            value={description}
+                            onChange={e => setDescription(e.target.value)}
+                            rows={3}
+                            placeholder="Puntos a tratar en la reunión..."
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#4285F4] focus:ring-2 focus:ring-[#4285F4]/20 outline-none text-sm text-gray-700 resize-none transition-all"
+                        />
+                    </div>
+
+                    {/* Toggles — only show if Google connected */}
+                    {googleIntegration && (
+                        <div className="space-y-3 bg-gray-50 rounded-2xl p-4">
+                            {/* Meet link toggle */}
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-xl bg-[#4285F4]/10 flex items-center justify-center">
+                                        <Video className="w-4 h-4 text-[#4285F4]" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-gray-800">Generar Google Meet</p>
+                                        <p className="text-xs text-gray-500">Link de video conferencia automático</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setAddMeetLink(!addMeetLink)}
+                                    className={`relative w-12 h-6 rounded-full transition-all duration-300 ${
+                                        addMeetLink ? 'bg-[#4285F4]' : 'bg-gray-300'
+                                    }`}
+                                >
+                                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-300 ${
+                                        addMeetLink ? 'translate-x-6' : 'translate-x-0'
+                                    }`} />
+                                </button>
+                            </div>
+
+                            {/* Send invites toggle */}
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center">
+                                        <Mail className="w-4 h-4 text-emerald-600" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-gray-800">Notificar asistentes</p>
+                                        <p className="text-xs text-gray-500">Google envía email con el invite</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setSendInvites(!sendInvites)}
+                                    className={`relative w-12 h-6 rounded-full transition-all duration-300 ${
+                                        sendInvites ? 'bg-emerald-500' : 'bg-gray-300'
+                                    }`}
+                                >
+                                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-300 ${
+                                        sendInvites ? 'translate-x-6' : 'translate-x-0'
+                                    }`} />
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex gap-3 shrink-0">
+                    <button
+                        onClick={onClose}
+                        className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-100 transition-all"
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        onClick={() => mutation.mutate()}
+                        disabled={mutation.isPending || !title.trim()}
+                        className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                            googleIntegration && addMeetLink
+                                ? 'bg-[#4285F4] hover:bg-[#3367d6] text-white shadow-lg shadow-[#4285F4]/30'
+                                : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200'
+                        } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    >
+                        {mutation.isPending ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : googleIntegration && addMeetLink ? (
+                            <Video className="w-4 h-4" />
+                        ) : (
+                            <Calendar className="w-4 h-4" />
+                        )}
+                        {mutation.isPending
+                            ? 'Creando...'
+                            : googleIntegration && addMeetLink
+                                ? 'Crear con Google Meet'
+                                : 'Agendar Reunión'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}

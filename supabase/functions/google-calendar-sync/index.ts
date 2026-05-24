@@ -245,7 +245,124 @@ serve(async (req) => {
             });
         }
 
+        // ─── ACTION: create_event (Google Meet Scheduler) ───────────────────────
+        if (action === 'create_event') {
+            const { integration_id, event } = body;
+
+            if (!integration_id || !event) throw new Error('integration_id and event are required');
+
+            // Fetch integration
+            const { data: integration, error: intError } = await supabase
+                .from('calendar_integrations')
+                .select('*')
+                .eq('id', integration_id)
+                .eq('is_active', true)
+                .single();
+
+            if (intError || !integration) throw new Error('Google Calendar integration not found or inactive');
+
+            // Refresh token if expired (same pattern as fetchGoogleEvents)
+            let accessToken = integration.access_token;
+            const expiresAt = new Date(integration.token_expires_at);
+            const isExpired = expiresAt.getTime() - Date.now() < 60_000;
+
+            if (isExpired) {
+                const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        client_id: GOOGLE_CLIENT_ID!,
+                        client_secret: GOOGLE_CLIENT_SECRET!,
+                        refresh_token: integration.refresh_token,
+                        grant_type: 'refresh_token',
+                    })
+                });
+                const tokens = await refreshResponse.json();
+                if (tokens.error) throw new Error(`Token refresh failed: ${tokens.error}`);
+                accessToken = tokens.access_token;
+                await supabase.from('calendar_integrations').update({
+                    access_token: tokens.access_token,
+                    token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+                }).eq('id', integration.id);
+            }
+
+            // Build Google Calendar event body
+            const timezone = event.timezone || 'America/El_Salvador';
+            const eventBody: any = {
+                summary: event.title,
+                description: event.description || '',
+                start: { dateTime: event.start, timeZone: timezone },
+                end:   { dateTime: event.end,   timeZone: timezone },
+                attendees: (event.attendees || []).map((email: string) => ({ email })),
+                reminders: {
+                    useDefault: false,
+                    overrides: [
+                        { method: 'email',  minutes: 24 * 60 }, // 24h before
+                        { method: 'popup',  minutes: 30 },       // 30min before
+                    ],
+                },
+            };
+
+            // Attach Google Meet conference if requested
+            const conferenceDataVersion = event.add_meet_link ? 1 : 0;
+            if (event.add_meet_link) {
+                eventBody.conferenceData = {
+                    createRequest: {
+                        requestId: crypto.randomUUID(),
+                        conferenceSolutionKey: { type: 'hangoutsMeet' },
+                    },
+                };
+            }
+
+            // sendUpdates: 'all' sends email invites to all attendees automatically
+            const sendUpdates = event.send_invites ? 'all' : 'none';
+
+            const createResponse = await fetch(
+                `https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=${conferenceDataVersion}&sendUpdates=${sendUpdates}`,
+                {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(eventBody),
+                }
+            );
+
+            const createdEvent = await createResponse.json();
+            if (createdEvent.error) {
+                throw new Error(createdEvent.error.message || 'Google Calendar API error');
+            }
+
+            // Extract Meet link from conference data
+            const meetLink = createdEvent.conferenceData?.entryPoints
+                ?.find((ep: any) => ep.entryPointType === 'video')?.uri || null;
+
+            // Persist Meet link + google_event_id back to follow_ups if provided
+            if (event.follow_up_id) {
+                await supabase
+                    .from('follow_ups')
+                    .update({
+                        google_event_id:    createdEvent.id,
+                        meet_link:          meetLink,
+                        calendar_html_link: createdEvent.htmlLink,
+                    })
+                    .eq('id', event.follow_up_id);
+            }
+
+            return new Response(JSON.stringify({
+                success:        true,
+                google_event_id: createdEvent.id,
+                meet_link:       meetLink,
+                html_link:       createdEvent.htmlLink,
+                event:           createdEvent,
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+
         throw new Error('Invalid action');
+
     } catch (error: any) {
         return new Response(JSON.stringify({ success: false, error: error.message || 'Error desconocido' }), {
             status: 500,

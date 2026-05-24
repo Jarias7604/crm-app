@@ -714,6 +714,7 @@ export const leadsService = {
             .select(`
                 id, date, notes, action_type, assigned_to,
                 completed, completed_at,
+                meet_link, google_event_id, calendar_html_link,
                 lead:leads(id, name, company_name, phone, email, status)
             `)
             .gte('date', from)
@@ -822,6 +823,49 @@ export const leadsService = {
             ...msg,
             channel: conversations.find(c => c.id === msg.conversation_id)?.channel || 'unknown'
         }));
-    }
+    },
+
+    // ─── Create a Google Calendar event with optional Meet link ──────────────
+    // Called by GoogleMeetScheduler after creating the CRM follow-up.
+    // The edge function handles token refresh and Google API auth automatically.
+    async createGoogleMeeting(params: {
+        integrationId: string;
+        followUpId?: string;
+        title: string;
+        description: string;
+        start: string;
+        end: string;
+        attendees: string[];
+        addMeetLink: boolean;
+        sendInvites: boolean;
+        timezone?: string;
+    }): Promise<{ meet_link: string | null; html_link: string; google_event_id: string }> {
+        const { data, error } = await supabase.functions.invoke('google-calendar-sync', {
+            body: {
+                action: 'create_event',
+                integration_id: params.integrationId,
+                event: {
+                    title: params.title,
+                    description: params.description,
+                    start: params.start,
+                    end: params.end,
+                    attendees: params.attendees,
+                    add_meet_link: params.addMeetLink,
+                    send_invites: params.sendInvites,
+                    follow_up_id: params.followUpId,
+                    timezone: params.timezone || 'America/El_Salvador',
+                },
+            },
+        });
+
+        if (error) throw new Error(error.message || 'Error calling google-calendar-sync');
+        if (!data?.success) throw new Error(data?.error || 'Failed to create Google Calendar event');
+
+        return {
+            meet_link: data.meet_link ?? null,
+            html_link: data.html_link,
+            google_event_id: data.google_event_id,
+        };
+    },
 };
 

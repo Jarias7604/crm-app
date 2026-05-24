@@ -19,6 +19,7 @@ import { companyCalendarsService } from '../services/companyCalendars';
 import { useAuth } from '../auth/AuthProvider';
 import { useTimezone } from '../hooks/useTimezone';
 import { formatTimeInZone, utcToLocalDate, DEFAULT_TIMEZONE } from '../utils/timezone';
+import GoogleMeetScheduler from '../components/GoogleMeetScheduler';
 import toast from 'react-hot-toast';
 
 type CalendarEvent = Awaited<ReturnType<typeof leadsService.getCalendarFollowUps>>[number];
@@ -122,6 +123,10 @@ export default function Calendar() {
     
     // Google Calendar Event Modal
     const [selectedGoogleEvent, setSelectedGoogleEvent] = useState<any | null>(null);
+
+    // Google Meet Scheduler modal
+    const [showMeetScheduler, setShowMeetScheduler] = useState(false);
+    const [meetSchedulerDate, setMeetSchedulerDate] = useState<Date | undefined>(undefined);
 
     // Responsable filter — admin only, ver perspectiva de un agente en el calendario
     const [calendarCollabProfiles, setCalendarCollabProfiles] = useState<{ id: string; full_name: string; role: string; avatar_url?: string | null }[]>([]);
@@ -505,8 +510,15 @@ export default function Calendar() {
                 </button>
 
                 <button
+                    onClick={() => { setMeetSchedulerDate(new Date()); setShowMeetScheduler(true); }}
+                    className="flex items-center gap-2 px-4 h-9 rounded-xl bg-gradient-to-r from-[#4285F4] to-[#1a73e8] hover:from-[#3367d6] hover:to-[#1557b0] text-white font-bold text-sm shadow-md shadow-[#4285F4]/30 transition-all"
+                >
+                    <Video className="w-4 h-4" />
+                    Nueva Reunión
+                </button>
+                <button
                     onClick={() => navigate('/leads')}
-                    className="flex items-center gap-2 px-4 h-9 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 transition-all ml-2"
+                    className="flex items-center gap-2 px-4 h-9 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 transition-all ml-1"
                 >
                     <Plus className="w-4 h-4" />
                     Nuevo Seguimiento
@@ -839,6 +851,19 @@ export default function Calendar() {
                                                 <span className={`text-[10px] font-medium leading-tight flex-1 truncate ${ev.completed ? 'line-through' : ''}`}>
                                                     {ev.lead?.name ?? 'Lead'}
                                                 </span>
+                                                {/* Meet link badge — shows if event has a Google Meet link */}
+                                                {(ev as any).meet_link && (
+                                                    <a
+                                                        href={(ev as any).meet_link}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        onClick={e => e.stopPropagation()}
+                                                        title="Abrir Google Meet"
+                                                        className="shrink-0 w-4 h-4 rounded-full bg-[#4285F4] flex items-center justify-center hover:bg-[#3367d6] transition-colors"
+                                                    >
+                                                        <Video className="w-2.5 h-2.5 text-white" />
+                                                    </a>
+                                                )}
                                                 <span className="text-[9px] opacity-60 shrink-0 leading-tight">
                                                     {timeStr}
                                                 </span>
@@ -1621,6 +1646,14 @@ export default function Calendar() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Google Meet Scheduler Modal */}
+            {showMeetScheduler && (
+                <GoogleMeetScheduler
+                    initialDate={meetSchedulerDate}
+                    onClose={() => { setShowMeetScheduler(false); setMeetSchedulerDate(undefined); }}
+                />
             )}
         </div>
     );
