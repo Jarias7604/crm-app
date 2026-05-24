@@ -353,10 +353,17 @@ serve(async (req) => {
             const meetLink = createdEvent.conferenceData?.entryPoints
                 ?.find((ep: any) => ep.entryPointType === 'video')?.uri || null;
 
-            // NOTE: follow_up update (meet_link / google_event_id) is disabled
-            // until the migration 20260524000000_add_google_meet_to_follow_ups.sql
-            // is applied to production. Re-enable after running the migration.
-            // if (event.follow_up_id) { ... }
+            // Persist Meet link + event ID back to the CRM follow-up record
+            if (event.follow_up_id && meetLink) {
+                await supabase
+                    .from('follow_ups')
+                    .update({
+                        google_event_id: createdEvent.id,
+                        meet_link: meetLink,
+                        calendar_html_link: createdEvent.htmlLink,
+                    })
+                    .eq('id', event.follow_up_id);
+            }
 
             return new Response(JSON.stringify({
                 success:         true,
