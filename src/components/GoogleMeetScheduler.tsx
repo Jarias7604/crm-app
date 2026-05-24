@@ -125,23 +125,29 @@ export default function GoogleMeetScheduler({
     const removeAttendee = (email: string) =>
         setAttendees(prev => prev.filter(e => e !== email));
 
-    // Mutation — create follow-up + optionally Google Meet event
+    // Mutation — create follow-up (if lead linked) + optionally Google Meet event
     const mutation = useMutation({
         mutationFn: async () => {
-            // Step 1: Create follow-up in CRM
-            const followUp = await leadsService.createFollowUp({
-                lead_id: initialLeadId,
-                date: startISO,
-                notes: description || `Reunión: ${title}`,
-                action_type: 'meeting',
-                company_id: profile?.company_id,
-            }, profile?.id);
+            let followUpId: string | undefined;
 
-            // Step 2: If Google connected and meet link requested
+            // Only create a CRM follow-up if a lead is linked.
+            // follow_ups.lead_id is NOT NULL — passing undefined would crash.
+            if (initialLeadId) {
+                const followUp = await leadsService.createFollowUp({
+                    lead_id: initialLeadId,
+                    date: startISO,
+                    notes: description || `Reunión: ${title}`,
+                    action_type: 'meeting',
+                    company_id: profile?.company_id,
+                }, profile?.id);
+                followUpId = followUp.id;
+            }
+
+            // Create Google Calendar event (with or without a linked follow-up)
             if (googleIntegration && addMeetLink) {
                 const result = await leadsService.createGoogleMeeting({
                     integrationId: googleIntegration.id,
-                    followUpId: followUp.id,
+                    followUpId,
                     title,
                     description,
                     start: startISO,
@@ -151,10 +157,10 @@ export default function GoogleMeetScheduler({
                     sendInvites,
                     timezone: profile?.company_id ? undefined : 'America/El_Salvador',
                 });
-                return { followUp, meetResult: result };
+                return { followUpId, meetResult: result };
             }
 
-            return { followUp, meetResult: null };
+            return { followUpId, meetResult: null };
         },
         onSuccess: ({ meetResult }) => {
             queryClient.invalidateQueries({ queryKey: ['calendar-follow-ups'] });
