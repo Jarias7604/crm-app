@@ -313,10 +313,29 @@ export default function Calendar() {
         }
     }, [queryClient]);
 
-    const getDailyEvents = (date: Date): CalendarEvent[] =>
-        filteredEvents
-            .filter(ev => ev.date && isSameDay(utcToLocalDate(ev.date, companyTimezone), date))
-            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // ─── Pre-indexed event map — O(n) once, O(1) per cell lookup ──────────────
+    // BEFORE: getDailyEvents filtered ALL events for EACH of 42 grid cells
+    //         → 42 cells × 200 events = 8,400+ comparisons on every render
+    // NOW:    Build a Map<'yyyy-MM-dd', events[]> once when data changes
+    //         → Each cell does a single Map.get() lookup — zero filtering
+    const eventsByDay = useMemo(() => {
+        const map = new Map<string, CalendarEvent[]>();
+        filteredEvents.forEach(ev => {
+            if (!ev.date) return;
+            const key = format(utcToLocalDate(ev.date, companyTimezone), 'yyyy-MM-dd');
+            if (!map.has(key)) map.set(key, []);
+            map.get(key)!.push(ev);
+        });
+        // Sort each day's events by time once (not on every render)
+        map.forEach((evs, key) => {
+            map.set(key, [...evs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+        });
+        return map;
+    }, [filteredEvents, companyTimezone]);
+
+    const getDailyEvents = useCallback((date: Date): CalendarEvent[] => {
+        return eventsByDay.get(format(date, 'yyyy-MM-dd')) ?? [];
+    }, [eventsByDay]);
 
     /* Summary: count per action type across all UPCOMING events */
     const actionSummary = useMemo(() => {
@@ -332,14 +351,14 @@ export default function Calendar() {
         return counts;
     }, [filteredEvents, companyTimezone]);
 
-    /* Helper: get completion stats for a day */
-    const getDayProgress = (date: Date) => {
+    /* Helper: get completion stats for a day — now O(1) via eventsByDay map */
+    const getDayProgress = useCallback((date: Date) => {
         const dayEvts = getDailyEvents(date);
         const total = dayEvts.length;
         const completed = dayEvts.filter(ev => ev.completed).length;
         const isPast = isBefore(date, new Date()) && !isToday(date);
         return { total, completed, isPast };
-    };
+    }, [getDailyEvents]);
 
     /* Unique assignees for the selected day — used by mobile filter */
     const dayAssignees = useMemo(() => {
