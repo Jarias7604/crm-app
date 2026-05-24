@@ -714,7 +714,6 @@ export const leadsService = {
             .select(`
                 id, date, notes, action_type, assigned_to,
                 completed, completed_at,
-                meet_link, google_event_id, calendar_html_link,
                 lead:leads(id, name, company_name, phone, email, status)
             `)
             .gte('date', from)
