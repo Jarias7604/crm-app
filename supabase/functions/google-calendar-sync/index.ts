@@ -330,28 +330,36 @@ serve(async (req) => {
             );
 
             const createdEvent = await createResponse.json();
-            if (createdEvent.error) {
-                throw new Error(createdEvent.error.message || 'Google Calendar API error');
+
+            // Log for debugging in Supabase Edge Function logs
+            if (!createResponse.ok || createdEvent.error) {
+                const errDetail = createdEvent.error
+                    ? `[${createdEvent.error.code}] ${createdEvent.error.message}`
+                    : `HTTP ${createResponse.status}`;
+                console.error('Google Calendar API create_event failed:', errDetail);
+                console.error('Response body:', JSON.stringify(createdEvent).substring(0, 800));
+                // Return 200 with success:false so the Supabase client
+                // can read the real error message (instead of generic "non-2xx")
+                return new Response(JSON.stringify({
+                    success: false,
+                    error: `Google Calendar: ${errDetail}`,
+                }), {
+                    status: 200,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
             }
 
             // Extract Meet link from conference data
             const meetLink = createdEvent.conferenceData?.entryPoints
                 ?.find((ep: any) => ep.entryPointType === 'video')?.uri || null;
 
-            // Persist Meet link + google_event_id back to follow_ups if provided
-            if (event.follow_up_id) {
-                await supabase
-                    .from('follow_ups')
-                    .update({
-                        google_event_id:    createdEvent.id,
-                        meet_link:          meetLink,
-                        calendar_html_link: createdEvent.htmlLink,
-                    })
-                    .eq('id', event.follow_up_id);
-            }
+            // NOTE: follow_up update (meet_link / google_event_id) is disabled
+            // until the migration 20260524000000_add_google_meet_to_follow_ups.sql
+            // is applied to production. Re-enable after running the migration.
+            // if (event.follow_up_id) { ... }
 
             return new Response(JSON.stringify({
-                success:        true,
+                success:         true,
                 google_event_id: createdEvent.id,
                 meet_link:       meetLink,
                 html_link:       createdEvent.htmlLink,
@@ -364,8 +372,10 @@ serve(async (req) => {
         throw new Error('Invalid action');
 
     } catch (error: any) {
+        console.error('google-calendar-sync unhandled error:', error.message);
+        // Return 200 with error details so frontend can display the real message
         return new Response(JSON.stringify({ success: false, error: error.message || 'Error desconocido' }), {
-            status: 500,
+            status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     }
