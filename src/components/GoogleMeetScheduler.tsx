@@ -269,7 +269,7 @@ export default function GoogleMeetScheduler({
     // ─── MAIN FORM ────────────────────────────────────────────────────────────
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-            <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
 
                 {/* Header */}
                 <div className="bg-gradient-to-br from-[#4285F4] to-[#1a73e8] p-6 flex items-start justify-between shrink-0">
