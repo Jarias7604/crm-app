@@ -9,7 +9,7 @@ import { useAuth } from '../../auth/AuthProvider';
 import RichTextEditor from '../../components/marketing/RichTextEditor';
 
 export default function CampaignBuilder() {
-    const { profile } = useAuth();
+    const { profile, simulatedCompanyId } = useAuth();
     const navigate = useNavigate();
     const { id: campaignId } = useParams();
     const isEditMode = !!campaignId;
@@ -133,20 +133,21 @@ export default function CampaignBuilder() {
 
     // Auto-update audience preview when filters change
     useEffect(() => {
-        if (profile?.company_id && formData.audience_filter) {
+        if ((simulatedCompanyId || profile?.company_id) && formData.audience_filter) {
             handlePreviewAudience();
         }
-    }, [formData.audience_filter.status, formData.audience_filter.priority, formData.audience_filter.dateRange, formData.audience_filter.industry, selectedChannel]);
+    }, [formData.audience_filter.status, formData.audience_filter.priority, formData.audience_filter.dateRange, formData.audience_filter.industry, selectedChannel, simulatedCompanyId]);
 
     // Load available industries
     useEffect(() => {
-        if (profile?.company_id) {
-            supabase.from('leads').select('industry').eq('company_id', profile.company_id).not('industry', 'is', null).not('industry', 'eq', '').then(({ data }) => {
+        const compId = simulatedCompanyId || profile?.company_id;
+        if (compId) {
+            supabase.from('leads').select('industry').eq('company_id', compId).not('industry', 'is', null).not('industry', 'eq', '').then(({ data }) => {
                 const unique = Array.from(new Set((data || []).map(l => l.industry).filter(Boolean))) as string[];
                 setAvailableIndustries(unique.sort());
             });
         }
-    }, [profile?.company_id]);
+    }, [simulatedCompanyId, profile?.company_id]);
 
     const getGreeting = () => {
         const hour = new Date().getHours();
@@ -175,8 +176,12 @@ export default function CampaignBuilder() {
     };
 
     const handlePreviewAudience = async (specificIds?: string[], channel?: string) => {
-        if (!profile?.company_id) {
-            toast.error('No se encontró información de la empresa');
+        // Prefer simulatedCompanyId (from localStorage via AuthContext) over profile.company_id
+        // This ensures simulation mode always queries the correct tenant's leads
+        const effectiveCompanyId = simulatedCompanyId || profile?.company_id;
+
+        if (!effectiveCompanyId) {
+            toast.error('No se encontró información de la empresa. Verifica el modo simulación.');
             return;
         }
 
@@ -184,18 +189,30 @@ export default function CampaignBuilder() {
         const idType = formData.audience_filter.idType;
         const currentChannel = channel || selectedChannel;
 
+        console.log('🎯 getAudiencePreview called with:', {
+            effectiveCompanyId,
+            simulatedCompanyId,
+            profileCompanyId: profile?.company_id,
+            filters: formData.audience_filter,
+            channel: currentChannel
+        });
+
         setLoadingPreview(true);
         try {
             const leads = await campaignService.getAudiencePreview({
                 ...formData.audience_filter,
                 specificIds: targetIds,
                 idType: idType
-            }, profile.company_id, currentChannel);
+            }, effectiveCompanyId, currentChannel);
             setPreviewLeads(leads);
             setCurrentLeadIndex(0); // Reset Scroller
+            console.log(`✅ Audience loaded: ${leads.length} leads for company ${effectiveCompanyId}`);
             if (leads.length === 0) toast('No se encontraron leads válidos para este canal.');
-        } catch (error) {
-            toast.error('Error al cargar audiencia');
+        } catch (error: any) {
+            // Show REAL error — never hide it behind a generic message
+            const msg = error?.message || error?.error_description || String(error);
+            console.error('❌ getAudiencePreview error:', error);
+            toast.error(`Error audiencia: ${msg}`);
         } finally {
             setLoadingPreview(false);
         }
