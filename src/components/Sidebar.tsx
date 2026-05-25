@@ -167,7 +167,19 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     }
 
     if (canAccess('calendar')) {
-        navigation.push({ name: t('sidebar.calendar'), href: '/calendar', icon: Calendar, current: location.pathname.startsWith('/calendar') });
+        const calendarSubItems: any[] = [
+            { name: t('sidebar.calendar'), href: '/calendar', icon: Calendar },
+        ];
+        if (profile?.role === 'super_admin' || profile?.role === 'company_admin') {
+            calendarSubItems.push({ name: 'Mi Agenda', href: '/calendar/booking', icon: BookOpen });
+        }
+        navigation.push({
+            name: t('sidebar.calendar'),
+            href: '/calendar',
+            icon: Calendar,
+            current: location.pathname.startsWith('/calendar'),
+            subItems: calendarSubItems
+        });
     }
 
     if (canAccess('reports') || profile?.role === 'super_admin' || profile?.role === 'company_admin') {
