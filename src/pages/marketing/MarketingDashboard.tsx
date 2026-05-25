@@ -17,6 +17,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { marketingStatsService, type MarketingStats, type HeatmapLead, type ActiveCampaign } from '../../services/marketing/marketingStats';
 import { cn } from '../../lib/utils';
+import { supabase } from '../../services/supabase';
+
 
 export default function MarketingDashboard() {
     const navigate = useNavigate();
@@ -25,26 +27,57 @@ export default function MarketingDashboard() {
     const [heatmapLeads, setHeatmapLeads] = useState<HeatmapLead[]>([]);
     const [activeCampaign, setActiveCampaign] = useState<ActiveCampaign | null>(null);
 
+    const [selectedCampaignId, setSelectedCampaignId] = useState<string>('');
+    const [campaignsList, setCampaignsList] = useState<{ id: string, name: string }[]>([]);
+    const [refreshingStats, setRefreshingStats] = useState(false);
+
     useEffect(() => {
-        const loadData = async () => {
+        const loadInitialData = async () => {
             try {
                 setLoading(true);
-                const [s, h, a] = await Promise.all([
+                const [s, h, a, campaignsRes] = await Promise.all([
                     marketingStatsService.getOverviewStats(),
                     marketingStatsService.getHeatmapLeads(),
-                    marketingStatsService.getActiveCampaign()
+                    marketingStatsService.getActiveCampaign(),
+                    supabase.from('marketing_campaigns').select('id, name').order('created_at', { ascending: false })
                 ]);
                 setStats(s);
                 setHeatmapLeads(h);
                 setActiveCampaign(a);
+                if (campaignsRes.data) {
+                    setCampaignsList(campaignsRes.data);
+                }
             } catch (error) {
                 console.error('Error loading dashboard data:', error);
             } finally {
                 setLoading(false);
             }
         };
-        loadData();
+        loadInitialData();
     }, []);
+
+    useEffect(() => {
+        const loadFilteredData = async () => {
+            try {
+                setRefreshingStats(true);
+                const [s, h] = await Promise.all([
+                    marketingStatsService.getOverviewStats(selectedCampaignId || undefined),
+                    marketingStatsService.getHeatmapLeads(selectedCampaignId || undefined)
+                ]);
+                setStats(s);
+                setHeatmapLeads(h);
+            } catch (error) {
+                console.error('Error updating filtered marketing data:', error);
+            } finally {
+                setRefreshingStats(false);
+            }
+        };
+
+        if (!loading) {
+            loadFilteredData();
+        }
+    }, [selectedCampaignId]);
+
 
     const handleLeadRedirect = (leadId: string) => {
         navigate('/leads', { state: { leadId } });
@@ -94,7 +127,7 @@ export default function MarketingDashboard() {
                 <QuickAction to="/marketing/settings" icon={MessageSquare} label="Canales" desc="Configurar" color="text-emerald-600" bg="bg-emerald-50" />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className={cn("grid grid-cols-1 lg:grid-cols-12 gap-4 transition-all duration-300", refreshingStats ? "opacity-60 blur-[0.3px]" : "opacity-100")}>
                 <div className="lg:col-span-8 space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <CompactStatCard title="Oportunidades" value={stats?.opportunities || 0} trend={stats?.opportunityTrend || "+0"} icon={Users} desc="Leads de valor" />
@@ -103,14 +136,40 @@ export default function MarketingDashboard() {
                     </div>
 
                     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col min-h-[460px]">
-                        <div className="p-4 border-b border-slate-50 flex justify-between items-center bg-slate-50/20">
-                            <h3 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-2">
-                                <TrendingUp className="w-4 h-4 text-indigo-500" />
-                                KPIs DE INTERACCIÓN
-                            </h3>
-                            <Link to="/marketing/email" className="text-[10px] font-black text-indigo-600 hover:text-indigo-700 flex items-center gap-1 uppercase tracking-widest transition-colors">
-                                Ver Todo <ArrowRight className="w-3 h-3" />
-                            </Link>
+                        <div className="p-4 border-b border-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-50/20">
+                            <div className="flex flex-wrap items-center gap-3">
+                                <h3 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-2">
+                                    <TrendingUp className="w-4 h-4 text-indigo-500" />
+                                    KPIs DE INTERACCIÓN
+                                </h3>
+
+                                <div className="relative">
+                                    <select
+                                        value={selectedCampaignId}
+                                        onChange={(e) => setSelectedCampaignId(e.target.value)}
+                                        className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-600 outline-none hover:border-indigo-500 hover:text-indigo-600 transition-all cursor-pointer shadow-sm select-none"
+                                    >
+                                        <option value="">🎯 Todas las Campañas</option>
+                                        {campaignsList.map((campaign) => (
+                                            <option key={campaign.id} value={campaign.id}>
+                                                ✉️ {campaign.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                {refreshingStats && (
+                                    <div className="text-[9px] font-bold text-slate-400 animate-pulse flex items-center gap-1.5 uppercase tracking-widest">
+                                        <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping"></div>
+                                        Filtrando...
+                                    </div>
+                                )}
+                                <Link to="/marketing/email" className="text-[10px] font-black text-indigo-600 hover:text-indigo-700 flex items-center gap-1 uppercase tracking-widest transition-colors">
+                                    Ver Todo <ArrowRight className="w-3 h-3" />
+                                </Link>
+                            </div>
                         </div>
                         <div className="overflow-x-auto flex-1">
                             <table className="w-full text-left">
@@ -123,33 +182,43 @@ export default function MarketingDashboard() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
-                                    {heatmapLeads.map((lead) => (
-                                        <tr key={lead.id} className="hover:bg-slate-50/50 transition-colors group">
-                                            <td className="px-5 py-3">
-                                                <button onClick={() => handleLeadRedirect(lead.id)} className="text-left group">
-                                                    <p className="font-bold text-slate-800 text-xs group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{lead.name}</p>
-                                                    <p className="text-[10px] text-slate-400 font-medium truncate max-w-[150px]">{lead.email}</p>
-                                                </button>
-                                            </td>
-                                            <td className="px-5 py-3">
-                                                <span className="text-[11px] font-black text-slate-600">{lead.sent} Envíos</span>
-                                            </td>
-                                            <td className="px-5 py-3">
-                                                <div className="flex items-center gap-1.5">
-                                                    <Badge value={`${lead.opens} AP`} color="text-orange-600 bg-orange-50 border-orange-100" />
-                                                    <Badge value={`${lead.clicks} CL`} color="text-indigo-600 bg-indigo-50 border-indigo-100" />
-                                                </div>
-                                            </td>
-                                            <td className="px-5 py-3 text-right">
-                                                <div className="inline-flex items-center gap-3">
-                                                    <div className="w-12 h-1 bg-slate-100 rounded-full overflow-hidden">
-                                                        <div className="h-full bg-indigo-500" style={{ width: `${Math.min(100, (lead.engagementScore / 20) * 100)}%` }}></div>
-                                                    </div>
-                                                    <span className="text-[11px] font-black text-indigo-600 min-w-[20px]">{lead.engagementScore}</span>
-                                                </div>
+                                    {heatmapLeads.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={4} className="px-5 py-16 text-center">
+                                                <Zap className="w-8 h-8 text-slate-200 mx-auto mb-2.5 animate-pulse" />
+                                                <p className="text-[11px] text-slate-400 font-black uppercase tracking-widest">Sin interacciones registradas</p>
+                                                <p className="text-[9px] text-slate-400 mt-1 font-medium italic">Nadie ha interactuado aún con esta campaña.</p>
                                             </td>
                                         </tr>
-                                    ))}
+                                    ) : (
+                                        heatmapLeads.map((lead) => (
+                                            <tr key={lead.id} className="hover:bg-slate-50/50 transition-colors group">
+                                                <td className="px-5 py-3">
+                                                    <button onClick={() => handleLeadRedirect(lead.id)} className="text-left group">
+                                                        <p className="font-bold text-slate-800 text-xs group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{lead.name}</p>
+                                                        <p className="text-[10px] text-slate-400 font-medium truncate max-w-[150px]">{lead.email}</p>
+                                                    </button>
+                                                </td>
+                                                <td className="px-5 py-3">
+                                                    <span className="text-[11px] font-black text-slate-600">{lead.sent} Envíos</span>
+                                                </td>
+                                                <td className="px-5 py-3">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Badge value={`${lead.opens} AP`} color="text-orange-600 bg-orange-50 border-orange-100" />
+                                                        <Badge value={`${lead.clicks} CL`} color="text-indigo-600 bg-indigo-50 border-indigo-100" />
+                                                    </div>
+                                                </td>
+                                                <td className="px-5 py-3 text-right">
+                                                    <div className="inline-flex items-center gap-3">
+                                                        <div className="w-12 h-1 bg-slate-100 rounded-full overflow-hidden">
+                                                            <div className="h-full bg-indigo-500" style={{ width: `${Math.min(100, (lead.engagementScore / 20) * 100)}%` }}></div>
+                                                        </div>
+                                                        <span className="text-[11px] font-black text-indigo-600 min-w-[20px]">{lead.engagementScore}</span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
                                 </tbody>
                             </table>
                         </div>

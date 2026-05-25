@@ -40,6 +40,31 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     const [company, setCompany] = useState<Company | null>(null);
     const [debugOpen, setDebugOpen] = useState(false);
     const [hotLeadCount, setHotLeadCount] = useState(0);
+    const [companiesList, setCompaniesList] = useState<Company[]>([]);
+
+    useEffect(() => {
+        const isEligible = profile?.id === 'c9c01b04-4160-4e4c-9718-15298c961e9b' || 
+                           profile?.id === '292bc954-0d25-4147-9526-b7a7268be8e1' || 
+                           profile?.email?.toLowerCase() === 'jarias7604@gmail.com' || 
+                           profile?.email?.toLowerCase() === 'jarias@ariasdefense.com';
+        if (isEligible) {
+            loadAllCompanies();
+        }
+    }, [profile]);
+
+    const loadAllCompanies = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('companies')
+                .select('id, name')
+                .order('name');
+            if (error) throw error;
+            if (data) setCompaniesList(data as Company[]);
+        } catch (err) {
+            console.error('Error loading companies for sidebar selector:', err);
+        }
+    };
+
 
     useEffect(() => {
         if (profile?.company_id) {
@@ -360,7 +385,9 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                                 }}
                             >
                                 <option value="">Contexto Global</option>
-                                <option value="7a582ba5-f7d0-4ae3-9985-35788deb1c30">Arias Defense Salvador</option>
+                                {companiesList.map(c => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
                             </select>
 
                             <select

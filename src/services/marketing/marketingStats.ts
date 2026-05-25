@@ -32,27 +32,69 @@ export interface ActiveCampaign {
 }
 
 export const marketingStatsService = {
-    async getOverviewStats(): Promise<MarketingStats> {
+    async getOverviewStats(campaignId?: string): Promise<MarketingStats> {
         // 1. Get total impacts from campaigns
-        const { data: campaigns } = await supabase
+        let campaignQuery = supabase
             .from('marketing_campaigns')
             .select('stats, total_recipients');
 
-        const totalRecipients = campaigns?.reduce((acc, c) => acc + (c.total_recipients || 0), 0) || 0;
+        if (campaignId) {
+            campaignQuery = campaignQuery.eq('id', campaignId);
+        }
+
+        const { data: campaigns } = await campaignQuery;
+
+        let totalRecipients = 0;
+        if (campaignId) {
+            // For a single campaign, get real-time sent count from marketing_messages
+            const { count } = await supabase
+                .from('marketing_messages')
+                .select('id', { count: 'exact', head: true })
+                .eq('metadata->>campaign_id', campaignId);
+            totalRecipients = count || campaigns?.[0]?.total_recipients || 0;
+        } else {
+            totalRecipients = campaigns?.reduce((acc, c) => acc + (c.total_recipients || 0), 0) || 0;
+        }
+
+        // Get leads associated with this campaign (if campaignId is provided)
+        let eligibleLeadIds: string[] = [];
+        if (campaignId) {
+            const { data: campaignMsgs } = await supabase
+                .from('marketing_messages')
+                .select('metadata')
+                .eq('metadata->>campaign_id', campaignId);
+            
+            const ids = (campaignMsgs || []).map(m => (m.metadata as any)?.lead_id).filter(Boolean);
+            eligibleLeadIds = Array.from(new Set(ids)) as string[];
+        }
 
         // 2. Get Opportunities & Pipeline from cotizaciones
-        // In a real scenario, we would filter by leads that originated from marketing
-        // For this performance view, we show general conversion performance
-        const { data: quotes } = await supabase
+        let quotesQuery = supabase
             .from('cotizaciones')
             .select('id, total_anual, lead_id, estado');
 
+        if (campaignId && eligibleLeadIds.length > 0) {
+            quotesQuery = quotesQuery.in('lead_id', eligibleLeadIds);
+        } else if (campaignId && eligibleLeadIds.length === 0) {
+            // No messages sent yet for this campaign, so 0 conversions
+            return {
+                totalImpacts: totalRecipients,
+                impactTrend: '0%',
+                opportunities: 0,
+                opportunityTrend: '0',
+                pipelineValue: 0,
+                pipelineTrend: '0%',
+                conversionRate: 0,
+                conversionTrend: '0%',
+                opportunityLeadIds: [],
+                convertedLeadIds: []
+            };
+        }
+
+        const { data: quotes } = await quotesQuery;
+
         const totalPipeline = quotes?.reduce((acc, q) => acc + Number(q.total_anual || 0), 0) || 0;
         const opportunityLeadIds = Array.from(new Set(quotes?.map(q => q.lead_id).filter(Boolean))) as string[];
-
-        // 3. Calculate Conversion Rate (Leads with quotes / Total recipients)
-        // For this logic, Converted Leads are those who have an accepted quote OR just a quote in this simple case
-        // Let's refine: Converted = Accepted quote.
         const conversionLeadIds = Array.from(new Set(quotes?.filter(q => q.estado === 'aceptada').map(q => q.lead_id).filter(Boolean))) as string[];
 
         const conversionRate = totalRecipients > 0
@@ -61,30 +103,36 @@ export const marketingStatsService = {
 
         return {
             totalImpacts: totalRecipients,
-            impactTrend: '+12%',
+            impactTrend: campaignId ? 'Camp. Activa' : '+12%',
             opportunities: opportunityLeadIds.length,
-            opportunityTrend: '+5',
+            opportunityTrend: campaignId ? 'De esta Camp.' : '+5',
             pipelineValue: totalPipeline,
-            pipelineTrend: '+18%',
+            pipelineTrend: campaignId ? 'Retorno' : '+18%',
             conversionRate: conversionRate,
-            conversionTrend: '+2.4%',
+            conversionTrend: campaignId ? 'Ratio' : '+2.4%',
             opportunityLeadIds,
             convertedLeadIds: conversionLeadIds
         };
     },
 
-    async getHeatmapLeads(): Promise<HeatmapLead[]> {
+    async getHeatmapLeads(campaignId?: string): Promise<HeatmapLead[]> {
         try {
             // 1. Get real data from marketing_messages
-            const { data: realStats, error: statsError } = await supabase
+            let query = supabase
                 .from('marketing_messages')
                 .select('metadata, status')
                 .order('created_at', { ascending: false })
                 .limit(1000);
 
+            if (campaignId) {
+                query = query.eq('metadata->>campaign_id', campaignId);
+            }
+
+            const { data: realStats, error: statsError } = await query;
+
             if (statsError) throw statsError;
 
-            // Aggregate stats in memory (since complex grouping on JSONB is easier here in this version)
+            // Aggregate stats in memory
             const statsMap: Record<string, { sent: number, opens: number, clicks: number }> = {};
 
             realStats.forEach(msg => {
@@ -97,13 +145,15 @@ export const marketingStatsService = {
                 }
 
                 statsMap[leadId].sent++;
-                // If clicked, it implies it was also opened
                 if (status === 'opened' || status === 'read' || status === 'clicked') statsMap[leadId].opens++;
                 if (status === 'clicked') statsMap[leadId].clicks++;
             });
 
             const leadIds = Object.keys(statsMap);
             if (leadIds.length === 0) {
+                if (campaignId) {
+                    return [];
+                }
                 // Fallback to most recent leads
                 const { data: recentLeads } = await supabase.from('leads').select('id, name, email').limit(20);
                 return (recentLeads || []).map(l => ({
@@ -133,7 +183,7 @@ export const marketingStatsService = {
             }));
 
             // Complete with recent leads up to 20 total
-            if (realLeads.length < 20) {
+            if (!campaignId && realLeads.length < 20) {
                 const { data: moreLeads } = await supabase
                     .from('leads')
                     .select('id, name, email')

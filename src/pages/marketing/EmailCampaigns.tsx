@@ -177,9 +177,18 @@ export default function EmailCampaigns() {
                         </div>
 
                         {/* Info */}
-                        <div className="flex-1 ml-4 min-w-0">
+                        <div
+                            className="flex-1 ml-4 min-w-0 cursor-pointer"
+                            onClick={() => {
+                                if (campaign.status === 'completed') {
+                                    navigate(`/marketing/campaign/${campaign.id}/report`);
+                                } else {
+                                    navigate(`/marketing/campaign/${campaign.id}/edit`);
+                                }
+                            }}
+                        >
                             <div className="flex items-center gap-3">
-                                <h3 className="font-bold text-slate-900 truncate tracking-tight text-sm uppercase">{campaign.name}</h3>
+                                <h3 className="font-bold text-slate-900 truncate tracking-tight text-sm uppercase group-hover:text-indigo-600 transition-colors">{campaign.name}</h3>
                                 <span className={cn(
                                     "px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-tighter border",
                                     campaign.type === 'email' ? 'bg-amber-50 text-amber-600 border-amber-100' :

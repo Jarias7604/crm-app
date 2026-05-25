@@ -213,6 +213,81 @@ export const campaignService = {
         return leads;
     },
 
+    /**
+     * Get per-lead interaction data for a specific campaign.
+     * Returns each recipient with their status: sent, opened, or clicked.
+     */
+    async getCampaignRecipients(campaignId: string) {
+        // 1. Fetch all messages belonging to this campaign
+        const { data: messages, error } = await supabase
+            .from('marketing_messages')
+            .select('metadata, status, sent_at, created_at')
+            .eq('metadata->>campaign_id', campaignId)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // 2. Aggregate per lead: best status wins (clicked > opened > sent)
+        const statusPriority: Record<string, number> = { clicked: 3, read: 2, opened: 2, delivered: 1, sent: 0, failed: -1 };
+        const leadMap: Record<string, { bestStatus: string; bestPriority: number; sentAt: string; lastActivity: string }> = {};
+
+        (messages || []).forEach(msg => {
+            const leadId = (msg.metadata as any)?.lead_id;
+            if (!leadId) return;
+
+            const status = msg.status || 'sent';
+            const priority = statusPriority[status] ?? 0;
+
+            if (!leadMap[leadId]) {
+                leadMap[leadId] = {
+                    bestStatus: status,
+                    bestPriority: priority,
+                    sentAt: msg.sent_at || msg.created_at,
+                    lastActivity: msg.created_at
+                };
+            } else {
+                if (priority > leadMap[leadId].bestPriority) {
+                    leadMap[leadId].bestStatus = status;
+                    leadMap[leadId].bestPriority = priority;
+                }
+                // Track latest activity timestamp
+                if (msg.created_at > leadMap[leadId].lastActivity) {
+                    leadMap[leadId].lastActivity = msg.created_at;
+                }
+            }
+        });
+
+        const leadIds = Object.keys(leadMap);
+        if (leadIds.length === 0) return [];
+
+        // 3. Fetch lead details
+        const { data: leads, error: leadsError } = await supabase
+            .from('leads')
+            .select('id, name, email, phone, company_name, status')
+            .in('id', leadIds);
+
+        if (leadsError) throw leadsError;
+
+        // 4. Merge and sort: opened/clicked first, then sent
+        return (leads || [])
+            .map(lead => ({
+                id: lead.id,
+                name: lead.name || 'Sin nombre',
+                email: lead.email || '-',
+                phone: lead.phone || '',
+                companyName: lead.company_name || '',
+                leadStatus: lead.status || '',
+                interactionStatus: leadMap[lead.id]?.bestStatus || 'sent',
+                sentAt: leadMap[lead.id]?.sentAt || '',
+                lastActivity: leadMap[lead.id]?.lastActivity || ''
+            }))
+            .sort((a, b) => {
+                const pa = statusPriority[a.interactionStatus] ?? 0;
+                const pb = statusPriority[b.interactionStatus] ?? 0;
+                return pb - pa; // Higher priority first (opened > sent)
+            });
+    },
+
     async uploadMarketingAsset(file: File) {
         const fileExt = file.name.split('.').pop();
         const fileName = `${Math.random().toString(36).substring(2)}${Date.now()}.${fileExt}`;
