@@ -70,7 +70,7 @@ export const bookingService = {
             user_id: user.id,
             company_id: profile?.company_id,
             display_name: link.display_name || profile?.full_name || 'Agent',
-            avatar_url: link.avatar_url || profile?.avatar_url,
+            avatar_url: profile?.avatar_url || link.avatar_url,
         };
 
         if (link.id) {
@@ -110,16 +110,6 @@ export const bookingService = {
             .select('name, logo_url')
             .eq('id', data.company_id)
             .maybeSingle();
-
-        // Fetch agent avatar if not already set
-        if (!data.avatar_url && data.user_id) {
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('avatar_url')
-                .eq('id', data.user_id)
-                .maybeSingle();
-            if (profile?.avatar_url) data.avatar_url = profile.avatar_url;
-        }
 
         return {
             ...data,
