@@ -139,7 +139,7 @@ export const campaignService = {
         return data;
     },
 
-    // NEW: Get audience preview based on advanced filters
+    // Get audience preview based on advanced filters
     async getAudiencePreview(filters: {
         status?: string[],
         industry?: string[],
@@ -150,15 +150,14 @@ export const campaignService = {
     }, companyId: string, channel: string = 'email') {
         if (!companyId) return [];
 
+        // IMPORTANT: No joins on marketing_conversations here.
+        // Joining that table can silently fail due to RLS and return [] with no error shown.
         let query = supabase
             .from('leads')
-            .select(`
-                id, name, company_name, email, phone, created_at, status, priority,
-                marketing_conversations(external_id, channel)
-            `)
+            .select('id, name, company_name, email, phone, created_at, status, priority')
             .eq('company_id', companyId);
 
-        // Filter by availability based on channel
+        // Filter by channel contact availability
         if (channel === 'email') {
             query = query.not('email', 'is', null).neq('email', '');
         } else {
@@ -174,15 +173,12 @@ export const campaignService = {
                 thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
                 query = query.gte('created_at', thirtyDaysAgo.toISOString());
             }
-
             if (filters.status && filters.status.length > 0) {
                 query = query.in('status', filters.status);
             }
-
             if (filters.priority && filters.priority !== 'all') {
                 query = query.eq('priority', filters.priority);
             }
-
             if (filters.industry && filters.industry.length > 0) {
                 query = query.in('industry', filters.industry);
             }
@@ -190,13 +186,31 @@ export const campaignService = {
 
         const { data, error } = await query.limit(1000);
 
-        if (error) {
-            console.error('Error fetching audience:', error);
-            // Return empty if error (table might typically be empty in dev)
-            return [];
+        // Throw so the UI shows the real error — never swallow it silently
+        if (error) throw new Error(`Error cargando audiencia: ${error.message}`);
+
+        const leads = data || [];
+
+        // For Telegram: fetch connected lead IDs in a separate isolated query
+        if (channel === 'telegram' && leads.length > 0) {
+            const leadIds = leads.map((l: any) => l.id);
+            const { data: convData } = await supabase
+                .from('marketing_conversations')
+                .select('lead_id, external_id')
+                .eq('channel', 'telegram')
+                .not('external_id', 'is', null)
+                .in('lead_id', leadIds);
+
+            const connectedIds = new Set((convData || []).map((c: any) => c.lead_id));
+            return leads.map((l: any) => ({
+                ...l,
+                marketing_conversations: connectedIds.has(l.id)
+                    ? [{ channel: 'telegram', external_id: true }]
+                    : []
+            }));
         }
 
-        return data || [];
+        return leads;
     },
 
     async uploadMarketingAsset(file: File) {
