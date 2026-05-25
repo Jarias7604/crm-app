@@ -27,6 +27,7 @@ export default function EmailCampaigns() {
     const [campaigns, setCampaigns] = useState<Campaign[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'draft'>('all');
 
     const CHANNEL_ICONS: Record<string, any> = {
         email: Mail,
@@ -91,9 +92,12 @@ export default function EmailCampaigns() {
         }
     };
 
-    const filteredCampaigns = campaigns.filter(c =>
-        c.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredCampaigns = campaigns.filter(c => {
+        if (!c.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+        if (statusFilter === 'completed' && c.status !== 'completed') return false;
+        if (statusFilter === 'draft' && c.status !== 'draft') return false;
+        return true;
+    });
 
     if (loading) {
         return (
@@ -152,11 +156,27 @@ export default function EmailCampaigns() {
                     />
                 </div>
                 <div className="md:col-span-4 flex justify-end gap-2">
-                    <button className="flex-1 md:flex-none px-4 py-2.5 bg-white border border-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 transition-all shadow-sm flex items-center justify-center gap-2">
-                        <Filter className="w-3.5 h-3.5" /> Filtrar
+                    <button
+                        onClick={() => setStatusFilter(statusFilter === 'completed' ? 'all' : 'completed')}
+                        className={cn(
+                            "flex-1 md:flex-none px-4 py-2.5 border rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm flex items-center justify-center gap-2",
+                            statusFilter === 'completed'
+                                ? 'bg-emerald-600 text-white border-emerald-600'
+                                : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'
+                        )}
+                    >
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Enviadas
                     </button>
-                    <button className="flex-1 md:flex-none px-4 py-2.5 bg-white border border-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 transition-all shadow-sm flex items-center justify-center gap-2">
-                        <BarChart3 className="w-3.5 h-3.5" /> Reportes
+                    <button
+                        onClick={() => setStatusFilter(statusFilter === 'draft' ? 'all' : 'draft')}
+                        className={cn(
+                            "flex-1 md:flex-none px-4 py-2.5 border rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-sm flex items-center justify-center gap-2",
+                            statusFilter === 'draft'
+                                ? 'bg-slate-700 text-white border-slate-700'
+                                : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'
+                        )}
+                    >
+                        <Clock className="w-3.5 h-3.5" /> Borradores
                     </button>
                 </div>
             </div>
