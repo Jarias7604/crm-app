@@ -107,14 +107,24 @@ export const bookingService = {
         // Fetch company branding for the public page
         const { data: company } = await supabase
             .from('companies')
-            .select('name, branding')
+            .select('name, logo_url')
             .eq('id', data.company_id)
             .maybeSingle();
+
+        // Fetch agent avatar if not already set
+        if (!data.avatar_url && data.user_id) {
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('avatar_url')
+                .eq('id', data.user_id)
+                .maybeSingle();
+            if (profile?.avatar_url) data.avatar_url = profile.avatar_url;
+        }
 
         return {
             ...data,
             company_name: company?.name || undefined,
-            company_logo: company?.branding?.logoUrl || company?.branding?.logo_url || undefined,
+            company_logo: company?.logo_url || undefined,
         };
     },
 

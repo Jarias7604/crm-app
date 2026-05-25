@@ -204,7 +204,9 @@ export default function PublicBookingPage() {
                                     )}
 
                                     <p className="text-sm text-gray-400 font-medium">{link.display_name}</p>
-                                    <h1 className="text-2xl font-bold text-gray-900 mt-1 leading-snug">{link.title || 'Reunión de Consulta'}</h1>
+                                    <h1 className="text-2xl font-bold text-gray-900 mt-1 leading-snug">
+                                        {link.title?.replace(/\d+\s*minutos?/i, `${link.duration_minutes} minutos`) || `Reunión de ${link.duration_minutes} minutos`}
+                                    </h1>
 
                                     <div className="mt-6 space-y-3">
                                         <div className="flex items-center gap-3 text-sm text-gray-500">
