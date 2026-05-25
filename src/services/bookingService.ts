@@ -95,14 +95,27 @@ export const bookingService = {
 
     // === PUBLIC — no auth needed ===
 
-    async getPublicBookingLink(slug: string): Promise<BookingLink | null> {
+    async getPublicBookingLink(slug: string): Promise<(BookingLink & { company_name?: string; company_logo?: string }) | null> {
         const { data } = await supabase
             .from('booking_links')
             .select('*')
             .eq('slug', slug)
             .eq('is_active', true)
             .maybeSingle();
-        return data;
+        if (!data) return null;
+
+        // Fetch company branding for the public page
+        const { data: company } = await supabase
+            .from('companies')
+            .select('name, branding')
+            .eq('id', data.company_id)
+            .maybeSingle();
+
+        return {
+            ...data,
+            company_name: company?.name || undefined,
+            company_logo: company?.branding?.logoUrl || company?.branding?.logo_url || undefined,
+        };
     },
 
     /** Get booked slots for a given date (to block them out) */
