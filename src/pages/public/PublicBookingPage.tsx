@@ -236,7 +236,7 @@ export default function PublicBookingPage() {
                                 </div>
 
                                 {/* CENTER — Calendar */}
-                                <div className={`flex-1 p-8 ${selectedDate ? 'border-b md:border-b-0 md:border-r border-gray-100' : ''}`}>
+                                <div className="flex-1 p-8 border-b md:border-b-0 md:border-r border-gray-100">
                                     <h2 className="text-lg font-bold text-gray-900 mb-6">Selecciona fecha y hora</h2>
 
                                     {/* Month navigation */}
@@ -292,66 +292,76 @@ export default function PublicBookingPage() {
                                     </div>
                                 </div>
 
-                                {/* RIGHT — Time Slots */}
-                                {selectedDate && (
-                                    <div className="md:w-[260px] shrink-0 p-8">
-                                        <p className="text-base font-semibold text-gray-900 mb-1">
-                                            {format(selectedDate, "EEEE", { locale: es })}
-                                        </p>
-                                        <p className="text-sm text-gray-400 mb-5">
-                                            {format(selectedDate, "dd 'de' MMMM", { locale: es })}
-                                        </p>
+                                {/* RIGHT — Time Slots — always visible */}
+                                <div className="md:w-[260px] shrink-0 p-8">
+                                    {!selectedDate ? (
+                                        <div className="flex flex-col items-center justify-center h-full text-center py-16">
+                                            <CalIcon className="w-10 h-10 text-gray-100 mb-3" />
+                                            <p className="text-sm text-gray-300 font-medium">Selecciona un día</p>
+                                            <p className="text-xs text-gray-200 mt-1">para ver horarios</p>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <p className="text-base font-semibold text-gray-900 mb-1">
+                                                {format(selectedDate, "EEEE", { locale: es })}
+                                            </p>
+                                            <p className="text-sm text-gray-400 mb-5">
+                                                {format(selectedDate, "dd 'de' MMMM", { locale: es })}
+                                            </p>
 
-                                        {/* Available indicator */}
-                                        {slots.length > 0 && !loadingSlots && (
-                                            <div className="flex items-center gap-2 mb-4">
-                                                <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                                                <span className="text-xs text-gray-400 font-medium">horarios disponibles</span>
-                                            </div>
-                                        )}
+                                            {/* Available indicator */}
+                                            {slots.length > 0 && !loadingSlots && (
+                                                <div className="flex items-center gap-2 mb-4">
+                                                    <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                                                    <span className="text-xs text-gray-400 font-medium">horarios disponibles</span>
+                                                </div>
+                                            )}
 
-                                        {loadingSlots ? (
-                                            <div className="flex items-center justify-center py-20">
-                                                <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-                                            </div>
-                                        ) : slots.length === 0 ? (
-                                            <div className="text-center py-20">
-                                                <p className="text-sm text-gray-400 font-medium">Sin horarios</p>
-                                                <p className="text-xs text-gray-300 mt-1">Elige otro día</p>
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-2.5 max-h-[400px] overflow-y-auto pr-1">
-                                                {slots.map(slot => {
-                                                    const active = selectedSlot === slot;
-                                                    return (
-                                                        <button
-                                                            key={slot}
-                                                            onClick={() => {
-                                                                if (active) setStep('form');
-                                                                else setSelectedSlot(slot);
-                                                            }}
-                                                            className={`w-full py-3 rounded-lg text-sm font-semibold transition-all border ${
-                                                                active
-                                                                    ? 'text-white border-transparent shadow-md'
-                                                                    : 'border-blue-200 text-blue-600 hover:border-blue-400 bg-white'
-                                                            }`}
-                                                            style={active ? { backgroundColor: brandColor, borderColor: brandColor } : {}}
-                                                        >
-                                                            {active ? (
-                                                                <span className="flex items-center justify-center gap-3">
-                                                                    {format(new Date(slot), 'h:mm a')}
-                                                                    <span className="text-xs bg-white/25 px-3 py-0.5 rounded-full font-bold">Confirmar</span>
-                                                                </span>
-                                                            ) : (
-                                                                format(new Date(slot), 'h:mm a')
-                                                            )}
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
+                                            {loadingSlots ? (
+                                                <div className="flex items-center justify-center py-20">
+                                                    <Loader2 className="w-5 h-5 animate-spin text-green-500" />
+                                                </div>
+                                            ) : slots.length === 0 ? (
+                                                <div className="text-center py-20">
+                                                    <p className="text-sm text-gray-400 font-medium">Sin horarios</p>
+                                                    <p className="text-xs text-gray-300 mt-1">Elige otro día</p>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-2.5 max-h-[400px] overflow-y-auto pr-1">
+                                                    {slots.map(slot => {
+                                                        const active = selectedSlot === slot;
+                                                        return (
+                                                            <button
+                                                                key={slot}
+                                                                onClick={() => {
+                                                                    if (active) setStep('form');
+                                                                    else setSelectedSlot(slot);
+                                                                }}
+                                                                className={`w-full py-3 rounded-lg text-sm font-semibold transition-all border ${
+                                                                    active
+                                                                        ? 'text-white border-transparent shadow-md bg-green-600'
+                                                                        : 'border-green-300 text-green-600 hover:border-green-500 hover:bg-green-50 bg-white'
+                                                                }`}
+                                                            >
+                                                                {active ? (
+                                                                    <span className="flex items-center justify-center gap-3">
+                                                                        {format(new Date(slot), 'h:mm a')}
+                                                                        <span className="text-xs bg-white/25 px-3 py-0.5 rounded-full font-bold">Confirmar</span>
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="flex items-center justify-center gap-2">
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                                                                        {format(new Date(slot), 'h:mm a')}
+                                                                    </span>
+                                                                )}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
