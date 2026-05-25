@@ -14,7 +14,8 @@ import {
     Loader2,
     MessageCircle,
     Phone,
-    User as UserIcon
+    User as UserIcon,
+    Zap
 } from 'lucide-react';
 import { campaignService } from '../../services/marketing/campaignService';
 import toast from 'react-hot-toast';
@@ -33,10 +34,16 @@ export default function RichTextEditor({ value, onChange, placeholder, channel =
     const [showWhatsAppInput, setShowWhatsAppInput] = useState(false);
     const [showPhoneInput, setShowPhoneInput] = useState(false);
     const [showVariables, setShowVariables] = useState(false);
+    const [showCtaPro, setShowCtaPro] = useState(false);
     const [linkUrl, setLinkUrl] = useState('');
     const [whatsappNumber, setWhatsappNumber] = useState('');
     const [whatsappMessage, setWhatsappMessage] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
+    const [ctaWhatsapp, setCtaWhatsapp] = useState('50379718911');
+    const [ctaWhatsappMsg, setCtaWhatsappMsg] = useState('Hola, me interesa la promoción de {{first_name}}');
+    const [ctaBookingUrl, setCtaBookingUrl] = useState('');
+    const [ctaEmail, setCtaEmail] = useState('ventas@ariasdefense.com');
+    const [ctaCompanyName, setCtaCompanyName] = useState('ARIAS DEFENSE COMPONENTS LLC');
 
     // Sync with external value changes (e.g. templates)
     useEffect(() => {
@@ -199,6 +206,43 @@ export default function RichTextEditor({ value, onChange, placeholder, channel =
         setShowPhoneInput(false);
     };
 
+    const insertCtaBlock = () => {
+        const cleanWa = ctaWhatsapp.replace(/\D/g, '');
+        const waUrl = `https://wa.me/${cleanWa}${ctaWhatsappMsg ? '?text=' + encodeURIComponent(ctaWhatsappMsg) : ''}`;
+        const bookUrl = ctaBookingUrl || '#';
+        const mailUrl = `mailto:${ctaEmail}?subject=Consulta%20sobre%20promoción`;
+
+        const ctaHtml = `
+<div style="margin:24px 0;padding:0;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:480px;margin:0 auto;">
+    <tr><td style="padding:6px 0;">
+      <a href="${waUrl}" target="_blank" style="display:block;background-color:#25D366;color:#ffffff;text-align:center;padding:14px 24px;border-radius:10px;text-decoration:none;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;letter-spacing:0.5px;">
+        💬&nbsp;&nbsp;CHATEAR POR WHATSAPP
+      </a>
+    </td></tr>
+    <tr><td style="padding:6px 0;">
+      <a href="${bookUrl}" target="_blank" style="display:block;background-color:#4F46E5;color:#ffffff;text-align:center;padding:14px 24px;border-radius:10px;text-decoration:none;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;letter-spacing:0.5px;">
+        📅&nbsp;&nbsp;AGENDAR REUNIÓN GRATUITA
+      </a>
+    </td></tr>
+    <tr><td style="padding:6px 0;">
+      <a href="${mailUrl}" style="display:block;background-color:#F1F5F9;color:#334155;text-align:center;padding:14px 24px;border-radius:10px;text-decoration:none;font-family:Arial,sans-serif;font-size:14px;font-weight:bold;letter-spacing:0.5px;border:1px solid #E2E8F0;">
+        📧&nbsp;&nbsp;RESPONDER A ESTE CORREO
+      </a>
+    </td></tr>
+    <tr><td style="padding:16px 0 0 0;text-align:center;">
+      <p style="margin:0;font-family:Arial,sans-serif;font-size:11px;color:#94A3B8;letter-spacing:0.5px;">🔒 Comunicación segura y confidencial</p>
+      <p style="margin:4px 0 0 0;font-family:Arial,sans-serif;font-size:10px;color:#CBD5E1;font-weight:bold;letter-spacing:1px;text-transform:uppercase;">${ctaCompanyName}</p>
+    </td></tr>
+  </table>
+</div><br/>`;
+
+        execCommand('insertHTML', ctaHtml);
+        if (editorRef.current) onChange(editorRef.current.innerHTML);
+        setShowCtaPro(false);
+        toast.success('Bloque CTA insertado');
+    };
+
     return (
         <div className="flex flex-col flex-1 border border-gray-200 rounded-2xl bg-white shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 transition-all relative">
             <div className="flex flex-wrap items-center gap-1 p-2 bg-gray-50 border-b border-gray-100">
@@ -213,7 +257,9 @@ export default function RichTextEditor({ value, onChange, placeholder, channel =
                 <ToolbarButton onClick={() => setShowLinkInput(!showLinkInput)} icon={LinkIcon} title="Enlace" active={showLinkInput} />
                 <ToolbarButton onClick={() => { setShowWhatsAppInput(!showWhatsAppInput); setShowPhoneInput(false); setShowLinkInput(false); setShowVariables(false); }} icon={MessageCircle} title="WhatsApp" active={showWhatsAppInput} />
                 <ToolbarButton onClick={() => { setShowPhoneInput(!showPhoneInput); setShowWhatsAppInput(false); setShowLinkInput(false); setShowVariables(false); }} icon={Phone} title="Llamada" active={showPhoneInput} />
-                <ToolbarButton onClick={() => { setShowVariables(!showVariables); setShowPhoneInput(false); setShowWhatsAppInput(false); setShowLinkInput(false); }} icon={UserIcon} title="Personalización" active={showVariables} />
+                <ToolbarButton onClick={() => { setShowVariables(!showVariables); setShowPhoneInput(false); setShowWhatsAppInput(false); setShowLinkInput(false); setShowCtaPro(false); }} icon={UserIcon} title="Personalización" active={showVariables} />
+                <div className="w-px h-6 bg-gray-200 mx-1" />
+                <ToolbarButton onClick={() => { setShowCtaPro(!showCtaPro); setShowVariables(false); setShowPhoneInput(false); setShowWhatsAppInput(false); setShowLinkInput(false); }} icon={Zap} title="CTA Pro — Bloque de Acción" active={showCtaPro} />
                 <div className="w-px h-6 bg-gray-200 mx-1" />
                 <label className="p-2 hover:bg-white hover:text-blue-600 rounded-lg transition-all cursor-pointer text-gray-500 relative group" title="Imagen">
                     <ImageIcon className="w-4 h-4" />
@@ -260,6 +306,43 @@ export default function RichTextEditor({ value, onChange, placeholder, channel =
                     <input type="text" placeholder="Teléfono..." className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-indigo-200 outline-none" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addPhoneLink()} autoFocus />
                     <button onClick={addPhoneLink} className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold">Añadir</button>
                     <button onClick={() => setShowPhoneInput(false)} className="p-1.5 text-gray-400"><X className="w-4 h-4" /></button>
+                </div>
+            )}
+
+            {showCtaPro && (
+                <div className="p-4 bg-gradient-to-br from-indigo-50 to-white border-b border-indigo-100 absolute top-12 left-0 z-20 w-96 rounded-xl border shadow-2xl">
+                    <div className="flex justify-between items-center border-b border-indigo-200 pb-2 mb-3">
+                        <div className="flex items-center gap-2">
+                            <Zap className="w-4 h-4 text-indigo-600" />
+                            <span className="text-[11px] font-black uppercase text-indigo-800 tracking-widest">CTA Pro — Llamada a la Acción</span>
+                        </div>
+                        <button onClick={() => setShowCtaPro(false)}><X className="w-3.5 h-3.5 text-indigo-400" /></button>
+                    </div>
+                    <div className="space-y-3">
+                        <div>
+                            <label className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1 block">WhatsApp — Número</label>
+                            <input type="text" className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 outline-none focus:border-green-400" value={ctaWhatsapp} onChange={(e) => setCtaWhatsapp(e.target.value)} placeholder="50379718911" />
+                        </div>
+                        <div>
+                            <label className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1 block">WhatsApp — Mensaje Pre-llenado</label>
+                            <input type="text" className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 outline-none focus:border-green-400" value={ctaWhatsappMsg} onChange={(e) => setCtaWhatsappMsg(e.target.value)} placeholder="Hola, me interesa..." />
+                        </div>
+                        <div>
+                            <label className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1 block">📅 URL de Agenda (Booking Page)</label>
+                            <input type="text" className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 outline-none focus:border-indigo-400" value={ctaBookingUrl} onChange={(e) => setCtaBookingUrl(e.target.value)} placeholder="https://crm-app-v2.vercel.app/book/mi-agenda" />
+                        </div>
+                        <div>
+                            <label className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1 block">📧 Email de Respuesta</label>
+                            <input type="text" className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 outline-none" value={ctaEmail} onChange={(e) => setCtaEmail(e.target.value)} placeholder="ventas@empresa.com" />
+                        </div>
+                        <div>
+                            <label className="text-[9px] font-black uppercase text-slate-500 tracking-widest mb-1 block">🏢 Nombre de Empresa (Footer)</label>
+                            <input type="text" className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 outline-none" value={ctaCompanyName} onChange={(e) => setCtaCompanyName(e.target.value)} />
+                        </div>
+                        <button onClick={insertCtaBlock} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-600/20 active:scale-[0.98] flex items-center justify-center gap-2">
+                            <Zap className="w-3.5 h-3.5" /> Insertar Bloque CTA
+                        </button>
+                    </div>
                 </div>
             )}
 
