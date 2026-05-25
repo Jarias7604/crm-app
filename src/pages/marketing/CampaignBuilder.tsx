@@ -202,7 +202,7 @@ export default function CampaignBuilder() {
     };
 
     const filteredByChannel = (selectedChannel === 'telegram' && onlyConnected)
-        ? previewLeads.filter(l => l.marketing_conversations?.[0]?.external_id)
+        ? previewLeads.filter(l => l.marketing_conversations?.some((c: any) => c.channel === 'telegram' && c.external_id))
         : previewLeads;
 
     // Smart Audience: exclude deselected leads

@@ -154,10 +154,9 @@ export const campaignService = {
             .from('leads')
             .select(`
                 id, name, company_name, email, phone, created_at, status, priority,
-                marketing_conversations(external_id)
+                marketing_conversations(external_id, channel)
             `)
-            .eq('company_id', companyId)
-            .eq('marketing_conversations.channel', channel);
+            .eq('company_id', companyId);
 
         // Filter by availability based on channel
         if (channel === 'email') {
