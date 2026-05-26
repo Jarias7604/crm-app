@@ -363,7 +363,7 @@ export default function PublicBookingPage() {
                                                     <p className="text-[10px] text-gray-300 mt-0.5">Elige otro día</p>
                                                 </div>
                                             ) : (
-                                                <div className="space-y-2 max-h-[382px] overflow-y-auto pr-1">
+                                                <div className="grid grid-cols-2 sm:grid-cols-3 md:flex md:flex-col gap-2 max-h-[382px] overflow-y-auto pr-1">
                                                     {slots.map(slot => {
                                                         const active = selectedSlot === slot;
                                                         return (
@@ -373,7 +373,7 @@ export default function PublicBookingPage() {
                                                                     if (active) setStep('form');
                                                                     else setSelectedSlot(slot);
                                                                 }}
-                                                                className={`w-full py-[14px] rounded-xl text-xs font-semibold transition-all duration-200 border ${
+                                                                className={`w-full py-[12px] md:py-[14px] rounded-xl text-xs font-semibold transition-all duration-200 border ${
                                                                     active
                                                                         ? 'text-white border-transparent shadow-sm bg-emerald-600 font-bold scale-[1.01]'
                                                                         : 'border-emerald-200 text-emerald-700 bg-emerald-50/40 hover:bg-emerald-600 hover:text-white hover:border-transparent'

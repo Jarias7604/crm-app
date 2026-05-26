@@ -391,34 +391,34 @@ export default function Calendar() {
 
     /* ─── DESKTOP HEADER ──────────────────────────── */
     const renderHeader = () => (
-        <div className="hidden md:flex items-center justify-between mb-5">
+        <div className="hidden md:flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-5 pb-3 border-b border-gray-100/50">
             <div>
                 <h1 className="text-2xl font-black text-gray-900 tracking-tight">Calendario</h1>
                 <p className="text-sm text-gray-400 font-medium capitalize mt-0.5">
                     {format(currentDate, "MMMM yyyy", { locale: es })}
                 </p>
             </div>
-            <div className="flex items-center gap-2">
-                <div className="flex items-center p-1 bg-gray-100/80 rounded-xl mr-2">
-                    <button onClick={() => setViewMode('month')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'month' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}>Mes</button>
-                    <button onClick={() => { setViewMode('week'); setSelectedDate(startOfWeek(currentDate, { weekStartsOn: 0 })); }} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'week' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}>Semana</button>
-                    <button onClick={() => setViewMode('day')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'day' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}>Día</button>
+            <div className="flex flex-wrap items-center gap-2 justify-start lg:justify-end max-w-full">
+                <div className="flex items-center p-1 bg-gray-100/80 rounded-xl mr-1">
+                    <button onClick={() => setViewMode('month')} className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'month' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}>Mes</button>
+                    <button onClick={() => { setViewMode('week'); setSelectedDate(startOfWeek(currentDate, { weekStartsOn: 0 })); }} className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'week' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}>Semana</button>
+                    <button onClick={() => setViewMode('day')} className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'day' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}>Día</button>
                 </div>
                 <button
                     onClick={() => { setCurrentDate(new Date()); setSelectedDate(new Date()); setViewMode('month'); }}
-                    className="px-4 h-9 rounded-xl border-2 border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-50 transition-all"
+                    className="px-3.5 h-9 rounded-xl border-2 border-gray-200 text-gray-600 font-bold text-xs hover:bg-gray-50 transition-all"
                 >
                     Hoy
                 </button>
                 <div className="flex items-center bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                    <button onClick={prevMonth} className="p-2.5 hover:bg-gray-50 text-gray-500 transition-colors">
-                        <ChevronLeft className="w-4 h-4" />
+                    <button onClick={prevMonth} className="p-2 hover:bg-gray-50 text-gray-500 transition-colors">
+                        <ChevronLeft className="w-3.5 h-3.5" />
                     </button>
-                    <span className="px-3 text-sm font-bold text-gray-700 capitalize min-w-[130px] text-center">
+                    <span className="px-2 text-xs font-bold text-gray-700 capitalize min-w-[110px] text-center">
                         {format(currentDate, 'MMMM yyyy', { locale: es })}
                     </span>
-                    <button onClick={nextMonth} className="p-2.5 hover:bg-gray-50 text-gray-500 transition-colors">
-                        <ChevronRight className="w-4 h-4" />
+                    <button onClick={nextMonth} className="p-2 hover:bg-gray-50 text-gray-500 transition-colors">
+                        <ChevronRight className="w-3.5 h-3.5" />
                     </button>
                 </div>
                 {/* Responsable filter — solo admins */}
@@ -433,7 +433,7 @@ export default function Calendar() {
                             }`}
                         >
                             <Users className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline max-w-[100px] truncate">
+                            <span className="hidden lg:inline max-w-[90px] truncate">
                                 {selectedCalendarCollabName || 'Responsable'}
                             </span>
                             <ChevronDown className={`w-3 h-3 transition-transform ${isCalendarCollabOpen ? 'rotate-180' : ''}`} />
@@ -475,53 +475,55 @@ export default function Calendar() {
 
                 <button
                     onClick={() => setShowCrmEvents(!showCrmEvents)}
-                    className={`flex items-center gap-2 px-3 h-9 rounded-xl border text-xs font-bold transition-all shadow-sm ${
+                    className={`flex items-center gap-1.5 px-2.5 h-9 rounded-xl border text-xs font-bold transition-all shadow-sm ${
                         showCrmEvents 
                             ? 'bg-indigo-50 border-indigo-200 text-indigo-700' 
                             : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
                     }`}
                 >
                     <Users className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">CRM</span>
+                    <span className="hidden lg:inline">CRM</span>
                 </button>
 
                 <button
                     onClick={() => setShowGoogleEvents(!showGoogleEvents)}
-                    className={`flex items-center gap-2 px-3 h-9 rounded-xl border text-xs font-bold transition-all shadow-sm ${
+                    className={`flex items-center gap-1.5 px-2.5 h-9 rounded-xl border text-xs font-bold transition-all shadow-sm ${
                         showGoogleEvents 
                             ? 'bg-[#4285F4]/10 border-[#4285F4]/30 text-[#4285F4]' 
                             : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
                     }`}
                 >
                     <CalendarIcon className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Google</span>
+                    <span className="hidden lg:inline">Google</span>
                 </button>
 
                 <button
                     onClick={() => setShowOutlookEvents(!showOutlookEvents)}
-                    className={`flex items-center gap-2 px-3 h-9 rounded-xl border text-xs font-bold transition-all shadow-sm ${
+                    className={`flex items-center gap-1.5 px-2.5 h-9 rounded-xl border text-xs font-bold transition-all shadow-sm ${
                         showOutlookEvents 
                             ? 'bg-[#0078D4]/10 border-[#0078D4]/30 text-[#0078D4]' 
                             : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
                     }`}
                 >
                     <CalendarIcon className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Outlook</span>
+                    <span className="hidden lg:inline">Outlook</span>
                 </button>
 
                 <button
                     onClick={() => { setMeetSchedulerDate(new Date()); setShowMeetScheduler(true); }}
-                    className="flex items-center gap-2 px-4 h-9 rounded-xl bg-gradient-to-r from-[#4285F4] to-[#1a73e8] hover:from-[#3367d6] hover:to-[#1557b0] text-white font-bold text-sm shadow-md shadow-[#4285F4]/30 transition-all"
+                    className="flex items-center gap-1.5 px-3 h-9 rounded-xl bg-gradient-to-r from-[#4285F4] to-[#1a73e8] hover:from-[#3367d6] hover:to-[#1557b0] text-white font-bold text-xs shadow-md shadow-[#4285F4]/30 transition-all shrink-0"
                 >
-                    <Video className="w-4 h-4" />
-                    Nueva Reunión
+                    <Video className="w-3.5 h-3.5" />
+                    <span className="hidden xl:inline">Nueva Reunión</span>
+                    <span className="xl:hidden">Reunión</span>
                 </button>
                 <button
                     onClick={() => navigate('/leads')}
-                    className="flex items-center gap-2 px-4 h-9 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 transition-all ml-1"
+                    className="flex items-center gap-1.5 px-3 h-9 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-md shadow-indigo-200 transition-all ml-1 shrink-0"
                 >
-                    <Plus className="w-4 h-4" />
-                    Nuevo Seguimiento
+                    <Plus className="w-3.5 h-3.5" />
+                    <span className="hidden xl:inline">Nuevo Seguimiento</span>
+                    <span className="xl:hidden">Seguimiento</span>
                 </button>
             </div>
         </div>
