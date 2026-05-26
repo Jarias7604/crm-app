@@ -81,5 +81,26 @@ export function utcToLocalDate(utcStr: string, ianaTimezone: string): Date {
     return new Date(y, m - 1, d, 12, 0, 0);  // noon local — safe for isSameDay
 }
 
+/**
+ * Gets the hour and minute of a UTC timestamp in a target IANA timezone.
+ * Useful for grid positioning in Calendar view.
+ */
+export function getHourAndMinuteInZone(utcStr: string, ianaTimezone: string): { hour: number; minute: number } {
+    try {
+        const formatter = new Intl.DateTimeFormat('sv', {
+            timeZone: ianaTimezone,
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        });
+        const formatted = formatter.format(new Date(utcStr)); // "HH:MM"
+        const [h, m] = formatted.split(':').map(Number);
+        return { hour: isNaN(h) ? 12 : h, minute: isNaN(m) ? 0 : m };
+    } catch (e) {
+        const d = new Date(utcStr);
+        return { hour: d.getHours(), minute: d.getMinutes() };
+    }
+}
+
 /** Fallback timezone if company setting is not loaded yet */
 export const DEFAULT_TIMEZONE = 'America/El_Salvador';

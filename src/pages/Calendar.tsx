@@ -18,7 +18,7 @@ import { supabase } from '../services/supabase';
 import { companyCalendarsService } from '../services/companyCalendars';
 import { useAuth } from '../auth/AuthProvider';
 import { useTimezone } from '../hooks/useTimezone';
-import { formatTimeInZone, utcToLocalDate, DEFAULT_TIMEZONE } from '../utils/timezone';
+import { formatTimeInZone, utcToLocalDate, getHourAndMinuteInZone, DEFAULT_TIMEZONE } from '../utils/timezone';
 import GoogleMeetScheduler from '../components/GoogleMeetScheduler';
 import toast from 'react-hot-toast';
 
@@ -33,14 +33,14 @@ const ACTION_CONFIG: Record<string, {
     dotColor: string;   // dot color for mobile
     Icon: React.ElementType;
 }> = {
-    call: { label: 'Llamada', pill: 'bg-emerald-50 text-emerald-800 border-l-2 border-emerald-400 hover:bg-emerald-100', badge: 'bg-emerald-50 border border-emerald-200', badgeText: 'text-emerald-700', dotColor: 'bg-emerald-500', Icon: Phone },
-    email: { label: 'Email', pill: 'bg-blue-50 text-blue-800 border-l-2 border-blue-400 hover:bg-blue-100', badge: 'bg-blue-50 border border-blue-200', badgeText: 'text-blue-700', dotColor: 'bg-blue-500', Icon: Mail },
-    whatsapp: { label: 'WhatsApp', pill: 'bg-teal-50 text-teal-800 border-l-2 border-teal-400 hover:bg-teal-100', badge: 'bg-teal-50 border border-teal-200', badgeText: 'text-teal-700', dotColor: 'bg-teal-500', Icon: MessageSquare },
-    telegram: { label: 'Telegram', pill: 'bg-sky-50 text-sky-800 border-l-2 border-sky-400 hover:bg-sky-100', badge: 'bg-sky-50 border border-sky-200', badgeText: 'text-sky-700', dotColor: 'bg-sky-500', Icon: MessageSquare },
-    meeting: { label: 'Reunión', pill: 'bg-violet-50 text-violet-800 border-l-2 border-violet-400 hover:bg-violet-100', badge: 'bg-violet-50 border border-violet-200', badgeText: 'text-violet-700', dotColor: 'bg-violet-500', Icon: Video },
-    quote: { label: 'Cotización', pill: 'bg-amber-50 text-amber-800 border-l-2 border-amber-400 hover:bg-amber-100', badge: 'bg-amber-50 border border-amber-200', badgeText: 'text-amber-700', dotColor: 'bg-amber-500', Icon: FileText },
-    google_calendar: { label: 'Google Event', pill: 'bg-[#4285F4]/10 text-[#4285F4] border-l-2 border-[#4285F4] hover:bg-[#4285F4]/20', badge: 'bg-[#4285F4]/10 border border-[#4285F4]/20', badgeText: 'text-[#4285F4]', dotColor: 'bg-[#4285F4]', Icon: CalendarIcon },
-    outlook_calendar: { label: 'Outlook Event', pill: 'bg-[#0078D4]/10 text-[#0078D4] border-l-2 border-[#0078D4] hover:bg-[#0078D4]/20', badge: 'bg-[#0078D4]/10 border border-[#0078D4]/20', badgeText: 'text-[#0078D4]', dotColor: 'bg-[#0078D4]', Icon: CalendarIcon },
+    call: { label: 'Llamada', pill: 'bg-emerald-50/80 border-emerald-200 text-emerald-950 hover:bg-emerald-100/90 hover:border-emerald-300', badge: 'bg-emerald-50 border border-emerald-200', badgeText: 'text-emerald-700', dotColor: 'bg-emerald-500', Icon: Phone },
+    email: { label: 'Email', pill: 'bg-blue-50/80 border-blue-200 text-blue-950 hover:bg-blue-100/90 hover:border-blue-300', badge: 'bg-blue-50 border border-blue-200', badgeText: 'text-blue-700', dotColor: 'bg-blue-500', Icon: Mail },
+    whatsapp: { label: 'WhatsApp', pill: 'bg-teal-50/80 border-teal-200 text-teal-950 hover:bg-teal-100/90 hover:border-teal-300', badge: 'bg-teal-50 border border-teal-200', badgeText: 'text-teal-700', dotColor: 'bg-teal-500', Icon: MessageSquare },
+    telegram: { label: 'Telegram', pill: 'bg-sky-50/80 border-sky-200 text-sky-950 hover:bg-sky-100/90 hover:border-sky-300', badge: 'bg-sky-50 border border-sky-200', badgeText: 'text-sky-700', dotColor: 'bg-sky-500', Icon: MessageSquare },
+    meeting: { label: 'Reunión', pill: 'bg-violet-50/80 border-violet-200 text-violet-950 hover:bg-violet-100/90 hover:border-violet-300', badge: 'bg-violet-50 border border-violet-200', badgeText: 'text-violet-700', dotColor: 'bg-violet-500', Icon: Video },
+    quote: { label: 'Cotización', pill: 'bg-amber-50/80 border-amber-200 text-amber-950 hover:bg-amber-100/90 hover:border-amber-300', badge: 'bg-amber-50 border border-amber-200', badgeText: 'text-amber-700', dotColor: 'bg-amber-500', Icon: FileText },
+    google_calendar: { label: 'Google Event', pill: 'bg-indigo-50/80 border-indigo-200 text-indigo-950 hover:bg-indigo-100/90 hover:border-indigo-300', badge: 'bg-[#4285F4]/10 border border-[#4285F4]/20', badgeText: 'text-[#4285F4]', dotColor: 'bg-[#4285F4]', Icon: CalendarIcon },
+    outlook_calendar: { label: 'Outlook Event', pill: 'bg-cyan-50/80 border-cyan-200 text-cyan-950 hover:bg-cyan-100/90 hover:border-cyan-300', badge: 'bg-[#0078D4]/10 border border-[#0078D4]/20', badgeText: 'text-[#0078D4]', dotColor: 'bg-[#0078D4]', Icon: CalendarIcon },
 };
 const getActionCfg = (type: string) => ACTION_CONFIG[type] ?? {
     label: type, pill: 'bg-gray-50 text-gray-700 border-l-2 border-gray-300 hover:bg-gray-100',
@@ -961,30 +961,42 @@ export default function Calendar() {
                         {weekDays.map((day, dayIdx) => {
                             const events = getDailyEvents(day);
                             return events.map((ev, evIdx) => {
-                                const evDate = utcToLocalDate(ev.date, companyTimezone);
-                                const startHour = evDate.getHours();
-                                const startMin = evDate.getMinutes();
+                                const { hour: startHour, minute: startMin } = getHourAndMinuteInZone(ev.date, companyTimezone);
                                 if (startHour < 6 || startHour > 22) return null; // out of view bounds
                                 
                                 const top = ((startHour - 6) * 60) + startMin;
                                 const height = 50; // fixed height for event block
                                 const cfg = getActionCfg(ev.action_type);
+                                const Icon = cfg.Icon;
+                                const isOverdue = !ev.completed && isBefore(utcToLocalDate(ev.date, companyTimezone), new Date()) && !isToday(utcToLocalDate(ev.date, companyTimezone));
                                 return (
                                     <div 
                                         key={ev.id}
                                         onClick={(e) => { e.stopPropagation(); if (ev.action_type === 'google_calendar') { setSelectedGoogleEvent(ev); return; } ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } }); }}
-                                        className={`absolute rounded-lg p-1.5 text-[9px] leading-tight overflow-hidden cursor-pointer hover:z-20 transition-all hover:ring-2 hover:ring-indigo-300 shadow-sm ${ev.completed ? 'opacity-50 bg-gray-100 border border-gray-200' : cfg.pill}`}
+                                        className={`absolute rounded-xl p-2 text-[10px] leading-snug overflow-hidden cursor-pointer hover:z-20 transition-all hover:scale-[1.02] hover:shadow-md border flex flex-col justify-between ${
+                                            ev.completed 
+                                                ? 'opacity-55 bg-gray-50 border-gray-200 text-gray-400' 
+                                                : isOverdue
+                                                    ? 'bg-rose-50/90 border-rose-200 text-rose-800 hover:bg-rose-100/90'
+                                                    : `backdrop-blur-[1px] ${cfg.pill}`
+                                        }`}
                                         style={{
                                             top: `${top}px`,
                                             height: `${height}px`,
-                                            left: `calc(${(dayIdx + 1) * (100 / 8)}% + 4px)`,
-                                            width: `calc(${100 / 8}% - 8px)`,
+                                            left: `calc(${(dayIdx + 1) * (100 / 8)}% + 3px)`,
+                                            width: `calc(${100 / 8}% - 6px)`,
                                             zIndex: 10 + evIdx
                                         }}
                                         title={`${ev.lead?.name || 'Evento'} - ${formatTimeInZone(ev.date, companyTimezone)}`}
                                     >
-                                        <div className="font-bold truncate">{ev.lead?.name || 'Evento'}</div>
-                                        <div className="opacity-80">{formatTimeInZone(ev.date, companyTimezone)}</div>
+                                        <div className="flex items-center gap-1 min-w-0">
+                                            <Icon className="w-2.5 h-2.5 shrink-0 opacity-80" />
+                                            <span className="font-extrabold truncate flex-1 leading-tight">{ev.lead?.name || 'Evento'}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between text-[8px] font-bold opacity-75 mt-0.5">
+                                            <span>{formatTimeInZone(ev.date, companyTimezone)}</span>
+                                            {ev.completed && <CheckCircle2 className="w-2.5 h-2.5 text-emerald-500 shrink-0" />}
+                                        </div>
                                     </div>
                                 );
                             });
@@ -1021,28 +1033,48 @@ export default function Calendar() {
                         ))}
                         {/* Events */}
                         {dayEvents.map((ev, evIdx) => {
-                            const evDate = utcToLocalDate(ev.date, companyTimezone);
-                            const startHour = evDate.getHours();
-                            const startMin = evDate.getMinutes();
+                            const { hour: startHour, minute: startMin } = getHourAndMinuteInZone(ev.date, companyTimezone);
                             if (startHour < 6 || startHour > 22) return null; // out of bounds
                             const top = ((startHour - 6) * 80) + (startMin / 60 * 80);
                             const height = 70; 
                             const cfg = getActionCfg(ev.action_type);
+                            const Icon = cfg.Icon;
+                            const isOverdue = !ev.completed && isBefore(utcToLocalDate(ev.date, companyTimezone), new Date()) && !isToday(utcToLocalDate(ev.date, companyTimezone));
                             return (
                                 <div 
                                     key={ev.id}
                                     onClick={(e) => { e.stopPropagation(); if (ev.action_type === 'google_calendar') { setSelectedGoogleEvent(ev); return; } ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } }); }}
-                                    className={`absolute left-24 right-4 rounded-xl p-3 cursor-pointer shadow-sm hover:shadow-md transition-all flex flex-col border-l-4 ${ev.completed ? 'opacity-50 bg-gray-100 border border-gray-200' : cfg.pill}`}
+                                    className={`absolute left-24 right-4 rounded-2xl p-3.5 cursor-pointer shadow-sm hover:shadow-md hover:scale-[1.005] transition-all flex flex-col justify-between border ${
+                                        ev.completed 
+                                            ? 'opacity-55 bg-gray-50 border-gray-200 text-gray-400 font-medium' 
+                                            : isOverdue
+                                                ? 'bg-rose-50/90 border-rose-200 text-rose-800 hover:bg-rose-100/90'
+                                                : `backdrop-blur-[2px] ${cfg.pill}`
+                                    }`}
                                     style={{
                                         top: `${top}px`,
                                         height: `${height}px`,
                                     }}
                                 >
-                                    <div className="flex justify-between items-start">
-                                        <div className="font-bold text-sm truncate text-gray-900">{ev.lead?.name || 'Evento'} {ev.lead?.company_name ? `- ${ev.lead.company_name}` : ''}</div>
-                                        <div className="text-xs font-bold opacity-80">{formatTimeInZone(ev.date, companyTimezone)}</div>
+                                    <div className="flex justify-between items-start gap-4">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <div className={`p-1.5 rounded-lg shrink-0 ${ev.completed ? 'bg-gray-100 text-gray-400' : 'bg-white/60 shadow-sm text-indigo-600'}`}>
+                                                <Icon className="w-4 h-4" />
+                                            </div>
+                                            <div className="min-w-0">
+                                                <div className="font-extrabold text-sm truncate text-gray-900 leading-tight">
+                                                    {ev.lead?.name || 'Evento'} {ev.lead?.company_name ? ` · ${ev.lead.company_name}` : ''}
+                                                </div>
+                                                <div className="text-[11px] mt-0.5 opacity-85 truncate font-medium text-gray-500">
+                                                    {ev.notes || cfg.label}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <span className="text-xs font-black text-gray-700 bg-white/50 px-2 py-0.5 rounded-lg shadow-sm border border-gray-100">{formatTimeInZone(ev.date, companyTimezone)}</span>
+                                            {ev.completed && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+                                        </div>
                                     </div>
-                                    <div className="text-xs mt-1 opacity-90 truncate font-medium">{ev.notes || cfg.label}</div>
                                 </div>
                             );
                         })}
