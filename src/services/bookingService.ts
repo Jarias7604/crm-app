@@ -132,8 +132,40 @@ export const bookingService = {
             .eq('id', data.company_id)
             .maybeSingle();
 
+        // ⚡ SPECIAL DYNAMIC AVATAR & DISPLAY NAME SYNC:
+        // Query the profile of the link owner to make sure we show their current avatar & full name.
+        let avatarUrl = data.avatar_url;
+        let displayName = data.display_name;
+
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('email, full_name, avatar_url')
+            .eq('id', data.user_id)
+            .maybeSingle();
+
+        if (profile) {
+            avatarUrl = profile.avatar_url || avatarUrl;
+            displayName = profile.full_name || displayName;
+
+            // Platform owner sync fallback
+            if (profile.email === 'jarias7604@gmail.com') {
+                const { data: corporateProfile } = await supabase
+                    .from('profiles')
+                    .select('full_name, avatar_url')
+                    .eq('email', 'jarias@ariasdefense.com')
+                    .maybeSingle();
+
+                if (corporateProfile) {
+                    avatarUrl = corporateProfile.avatar_url || avatarUrl;
+                    displayName = corporateProfile.full_name || displayName;
+                }
+            }
+        }
+
         return {
             ...data,
+            avatar_url: avatarUrl || undefined,
+            display_name: displayName,
             company_name: company?.name || undefined,
             company_logo: company?.logo_url || undefined,
         };
@@ -168,13 +200,178 @@ export const bookingService = {
         duration_minutes: number;
         timezone: string;
     }): Promise<BookingAppointment> {
-        const { data, error } = await supabase
+        // 1. Check if lead already exists by email
+        let leadId = '';
+        const emailLower = appointment.guest_email.trim().toLowerCase();
+        
+        const { data: existingLead } = await supabase
+            .from('leads')
+            .select('id')
+            .eq('company_id', appointment.company_id)
+            .eq('email', emailLower)
+            .maybeSingle();
+
+        if (existingLead) {
+            leadId = existingLead.id;
+        } else {
+            // Create a new Lead
+            const { data: newLead, error: newLeadError } = await supabase
+                .from('leads')
+                .insert({
+                    company_id: appointment.company_id,
+                    name: appointment.guest_name,
+                    email: emailLower,
+                    phone: appointment.guest_phone || null,
+                    company_name: appointment.guest_company || null,
+                    assigned_to: appointment.user_id,
+                    source: 'Agendador Web',
+                    status: 'Prospecto'
+                })
+                .select('id')
+                .single();
+
+            if (newLeadError) throw newLeadError;
+            leadId = newLead.id;
+        }
+
+        // 2. Insert the appointment associated with the lead_id
+        const { data: apptData, error: apptError } = await supabase
             .from('booking_appointments')
-            .insert({ ...appointment, status: 'confirmed' })
+            .insert({
+                ...appointment,
+                lead_id: leadId,
+                status: 'confirmed'
+            })
             .select()
             .single();
-        if (error) throw error;
-        return data;
+
+        if (apptError) throw apptError;
+
+        // 3. Create a matching FollowUp in the follow_ups table (this places it on the CRM Calendar)
+        const { data: followUp, error: followUpError } = await supabase
+            .from('follow_ups')
+            .insert({
+                lead_id: leadId,
+                company_id: appointment.company_id,
+                user_id: appointment.user_id,
+                assigned_to: appointment.user_id,
+                date: appointment.start_time,
+                notes: appointment.notes || `Reunión agendada vía web por ${appointment.guest_name}`,
+                action_type: 'meeting',
+                completed: false
+            })
+            .select()
+            .single();
+
+        if (followUpError) {
+            console.error('Error creating CRM follow_up:', followUpError);
+        }
+
+        // 4. Try to sync with Google Calendar if integrated
+        const { data: googleIntegration } = await supabase
+            .from('calendar_integrations')
+            .select('id, google_email')
+            .eq('user_id', appointment.user_id)
+            .eq('provider', 'google')
+            .eq('is_active', true)
+            .maybeSingle();
+
+        if (googleIntegration && followUp) {
+            try {
+                // Call google-calendar-sync edge function exactly like GoogleMeetScheduler does
+                await supabase.functions.invoke('google-calendar-sync', {
+                    body: {
+                        action: 'create_event',
+                        integration_id: googleIntegration.id,
+                        event: {
+                            title: `Reunión: ${appointment.guest_name}`,
+                            description: appointment.notes || 'Reunión agendada vía web.',
+                            start: appointment.start_time,
+                            end: appointment.end_time,
+                            attendees: [emailLower],
+                            add_meet_link: true,
+                            send_invites: true,
+                            follow_up_id: followUp.id,
+                            timezone: 'America/El_Salvador',
+                        },
+                    },
+                });
+            } catch (err) {
+                console.error('Error calling google-calendar-sync:', err);
+            }
+        } else {
+            // Fallback: Send a professional Resend email through marketing queue
+            try {
+                const formattedDate = new Date(appointment.start_time).toLocaleDateString('es-ES', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    timeZone: 'America/El_Salvador'
+                });
+                const formattedTime = new Date(appointment.start_time).toLocaleTimeString('es-ES', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZone: 'America/El_Salvador'
+                });
+
+                const htmlContent = `
+                    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #f0f0f0; border-radius: 16px; background-color: #ffffff;">
+                        <h2 style="color: #10B981; font-weight: 800; margin-bottom: 20px; font-size: 24px;">¡Reunión Confirmada!</h2>
+                        <p style="color: #4B5563; font-size: 15px; line-height: 1.6;">Hola <strong>${appointment.guest_name}</strong>,</p>
+                        <p style="color: #4B5563; font-size: 15px; line-height: 1.6;">Tu reunión ha sido agendada con éxito en nuestra plataforma. A continuación encontrarás los detalles:</p>
+                        
+                        <div style="background-color: #F9FAFB; padding: 24px; border-radius: 12px; margin: 25px 0; border: 1px solid #F3F4F6;">
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <tr>
+                                    <td style="padding: 8px 0; color: #9CA3AF; font-size: 11px; font-weight: bold; text-transform: uppercase; width: 120px; letter-spacing: 0.05em;">Fecha</td>
+                                    <td style="padding: 8px 0; color: #1F2937; font-size: 14px; font-weight: 600; text-transform: capitalize;">${formattedDate}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 0; color: #9CA3AF; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em;">Hora</td>
+                                    <td style="padding: 8px 0; color: #1F2937; font-size: 14px; font-weight: 600;">${formattedTime} (CST / El Salvador)</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 0; color: #9CA3AF; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em;">Duración</td>
+                                    <td style="padding: 8px 0; color: #1F2937; font-size: 14px; font-weight: 600;">${appointment.duration_minutes} minutos</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 0; color: #9CA3AF; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em;">Ubicación</td>
+                                    <td style="padding: 8px 0; color: #1F2937; font-size: 14px; font-weight: 600;">Videollamada (Enlace enviado por el agente)</td>
+                                </tr>
+                            </table>
+                        </div>
+                        
+                        <p style="color: #4B5563; font-size: 14px; line-height: 1.6; margin-bottom: 25px;">
+                            El agente se pondrá en contacto contigo para compartirte el enlace de acceso minutos antes de la sesión.
+                        </p>
+                        
+                        <p style="color: #9CA3AF; font-size: 11px; margin-top: 30px; border-top: 1px solid #E5E7EB; padding-top: 15px; text-align: center;">
+                            Este es un mensaje automático de confirmación enviado por Arias CRM.
+                        </p>
+                    </div>
+                `;
+
+                await supabase
+                    .from('marketing_message_queue')
+                    .insert({
+                        company_id: appointment.company_id,
+                        lead_id: leadId,
+                        channel: 'email',
+                        subject: 'Confirmación de tu cita - Arias Defense',
+                        content: htmlContent,
+                        status: 'pending',
+                        scheduled_at: new Date().toISOString()
+                    });
+
+                // Trigger queue immediately
+                supabase.functions.invoke('process-message-queue');
+            } catch (err) {
+                console.error('Error scheduling backup confirmation email:', err);
+            }
+        }
+
+        return apptData;
     },
 
     // === AGENT — view their appointments ===
@@ -228,8 +425,8 @@ export const bookingService = {
             const slotEnd = new Date(cursor.getTime() + durationMinutes * 60000);
             if (slotEnd > dayEnd) break;
 
-            // Skip past slots
-            if (cursor <= now) {
+            // Skip past slots (current time + 10 minute buffer to avoid booking in the immediate past)
+            if (cursor.getTime() <= now.getTime() + 10 * 60 * 1000) {
                 cursor = new Date(cursor.getTime() + (durationMinutes + bufferMinutes) * 60000);
                 continue;
             }

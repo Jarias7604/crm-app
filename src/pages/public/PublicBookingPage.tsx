@@ -30,8 +30,37 @@ export default function PublicBookingPage() {
     useEffect(() => {
         if (!slug) return;
         bookingService.getPublicBookingLink(slug).then(l => {
-            if (!l) setNotFound(true);
-            else setLink(l);
+            if (!l) {
+                setNotFound(true);
+            } else {
+                setLink(l);
+                
+                // Auto-select the first available day starting from today
+                const today = new Date();
+                let targetDate: Date | null = null;
+                
+                const isAvailableDayLocal = (date: Date) => {
+                    const dayOfWeek = date.getDay();
+                    const avail = l.availability.some(a => a.day === dayOfWeek);
+                    if (!avail) return false;
+                    if (startOfDay(date) < startOfDay(new Date())) return false;
+                    return true;
+                };
+
+                for (let i = 0; i < 30; i++) {
+                    const candidate = new Date();
+                    candidate.setDate(today.getDate() + i);
+                    if (isAvailableDayLocal(candidate)) {
+                        targetDate = candidate;
+                        break;
+                    }
+                }
+                
+                if (targetDate) {
+                    setSelectedDate(targetDate);
+                    setCurrentMonth(targetDate);
+                }
+            }
             setLoading(false);
         });
     }, [slug]);
@@ -181,7 +210,7 @@ export default function PublicBookingPage() {
             ) : (
                 /* ── CALENDAR + SLOTS ── */
                 <div className="flex-1 flex items-center justify-center px-4 py-6">
-                    <div className="w-full" style={{ maxWidth: '1100px' }}>
+                    <div className="w-full" style={{ maxWidth: '1200px' }}>
                         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
                             <div className="flex flex-col md:flex-row">
 
@@ -205,7 +234,7 @@ export default function PublicBookingPage() {
 
                                     <p className="text-sm text-gray-400 font-medium">{link.display_name}</p>
                                     <h1 className="text-2xl font-bold text-gray-900 mt-1 leading-snug">
-                                        {link.title?.replace(/\d+\s*minutos?/i, `${link.duration_minutes} minutos`) || `Reunión de ${link.duration_minutes} minutos`}
+                                        {link.title || `Reunión de ${link.duration_minutes} minutos`}
                                     </h1>
 
                                     <div className="mt-6 space-y-3">
@@ -230,9 +259,14 @@ export default function PublicBookingPage() {
                                     )}
 
                                     <div className="mt-auto pt-6">
-                                        <div className="flex items-center gap-2 text-xs text-gray-300">
-                                            <Shield className="w-3.5 h-3.5" />
-                                            <span>Reunión segura y confidencial</span>
+                                        <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3.5 flex flex-col gap-1.5">
+                                            <div className="flex items-center gap-1.5 text-xs text-emerald-800 font-black">
+                                                <Shield className="w-4 h-4 text-emerald-600 shrink-0" />
+                                                <span>CONEXIÓN 100% SEGURA</span>
+                                            </div>
+                                            <p className="text-[10px] text-emerald-600 leading-relaxed font-medium">
+                                                Portal oficial verificado por Arias Defense CRM. Tus datos de contacto y la videollamada están cifrados de extremo a extremo para tu total tranquilidad y seguridad.
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
@@ -339,20 +373,20 @@ export default function PublicBookingPage() {
                                                                     if (active) setStep('form');
                                                                     else setSelectedSlot(slot);
                                                                 }}
-                                                                className={`w-full py-3 rounded-lg text-sm font-semibold transition-all border ${
+                                                                className={`w-full py-3.5 rounded-xl text-sm font-semibold transition-all duration-200 border ${
                                                                     active
-                                                                        ? 'text-white border-transparent shadow-md bg-green-600'
-                                                                        : 'border-green-300 text-green-600 hover:border-green-500 hover:bg-green-50 bg-white'
+                                                                        ? 'text-white border-transparent shadow-md bg-emerald-600 font-bold scale-[1.02]'
+                                                                        : 'border-emerald-200 text-emerald-700 bg-emerald-50/40 hover:bg-emerald-600 hover:text-white hover:border-transparent hover:shadow'
                                                                 }`}
                                                             >
                                                                 {active ? (
                                                                     <span className="flex items-center justify-center gap-3">
                                                                         {format(new Date(slot), 'h:mm a')}
-                                                                        <span className="text-xs bg-white/25 px-3 py-0.5 rounded-full font-bold">Confirmar</span>
+                                                                        <span className="text-xs bg-white/20 px-3 py-0.5 rounded-full font-bold">Confirmar</span>
                                                                     </span>
                                                                 ) : (
                                                                     <span className="flex items-center justify-center gap-2">
-                                                                        <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                                                                         {format(new Date(slot), 'h:mm a')}
                                                                     </span>
                                                                 )}
