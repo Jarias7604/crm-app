@@ -65,12 +65,33 @@ export const bookingService = {
             .eq('id', user.id)
             .single();
 
+        let avatarUrl = profile?.avatar_url || link.avatar_url;
+        let displayName = link.display_name || profile?.full_name || 'Agent';
+
+        // ⚡ SPECIAL PLATFORM OWNER SYNC:
+        // If the logged-in user is the Super Admin (jarias7604@gmail.com),
+        // pull the avatar and professional name from the main corporate account (jarias@ariasdefense.com).
+        if (user.email === 'jarias7604@gmail.com') {
+            const { data: corporateProfile } = await supabase
+                .from('profiles')
+                .select('full_name, avatar_url')
+                .eq('email', 'jarias@ariasdefense.com')
+                .maybeSingle();
+
+            if (corporateProfile?.avatar_url) {
+                avatarUrl = corporateProfile.avatar_url;
+            }
+            if (corporateProfile?.full_name) {
+                displayName = corporateProfile.full_name;
+            }
+        }
+
         const payload = {
             ...link,
             user_id: user.id,
             company_id: profile?.company_id,
-            display_name: link.display_name || profile?.full_name || 'Agent',
-            avatar_url: profile?.avatar_url || link.avatar_url,
+            display_name: displayName,
+            avatar_url: avatarUrl,
         };
 
         if (link.id) {
