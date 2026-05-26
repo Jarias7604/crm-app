@@ -209,96 +209,96 @@ export default function PublicBookingPage() {
 
             ) : (
                 /* ── CALENDAR + SLOTS ── */
-                <div className="flex-1 flex items-center justify-center px-4 py-6">
+                <div className="flex-1 flex items-center justify-center px-4 py-2 md:py-4">
                     <div className="w-full" style={{ maxWidth: '1200px' }}>
                         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
                             <div className="flex flex-col md:flex-row">
 
                                 {/* LEFT — Agent Info & Branding */}
-                                <div className="md:w-[300px] shrink-0 p-8 border-b md:border-b-0 md:border-r border-gray-100 flex flex-col">
+                                <div className="md:w-[280px] shrink-0 p-5 border-b md:border-b-0 md:border-r border-gray-100 flex flex-col">
                                     {/* Company Logo */}
                                     {link.company_logo ? (
-                                        <img src={link.company_logo} alt={link.company_name} className="h-8 w-auto mb-6 object-contain self-start" />
+                                        <img src={link.company_logo} alt={link.company_name} className="h-6 w-auto mb-4 object-contain self-start" />
                                     ) : link.company_name ? (
-                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6">{link.company_name}</p>
+                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">{link.company_name}</p>
                                     ) : null}
 
                                     {/* Agent Photo */}
                                     {link.avatar_url ? (
-                                        <img src={link.avatar_url} className="w-16 h-16 rounded-full object-cover mb-5 shadow-sm" alt={link.display_name} />
+                                        <img src={link.avatar_url} className="w-12 h-12 rounded-full object-cover mb-3 shadow-sm" alt={link.display_name} />
                                     ) : (
-                                        <div className="w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-bold mb-5 shadow-sm" style={{ backgroundColor: brandColor }}>
+                                        <div className="w-12 h-12 rounded-full flex items-center justify-center text-white text-xl font-bold mb-3 shadow-sm" style={{ backgroundColor: brandColor }}>
                                             {link.display_name.charAt(0).toUpperCase()}
                                         </div>
                                     )}
 
-                                    <p className="text-sm text-gray-400 font-medium">{link.display_name}</p>
-                                    <h1 className="text-2xl font-bold text-gray-900 mt-1 leading-snug">
+                                    <p className="text-xs text-gray-400 font-medium">{link.display_name}</p>
+                                    <h1 className="text-lg font-bold text-gray-900 mt-0.5 leading-snug">
                                         {link.title || `Reunión de ${link.duration_minutes} minutos`}
                                     </h1>
 
-                                    <div className="mt-6 space-y-3">
-                                        <div className="flex items-center gap-3 text-sm text-gray-500">
-                                            <Clock className="w-5 h-5 text-gray-400 shrink-0" />
+                                    <div className="mt-4 space-y-2">
+                                        <div className="flex items-center gap-2.5 text-xs text-gray-500">
+                                            <Clock className="w-4 h-4 text-gray-400 shrink-0" />
                                             <span>{link.duration_minutes} min</span>
                                         </div>
-                                        <div className="flex items-center gap-3 text-sm text-gray-500">
-                                            <Video className="w-5 h-5 text-gray-400 shrink-0" />
+                                        <div className="flex items-center gap-2.5 text-xs text-gray-500">
+                                            <Video className="w-4 h-4 text-gray-400 shrink-0" />
                                             <span>{link.location}</span>
                                         </div>
                                     </div>
 
                                     {link.description ? (
-                                        <p className="mt-6 text-sm text-gray-400 leading-relaxed border-t border-gray-100 pt-5">
+                                        <p className="mt-4 text-xs text-gray-400 leading-relaxed border-t border-gray-100 pt-3">
                                             {link.description}
                                         </p>
                                     ) : (
-                                        <p className="mt-6 text-sm text-gray-400 leading-relaxed border-t border-gray-100 pt-5">
-                                            Agenda una reunión gratuita para discutir tus necesidades. Sin compromisos, sin presión — solo una conversación profesional para entender cómo podemos ayudarte.
+                                        <p className="mt-4 text-xs text-gray-400 leading-relaxed border-t border-gray-100 pt-3">
+                                            Agenda una reunión gratuita para discutir tus necesidades. Sin compromisos, sin presión — solo una conversación profesional.
                                         </p>
                                     )}
 
-                                    <div className="mt-auto pt-6">
-                                        <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3.5 flex flex-col gap-1.5">
-                                            <div className="flex items-center gap-1.5 text-xs text-emerald-800 font-black">
-                                                <Shield className="w-4 h-4 text-emerald-600 shrink-0" />
+                                    <div className="mt-auto pt-4">
+                                        <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-2.5 flex flex-col gap-1">
+                                            <div className="flex items-center gap-1 text-[10px] text-emerald-800 font-black">
+                                                <Shield className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                                                 <span>CONEXIÓN 100% SEGURA</span>
                                             </div>
-                                            <p className="text-[10px] text-emerald-600 leading-relaxed font-medium">
-                                                Portal oficial verificado por Arias Defense CRM. Tus datos de contacto y la videollamada están cifrados de extremo a extremo para tu total tranquilidad y seguridad.
+                                            <p className="text-[9px] text-emerald-600 leading-relaxed font-medium">
+                                                Portal verificado por Arias CRM. Datos y videollamada cifrados SSL de extremo a extremo.
                                             </p>
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* CENTER — Calendar */}
-                                <div className="flex-1 p-8 border-b md:border-b-0 md:border-r border-gray-100">
-                                    <h2 className="text-lg font-bold text-gray-900 mb-6">Selecciona fecha y hora</h2>
+                                <div className="flex-1 p-5 md:p-6 border-b md:border-b-0 md:border-r border-gray-100">
+                                    <h2 className="text-base font-bold text-gray-900 mb-3">Selecciona fecha y hora</h2>
 
                                     {/* Month navigation */}
-                                    <div className="flex items-center justify-between mb-5">
-                                        <span className="text-base font-semibold text-gray-900">{MONTHS_ES[currentMonth.getMonth()]} {currentMonth.getFullYear()}</span>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <span className="text-sm font-semibold text-gray-900">{MONTHS_ES[currentMonth.getMonth()]} {currentMonth.getFullYear()}</span>
                                         <div className="flex gap-1">
-                                            <button onClick={() => setCurrentMonth(m => addMonths(m, -1))} className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">
-                                                <ChevronLeft className="w-5 h-5 text-gray-400" />
+                                            <button onClick={() => setCurrentMonth(m => addMonths(m, -1))} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">
+                                                <ChevronLeft className="w-4 h-4 text-gray-400" />
                                             </button>
-                                            <button onClick={() => setCurrentMonth(m => addMonths(m, 1))} className="w-9 h-9 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">
-                                                <ChevronRight className="w-5 h-5 text-gray-400" />
+                                            <button onClick={() => setCurrentMonth(m => addMonths(m, 1))} className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">
+                                                <ChevronRight className="w-4 h-4 text-gray-400" />
                                             </button>
                                         </div>
                                     </div>
 
                                     {/* Day headers */}
-                                    <div className="grid grid-cols-7 mb-2">
+                                    <div className="grid grid-cols-7 mb-1">
                                         {DAYS_ES.map(d => (
-                                            <div key={d} className="text-center text-xs font-semibold text-gray-400 uppercase tracking-wide py-2">{d}</div>
+                                            <div key={d} className="text-center text-[10px] font-semibold text-gray-400 uppercase tracking-wide py-1">{d}</div>
                                         ))}
                                     </div>
 
                                     {/* Day grid */}
-                                    <div className="grid grid-cols-7 gap-1">
+                                    <div className="grid grid-cols-7 gap-y-2 gap-x-1 justify-items-center">
                                         {calendarDays.map((day, i) => {
-                                            if (!day) return <div key={`e-${i}`} />;
+                                            if (!day) return <div key={`e-${i}`} className="w-8 h-8" />;
                                             const available = isAvailableDay(day);
                                             const selected = selectedDate && isSameDay(day, selectedDate);
                                             const today = isSameDay(day, new Date());
@@ -307,11 +307,11 @@ export default function PublicBookingPage() {
                                                     key={day.toISOString()}
                                                     disabled={!available}
                                                     onClick={() => { setSelectedDate(day); setSelectedSlot(null); }}
-                                                    className={`w-full aspect-square rounded-full text-sm transition-all flex items-center justify-center
+                                                    className={`w-8 h-8 rounded-full text-xs transition-all flex items-center justify-center font-semibold
                                                         ${selected ? 'text-white font-bold' : ''}
-                                                        ${!selected && available ? 'text-gray-900 font-medium hover:bg-blue-50 cursor-pointer' : ''}
-                                                        ${!available ? 'text-gray-200 cursor-default' : ''}
-                                                        ${today && !selected ? 'font-bold text-blue-600' : ''}
+                                                        ${!selected && available ? 'text-gray-900 hover:bg-blue-50 cursor-pointer' : ''}
+                                                        ${!available ? 'text-gray-200 cursor-default font-normal' : ''}
+                                                        ${today && !selected ? 'text-blue-600 font-bold border border-blue-100' : ''}
                                                     `}
                                                     style={selected ? { backgroundColor: brandColor } : {}}
                                                 >
@@ -322,48 +322,48 @@ export default function PublicBookingPage() {
                                     </div>
 
                                     {/* Timezone */}
-                                    <div className="flex items-center gap-2 mt-6 text-xs text-gray-400">
-                                        <Globe className="w-4 h-4" />
+                                    <div className="flex items-center gap-1.5 mt-4 text-[10px] text-gray-400">
+                                        <Globe className="w-3.5 h-3.5" />
                                         <span>Hora Central (El Salvador, CST)</span>
                                     </div>
                                 </div>
 
                                 {/* RIGHT — Time Slots — always visible */}
-                                <div className="md:w-[260px] shrink-0 p-8">
+                                <div className="md:w-[240px] shrink-0 p-5 flex flex-col justify-start">
                                     {!selectedDate ? (
                                         <div className="flex flex-col items-center justify-center h-full text-center py-16">
-                                            <CalIcon className="w-10 h-10 text-gray-100 mb-3" />
-                                            <p className="text-sm text-gray-300 font-medium">Selecciona un día</p>
-                                            <p className="text-xs text-gray-200 mt-1">para ver horarios</p>
+                                            <CalIcon className="w-8 h-8 text-gray-100 mb-2" />
+                                            <p className="text-xs text-gray-300 font-medium">Selecciona un día</p>
+                                            <p className="text-[10px] text-gray-200 mt-0.5">para ver horarios</p>
                                         </div>
                                     ) : (
                                         <>
-                                            <p className="text-base font-semibold text-gray-900 mb-1">
+                                            <p className="text-sm font-semibold text-gray-900 mb-0.5 capitalize">
                                                 {format(selectedDate, "EEEE", { locale: es })}
                                             </p>
-                                            <p className="text-sm text-gray-400 mb-5">
+                                            <p className="text-xs text-gray-400 mb-3">
                                                 {format(selectedDate, "dd 'de' MMMM", { locale: es })}
                                             </p>
 
                                             {/* Available indicator */}
                                             {slots.length > 0 && !loadingSlots && (
-                                                <div className="flex items-center gap-2 mb-4">
-                                                    <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                                                    <span className="text-xs text-gray-400 font-medium">horarios disponibles</span>
+                                                <div className="inline-flex items-center gap-1.5 mb-3 bg-emerald-50 text-emerald-800 px-2.5 py-1 rounded-lg border border-emerald-100/50 self-start">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                    <span className="text-[9px] font-black uppercase tracking-wider">disponibles</span>
                                                 </div>
                                             )}
 
                                             {loadingSlots ? (
-                                                <div className="flex items-center justify-center py-20">
-                                                    <Loader2 className="w-5 h-5 animate-spin text-green-500" />
+                                                <div className="flex items-center justify-center py-12">
+                                                    <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
                                                 </div>
                                             ) : slots.length === 0 ? (
-                                                <div className="text-center py-20">
-                                                    <p className="text-sm text-gray-400 font-medium">Sin horarios</p>
-                                                    <p className="text-xs text-gray-300 mt-1">Elige otro día</p>
+                                                <div className="text-center py-12">
+                                                    <p className="text-xs text-gray-400 font-medium">Sin horarios</p>
+                                                    <p className="text-[10px] text-gray-300 mt-0.5">Elige otro día</p>
                                                 </div>
                                             ) : (
-                                                <div className="space-y-2.5 max-h-[400px] overflow-y-auto pr-1">
+                                                <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1">
                                                     {slots.map(slot => {
                                                         const active = selectedSlot === slot;
                                                         return (
@@ -373,20 +373,20 @@ export default function PublicBookingPage() {
                                                                     if (active) setStep('form');
                                                                     else setSelectedSlot(slot);
                                                                 }}
-                                                                className={`w-full py-3.5 rounded-xl text-sm font-semibold transition-all duration-200 border ${
+                                                                className={`w-full py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 border ${
                                                                     active
-                                                                        ? 'text-white border-transparent shadow-md bg-emerald-600 font-bold scale-[1.02]'
-                                                                        : 'border-emerald-200 text-emerald-700 bg-emerald-50/40 hover:bg-emerald-600 hover:text-white hover:border-transparent hover:shadow'
+                                                                        ? 'text-white border-transparent shadow-sm bg-emerald-600 font-bold scale-[1.01]'
+                                                                        : 'border-emerald-200 text-emerald-700 bg-emerald-50/40 hover:bg-emerald-600 hover:text-white hover:border-transparent'
                                                                 }`}
                                                             >
                                                                 {active ? (
-                                                                    <span className="flex items-center justify-center gap-3">
+                                                                    <span className="flex items-center justify-center gap-2">
                                                                         {format(new Date(slot), 'h:mm a')}
-                                                                        <span className="text-xs bg-white/20 px-3 py-0.5 rounded-full font-bold">Confirmar</span>
+                                                                        <span className="text-[9px] bg-white/20 px-2 py-0.5 rounded-full font-bold">Confirmar</span>
                                                                     </span>
                                                                 ) : (
-                                                                    <span className="flex items-center justify-center gap-2">
-                                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                                                    <span className="flex items-center justify-center gap-1.5">
+                                                                        <span className="w-1 h-1 rounded-full bg-emerald-400" />
                                                                         {format(new Date(slot), 'h:mm a')}
                                                                     </span>
                                                                 )}
