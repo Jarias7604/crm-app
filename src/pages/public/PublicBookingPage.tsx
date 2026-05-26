@@ -210,24 +210,24 @@ export default function PublicBookingPage() {
             ) : (
                 /* ── CALENDAR + SLOTS ── */
                 <div className="flex-1 flex items-center justify-center px-4 py-4 md:py-6">
-                    <div className="w-full" style={{ maxWidth: '920px' }}>
+                    <div className="w-full" style={{ maxWidth: '1012px' }}>
                         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
                             <div className="flex flex-col md:flex-row">
 
                                 {/* LEFT — Agent Info & Branding */}
-                                <div className="md:w-[230px] shrink-0 p-5 border-b md:border-b-0 md:border-r border-gray-100 flex flex-col">
+                                <div className="md:w-[253px] shrink-0 p-5 border-b md:border-b-0 md:border-r border-gray-100 flex flex-col">
                                     {/* Company Logo */}
                                     {link.company_logo ? (
-                                        <img src={link.company_logo} alt={link.company_name} className="h-6 w-auto mb-4 object-contain self-start" />
+                                        <img src={link.company_logo} alt={link.company_name} className="h-[27px] w-auto mb-4 object-contain self-start" />
                                     ) : link.company_name ? (
                                         <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">{link.company_name}</p>
                                     ) : null}
 
                                     {/* Agent Photo */}
                                     {link.avatar_url ? (
-                                        <img src={link.avatar_url} className="w-14 h-14 rounded-full object-cover mb-3.5 shadow-sm" alt={link.display_name} />
+                                        <img src={link.avatar_url} className="w-[62px] h-[62px] rounded-full object-cover mb-3.5 shadow-sm" alt={link.display_name} />
                                     ) : (
-                                        <div className="w-14 h-14 rounded-full flex items-center justify-center text-white text-2xl font-bold mb-3.5 shadow-sm" style={{ backgroundColor: brandColor }}>
+                                        <div className="w-[62px] h-[62px] rounded-full flex items-center justify-center text-white text-2xl font-bold mb-3.5 shadow-sm" style={{ backgroundColor: brandColor }}>
                                             {link.display_name.charAt(0).toUpperCase()}
                                         </div>
                                     )}
@@ -296,9 +296,9 @@ export default function PublicBookingPage() {
                                     </div>
 
                                     {/* Day grid */}
-                                    <div className="grid grid-cols-7 gap-y-2.5 gap-x-1.5 justify-items-center">
+                                    <div className="grid grid-cols-7 gap-y-3 gap-x-2 justify-items-center">
                                         {calendarDays.map((day, i) => {
-                                            if (!day) return <div key={`e-${i}`} className="w-9 h-9" />;
+                                            if (!day) return <div key={`e-${i}`} className="w-10 h-10" />;
                                             const available = isAvailableDay(day);
                                             const selected = selectedDate && isSameDay(day, selectedDate);
                                             const today = isSameDay(day, new Date());
@@ -307,7 +307,7 @@ export default function PublicBookingPage() {
                                                     key={day.toISOString()}
                                                     disabled={!available}
                                                     onClick={() => { setSelectedDate(day); setSelectedSlot(null); }}
-                                                    className={`w-9 h-9 rounded-full text-xs transition-all flex items-center justify-center font-bold
+                                                    className={`w-10 h-10 rounded-full text-xs transition-all flex items-center justify-center font-bold
                                                         ${selected ? 'text-white' : ''}
                                                         ${!selected && available ? 'text-gray-900 hover:bg-blue-50 cursor-pointer' : ''}
                                                         ${!available ? 'text-gray-200 cursor-default font-normal' : ''}
@@ -329,7 +329,7 @@ export default function PublicBookingPage() {
                                 </div>
 
                                 {/* RIGHT — Time Slots — always visible */}
-                                <div className="md:w-[200px] shrink-0 p-5 flex flex-col justify-start">
+                                <div className="md:w-[220px] shrink-0 p-5 flex flex-col justify-start">
                                     {!selectedDate ? (
                                         <div className="flex flex-col items-center justify-center h-full text-center py-16">
                                             <CalIcon className="w-8 h-8 text-gray-100 mb-2" />
@@ -363,7 +363,7 @@ export default function PublicBookingPage() {
                                                     <p className="text-[10px] text-gray-300 mt-0.5">Elige otro día</p>
                                                 </div>
                                             ) : (
-                                                <div className="space-y-2 max-h-[310px] overflow-y-auto pr-1">
+                                                <div className="space-y-2 max-h-[341px] overflow-y-auto pr-1">
                                                     {slots.map(slot => {
                                                         const active = selectedSlot === slot;
                                                         return (
@@ -373,7 +373,7 @@ export default function PublicBookingPage() {
                                                                     if (active) setStep('form');
                                                                     else setSelectedSlot(slot);
                                                                 }}
-                                                                className={`w-full py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 border ${
+                                                                className={`w-full py-3 rounded-xl text-xs font-semibold transition-all duration-200 border ${
                                                                     active
                                                                         ? 'text-white border-transparent shadow-sm bg-emerald-600 font-bold scale-[1.01]'
                                                                         : 'border-emerald-200 text-emerald-700 bg-emerald-50/40 hover:bg-emerald-600 hover:text-white hover:border-transparent'
