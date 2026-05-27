@@ -100,7 +100,7 @@ export interface CallBotConfig {
 export const DEFAULT_CALL_BOT_CONFIG: CallBotConfig = {
     enabled: false,
 
-    voice_engine: 'telnyx',
+    voice_engine: 'vapi',
     vapi_api_key: '',
     vapi_assistant_id: '',
     vapi_phone_id: '',

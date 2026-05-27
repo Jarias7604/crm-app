@@ -448,7 +448,121 @@ export default function CallBot() {
             {tab === 'dashboard' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div className="space-y-6">
+                        {/* WARNING: Missing Phone Number */}
+                        {config.voice_engine === 'vapi' && !config.vapi_phone_id && (
+                            <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200 rounded-3xl p-5 space-y-3 shadow-sm animate-pulse">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-10 h-10 bg-amber-500/10 rounded-xl flex items-center justify-center text-amber-600 flex-shrink-0">
+                                        <AlertCircle className="w-5 h-5" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <h4 className="text-sm font-black text-amber-900 uppercase tracking-wide">⚠️ Falta tu Número de Teléfono en Vapi</h4>
+                                        <p className="text-xs text-amber-800 leading-relaxed font-medium">
+                                            Para hacer llamadas reales o de prueba con Sofía, necesitas un número saliente. Ve a tu panel de Vapi para conseguir uno.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-3 border border-amber-200/50 flex flex-col sm:flex-row items-center gap-3">
+                                    <div className="flex-1 w-full">
+                                        <label className="text-[10px] font-black text-amber-800 uppercase tracking-widest block mb-1">Vapi Phone ID (UUID)</label>
+                                        <input
+                                            value={config.vapi_phone_id || ''}
+                                            onChange={e => upd('vapi_phone_id', e.target.value)}
+                                            placeholder="Copia el ID del número desde Vapi..."
+                                            className="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={save}
+                                        className="w-full sm:w-auto px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs rounded-xl shadow transition-colors flex-shrink-0"
+                                    >
+                                        Vincular Número
+                                    </button>
+                                </div>
+                                <div className="text-center">
+                                    <a
+                                        href="https://dashboard.vapi.ai/phone-numbers"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[11px] font-black text-amber-700 hover:text-amber-900 underline uppercase tracking-wider"
+                                    >
+                                        🌐 Ir a Vapi Phone Numbers →
+                                    </a>
+                                </div>
+                            </div>
+                        )}
+
+                        {config.voice_engine === 'telnyx' && !config.telnyx_phone && (
+                            <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200 rounded-3xl p-5 space-y-3 shadow-sm">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-10 h-10 bg-amber-500/10 rounded-xl flex items-center justify-center text-amber-600 flex-shrink-0">
+                                        <AlertCircle className="w-5 h-5" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <h4 className="text-sm font-black text-amber-900 uppercase tracking-wide">⚠️ Falta configurar Número Saliente en Telnyx</h4>
+                                        <p className="text-xs text-amber-800 leading-relaxed font-medium">
+                                            Ingresa el número comprado en tu panel de Telnyx para lanzar llamadas.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-3 border border-amber-200/50 flex flex-col sm:flex-row items-center gap-3">
+                                    <div className="flex-1 w-full">
+                                        <label className="text-[10px] font-black text-amber-800 uppercase tracking-widest block mb-1">Número Saliente</label>
+                                        <input
+                                            value={config.telnyx_phone || ''}
+                                            onChange={e => upd('telnyx_phone', e.target.value)}
+                                            placeholder="+50312345678"
+                                            className="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={save}
+                                        className="w-full sm:w-auto px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs rounded-xl shadow transition-colors flex-shrink-0"
+                                    >
+                                        Guardar Número
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                         <HybridFlowDiagram />
+
+                        {/* Pruébalo ahora mismo (Test Call form) directly in Dashboard */}
+                        <div className="bg-gradient-to-br from-emerald-500/5 to-teal-500/5 border border-emerald-500/20 rounded-3xl p-6 shadow-sm">
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="w-9 h-9 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-600">
+                                    <PhoneCall className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h4 className="text-sm font-black text-emerald-950 uppercase tracking-wide">🎙️ Iniciar Llamada de Prueba</h4>
+                                    <p className="text-xs text-emerald-700 mt-0.5">Comprueba la voz natural en español y el flujo de ventas de Sofía de inmediato.</p>
+                                </div>
+                            </div>
+                            
+                            <div className="flex flex-col sm:flex-row items-center gap-3 mt-4">
+                                <input 
+                                    value={testPhoneInput} 
+                                    onChange={e => setTestPhoneInput(e.target.value)} 
+                                    placeholder="+503..." 
+                                    className="w-full sm:flex-1 px-4 py-3 bg-white border border-emerald-200 rounded-2xl text-sm font-bold shadow-inner focus:ring-2 focus:ring-emerald-400 focus:outline-none"
+                                />
+                                <button 
+                                    onClick={handleTestCall} 
+                                    disabled={testing || !isConfigured}
+                                    className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black rounded-2xl transition flex items-center justify-center gap-2 text-sm shadow-lg shadow-emerald-500/25 disabled:opacity-40 flex-none"
+                                >
+                                    {testing ? (
+                                        <><RefreshCw className="w-4 h-4 animate-spin" /> Llamando...</>
+                                    ) : (
+                                        <><PhoneCall className="w-4 h-4" /> Probar Llamada</>
+                                    )}
+                                </button>
+                            </div>
+                            {!isConfigured && (
+                                <p className="text-[10px] text-emerald-600 mt-2 text-center font-bold">⚠️ Completa la vinculación del asistente y número saliente para probar.</p>
+                            )}
+                        </div>
+
                         {/* System status */}
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
                             <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">📡 Estado del Sistema</h4>
@@ -456,9 +570,11 @@ export default function CallBot() {
                                 { label: 'WhatsApp Business API', ok: config.wa_enabled, detail: config.wa_enabled ? 'Activo — envía mensajes automáticos' : 'Desactivado' },
                                 ...(config.voice_engine === 'vapi' ? [
                                     { label: 'Vapi AI Voice Gateway', ok: !!config.vapi_api_key, detail: config.vapi_api_key ? 'Conectado a latencia cero' : 'Pendiente API Key' },
-                                    { label: 'Vapi Asistente Activo', ok: !!config.vapi_assistant_id, detail: config.vapi_assistant_id ? 'Asistente de voz sincronizado' : 'Pendiente configurar ID' }
+                                    { label: 'Vapi Asistente Activo', ok: !!config.vapi_assistant_id, detail: config.vapi_assistant_id ? 'Asistente de voz sincronizado' : 'Pendiente configurar ID' },
+                                    { label: 'Número de Teléfono en Vapi', ok: !!config.vapi_phone_id, detail: config.vapi_phone_id ? 'Número saliente vinculado' : 'Pendiente de vincular' }
                                 ] : [
                                     { label: 'Telnyx (telefonía +503)', ok: !!config.telnyx_api_key, detail: config.telnyx_api_key ? 'API Key configurada' : 'Pendiente — crea cuenta Telnyx' },
+                                    { label: 'Número Saliente Telnyx', ok: !!config.telnyx_phone, detail: config.telnyx_phone ? 'Número configurado' : 'Pendiente número' },
                                     { label: 'Cartesia (tu voz)', ok: !!config.cartesia_voice_id, detail: config.cartesia_voice_id ? 'Voz clonada lista' : 'Pendiente — clona tu voz' }
                                 ]),
                                 { label: 'GPT-4o-mini (cerebro)', ok: true, detail: 'OpenAI · Activo' },
@@ -478,6 +594,7 @@ export default function CallBot() {
                     <CostEstimator />
                 </div>
             )}
+
 
             {/* CONFIG */}
             {tab === 'config' && (
