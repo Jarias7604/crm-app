@@ -262,7 +262,8 @@ export const callBotService = {
             .eq('id', companyId)
             .single();
         if (error) throw error;
-        const raw = (data?.features as Record<string, unknown>)?.call_bot as Partial<CallBotConfig> | undefined;
+        const callBotObj = (data?.features as Record<string, unknown>)?.call_bot;
+        const raw = (callBotObj && typeof callBotObj === 'object') ? (callBotObj as Partial<CallBotConfig>) : {};
         return { ...DEFAULT_CALL_BOT_CONFIG, ...raw };
     },
 
@@ -275,7 +276,8 @@ export const callBotService = {
         if (readErr) throw readErr;
 
         const currentFeatures = (data?.features as Record<string, unknown>) ?? {};
-        const currentCallBot  = (currentFeatures.call_bot as Partial<CallBotConfig>) ?? {};
+        const callBotObj      = currentFeatures.call_bot;
+        const currentCallBot  = (callBotObj && typeof callBotObj === 'object') ? (callBotObj as Partial<CallBotConfig>) : {};
         const merged          = { ...currentCallBot, ...config };
 
         const { error } = await supabase
