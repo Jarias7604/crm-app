@@ -60,9 +60,7 @@ export default function PublicQuoteView() {
                 const { error: insertErr } = await supabase
                     .from('pagos')
                     .insert({
-                        company_id: cotizacion?.company_id,
                         cotizacion_id: id,
-                        lead_id: cotizacion?.lead_id,
                         monto: totalImplementacion,
                         fecha_pago: new Date().toISOString().split('T')[0],
                         tipo: 'anticipo',
