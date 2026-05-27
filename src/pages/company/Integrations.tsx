@@ -30,7 +30,9 @@ export default function Integrations() {
   const { profile } = useAuth();
   const [calendarConnected, setCalendarConnected] = useState(false);
   const [outlookConnected, setOutlookConnected] = useState(false);
-  const [integrationId, setIntegrationId] = useState<string | null>(null);
+  const [googleIntegrationId, setGoogleIntegrationId] = useState<string | null>(null);
+  const [outlookIntegrationId, setOutlookIntegrationId] = useState<string | null>(null);
+  const [showOutlookSetupModal, setShowOutlookSetupModal] = useState(false);
 
   useEffect(() => {
     if (!profile?.id) return;
@@ -38,13 +40,27 @@ export default function Integrations() {
         const { data } = await supabase
             .from('calendar_integrations')
             .select('*')
-            .eq('user_id', profile.id)
-            .eq('provider', 'google')
-            .single();
+            .eq('user_id', profile.id);
         
-        if (data && data.is_active) {
-            setCalendarConnected(true);
-            setIntegrationId(data.id);
+        if (data) {
+            const google = data.find(item => item.provider === 'google' && item.is_active);
+            const outlook = data.find(item => item.provider === 'outlook' && item.is_active);
+
+            if (google) {
+                setCalendarConnected(true);
+                setGoogleIntegrationId(google.id);
+            } else {
+                setCalendarConnected(false);
+                setGoogleIntegrationId(null);
+            }
+
+            if (outlook) {
+                setOutlookConnected(true);
+                setOutlookIntegrationId(outlook.id);
+            } else {
+                setOutlookConnected(false);
+                setOutlookIntegrationId(null);
+            }
         }
     };
     fetchIntegrations();
@@ -60,6 +76,7 @@ export default function Integrations() {
   const [tab, setTab] = useState<TabType>('calendar');
 
   const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  const MICROSOFT_CLIENT_ID = import.meta.env.VITE_MICROSOFT_CLIENT_ID;
 
   const handleConnectGoogle = async () => {
     if (!GOOGLE_CLIENT_ID) {
@@ -74,22 +91,39 @@ export default function Integrations() {
   };
 
   const handleDisconnectGoogle = async () => {
-    if (!integrationId) return;
-    const { error } = await supabase.from('calendar_integrations').delete().eq('id', integrationId);
+    if (!googleIntegrationId) return;
+    const { error } = await supabase.from('calendar_integrations').delete().eq('id', googleIntegrationId);
     if (error) {
         toast.error('Error al desconectar');
     } else {
         setCalendarConnected(false);
-        setIntegrationId(null);
+        setGoogleIntegrationId(null);
         toast.success('Google Calendar desconectado');
     }
   };
 
   const handleConnectOutlook = async () => {
-    toast('📅 Microsoft Outlook — Próximamente disponible. Estamos implementando el OAuth de Azure AD.', {
-      icon: '🔜',
-      duration: 4000,
-    });
+    if (!MICROSOFT_CLIENT_ID) {
+        setShowOutlookSetupModal(true);
+        return;
+    }
+    toast.success('Redirigiendo a Microsoft OAuth...');
+    const redirectUri = encodeURIComponent(`${window.location.origin}/integrations/outlook/callback`);
+    const scope = encodeURIComponent('openid profile offline_access User.Read Calendars.ReadWrite');
+    const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${MICROSOFT_CLIENT_ID}&response_type=code&redirect_uri=${redirectUri}&response_mode=query&scope=${scope}&prompt=consent`;
+    window.location.href = authUrl;
+  };
+
+  const handleDisconnectOutlook = async () => {
+    if (!outlookIntegrationId) return;
+    const { error } = await supabase.from('calendar_integrations').delete().eq('id', outlookIntegrationId);
+    if (error) {
+        toast.error('Error al desconectar');
+    } else {
+        setOutlookConnected(false);
+        setOutlookIntegrationId(null);
+        toast.success('Microsoft Outlook desconectado');
+    }
   };
 
   const toggleEvent = (key: string) => {
@@ -268,7 +302,7 @@ export default function Integrations() {
                    Conectar Office 365
                  </button>
                ) : (
-                 <button onClick={() => setOutlookConnected(false)} className="bg-white text-red-500 border border-red-200 px-6 py-3 rounded-2xl font-black hover:bg-red-50 transition-all flex items-center gap-2">
+                 <button onClick={handleDisconnectOutlook} className="bg-white text-red-500 border border-red-200 px-6 py-3 rounded-2xl font-black hover:bg-red-50 transition-all flex items-center gap-2">
                    Desconectar
                  </button>
                )}
@@ -418,6 +452,87 @@ export default function Integrations() {
                  </button>
                </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Microsoft Outlook Setup Modal ────────────────────────────────────── */}
+      {showOutlookSetupModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in">
+          <div className="bg-white rounded-[2rem] w-full max-w-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-lg text-gray-900">Configuración de Outlook 365</h3>
+                  <p className="text-xs text-gray-500 font-medium">Requisitos para habilitar la sincronización nativa</p>
+                </div>
+              </div>
+              <button onClick={() => setShowOutlookSetupModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto space-y-6">
+              <div className="bg-blue-50/70 border border-blue-100 rounded-2xl p-4 flex gap-3 text-blue-900">
+                <AlertCircle className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                <div className="text-xs font-medium leading-relaxed">
+                  Para sincronizar tu calendario de Microsoft Outlook / Office 365 de forma nativa y segura, el CRM requiere que registres la aplicación en tu consola de Azure Active Directory (Microsoft Entra ID).
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Pasos para activar la integración:</h4>
+                
+                <ol className="space-y-3.5 text-xs text-gray-600 font-medium list-decimal pl-4">
+                  <li>
+                    Ingresa a <a href="https://portal.azure.com/" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-bold inline-flex items-center gap-0.5">Azure Portal <ExternalLink className="w-3 h-3 inline"/></a> y ve a **App Registrations** (Registros de aplicaciones).
+                  </li>
+                  <li>
+                    Crea un **Nuevo registro** con soporte para cuentas multitenant y personales (*"Accounts in any organizational directory and personal Microsoft accounts"*).
+                  </li>
+                  <li>
+                    Configura la **Redirect URI** como Web e introduce:
+                    <div className="mt-2 flex items-center gap-2 bg-gray-50 p-2.5 rounded-xl border border-gray-200 font-mono text-[11px] text-gray-800 relative">
+                      <span className="truncate flex-1 select-all">{`${window.location.origin}/integrations/outlook/callback`}</span>
+                      <button type="button" onClick={() => copyKey(`${window.location.origin}/integrations/outlook/callback`)} className="p-1 hover:bg-gray-200 rounded text-gray-500 shrink-0">
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </li>
+                  <li>
+                    En **API Permissions**, agrega los siguientes permisos de Microsoft Graph:
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-md font-mono text-[10px]">Calendars.ReadWrite</span>
+                      <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-md font-mono text-[10px]">User.Read</span>
+                      <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-md font-mono text-[10px]">offline_access</span>
+                    </div>
+                  </li>
+                  <li>
+                    Crea un **Client Secret** en *"Certificates & secrets"* y copia el valor del secreto.
+                  </li>
+                  <li>
+                    Agrega el Client ID obtenido a las variables de entorno de tu archivo local:
+                    <div className="mt-2 bg-slate-900 text-slate-200 p-3 rounded-xl font-mono text-[11px] leading-relaxed relative font-medium">
+                      <span className="text-green-400"># En tu archivo .env.local o variables de Vercel</span>
+                      <br />
+                      VITE_MICROSOFT_CLIENT_ID=<span className="text-amber-300">"tu_client_id_de_azure"</span>
+                      <button type="button" onClick={() => copyKey(`VITE_MICROSOFT_CLIENT_ID="tu_client_id_de_azure"`)} className="absolute top-3 right-3 p-1 hover:bg-slate-800 rounded text-slate-400 shrink-0">
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </li>
+                </ol>
+              </div>
+
+              <div className="pt-4 border-t border-gray-100 flex justify-end">
+                <button type="button" onClick={() => setShowOutlookSetupModal(false)} className="bg-[#0f172a] text-white px-6 py-3 rounded-2xl font-black shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all text-xs">
+                  Entendido
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

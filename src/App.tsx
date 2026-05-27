@@ -69,6 +69,7 @@ const Observatory       = lazy(() => import('./pages/admin/Observatory'));
 const Integrations      = lazy(() => import('./pages/company/Integrations'));
 const Billing           = lazy(() => import('./pages/company/Billing'));
 const GoogleCallback    = lazy(() => import('./pages/company/GoogleCallback'));
+const OutlookCallback   = lazy(() => import('./pages/company/OutlookCallback'));
 const Reports           = lazy(() => import('./pages/Reports'));
 const PlanManager       = lazy(() => import('./pages/admin/PlanManager'));
 const BookingSettings   = lazy(() => import('./pages/calendar/BookingSettings'));
@@ -232,6 +233,7 @@ function App() {
                   <Route element={<RoleProtectedRoute allowedRoles={['super_admin', 'company_admin']} />}>
                     <Route path="/company/integrations" element={<Integrations />} />
                     <Route path="/integrations/google/callback" element={<GoogleCallback />} />
+                    <Route path="/integrations/outlook/callback" element={<OutlookCallback />} />
                   </Route>
 
                   {/* Reports (all authenticated) */}

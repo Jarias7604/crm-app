@@ -52,7 +52,7 @@ export const flyerService = {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('No autenticado');
     const res = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flyer-recommend`,
+      `https://ikofyypxphrqkncimszt.supabase.co/functions/v1/flyer-recommend`,
       { 
         method: 'POST', 
         headers: { 

@@ -40,6 +40,42 @@ function isWithinCallHours(start: string, end: string, days: string[]): boolean 
   return days.includes(dayMap[day]) && nowMin >= startMin && nowMin < endMin;
 }
 
+// ── Vapi: Initiate Zero-Latency outbound call ─────────────────────────────────
+
+async function vapiInitiateCall(params: {
+  apiKey: string; assistantId: string; phoneId?: string; customerNumber: string; queueId: string;
+}): Promise<{ call_id: string }> {
+  const body: any = {
+    assistantId: params.assistantId,
+    customer: {
+      number: params.customerNumber,
+    },
+    metadata: {
+      queue_id: params.queueId
+    }
+  };
+
+  if (params.phoneId) {
+    body.phoneNumberId = params.phoneId;
+  }
+
+  const res = await fetch('https://api.vapi.ai/call/phone', {
+    method: 'POST',
+    headers: { 
+      'Authorization': `Bearer ${params.apiKey}`, 
+      'Content-Type': 'application/json' 
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Vapi initiate failed (${res.status}): ${err}`);
+  }
+  const data = await res.json();
+  return { call_id: data.id };
+}
+
 // ── Telnyx: Initiate outbound call ────────────────────────────────────────────
 
 async function telnyxInitiateCall(params: {
@@ -217,6 +253,37 @@ async function handleCallCompletion(queueId: string, outcome: string, aiScore: n
     }).eq('id', qItem.lead.id);
   }
 
+  // ── Multi-Tenant Call Memory Sync ──────────────────────────────────────────
+  try {
+    const interest = Math.min(10, Math.max(0, Math.round(aiScore / 10)));
+    let currentStatus = 'cold';
+    if (demoBooked) {
+      currentStatus = 'demo_scheduled';
+    } else if (outcome === 'connected_qualified') {
+      currentStatus = 'interested';
+    } else if (outcome === 'connected_not_qualified') {
+      currentStatus = 'follow_up';
+    }
+
+    const nextAction = demoBooked ? 'send_demo' : 'follow_up_call';
+
+    await supabase.rpc('upsert_call_memory', {
+      p_company_id:         qItem.lead.company_id,
+      p_lead_id:            qItem.lead.id,
+      p_prospect_name:      qItem.lead.name || null,
+      p_prospect_company:   null,
+      p_interest_level:     interest,
+      p_current_status:     currentStatus,
+      p_transcript_summary: summary || null,
+      p_objections:         null,
+      p_next_action:        nextAction,
+      p_demo_booked_at:     demoBooked ? new Date().toISOString() : null,
+    });
+    log(`Saved call memory successfully for lead: ${qItem.lead.name}`);
+  } catch (e: any) {
+    log('Call memory sync failed:', e.message);
+  }
+
   // Notify via Telegram
   try {
     const { data: tgInt } = await supabase.from('marketing_integrations')
@@ -303,12 +370,24 @@ async function handleAutoDispatch(): Promise<Response> {
 
       // Initiate call
       try {
-        const webhookUrl = `${webhookBase}/functions/v1/sofia-voice-bot/webhook?queue_id=${qItem.id}`;
-        const { call_control_id } = await telnyxInitiateCall({
-          apiKey: cfg.telnyx_api_key, connectionId: cfg.telnyx_connection_id,
-          from: cfg.telnyx_phone, to: lead.phone, webhookUrl,
-        });
-        await supabase.from('call_queue').update({ status: 'calling', call_id: call_control_id, started_at: new Date().toISOString() }).eq('id', qItem.id);
+        const voiceEngine = cfg.voice_engine || 'telnyx';
+        if (voiceEngine === 'vapi') {
+          const { call_id } = await vapiInitiateCall({
+            apiKey: cfg.vapi_api_key,
+            assistantId: cfg.vapi_assistant_id,
+            phoneId: cfg.vapi_phone_id,
+            customerNumber: lead.phone,
+            queueId: qItem.id,
+          });
+          await supabase.from('call_queue').update({ status: 'calling', call_id, started_at: new Date().toISOString() }).eq('id', qItem.id);
+        } else {
+          const webhookUrl = `${webhookBase}/functions/v1/sofia-voice-bot/webhook?queue_id=${qItem.id}`;
+          const { call_control_id } = await telnyxInitiateCall({
+            apiKey: cfg.telnyx_api_key, connectionId: cfg.telnyx_connection_id,
+            from: cfg.telnyx_phone, to: lead.phone, webhookUrl,
+          });
+          await supabase.from('call_queue').update({ status: 'calling', call_id: call_control_id, started_at: new Date().toISOString() }).eq('id', qItem.id);
+        }
         dispatched++;
       } catch (e: any) {
         log('Call initiation failed:', e.message);
@@ -325,38 +404,101 @@ async function handleAutoDispatch(): Promise<Response> {
 // ── INITIATE: Manual or test call ─────────────────────────────────────────────
 
 async function handleInitiate(body: any): Promise<Response> {
-  const { queue_id, test_phone } = body;
+  const { queue_id, test_phone, config: bodyConfig } = body;
 
-  const { data: qItem, error } = await supabase
-    .from('call_queue')
-    .select('*, lead:leads(id, name, phone, company_id)')
-    .eq('id', queue_id).single();
-  if (error || !qItem) return new Response(JSON.stringify({ error: 'Queue item not found' }), { status: 404, headers: corsHeaders });
+  let qItem = null;
+  let cfg = bodyConfig || {};
+  let toPhone = test_phone;
 
-  const { data: company } = await supabase.from('companies').select('features').eq('id', qItem.lead.company_id).single();
-  const cfg = (company?.features as any)?.call_bot || {};
-  if (!cfg.telnyx_api_key || !cfg.telnyx_phone) {
-    return new Response(JSON.stringify({ error: 'Telnyx not configured' }), { status: 400, headers: corsHeaders });
+  if (queue_id) {
+    try {
+      const { data } = await supabase
+        .from('call_queue')
+        .select('*, lead:leads(id, name, phone, company_id)')
+        .eq('id', queue_id)
+        .maybeSingle();
+      qItem = data;
+    } catch (_) {
+      // Ignorar errores de RLS o de tabla inexistente en microservicios
+    }
+
+    if (qItem && qItem.lead) {
+      if (!toPhone) toPhone = qItem.lead.phone;
+      if (!bodyConfig) {
+        try {
+          const { data: company } = await supabase.from('companies').select('features').eq('id', qItem.lead.company_id).maybeSingle();
+          cfg = (company?.features as any)?.call_bot || {};
+        } catch (_) {
+          // Fallback a config vacía
+        }
+      }
+    }
   }
 
-  const toPhone = test_phone || qItem.lead.phone;
-  if (!toPhone) return new Response(JSON.stringify({ error: 'No phone number' }), { status: 400, headers: corsHeaders });
+  // Si no tenemos credenciales explícitas, intentamos buscar la primera empresa en la base de datos local como fallback
+  if (!cfg.vapi_api_key && !cfg.telnyx_api_key) {
+    try {
+      const { data: firstCompany } = await supabase.from('companies').select('features').limit(1).maybeSingle();
+      if (firstCompany) {
+        cfg = (firstCompany.features as any)?.call_bot || {};
+      }
+    } catch (_) {
+      // Ignorar
+    }
+  }
 
-  const webhookBase = (Deno.env.get('SUPABASE_URL') || '').replace('/rest/v1','');
-  const webhookUrl  = `${webhookBase}/functions/v1/sofia-voice-bot?action=webhook&queue_id=${queue_id}`;
+  if (!toPhone) {
+    return new Response(JSON.stringify({ error: 'No se especificó un número de teléfono de destino válido' }), { status: 400, headers: corsHeaders });
+  }
 
-  const { call_control_id } = await telnyxInitiateCall({
-    apiKey: cfg.telnyx_api_key, connectionId: cfg.telnyx_connection_id,
-    from: cfg.telnyx_phone, to: toPhone, webhookUrl,
-  });
+  const voiceEngine = cfg.voice_engine || 'telnyx';
+  let callControlId = '';
 
-  await supabase.from('call_queue').update({
-    status: 'calling', call_id: call_control_id, started_at: new Date().toISOString()
-  }).eq('id', queue_id);
+  try {
+    if (voiceEngine === 'vapi') {
+      if (!cfg.vapi_api_key || !cfg.vapi_assistant_id) {
+        return new Response(JSON.stringify({ error: 'Vapi no configurado. Ingresa tu API Key y Assistant ID.' }), { status: 400, headers: corsHeaders });
+      }
+      const { call_id } = await vapiInitiateCall({
+        apiKey: cfg.vapi_api_key,
+        assistantId: cfg.vapi_assistant_id,
+        phoneId: cfg.vapi_phone_id,
+        customerNumber: toPhone,
+        queueId: queue_id || 'test-call-id',
+      });
+      callControlId = call_id;
+    } else {
+      if (!cfg.telnyx_api_key || !cfg.telnyx_phone) {
+        return new Response(JSON.stringify({ error: 'Telnyx no configurado. Registra tus credenciales SIP.' }), { status: 400, headers: corsHeaders });
+      }
+      const webhookBase = (Deno.env.get('SUPABASE_URL') || '').replace('/rest/v1','');
+      const webhookUrl  = `${webhookBase}/functions/v1/sofia-voice-bot?action=webhook&queue_id=${queue_id || 'test-call-id'}`;
 
-  return new Response(JSON.stringify({ success: true, call_control_id }), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-  });
+      const { call_control_id } = await telnyxInitiateCall({
+        apiKey: cfg.telnyx_api_key, connectionId: cfg.telnyx_connection_id,
+        from: cfg.telnyx_phone, to: toPhone, webhookUrl,
+      });
+      callControlId = call_control_id;
+    }
+
+    // Intentar actualizar la tabla call_queue si existe localmente
+    if (queue_id && qItem) {
+      await supabase.from('call_queue').update({
+        status: 'calling', call_id: callControlId, started_at: new Date().toISOString()
+      }).eq('id', queue_id).catch(() => {});
+    }
+
+    return new Response(JSON.stringify({ success: true, call_control_id: callControlId }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (err) {
+    console.error('CallBot Initiation Error:', err.message);
+    return new Response(JSON.stringify({ error: `Fallo al lanzar llamada: ${err.message}` }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
 }
 
 // ── WEBHOOK: Receive Telnyx call events ───────────────────────────────────────
@@ -443,6 +585,94 @@ async function handleWebhook(req: Request): Promise<Response> {
   return new Response('ok', { headers: corsHeaders });
 }
 
+// ── VAPI: Receive end-of-call reports for Zero-Latency calls ──────────────────
+
+async function handleVapiWebhook(body: any): Promise<Response> {
+  const message = body?.message;
+  const type = message?.type;
+
+  log(`Vapi webhook received of type: ${type}`);
+
+  if (type === 'end-of-call-report') {
+    const call = message?.call;
+    const metadata = call?.metadata || {};
+    const queueId = metadata?.queue_id || body?.metadata?.queue_id;
+
+    if (!queueId) {
+      log('Vapi: queue_id not found in metadata. Skipping.');
+      return new Response(JSON.stringify({ success: false, error: 'No queue_id in metadata' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    log(`Vapi end-of-call-report for queue_id: ${queueId}`);
+
+    // Parse transcript
+    const vapiTranscript = message?.transcript || "";
+    const transcriptList: {role: string; content: string; timestamp: string}[] = [];
+    
+    // Parse individual messages if available to structure them
+    if (call?.messages && call.messages.length > 0) {
+      for (const msg of call.messages) {
+        if (msg.role === 'assistant' || msg.role === 'user') {
+          transcriptList.push({
+            role: msg.role === 'assistant' ? 'bot' : 'lead',
+            content: msg.message || '',
+            timestamp: new Date(msg.time || Date.now()).toISOString()
+          });
+        }
+      }
+    } else {
+      // Fallback: put raw transcript in a single block
+      transcriptList.push({
+        role: 'system',
+        content: vapiTranscript,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // Extract structured analysis or set high-quality fallbacks
+    const analysis = message?.analysis || {};
+    const structuredData = analysis?.structuredData || {};
+    
+    // Detección inteligente del resultado (outcome)
+    let outcome = structuredData?.outcome || 'connected_not_qualified';
+    if (structuredData?.qualified === true || structuredData?.qualified === 'yes' || analysis?.success === true) {
+      outcome = 'connected_qualified';
+    } else if (call?.endedReason === 'customer-did-not-answer' || call?.endedReason === 'voicemail') {
+      outcome = 'no_answer';
+    }
+
+    const aiScore = Number(structuredData?.ai_score || structuredData?.score || (outcome === 'connected_qualified' ? 85 : 45));
+    const demoBooked = Boolean(structuredData?.demo_booked || structuredData?.appointment_booked || false);
+    const summary = analysis?.summary || `Llamada de Vapi finalizada. Razón: ${call?.endedReason || 'N/A'}`;
+    const durationSeconds = Math.round(call?.durationSeconds || 0);
+
+    // Invoke our existing CRM sync and Telegram notify flow!
+    await handleCallCompletion(
+      queueId,
+      outcome,
+      aiScore,
+      demoBooked,
+      transcriptList,
+      summary,
+      durationSeconds
+    );
+
+    // Update status in call_queue to completed to sync with CRM front
+    await supabase.from('call_queue').update({
+      status: 'completed',
+      ended_at: new Date().toISOString()
+    }).eq('id', queueId);
+
+    log(`Vapi webhook completed successfully for queue: ${queueId}`);
+  }
+
+  return new Response(JSON.stringify({ success: true }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  });
+}
+
 // ── MAIN ROUTER ───────────────────────────────────────────────────────────────
 
 Deno.serve(async (req: Request) => {
@@ -458,6 +688,9 @@ Deno.serve(async (req: Request) => {
 
     // Telnyx webhook
     if (action === 'webhook' || url.pathname.includes('/webhook')) return await handleWebhook(req);
+
+    // Vapi Webhook (Zero Latency call-reports)
+    if (body?.message?.type) return await handleVapiWebhook(body);
 
     // Manual initiate
     if (body?.queue_id) return await handleInitiate(body);

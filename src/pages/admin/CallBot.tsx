@@ -267,7 +267,7 @@ export default function CallBot() {
         }
         setTesting(true);
         try {
-            await callBotService.sendTestCall(profile.company_id, testPhoneInput);
+            await callBotService.sendTestCall(profile.company_id, testPhoneInput, config);
             toast.success('Llamada de prueba lanzada 📞');
         } catch (e: any) {
             toast.error(e.message || 'Error al lanzar llamada de prueba');
@@ -317,6 +317,30 @@ export default function CallBot() {
     const upd = (key: keyof CallBotConfig, val: unknown) =>
         setConfig(prev => ({ ...prev, [key]: val }));
 
+    const [provisioning, setProvisioning] = useState(false);
+
+    const handleProvision = async () => {
+        if (!profile?.company_id) return;
+        if (!config.vapi_api_key) {
+            toast.error('Ingresa tu Vapi API Key primero');
+            return;
+        }
+        setProvisioning(true);
+        try {
+            const assistantId = await callBotService.provisionVapiAssistant(
+                profile.company_id, config.vapi_api_key, config
+            );
+            const next = { ...config, vapi_assistant_id: assistantId, voice_engine: 'vapi' as const };
+            setConfig(next);
+            await callBotService.saveConfig(profile.company_id, next);
+            toast.success('🎙️ ¡Sofía activada! Tu asistente está listo para llamar.');
+        } catch (e: any) {
+            toast.error(e.message || 'Error al provisionar asistente');
+        } finally {
+            setProvisioning(false);
+        }
+    };
+
     if (loading) return (
         <div className="flex items-center justify-center h-64">
             <div className="flex flex-col items-center gap-3">
@@ -326,7 +350,9 @@ export default function CallBot() {
         </div>
     );
 
-    const isConfigured = !!(config.telnyx_api_key && config.telnyx_phone);
+    const isConfigured = !!(config.voice_engine === 'vapi'
+        ? (config.vapi_api_key && config.vapi_assistant_id)
+        : (config.telnyx_api_key && config.telnyx_phone));
 
     return (
         <div className="min-h-screen bg-gray-50/50 p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
@@ -428,8 +454,13 @@ export default function CallBot() {
                             <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">📡 Estado del Sistema</h4>
                             {[
                                 { label: 'WhatsApp Business API', ok: config.wa_enabled, detail: config.wa_enabled ? 'Activo — envía mensajes automáticos' : 'Desactivado' },
-                                { label: 'Telnyx (telefonía +503)', ok: !!config.telnyx_api_key, detail: config.telnyx_api_key ? 'API Key configurada' : 'Pendiente — crea cuenta Telnyx' },
-                                { label: 'Cartesia (tu voz)', ok: !!config.cartesia_voice_id, detail: config.cartesia_voice_id ? 'Voz clonada lista' : 'Pendiente — clona tu voz' },
+                                ...(config.voice_engine === 'vapi' ? [
+                                    { label: 'Vapi AI Voice Gateway', ok: !!config.vapi_api_key, detail: config.vapi_api_key ? 'Conectado a latencia cero' : 'Pendiente API Key' },
+                                    { label: 'Vapi Asistente Activo', ok: !!config.vapi_assistant_id, detail: config.vapi_assistant_id ? 'Asistente de voz sincronizado' : 'Pendiente configurar ID' }
+                                ] : [
+                                    { label: 'Telnyx (telefonía +503)', ok: !!config.telnyx_api_key, detail: config.telnyx_api_key ? 'API Key configurada' : 'Pendiente — crea cuenta Telnyx' },
+                                    { label: 'Cartesia (tu voz)', ok: !!config.cartesia_voice_id, detail: config.cartesia_voice_id ? 'Voz clonada lista' : 'Pendiente — clona tu voz' }
+                                ]),
                                 { label: 'GPT-4o-mini (cerebro)', ok: true, detail: 'OpenAI · Activo' },
                                 { label: 'Deepgram (escucha STT)', ok: true, detail: 'Nova-2 · Activo' },
                                 { label: 'Cron Job (cada 5 min)', ok: config.enabled, detail: config.enabled ? 'Supabase pg_cron · Activo' : 'Inactivo' },
@@ -452,6 +483,48 @@ export default function CallBot() {
             {tab === 'config' && (
                 <div className="space-y-4">
 
+                    {/* Selección de Motor de Voz */}
+                    <Section title="⚙️ Motor de Voz (AI Voice Engine)" icon={<Settings className="w-4 h-4" />} defaultOpen>
+                        <p className="text-xs text-gray-500 font-medium pt-4 mb-3">
+                            Selecciona el motor de telefonía y síntesis de voz en tiempo real de Sofía:
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <button
+                                onClick={() => upd('voice_engine', 'telnyx')}
+                                className={`p-4 rounded-2xl border-2 text-left transition-all ${
+                                    config.voice_engine !== 'vapi'
+                                        ? 'border-violet-600 bg-violet-50/50 shadow-md shadow-violet-100'
+                                        : 'border-slate-100 bg-slate-50 hover:bg-slate-100'
+                                }`}
+                            >
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-xl">📞</span>
+                                    <span className="font-black text-xs uppercase tracking-wider text-slate-800">Telnyx + Cartesia</span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+                                    Stack personalizado con clonación de voz en Cartesia. Latencia de respuesta de 2 a 3 segundos.
+                                </p>
+                            </button>
+
+                            <button
+                                onClick={() => upd('voice_engine', 'vapi')}
+                                className={`p-4 rounded-2xl border-2 text-left transition-all ${
+                                    config.voice_engine === 'vapi'
+                                        ? 'border-violet-600 bg-violet-50/50 shadow-md shadow-violet-100'
+                                        : 'border-slate-100 bg-slate-50 hover:bg-slate-100'
+                                }`}
+                            >
+                                <div className="flex items-center gap-2 mb-2">
+                                    <span className="text-xl">⚡</span>
+                                    <span className="font-black text-xs uppercase tracking-wider text-slate-800">Vapi (Latencia Cero)</span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+                                    WebSockets bidireccionales en tiempo real. Latencia de respuesta menor a 500 milisegundos.
+                                </p>
+                            </button>
+                        </div>
+                    </Section>
+
                     {/* WhatsApp */}
                     <Section title="💬 WhatsApp — Primer Contacto (siempre activo)" icon={<MessageSquare className="w-4 h-4" />} badge="Siempre ON" defaultOpen>
                         <Field label="Mensaje automático al llegar el lead" hint="Se envía inmediatamente cuando entra un lead nuevo">
@@ -473,48 +546,158 @@ export default function CallBot() {
                         </Field>
                     </Section>
 
-                    {/* Telnyx */}
-                    <Section title="📞 Telnyx — Llamadas a El Salvador" icon={<Phone className="w-4 h-4" />} defaultOpen>
-                        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-2 flex gap-2 mt-4">
-                            <AlertCircle className="w-4 h-4 text-blue-600 flex-none mt-0.5" />
+                    {/* ── Agente Sofía: Script & Personalidad ── */}
+                    <Section title="🎙️ Agente Sofía — Personalidad & Script de Ventas" icon={<Bot className="w-4 h-4" />} defaultOpen>
+                        <div className="bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-200 rounded-xl p-3 mb-3 mt-4 flex gap-2">
+                            <Zap className="w-4 h-4 text-violet-600 flex-none mt-0.5" />
                             <div>
-                                <p className="text-xs font-black text-blue-800">Registra tu cuenta Telnyx</p>
-                                <p className="text-xs text-blue-700 mt-0.5">
-                                    <a href="https://telnyx.com" target="_blank" rel="noopener noreferrer" className="underline font-bold">telnyx.com</a>
-                                    {' '}→ Mission Control → API Keys + compra un número El Salvador o USA
+                                <p className="text-xs font-black text-violet-800">Auto-sincronizado con Vapi</p>
+                                <p className="text-xs text-violet-700 mt-0.5">
+                                    Al guardar, estos cambios se aplican automáticamente en tu asistente de Vapi sin salir del CRM.
                                 </p>
                             </div>
                         </div>
-                        <Field label="Telnyx API Key">
-                            <SecretInput value={config.telnyx_api_key} onChange={v => upd('telnyx_api_key', v)} placeholder="KEY0..." />
+
+                        <Field label="Primera frase al contestar" hint="Exactamente lo que Sofía dice cuando alguien contesta. Directo y con gancho.">
+                            <input
+                                value={config.first_message}
+                                onChange={e => upd('first_message', e.target.value)}
+                                placeholder="Hola, buenos días. Con quién tengo el gusto de hablar?"
+                                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-violet-400 transition"
+                            />
                         </Field>
-                        <Field label="Connection ID" hint="Mission Control → Voice → Connections → tu SIP Connection ID">
-                            <TextInput value={config.telnyx_connection_id} onChange={v => upd('telnyx_connection_id', v)} placeholder="1234567890123456789" />
+
+                        <Field label="Script completo de ventas (Guión de Sofía)" hint="Este texto define exactamente cómo piensa, habla y vende Sofía. Se inyecta como System Prompt en GPT-4o-mini.">
+                            <textarea
+                                value={config.system_prompt}
+                                onChange={e => upd('system_prompt', e.target.value)}
+                                rows={18}
+                                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-mono focus:ring-2 focus:ring-violet-400 transition resize-y leading-relaxed"
+                                placeholder="Eres Sofía, ejecutiva de ventas de Arias Defense..."
+                            />
                         </Field>
-                        <Field label="Número saliente" hint="El número desde el que llamará Sofía (formato +503XXXXXXXX o +1XXXXXXXXXX)">
-                            <TextInput value={config.telnyx_phone} onChange={v => upd('telnyx_phone', v)} placeholder="+50312345678" />
-                        </Field>
+
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2">
+                            <AlertCircle className="w-4 h-4 text-amber-600 flex-none mt-0.5" />
+                            <p className="text-xs text-amber-700 font-medium">
+                                <strong>Tip de ventas:</strong> Sofía funciona mejor con respuestas cortas (máx 2 oraciones). 
+                                Instrúyela a hacer UNA pregunta a la vez y a escuchar. El silencio estratégico es tu arma más poderosa.
+                            </p>
+                        </div>
                     </Section>
 
-                    {/* Cartesia */}
-                    <Section title="🎙️ Cartesia — Tu Voz Clonada" icon={<Mic className="w-4 h-4" />}>
-                        <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 mb-2 mt-4 flex gap-2">
-                            <Shield className="w-4 h-4 text-violet-600 flex-none mt-0.5" />
-                            <div>
-                                <p className="text-xs font-black text-violet-800">Clona tu voz en Cartesia</p>
-                                <p className="text-xs text-violet-700 mt-0.5">
-                                    <a href="https://cartesia.ai" target="_blank" rel="noopener noreferrer" className="underline font-bold">cartesia.ai</a>
-                                    {' '}→ Voices → Clone → sube 1 minuto de tu voz → copia el Voice ID
-                                </p>
+                    {/* Vapi (Latencia Cero) - Multi-Tenant Provisioning Wizard */}
+                    {config.voice_engine === 'vapi' && (
+                        <Section title="⚡ Configuración de Vapi — Motor de Voz" icon={<Zap className="w-4 h-4" />} defaultOpen>
+
+                            {/* PASO 1: API Key */}
+                            <Field
+                                label="Vapi Private API Key"
+                                hint="Ve a dashboard.vapi.ai → Organization → API Keys → copia tu Private Key"
+                            >
+                                <SecretInput value={config.vapi_api_key || ''} onChange={v => upd('vapi_api_key', v)} placeholder="vapi-private-key-..." />
+                            </Field>
+
+                            {/* PASO 2: Si no tiene assistant_id → Botón de Auto-Provision */}
+                            {!config.vapi_assistant_id ? (
+                                <div className="bg-gradient-to-br from-violet-900 to-indigo-900 rounded-2xl p-5 mt-2 space-y-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-xl">🎙️</div>
+                                        <div>
+                                            <p className="text-sm font-black text-white">Activa Sofía en 1 clic</p>
+                                            <p className="text-xs text-violet-300 mt-0.5">El CRM creará automáticamente tu asistente de voz en Vapi con todo configurado.</p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-1.5 text-xs text-violet-300">
+                                        {['✅ Voz femenina ElevenLabs en español', '✅ STT Deepgram Nova-2 en español', '✅ GPT-4o-mini con tu script de ventas', '✅ Webhook conectado a tu CRM'].map(item => (
+                                            <span key={item}>{item}</span>
+                                        ))}
+                                    </div>
+                                    <button
+                                        onClick={handleProvision}
+                                        disabled={provisioning || !config.vapi_api_key}
+                                        className="w-full py-3 bg-gradient-to-r from-violet-500 to-indigo-500 hover:from-violet-600 hover:to-indigo-600 disabled:opacity-50 text-white font-black rounded-xl text-sm transition flex items-center justify-center gap-2"
+                                    >
+                                        {provisioning ? (
+                                            <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Creando asistente...</>
+                                        ) : (
+                                            <><Zap className="w-4 h-4" /> Activar Sofía en mi cuenta</>
+                                        )}
+                                    </button>
+                                    {!config.vapi_api_key && (
+                                        <p className="text-xs text-violet-400 text-center">Ingresa tu API Key para continuar</p>
+                                    )}
+                                </div>
+                            ) : (
+                                /* PASO 3: Ya provisionado — mostrar status */
+                                <div className="space-y-3 mt-2">
+                                    <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center gap-3">
+                                        <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-none" />
+                                        <div>
+                                            <p className="text-xs font-black text-emerald-800">✅ Asistente Sofía configurado</p>
+                                            <p className="text-xs text-emerald-700 mt-0.5 font-mono">{config.vapi_assistant_id}</p>
+                                        </div>
+                                        <button
+                                            onClick={() => upd('vapi_assistant_id', '')}
+                                            className="ml-auto text-xs text-red-500 hover:text-red-700 font-bold transition"
+                                        >
+                                            Reconfigurar
+                                        </button>
+                                    </div>
+                                    <Field label="Número de Teléfono en Vapi (Phone ID)" hint="Ve a Vapi → Phone Numbers → compra un número → copia el ID. Necesario para llamadas salientes.">
+                                        <TextInput value={config.vapi_phone_id || ''} onChange={v => upd('vapi_phone_id', v)} placeholder="uuid-del-numero-en-vapi..." />
+                                    </Field>
+                                </div>
+                            )}
+                        </Section>
+                    )}
+
+                    {/* Telnyx (Clásico) */}
+                    {config.voice_engine !== 'vapi' && (
+                        <Section title="📞 Telnyx — Llamadas a El Salvador" icon={<Phone className="w-4 h-4" />} defaultOpen>
+                            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-2 flex gap-2 mt-4">
+                                <AlertCircle className="w-4 h-4 text-blue-600 flex-none mt-0.5" />
+                                <div>
+                                    <p className="text-xs font-black text-blue-800">Registra tu cuenta Telnyx</p>
+                                    <p className="text-xs text-blue-700 mt-0.5">
+                                        <a href="https://telnyx.com" target="_blank" rel="noopener noreferrer" className="underline font-bold">telnyx.com</a>
+                                        {' '}→ Mission Control → API Keys + compra un número El Salvador o USA
+                                    </p>
+                                </div>
                             </div>
-                        </div>
-                        <Field label="Cartesia API Key">
-                            <SecretInput value={config.cartesia_api_key} onChange={v => upd('cartesia_api_key', v)} placeholder="sk_car_..." />
-                        </Field>
-                        <Field label="Voice ID" hint="El ID de tu voz clonada en Cartesia">
-                            <TextInput value={config.cartesia_voice_id} onChange={v => upd('cartesia_voice_id', v)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
-                        </Field>
-                    </Section>
+                            <Field label="Telnyx API Key">
+                                <SecretInput value={config.telnyx_api_key} onChange={v => upd('telnyx_api_key', v)} placeholder="KEY0..." />
+                            </Field>
+                            <Field label="Connection ID" hint="Mission Control → Voice → Connections → tu SIP Connection ID">
+                                <TextInput value={config.telnyx_connection_id} onChange={v => upd('telnyx_connection_id', v)} placeholder="1234567890123456789" />
+                            </Field>
+                            <Field label="Número saliente" hint="El número desde el que llamará Sofía (formato +503XXXXXXXX o +1XXXXXXXXXX)">
+                                <TextInput value={config.telnyx_phone} onChange={v => upd('telnyx_phone', v)} placeholder="+50312345678" />
+                            </Field>
+                        </Section>
+                    )}
+
+                    {/* Cartesia (Clásico) */}
+                    {config.voice_engine !== 'vapi' && (
+                        <Section title="🎙️ Cartesia — Tu Voz Clonada" icon={<Mic className="w-4 h-4" />}>
+                            <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 mb-2 mt-4 flex gap-2">
+                                <Shield className="w-4 h-4 text-violet-600 flex-none mt-0.5" />
+                                <div>
+                                    <p className="text-xs font-black text-violet-800">Clona tu voz en Cartesia</p>
+                                    <p className="text-xs text-violet-700 mt-0.5">
+                                        <a href="https://cartesia.ai" target="_blank" rel="noopener noreferrer" className="underline font-bold">cartesia.ai</a>
+                                        {' '}→ Voices → Clone → sube 1 minuto de tu voz → copia el Voice ID
+                                    </p>
+                                </div>
+                            </div>
+                            <Field label="Cartesia API Key">
+                                <SecretInput value={config.cartesia_api_key} onChange={v => upd('cartesia_api_key', v)} placeholder="sk_car_..." />
+                            </Field>
+                            <Field label="Voice ID" hint="El ID de tu voz clonada en Cartesia">
+                                <TextInput value={config.cartesia_voice_id} onChange={v => upd('cartesia_voice_id', v)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+                            </Field>
+                        </Section>
+                    )}
 
                     {/* Sofia agent */}
                     <Section title="🤖 Agente Sofía — Guión y Personalidad" icon={<Bot className="w-4 h-4" />}>

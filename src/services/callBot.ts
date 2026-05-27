@@ -48,6 +48,12 @@ export interface OutcomeMapping {
 export interface CallBotConfig {
     enabled: boolean;
 
+    // ── Vapi (Zero Latency) ───────────────────────────────────────────────
+    voice_engine: 'telnyx' | 'vapi';
+    vapi_api_key: string;
+    vapi_assistant_id: string;
+    vapi_phone_id: string;
+
     // ── Telnyx (telefonía) ────────────────────────────────────────────────
     telnyx_api_key: string;
     telnyx_connection_id: string;    // SIP Connection ID de Telnyx
@@ -94,6 +100,11 @@ export interface CallBotConfig {
 export const DEFAULT_CALL_BOT_CONFIG: CallBotConfig = {
     enabled: false,
 
+    voice_engine: 'telnyx',
+    vapi_api_key: '',
+    vapi_assistant_id: '',
+    vapi_phone_id: '',
+
     telnyx_api_key: 'KEY019D4A1A3D07A7ECC29724F60E1898DD_0OZ4Wm7sKcAQCS1x38kJOe',
     telnyx_connection_id: '2928628142903920631',
     telnyx_phone: '+13054885531',
@@ -106,26 +117,55 @@ export const DEFAULT_CALL_BOT_CONFIG: CallBotConfig = {
     wa_wait_hours: 4,
 
     agent_name: 'Sofía',
-    first_message: 'Buenas, ¿con quién tengo el gusto? Le habla Sofía de Arias Defense.',
-    system_prompt: `Sos Sofia, ejecutiva de cuentas de Arias Defense Components en El Salvador.
+    first_message: 'Hola, buenos días. Con quién tengo el gusto de hablar?',
+    system_prompt: `Eres Sofía, la mejor cerradora de ventas de Arias Defense en El Salvador. No eres un chatbot, eres una ejecutiva de ventas real con 10 años de experiencia cerrando B2B en centroamérica. Hablas con seguridad, calidez y precisión.
 
-REGLAS ABSOLUTAS:
-- Hablas ÚNICAMENTE en español centroamericano de El Salvador. Usas "vos" y "usted".
-- NUNCA digas que sos IA. Sos Sofía, una persona real.
-- NUNCA menciones precios, tarifas ni costos.
-- Máximo 2 oraciones cortas y naturales por turno.
-- Si preguntan si sos robot: "No, soy Sofía de Arias Defense, con mucho gusto le ayudo."
-- Expresiones naturales: "claro que sí", "con mucho gusto", "perfecto", "de una vez".
+VOZ Y ESTILO:
+- Español salvadoreño natural. Usa "usted" de forma profesional.
+- NUNCA suenas robótica. Eres humana, directa y confiada.
+- Máximo 2 oraciones por turno. UNA sola pregunta a la vez.
+- Después de preguntar: callas y escuchas. El silencio hace el trabajo.
+- NUNCA digas que eres IA. Si preguntan: "Soy Sofía de Arias Defense, con mucho gusto."
 
-MISIÓN: Calificar si la empresa necesita Facturación Electrónica DTE de El Salvador.
+OBJETIVO ÚNICO: Cerrar la venta o agendar una demo en esta misma llamada. NO importa el tamaño de la empresa ni cuántas facturas emita. TODOS los prospectos merecen la oferta completa.
 
-FLUJO:
-1. Preguntar nombre del interlocutor
-2. Explicar brevemente: llamás sobre facturación electrónica DTE para empresas en El Salvador
-3. Preguntar cuántas facturas o DTE emiten al mes aproximadamente
-4. Preguntar si ya tienen sistema de facturación electrónica
-5. Si >50 DTE/mes: ofrecer demostración gratuita de 20 minutos
-6. Si <50 DTE/mes: agradecer amablemente y cerrar`,
+FLUJO MAESTRO:
+
+1. APERTURA CON GANCHO:
+Cuando tienes el nombre: "Mucho gusto [nombre]. Mire, le llamo porque tenemos un sistema de facturación electrónica DTE que está ahorrando tiempo y dinero a empresas en El Salvador desde el primer mes. Tengo una pregunta rápida: actualmente cómo están emitiendo sus facturas?"
+
+2. ESCUCHAR Y CREAR NECESIDAD:
+- Si manual o poca tecnología: "¿Cuánto tiempo les toma emitir cada factura actualmente?"
+- Si ya tienen sistema: "¿Y con ese sistema, están 100% satisfechos o hay algo que mejorarían?"
+- Si dicen que están bien: "Entiendo. ¿Y si pudieran hacerlo más rápido y con menos errores en los DTEs, eso sería de valor para su empresa?"
+
+3. PRESENTACIÓN RÁPIDA (MÁX 2 ORACIONES):
+"Nuestro sistema automatiza todo el proceso de emisión de DTEs, se integra con su operación actual y el soporte es local aquí en El Salvador. Es la solución que más empresas salvadoreñas están adoptando este año."
+
+4. CIERRE DIRECTO (intentar primero):
+"[nombre], basándome en lo que me cuenta, creo que podemos ayudarle. Hablando directamente, ¿le gustaría que le mostremos cómo funciona esta semana con una demo sin costo?"
+
+Si duda: "Entiendo que quiere pensarlo. Pero mire, son solo 20 minutos donde le mostramos exactamente cuánto ahorraría su empresa. Sin compromiso. ¿Le funciona el martes o el jueves?"
+
+5. MANEJO DE OBJECIONES:
+- "No me interesa": "Entiendo [nombre]. ¿Puedo preguntarle qué les está frenando actualmente en su proceso de facturación electrónica?"
+- "Ya tenemos proveedor": "¡Qué bueno! ¿Y con ese proveedor, están completamente satisfechos o hay algo que cambiarían? [escucha] Justo eso es lo que nosotros resolvemos mejor. ¿Le parecería bien una comparativa rápida sin costo?"
+- "Mándeme información": "Con gusto. Y para enviarle algo útil para su empresa, ¿me dice en qué parte del proceso de facturación sienten más el problema actualmente?"
+- "Estoy ocupado": "Le entiendo [nombre]. Son solo 20 minutos y lo hacemos a su hora. ¿Le va mejor por la mañana o por la tarde esta semana?"
+- "Es muy caro": "Entiendo la preocupación. Precisamente por eso hacemos la demo primero, para que vea el retorno real antes de tomar cualquier decisión. ¿Le parece?"
+- "No tengo tiempo para demos": "Claro, lo entiendo. Entonces le propongo algo mejor: una llamada de 10 minutos con nuestro especialista técnico que va directo al punto. Nada de presentaciones largas. ¿Le funciona?"
+
+6. CIERRE DE DEMO (cuando acepta):
+"Perfecto [nombre]. Para confirmar la demo necesito: su nombre completo, el nombre de su empresa y el mejor correo para enviarle los detalles. ¿Me los da?"
+Después de obtener datos: "Listo [nombre]. Le confirmo todo por correo. El especialista de Arias Defense le estará contactando. Que tenga excelente día."
+
+7. CIERRE NEGATIVO (si definitivamente rechaza 3 veces):
+"Entiendo perfectamente [nombre]. Quedo a sus órdenes para cuando estén listos. Una última pregunta antes de despedirme: ¿hay alguien en su empresa que sí esté evaluando soluciones de facturación electrónica ahora mismo?"
+
+MEMORIA DE CONVERSACIÓN:
+Lleva registro mental de: nombre completo, empresa, situación actual de facturación, objeciones que mencionó, nivel de interés del 1 al 10, acción concreta acordada.
+
+PROHIBIDO: hablar más de 2 oraciones seguidas, hacer múltiples preguntas en un turno, desistir antes del tercer intento de cierre, hablar en inglés, sonar robótica, descalificar a un prospecto por tamaño o volumen.`,
 
     call_hours: { start: '08:00', end: '18:00' },
     call_days: ['MON', 'TUE', 'WED', 'THU', 'FRI'],
@@ -162,6 +202,57 @@ export interface CallBotStats {
 
 export const callBotService = {
 
+    // ── Auto-Provision: Crea un asistente Vapi único para este tenant ──────────
+
+    async provisionVapiAssistant(companyId: string, vapiApiKey: string, config: Partial<CallBotConfig>): Promise<string> {
+        const systemPrompt = config.system_prompt || DEFAULT_CALL_BOT_CONFIG.system_prompt;
+        const firstMessage = config.first_message || DEFAULT_CALL_BOT_CONFIG.first_message;
+
+        const payload = {
+            name: `Sofia - ${companyId.slice(0, 8)}`,
+            firstMessage,
+            voice: {
+                provider: '11labs',
+                voiceId: 'pFZP5JQG7iQjIQuC4Bku',
+                model: 'eleven_turbo_v2_5',
+                language: 'es',
+                stability: 0.45,
+                similarityBoost: 0.75,
+                style: 0.3,
+                useSpeakerBoost: true,
+            },
+            transcriber: {
+                provider: 'deepgram',
+                model: 'nova-2',
+                language: 'es',
+                smartFormat: true,
+                endpointing: 250,
+            },
+            model: {
+                provider: 'openai',
+                model: 'gpt-4o-mini',
+                temperature: 0.4,
+                maxTokens: 120,
+                messages: [{ role: 'system', content: systemPrompt }],
+            },
+            serverUrl: `https://ikofyypxphrqkncimszt.supabase.co/functions/v1/sofia-voice-bot?company_id=${companyId}`,
+        };
+
+        const res = await fetch('https://api.vapi.ai/assistant', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${vapiApiKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+            const err = await res.text();
+            throw new Error(`Vapi provision error: ${err}`);
+        }
+
+        const data = await res.json();
+        return data.id as string;
+    },
+
     // ── Config ────────────────────────────────────────────────────────────────
 
     async getConfig(companyId: string): Promise<CallBotConfig> {
@@ -192,6 +283,35 @@ export const callBotService = {
             .update({ features: { ...currentFeatures, call_bot: merged } })
             .eq('id', companyId);
         if (error) throw error;
+
+        // ── Auto-sync to Vapi assistant when using Vapi engine ────────────────
+        const vapiKey       = merged.vapi_api_key;
+        const vapiAssistant = merged.vapi_assistant_id;
+        const isVapi        = merged.voice_engine === 'vapi';
+        const hasScript     = config.first_message !== undefined || config.system_prompt !== undefined;
+
+        if (isVapi && vapiKey && vapiAssistant && hasScript) {
+            try {
+                const patch: Record<string, unknown> = {};
+                if (config.first_message !== undefined) patch.firstMessage = config.first_message;
+                if (config.system_prompt !== undefined) {
+                    patch.model = {
+                        provider: 'openai',
+                        model: 'gpt-4o-mini',
+                        temperature: 0.4,
+                        maxTokens: 120,
+                        messages: [{ role: 'system', content: config.system_prompt }],
+                    };
+                }
+                await fetch(`https://api.vapi.ai/assistant/${vapiAssistant}`, {
+                    method: 'PATCH',
+                    headers: { 'Authorization': `Bearer ${vapiKey}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(patch),
+                });
+            } catch (e) {
+                console.warn('[CallBot] Vapi sync skipped:', e);
+            }
+        }
     },
 
     // ── Queue ─────────────────────────────────────────────────────────────────
@@ -237,9 +357,7 @@ export const callBotService = {
     async triggerCall(queueId: string): Promise<{ success: boolean; call_id?: string; error?: string }> {
         try {
             const { data: { session } } = await supabase.auth.getSession();
-            let supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || 'https://ikofyypxphrqkncimszt.supabase.co').trim();
-            if (supabaseUrl.endsWith('/')) supabaseUrl = supabaseUrl.slice(0, -1);
-            
+            const supabaseUrl = 'https://ikofyypxphrqkncimszt.supabase.co';
             const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
             const res = await fetch(`${supabaseUrl}/functions/v1/sofia-voice-bot/initiate`, {
@@ -358,7 +476,7 @@ export const callBotService = {
 
     // ── Test Call ─────────────────────────────────────────────────────────────
 
-    async sendTestCall(companyId: string, phone: string): Promise<void> {
+    async sendTestCall(companyId: string, phone: string, config: CallBotConfig): Promise<void> {
         // Encontrar un lead existente para simular la llamada
         const { data: lead } = await supabase.from('leads').select('id').eq('company_id', companyId).limit(1).single();
         const fallbackLeadId = lead ? lead.id : '00000000-0000-0000-0000-000000000000';
@@ -376,12 +494,8 @@ export const callBotService = {
 
         // Fetch nativo con sanitización extrema de URL
         const { data: { session } } = await supabase.auth.getSession();
-        
-        let supabaseUrl = (import.meta.env.VITE_SUPABASE_URL || 'https://ikofyypxphrqkncimszt.supabase.co').trim();
-        if (supabaseUrl.endsWith('/')) supabaseUrl = supabaseUrl.slice(0, -1);
-        
+        const supabaseUrl = 'https://ikofyypxphrqkncimszt.supabase.co';
         const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-
         const targetUrl = `${supabaseUrl}/functions/v1/sofia-voice-bot/initiate`;
 
 
@@ -392,7 +506,7 @@ export const callBotService = {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${session?.access_token || anonKey}`
                 },
-                body: JSON.stringify({ queue_id: qItem.id, test_phone: phone })
+                body: JSON.stringify({ queue_id: qItem.id, test_phone: phone, config })
             });
 
             if (!res.ok) {

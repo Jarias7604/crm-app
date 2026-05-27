@@ -317,7 +317,7 @@ export default function FlyerStudio() {
     setIsLoadingImg(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flyer-generate`, {
+      const res = await fetch(`https://ikofyypxphrqkncimszt.supabase.co/functions/v1/flyer-generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session!.access_token}` },
         body: JSON.stringify({ idea, industria: selectedIndustries.join(', '), oferta, tono, seed: Date.now() }),

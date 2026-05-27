@@ -138,7 +138,7 @@ function Step2Plan({ selectedPlan, onSelect, billingCycle, onCycleChange, onNext
   );
 }
 
-function Step3Payment({ onNext }: any) {
+function Step3Payment({ onNext, isSaving }: any) {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-md mx-auto">
       <div className="mb-8 text-center">
@@ -178,9 +178,22 @@ function Step3Payment({ onNext }: any) {
         </p>
       </div>
 
-      <button className="w-full bg-[#0f172a] text-white px-8 py-4 rounded-2xl font-black shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2" onClick={onNext}>
-        <CreditCard size={18} />
-        Activar suscripción ahora
+      <button 
+        disabled={isSaving}
+        className="w-full bg-[#0f172a] text-white px-8 py-4 rounded-2xl font-black shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 disabled:opacity-50" 
+        onClick={onNext}
+      >
+        {isSaving ? (
+          <>
+            <Loader2 className="w-5 h-5 animate-spin" />
+            Procesando activación...
+          </>
+        ) : (
+          <>
+            <CreditCard size={18} />
+            Activar suscripción ahora
+          </>
+        )}
       </button>
       <p className="text-center text-slate-400 text-xs font-bold mt-4 uppercase tracking-wider">
         Sin contratos. Cancela en cualquier momento.
@@ -365,6 +378,59 @@ export default function OnboardingWizard() {
     }
   };
 
+  // Step 3: save real subscription based on selected plan and cycle
+  const handleStep3Next = async () => {
+    if (!profile?.company_id) { setStep(4); return; }
+    setIsSaving(true);
+    try {
+      // 1. Fetch the selected plan details to get plan id
+      const { data: planData, error: planError } = await supabase
+        .from('saas_plans')
+        .select('id, name')
+        .eq('slug', selectedPlan)
+        .single();
+      if (planError) throw planError;
+
+      // 2. Determine dates
+      const now = new Date();
+      const periodEnd = new Date();
+      if (billingCycle === 'annual') {
+        periodEnd.setFullYear(now.getFullYear() + 1);
+      } else {
+        periodEnd.setMonth(now.getMonth() + 1);
+      }
+
+      // 3. Upsert into company_subscriptions
+      const { error: subError } = await supabase
+        .from('company_subscriptions')
+        .upsert({
+          company_id: profile.company_id,
+          plan_id: planData.id,
+          status: 'active',
+          billing_cycle: billingCycle,
+          trial_ends_at: null,
+          current_period_start: now.toISOString(),
+          current_period_end: periodEnd.toISOString(),
+          stripe_customer_id: 'cus_simulated_' + profile.company_id.substring(0, 8),
+          stripe_subscription_id: 'sub_simulated_' + profile.company_id.substring(0, 8),
+          updated_at: now.toISOString(),
+        }, { onConflict: 'company_id' });
+
+      if (subError) throw subError;
+
+      toast.success(`🎉 ¡Plan ${planData.name} activado con éxito!`);
+      
+      // Notify components to update subscription cache
+      window.dispatchEvent(new CustomEvent('company-subscription-updated'));
+    } catch (err: any) {
+      console.error('[OnboardingWizard] Error updating subscription:', err);
+      toast.error('Error al activar el plan. Reintentando...');
+    } finally {
+      setIsSaving(false);
+      setStep(4);
+    }
+  };
+
   // Step 4: save branding (logo + color) to DB
   // Logo upload is fully non-blocking — if storage fails or no file selected,
   // the wizard still advances to Step 5 silently. User can upload logo later.
@@ -432,7 +498,7 @@ export default function OnboardingWizard() {
         <div className={`w-full transition-all duration-500 ${step === 2 || step === 5 ? 'max-w-5xl' : 'max-w-xl'}`}>
           {step === 1 && <Step1Company data={companyData} onChange={setCompanyData} onNext={handleStep1Next} isSaving={isSaving} />}
           {step === 2 && <Step2Plan selectedPlan={selectedPlan} onSelect={setSelectedPlan} billingCycle={billingCycle} onCycleChange={setBillingCycle} onNext={() => setStep(3)} />}
-          {step === 3 && <Step3Payment onNext={() => setStep(4)} />}
+          {step === 3 && <Step3Payment onNext={handleStep3Next} isSaving={isSaving} />}
           {step === 4 && <Step4Branding data={companyData} onChange={setCompanyData} onNext={handleStep4Next} isSaving={isSaving} />}
           {step === 5 && <Step5Done companyName={companyData.companyName} onGoToDashboard={() => navigate('/dashboard')} />}
         </div>
