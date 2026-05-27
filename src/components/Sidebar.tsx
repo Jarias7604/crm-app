@@ -236,7 +236,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         { name: 'Gestión Financiera', href: '/financial-rules', icon: CreditCard, current: location.pathname === '/financial-rules', permissionKey: 'financial_rules' },
         { name: 'Motivos de Pérdida', href: '/loss-reasons', icon: XCircle, current: location.pathname === '/loss-reasons', permissionKey: 'loss_reasons' },
         { name: 'Rubros / Industrias', href: '/industries', icon: Building2, current: location.pathname === '/industries', permissionKey: 'loss_reasons' },
-        { name: 'Call Bot AI', href: '/admin/call-bot', icon: PhoneCall, current: location.pathname === '/admin/call-bot', permissionKey: 'pipeline.admin', devOnly: true },
+        { name: 'Call Bot AI', href: '/admin/call-bot', icon: PhoneCall, current: location.pathname === '/admin/call-bot', permissionKey: 'pipeline.admin' },
     ];
 
     const isSuperOrAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
