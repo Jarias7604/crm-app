@@ -36,8 +36,8 @@ export const dashboardService = {
                     companyId: finalCompanyId
                 });
                 // Return empty defaults instead of throwing — shows zeros on empty environments
-                return {
-                    stats: { totalLeads: 0, totalLeadsTrend: 0, totalPipeline: 0, totalPipelineTrend: 0, wonDeals: 0, wonDealsTrend: 0, totalWonAmount: 0, conversionRate: 0, conversionRateTrend: 0, erroneousLeads: 0, erroneousLeadsTrend: 0 },
+                 return {
+                    stats: { totalLeads: 0, totalLeadsTrend: 0, totalPipeline: 0, totalPipelineTrend: 0, wonDeals: 0, wonDealsTrend: 0, totalWonAmount: 0, totalWonPotential: 0, conversionRate: 0, conversionRateTrend: 0, erroneousLeads: 0, erroneousLeadsTrend: 0 },
                     byStatus: [], bySource: [], byPriority: [], topOpportunities: [],
                     upcomingFollowUps: [], recentConversions: [], lossReasons: [],
                     lossStages: [], qualityTrend: [], salesTrend: [], salesKpis: []
@@ -48,7 +48,7 @@ export const dashboardService = {
             return {
                 stats: data?.stats || {
                     totalLeads: 0, totalLeadsTrend: 0, totalPipeline: 0, totalPipelineTrend: 0,
-                    wonDeals: 0, wonDealsTrend: 0, totalWonAmount: 0, conversionRate: 0,
+                    wonDeals: 0, wonDealsTrend: 0, totalWonAmount: 0, totalWonPotential: 0, conversionRate: 0,
                     conversionRateTrend: 0, erroneousLeads: 0, erroneousLeadsTrend: 0
                 },
                 byStatus: data?.byStatus || [],
@@ -67,7 +67,7 @@ export const dashboardService = {
             logger.error('Unhandled error in getDashboardStats', error);
             // Return empty defaults instead of crashing the dashboard
             return {
-                stats: { totalLeads: 0, totalLeadsTrend: 0, totalPipeline: 0, totalPipelineTrend: 0, wonDeals: 0, wonDealsTrend: 0, totalWonAmount: 0, conversionRate: 0, conversionRateTrend: 0, erroneousLeads: 0, erroneousLeadsTrend: 0 },
+                stats: { totalLeads: 0, totalLeadsTrend: 0, totalPipeline: 0, totalPipelineTrend: 0, wonDeals: 0, wonDealsTrend: 0, totalWonAmount: 0, totalWonPotential: 0, conversionRate: 0, conversionRateTrend: 0, erroneousLeads: 0, erroneousLeadsTrend: 0 },
                 byStatus: [], bySource: [], byPriority: [], topOpportunities: [],
                 upcomingFollowUps: [], recentConversions: [], lossReasons: [],
                 lossStages: [], qualityTrend: [], salesTrend: [], salesKpis: []

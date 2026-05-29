@@ -7,12 +7,15 @@ import type { Client, ClientPipelineStage } from '../../types/clients';
 import OnboardingPipeline from '../../components/clientes/OnboardingPipeline';
 import ClienteDetail from '../../components/clientes/ClienteDetail';
 import { usePermissions } from '../../hooks/usePermissions';
+import { useAuth } from '../../auth/AuthProvider';
+import { pagosService } from '../../services/pagos';
 
 type Tab = 'pipeline' | 'activos';
 
 export default function Clientes() {
   const { hasPermission, isAdmin } = usePermissions();
   const canView = hasPermission('clientes.view') || isAdmin();
+  const { profile } = useAuth();
 
   const [tab, setTab] = useState<Tab>('pipeline');
   const [clients, setClients] = useState<Client[]>([]);
@@ -21,6 +24,7 @@ export default function Clientes() {
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
+  const [clientesCuentas, setClientesCuentas] = useState<Record<string, any>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -31,13 +35,28 @@ export default function Clientes() {
       ]);
       setClients(clientResult.status === 'fulfilled' ? clientResult.value : []);
       setStages(stageResult.status === 'fulfilled' ? stageResult.value : []);
+
+      if (profile?.company_id) {
+        try {
+          const cuentas = await pagosService.getClientesCuentas(profile.company_id);
+          const cuentasMap: Record<string, any> = {};
+          cuentas.forEach(c => {
+            if (c.nombre_cliente) {
+              cuentasMap[c.nombre_cliente.trim().toLowerCase()] = c;
+            }
+          });
+          setClientesCuentas(cuentasMap);
+        } catch (err) {
+          console.error('[Clientes] Error loading accounts:', err);
+        }
+      }
     } catch {
       setClients([]);
       setStages([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [profile?.company_id]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -281,6 +300,32 @@ export default function Clientes() {
                       </span>
                     </div>
                   )}
+
+                  {/* Payment status badge */}
+                  {(() => {
+                    const cuenta = clientesCuentas[client.nombre.trim().toLowerCase()] || 
+                                   (client.contacto ? clientesCuentas[client.contacto.trim().toLowerCase()] : null);
+                    if (!cuenta) return null;
+                    const total = (cuenta.total_cobrado || 0) + (cuenta.total_pendiente || 0);
+                    if (total === 0) return null;
+                    const pct = Math.round((cuenta.total_cobrado / total) * 100);
+                    return (
+                      <div className="flex flex-col items-end gap-0.5 min-w-[120px] text-right mr-2 flex-shrink-0">
+                        <div className="flex items-center gap-1">
+                          <span className={`w-1.5 h-1.5 rounded-full ${cuenta.total_pendiente === 0 ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                          <span className={`text-[9px] font-black uppercase tracking-wider ${cuenta.total_pendiente === 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                            {cuenta.total_pendiente === 0 ? 'Pagado (Income)' : 'CxC Pendiente'}
+                          </span>
+                        </div>
+                        <p className="text-[10px] font-mono font-black text-slate-700">
+                          ${(cuenta.total_cobrado || 0).toLocaleString()} / ${(total || 0).toLocaleString()}
+                        </p>
+                        <div className="w-20 h-1 bg-slate-100 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all duration-1000 ${cuenta.total_pendiente === 0 ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Doc count badge */}
                   {(() => {

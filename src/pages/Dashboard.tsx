@@ -26,6 +26,7 @@ import { MobileQuickActions } from '../components/MobileQuickActions';
 import { ManagerLivePulse } from '../components/ManagerLivePulse';
 import { WeeklyLeaderboard } from '../components/WeeklyLeaderboard';
 import { PanoramaFinancieroWidget } from '../components/financiero/PanoramaFinancieroWidget';
+import { pagosService } from '../services/pagos';
 import toast from 'react-hot-toast';
 
 const THEME = {
@@ -156,6 +157,7 @@ export default function Dashboard() {
         wonDeals: 0,
         wonDealsTrend: 0,
         totalWonAmount: 0,
+        totalWonPotential: 0,
         conversionRate: 0,
         conversionRateTrend: 0,
         erroneousLeads: 0,
@@ -174,7 +176,29 @@ export default function Dashboard() {
     const [escalationLeads, setEscalationLeads] = useState<any[]>([]);
     const [showEscalation, setShowEscalation] = useState<boolean | 'expanded'>(true);
     const [hotLeads, setHotLeads] = useState<any[]>([]);
+    const [financeResumen, setFinanceResumen] = useState<{
+        ventaTotal: number;
+        totalCobrado: number;
+        totalPendiente: number;
+        cotizacionesActivas: number;
+    } | null>(null);
+    const [isFinanceLoading, setIsFinanceLoading] = useState(true);
 
+    useEffect(() => {
+        if (profile?.company_id) {
+            setIsFinanceLoading(true);
+            pagosService.getResumen(profile.company_id)
+                .then(res => {
+                    setFinanceResumen(res);
+                })
+                .catch(err => {
+                    logger.error('Error fetching finance summary', err);
+                })
+                .finally(() => {
+                    setIsFinanceLoading(false);
+                });
+        }
+    }, [profile?.company_id, refreshKey]);
 
     const navigate = useNavigate();
 
@@ -1076,10 +1100,43 @@ export default function Dashboard() {
 
                                 <div className="flex-grow">
                                     <h3 className="text-[10px] font-black uppercase tracking-[0.2em] mb-1 text-slate-400">{item.name}</h3>
-                                    <div className="flex items-baseline gap-2">
-                                        <span className="text-3xl font-black tracking-tighter text-slate-900">{item.value}</span>
-                                        {item.secondaryValue && <span className="text-[11px] font-bold text-slate-400">{item.secondaryValue}</span>}
-                                    </div>
+                                    {item.name === t('dashboard.crm.wonDeals') ? (
+                                        <div className="space-y-1.5 mt-1">
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-3xl font-black tracking-tighter text-slate-900">{item.value}</span>
+                                                <span className="text-[9px] bg-emerald-100/70 text-emerald-800 font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider">Tratos</span>
+                                            </div>
+                                            <div className="space-y-1 text-[11px] font-bold font-inter text-slate-600 bg-slate-50/70 p-2 rounded-xl border border-slate-100/50">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-slate-400">🎯 Cierre Real:</span>
+                                                    <span className="text-emerald-600">${(stats.totalWonAmount || 0).toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-slate-400">📊 Potencial:</span>
+                                                    <span className="text-indigo-600">${(stats.totalWonPotential || 0).toLocaleString()}</span>
+                                                </div>
+                                                {stats.totalWonPotential > 0 && (
+                                                    <div className="mt-1.5 pt-1.5 border-t border-slate-200/50 flex justify-between items-center text-[9px]">
+                                                        <span className="text-slate-400 uppercase tracking-wider text-[8px] font-black">Efectividad:</span>
+                                                        {stats.totalWonAmount >= stats.totalWonPotential ? (
+                                                            <span className="text-emerald-600 bg-emerald-50 px-1 py-0.2 rounded font-black">
+                                                                🚀 +{Math.round(((stats.totalWonAmount - stats.totalWonPotential) / stats.totalWonPotential) * 100)}%
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-amber-600 bg-amber-50 px-1 py-0.2 rounded font-black">
+                                                                📉 {Math.round((stats.totalWonAmount / stats.totalWonPotential) * 100)}%
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-baseline gap-2">
+                                            <span className="text-3xl font-black tracking-tighter text-slate-900">{item.value}</span>
+                                            {item.secondaryValue && <span className="text-[11px] font-bold text-slate-400">{item.secondaryValue}</span>}
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
@@ -1482,6 +1539,72 @@ export default function Dashboard() {
                         );
                     })()}
 
+                </div>
+
+                {/* Control de Pagos (CxC) Widget */}
+                <div className="lg:col-span-4 bg-white rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative z-0">
+                    <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-white">
+                        <div className="flex flex-col">
+                            <h3 className="text-[11px] font-black text-emerald-800 uppercase tracking-[0.2em] flex items-center gap-1.5">
+                                <BadgeDollarSign className="w-3.5 h-3.5" /> Control de Pagos
+                            </h3>
+                            <p className="text-[10px] text-gray-400 font-medium mt-0.5">Ingresos vs. Cuentas por Cobrar (CxC)</p>
+                        </div>
+                        <button 
+                            onClick={() => navigate('/finanzas')} 
+                            className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2.5 py-1 rounded-xl text-[9px] font-black tracking-widest uppercase transition-all"
+                        >
+                            Ver Finanzas →
+                        </button>
+                    </div>
+                    
+                    <div className="p-4 flex-grow flex flex-col justify-between min-h-[220px]">
+                        {isFinanceLoading ? (
+                            <div className="h-full flex items-center justify-center py-10 opacity-30 text-[9px] font-black uppercase tracking-widest animate-pulse">Cargando datos...</div>
+                        ) : financeResumen ? (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-100/50 hover:bg-emerald-50 transition-colors">
+                                        <p className="text-[9px] font-black text-emerald-700 uppercase tracking-wider mb-1">💰 Pagado (Income)</p>
+                                        <p className="text-xl font-black text-emerald-600 font-mono">${(financeResumen.totalCobrado || 0).toLocaleString()}</p>
+                                        <p className="text-[8px] text-slate-400 font-bold">Ingresos cobrados</p>
+                                    </div>
+                                    <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-100/50 hover:bg-amber-50 transition-colors">
+                                        <p className="text-[9px] font-black text-amber-700 uppercase tracking-wider mb-1">⏳ Pendiente (CxC)</p>
+                                        <p className="text-xl font-black text-amber-600 font-mono">${(financeResumen.totalPendiente || 0).toLocaleString()}</p>
+                                        <p className="text-[8px] text-slate-400 font-bold">Cuentas por cobrar</p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1.5 pt-2 border-t border-slate-50">
+                                    <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider">
+                                        <span className="text-slate-400">Progreso de Recaudo</span>
+                                        <span className="text-emerald-600 font-mono text-[11px] font-bold">
+                                            {financeResumen.ventaTotal > 0 
+                                                ? `${Math.round((financeResumen.totalCobrado / financeResumen.ventaTotal) * 100)}%` 
+                                                : '0%'}
+                                        </span>
+                                    </div>
+                                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                                        <div 
+                                            className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-1000" 
+                                            style={{ 
+                                                width: financeResumen.ventaTotal > 0 
+                                                    ? `${Math.min(100, (financeResumen.totalCobrado / financeResumen.ventaTotal) * 100)}%` 
+                                                    : '0%' 
+                                            }} 
+                                        />
+                                    </div>
+                                    <div className="flex justify-between text-[9px] text-slate-400 font-bold">
+                                        <span>Total: ${(financeResumen.ventaTotal || 0).toLocaleString()}</span>
+                                        <span>{financeResumen.cotizacionesActivas} contratos con pagos</span>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="h-full flex items-center justify-center py-10 opacity-30 text-[9px] font-black uppercase tracking-widest">Sin datos financieros</div>
+                        )}
+                    </div>
                 </div>
 
                 <div className={`lg:col-span-4 bg-white rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'topOpp' ? 'z-[50]' : 'z-0'}`}>
