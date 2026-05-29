@@ -198,7 +198,7 @@ export default function Finanzas() {
           <Button onClick={() => setIsAddingIngreso(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm border-0 font-bold tracking-wide">
             <Plus className="w-4 h-4 mr-2" /> Registrar Ingreso
           </Button>
-          <Button onClick={() => setIsAddingGasto(true)} variant="outline" className="text-slate-700 bg-white shadow-sm font-bold tracking-wide border-slate-200 hover:bg-slate-50">
+          <Button onClick={() => { setActiveTab('gastos'); setIsAddingGasto(true); }} variant="outline" className="text-slate-700 bg-white shadow-sm font-bold tracking-wide border-slate-200 hover:bg-slate-50">
             <Plus className="w-4 h-4 mr-2 text-rose-500" /> Registrar Gasto
           </Button>
         </div>
