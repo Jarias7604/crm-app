@@ -204,13 +204,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     'tickets', 'inventory', 'team_manage', 'team_view_assigned', 
                     'dashboard_full', 'pricing', 'paquetes', 'financial_rules', 'items', 
                     'calendar', 'loss_reasons', 'chat', 'branding', 'dashboard_filter_dates', 
-                    'ai_agents', 'admin_companies', 'onboarding', 'reports'
+                    'ai_agents', 'admin_companies', 'onboarding', 'reports', 'view_financials'
                 ];
                 
                 allPerms.forEach(p => { 
                     if (finalRole !== 'super_admin' && ['companies', 'audit_log', 'admin_companies', 'admin_audit'].includes(p)) {
                         bypassProfile.permissions![p] = false;
-                    } else if (finalRole === 'collaborator' && ['marketing', 'pricing', 'paquetes', 'financial_rules', 'team_manage'].includes(p)) {
+                    } else if (finalRole === 'collaborator' && ['marketing', 'pricing', 'paquetes', 'financial_rules', 'team_manage', 'view_financials'].includes(p)) {
                         bypassProfile.permissions![p] = false;
                     } else {
                         bypassProfile.permissions![p] = true; 

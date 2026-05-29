@@ -227,8 +227,10 @@ export const leadsService = {
     // Get lead statistics for Dashboard - Optimized selection
     async getLeadStats(startDate?: string, endDate?: string) {
         try {
-            // First, get leads created in range
-            let createdQuery = supabase.from('leads').select('id, value, created_at');
+            // First, get leads created in range — exclude statuses hidden by default in Leads.tsx
+            // (Erróneo, Perdido, En Nutrición are auto-hidden unless explicitly filtered)
+            let createdQuery = supabase.from('leads').select('id, value, created_at')
+                .not('status', 'in', '("Erróneo","Perdido","En Nutrición")');
             if (startDate) createdQuery = createdQuery.gte('created_at', startDate);
             if (endDate) createdQuery = createdQuery.lte('created_at', endDate);
 

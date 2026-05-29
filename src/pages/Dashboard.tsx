@@ -4,7 +4,7 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
-import { BadgeDollarSign, TrendingUp, Users, Target, Building, Building2, Calendar, Clock, CheckCircle, ChevronDown, Edit2, Settings, AlertTriangle, PhoneOff, ArrowRight, Sprout } from 'lucide-react';
+import { BadgeDollarSign, TrendingUp, Users, Target, Building, Building2, Calendar, Clock, CheckCircle, ChevronDown, Edit2, Settings, AlertTriangle, PhoneOff, ArrowRight, Sprout, CreditCard, Brain, Sparkles, MessageSquare, Crosshair, Flame, Zap } from 'lucide-react';
 import { adminService } from '../services/admin';
 import { supabase } from '../services/supabase';
 import { useEffect, useState, useRef, useMemo } from 'react';
@@ -28,6 +28,7 @@ import { WeeklyLeaderboard } from '../components/WeeklyLeaderboard';
 import { PanoramaFinancieroWidget } from '../components/financiero/PanoramaFinancieroWidget';
 import { pagosService } from '../services/pagos';
 import toast from 'react-hot-toast';
+
 
 const THEME = {
     primary: '#4F46E5',   // Indigo Moderno
@@ -56,10 +57,11 @@ const SIA_PERIOD_LABELS: Record<string, string> = {
 
 const PIE_COLORS = [THEME.primary, THEME.success, THEME.accent, THEME.chart2, THEME.chart3, '#94A3B8'];
 
-const FunnelInfographic = ({ data, onStageClick, hideClientAmount }: {
+const FunnelInfographic = ({ data, onStageClick, hideClientAmount, hideAmounts }: {
     data: any[];
     onStageClick: (status: string) => void;
     hideClientAmount?: boolean;
+    hideAmounts?: boolean;
 }) => {
     // Unicode-safe lookup: normalize both sides to NFC to handle accent encoding variations
     const findByStatus = (status: string) => {
@@ -99,7 +101,7 @@ const FunnelInfographic = ({ data, onStageClick, hideClientAmount }: {
                     <div className="flex justify-between items-center mb-1">
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider group-hover:text-indigo-600 transition-colors">{layer.label}</span>
                         <div className="flex items-center gap-2">
-                            {layer.amount > 0 && !(hideClientAmount && layer.key === 'Cliente') && (
+                            {layer.amount > 0 && !hideAmounts && !(hideClientAmount && layer.key === 'Cliente') && (
                                 <span className="text-[10px] font-bold text-emerald-600">${layer.amount.toLocaleString()}</span>
                             )}
                             <span className="text-[11px] font-black text-slate-900">{layer.value}</span>
@@ -183,6 +185,31 @@ export default function Dashboard() {
         cotizacionesActivas: number;
     } | null>(null);
     const [isFinanceLoading, setIsFinanceLoading] = useState(true);
+
+    // States for AI Cognitive Capsule
+    const [selectedAiLead, setSelectedAiLead] = useState<{ id: string; name: string } | null>(null);
+    const [aiMemoryData, setAiMemoryData] = useState<any | null>(null);
+    const [isLoadingAiMemory, setIsLoadingAiMemory] = useState(false);
+
+    const handleViewAiMemory = async (leadId: string, leadName: string) => {
+        setSelectedAiLead({ id: leadId, name: leadName });
+        setIsLoadingAiMemory(true);
+        try {
+            const { data, error } = await supabase
+                .from('lead_ai_memory')
+                .select('*')
+                .eq('lead_id', leadId)
+                .maybeSingle();
+            
+            if (error) throw error;
+            setAiMemoryData(data || null);
+        } catch (e) {
+            logger.error('Error fetching lead AI memory', e);
+            toast.error('No se pudo cargar la memoria de la IA');
+        } finally {
+            setIsLoadingAiMemory(false);
+        }
+    };
 
     useEffect(() => {
         if (profile?.company_id) {
@@ -332,11 +359,15 @@ export default function Dashboard() {
     // 🔒 Role-based dashboard: collaborators without dashboard_view_company only see their own stats
     const isAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
     const canViewCompanyDashboard = isAdmin || (profile?.permissions?.['dashboard_view_company'] === true);
+    const canViewFinancials = isAdmin || (profile?.permissions?.['view_financials'] === true);
     // Admin: puede ver perspectiva de un colaborador específico; Agent: siempre ve lo suyo
     const dashboardAssignedTo = canViewCompanyDashboard ? selectedCollabId : profile?.id;
+    const isViewingOwnData = !dashboardAssignedTo || dashboardAssignedTo === profile?.id;
+    const canViewActiveFinancials = canViewFinancials || isViewingOwnData;
+    const averageTicket = stats.wonDeals > 0 ? Math.round((stats.totalWonAmount || stats.totalWonPotential || 0) / stats.wonDeals) : 0;
 
     // Use optimized dashboard hook (replaces 5 queries with 1)
-    const { data: dashboardData, isLoading: isDashboardLoading, error: dashboardError } = useDashboardStats(
+    const { data: dashboardData, isLoading: isDashboardLoading, error: dashboardError, refetch } = useDashboardStats(
         profile?.company_id,
         dateRange.startDate,
         dateRange.endDate,
@@ -346,8 +377,18 @@ export default function Dashboard() {
     // Process dashboard data when it arrives
     useEffect(() => {
         if (dashboardData) {
-            // Set stats
-            setStats(dashboardData.stats);
+            // Set stats - fall back totalWonAmount if 0 (e.g. when closing_amount is not set or RPC schema is older)
+            const adjustedStats = { ...dashboardData.stats };
+            if ((adjustedStats.totalWonAmount === 0 || !adjustedStats.totalWonAmount) && adjustedStats.wonDeals > 0) {
+                const conversions = dashboardData.recentConversions || [];
+                const computedTotal = conversions.reduce((sum: number, l: any) => sum + (l.closing_amount || l.value || 0), 0);
+                if (computedTotal > 0) {
+                    adjustedStats.totalWonAmount = computedTotal;
+                } else if (adjustedStats.totalWonPotential > 0) {
+                    adjustedStats.totalWonAmount = adjustedStats.totalWonPotential;
+                }
+            }
+            setStats(adjustedStats);
 
             // Map funnel data with labels — normalize Unicode keys to NFC for consistent matching
             const mappedFunnelData = dashboardData.byStatus.map((item: any) => {
@@ -378,7 +419,32 @@ export default function Dashboard() {
             setTopOpportunities(dashboardData.topOpportunities || []);
 
             // Set upcoming follow-ups
-            setUpcomingFollowUps(dashboardData.upcomingFollowUps || []);
+            // Set upcoming follow-ups with dynamic phone/email fetching to enable WhatsApp and dynamic AI quick-actions
+            const followups = dashboardData.upcomingFollowUps || [];
+            if (followups.length > 0 && profile?.company_id) {
+                const leadIds = followups.map((f: any) => f.id);
+                supabase
+                    .from('leads')
+                    .select('id, phone, email')
+                    .in('id', leadIds)
+                    .then(({ data: leadContactData }) => {
+                        if (leadContactData) {
+                            const mappedFollowups = followups.map((f: any) => {
+                                const contact = leadContactData.find((c: any) => c.id === f.id);
+                                return {
+                                    ...f,
+                                    phone: contact?.phone || '',
+                                    email: contact?.email || ''
+                                };
+                            });
+                            setUpcomingFollowUps(mappedFollowups);
+                        } else {
+                            setUpcomingFollowUps(followups);
+                        }
+                    });
+            } else {
+                setUpcomingFollowUps(followups);
+            }
 
             // Set recent conversions
             setRecentConversions(dashboardData.recentConversions || []);
@@ -440,12 +506,15 @@ export default function Dashboard() {
 
         // 🔥 Load hot leads (cierre_inminente) for dashboard card
         if (profile?.company_id) {
-            supabase
+            const hotQuery = supabase
                 .from('lead_ai_memory')
-                .select('lead_id, sentiment_score, leads!inner(id, name, company_name, phone)')
+                .select('lead_id, sentiment_score, leads!inner(id, name, company_name, phone, assigned_to)')
                 .eq('company_id', profile.company_id)
-                .eq('next_action', 'cierre_inminente')
-                .limit(5)
+                .eq('next_action', 'cierre_inminente');
+            if (dashboardAssignedTo) {
+                hotQuery.eq('leads.assigned_to', dashboardAssignedTo);
+            }
+            hotQuery.limit(5)
                 .then(({ data }) => {
                     setHotLeads((data || []).map((m: any) => ({
                         id: m.lead_id,
@@ -999,35 +1068,25 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 {[
                     {
-                        name: t('dashboard.crm.totalPipeline'),
-                        value: `$${stats.totalPipeline.toLocaleString()}`,
-                        icon: BadgeDollarSign,
-                        color: 'text-indigo-600',
-                        bg: 'bg-indigo-50/50',
-                        trend: `${stats.totalPipelineTrend > 0 ? '+' : ''}${stats.totalPipelineTrend}%`,
-                        trendColor: stats.totalPipelineTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
-                        onClick: () => navigate('/cotizaciones', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } })
-                    },
-                    {
-                        name: t('dashboard.crm.totalLeads'),
-                        value: stats.totalLeads,
-                        icon: Users,
-                        color: 'text-blue-600',
-                        bg: 'bg-blue-50/50',
-                        trend: `${stats.totalLeadsTrend > 0 ? '+' : ''}${stats.totalLeadsTrend}%`,
-                        trendColor: stats.totalLeadsTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
-                        onClick: () => navigate('/leads', { state: {} })
-                    },
-                    {
                         name: t('dashboard.crm.wonDeals'),
                         value: stats.wonDeals,
-                        secondaryValue: `| $${(stats.totalWonAmount || 0).toLocaleString()}`,
+                        secondaryValue: canViewFinancials ? `| $${(stats.totalWonAmount || 0).toLocaleString()}` : '',
                         icon: Target,
                         color: 'text-emerald-600',
                         bg: 'bg-emerald-50/50',
                         trend: `${stats.wonDealsTrend > 0 ? '+' : ''}${stats.wonDealsTrend}%`,
                         trendColor: stats.wonDealsTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
                         onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'] } })
+                    },
+                    {
+                        name: t('dashboard.crm.totalPipeline'),
+                        value: canViewFinancials ? `$${stats.totalPipeline.toLocaleString()}` : '$ •••',
+                        icon: BadgeDollarSign,
+                        color: 'text-indigo-600',
+                        bg: 'bg-indigo-50/50',
+                        trend: `${stats.totalPipelineTrend > 0 ? '+' : ''}${stats.totalPipelineTrend}%`,
+                        trendColor: stats.totalPipelineTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
+                        onClick: () => navigate('/cotizaciones', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } })
                     },
                     {
                         name: t('dashboard.crm.conversionRate'),
@@ -1038,6 +1097,16 @@ export default function Dashboard() {
                         trend: `${stats.conversionRateTrend > 0 ? '+' : ''}${stats.conversionRateTrend}%`,
                         trendColor: stats.conversionRateTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
                         onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'] } })
+                    },
+                    {
+                        name: t('dashboard.crm.totalLeads'),
+                        value: stats.totalLeads,
+                        icon: Users,
+                        color: 'text-blue-600',
+                        bg: 'bg-blue-50/50',
+                        trend: `${stats.totalLeadsTrend > 0 ? '+' : ''}${stats.totalLeadsTrend}%`,
+                        trendColor: stats.totalLeadsTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
+                        onClick: () => navigate('/leads', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } })
                     },
                     {
                         name: t('dashboard.crm.erroneousLeads'),
@@ -1109,13 +1178,29 @@ export default function Dashboard() {
                                             <div className="space-y-1 text-[11px] font-bold font-inter text-slate-600 bg-slate-50/70 p-2 rounded-xl border border-slate-100/50">
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-slate-400">🎯 Cierre Real:</span>
-                                                    <span className="text-emerald-600">${(stats.totalWonAmount || 0).toLocaleString()}</span>
+                                                    {canViewFinancials ? (
+                                                        <span className="text-emerald-600 font-black">${(stats.totalWonAmount || 0).toLocaleString()}</span>
+                                                    ) : (
+                                                        <span className="text-slate-400 font-black">$•••</span>
+                                                    )}
                                                 </div>
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-slate-400">📊 Potencial:</span>
-                                                    <span className="text-indigo-600">${(stats.totalWonPotential || 0).toLocaleString()}</span>
+                                                    {canViewFinancials ? (
+                                                        <span className="text-indigo-600 font-black">${(stats.totalWonPotential || 0).toLocaleString()}</span>
+                                                    ) : (
+                                                        <span className="text-slate-400 font-black">$•••</span>
+                                                    )}
                                                 </div>
-                                                {stats.totalWonPotential > 0 && (
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-slate-400">🎟️ Ticket Prom:</span>
+                                                    {canViewFinancials ? (
+                                                        <span className="text-slate-700 font-black">${averageTicket.toLocaleString()}</span>
+                                                    ) : (
+                                                        <span className="text-slate-400 font-black">$•••</span>
+                                                    )}
+                                                </div>
+                                                {canViewFinancials && stats.totalWonPotential > 0 && (
                                                     <div className="mt-1.5 pt-1.5 border-t border-slate-200/50 flex justify-between items-center text-[9px]">
                                                         <span className="text-slate-400 uppercase tracking-wider text-[8px] font-black">Efectividad:</span>
                                                         {stats.totalWonAmount >= stats.totalWonPotential ? (
@@ -1146,7 +1231,7 @@ export default function Dashboard() {
                                             {item.trend}
                                         </span>
                                     </div>
-                                    <span className="text-[9px] font-bold text-slate-300">
+                                    <span className="text-[8px] font-bold text-slate-300">
                                         {getDateRangeLabelDisplay(selectedDateRange) || 'Todo el tiempo'}
                                     </span>
                                 </div>
@@ -1156,14 +1241,12 @@ export default function Dashboard() {
                 })}
             </div>
 
-
-
             {/* Main Content Area: Grouped Proportions */}
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch relative z-0">
 
                 {/* Row 1: Funnel + Strategic Priority + Sources */}
-                <div className={`bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 lg:col-span-4 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'funnel' ? 'z-[50]' : 'z-0'}`}>
+                <div className={`bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 lg:col-span-5 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'funnel' ? 'z-[50]' : 'z-0'}`}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex flex-col">
                             <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('dashboard.crm.funnelTitle')}</h3>
@@ -1208,94 +1291,127 @@ export default function Dashboard() {
                             data={funnelData}
                             onStageClick={(status) => navigate('/leads', { state: { status, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
                             hideClientAmount={!isAdmin}
+                            hideAmounts={!canViewActiveFinancials}
                         />
-                    </div>
-                </div >
-
-                <div className={`bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 lg:col-span-4 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'priority' ? 'z-[50]' : 'z-0'}`}>
-                    <div className="flex justify-between items-center mb-2">
-                        <div className="flex flex-col">
-                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Priorización</h3>
-                            <p className="text-[10px] text-gray-400 font-medium">Enfoque estratégico</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Target className="w-5 h-5 text-amber-500 opacity-30" />
-                            <div className="relative" ref={activeCardFilter === 'priority' ? cardFilterRef : null}>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setActiveCardFilter(activeCardFilter === 'priority' ? null : 'priority');
-                                    }}
-                                    className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'priority' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
-                                >
-                                    <Settings className="w-3.5 h-3.5" />
-                                </button>
-                                {activeCardFilter === 'priority' && (
-                                    <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-[51] py-2 animate-in fade-in slide-in-from-top-2 overflow-hidden">
-                                        {(Object.entries(DATE_RANGE_OPTIONS) as [DateRange, { label: string }][]).map(([key, option]) => (
-                                            <button
-                                                key={key}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedDateRange(key);
-                                                    setActiveCardFilter(null);
-                                                }}
-                                                className={`w-full text-left px-4 py-2 text-[10px] transition-colors flex items-center justify-between ${selectedDateRange === key ? 'bg-indigo-50 text-indigo-600 font-black' : 'text-slate-600 font-bold hover:bg-gray-50'}`}
-                                            >
-                                                <span className="flex items-center gap-1.5">
-                                                    {option.label}
-                                                    <span className="text-[9px] opacity-30 font-medium">{getDateRangeLabelDisplay(key)}</span>
-                                                </span>
-                                                {selectedDateRange === key && <CheckCircle className="w-2.5 h-2.5 text-indigo-600" />}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex-grow min-h-[200px]">
-                        {priorityData.length > 0 ? (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={priorityData} layout="vertical" margin={{ left: 0, right: 10 }}>
-                                    <XAxis type="number" hide />
-                                    <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 700, fill: '#64748b' }} width={120} />
-                                    <Tooltip
-                                        cursor={{ fill: 'transparent' }}
-                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                    />
-                                    <Bar
-                                        dataKey="value"
-                                        radius={[0, 4, 4, 0]}
-                                        barSize={16}
-                                        onClick={(data) => {
-                                            if (data && data.key) {
-                                                navigate('/leads', { state: { priority: data.key, startDate: dateRange.startDate, endDate: dateRange.endDate } });
-                                            }
-                                        }}
-                                        className="cursor-pointer"
-                                    >
-                                        {priorityData.map((entry, index) => (
-                                            <Cell
-                                                key={`cell-${index}`}
-                                                fill={
-                                                    entry.key === 'very_high' ? '#EF4444' : // Red 500
-                                                        entry.key === 'high' ? '#F97316' :      // Orange 500
-                                                            entry.key === 'medium' ? '#FACC15' :    // Yellow 400
-                                                                '#D1D5DB'                               // Gray 300
-                                                }
-                                            />
-                                        ))}
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
-                        ) : (
-                            <div className="h-full flex items-center justify-center text-gray-300 font-bold text-[9px] uppercase tracking-widest">Sin actividad</div>
-                        )}
                     </div>
                 </div>
 
-                <div className={`bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 lg:col-span-4 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'sources' ? 'z-[50]' : 'z-0'}`}>
+                {/* ── ENFOQUE ESTRATÉGICO ── */}
+                {(() => {
+                    // Calcula etapa con más leads estancados (mayor volumen sin ser Cerrado/Cliente)
+                    const STUCK_STAGES = ['Prospecto','Llamada fría','En Nutrición','Lead calificado','En seguimiento','Negociación'];
+                    const stuck = funnelData
+                        .filter(d => STUCK_STAGES.includes(d.key) && d.value > 0)
+                        .sort((a, b) => b.value - a.value);
+                    const biggestStuck = stuck[0];
+
+                    // Etapa más cercana al cierre con leads activos
+                    const CLOSE_STAGES = ['Negociación','En seguimiento','Lead calificado'];
+                    const closestToClose = funnelData
+                        .find(d => CLOSE_STAGES.includes(d.key) && d.value > 0);
+
+                    // Potencial desbloqueado si se mueven los leads de la etapa mayor
+                    const avgTicket = stats.wonDeals > 0 ? Math.round((stats.totalWonAmount || stats.totalWonPotential || 0) / stats.wonDeals) : 0;
+                    const potentialUnlock = biggestStuck ? biggestStuck.value * avgTicket : 0;
+
+                    const focusItems = [
+                        biggestStuck && {
+                            icon: Flame,
+                            color: 'text-rose-500',
+                            bg: 'bg-rose-50',
+                            label: 'Mayor acumulación',
+                            value: biggestStuck.label || biggestStuck.key,
+                            sub: `${biggestStuck.value} leads estancados`,
+                            action: biggestStuck.key,
+                        },
+                        closestToClose && {
+                            icon: Target,
+                            color: 'text-emerald-600',
+                            bg: 'bg-emerald-50',
+                            label: 'Más cerca del cierre',
+                            value: closestToClose.label || closestToClose.key,
+                            sub: `${closestToClose.value} lead${closestToClose.value > 1 ? 's' : ''} listo${closestToClose.value > 1 ? 's' : ''}`,
+                            action: closestToClose.key,
+                        },
+                        avgTicket > 0 && canViewActiveFinancials && {
+                            icon: Zap,
+                            color: 'text-amber-500',
+                            bg: 'bg-amber-50',
+                            label: 'Potencial desbloqueado',
+                            value: `$${potentialUnlock.toLocaleString()}`,
+                            sub: `Si cierras leads de ${biggestStuck?.label || '—'}`,
+                            action: biggestStuck?.key || '',
+                        },
+                    ].filter(Boolean) as { icon: any; color: string; bg: string; label: string; value: string; sub: string; action: string }[];
+
+                    return (
+                        <div className="bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 lg:col-span-4 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500">
+                            {/* Header */}
+                            <div className="flex items-center justify-between mb-3">
+                                <div>
+                                    <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-1.5">
+                                        <Crosshair className="w-3.5 h-3.5 text-indigo-400" />
+                                        Enfoque Estratégico
+                                    </h3>
+                                    <p className="text-[10px] text-gray-400 font-medium mt-0.5">Dónde concentrar energía ahora</p>
+                                </div>
+                                <div className="bg-indigo-50 px-2 py-0.5 rounded-full text-[8px] font-black text-indigo-600 tracking-wider">FOCO</div>
+                            </div>
+
+                            {/* Focus items */}
+                            {focusItems.length === 0 ? (
+                                <div className="flex-grow flex flex-col items-center justify-center py-6 text-center opacity-40">
+                                    <CheckCircle className="w-8 h-8 text-emerald-400 mb-2" />
+                                    <p className="text-[10px] font-black text-slate-500">Pipeline sin datos aún</p>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col gap-2 flex-grow">
+                                    {focusItems.map((item, i) => (
+                                        <div
+                                            key={i}
+                                            onClick={() => item.action && navigate('/leads', { state: { status: item.action } })}
+                                            className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-50/60 hover:bg-slate-100/80 cursor-pointer transition-all group/item border border-slate-100/80"
+                                        >
+                                            <div className={`w-8 h-8 rounded-xl ${item.bg} flex items-center justify-center shrink-0 mt-0.5`}>
+                                                <item.icon className={`w-4 h-4 ${item.color}`} />
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">{item.label}</p>
+                                                <p className="text-[13px] font-black text-slate-800 leading-tight truncate group-hover/item:text-indigo-600 transition-colors">{item.value}</p>
+                                                <p className="text-[9px] text-slate-400 font-medium mt-0.5">{item.sub}</p>
+                                            </div>
+                                            <ArrowRight className="w-3.5 h-3.5 text-slate-300 group-hover/item:text-indigo-400 transition-colors shrink-0 mt-1.5" />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Top opportunity CTA */}
+                            {topOpportunities.length > 0 && (
+                                <div className="mt-3 pt-2.5 border-t border-slate-100">
+                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1.5">🏆 Mejor Oportunidad</p>
+                                    <div
+                                        onClick={() => navigate('/leads', { state: { leadId: topOpportunities[0].id } })}
+                                        className="flex items-center gap-2 p-2 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100/60 cursor-pointer hover:border-indigo-200 transition-all"
+                                    >
+                                        <div className="w-7 h-7 rounded-lg bg-indigo-500 flex items-center justify-center text-white text-[11px] font-black shrink-0">
+                                            {(topOpportunities[0].name || '?')[0]}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-[11px] font-black text-slate-800 truncate">{topOpportunities[0].name}</p>
+                                            {canViewActiveFinancials && topOpportunities[0].value > 0 && (
+                                                <p className="text-[9px] font-black text-emerald-600">${topOpportunities[0].value?.toLocaleString()}</p>
+                                            )}
+                                        </div>
+                                        <ArrowRight className="w-3 h-3 text-indigo-400 shrink-0" />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()}
+
+                <div className={`bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 lg:col-span-3 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'sources' ? 'z-[50]' : 'z-0'}`}>
                     <div className="flex justify-between items-start mb-4">
                         <div className="flex flex-col">
                             <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('dashboard.crm.sourcesTitle')}</h3>
@@ -1404,7 +1520,17 @@ export default function Dashboard() {
                         <div className="bg-emerald-50 px-2 py-0.5 rounded text-[8px] font-black text-emerald-600 tracking-wider">REVENUE</div>
                     </div>
                     <div className="flex-grow w-full h-[220px]">
-                        {salesTrendData.length > 0 ? (
+                        {!canViewActiveFinancials ? (
+                            <div className="flex flex-col items-center justify-center h-full text-center space-y-3 py-10">
+                                <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
+                                    <TrendingUp className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-black text-slate-800 uppercase tracking-wider">Gráfico Confidencial</p>
+                                    <p className="text-[10px] text-slate-400 font-medium mt-1 px-4">La tendencia de ingresos solo es visible para administradores o colaboradores con permisos financieros.</p>
+                                </div>
+                            </div>
+                        ) : salesTrendData.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={salesTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                                     <defs>
@@ -1550,16 +1676,28 @@ export default function Dashboard() {
                             </h3>
                             <p className="text-[10px] text-gray-400 font-medium mt-0.5">Ingresos vs. Cuentas por Cobrar (CxC)</p>
                         </div>
-                        <button 
-                            onClick={() => navigate('/finanzas')} 
-                            className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2.5 py-1 rounded-xl text-[9px] font-black tracking-widest uppercase transition-all"
-                        >
-                            Ver Finanzas →
-                        </button>
+                        {canViewActiveFinancials && (
+                            <button 
+                                onClick={() => navigate('/finanzas')} 
+                                className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2.5 py-1 rounded-xl text-[9px] font-black tracking-widest uppercase transition-all"
+                            >
+                                Ver Finanzas →
+                            </button>
+                        )}
                     </div>
                     
                     <div className="p-4 flex-grow flex flex-col justify-between min-h-[220px]">
-                        {isFinanceLoading ? (
+                        {!canViewActiveFinancials ? (
+                            <div className="flex flex-col items-center justify-center h-full text-center space-y-3 py-10">
+                                <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
+                                    <CreditCard className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <p className="text-xs font-black text-slate-800 uppercase tracking-wider">Acceso Restringido</p>
+                                    <p className="text-[10px] text-slate-400 font-medium mt-1 px-4">Esta sección contiene información financiera confidencial y requiere permisos adicionales.</p>
+                                </div>
+                            </div>
+                        ) : isFinanceLoading ? (
                             <div className="h-full flex items-center justify-center py-10 opacity-30 text-[9px] font-black uppercase tracking-widest animate-pulse">Cargando datos...</div>
                         ) : financeResumen ? (
                             <div className="space-y-4">
@@ -1666,7 +1804,11 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-[11px] font-black text-emerald-600 font-mono">${(lead.value || 0).toLocaleString()}</p>
+                                    {canViewActiveFinancials ? (
+                                        <p className="text-[11px] font-black text-emerald-600 font-mono">${(lead.value || 0).toLocaleString()}</p>
+                                    ) : (
+                                        <p className="text-[11px] font-black text-slate-400 font-mono">•••</p>
+                                    )}
                                     <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest">{STATUS_CONFIG[lead.status as keyof typeof STATUS_CONFIG]?.label || lead.status}</p>
                                 </div>
                             </div>
@@ -1680,10 +1822,21 @@ export default function Dashboard() {
                     <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-white">
                         <div className="flex flex-col">
                             <h3 className="text-[11px] font-black text-blue-700 uppercase tracking-[0.2em] flex items-center gap-2">
-                                <Clock className="w-3 h-3" /> Seguimientos
-                                {upcomingFollowUps.length > 0 && <span className="bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full text-[9px] font-black">{upcomingFollowUps.length}</span>}
+                                <Clock className="w-3.5 h-3.5 animate-pulse text-amber-500" />
+                                {selectedCollabName ? (
+                                    <span>🔥 Enfoque de {selectedCollabName}</span>
+                                ) : (
+                                    <span>🔥 Mi Enfoque de Hoy</span>
+                                )}
+                                {(upcomingFollowUps.length > 0 || hotLeads.length > 0) && (
+                                    <span className="bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full text-[9px] font-black">
+                                        {upcomingFollowUps.length + hotLeads.length}
+                                    </span>
+                                )}
                             </h3>
-                            <p className="text-[10px] text-blue-600/60 font-medium mt-0.5">Pendientes</p>
+                            <p className="text-[10px] text-blue-600/60 font-medium mt-0.5">
+                                Priorizado por urgencia y temperatura de cierre
+                            </p>
                         </div>
                         <div className="flex items-center gap-2">
                             <button onClick={() => navigate('/leads')} className="text-[9px] font-black text-blue-600 hover:text-blue-800 uppercase tracking-[0.2em] transition-all">Ver</button>
@@ -1721,283 +1874,174 @@ export default function Dashboard() {
                             </div>
                         </div>
                     </div>
-                    <div className="p-3 space-y-1.5 max-h-[300px] overflow-y-auto custom-scrollbar">
-                        {upcomingFollowUps.length > 0 ? (
-                            upcomingFollowUps.map((lead) => (
-                                <div
-                                    key={lead.id}
-                                    onClick={() => navigate('/leads', { state: { leadId: lead.id } })}
-                                    className="p-2.5 bg-gray-50/50 rounded-xl border border-transparent hover:border-blue-100 hover:bg-white transition-all cursor-pointer group/item flex justify-between items-center"
-                                >
-                                    <div className="flex flex-col gap-0.5 max-w-[70%]">
-                                        <h4 className="text-[11px] font-black text-slate-900 truncate group-hover/item:text-blue-600">{lead.name}</h4>
-                                        <p className="text-[9px] text-slate-500 font-medium line-clamp-1">{lead.next_action_notes || 'Revisar contacto'}</p>
-                                    </div>
-                                    <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-lg border border-blue-100 min-w-[35px] text-center">
-                                        {(() => {
-                                            try {
-                                                const dateObj = new Date(lead.next_followup_date);
-                                                return format(dateObj, 'dd MMM', { locale: es });
-                                            } catch (e) { return 'N/A'; }
-                                        })()}
-                                    </span>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="h-full flex flex-col items-center justify-center py-20 opacity-30">
-                                <CheckCircle className="w-8 h-8 mb-2 text-emerald-500" />
-                                <p className="text-[10px] font-black uppercase tracking-[0.1em]">Al día</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                    {(() => {
+                        const items: {
+                            id: string;
+                            name: string;
+                            notes: string;
+                            type: 'hot' | 'overdue' | 'today' | 'upcoming';
+                            dateLabel: string;
+                            phone?: string;
+                            email?: string;
+                        }[] = [];
 
-                <div className={`lg:col-span-4 bg-white rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'conversions' ? 'z-[50]' : 'z-0'}`}>
-                    <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-white">
-                        <div className="flex flex-col">
-                            <h3 className="text-[11px] font-black text-emerald-700 uppercase tracking-[0.2em] flex items-center gap-2">
-                                <TrendingUp className="w-3 h-3" /> Conversiones
-                                {recentConversions.length > 0 && <span className="bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full text-[9px] font-black">{recentConversions.length}</span>}
-                            </h3>
-                            <p className="text-[10px] text-emerald-600/60 font-medium mt-0.5">Últimos cierres</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[8px] font-black tracking-widest uppercase">Winning</div>
-                            <div className="relative" ref={activeCardFilter === 'conversions' ? cardFilterRef : null}>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setActiveCardFilter(activeCardFilter === 'conversions' ? null : 'conversions');
-                                    }}
-                                    className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'conversions' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
-                                >
-                                    <Settings className="w-3.5 h-3.5" />
-                                </button>
-                                {activeCardFilter === 'conversions' && (
-                                    <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-[51] py-2 animate-in fade-in slide-in-from-top-2 overflow-hidden">
-                                        {(Object.entries(DATE_RANGE_OPTIONS) as [DateRange, { label: string }][]).map(([key, option]) => (
-                                            <button
-                                                key={key}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedDateRange(key);
-                                                    setActiveCardFilter(null);
-                                                }}
-                                                className={`w-full text-left px-4 py-2 text-[11px] transition-colors flex items-center justify-between ${selectedDateRange === key
-                                                    ? 'bg-indigo-50 text-indigo-600 font-black'
-                                                    : 'text-slate-600 font-bold hover:bg-gray-50'
-                                                    }`}
-                                            >
-                                                <span className="flex items-center gap-2">
-                                                    {option.label}
-                                                    <span className="text-[9px] opacity-30 font-medium">{getDateRangeLabelDisplay(key)}</span>
-                                                </span>
-                                                {selectedDateRange === key && <CheckCircle className="w-4 h-4 text-indigo-600" />}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="p-3 space-y-1.5 max-h-[300px] overflow-y-auto custom-scrollbar">
-                        {recentConversions.length > 0 ? (
-                            recentConversions.map((lead) => (
-                                <div
-                                    key={lead.id}
-                                    onClick={() => navigate('/leads', { state: { leadId: lead.id } })}
-                                    className="p-2.5 bg-gray-50/50 rounded-xl border border-transparent hover:border-emerald-100 hover:bg-white transition-all cursor-pointer group/item flex justify-between items-center"
-                                >
-                                    <div className="flex flex-col gap-0.5 max-w-[60%]">
-                                        <h4 className="text-[11px] font-black text-slate-900 truncate group-hover/item:text-emerald-600">{lead.name}</h4>
-                                        <p className="text-[9px] text-slate-400 font-black uppercase tracking-tighter truncate">{lead.company_name || 'Particular'}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-[11px] font-black text-emerald-600 font-mono">${(lead.closing_amount || lead.value || 0).toLocaleString()}</p>
-                                        <p className="text-[8px] text-slate-300 font-black uppercase tracking-widest">Cerrado</p>
-                                    </div>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="h-full flex flex-col items-center justify-center py-20 opacity-30">
-                                <Target className="w-8 h-8 mb-2 text-indigo-400" />
-                                <p className="text-[10px] font-black uppercase tracking-[0.1em]">En busca del cierre</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                        // 1. Add Hot Leads
+                        hotLeads.forEach(hl => {
+                            items.push({
+                                id: hl.id,
+                                name: hl.name || 'Prospecto sin nombre',
+                                notes: '🔥 Cierre Inminente (Inteligencia AI)',
+                                type: 'hot',
+                                dateLabel: 'HOT',
+                                phone: hl.phone || ''
+                            });
+                        });
 
+                        // 2. Add upcoming follow-ups
+                        upcomingFollowUps.forEach(uf => {
+                            if (items.some(x => x.id === uf.id)) return;
+                            
+                            const dateObj = new Date(uf.next_followup_date);
+                            const isOverdue = dateObj < startOfToday();
+                            const isToday = dateObj >= startOfToday() && dateObj <= endOfToday();
+                            
+                            let type: 'overdue' | 'today' | 'upcoming' = 'upcoming';
+                            if (isOverdue) type = 'overdue';
+                            else if (isToday) type = 'today';
 
-                {/* Row 4: Lost Leads Analysis */}
-                <div className="lg:col-span-12 grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    {/* Lost by Stage */}
-                    <div className={`bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'lostByStage' ? 'z-[50]' : 'z-0'}`}>
-                        <div className="flex justify-between items-start mb-4">
-                            <div className="flex flex-col">
-                                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Leads Perdidos por Etapa</h3>
-                                <p className="text-[10px] text-gray-400 font-medium mt-0.5">Dónde se están perdiendo las oportunidades</p>
-                            </div>
-                            <div className="relative" ref={activeCardFilter === 'lostByStage' ? cardFilterRef : null}>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setActiveCardFilter(activeCardFilter === 'lostByStage' ? null : 'lostByStage');
-                                    }}
-                                    className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'lostByStage' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
-                                >
-                                    <Settings className="w-3.5 h-3.5" />
-                                </button>
-                                {activeCardFilter === 'lostByStage' && (
-                                    <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-[51] py-2 animate-in fade-in slide-in-from-top-2 overflow-hidden">
-                                        {(Object.entries(DATE_RANGE_OPTIONS) as [DateRange, { label: string }][]).map(([key, option]) => (
-                                            <button
-                                                key={key}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedDateRange(key);
-                                                    setActiveCardFilter(null);
-                                                }}
-                                                className={`w-full text-left px-4 py-2 text-[11px] transition-colors flex items-center justify-between ${selectedDateRange === key
-                                                    ? 'bg-indigo-50 text-indigo-600 font-black'
-                                                    : 'text-slate-600 font-bold hover:bg-gray-50'
-                                                    }`}
-                                            >
-                                                <span className="flex items-center gap-2">
-                                                    {option.label}
-                                                    <span className="text-[9px] opacity-30 font-medium">{getDateRangeLabelDisplay(key)}</span>
-                                                </span>
-                                                {selectedDateRange === key && <CheckCircle className="w-4 h-4 text-indigo-600" />}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                        <div className="flex-grow flex flex-col gap-2">
-                            {(() => {
-                                const stageLossData = lossStageData.map((s, idx) => ({
-                                    stage: s.stage_name,
-                                    count: s.loss_count,
-                                    color: ['bg-blue-500', 'bg-indigo-500', 'bg-teal-500', 'bg-yellow-500', 'bg-red-500'][idx % 5]
-                                }));
+                            // En "Mi Enfoque de Hoy", solo mostramos tareas vencidas o para hoy
+                            if (type !== 'overdue' && type !== 'today') return;
 
-                                const totalLost = stageLossData.reduce((sum, s) => sum + s.count, 0);
+                            let dateLabel = 'N/A';
+                            try {
+                                dateLabel = format(dateObj, 'dd MMM', { locale: es });
+                            } catch (e) {}
 
-                                return totalLost > 0 ? (
-                                    stageLossData.map((item, index) => (
+                            items.push({
+                                id: uf.id,
+                                name: uf.name || 'Prospecto sin nombre',
+                                notes: uf.next_action_notes || 'Revisar contacto',
+                                type,
+                                dateLabel,
+                                phone: uf.phone || '',
+                                email: uf.email || ''
+                            });
+                        });
+
+                        const typePriority = { hot: 0, overdue: 1, today: 2, upcoming: 3 };
+                        items.sort((a, b) => typePriority[a.type] - typePriority[b.type]);
+
+                        return (
+                            <div className="p-3 space-y-1.5 max-h-[300px] overflow-y-auto custom-scrollbar flex-grow">
+                                {items.length > 0 ? (
+                                    items.map((item) => (
                                         <div
-                                            key={index}
-                                            className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-all cursor-pointer group/item"
-                                            onClick={() => navigate('/leads', { state: { status: 'Perdido', lostAtStage: item.stage, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
+                                            key={`${item.id}-${item.type}`}
+                                            onClick={() => navigate('/leads', { state: { leadId: item.id } })}
+                                            className={`p-2.5 rounded-xl border border-transparent transition-all cursor-pointer group/item flex justify-between items-center bg-gray-50/50 ${
+                                                item.type === 'hot' ? 'hover:border-amber-100 hover:bg-amber-50/20' :
+                                                item.type === 'overdue' ? 'hover:border-rose-100 hover:bg-rose-50/20' :
+                                                'hover:border-blue-100 hover:bg-white'
+                                            }`}
                                         >
-                                            <div className={`w-3 h-3 rounded-full ${item.color} shadow-sm group-hover/item:scale-125 transition-transform`} />
-                                            <div className="flex-1">
-                                                <p className="text-xs font-black text-slate-700 group-hover/item:text-indigo-600 transition-colors">{item.stage}</p>
+                                            <div className="flex flex-col gap-0.5 max-w-[70%]">
+                                                <h4 className="text-[11px] font-black text-slate-900 truncate group-hover/item:text-indigo-600 flex items-center gap-1.5">
+                                                    {item.type === 'hot' && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />}
+                                                    {item.type === 'overdue' && <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse shrink-0" />}
+                                                    {item.type === 'today' && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />}
+                                                    {item.type === 'upcoming' && <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />}
+                                                    <span className="truncate">{item.name}</span>
+                                                </h4>
+                                                <p className={`text-[9px] font-medium line-clamp-1 ${
+                                                    item.type === 'hot' ? 'text-amber-600 font-extrabold' : 
+                                                    item.type === 'overdue' ? 'text-rose-500 font-extrabold' : 
+                                                    'text-slate-500'
+                                                }`}>
+                                                    {item.notes}
+                                                </p>
                                             </div>
-                                            <div className="text-right">
-                                                <p className="text-sm font-black text-red-600">{item.count}</p>
-                                                <p className="text-[8px] font-black text-slate-300 uppercase">Perdidos</p>
-                                            </div>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="h-full flex flex-col items-center justify-center py-12 opacity-30">
-                                        <CheckCircle className="w-10 h-10 mb-2 text-green-400" />
-                                        <p className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">Sin pérdidas registradas</p>
-                                        <p className="text-[9px] font-medium text-slate-300 mt-1">¡Excelente trabajo!</p>
-                                    </div>
-                                );
-                            })()}
-                        </div>
-                    </div>
-
-                    {/* Lost by Reason */}
-                    <div className={`bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'lostByReason' ? 'z-[50]' : 'z-0'}`}>
-                        <div className="flex justify-between items-start mb-4">
-                            <div className="flex flex-col">
-                                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Motivos de Pérdida</h3>
-                                <p className="text-[10px] text-gray-400 font-medium mt-0.5">Por qué se están perdiendo</p>
-                            </div>
-                            <div className="relative" ref={activeCardFilter === 'lostByReason' ? cardFilterRef : null}>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setActiveCardFilter(activeCardFilter === 'lostByReason' ? null : 'lostByReason');
-                                    }}
-                                    className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'lostByReason' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
-                                >
-                                    <Settings className="w-3.5 h-3.5" />
-                                </button>
-                                {activeCardFilter === 'lostByReason' && (
-                                    <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-[51] py-2 animate-in fade-in slide-in-from-top-2 overflow-hidden">
-                                        {(Object.entries(DATE_RANGE_OPTIONS) as [DateRange, { label: string }][]).map(([key, option]) => (
-                                            <button
-                                                key={key}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedDateRange(key);
-                                                    setActiveCardFilter(null);
-                                                }}
-                                                className={`w-full text-left px-4 py-2 text-[11px] transition-colors flex items-center justify-between ${selectedDateRange === key
-                                                    ? 'bg-indigo-50 text-indigo-600 font-black'
-                                                    : 'text-slate-600 font-bold hover:bg-gray-50'
-                                                    }`}
-                                            >
-                                                <span className="flex items-center gap-2">
-                                                    {option.label}
-                                                    <span className="text-[9px] opacity-30 font-medium">{getDateRangeLabelDisplay(key)}</span>
+                                            <div className="flex items-center shrink-0">
+                                                {/* Date Label (visible by default, hidden on hover) */}
+                                                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-lg border min-w-[42px] text-center uppercase group-hover/item:hidden transition-all ${
+                                                    item.type === 'hot' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                                                    item.type === 'overdue' ? 'bg-rose-100 text-rose-700 border-rose-200' :
+                                                    'bg-blue-50 text-blue-600 border-blue-100'
+                                                }`}>
+                                                    {item.dateLabel}
                                                 </span>
-                                                {selectedDateRange === key && <CheckCircle className="w-4 h-4 text-indigo-600" />}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                        <div className="flex-grow flex flex-col gap-2">
-                            {(() => {
-                                const reasonData = lossReasonData.map(r => ({
-                                    id: r.reason_id,
-                                    reason: r.reason_name,
-                                    count: r.loss_count,
-                                    percentage: Math.round(r.percentage)
-                                }));
 
-                                const totalReasonsCount = reasonData.reduce((sum, r) => sum + r.count, 0);
+                                                {/* Quick Actions (hidden by default, flex row on hover) */}
+                                                <div className="hidden group-hover/item:flex items-center gap-1 transition-all animate-in fade-in slide-in-from-right-1">
+                                                    {/* WhatsApp click-to-chat */}
+                                                    {item.phone && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                const cleanPhone = (item.phone || '').replace(/[^0-9]/g, '');
+                                                                const message = `Hola ${item.name}, te saludo de Arias Defense. ¿Cómo te encuentras hoy?`;
+                                                                window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(message)}`, '_blank');
+                                                            }}
+                                                            className="p-1 rounded-lg bg-emerald-50 hover:bg-emerald-600 text-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"
+                                                            title="Chat instantáneo de WhatsApp"
+                                                        >
+                                                            <MessageSquare className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
 
-                                return totalReasonsCount > 0 ? (
-                                    reasonData.filter(r => r.count > 0).map((item, index) => (
-                                        <div
-                                            key={index}
-                                            onClick={() => navigate('/leads', { state: { status: 'Perdido', lossReasonId: item.id, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
-                                            className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-all cursor-pointer group/item"
-                                        >
-                                            <div className="flex-1">
-                                                <p className="text-xs font-black text-slate-700 group-hover/item:text-red-500 transition-colors">{item.reason}</p>
-                                                <div className="mt-1 bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                                                    <div
-                                                        className="bg-red-500 h-full rounded-full transition-all duration-500 group-hover/item:bg-red-600"
-                                                        style={{ width: `${item.percentage}%` }}
-                                                    />
+                                                    {/* Instant Snooze +24h */}
+                                                    {item.type !== 'hot' && (
+                                                        <button
+                                                            onClick={async (e) => {
+                                                                e.stopPropagation();
+                                                                const tomorrow = new Date();
+                                                                tomorrow.setDate(tomorrow.getDate() + 1);
+                                                                try {
+                                                                    const { error } = await supabase
+                                                                        .from('leads')
+                                                                        .update({ next_followup_date: tomorrow.toISOString().split('T')[0] })
+                                                                        .eq('id', item.id);
+                                                                    if (error) throw error;
+                                                                    toast.success(`📅 Pospuesto para mañana`);
+                                                                    setRefreshKey(p => p + 1);
+                                                                    refetch();
+                                                                } catch (err) {
+                                                                    logger.error('Error snoozing lead', err);
+                                                                    toast.error('No se pudo reprogramar');
+                                                                }
+                                                            }}
+                                                            className="p-1 rounded-lg bg-indigo-50 hover:bg-indigo-600 text-indigo-600 hover:text-white transition-all shadow-sm border border-indigo-100"
+                                                            title="Snooze 24h (Pospone para mañana)"
+                                                        >
+                                                            <Calendar className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+
+                                                    {/* AI Mind Capsule (Brain Icon) */}
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleViewAiMemory(item.id, item.name);
+                                                        }}
+                                                        className="p-1 rounded-lg bg-amber-50 hover:bg-amber-500 text-amber-600 hover:text-white transition-all shadow-sm border border-amber-100"
+                                                        title="AI Capsule: Ver memoria cerebral del Lead"
+                                                    >
+                                                        <Brain className="w-3.5 h-3.5" />
+                                                    </button>
                                                 </div>
                                             </div>
-                                            <div className="text-right">
-                                                <p className="text-sm font-black text-red-600">{item.count}</p>
-                                                <p className="text-[8px] font-black text-slate-300 uppercase">{item.percentage}%</p>
-                                            </div>
                                         </div>
                                     ))
                                 ) : (
-                                    <div className="h-full flex flex-col items-center justify-center py-12 opacity-30">
-                                        <CheckCircle className="w-10 h-10 mb-2 text-green-400" />
-                                        <p className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">Sin pérdidas registradas</p>
-                                        <p className="text-[9px] font-medium text-slate-300 mt-1">¡Sigue así!</p>
+                                    <div className="h-full flex flex-col items-center justify-center py-20 opacity-30">
+                                        <CheckCircle className="w-8 h-8 mb-2 text-emerald-500" />
+                                        <p className="text-[10px] font-black uppercase tracking-[0.1em]">Al día</p>
                                     </div>
-                                );
-                            })()}
-                        </div>
-                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
                 </div>
+
 
                 {/* Row 5: Industry Distribution */}
                 {industryData.length > 0 && (
@@ -2048,16 +2092,176 @@ export default function Dashboard() {
                 )}
             </div>
 
-            {/* Widget: Panorama Financiero */}
-            {profile?.company_id && (
-                <div className="relative z-0 mb-3">
-                    <PanoramaFinancieroWidget 
-                        companyId={profile.company_id} 
-                        startDate={dateRange.startDate}
-                        endDate={dateRange.endDate}
-                    />
+            {/* Lost Leads Analysis - Replaces Control Financiero */}
+            <div className="relative z-0 mb-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {/* Lost by Stage */}
+                <div className={`bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'lostByStage' ? 'z-[50]' : 'z-0'}`}>
+                    <div className="flex justify-between items-start mb-4">
+                        <div className="flex flex-col">
+                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Leads Perdidos por Etapa</h3>
+                            <p className="text-[10px] text-gray-400 font-medium mt-0.5">Dónde se están perdiendo las oportunidades</p>
+                        </div>
+                        <div className="relative" ref={activeCardFilter === 'lostByStage' ? cardFilterRef : null}>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveCardFilter(activeCardFilter === 'lostByStage' ? null : 'lostByStage');
+                                }}
+                                className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'lostByStage' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                            >
+                                <Settings className="w-3.5 h-3.5" />
+                            </button>
+                            {activeCardFilter === 'lostByStage' && (
+                                <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-[51] py-2 animate-in fade-in slide-in-from-top-2 overflow-hidden">
+                                    {(Object.entries(DATE_RANGE_OPTIONS) as [DateRange, { label: string }][]).map(([key, option]) => (
+                                        <button
+                                            key={key}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedDateRange(key);
+                                                setActiveCardFilter(null);
+                                            }}
+                                            className={`w-full text-left px-4 py-2 text-[11px] transition-colors flex items-center justify-between ${selectedDateRange === key
+                                                ? 'bg-indigo-50 text-indigo-600 font-black'
+                                                : 'text-slate-600 font-bold hover:bg-gray-50'
+                                                }`}
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                {option.label}
+                                                <span className="text-[9px] opacity-30 font-medium">{getDateRangeLabelDisplay(key)}</span>
+                                            </span>
+                                            {selectedDateRange === key && <CheckCircle className="w-4 h-4 text-indigo-600" />}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    <div className="flex-grow flex flex-col gap-2">
+                        {(() => {
+                            const stageLossData = lossStageData.map((s, idx) => ({
+                                stage: s.stage_name,
+                                count: s.loss_count,
+                                color: ['bg-blue-500', 'bg-indigo-500', 'bg-teal-500', 'bg-yellow-500', 'bg-red-500'][idx % 5]
+                            }));
+
+                            const totalLost = stageLossData.reduce((sum, s) => sum + s.count, 0);
+
+                            return totalLost > 0 ? (
+                                stageLossData.map((item, index) => (
+                                    <div
+                                        key={index}
+                                        className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-all cursor-pointer group/item"
+                                        onClick={() => navigate('/leads', { state: { status: 'Perdido', lostAtStage: item.stage, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
+                                    >
+                                        <div className={`w-3 h-3 rounded-full ${item.color} shadow-sm group-hover/item:scale-125 transition-transform`} />
+                                        <div className="flex-1">
+                                            <p className="text-xs font-black text-slate-700 group-hover/item:text-indigo-600 transition-colors">{item.stage}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-black text-red-600">{item.count}</p>
+                                            <p className="text-[8px] font-black text-slate-300 uppercase">Perdidos</p>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center py-12 opacity-30">
+                                    <CheckCircle className="w-10 h-10 mb-2 text-green-400" />
+                                    <p className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">Sin pérdidas registradas</p>
+                                    <p className="text-[9px] font-medium text-slate-300 mt-1">¡Excelente trabajo!</p>
+                                </div>
+                            );
+                        })()}
+                    </div>
                 </div>
-            )}
+
+                {/* Lost by Reason */}
+                <div className={`bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'lostByReason' ? 'z-[50]' : 'z-0'}`}>
+                    <div className="flex justify-between items-start mb-4">
+                        <div className="flex flex-col">
+                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Motivos de Pérdida</h3>
+                            <p className="text-[10px] text-gray-400 font-medium mt-0.5">Por qué se están perdiendo</p>
+                        </div>
+                        <div className="relative" ref={activeCardFilter === 'lostByReason' ? cardFilterRef : null}>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveCardFilter(activeCardFilter === 'lostByReason' ? null : 'lostByReason');
+                                }}
+                                className={`p-1.5 rounded-lg transition-all ${activeCardFilter === 'lostByReason' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                            >
+                                <Settings className="w-3.5 h-3.5" />
+                            </button>
+                            {activeCardFilter === 'lostByReason' && (
+                                <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-[51] py-2 animate-in fade-in slide-in-from-top-2 overflow-hidden">
+                                    {(Object.entries(DATE_RANGE_OPTIONS) as [DateRange, { label: string }][]).map(([key, option]) => (
+                                        <button
+                                            key={key}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedDateRange(key);
+                                                setActiveCardFilter(null);
+                                            }}
+                                            className={`w-full text-left px-4 py-2 text-[11px] transition-colors flex items-center justify-between ${selectedDateRange === key
+                                                ? 'bg-indigo-50 text-indigo-600 font-black'
+                                                : 'text-slate-600 font-bold hover:bg-gray-50'
+                                                }`}
+                                        >
+                                            <span className="flex items-center gap-2">
+                                                {option.label}
+                                                <span className="text-[9px] opacity-30 font-medium">{getDateRangeLabelDisplay(key)}</span>
+                                            </span>
+                                            {selectedDateRange === key && <CheckCircle className="w-4 h-4 text-indigo-600" />}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    <div className="flex-grow flex flex-col gap-2">
+                        {(() => {
+                            const reasonData = lossReasonData.map(r => ({
+                                id: r.reason_id,
+                                reason: r.reason_name,
+                                count: r.loss_count,
+                                percentage: Math.round(r.percentage)
+                            }));
+
+                            const totalReasonsCount = reasonData.reduce((sum, r) => sum + r.count, 0);
+
+                            return totalReasonsCount > 0 ? (
+                                reasonData.filter(r => r.count > 0).map((item, index) => (
+                                    <div
+                                        key={index}
+                                        onClick={() => navigate('/leads', { state: { status: 'Perdido', lossReasonId: item.id, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
+                                        className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-all cursor-pointer group/item"
+                                    >
+                                        <div className="flex-1">
+                                            <p className="text-xs font-black text-slate-700 group-hover/item:text-red-500 transition-colors">{item.reason}</p>
+                                            <div className="mt-1 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                                <div
+                                                    className="bg-red-500 h-full rounded-full transition-all duration-500 group-hover/item:bg-red-600"
+                                                    style={{ width: `${item.percentage}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-black text-red-600">{item.count}</p>
+                                            <p className="text-[8px] font-black text-slate-300 uppercase">{item.percentage}%</p>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center py-12 opacity-30">
+                                    <CheckCircle className="w-10 h-10 mb-2 text-green-400" />
+                                    <p className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">Sin pérdidas registradas</p>
+                                    <p className="text-[9px] font-medium text-slate-300 mt-1">¡Sigue así!</p>
+                                </div>
+                            );
+                        })()}
+                    </div>
+                </div>
+            </div>
 
             {/* F4 + F5 — SIA Intelligence Panel (at the bottom, date-filter aware) */}
             {profile?.company_id && (
@@ -2082,6 +2286,117 @@ export default function Dashboard() {
                             endDate={dateRange.endDate}
                             periodLabel={SIA_PERIOD_LABELS[selectedDateRange] || 'este período'}
                         />
+                    </div>
+                </div>
+            )}
+            {/* 🧠 AI Mind Capsule Modal */}
+            {selectedAiLead && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[999] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white/95 backdrop-blur-md rounded-2xl max-w-md w-full shadow-2xl border border-indigo-50 overflow-hidden relative p-5 flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+                        {/* Header */}
+                        <div className="flex justify-between items-start pb-3 border-b border-slate-100">
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-500">
+                                    <Brain className="w-4 h-4" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-black text-slate-800 tracking-tight">AI Mind Capsule</h3>
+                                    <p className="text-[10px] text-indigo-500 font-extrabold uppercase tracking-wider">{selectedAiLead.name}</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setSelectedAiLead(null);
+                                    setAiMemoryData(null);
+                                }}
+                                className="text-slate-400 hover:text-slate-600 text-xs font-bold bg-slate-50 hover:bg-slate-100 w-6 h-6 rounded-lg flex items-center justify-center transition-all"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        {isLoadingAiMemory ? (
+                            <div className="py-12 flex flex-col items-center justify-center gap-2">
+                                <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                                <span className="text-[10px] font-black uppercase text-indigo-600 tracking-wider">Leyendo memoria del Lead...</span>
+                            </div>
+                        ) : aiMemoryData ? (
+                            <div className="space-y-4 max-h-[350px] overflow-y-auto pr-1">
+                                {/* Sentiment Meter */}
+                                <div className="bg-indigo-50/50 p-3 rounded-xl border border-indigo-100/50">
+                                    <div className="flex justify-between items-center mb-1.5 text-[10px] font-black uppercase tracking-wider">
+                                        <span className="text-indigo-600">Nivel de Engagement (IA)</span>
+                                        <span className="text-amber-500 font-black">{aiMemoryData.sentiment_score}%</span>
+                                    </div>
+                                    <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden flex">
+                                        <div
+                                            className="h-full rounded-full transition-all duration-1000 bg-gradient-to-r from-amber-500 to-indigo-600"
+                                            style={{ width: `${aiMemoryData.sentiment_score}%` }}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Objections & Next Action */}
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div className="bg-rose-50 p-2.5 rounded-xl border border-rose-100">
+                                        <span className="text-[8px] font-black text-rose-500 uppercase tracking-widest block mb-0.5">Última Objeción</span>
+                                        <p className="text-[10px] font-bold text-rose-800 line-clamp-2">
+                                            {aiMemoryData.last_objection || 'Sin objeción registrada'}
+                                        </p>
+                                    </div>
+                                    <div className="bg-amber-50 p-2.5 rounded-xl border border-amber-100">
+                                        <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest block mb-0.5">Acción Recomendada</span>
+                                        <p className="text-[10px] font-bold text-amber-800 line-clamp-2 uppercase tracking-tight">
+                                            {aiMemoryData.next_action || 'Calificar lead'}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Facts / Known Facts */}
+                                <div>
+                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Hechos Clave Registrados</span>
+                                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100/80 space-y-1.5">
+                                        {aiMemoryData.known_facts && Object.keys(aiMemoryData.known_facts).length > 0 ? (
+                                            Object.entries(aiMemoryData.known_facts).map(([key, val]) => (
+                                                <div key={key} className="flex justify-between items-start gap-3 text-[10px] pb-1.5 border-b border-slate-200/50 last:border-0 last:pb-0">
+                                                    <span className="font-extrabold text-slate-500 uppercase tracking-wider text-[8px]">{key.replace(/_/g, ' ')}:</span>
+                                                    <span className="font-black text-slate-800 text-right">{Array.isArray(val) ? val.join(', ') : String(val)}</span>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="text-[10px] text-slate-400 italic">No hay hechos calificados por la IA en esta conversación aún.</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Contact preference & Time */}
+                                {aiMemoryData.best_contact_time && (
+                                    <div className="flex items-center gap-1.5 text-[9px] text-indigo-600 font-extrabold">
+                                        <Clock className="w-3.5 h-3.5" />
+                                        <span>Horario óptimo de contacto: {aiMemoryData.best_contact_time}</span>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="py-8 flex flex-col items-center justify-center text-center opacity-40">
+                                <Sparkles className="w-8 h-8 mb-2 text-indigo-500" />
+                                <p className="text-[10px] font-black uppercase tracking-wider">Sin análisis AI registrado</p>
+                                <p className="text-[9px] text-slate-500 max-w-[200px] mt-1">
+                                    La IA no ha tenido conversaciones directas o analizado a este lead para generar memoria.
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Footer button */}
+                        <div className="flex justify-end pt-2 border-t border-slate-100">
+                            <Button
+                                onClick={() => navigate('/leads', { state: { leadId: selectedAiLead.id } })}
+                                className="text-[10px] font-black uppercase tracking-wider bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl"
+                            >
+                                Ver Detalles del Lead
+                            </Button>
+                        </div>
                     </div>
                 </div>
             )}

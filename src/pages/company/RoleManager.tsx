@@ -25,6 +25,7 @@ const ALL_PERMISSIONS = [
     { key: 'financial_rules',label: 'Reglas Financieras',    icon: CreditCard,   desc: 'Configurar reglas de pago y crédito' },
     { key: 'loss_reasons',   label: 'Motivos de Pérdida',    icon: XCircle,      desc: 'Administrar razones de cierre perdido' },
     { key: 'dashboard_full', label: 'Dashboard Completo',    icon: Shield,       desc: 'Ver métricas globales y reportes' },
+    { key: 'view_financials',label: 'Ver Montos Financieros',icon: CreditCard,   desc: 'Ver montos de cotizaciones, cierres y reportes financieros' },
 ];
 
 interface CustomRole {
@@ -46,6 +47,7 @@ const DEFAULT_AGENT_PERMS: Record<string, boolean> = {
     chat: true, clientes: true, loss_reasons: true,
     marketing: false, pricing: false, paquetes: false,
     items: false, financial_rules: false, dashboard_full: false,
+    view_financials: false,
 };
 
 export default function RoleManager() {
