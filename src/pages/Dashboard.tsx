@@ -4,7 +4,7 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
-import { BadgeDollarSign, TrendingUp, Users, Target, Building, Building2, Calendar, Clock, CheckCircle, ChevronDown, Edit2, Settings, AlertTriangle, PhoneOff, ArrowRight, Sprout, CreditCard, Brain, Sparkles, MessageSquare, Crosshair, Flame, Zap, HelpCircle } from 'lucide-react';
+import { BadgeDollarSign, TrendingUp, Users, Target, Building, Building2, Calendar, Clock, CheckCircle, ChevronDown, Edit2, Settings, AlertTriangle, PhoneOff, ArrowRight, Sprout, CreditCard, Brain, Sparkles, MessageSquare, Crosshair, Flame, Zap, HelpCircle, UserMinus } from 'lucide-react';
 import { adminService } from '../services/admin';
 import { supabase } from '../services/supabase';
 import { useEffect, useState, useRef, useMemo } from 'react';
@@ -17,7 +17,7 @@ import {
 } from 'date-fns';
 import { useAuth } from '../auth/AuthProvider';
 import { STATUS_CONFIG, PRIORITY_CONFIG, SOURCE_CONFIG, DATE_RANGE_OPTIONS, type DateRange } from '../types';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '../components/ui/Button';
 import { logger } from '../utils/logger';
@@ -186,6 +186,11 @@ export default function Dashboard() {
     } | null>(null);
     const [isFinanceLoading, setIsFinanceLoading] = useState(true);
 
+    const [showAllLossReasons, setShowAllLossReasons] = useState(false);
+    const [unassignedLeads, setUnassignedLeads] = useState<any[]>([]);
+    const [isLoadingUnassigned, setIsLoadingUnassigned] = useState(true);
+    const [isUnassignedModalOpen, setIsUnassignedModalOpen] = useState(false);
+
     // States for AI Cognitive Capsule
     const [selectedAiLead, setSelectedAiLead] = useState<{ id: string; name: string } | null>(null);
     const [aiMemoryData, setAiMemoryData] = useState<any | null>(null);
@@ -208,6 +213,28 @@ export default function Dashboard() {
             toast.error('No se pudo cargar la memoria de la IA');
         } finally {
             setIsLoadingAiMemory(false);
+        }
+    };
+
+    const handleAssignLead = async (leadId: string, collaboratorId: string, collaboratorName: string) => {
+        try {
+            const { error } = await supabase
+                .from('leads')
+                .update({ assigned_to: collaboratorId })
+                .eq('id', leadId);
+
+            if (error) throw error;
+
+            toast.success(`Lead asignado a ${collaboratorName}`);
+            
+            // Remove from the local list of unassigned leads
+            setUnassignedLeads(prev => prev.filter(l => l.id !== leadId));
+            
+            // Trigger dashboard refetch to update other components
+            refetch();
+        } catch (err) {
+            logger.error('Error assigning lead', err);
+            toast.error('No se pudo asignar el lead');
         }
     };
 
@@ -377,6 +404,26 @@ export default function Dashboard() {
     // Process dashboard data when it arrives
     useEffect(() => {
         if (dashboardData) {
+            // Fetch unassigned leads
+            if (profile?.company_id) {
+                setIsLoadingUnassigned(true);
+                supabase
+                    .from('leads')
+                    .select('id, name, company_name, created_at, value, source, status')
+                    .eq('company_id', profile.company_id)
+                    .is('assigned_to', null)
+                    .not('status', 'in', '("Cerrado","Cliente","Perdido","Erróneo")')
+                    .order('created_at', { ascending: false })
+                    .then(({ data, error }) => {
+                        if (error) {
+                            logger.error('Error fetching unassigned leads', error);
+                        } else {
+                            setUnassignedLeads(data || []);
+                        }
+                        setIsLoadingUnassigned(false);
+                    });
+            }
+
             // Set stats - fall back totalWonAmount if 0 (e.g. when closing_amount is not set or RPC schema is older)
             const adjustedStats = { ...dashboardData.stats };
             if ((adjustedStats.totalWonAmount === 0 || !adjustedStats.totalWonAmount) && adjustedStats.wonDeals > 0) {
@@ -1686,6 +1733,52 @@ export default function Dashboard() {
                         );
                     })()}
 
+                    {/* KPI 3: Leads sin asignar */}
+                    {(() => {
+                        const count = unassignedLeads.length;
+                        let oldestDateLabel = '';
+                        if (count > 0) {
+                            const oldest = unassignedLeads.reduce((oldest, l) => {
+                                return new Date(l.created_at) < new Date(oldest.created_at) ? l : oldest;
+                            });
+                            try {
+                                const diff = formatDistanceToNow(new Date(oldest.created_at), { addSuffix: true, locale: es });
+                                oldestDateLabel = diff;
+                            } catch (e) {
+                                oldestDateLabel = 'recientemente';
+                            }
+                        }
+                        return (
+                            <div
+                                onClick={() => setIsUnassignedModalOpen(true)}
+                                className="flex-1 bg-white rounded-2xl border border-slate-200/60 shadow-[0_2px_15px_rgb(0,0,0,0.03)] p-4 cursor-pointer hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 group flex flex-col justify-between min-h-[120px]"
+                            >
+                                <div className="flex items-start justify-between">
+                                    <div>
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1 flex items-center gap-1.5">
+                                            <UserMinus className="w-3 h-3 text-amber-500" /> Leads sin asignar
+                                        </p>
+                                        <p className="text-[10px] text-gray-400 font-medium">Bandeja de entrada pendiente</p>
+                                    </div>
+                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${ count > 0 ? 'bg-amber-100 animate-pulse' : 'bg-emerald-100' }`}>
+                                        <UserMinus className={`w-4 h-4 ${ count > 0 ? 'text-amber-600' : 'text-emerald-600' }`} />
+                                    </div>
+                                </div>
+                                <div className="mt-3 flex items-end justify-between">
+                                    <div className="flex items-baseline gap-2">
+                                        <span className={`text-4xl font-black tracking-tighter ${ count > 0 ? 'text-amber-600' : 'text-emerald-600' }`}>{count}</span>
+                                        <span className="text-[10px] font-bold text-slate-400">sin asignar</span>
+                                    </div>
+                                    {count > 0 && (
+                                        <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                                            Antiguo: {oldestDateLabel}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })()}
+
                 </div>
 
                 {/* Control de Pagos (CxC) Widget */}
@@ -2433,6 +2526,117 @@ export default function Dashboard() {
                                 className="text-[10px] font-black uppercase tracking-wider bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl"
                             >
                                 Ver Detalles del Lead
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            {/* 👥 Leads Sin Asignar Modal */}
+            {isUnassignedModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[999] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white/95 backdrop-blur-md rounded-2xl max-w-lg w-full shadow-2xl border border-indigo-50 overflow-hidden relative p-5 flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+                        {/* Header */}
+                        <div className="flex justify-between items-start pb-3 border-b border-slate-100">
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-600">
+                                    <UserMinus className="w-4 h-4" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-black text-slate-800 tracking-tight">Leads Sin Asignar</h3>
+                                    <p className="text-[10px] text-amber-600 font-extrabold uppercase tracking-wider">{unassignedLeads.length} prospectos en la bandeja de entrada</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setIsUnassignedModalOpen(false)}
+                                className="text-slate-400 hover:text-slate-600 text-xs font-bold bg-slate-50 hover:bg-slate-100 w-6 h-6 rounded-lg flex items-center justify-center transition-all"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1 custom-scrollbar">
+                            {unassignedLeads.length > 0 ? (
+                                unassignedLeads.map((lead) => {
+                                    let dateLabel = '';
+                                    try {
+                                        dateLabel = formatDistanceToNow(new Date(lead.created_at), { addSuffix: true, locale: es });
+                                    } catch (e) {
+                                        dateLabel = 'recientemente';
+                                    }
+
+                                    return (
+                                        <div
+                                            key={lead.id}
+                                            className="p-3 bg-slate-50/50 hover:bg-indigo-50/20 rounded-xl border border-slate-100/80 hover:border-indigo-100/50 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 group"
+                                        >
+                                            <div className="flex flex-col gap-0.5 max-w-[65%]">
+                                                <div className="flex items-center gap-2">
+                                                    <h4 className="text-[11px] font-black text-slate-900 truncate">{lead.name}</h4>
+                                                    {lead.value > 5000 && (
+                                                        <span className="bg-amber-100 text-amber-700 text-[8px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider shrink-0 animate-pulse">VIP</span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-2 opacity-75 mt-0.5">
+                                                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter truncate">{lead.company_name || 'Particular'}</span>
+                                                    <span className="text-[9px] font-bold text-indigo-500">• Ingesta: {dateLabel}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    {lead.source && (
+                                                        <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-md font-extrabold flex items-center gap-1">
+                                                            {SOURCE_CONFIG[lead.source]?.icon || '🌐'} {SOURCE_CONFIG[lead.source]?.label || lead.source}
+                                                        </span>
+                                                    )}
+                                                    {canViewActiveFinancials && lead.value > 0 && (
+                                                        <span className="text-[9px] font-black text-emerald-600 font-mono">${(lead.value).toLocaleString()}</span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Assignment Dropdown */}
+                                            <div className="sm:text-right shrink-0">
+                                                <select
+                                                    onChange={(e) => {
+                                                        const collabId = e.target.value;
+                                                        if (!collabId) return;
+                                                        const collab = companyProfiles.find(p => p.id === collabId);
+                                                        if (collab) {
+                                                            handleAssignLead(lead.id, collab.id, collab.full_name);
+                                                        }
+                                                    }}
+                                                    value=""
+                                                    className="w-full sm:w-auto text-[9px] font-black uppercase tracking-wider bg-white border border-slate-200 hover:border-indigo-300 text-slate-700 rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer shadow-sm"
+                                                >
+                                                    <option value="" disabled>👥 Asignar Agente...</option>
+                                                    {companyProfiles.map(p => (
+                                                        <option key={p.id} value={p.id}>
+                                                            {p.full_name} ({p.role === 'company_admin' ? 'Admin' : 'Agente'})
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                <div className="py-12 flex flex-col items-center justify-center text-center opacity-40">
+                                    <CheckCircle className="w-10 h-10 mb-2 text-emerald-500" />
+                                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-800">¡Bandeja de entrada vacía!</p>
+                                    <p className="text-[9px] text-slate-500 max-w-[220px] mt-1">
+                                        Todos los leads ingresados han sido asignados exitosamente a tu equipo de ventas.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer button */}
+                        <div className="flex justify-end pt-2 border-t border-slate-100">
+                            <Button
+                                onClick={() => navigate('/leads')}
+                                className="text-[10px] font-black uppercase tracking-wider bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl"
+                            >
+                                Ver Todos los Leads
                             </Button>
                         </div>
                     </div>
