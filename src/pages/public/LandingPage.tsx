@@ -148,6 +148,154 @@ const Cross = () => (
   </span>
 );
 
+// ─── HIGH-TECH PRODUCT DETAILS DATA (For interactive info modal popups) ─────
+const PRODUCT_DETAILS: Record<string, {
+  title: string;
+  tag: string;
+  desc: string;
+  bullets: string[];
+  metric: string;
+  metricLabel: string;
+  techStack: string[];
+  mockup: string;
+}> = {
+  'tiktok-api': {
+    title: 'TikTok API Ingestión Express',
+    tag: 'INTEGRACIÓN DIRECTA V2',
+    desc: 'Conéctate directamente a la API oficial de TikTok Leads sin intermediarios lentos o costosos como Zapier. Recibe prospectos en tiempo real con latencia menor a 120ms.',
+    bullets: [
+      'Suscripción automática a webhooks oficiales de TikTok Leads.',
+      'Validación de firma HMAC y cifrado SHA-256 para seguridad absoluta.',
+      'Sincronización instantánea con campos del CRM.',
+      'Acciones automatizadas inmediatas al recibir el lead.'
+    ],
+    metric: '<120ms',
+    metricLabel: 'Latencia de Ingestión',
+    techStack: ['TikTok Graph API', 'HMAC Validation', 'SHA-256 Encryption'],
+    mockup: 'tiktok'
+  },
+  'meta-ads': {
+    title: 'Meta Leads API & Webhook',
+    tag: 'CAMPANAS FB/IG',
+    desc: 'Inyecta datos de prospectos desde formularios de Facebook e Instagram al instante. Nuestro sistema procesa las peticiones de Meta Graph API de manera asíncrona para garantizar cero pérdida de registros.',
+    bullets: [
+      'Conexión nativa con Meta Leads Ads API.',
+      'Desduplicación automática de prospectos basada en teléfono/email.',
+      'Disparadores automáticos de secuencias de seguimiento.',
+      'Asignación automática de leads según canal o presupuesto.'
+    ],
+    metric: '100%',
+    metricLabel: 'Tasa de Captura',
+    techStack: ['Meta Graph API v19.0', 'Webhook Handshake', 'Async Queueing'],
+    mockup: 'meta'
+  },
+  'whatsapp-gen': {
+    title: 'WhatsApp Lead Generator Widget',
+    tag: 'CAPTURA DESDE SITIO WEB',
+    desc: 'Un widget flotante premium para tu landing page que convierte visitantes pasivos en conversaciones activas de WhatsApp. Inicia el bot calificador en 5 segundos.',
+    bullets: [
+      'Widget altamente personalizable con micro-animaciones.',
+      'Captura previa de datos clave (nombre, negocio) antes del desvío.',
+      'Enrutamiento inteligente según disponibilidad del agente.',
+      'Historial de chats enlazado al perfil del lead automáticamente.'
+    ],
+    metric: '+35%',
+    metricLabel: 'Conversión de Tráfico',
+    techStack: ['React Widget', 'WhatsApp Click-to-Chat', 'Lead Router'],
+    mockup: 'whatsapp'
+  },
+  'ai-agent': {
+    title: 'AI Agent Conversacional Autopilot',
+    tag: 'INTELIGENCIA ARTIFICIAL GPT-4',
+    desc: 'Tu agente de ventas virtual que trabaja 24/7 en WhatsApp. Califica prospectos, resuelve objeciones comunes y agenda citas directamente en tu calendario.',
+    bullets: [
+      'Respuestas hiper-contextuales impulsadas por GPT-4o.',
+      'Calificación de leads en base a presupuesto y urgencia.',
+      'Agendamiento de citas en tiempo real con Google Calendar y Outlook.',
+      'Transferencia fluida a agentes humanos cuando se detecta intención de compra caliente.'
+    ],
+    metric: '38%',
+    metricLabel: 'Tasa de Conversión (vs 12% manual)',
+    techStack: ['GPT-4o API', 'Embeddings vectoriales', 'Calendar OAuth Sync'],
+    mockup: 'ai_agent'
+  },
+  'omnicanal': {
+    title: 'Bandeja de Entrada Omnicanal',
+    tag: 'COLABORACIÓN EN EQUIPO',
+    desc: 'Una bandeja centralizada y colaborativa para que todo tu equipo atienda chats de WhatsApp, Instagram, Facebook y Telegram sin cruzar cuentas ni perder contexto.',
+    bullets: [
+      'Conversaciones multi-canal en un solo hilo unificado.',
+      'Notas internas invisibles para el cliente para soporte de equipo.',
+      'Asignación manual o rotativa (Round-Robin) de chats.',
+      'Respuestas rápidas, plantillas oficiales y envío de cotizaciones en un clic.'
+    ],
+    metric: '0',
+    metricLabel: 'Mensajes Sin Responder',
+    techStack: ['WebSockets', 'Shared Inbox Orchestrator', 'Rotative Allocator'],
+    mockup: 'inbox'
+  },
+  'lead-hunter': {
+    title: 'Lead Hunter (Google Maps Extractor)',
+    tag: 'MINERÍA DE LEADS B2B',
+    desc: 'La herramienta definitiva para la prospección B2B en frío. Extrae automáticamente cientos de empresas locales con teléfonos, correos y páginas web con solo ingresar una palabra clave y una ciudad.',
+    bullets: [
+      'Extracción directa desde Google Places API.',
+      'Validación de números telefónicos y formatos internacionales.',
+      'Enriquecimiento automático de emails buscando dominios activos.',
+      'Exportación en un clic o inyección directa a embudos de marketing.'
+    ],
+    metric: '500+',
+    metricLabel: 'Leads/minuto extraídos',
+    techStack: ['Google Places SDK', 'Web Scraper Crawler', 'Deduplication Pipeline'],
+    mockup: 'hunter'
+  },
+  'cotizador': {
+    title: 'Cotizador Profesional Dinámico',
+    tag: 'FINANZAS & DOCUMENTOS PRO',
+    desc: 'Crea propuestas comerciales y cotizaciones con partidas detalladas en menos de 60 segundos. Genera PDFs espectaculares adaptados a la marca de tu empresa de forma automática.',
+    bullets: [
+      'Cálculo exacto de impuestos, descuentos y esquemas de pago.',
+      'Módulos opcionales configurables por el cliente final.',
+      'Control de versiones de propuestas y validez comercial.',
+      'Generador PDF con firma digital y marca de agua corporativa.'
+    ],
+    metric: '<1 min',
+    metricLabel: 'Tiempo de Creación',
+    techStack: ['PDF Rendering Engine', 'Catalog Sync', 'Taxation Logic Salvador'],
+    mockup: 'cotizador'
+  },
+  'cobros': {
+    title: 'Portal de Cobros & Facturación',
+    tag: 'FLUJO DE CAJA ACELERADO',
+    desc: 'Un portal público y seguro para tu cliente donde puede revisar su cotización comercial y pagarte directamente en línea mediante tarjeta de crédito o transferencia.',
+    bullets: [
+      'Integración directa con pasarelas de pago locales.',
+      'Soporte para múltiples monedas y pasarelas.',
+      'Generación automática de recibos y facturas fiscales.',
+      'Recordatorios automatizados de pago vía WhatsApp.'
+    ],
+    metric: '2.5x',
+    metricLabel: 'Velocidad de Recaudo',
+    techStack: ['Payment Gateway APIs', 'Receipt Auto-generator', 'Invoice Tracker'],
+    mockup: 'cobros'
+  },
+  'flyer': {
+    title: 'Flyer Studio IA',
+    tag: 'MARKETING MULTIMEDIA',
+    desc: 'Genera contenido promocional de alto impacto para campañas utilizando inteligencia artificial. Diseña artes listos para publicar en Instagram y Facebook sin saber de diseño gráfico.',
+    bullets: [
+      'Generador de imágenes impulsado por IA para productos.',
+      'Adaptación automática de formatos para historias y publicaciones.',
+      'Escribe copys promocionales de alta conversión adjuntos al flyer.',
+      'Programador de publicaciones automáticas en canales oficiales.'
+    ],
+    metric: '90%',
+    metricLabel: 'Ahorro en Costo de Diseño',
+    techStack: ['Creative AI Models', 'Layout Auto-composer', 'FB Publisher API'],
+    mockup: 'flyer'
+  }
+};
+
 // ─── MAIN EXPORT ─────────────────────────────────────────────────────────────
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -177,6 +325,9 @@ export default function LandingPage() {
   const [toggleHunter, setToggleHunter] = useState(true);
   const [toggleInbox, setToggleInbox] = useState(true);
 
+  // Active product/feature for detailed popup modal
+  const [activeProductDetail, setActiveProductDetail] = useState<string | null>(null);
+
   const handleSimulate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!simName || !simPhone) return;
@@ -203,7 +354,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#07070d] text-white font-sans antialiased overflow-x-hidden" style={{fontFamily:"'Inter','system-ui',sans-serif"}}>
-      <LandingNavbar onLoginClick={() => setShowLogin(true)} />
+      <LandingNavbar onLoginClick={() => setShowLogin(true)} onProductClick={setActiveProductDetail} />
 
       {/* ─── HERO WITH LIVE SIMULATOR ────────────────────────────────────────── */}
       <section className="relative min-h-screen flex flex-col justify-center pt-32 pb-24 border-b border-white/[0.05]">
@@ -458,55 +609,58 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─── DYNAMIC PRODUCT EXPLORER ────────────────────────────────────────── */}
-      <section className="py-28 bg-[#040408] border-b border-white/[0.05]">
-        <div className="max-w-5xl mx-auto px-6">
+      {/* ─── DYNAMIC PRODUCT EXPLORER (LIGHT THEME MIX) ────────────────────────── */}
+      <section className="py-28 bg-[#f8fafc] border-y border-slate-200/60 relative overflow-hidden">
+        {/* Subtle grid pattern background for the light theme */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-35" />
+
+        <div className="max-w-5xl mx-auto px-6 relative z-10">
           <div className="text-center mb-16">
-            <span className="text-xs font-black text-indigo-400 uppercase tracking-[0.25em]">Tecnología en Acción</span>
-            <h2 className="text-4xl font-black text-white mt-3">Diseño pensado para convertir</h2>
-            <p className="text-slate-500 mt-2">Nuestra plataforma cuenta con herramientas exclusivas que la competencia simplemente no ofrece.</p>
+            <span className="text-xs font-black text-blue-600 uppercase tracking-[0.25em]">Tecnología en Acción</span>
+            <h2 className="text-4xl lg:text-5xl font-black text-slate-900 mt-3 leading-tight">Diseño pensado para convertir</h2>
+            <p className="text-slate-600 mt-3 max-w-xl mx-auto text-sm">Nuestra plataforma cuenta con herramientas exclusivas que la competencia simplemente no ofrece.</p>
           </div>
 
-          {/* Interactive Feature Toggles */}
+          {/* Interactive Feature Toggles - Light themed */}
           <div className="flex justify-center gap-3 mb-12 flex-wrap">
             <button
               onClick={() => setActiveTab('social')}
-              className={`px-6 py-3.5 rounded-full text-xs font-black transition-all ${activeTab === 'social' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-white/5 text-slate-400 hover:text-white border border-white/10'}`}
+              className={`px-6 py-3.5 rounded-full text-xs font-black transition-all ${activeTab === 'social' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'bg-slate-200/60 text-slate-700 hover:text-slate-900 border border-slate-300/40'}`}
             >
               ⚡ Captura Social Express
             </button>
             <button
               onClick={() => setActiveTab('agent')}
-              className={`px-6 py-3.5 rounded-full text-xs font-black transition-all ${activeTab === 'agent' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-white/5 text-slate-400 hover:text-white border border-white/10'}`}
+              className={`px-6 py-3.5 rounded-full text-xs font-black transition-all ${activeTab === 'agent' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'bg-slate-200/60 text-slate-700 hover:text-slate-900 border border-slate-300/40'}`}
             >
               🤖 AI Agent Autopilot
             </button>
             <button
               onClick={() => setActiveTab('billing')}
-              className={`px-6 py-3.5 rounded-full text-xs font-black transition-all ${activeTab === 'billing' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'bg-white/5 text-slate-400 hover:text-white border border-white/10'}`}
+              className={`px-6 py-3.5 rounded-full text-xs font-black transition-all ${activeTab === 'billing' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'bg-slate-200/60 text-slate-700 hover:text-slate-900 border border-slate-300/40'}`}
             >
               💸 Cotizador & Cobros
             </button>
           </div>
 
-          {/* Dynamic Content Panel */}
-          <div className="bg-white/[0.01] border border-white/10 rounded-3xl overflow-hidden grid md:grid-cols-12">
-            <div className="p-8 md:p-12 md:col-span-5 flex flex-col justify-center">
+          {/* Dynamic Content Panel - Premium Light Box */}
+          <div className="bg-white border border-slate-200/80 rounded-3xl shadow-xl overflow-hidden grid md:grid-cols-12">
+            <div className="p-8 md:p-12 md:col-span-5 flex flex-col justify-center bg-slate-50/50">
               {activeTab === 'social' && (
                 <>
-                  <span className="text-[10px] font-black bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-3 py-1 rounded-full uppercase tracking-wider self-start mb-6">Omnicanal V2</span>
-                  <h3 className="text-2xl font-black text-white mb-4 leading-tight">Cero leads perdidos en campañas.</h3>
-                  <p className="text-sm text-slate-400 leading-relaxed mb-8">
+                  <span className="text-[10px] font-black bg-blue-100 text-blue-700 border border-blue-200/60 px-3 py-1 rounded-full uppercase tracking-wider self-start mb-6">Omnicanal V2</span>
+                  <h3 className="text-2xl font-black text-slate-900 mb-4 leading-tight">Cero leads perdidos en campañas.</h3>
+                  <p className="text-sm text-slate-600 leading-relaxed mb-8">
                     Tus formularios de anuncios en redes sociales inyectan datos de forma instantánea. Olvídate de dependencias de Zapier lentas o exportaciones de CSV manuales de fin de semana.
                   </p>
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <BrandIcon name="WhatsApp" />
-                      <span className="text-xs font-semibold text-slate-300">WhatsApp Webhook Integrado</span>
+                      <span className="text-xs font-bold text-slate-700">WhatsApp Webhook Integrado</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <BrandIcon name="TikTok" />
-                      <span className="text-xs font-semibold text-slate-300">TikTok Leads API Oficial</span>
+                      <span className="text-xs font-bold text-slate-700">TikTok Leads API Oficial</span>
                     </div>
                   </div>
                 </>
@@ -514,19 +668,19 @@ export default function LandingPage() {
 
               {activeTab === 'agent' && (
                 <>
-                  <span className="text-[10px] font-black bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-3 py-1 rounded-full uppercase tracking-wider self-start mb-6">Autopilot</span>
-                  <h3 className="text-2xl font-black text-white mb-4 leading-tight">Contacta a tu prospecto en 5 segundos.</h3>
-                  <p className="text-sm text-slate-400 leading-relaxed mb-8">
+                  <span className="text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200/60 px-3 py-1 rounded-full uppercase tracking-wider self-start mb-6">Autopilot</span>
+                  <h3 className="text-2xl font-black text-slate-900 mb-4 leading-tight">Contacta a tu prospecto en 5 segundos.</h3>
+                  <p className="text-sm text-slate-600 leading-relaxed mb-8">
                     El AI Agent inteligente interactúa con el cliente al instante, califica su interés, responde objeciones comunes y agenda una reunión en tu calendario.
                   </p>
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <span className="text-base">🎯</span>
-                      <span className="text-xs font-semibold text-slate-300">Calificación Automática de Prospectos</span>
+                      <span className="text-xs font-bold text-slate-700">Calificación Automática de Prospectos</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-base">📅</span>
-                      <span className="text-xs font-semibold text-slate-300">Agendamiento de Citas 24/7</span>
+                      <span className="text-xs font-bold text-slate-700">Agendamiento de Citas 24/7</span>
                     </div>
                   </div>
                 </>
@@ -534,27 +688,27 @@ export default function LandingPage() {
 
               {activeTab === 'billing' && (
                 <>
-                  <span className="text-[10px] font-black bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-3 py-1 rounded-full uppercase tracking-wider self-start mb-6">Finanzas</span>
-                  <h3 className="text-2xl font-black text-white mb-4 leading-tight">Cierra tratos con PDFs impecables.</h3>
-                  <p className="text-sm text-slate-400 leading-relaxed mb-8">
+                  <span className="text-[10px] font-black bg-indigo-100 text-indigo-700 border border-indigo-200/60 px-3 py-1 rounded-full uppercase tracking-wider self-start mb-6">Finanzas</span>
+                  <h3 className="text-2xl font-black text-slate-900 mb-4 leading-tight">Cierra tratos con PDFs impecables.</h3>
+                  <p className="text-sm text-slate-600 leading-relaxed mb-8">
                     Genera presupuestos, cotizaciones y facturas profesionales con tu branding de manera nativa. El cliente puede revisar, configurar módulos opcionales y pagar en línea de inmediato.
                   </p>
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <span className="text-base">📄</span>
-                      <span className="text-xs font-semibold text-slate-300">Cotizador Dinámico & Editor de PDF</span>
+                      <span className="text-xs font-bold text-slate-700">Cotizador Dinámico & Editor de PDF</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-base">💳</span>
-                      <span className="text-xs font-semibold text-slate-300">Pasarelas de Pago Directas</span>
+                      <span className="text-xs font-bold text-slate-700">Pasarelas de Pago Directas</span>
                     </div>
                   </div>
                 </>
               )}
             </div>
 
-            {/* Dynamic Screen Mockup */}
-            <div className="bg-[#0b0b12] p-8 md:col-span-7 flex items-center justify-center border-t md:border-t-0 md:border-l border-white/[0.08] min-h-[360px] relative">
+            {/* Dynamic Screen Mockup - Beautiful dark-slate inside canvas */}
+            <div className="bg-[#0b0b12] p-8 md:col-span-7 flex items-center justify-center border-t md:border-t-0 md:border-l border-slate-200/60 min-h-[360px] relative">
               <div className="absolute inset-0 bg-gradient-to-tr from-indigo-500/10 to-transparent pointer-events-none" />
 
               {activeTab === 'social' && (
@@ -895,31 +1049,31 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─── INTERACTIVE FAQ ACCORDION (Top landing tech!) ─── */}
-      <section className="py-28 bg-[#040408] border-b border-white/[0.05]">
+      {/* ─── INTERACTIVE FAQ ACCORDION (LIGHT THEME MIX) ─── */}
+      <section className="py-28 bg-[#f8fafc] border-y border-slate-200/60">
         <div className="max-w-3xl mx-auto px-6">
           <div className="text-center mb-16">
-            <span className="text-xs font-black text-indigo-400 uppercase tracking-[0.25em]">Preguntas Frecuentes</span>
-            <h2 className="text-4xl font-black text-white mt-3">Todo lo que debes saber</h2>
+            <span className="text-xs font-black text-blue-600 uppercase tracking-[0.25em]">Preguntas Frecuentes</span>
+            <h2 className="text-4xl font-black text-slate-900 mt-3">Todo lo que debes saber</h2>
           </div>
 
           <div className="space-y-4">
             {FAQS.map((faq, idx) => (
               <div 
                 key={idx} 
-                className="border border-white/5 bg-white/[0.01] rounded-2xl overflow-hidden transition-all"
+                className="border border-slate-200 bg-white rounded-2xl overflow-hidden shadow-sm transition-all"
               >
                 <button
                   onClick={() => setActiveFaq(activeFaq === idx ? null : idx)}
                   className="w-full p-6 text-left flex justify-between items-center focus:outline-none"
                 >
-                  <span className="text-sm font-bold text-white">{faq.q}</span>
-                  <span className="text-slate-400 font-bold ml-4">
+                  <span className="text-sm font-bold text-slate-800">{faq.q}</span>
+                  <span className="text-slate-500 font-bold ml-4">
                     {activeFaq === idx ? '−' : '+'}
                   </span>
                 </button>
                 {activeFaq === idx && (
-                  <div className="px-6 pb-6 text-xs text-slate-400 leading-relaxed border-t border-white/[0.03] pt-4 animate-fadeIn">
+                  <div className="px-6 pb-6 text-xs text-slate-500 leading-relaxed border-t border-slate-100 pt-4 animate-fadeIn">
                     {faq.a}
                   </div>
                 )}
@@ -957,6 +1111,249 @@ export default function LandingPage() {
           </div>
         </div>
       )}
+      {/* ─── FUTURISTIC FEATURE DETAILS OVERLAY MODAL ────────────────────────── */}
+      {activeProductDetail && (() => {
+        const prod = PRODUCT_DETAILS[activeProductDetail];
+        if (!prod) return null;
+        return (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 md:p-6 bg-slate-950/80 backdrop-blur-xl animate-fadeIn">
+            <div className="relative w-full max-w-4xl bg-[#080812] border border-blue-500/30 rounded-3xl shadow-[0_0_80px_-15px_rgba(59,130,246,0.3)] overflow-hidden grid md:grid-cols-12 max-h-[90vh] md:max-h-[85vh]">
+              
+              {/* Decorative radial tech mesh */}
+              <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-blue-600/5 blur-[100px] pointer-events-none" />
+
+              {/* Close Button */}
+              <button 
+                onClick={() => setActiveProductDetail(null)} 
+                className="absolute top-6 right-6 p-2 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl transition-all z-20"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              {/* Left Side: Rich Detailed Product Copy */}
+              <div className="md:col-span-7 p-8 md:p-10 overflow-y-auto space-y-6 flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-black bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-3 py-1 rounded-full uppercase tracking-wider inline-block mb-4">
+                    {prod.tag}
+                  </span>
+                  
+                  <h3 className="text-3xl font-black text-white leading-tight">
+                    {prod.title}
+                  </h3>
+                  
+                  <p className="text-sm text-slate-400 mt-4 leading-relaxed">
+                    {prod.desc}
+                  </p>
+
+                  <div className="mt-6 space-y-3">
+                    {prod.bullets.map((b, i) => (
+                      <div key={i} className="flex items-start gap-3">
+                        <span className="text-emerald-400 font-bold text-sm shrink-0">✓</span>
+                        <span className="text-xs text-slate-300 leading-normal">{b}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-6 border-t border-white/5 space-y-4">
+                  {/* Tech stack badge tags */}
+                  <div>
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Tecnología & Protocolo</p>
+                    <div className="flex gap-2 flex-wrap">
+                      {prod.techStack.map(ts => (
+                        <span key={ts} className="text-[10px] bg-slate-900 border border-white/5 text-slate-400 px-2.5 py-1 rounded-lg">
+                          {ts}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                    <button 
+                      onClick={() => { setActiveProductDetail(null); navigate('/register'); }}
+                      className="bg-blue-600 hover:bg-blue-500 text-white font-black px-6 py-3.5 rounded-xl text-xs transition-all shadow-lg shadow-blue-600/25 shrink-0"
+                    >
+                      Comenzar gratis con esta herramienta
+                    </button>
+                    <button 
+                      onClick={() => setActiveProductDetail(null)}
+                      className="border border-white/10 hover:bg-white/5 text-slate-300 font-bold px-6 py-3.5 rounded-xl text-xs transition-all"
+                    >
+                      Volver a la landing
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Side: Simulated Live Telemetry Sandbox Mockup */}
+              <div className="md:col-span-5 bg-slate-950/80 border-t md:border-t-0 md:border-l border-white/10 p-8 flex flex-col justify-center items-center relative overflow-hidden min-h-[300px]">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-600/5 to-transparent pointer-events-none" />
+                
+                {/* Product Live Metric Card */}
+                <div className="absolute top-6 left-6 right-6 bg-slate-900/60 border border-white/5 p-4 rounded-2xl flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">{prod.metricLabel}</p>
+                    <p className="text-lg font-black text-emerald-400 tracking-tight">{prod.metric}</p>
+                  </div>
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-black animate-pulse">
+                    LIVE TELEMETRY
+                  </span>
+                </div>
+
+                <div className="w-full max-w-xs mt-12">
+                  
+                  {/* TIKTOK API MOCKUP */}
+                  {prod.mockup === 'tiktok' && (
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl p-4 shadow-2xl space-y-3 font-mono text-[9px] text-slate-300 overflow-x-auto">
+                      <p className="text-indigo-400 font-bold border-b border-white/5 pb-1">POST /api/webhooks/tiktok</p>
+                      <p>{"{"}</p>
+                      <p className="pl-3">"event": "LEAD_CAPTURE",</p>
+                      <p className="pl-3">"signature_sha256": "8a02f9...",</p>
+                      <p className="pl-3">"lead_data": {"{"}</p>
+                      <p className="pl-6">"full_name": "Carlos Mendoza",</p>
+                      <p className="pl-6">"whatsapp": "+50371204488",</p>
+                      <p className="pl-6">"business": "Repuestos SV"</p>
+                      <p className="pl-3">{"}"}</p>
+                      <p>{"}"}</p>
+                      <p className="text-emerald-400 font-bold border-t border-white/5 pt-1">HTTP 200 OK (Processed in 118ms)</p>
+                    </div>
+                  )}
+
+                  {/* META MOCKUP */}
+                  {prod.mockup === 'meta' && (
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl p-4 shadow-2xl space-y-3 text-xs">
+                      <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                        <span className="font-bold text-white">Meta Webhook Ingestion</span>
+                        <span className="text-[9px] text-indigo-400">v19.0 API</span>
+                      </div>
+                      <div className="space-y-1.5 text-[11px] text-slate-300">
+                        <p><strong>Campaign ID:</strong> camp_meta_lead_ads</p>
+                        <p><strong>Source Channel:</strong> Instagram Feed</p>
+                        <div className="bg-slate-950 p-2.5 rounded-lg border border-white/5 text-[10px] space-y-1">
+                          <p><strong>WhatsApp:</strong> +503 7120 4488</p>
+                          <p><strong>Status:</strong> Deduplicated & Queued</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* WHATSAPP WIDGET */}
+                  {prod.mockup === 'whatsapp' && (
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl p-4 shadow-2xl space-y-3">
+                      <div className="flex items-center gap-2 border-b border-white/5 pb-2">
+                        <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
+                        <span className="text-xs font-bold text-white">Arias Web widget</span>
+                      </div>
+                      <div className="bg-slate-950 p-3 rounded-xl border border-white/5 space-y-2 text-[10px]">
+                        <p className="text-slate-400">¿Quieres agilizar tus ventas con WhatsApp?</p>
+                        <input type="text" placeholder="Tu nombre..." value="Carlos" className="w-full bg-slate-900 border border-white/10 p-2 rounded text-[10px] text-white" readOnly />
+                        <button className="w-full bg-emerald-600 text-white p-2 rounded text-[10px] font-bold">Chatear con AI Agent</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* AI AGENT CHAT */}
+                  {prod.mockup === 'ai_agent' && (
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl p-4 shadow-2xl space-y-3">
+                      <div className="flex items-center gap-2 border-b border-white/5 pb-2">
+                        <div className="w-2.5 h-2.5 bg-blue-500 rounded-full" />
+                        <span className="text-xs font-bold text-white">AI Agent Conversational</span>
+                      </div>
+                      <div className="text-[10px] space-y-2 flex flex-col max-h-[140px] overflow-y-auto">
+                        <div className="bg-slate-800 text-white rounded-lg p-2 max-w-[85%] self-start leading-normal">
+                          ¡Hola! Veo tu interés en Arias CRM. ¿Cuántos vendedores son?
+                        </div>
+                        <div className="bg-indigo-600 text-white rounded-lg p-2 max-w-[85%] self-end leading-normal">
+                          Hola, somos 6 asesores.
+                        </div>
+                        <div className="bg-slate-800 text-white rounded-lg p-2 max-w-[85%] self-start leading-normal">
+                          Excelente, agendo tu demo para mañana a las 3:00 PM.
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* OMNICHANNEL INBOX */}
+                  {prod.mockup === 'inbox' && (
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl p-4 shadow-2xl space-y-3">
+                      <p className="text-xs font-bold text-white border-b border-white/5 pb-2">Cola Omnicanal</p>
+                      <div className="space-y-2 text-[10px]">
+                        <div className="flex justify-between items-center bg-slate-950 p-2 rounded border-l-2 border-emerald-500">
+                          <span>WhatsApp - Repuestos SV</span>
+                          <span className="bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded text-[8px]">Calificado</span>
+                        </div>
+                        <div className="flex justify-between items-center bg-slate-950 p-2 rounded border-l-2 border-blue-500">
+                          <span>TikTok - Black Friday SV</span>
+                          <span className="bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded text-[8px]">Pendiente</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* LEAD HUNTER */}
+                  {prod.mockup === 'hunter' && (
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl p-4 shadow-2xl space-y-2 text-xs">
+                      <p className="font-bold text-white">Lead Hunter Scraper</p>
+                      <div className="bg-slate-950 p-2.5 rounded-lg border border-white/5 space-y-1.5 text-[9px] text-slate-300">
+                        <p className="text-emerald-400 font-bold">✓ 342 empresas extraídas</p>
+                        <div className="border-t border-white/5 pt-1 space-y-1">
+                          <p>1. Taller Mecánico Premium - +503 2244 8899</p>
+                          <p>2. Distribuidora Santa Tecla - info@santecla.com</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* COTIZADOR */}
+                  {prod.mockup === 'cotizador' && (
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl p-4 shadow-2xl space-y-2.5 text-xs">
+                      <p className="font-bold text-white">Interactive PDF Proposal</p>
+                      <div className="bg-slate-950 p-2.5 rounded-lg border border-white/5 text-[9px] space-y-1 text-slate-300">
+                        <div className="flex justify-between">
+                          <span>Plan Growth Anual</span>
+                          <span>$1,188.00</span>
+                        </div>
+                        <div className="flex justify-between border-t border-white/5 pt-1 font-bold text-white">
+                          <span>Total</span>
+                          <span>$1,188.00</span>
+                        </div>
+                      </div>
+                      <button className="w-full bg-indigo-600 text-white text-[9px] py-1.5 rounded font-bold">Generar Enlace Seguro</button>
+                    </div>
+                  )}
+
+                  {/* COBROS */}
+                  {prod.mockup === 'cobros' && (
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl p-4 shadow-2xl space-y-3">
+                      <p className="text-xs font-bold text-white border-b border-white/5 pb-2">Portal de Recaudo</p>
+                      <div className="space-y-2 text-[10px] text-slate-300">
+                        <p>Cotización #1092 - Aceptada</p>
+                        <div className="flex gap-2">
+                          <button className="flex-1 bg-blue-600 text-white p-2 rounded text-[8px] font-bold">Tarjeta de Crédito</button>
+                          <button className="flex-1 bg-slate-950 border border-white/10 text-slate-300 p-2 rounded text-[8px] font-bold">Transferencia</button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* FLYER */}
+                  {prod.mockup === 'flyer' && (
+                    <div className="bg-slate-900 border border-white/10 rounded-2xl p-4 shadow-2xl space-y-2 text-xs">
+                      <p className="font-bold text-white">Flyer Canvas Preview</p>
+                      <div className="aspect-square bg-slate-950 rounded-lg flex items-center justify-center border border-white/5 text-[9px] text-slate-500">
+                        [ Creative AI Artwork Generator ]
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
+
