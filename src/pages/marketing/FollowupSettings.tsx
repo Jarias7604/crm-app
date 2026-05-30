@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
-    ArrowLeft, Save, Play, Clock, ToggleLeft, ToggleRight,
+    ArrowLeft, Save, Clock, ToggleLeft, ToggleRight,
     MessageSquare, AlertTriangle, RefreshCw, CheckCircle2,
-    ChevronDown, ChevronUp, Zap, Users, Timer, FlaskConical, BarChart2, RotateCcw
+    ChevronDown, ChevronUp, Zap, Users, Timer, FlaskConical, BarChart2, RotateCcw, Info
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { followupSettingsService, type FollowupSettings, DEFAULT_FOLLOWUP_SETTINGS } from '../../services/marketing/followupSettingsService';
@@ -147,6 +147,58 @@ function TemplateEditor({ num, value, onChange }: {
     );
 }
 
+function ActiveInfoTooltip() {
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    return (
+        <div className="relative" ref={ref}>
+            <button
+                onClick={() => setOpen(v => !v)}
+                className="w-6 h-6 rounded-full bg-slate-100 hover:bg-blue-100 text-slate-400 hover:text-blue-600 flex items-center justify-center transition-all"
+                title="¿Qué hace este toggle?"
+            >
+                <Info className="w-3.5 h-3.5" />
+            </button>
+
+            {open && (
+                <div className="absolute right-0 top-8 z-50 w-72 bg-white border border-slate-100 rounded-2xl shadow-2xl shadow-slate-900/10 p-4 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="w-7 h-7 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+                            <Timer className="w-4 h-4 text-emerald-600" />
+                        </div>
+                        <p className="text-xs font-black text-slate-800">Seguimientos Automáticos</p>
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-relaxed mb-3">
+                        Cuando está <strong className="text-emerald-600">ACTIVO</strong>, Sofía (tu agente IA) envía mensajes automáticos por Telegram a leads que no han respondido, siguiendo los tiempos configurados abajo.
+                    </p>
+                    <div className="space-y-1.5">
+                        <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+                            <span><strong>Activo:</strong> Sofía envía seguimientos automáticamente</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                            <span className="w-2 h-2 rounded-full bg-slate-300 shrink-0" />
+                            <span><strong>Inactivo:</strong> Los seguimientos se pausan completamente</span>
+                        </div>
+                    </div>
+                    <p className="text-[9px] text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mt-3 leading-relaxed">
+                        ⚠️ Recuerda hacer clic en <strong>Guardar Configuración</strong> después de cambiar el estado.
+                    </p>
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function FollowupSettingsPage() {
     const { profile } = useAuth();
     const [settings, setSettings] = useState<FollowupSettings | null>(null);
@@ -226,15 +278,29 @@ export default function FollowupSettingsPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
+                    {/* Info tooltip */}
+                    <ActiveInfoTooltip />
+
+                    {/* Status label */}
+                    <span className={`text-[10px] font-black tracking-widest transition-colors ${
+                        settings.is_active ? 'text-emerald-600' : 'text-slate-400'
+                    }`}>
+                        {settings.is_active ? 'ACTIVO' : 'INACTIVO'}
+                    </span>
+
+                    {/* Premium toggle switch */}
                     <button
                         onClick={() => update('is_active', !settings.is_active)}
-                        className={`px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest transition-all ${
+                        title={settings.is_active ? 'Pausar seguimientos automáticos' : 'Activar seguimientos automáticos'}
+                        className={`relative w-14 h-7 rounded-full transition-all duration-300 shadow-inner focus:outline-none ${
                             settings.is_active
-                                ? 'bg-emerald-100 text-emerald-600'
-                                : 'bg-slate-100 text-slate-400'
+                                ? 'bg-emerald-500 shadow-emerald-200'
+                                : 'bg-slate-200'
                         }`}
                     >
-                        {settings.is_active ? 'ACTIVO' : 'INACTIVO'}
+                        <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-300 ${
+                            settings.is_active ? 'translate-x-7' : 'translate-x-0'
+                        }`} />
                     </button>
                 </div>
             </div>
