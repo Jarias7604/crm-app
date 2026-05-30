@@ -190,8 +190,8 @@ function ActiveInfoTooltip() {
                             <span><strong>Inactivo:</strong> Los seguimientos se pausan completamente</span>
                         </div>
                     </div>
-                    <p className="text-[9px] text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mt-3 leading-relaxed">
-                        ⚠️ Recuerda hacer clic en <strong>Guardar Configuración</strong> después de cambiar el estado.
+                    <p className="text-[9px] text-blue-600 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 mt-3 leading-relaxed">
+                        💡 El toggle se guarda <strong>automáticamente</strong> al activarlo o pausarlo.
                     </p>
                 </div>
             )}
@@ -253,6 +253,24 @@ export default function FollowupSettingsPage() {
         setSettings({ ...settings, [field]: value });
     };
 
+    // Auto-save is_active immediately when toggled (no manual Save needed)
+    const handleToggleActive = async () => {
+        if (!settings) return;
+        const newValue = !settings.is_active;
+        setSettings({ ...settings, is_active: newValue }); // optimistic
+        try {
+            await followupSettingsService.save({ ...settings, is_active: newValue });
+            toast.success(newValue
+                ? '✅ Seguimientos activados'
+                : '⏸️ Seguimientos pausados'
+            );
+        } catch (e: any) {
+            // revert on failure
+            setSettings({ ...settings, is_active: !newValue });
+            toast.error('Error al guardar — intenta de nuevo');
+        }
+    };
+
     if (loading) return (
         <div className="flex items-center justify-center h-64">
             <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
@@ -288,9 +306,9 @@ export default function FollowupSettingsPage() {
                         {settings.is_active ? 'ACTIVO' : 'INACTIVO'}
                     </span>
 
-                    {/* Premium toggle switch */}
+                    {/* Premium toggle switch — auto-saves on click */}
                     <button
-                        onClick={() => update('is_active', !settings.is_active)}
+                        onClick={handleToggleActive}
                         title={settings.is_active ? 'Pausar seguimientos automáticos' : 'Activar seguimientos automáticos'}
                         className={`relative w-14 h-7 rounded-full transition-all duration-300 shadow-inner focus:outline-none ${
                             settings.is_active
