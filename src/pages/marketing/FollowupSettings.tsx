@@ -255,19 +255,19 @@ export default function FollowupSettingsPage() {
 
     // Auto-save is_active immediately when toggled (no manual Save needed)
     const handleToggleActive = async () => {
-        if (!settings) return;
+        if (!settings || !profile?.company_id) return;
         const newValue = !settings.is_active;
-        setSettings({ ...settings, is_active: newValue }); // optimistic
+        setSettings({ ...settings, is_active: newValue }); // optimistic UI update
         try {
-            await followupSettingsService.save({ ...settings, is_active: newValue });
+            await followupSettingsService.updateActiveState(profile.company_id, newValue);
             toast.success(newValue
                 ? '✅ Seguimientos activados'
                 : '⏸️ Seguimientos pausados'
             );
         } catch (e: any) {
-            // revert on failure
+            // Revert on failure and show real error
             setSettings({ ...settings, is_active: !newValue });
-            toast.error('Error al guardar — intenta de nuevo');
+            toast.error(`No se pudo guardar: ${e.message || 'Error desconocido'}`);
         }
     };
 

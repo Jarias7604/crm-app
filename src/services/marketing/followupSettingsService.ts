@@ -71,6 +71,26 @@ export const followupSettingsService = {
         if (error) throw error;
     },
 
+    /** Targeted update for is_active only — verifies rows were actually changed */
+    async updateActiveState(companyId: string, isActive: boolean): Promise<void> {
+        // First try update (row already exists)
+        const { data, error } = await supabase
+            .from('ai_followup_settings')
+            .update({ is_active: isActive })
+            .eq('company_id', companyId)
+            .select('id');
+
+        if (error) throw error;
+
+        // If no rows updated, the row doesn't exist yet — insert it
+        if (!data || data.length === 0) {
+            const { error: insertError } = await supabase
+                .from('ai_followup_settings')
+                .insert({ company_id: companyId, is_active: isActive });
+            if (insertError) throw insertError;
+        }
+    },
+
     async triggerNow(companyId: string): Promise<{ followups_sent: number; evaluated: number; skipped: number }> {
         const { data, error } = await supabase.functions.invoke('auto-followup', {
             body: { company_id: companyId }
