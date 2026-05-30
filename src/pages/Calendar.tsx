@@ -1619,10 +1619,77 @@ export default function Calendar() {
                                 </div>
                             )}
 
+                            {/* Attendees */}
+                            {selectedGoogleEvent._rawEvent?.attendees && selectedGoogleEvent._rawEvent.attendees.length > 0 && (
+                                <div className="space-y-3">
+                                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 pl-0.5">
+                                        <Users className="w-4 h-4 text-slate-500" />
+                                        Asistentes ({selectedGoogleEvent._rawEvent.attendees.length})
+                                    </h3>
+                                    <div className="flex flex-col gap-2 max-h-[180px] overflow-y-auto pr-1">
+                                        {selectedGoogleEvent._rawEvent.attendees.map((att: any, i: number) => (
+                                            <div key={i} className="flex items-center gap-3 bg-slate-50/50 hover:bg-slate-50 rounded-xl p-2.5 border border-slate-100/50 transition-colors">
+                                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-50 to-indigo-100 flex items-center justify-center text-xs font-black text-indigo-700 border border-indigo-200/40 shrink-0">
+                                                    {(att.displayName || att.email || '?').charAt(0).toUpperCase()}
+                                                </div>
+                                                <div className="flex flex-col min-w-0">
+                                                    <span className="text-xs font-bold text-slate-800 truncate">
+                                                        {att.displayName || att.email.split('@')[0]}
+                                                    </span>
+                                                    <span className="text-[10px] font-medium text-slate-400 truncate">
+                                                        {att.email}
+                                                    </span>
+                                                </div>
+                                                {att.organizer && (
+                                                    <span className="ml-auto text-[9px] font-black uppercase tracking-wider text-indigo-600 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-full shrink-0">
+                                                        Organizador
+                                                    </span>
+                                                )}
+                                            </div>
+                                        ))}
                                     </div>
-                                )}
-                            </div>
+                                </div>
+                            )}
+
+                            {/* Description */}
+                            {selectedGoogleEvent._rawEvent?.description && (
+                                <div className="space-y-2">
+                                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5 pl-0.5">
+                                        <AlignLeft className="w-4 h-4 text-slate-500" />
+                                        Agenda / Detalles
+                                    </h3>
+                                    <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 max-h-[140px] overflow-y-auto">
+                                        <div 
+                                            className="text-xs leading-relaxed text-slate-600 prose prose-sm max-w-none break-words" 
+                                            dangerouslySetInnerHTML={{ __html: selectedGoogleEvent._rawEvent.description }} 
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
                         </div>
+
+                        {/* Actions Footer */}
+                        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex gap-3 shrink-0">
+                            <button
+                                onClick={() => setSelectedGoogleEvent(null)}
+                                className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-100 transition-all"
+                            >
+                                Cerrar
+                            </button>
+                            {selectedGoogleEvent._rawEvent?.htmlLink && (
+                                <a 
+                                    href={selectedGoogleEvent._rawEvent.htmlLink} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="flex-1 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-slate-900/10"
+                                >
+                                    ✏️ Editar en Google
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                </a>
+                            )}
+                        </div>
+
                     </div>
                 </div>
             )}
