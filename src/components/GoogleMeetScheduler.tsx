@@ -5,11 +5,13 @@ import { es } from 'date-fns/locale';
 import {
     X, Video, Calendar, Clock, Users, Mail, Copy,
     ExternalLink, Check, Loader2, AlertCircle, Link2,
-    ChevronDown, Plus
+    ChevronDown, Plus, Globe
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { leadsService } from '../services/leads';
 import { useAuth } from '../auth/AuthProvider';
+import { localToUtcISO, formatTimeInZone } from '../utils/timezone';
+import { useTimezone } from '../hooks/useTimezone';
 import toast from 'react-hot-toast';
 
 interface GoogleMeetSchedulerProps {
@@ -29,6 +31,26 @@ const DURATION_OPTIONS = [
     { label: '2 horas', value: 120 },
 ];
 
+const COMMON_TIMEZONES = [
+    { value: 'America/El_Salvador', label: 'El Salvador (CST, UTC-6)' },
+    { value: 'America/Guatemala', label: 'Guatemala (CST, UTC-6)' },
+    { value: 'America/Tegucigalpa', label: 'Honduras (CST, UTC-6)' },
+    { value: 'America/Managua', label: 'Nicaragua (CST, UTC-6)' },
+    { value: 'America/Costa_Rica', label: 'Costa Rica (CST, UTC-6)' },
+    { value: 'America/Panama', label: 'Panamá (EST, UTC-5)' },
+    { value: 'America/Mexico_City', label: 'México - CDMX (CST, UTC-6)' },
+    { value: 'America/Bogota', label: 'Colombia / Ecuador / Perú (EST, UTC-5)' },
+    { value: 'America/Caracas', label: 'Venezuela (AST, UTC-4)' },
+    { value: 'America/Santo_Domingo', label: 'República Dominicana (AST, UTC-4)' },
+    { value: 'America/Santiago', label: 'Chile (CLT, UTC-4)' },
+    { value: 'America/Argentina/Buenos_Aires', label: 'Argentina (ART, UTC-3)' },
+    { value: 'America/New_York', label: 'US Eastern Time (EST/EDT, UTC-5/-4)' },
+    { value: 'America/Chicago', label: 'US Central Time (CST/CDT, UTC-6/-5)' },
+    { value: 'America/Denver', label: 'US Mountain Time (MST/MDT, UTC-7/-6)' },
+    { value: 'America/Los_Angeles', label: 'US Pacific Time (PST/PDT, UTC-8/-7)' },
+    { value: 'Europe/Madrid', label: 'España (CET/CEST, UTC+1/+2)' },
+];
+
 export default function GoogleMeetScheduler({
     onClose,
     initialDate,
@@ -38,6 +60,17 @@ export default function GoogleMeetScheduler({
 }: GoogleMeetSchedulerProps) {
     const { profile } = useAuth();
     const queryClient = useQueryClient();
+
+    // Fetch company/user timezone and initialize selectedTimezone
+    const { timezone: companyTimezone } = useTimezone(profile?.company_id);
+    const [selectedTimezone, setSelectedTimezone] = useState('America/El_Salvador');
+
+    // Sync timezone once companyTimezone resolves
+    useEffect(() => {
+        if (companyTimezone) {
+            setSelectedTimezone(companyTimezone);
+        }
+    }, [companyTimezone]);
 
     // Form state
     const [title, setTitle] = useState(
@@ -93,7 +126,7 @@ export default function GoogleMeetScheduler({
         enabled: !!profile?.id,
     });
 
-    // Compute end time from start + duration
+    // Compute end time (HH:mm) from start + duration
     const endTime = useMemo(() => {
         const [h, m] = startTime.split(':').map(Number);
         const start = setMinutes(setHours(new Date(), h), m);
@@ -101,18 +134,30 @@ export default function GoogleMeetScheduler({
         return format(end, 'HH:mm');
     }, [startTime, duration]);
 
-    // Build ISO datetimes
+    // Build ISO datetimes using localToUtcISO and the selected timezone
     const startISO = useMemo(() => {
-        const [h, m] = startTime.split(':').map(Number);
-        const d = parseISO(date);
-        return setMinutes(setHours(d, h), m).toISOString();
-    }, [date, startTime]);
+        try {
+            return localToUtcISO(`${date}T${startTime}`, selectedTimezone);
+        } catch (e) {
+            // Safe fallback
+            const [h, m] = startTime.split(':').map(Number);
+            const d = parseISO(date);
+            return setMinutes(setHours(d, h), m).toISOString();
+        }
+    }, [date, startTime, selectedTimezone]);
 
     const endISO = useMemo(() => {
-        const [h, m] = endTime.split(':').map(Number);
-        const d = parseISO(date);
-        return setMinutes(setHours(d, h), m).toISOString();
-    }, [date, endTime]);
+        try {
+            // Safely compute end time by adding duration milliseconds to startISO
+            const startMs = new Date(startISO).getTime();
+            return new Date(startMs + duration * 60 * 1000).toISOString();
+        } catch (e) {
+            // Fallback
+            const [h, m] = endTime.split(':').map(Number);
+            const d = parseISO(date);
+            return setMinutes(setHours(d, h), m).toISOString();
+        }
+    }, [startISO, duration, endTime]);
 
     // Add attendee
     const addAttendee = (email: string) => {
@@ -131,7 +176,6 @@ export default function GoogleMeetScheduler({
             let followUpId: string | undefined;
 
             // Only create a CRM follow-up if a lead is linked.
-            // follow_ups.lead_id is NOT NULL — passing undefined would crash.
             if (initialLeadId) {
                 const followUp = await leadsService.createFollowUp({
                     lead_id: initialLeadId,
@@ -145,17 +189,25 @@ export default function GoogleMeetScheduler({
 
             // Create Google Calendar event (with or without a linked follow-up)
             if (googleIntegration && addMeetLink) {
+                // Enrich meeting description with Organizer Profile details
+                const hostName = profile?.full_name || 'Administrador del CRM';
+                const hostEmail = profile?.email || '';
+                const enrichedDescription = `${description ? description + '\n\n' : ''}---
+Organizador: ${hostName}
+Email: ${hostEmail}
+Reunión programada automáticamente desde Arias CRM.`;
+
                 const result = await leadsService.createGoogleMeeting({
                     integrationId: googleIntegration.id,
                     followUpId,
                     title,
-                    description,
+                    description: enrichedDescription,
                     start: startISO,
                     end: endISO,
                     attendees,
                     addMeetLink: true,
                     sendInvites,
-                    timezone: profile?.company_id ? undefined : 'America/El_Salvador',
+                    timezone: selectedTimezone,
                 });
                 return { followUpId, meetResult: result };
             }
@@ -197,7 +249,7 @@ export default function GoogleMeetScheduler({
                         </div>
                         <h2 className="text-2xl font-black text-white">¡Reunión creada!</h2>
                         <p className="text-emerald-100 mt-1 text-sm font-medium">
-                            {format(parseISO(startISO), "EEEE d 'de' MMMM · HH:mm", { locale: es })} — {endTime}
+                            {format(parseISO(startISO), "EEEE d 'de' MMMM", { locale: es })} · {formatTimeInZone(startISO, selectedTimezone)} — {formatTimeInZone(endISO, selectedTimezone)}
                         </p>
                     </div>
 
@@ -260,12 +312,21 @@ export default function GoogleMeetScheduler({
                             </div>
                         )}
 
-                        <button
-                            onClick={onClose}
-                            className="w-full py-3 rounded-xl bg-gray-900 hover:bg-gray-700 text-white font-bold text-sm transition-all"
-                        >
-                            Listo
-                        </button>
+                        {/* Split Edit/Finish Actions */}
+                        <div className="flex gap-3 pt-2">
+                            <button
+                                onClick={() => setCreatedMeet(null)}
+                                className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-700 font-bold text-sm hover:bg-gray-100 transition-all flex items-center justify-center gap-1.5"
+                            >
+                                ✏️ Modificar
+                            </button>
+                            <button
+                                onClick={onClose}
+                                className="flex-1 py-3 rounded-xl bg-gray-900 hover:bg-gray-700 text-white font-bold text-sm transition-all"
+                            >
+                                Listo
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -275,7 +336,7 @@ export default function GoogleMeetScheduler({
     // ─── MAIN FORM ────────────────────────────────────────────────────────────
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-            <div className="w-full max-w-xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
 
                 {/* Header */}
                 <div className="bg-gradient-to-br from-[#4285F4] to-[#1a73e8] p-6 flex items-start justify-between shrink-0">
@@ -317,6 +378,33 @@ export default function GoogleMeetScheduler({
                 {/* Scrollable form body */}
                 <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 
+                    {/* Premium Organizer Profile Card */}
+                    <div className="bg-gradient-to-r from-indigo-50 to-blue-50/50 rounded-2xl border border-indigo-100/60 p-4 flex items-center gap-3 shadow-sm">
+                        {profile?.avatar_url ? (
+                            <img
+                                src={profile.avatar_url}
+                                alt={profile.full_name || 'Organizador'}
+                                className="w-11 h-11 rounded-full object-cover shadow-md border-2 border-white ring-2 ring-indigo-100 shrink-0"
+                            />
+                        ) : (
+                            <div className="w-11 h-11 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-black text-base shadow-md shrink-0">
+                                {(profile?.full_name || 'U').charAt(0).toUpperCase()}
+                            </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                            <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">
+                                Organizador del Evento
+                            </p>
+                            <p className="text-sm font-bold text-gray-800 truncate">
+                                {profile?.full_name || 'Administrador del CRM'}
+                            </p>
+                            <p className="text-xs text-gray-500 truncate flex items-center gap-1.5 mt-0.5">
+                                <Mail className="w-3.5 h-3.5 text-indigo-400" />
+                                {profile?.email || 'soporte@crm.com'}
+                            </p>
+                        </div>
+                    </div>
+
                     {/* Title */}
                     <div>
                         <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-1.5">
@@ -331,7 +419,7 @@ export default function GoogleMeetScheduler({
                     </div>
 
                     {/* Date + Time */}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-1.5">
                                 Fecha
@@ -362,6 +450,28 @@ export default function GoogleMeetScheduler({
                         </div>
                     </div>
 
+                    {/* Timezone Selector */}
+                    <div>
+                        <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-1.5 flex items-center gap-1.5">
+                            <Globe className="w-3.5 h-3.5 text-[#4285F4]" />
+                            Zona Horaria
+                        </label>
+                        <div className="relative">
+                            <select
+                                value={selectedTimezone}
+                                onChange={e => setSelectedTimezone(e.target.value)}
+                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#4285F4] focus:ring-2 focus:ring-[#4285F4]/20 outline-none text-sm font-semibold text-gray-800 transition-all appearance-none bg-white cursor-pointer"
+                            >
+                                {COMMON_TIMEZONES.map(tz => (
+                                    <option key={tz.value} value={tz.value}>
+                                        {tz.label}
+                                    </option>
+                                ))}
+                            </select>
+                            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                        </div>
+                    </div>
+
                     {/* Duration quick buttons */}
                     <div>
                         <label className="text-xs font-black text-gray-500 uppercase tracking-widest block mb-1.5">
@@ -372,7 +482,7 @@ export default function GoogleMeetScheduler({
                                 <button
                                     key={opt.value}
                                     onClick={() => setDuration(opt.value)}
-                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
                                         duration === opt.value
                                             ? 'bg-[#4285F4] text-white shadow-md shadow-[#4285F4]/30'
                                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
