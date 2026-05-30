@@ -2249,29 +2249,46 @@ export default function Dashboard() {
                             }));
 
                             const totalReasonsCount = reasonData.reduce((sum, r) => sum + r.count, 0);
+                            const filteredReasons = reasonData.filter(r => r.count > 0);
+                            const displayedReasons = showAllLossReasons ? filteredReasons : filteredReasons.slice(0, 6);
 
                             return totalReasonsCount > 0 ? (
-                                reasonData.filter(r => r.count > 0).map((item, index) => (
-                                    <div
-                                        key={index}
-                                        onClick={() => navigate('/leads', { state: { status: 'Perdido', lossReasonId: item.id, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
-                                        className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-all cursor-pointer group/item"
-                                    >
-                                        <div className="flex-1">
-                                            <p className="text-xs font-black text-slate-700 group-hover/item:text-red-500 transition-colors">{item.reason}</p>
-                                            <div className="mt-1 bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                                                <div
-                                                    className="bg-red-500 h-full rounded-full transition-all duration-500 group-hover/item:bg-red-600"
-                                                    style={{ width: `${item.percentage}%` }}
-                                                />
+                                <>
+                                    <div className="space-y-2 flex-grow">
+                                        {displayedReasons.map((item, index) => (
+                                            <div
+                                                key={index}
+                                                onClick={() => navigate('/leads', { state: { status: 'Perdido', lossReasonId: item.id, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
+                                                className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-all cursor-pointer group/item"
+                                            >
+                                                <div className="flex-1">
+                                                    <p className="text-xs font-black text-slate-700 group-hover/item:text-red-500 transition-colors">{item.reason}</p>
+                                                    <div className="mt-1 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                                        <div
+                                                            className="bg-red-500 h-full rounded-full transition-all duration-500 group-hover/item:bg-red-600"
+                                                            style={{ width: `${item.percentage}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-sm font-black text-red-600">{item.count}</p>
+                                                    <p className="text-[8px] font-black text-slate-300 uppercase">{item.percentage}%</p>
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-sm font-black text-red-600">{item.count}</p>
-                                            <p className="text-[8px] font-black text-slate-300 uppercase">{item.percentage}%</p>
-                                        </div>
+                                        ))}
                                     </div>
-                                ))
+                                    {filteredReasons.length > 6 && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShowAllLossReasons(!showAllLossReasons);
+                                            }}
+                                            className="w-full text-center py-2 text-[9px] font-black text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50/50 rounded-xl transition-all border border-indigo-100/50 mt-2 uppercase tracking-widest"
+                                        >
+                                            {showAllLossReasons ? 'Ver menos ↑' : `Ver más (${filteredReasons.length - 6} más) ↓`}
+                                        </button>
+                                    )}
+                                </>
                             ) : (
                                 <div className="h-full flex flex-col items-center justify-center py-12 opacity-30">
                                     <CheckCircle className="w-10 h-10 mb-2 text-green-400" />
