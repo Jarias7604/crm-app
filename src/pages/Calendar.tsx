@@ -123,6 +123,7 @@ export default function Calendar() {
     
     // Google Calendar Event Modal
     const [selectedGoogleEvent, setSelectedGoogleEvent] = useState<any | null>(null);
+    const [editGoogleEvent, setEditGoogleEvent] = useState<any | null>(null);
 
     // Google Meet Scheduler modal
     const [showMeetScheduler, setShowMeetScheduler] = useState(false);
@@ -1677,28 +1678,32 @@ export default function Calendar() {
                             >
                                 Cerrar
                             </button>
-                            {selectedGoogleEvent._rawEvent?.htmlLink && (
-                                <a 
-                                    href={selectedGoogleEvent._rawEvent.htmlLink} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="flex-1 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-slate-900/10"
-                                >
-                                    ✏️ Editar en Google
-                                    <ExternalLink className="w-3.5 h-3.5" />
-                                </a>
-                            )}
+                    <button
+                        onClick={() => {
+                                    setEditGoogleEvent(selectedGoogleEvent);
+                                    setSelectedGoogleEvent(null);
+                                }}
+                                className="flex-1 py-3 rounded-xl bg-[#4285F4] hover:bg-[#3367d6] text-white font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-[#4285F4]/20"
+                            >
+                                ✏️ Editar Reunión
+                            </button>
                         </div>
 
                     </div>
                 </div>
             )}
-
-            {/* Google Meet Scheduler Modal */}
+            {/* Google Meet Scheduler Modal (Create Mode) */}
             {showMeetScheduler && (
                 <GoogleMeetScheduler
                     initialDate={meetSchedulerDate}
                     onClose={() => { setShowMeetScheduler(false); setMeetSchedulerDate(undefined); }}
+                />
+            )}
+
+            {editGoogleEvent && (
+                <GoogleMeetScheduler
+                    initialEvent={editGoogleEvent}
+                    onClose={() => setEditGoogleEvent(null)}
                 />
             )}
         </div>

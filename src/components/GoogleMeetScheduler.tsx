@@ -20,6 +20,7 @@ interface GoogleMeetSchedulerProps {
     initialLeadId?: string;
     initialLeadName?: string;
     initialLeadEmail?: string | null;
+    initialEvent?: any;
 }
 
 const DURATION_OPTIONS = [
@@ -57,42 +58,89 @@ export default function GoogleMeetScheduler({
     initialLeadId,
     initialLeadName,
     initialLeadEmail,
+    initialEvent,
 }: GoogleMeetSchedulerProps) {
     const { profile } = useAuth();
     const queryClient = useQueryClient();
 
+    const isEditMode = !!initialEvent;
+
     // Fetch company/user timezone and initialize selectedTimezone
     const { timezone: companyTimezone } = useTimezone(profile?.company_id);
-    const [selectedTimezone, setSelectedTimezone] = useState('America/El_Salvador');
+    const [selectedTimezone, setSelectedTimezone] = useState(() => {
+        if (initialEvent?._rawEvent?.start?.timeZone) {
+            return initialEvent._rawEvent.start.timeZone;
+        }
+        return 'America/El_Salvador';
+    });
 
     // Sync timezone once companyTimezone resolves
     useEffect(() => {
-        if (companyTimezone) {
+        if (companyTimezone && !initialEvent?._rawEvent?.start?.timeZone) {
             setSelectedTimezone(companyTimezone);
         }
-    }, [companyTimezone]);
+    }, [companyTimezone, initialEvent]);
 
     // Form state
-    const [title, setTitle] = useState(
-        initialLeadName ? `Reunión con ${initialLeadName}` : 'Nueva Reunión'
-    );
-    const [date, setDate] = useState(
-        format(initialDate || new Date(), 'yyyy-MM-dd')
-    );
+    const [title, setTitle] = useState(() => {
+        if (initialEvent?._rawEvent?.summary) return initialEvent._rawEvent.summary;
+        if (initialEvent?.lead?.name) return initialEvent.lead.name;
+        return initialLeadName ? `Reunión con ${initialLeadName}` : 'Nueva Reunión';
+    });
+
+    const [date, setDate] = useState(() => {
+        if (initialEvent?.date) {
+            return format(new Date(initialEvent.date), 'yyyy-MM-dd');
+        }
+        return format(initialDate || new Date(), 'yyyy-MM-dd');
+    });
+
     const [startTime, setStartTime] = useState(() => {
+        if (initialEvent?.date) {
+            return format(new Date(initialEvent.date), 'HH:mm');
+        }
         const d = initialDate || new Date();
-        // Round up to next 30-min slot
         const mins = d.getMinutes() < 30 ? 30 : 0;
         const hrs = d.getMinutes() < 30 ? d.getHours() : d.getHours() + 1;
         return `${String(hrs % 24).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
     });
-    const [duration, setDuration] = useState(30);
-    const [description, setDescription] = useState('');
+
+    const [duration, setDuration] = useState(() => {
+        if (initialEvent?._rawEvent?.start?.dateTime && initialEvent?._rawEvent?.end?.dateTime) {
+            const start = new Date(initialEvent._rawEvent.start.dateTime).getTime();
+            const end = new Date(initialEvent._rawEvent.end.dateTime).getTime();
+            return Math.round((end - start) / (60 * 1000));
+        }
+        return 30;
+    });
+
+    const [description, setDescription] = useState(() => {
+        if (initialEvent?._rawEvent?.description) {
+            const desc = initialEvent._rawEvent.description;
+            const markerIdx = desc.indexOf('\n\n---');
+            if (markerIdx !== -1) {
+                return desc.substring(0, markerIdx);
+            }
+            return desc;
+        }
+        return '';
+    });
+
     const [attendeeInput, setAttendeeInput] = useState('');
-    const [attendees, setAttendees] = useState<string[]>(
-        initialLeadEmail ? [initialLeadEmail] : []
-    );
-    const [addMeetLink, setAddMeetLink] = useState(true);
+    const [attendees, setAttendees] = useState<string[]>(() => {
+        if (initialEvent?._rawEvent?.attendees) {
+            return initialEvent._rawEvent.attendees.map((a: any) => a.email).filter(Boolean);
+        }
+        return initialLeadEmail ? [initialLeadEmail] : [];
+    });
+
+    const [addMeetLink, setAddMeetLink] = useState(() => {
+        if (isEditMode) {
+            return !!initialEvent?._rawEvent?.hangoutLink;
+        }
+        return true;
+    });
+
     const [sendInvites, setSendInvites] = useState(true);
     const [copied, setCopied] = useState(false);
     const [createdMeet, setCreatedMeet] = useState<{
@@ -227,9 +275,50 @@ export default function GoogleMeetScheduler({
     const removeAttendee = (email: string) =>
         setAttendees(prev => prev.filter(e => e !== email));
 
-    // Mutation — create follow-up (if lead linked) + optionally Google Meet event
+    // Mutation — handle create/update follow-up + Google Calendar event
     const mutation = useMutation({
         mutationFn: async () => {
+            if (isEditMode) {
+                if (!googleIntegration) throw new Error('No Google Calendar integration connected');
+
+                const hostName = profile?.full_name || 'Administrador del CRM';
+                const hostEmail = profile?.email || '';
+                const enrichedDescription = `${description ? description + '\n\n' : ''}---
+Organizador: ${hostName}
+Email: ${hostEmail}
+Reunión modificada desde Arias CRM.`;
+
+                // extract actual google event ID (from format `google-{real_id}-{group}`)
+                let rawId = initialEvent.id;
+                if (rawId.startsWith('google-')) {
+                    const parts = rawId.split('-');
+                    rawId = parts[1]; // get {real_id}
+                }
+
+                const { data, error } = await supabase.functions.invoke('google-calendar-sync', {
+                    body: {
+                        action: 'update_event',
+                        integration_id: googleIntegration.id,
+                        event_id: rawId,
+                        event: {
+                            title,
+                            description: enrichedDescription,
+                            start: startISO,
+                            end: endISO,
+                            attendees,
+                            send_invites: sendInvites,
+                            timezone: selectedTimezone,
+                        }
+                    }
+                });
+
+                if (error || !data || data.success === false) {
+                    throw new Error(data?.error || error?.message || 'Error al actualizar reunión en Google Calendar');
+                }
+
+                return { isEdit: true, meetResult: null };
+            }
+
             let followUpId: string | undefined;
 
             // Only create a CRM follow-up if a lead is linked.
@@ -266,26 +355,31 @@ Reunión programada automáticamente desde Arias CRM.`;
                     sendInvites,
                     timezone: selectedTimezone,
                 });
-                return { followUpId, meetResult: result };
+                return { isEdit: false, meetResult: result };
             }
 
-            return { followUpId, meetResult: null };
+            return { isEdit: false, meetResult: null };
         },
-        onSuccess: ({ meetResult }) => {
+        onSuccess: (res) => {
             queryClient.invalidateQueries({ queryKey: ['calendar-follow-ups'] });
-            if (meetResult?.meet_link) {
-                setCreatedMeet(meetResult);
-            } else {
-                toast.success('✅ Reunión agendada en el calendario');
+            queryClient.invalidateQueries({ queryKey: ['google-calendar-events'] });
+
+            if (isEditMode) {
+                toast.success('✅ Cambios guardados en Google Calendar');
                 onClose();
+            } else {
+                if (res.meetResult?.meet_link) {
+                    setCreatedMeet(res.meetResult);
+                } else {
+                    toast.success('✅ Reunión agendada en el calendario');
+                    onClose();
+                }
             }
         },
         onError: (err: any) => {
-            toast.error(`Error: ${err.message || 'No se pudo crear la reunión'}`);
+            toast.error(`Error: ${err.message || 'No se pudo procesar la reunión'}`);
         }
-    });
-
-    const copyMeetLink = () => {
+    });    const copyMeetLink = () => {
         if (createdMeet?.meet_link) {
             navigator.clipboard.writeText(createdMeet.meet_link);
             setCopied(true);
@@ -394,13 +488,18 @@ Reunión programada automáticamente desde Arias CRM.`;
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
             <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-
                 {/* Header */}
-                <div className="bg-gradient-to-br from-[#4285F4] to-[#1a73e8] p-6 flex items-start justify-between shrink-0">
+                <div className={`p-6 flex items-start justify-between shrink-0 bg-gradient-to-br ${
+                    isEditMode 
+                        ? 'from-blue-500 to-indigo-600' 
+                        : 'from-[#4285F4] to-[#1a73e8]'
+                }`}>
                     <div>
                         <div className="flex items-center gap-2 mb-1">
                             <Video className="w-5 h-5 text-white/90" />
-                            <h2 className="text-xl font-black text-white">Nueva Reunión</h2>
+                            <h2 className="text-xl font-black text-white">
+                                {isEditMode ? 'Editar Reunión' : 'Nueva Reunión'}
+                            </h2>
                         </div>
                         <p className="text-blue-100 text-sm font-medium">
                             {googleIntegration
@@ -785,9 +884,11 @@ Reunión programada automáticamente desde Arias CRM.`;
                         onClick={() => mutation.mutate()}
                         disabled={mutation.isPending || !title.trim()}
                         className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-                            googleIntegration && addMeetLink
-                                ? 'bg-[#4285F4] hover:bg-[#3367d6] text-white shadow-lg shadow-[#4285F4]/30'
-                                : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200'
+                            isEditMode
+                                ? 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg shadow-indigo-100'
+                                : googleIntegration && addMeetLink
+                                    ? 'bg-[#4285F4] hover:bg-[#3367d6] text-white shadow-lg shadow-[#4285F4]/30'
+                                    : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200'
                         } disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                         {mutation.isPending ? (
@@ -798,10 +899,12 @@ Reunión programada automáticamente desde Arias CRM.`;
                             <Calendar className="w-4 h-4" />
                         )}
                         {mutation.isPending
-                            ? 'Creando...'
-                            : googleIntegration && addMeetLink
-                                ? 'Crear con Google Meet'
-                                : 'Agendar Reunión'}
+                            ? isEditMode ? 'Guardando...' : 'Creando...'
+                            : isEditMode
+                                ? sendInvites ? 'Guardar y Notificar' : 'Solo Guardar'
+                                : googleIntegration && addMeetLink
+                                    ? 'Crear con Google Meet'
+                                    : 'Agendar Reunión'}
                     </button>
                 </div>
             </div>

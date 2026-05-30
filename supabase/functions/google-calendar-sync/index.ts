@@ -376,6 +376,113 @@ serve(async (req) => {
             });
         }
 
+        // ─── ACTION: update_event ───────────────────────────────────────────────
+        if (action === 'update_event') {
+            const { integration_id, event_id, event } = body;
+
+            if (!integration_id || !event_id || !event) throw new Error('integration_id, event_id and event are required');
+
+            // Fetch integration
+            const { data: integration, error: intError } = await supabase
+                .from('calendar_integrations')
+                .select('*')
+                .eq('id', integration_id)
+                .eq('is_active', true)
+                .single();
+
+            if (intError || !integration) throw new Error('Google Calendar integration not found or inactive');
+
+            // Refresh token if expired
+            let accessToken = integration.access_token;
+            const expiresAt = new Date(integration.token_expires_at);
+            const isExpired = expiresAt.getTime() - Date.now() < 60_000;
+
+            if (isExpired) {
+                const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams({
+                        client_id: GOOGLE_CLIENT_ID!,
+                        client_secret: GOOGLE_CLIENT_SECRET!,
+                        refresh_token: integration.refresh_token,
+                        grant_type: 'refresh_token',
+                    })
+                });
+                const tokens = await refreshResponse.json();
+                if (tokens.error) throw new Error(`Token refresh failed: ${tokens.error}`);
+                accessToken = tokens.access_token;
+                await supabase.from('calendar_integrations').update({
+                    access_token: tokens.access_token,
+                    token_expires_at: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
+                }).eq('id', integration.id);
+            }
+
+            // Build Google Calendar event update body
+            const timezone = event.timezone || 'America/El_Salvador';
+            const eventBody: any = {
+                summary: event.title,
+                description: event.description || '',
+                start: { dateTime: event.start, timeZone: timezone },
+                end:   { dateTime: event.end,   timeZone: timezone },
+                attendees: (event.attendees || []).map((email: string) => ({ email })),
+            };
+
+            // sendUpdates: 'all' sends email updates automatically
+            const sendUpdates = event.send_invites ? 'all' : 'none';
+
+            const updateResponse = await fetch(
+                `https://www.googleapis.com/calendar/v3/calendars/primary/events/${event_id}?sendUpdates=${sendUpdates}`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(eventBody),
+                }
+            );
+
+            const updatedEvent = await updateResponse.json();
+
+            if (!updateResponse.ok || updatedEvent.error) {
+                const errDetail = updatedEvent.error
+                    ? `[${updatedEvent.error.code}] ${updatedEvent.error.message}`
+                    : `HTTP ${updateResponse.status}`;
+                console.error('Google Calendar API update_event failed:', errDetail);
+                return new Response(JSON.stringify({
+                    success: false,
+                    error: `Google Calendar Update: ${errDetail}`,
+                }), {
+                    status: 200,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+            }
+
+            // If we have a CRM follow_up linked to this google_event_id, update its notes/dates
+            const { data: followUps } = await supabase
+                .from('follow_ups')
+                .select('id')
+                .eq('google_event_id', event_id);
+                
+            if (followUps && followUps.length > 0) {
+                const followUpIds = followUps.map(f => f.id);
+                await supabase
+                    .from('follow_ups')
+                    .update({
+                        date: event.start,
+                        notes: event.description || '',
+                    })
+                    .in( 'id', followUpIds);
+            }
+
+            return new Response(JSON.stringify({
+                success: true,
+                event: updatedEvent,
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+        }
+
         throw new Error('Invalid action');
 
     } catch (error: any) {
