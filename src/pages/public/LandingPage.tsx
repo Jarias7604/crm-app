@@ -133,16 +133,16 @@ const BrandIcon = ({ name }: { name: string }) => {
 };
 
 const Tick = () => (
-  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/10 text-emerald-400">
-    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+  <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-400">
+    <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
     </svg>
   </span>
 );
 
 const Cross = () => (
-  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-500/10 text-slate-600">
-    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+  <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-red-500/15 text-red-400">
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
     </svg>
   </span>
@@ -962,71 +962,436 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─── PRICING WITH CLASSIC CAPSULE TOGGLE ────────────────────────────────── */}
-      <section id="pricing" className="py-28 scroll-mt-20 border-b border-white/[0.05]">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 mb-14">
-            <div>
-              <span className="text-xs font-black text-indigo-600 uppercase tracking-[0.25em] mb-4 block">Precios Transparentes</span>
-              <h2 className="text-4xl font-black text-white leading-tight">Planes simples.<br />Sin cargos ocultos.</h2>
-            </div>
-
-            {/* Restored capsule selector exactly as requested */}
-            <div className="inline-flex items-center gap-1.5 bg-white/5 rounded-full p-1.5 border border-white/10">
-              <button
-                onClick={() => setAnnual(true)}
-                className={`px-5 py-2 rounded-full text-xs font-black transition-all ${annual ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
-              >
-                Anual — 20% off
-              </button>
-              <button
-                onClick={() => setAnnual(false)}
-                className={`px-5 py-2 rounded-full text-xs font-black transition-all ${!annual ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
-              >
-                Mensual
-              </button>
-            </div>
+      {/* ─── PRICING COMPARISON MATRIX (Inspired by respond.io Pricing Grid) ─── */}
+      <section id="pricing" className="py-28 bg-[#07070d] border-b border-white/[0.05] scroll-mt-20">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center mb-16">
+            <span className="text-xs font-black text-indigo-400 uppercase tracking-[0.25em] mb-4 block">Comparativa Premium</span>
+            <h2 className="text-4xl lg:text-5xl font-black text-white leading-tight">
+              Encuentra el plan perfecto para tu equipo
+            </h2>
+            <p className="text-slate-400 mt-4 max-w-xl mx-auto text-sm">
+              Compara detalladamente las características y descubre por qué Arias CRM es la mejor alternativa integrada del mercado.
+            </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 items-start">
-            {PLANS.map(plan => {
-              const price = annual ? plan.annual : plan.monthly;
-              return (
-                <div key={plan.name} className={`rounded-3xl p-8 border transition-all bg-white/[0.01] ${plan.pop ? 'border-indigo-500 shadow-2xl shadow-indigo-600/10 relative' : 'border-white/10'}`}>
-                  {plan.pop && (
-                    <span className="absolute -top-3 left-6 text-[10px] font-black bg-indigo-600 text-white px-3 py-1 rounded-full uppercase tracking-widest shadow">Popular</span>
-                  )}
-                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">{plan.name}</p>
-                  <div className="flex items-baseline gap-1 mb-3">
-                    <span className="text-5xl font-black text-white tracking-tight">${price}</span>
-                    <span className="text-slate-500 text-sm font-semibold">/mo</span>
-                  </div>
-                  {annual && (
-                    <p className="text-[11px] text-emerald-400 mb-6 font-semibold">Facturado ${price*12}/año · Ahorras ${(plan.monthly-plan.annual)*12}/año</p>
-                  )}
-                  <p className="text-xs text-slate-400 leading-relaxed mb-6">{plan.desc}</p>
-                  <button onClick={() => navigate('/register')} className={`w-full text-xs font-black py-3 rounded-xl mb-8 transition-all ${plan.pop ? 'bg-indigo-600 hover:bg-indigo-500 text-white' : 'bg-white/5 hover:bg-white/10 text-white border border-white/10'}`}>
-                    Prueba 14 días gratis
+          {/* Pricing Grid & Table Wrapper */}
+          <div className="bg-[#0b0b18]/40 border border-white/10 rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(99,102,241,0.05)]">
+            
+            {/* 1. Header Control Panel */}
+            <div className="p-8 border-b border-white/10 bg-[#0c0c1b]/60 flex flex-col md:flex-row justify-between items-center gap-6">
+              <div className="flex items-center gap-4">
+                <span className="text-sm font-black text-white uppercase tracking-wider">Comparar Planes</span>
+                
+                {/* Yearly / Monthly Toggle Switch */}
+                <div className="inline-flex items-center gap-1 bg-white/5 rounded-full p-1 border border-white/10">
+                  <button
+                    onClick={() => setAnnual(true)}
+                    className={`px-4 py-1.5 rounded-full text-[10px] font-black transition-all ${
+                      annual ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Anual (20% OFF)
                   </button>
-                  <ul className="space-y-4">
-                    <li className="flex items-start gap-2.5 text-xs text-slate-300">
-                      <CheckCircle2 className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-                      <span>Hasta <strong>{plan.users}</strong> asesores integrados</span>
+                  <button
+                    onClick={() => setAnnual(false)}
+                    className={`px-4 py-1.5 rounded-full text-[10px] font-black transition-all ${
+                      !annual ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Mensual
+                  </button>
+                </div>
+              </div>
+
+              <div className="text-xs text-slate-500 font-medium">
+                🚀 Prueba gratis por 14 días · Sin tarjetas · Configuración en 5 minutos
+              </div>
+            </div>
+
+            {/* 2. Scrollable Table Container */}
+            <div className="overflow-x-auto lg:overflow-visible">
+              <table className="w-full min-w-[900px] border-collapse text-left">
+                {/* Plan Header row */}
+                <thead>
+                  <tr>
+                    {/* Characteristics Header */}
+                    <th className="lg:sticky lg:top-[96px] z-30 lg:bg-[#07070d]/95 lg:backdrop-blur-md p-6 text-sm font-black text-slate-500 uppercase tracking-widest w-[30%] border-b border-white/10">
+                      Características
+                    </th>
+                    
+                    {/* Starter Header */}
+                    <th className="lg:sticky lg:top-[96px] z-30 lg:bg-[#07070d]/95 lg:backdrop-blur-md p-6 text-center w-[17.5%] border-r border-b border-white/10">
+                      <p className="text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Starter</p>
+                      <div className="flex items-baseline justify-center gap-0.5 mb-4">
+                        <span className="text-3xl font-black text-white">${annual ? 49 : 65}</span>
+                        <span className="text-[10px] text-slate-500">/mes</span>
+                      </div>
+                      <button onClick={() => navigate('/register')} className="w-full bg-white/5 hover:bg-white/10 text-white border border-white/10 text-[10px] font-bold py-2 rounded-xl transition-all">
+                        Iniciar Prueba
+                      </button>
+                    </th>
+
+                    {/* Growth Header (Highlighted) */}
+                    <th className="lg:sticky lg:top-[96px] z-30 lg:bg-[#0c0c22]/95 lg:backdrop-blur-md p-6 text-center w-[20%] border-x border-b border-indigo-500/25 relative shadow-[0_4px_30px_rgba(99,102,241,0.08)]">
+                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-[8px] font-black bg-indigo-600 text-white px-2.5 py-1 rounded-full uppercase tracking-widest shadow-md">
+                        Recomendado
+                      </span>
+                      <p className="text-xs font-black text-indigo-400 uppercase tracking-wider mb-2 mt-1">Growth</p>
+                      <div className="flex items-baseline justify-center gap-0.5 mb-4">
+                        <span className="text-3xl font-black text-emerald-400">${annual ? 99 : 129}</span>
+                        <span className="text-[10px] text-slate-500">/mes</span>
+                      </div>
+                      <button onClick={() => navigate('/register')} className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[10px] font-black py-2 rounded-xl transition-all shadow-lg shadow-emerald-500/10">
+                        Iniciar Prueba
+                      </button>
+                    </th>
+
+                    {/* Pro Header */}
+                    <th className="lg:sticky lg:top-[96px] z-30 lg:bg-[#07070d]/95 lg:backdrop-blur-md p-6 text-center w-[17.5%] border-x border-b border-white/10">
+                      <p className="text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Pro</p>
+                      <div className="flex items-baseline justify-center gap-0.5 mb-4">
+                        <span className="text-3xl font-black text-white">${annual ? 159 : 199}</span>
+                        <span className="text-[10px] text-slate-500">/mes</span>
+                      </div>
+                      <button onClick={() => navigate('/register')} className="w-full bg-white/5 hover:bg-white/10 text-white border border-white/10 text-[10px] font-bold py-2 rounded-xl transition-all">
+                        Iniciar Prueba
+                      </button>
+                    </th>
+
+                    {/* Enterprise Header */}
+                    <th className="lg:sticky lg:top-[96px] z-30 lg:bg-[#07070d]/95 lg:backdrop-blur-md p-6 text-center w-[15%] border-b border-white/10">
+                      <p className="text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Enterprise</p>
+                      <div className="flex items-baseline justify-center gap-0.5 mb-4 h-9 items-center">
+                        <span className="text-sm font-black text-indigo-300 uppercase tracking-wider">Personalizado</span>
+                      </div>
+                      <button onClick={() => navigate('/register')} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold py-2 rounded-xl transition-all">
+                        Contactar
+                      </button>
+                    </th>
+                  </tr>
+                </thead>
+
+                {/* Table Body Content */}
+                <tbody>
+                  
+                  {/* CATEGORY 1: CAPACIDAD Y USO */}
+                  <tr className="bg-white/[0.02] border-b border-white/5">
+                    <td colSpan={5} className="p-5 pl-6 text-xs lg:text-sm font-black text-indigo-400 uppercase tracking-[0.2em]">
+                      Capacidad y Uso
+                    </td>
+                  </tr>
+
+                  <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
+                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Asesores Incluidos</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">3 asesores</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-emerald-400 font-extrabold bg-indigo-500/[0.03] border-x border-indigo-500/20">8 asesores</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">15 asesores</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-indigo-300 font-extrabold">Ilimitados</td>
+                  </tr>
+
+                  <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
+                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Contactos en CRM</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">Ilimitados</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-emerald-400 font-extrabold bg-indigo-500/[0.03] border-x border-indigo-500/20">Ilimitados</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">Ilimitados</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-indigo-300 font-extrabold">Personalizado</td>
+                  </tr>
+
+                  <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
+                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Workspaces Multi-Empresa</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">1 workspace</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 bg-indigo-500/[0.03] border-x border-indigo-500/20">3 workspaces</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">10 workspaces</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-indigo-300 font-extrabold">Ilimitados</td>
+                  </tr>
+
+                  {/* CATEGORY 2: CANALES INCLUIDOS */}
+                  <tr className="bg-white/[0.02] border-b border-white/5">
+                    <td colSpan={5} className="p-5 pl-6 text-xs lg:text-sm font-black text-indigo-400 uppercase tracking-[0.2em]">
+                      Canales Oficiales
+                    </td>
+                  </tr>
+
+                  <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
+                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold flex items-center gap-2.5">
+                      <BrandIcon name="WhatsApp" /> WhatsApp API Oficial
+                    </td>
+                    <td className="p-6 text-center border-r border-white/5"><Tick /></td>
+                    <td className="p-6 text-center bg-indigo-500/[0.03] border-x border-indigo-500/20"><Tick /></td>
+                    <td className="p-6 text-center border-r border-white/5"><Tick /></td>
+                    <td className="p-6 text-center"><Tick /></td>
+                  </tr>
+
+                  <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
+                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold flex items-center gap-2.5">
+                      <BrandIcon name="Instagram" /> Instagram Direct
+                    </td>
+                    <td className="p-6 text-center border-r border-white/5"><Tick /></td>
+                    <td className="p-6 text-center bg-indigo-500/[0.03] border-x border-indigo-500/20"><Tick /></td>
+                    <td className="p-6 text-center border-r border-white/5"><Tick /></td>
+                    <td className="p-6 text-center"><Tick /></td>
+                  </tr>
+
+                  <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
+                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold flex items-center gap-2.5">
+                      <BrandIcon name="Facebook" /> Facebook Messenger
+                    </td>
+                    <td className="p-6 text-center border-r border-white/5"><Tick /></td>
+                    <td className="p-6 text-center bg-indigo-500/[0.03] border-x border-indigo-500/20"><Tick /></td>
+                    <td className="p-6 text-center border-r border-white/5"><Tick /></td>
+                    <td className="p-6 text-center"><Tick /></td>
+                  </tr>
+
+                  <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
+                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold flex items-center gap-2.5">
+                      <BrandIcon name="TikTok" /> TikTok Leads API
+                    </td>
+                    <td className="p-6 text-center border-r border-white/5"><Cross /></td>
+                    <td className="p-6 text-center bg-indigo-500/[0.03] border-x border-indigo-500/20"><Tick /></td>
+                    <td className="p-6 text-center border-r border-white/5"><Tick /></td>
+                    <td className="p-6 text-center"><Tick /></td>
+                  </tr>
+
+                  <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
+                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold flex items-center gap-2.5">
+                      <BrandIcon name="Telegram" /> Telegram Bot
+                    </td>
+                    <td className="p-6 text-center border-r border-white/5"><Tick /></td>
+                    <td className="p-6 text-center bg-indigo-500/[0.03] border-x border-indigo-500/20"><Tick /></td>
+                    <td className="p-6 text-center border-r border-white/5"><Tick /></td>
+                    <td className="p-6 text-center"><Tick /></td>
+                  </tr>
+
+                  {/* CATEGORY 3: AI & AUTOMATIZACION */}
+                  <tr className="bg-white/[0.02] border-b border-white/5">
+                    <td colSpan={5} className="p-5 pl-6 text-[10px] font-black text-indigo-400 uppercase tracking-widest">
+                      AI & Automatización
+                    </td>
+                  </tr>
+
+                  <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
+                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">AI Sales Agent Bot</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">1 bot activo</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-emerald-400 font-extrabold bg-indigo-500/[0.03] border-x border-indigo-500/20">Bots Ilimitados</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">Bots Ilimitados</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-indigo-300 font-bold">Bots Dedicados</td>
+                  </tr>
+
+                  <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
+                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Cotizador PDF Profesional</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">Básico</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-emerald-400 font-extrabold bg-indigo-500/[0.03] border-x border-indigo-500/20">Avanzado + Logo</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">Avanzado + Multi-moneda</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-indigo-300 font-bold">API de Cotización</td>
+                  </tr>
+
+                  <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
+                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Lead Hunter (Google Maps)</td>
+                    <td className="p-6 text-center border-r border-white/5"><Cross /></td>
+                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 bg-indigo-500/[0.03] border-x border-indigo-500/20">✓ (500 leads/min)</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">✓ (Ilimitado)</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-indigo-300 font-bold">✓ (Ilimitado)</td>
+                  </tr>
+
+                  <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
+                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Flyer Studio con IA</td>
+                    <td className="p-6 text-center border-r border-white/5"><Cross /></td>
+                    <td className="p-6 text-center bg-indigo-500/[0.03] border-x border-indigo-500/20"><Tick /></td>
+                    <td className="p-6 text-center border-r border-white/5"><Tick /></td>
+                    <td className="p-6 text-center"><Tick /></td>
+                  </tr>
+
+                  <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
+                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Workflows Automatizados</td>
+                    <td className="p-6 text-center border-r border-white/5"><Cross /></td>
+                    <td className="p-6 text-center bg-indigo-500/[0.03] border-x border-indigo-500/20"><Cross /></td>
+                    <td className="p-6 text-center border-r border-white/5"><Tick /></td>
+                    <td className="p-6 text-center"><Tick /></td>
+                  </tr>
+
+                  {/* CATEGORY 4: SOPORTE Y GARANTIAS */}
+                  <tr className="bg-white/[0.02] border-b border-white/5">
+                    <td colSpan={5} className="p-5 pl-6 text-[10px] font-black text-indigo-400 uppercase tracking-widest">
+                      Soporte y Garantías
+                    </td>
+                  </tr>
+
+                  <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
+                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Canal de Soporte</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">Email</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-emerald-400 font-extrabold bg-indigo-500/[0.03] border-x border-indigo-500/20">WhatsApp + Email</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">Soporte 24/7</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-indigo-300 font-bold">SLA Dedicado 24/7</td>
+                  </tr>
+
+                  <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
+                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Onboarding</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">Documentación</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 bg-indigo-500/[0.03] border-x border-indigo-500/20">Guiado</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">1-a-1 Dedicado</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-indigo-300 font-bold">1-a-1 Dedicado</td>
+                  </tr>
+
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+
+          {/* ─── DIRECT COMPETITOR VALUE COMPARISON MATRIX (Arias CRM vs HubSpot vs respond.io) ─── */}
+          <div className="mt-24 border-t border-white/10 pt-20">
+            <div className="text-center mb-16">
+              <span className="text-xs font-black text-emerald-400 uppercase tracking-[0.25em] mb-4 block">
+                ¿Por qué pagar miles de dólares de más?
+              </span>
+              <h3 className="text-3xl lg:text-4xl font-black text-white leading-tight">
+                Comparativa Real de Valor y Capacidades
+              </h3>
+              <p className="text-slate-400 mt-4 max-w-2xl mx-auto text-sm">
+                Analiza de forma honesta el costo y las prestaciones de las tres alternativas líderes. Arias CRM te ofrece el stack de ventas completo de alta gama a una fracción de su costo ordinario.
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-8 items-stretch">
+              
+              {/* Competitor 1: HubSpot CRM */}
+              <div className="bg-[#0b0b18]/25 border border-white/5 rounded-3xl p-8 flex flex-col justify-between hover:border-white/10 transition-all group">
+                <div>
+                  <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-6">
+                    <span className="text-base font-black text-slate-500 uppercase tracking-widest">HubSpot CRM</span>
+                    <span className="text-[9px] bg-red-500/10 text-red-400 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">
+                      Muy Costoso
+                    </span>
+                  </div>
+                  
+                  <p className="text-xs text-slate-400 leading-relaxed mb-6">
+                    El software tradicional corporativo. Excelente reputación, pero requiere pagar miles de dólares en módulos separados, cobra extra por cada asesor y te bloquea en contratos anuales.
+                  </p>
+
+                  <ul className="space-y-4 mb-8">
+                    <li className="flex items-start gap-3 text-xs text-slate-400">
+                      <Cross />
+                      <span><strong>$890/mes</strong> (Plan Professional base para equipo chico)</span>
                     </li>
-                    <li className="flex items-start gap-2.5 text-xs text-slate-300">
-                      <CheckCircle2 className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
-                      <span><strong>Contactos ilimitados</strong> en CRM</span>
+                    <li className="flex items-start gap-3 text-xs text-slate-400">
+                      <Cross />
+                      <span><strong>Cobro extra por contacto</strong> (marketing vs comercial)</span>
                     </li>
-                    {plan.features.map(f => (
-                      <li key={f} className="flex items-start gap-2.5 text-xs text-slate-500">
-                        <CheckCircle2 className="w-4 h-4 text-slate-700 shrink-0 mt-0.5" />
-                        <span>{f}</span>
-                      </li>
-                    ))}
+                    <li className="flex items-start gap-3 text-xs text-slate-400">
+                      <Cross />
+                      <span><strong>Sin cotizador PDF profesional</strong> integrado por defecto</span>
+                    </li>
+                    <li className="flex items-start gap-3 text-xs text-slate-400">
+                      <Cross />
+                      <span><strong>Sin extractor de Google Maps</strong> (requiere software externo)</span>
+                    </li>
+                    <li className="flex items-start gap-3 text-xs text-slate-400">
+                      <Cross />
+                      <span><strong>Contratos anuales forzosos</strong> y cargos de onboarding</span>
+                    </li>
                   </ul>
                 </div>
-              );
-            })}
+
+                <div className="border-t border-white/5 pt-6 text-center">
+                  <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Costo Anual Estimado:</p>
+                  <p className="text-3xl font-black text-slate-300 mt-1.5">$10,680+ USD</p>
+                </div>
+              </div>
+
+              {/* The Champion: Arias CRM */}
+              <div className="bg-[#0c0c24]/50 border-2 border-indigo-500 rounded-3xl p-8 flex flex-col justify-between relative shadow-[0_0_50px_rgba(99,102,241,0.15)] hover:scale-[1.03] transition-all group">
+                <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-[9px] font-black bg-indigo-600 text-white px-3 py-1 rounded-full uppercase tracking-widest shadow-md">
+                  La Mejor Inversión
+                </span>
+                
+                <div>
+                  <div className="flex items-center justify-between border-b border-indigo-500/25 pb-4 mb-6">
+                    <span className="text-base font-black text-indigo-400 uppercase tracking-widest">Arias CRM</span>
+                    <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-2.5 py-1 rounded-full font-black uppercase tracking-wider">
+                      Todo Incluido
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-slate-300 leading-relaxed mb-6 font-medium">
+                    Ofrecemos la suite completa sin parches externos. Inbox unificado omnicanal, cotizador profesional interactivo, extractor de leads de Google Maps ilimitado y Flyer Studio con IA.
+                  </p>
+
+                  <ul className="space-y-4 mb-8">
+                    <li className="flex items-start gap-3 text-xs text-slate-200">
+                      <Tick />
+                      <span><strong>$65/mes</strong> (Tarifa única plana sin cargos ocultos)</span>
+                    </li>
+                    <li className="flex items-start gap-3 text-xs text-slate-200">
+                      <Tick />
+                      <span><strong>Contactos e Ingestión Ilimitada</strong> gratis</span>
+                    </li>
+                    <li className="flex items-start gap-3 text-xs text-slate-200">
+                      <Tick />
+                      <span><strong>Lead Hunter de Google Maps</strong> gratis integrado</span>
+                    </li>
+                    <li className="flex items-start gap-3 text-xs text-slate-200">
+                      <Tick />
+                      <span><strong>Cotizador interactivo y PDF</strong> con tu propia marca</span>
+                    </li>
+                    <li className="flex items-start gap-3 text-xs text-slate-200">
+                      <Tick />
+                      <span><strong>Cancela cuando quieras</strong>, sin contratos obligatorios</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="border-t border-indigo-500/20 pt-6 text-center">
+                  <p className="text-xs text-indigo-300 font-semibold uppercase tracking-wider">Costo Anual Fijo:</p>
+                  <p className="text-4xl font-black text-emerald-400 mt-1.5">$780 USD</p>
+                </div>
+              </div>
+
+              {/* Competitor 3: Respond.io */}
+              <div className="bg-[#0b0b18]/25 border border-white/5 rounded-3xl p-8 flex flex-col justify-between hover:border-white/10 transition-all group">
+                <div>
+                  <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-6">
+                    <span className="text-base font-black text-slate-500 uppercase tracking-widest">Respond.io</span>
+                    <span className="text-[9px] bg-amber-500/10 text-amber-400 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">
+                      Inbox Limitado
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-slate-400 leading-relaxed mb-6">
+                    Excelente bandeja omnicanal para chats, pero carece por completo de base de datos CRM avanzada, procesos de cierre de ventas, cotizaciones o captación B2B en frío.
+                  </p>
+
+                  <ul className="space-y-4 mb-8">
+                    <li className="flex items-start gap-3 text-xs text-slate-400">
+                      <Cross />
+                      <span><strong>$99/mes</strong> (Plan básico con límite de solo 5 asesores)</span>
+                    </li>
+                    <li className="flex items-start gap-3 text-xs text-slate-400">
+                      <Cross />
+                      <span><strong>Límite estricto de contactos</strong> mensuales activos</span>
+                    </li>
+                    <li className="flex items-start gap-3 text-xs text-slate-400">
+                      <Cross />
+                      <span><strong>Sin cotizaciones ni facturación</strong> comercial integrada</span>
+                    </li>
+                    <li className="flex items-start gap-3 text-xs text-slate-400">
+                      <Cross />
+                      <span><strong>Sin generadores ni extractores</strong> de leads fríos</span>
+                    </li>
+                    <li className="flex items-start gap-3 text-xs text-slate-400">
+                      <Cross />
+                      <span><strong>Costos adicionales</strong> por volumen de mensajes activos</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="border-t border-white/5 pt-6 text-center">
+                  <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Costo Anual Base:</p>
+                  <p className="text-3xl font-black text-slate-300 mt-1.5">$1,188+ USD</p>
+                </div>
+              </div>
+
+            </div>
           </div>
         </div>
       </section>
