@@ -5,7 +5,7 @@ import { es } from 'date-fns/locale';
 import {
     X, Video, Calendar, Clock, Users, Mail, Copy,
     ExternalLink, Check, Loader2, AlertCircle, Link2,
-    ChevronDown, Plus, Globe
+    ChevronDown, Plus, Globe, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { leadsService } from '../services/leads';
@@ -99,6 +99,63 @@ export default function GoogleMeetScheduler({
         meet_link: string | null;
         html_link: string;
     } | null>(null);
+
+    // Custom modern Spanish Date Picker States
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [currentMonth, setCurrentMonth] = useState(() => parseISO(format(initialDate || new Date(), 'yyyy-MM-dd')));
+
+    const MONTH_NAMES = [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+    const WEEKDAY_NAMES = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'];
+
+    const calendarDays = useMemo(() => {
+        const refMonth = currentMonth;
+        const startOfCurMonth = new Date(refMonth.getFullYear(), refMonth.getMonth(), 1);
+        const endOfCurMonth = new Date(refMonth.getFullYear(), refMonth.getMonth() + 1, 0);
+        
+        const daysInMonth = endOfCurMonth.getDate();
+        const startDayOfWeek = startOfCurMonth.getDay(); // 0 = Sunday
+        
+        const days: Array<{ dateStr: string; dayNum: number; isCurrentMonth: boolean }> = [];
+        
+        // Prev month padding
+        const prevMonthEnd = new Date(refMonth.getFullYear(), refMonth.getMonth(), 0);
+        const prevDaysCount = prevMonthEnd.getDate();
+        for (let i = startDayOfWeek - 1; i >= 0; i--) {
+            const d = prevDaysCount - i;
+            const prevDate = new Date(refMonth.getFullYear(), refMonth.getMonth() - 1, d);
+            days.push({
+                dateStr: format(prevDate, 'yyyy-MM-dd'),
+                dayNum: d,
+                isCurrentMonth: false
+            });
+        }
+        
+        // Current month days
+        for (let i = 1; i <= daysInMonth; i++) {
+            const curDate = new Date(refMonth.getFullYear(), refMonth.getMonth(), i);
+            days.push({
+                dateStr: format(curDate, 'yyyy-MM-dd'),
+                dayNum: i,
+                isCurrentMonth: true
+            });
+        }
+        
+        // Next month padding
+        const remaining = 42 - days.length;
+        for (let i = 1; i <= remaining; i++) {
+            const nextDate = new Date(refMonth.getFullYear(), refMonth.getMonth() + 1, i);
+            days.push({
+                dateStr: format(nextDate, 'yyyy-MM-dd'),
+                dayNum: i,
+                isCurrentMonth: false
+            });
+        }
+        
+        return days;
+    }, [currentMonth]);
 
     // Check if user has Google Calendar connected
     const { data: googleIntegration, isLoading: checkingIntegration } = useQuery({
@@ -425,13 +482,97 @@ Reunión programada automáticamente desde Arias CRM.`;
                                 Fecha
                             </label>
                             <div className="relative">
-                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                                <input
-                                    type="date"
-                                    value={date}
-                                    onChange={e => setDate(e.target.value)}
-                                    className="w-full pl-9 pr-3 py-3 rounded-xl border border-gray-200 focus:border-[#4285F4] focus:ring-2 focus:ring-[#4285F4]/20 outline-none text-sm font-semibold text-gray-800 transition-all"
-                                />
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        try {
+                                            setCurrentMonth(parseISO(date));
+                                        } catch (e) {
+                                            setCurrentMonth(new Date());
+                                        }
+                                        setShowDatePicker(!showDatePicker);
+                                    }}
+                                    className="w-full pl-9 pr-4 py-3 rounded-xl border border-gray-200 focus:border-[#4285F4] focus:ring-2 focus:ring-[#4285F4]/20 outline-none text-sm font-semibold text-gray-800 text-left bg-white transition-all flex items-center gap-2 shadow-sm hover:border-gray-300"
+                                >
+                                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                    {(() => {
+                                        try {
+                                            return format(parseISO(date), "d 'de' MMMM, yyyy", { locale: es });
+                                        } catch (e) {
+                                            return date;
+                                        }
+                                    })()}
+                                </button>
+
+                                {showDatePicker && (
+                                    <>
+                                        {/* Click outside backdrop */}
+                                        <div className="fixed inset-0 z-40 cursor-default" onClick={() => setShowDatePicker(false)} />
+                                        
+                                        {/* Modern Date Picker Popover */}
+                                        <div className="absolute top-[105%] left-0 z-50 w-[290px] bg-white rounded-2xl shadow-2xl border border-slate-100 p-4 animate-in fade-in slide-in-from-top-2 duration-150">
+                                            {/* Header Navigation */}
+                                            <div className="flex items-center justify-between mb-3.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
+                                                    className="p-1.5 rounded-xl hover:bg-slate-50 text-slate-500 transition-colors"
+                                                >
+                                                    <ChevronLeft className="w-4 h-4" />
+                                                </button>
+                                                <span className="text-[11px] font-black text-slate-800 uppercase tracking-wider">
+                                                    {MONTH_NAMES[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
+                                                    className="p-1.5 rounded-xl hover:bg-slate-50 text-slate-500 transition-colors"
+                                                >
+                                                    <ChevronRight className="w-4 h-4" />
+                                                </button>
+                                            </div>
+
+                                            {/* Weekdays Grid */}
+                                            <div className="grid grid-cols-7 gap-1 text-center mb-1.5">
+                                                {WEEKDAY_NAMES.map(w => (
+                                                    <span key={w} className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                                                        {w}
+                                                    </span>
+                                                ))}
+                                            </div>
+
+                                            {/* Days Grid */}
+                                            <div className="grid grid-cols-7 gap-1">
+                                                {calendarDays.map((d, idx) => {
+                                                    const isSelected = d.dateStr === date;
+                                                    const isToday = d.dateStr === format(new Date(), 'yyyy-MM-dd');
+                                                    return (
+                                                        <button
+                                                            key={idx}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setDate(d.dateStr);
+                                                                setShowDatePicker(false);
+                                                            }}
+                                                            className={`py-1.5 rounded-xl text-[11px] font-bold transition-all relative ${
+                                                                isSelected
+                                                                    ? 'bg-[#4285F4] text-white shadow-md shadow-[#4285F4]/30'
+                                                                    : d.isCurrentMonth
+                                                                        ? 'text-slate-700 hover:bg-slate-50'
+                                                                        : 'text-slate-300 hover:bg-slate-50/50'
+                                                            }`}
+                                                        >
+                                                            {d.dayNum}
+                                                            {isToday && !isSelected && (
+                                                                <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[#4285F4]" />
+                                                            )}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
                         <div>
