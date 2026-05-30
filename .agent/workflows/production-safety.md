@@ -86,6 +86,21 @@ Si la URL no coincide con un proyecto de la tabla → cerrar esa pestaña.
 
 ---
 
+## REGLA 7 — Mantener Edición e Inserción Nativa de Google Calendar y Botones Explícitos
+
+**PROHIBIDO:** 
+1. Revertir la edición nativa del CRM y reemplazarla con enlaces externos como `✏️ Editar en Google` para sacar al usuario de la aplicación.
+2. Reintroducir el interruptor o switch de *"Notificar asistentes"* dentro del formulario del programador, ya que satura la UI y causa confusión sobre si se enviará correo o no.
+
+**OBLIGATORIO:**
+- Mantener la edición e inserción **100% nativa** en el CRM utilizando el componente `GoogleMeetScheduler` y el endpoint `update_event` de la Edge Function `google-calendar-sync`.
+- El pie de página (footer) de `GoogleMeetScheduler` debe presentar siempre las **opciones de acción explícitas de un solo clic** para evitar errores:
+  - **Botón "Solo Guardar" / "Solo Agendar":** Llama a la mutación pasando `false` para guardar/agendar el evento en Google Calendar sin enviar invitaciones.
+  - **Botón "Guardar y Notificar" / "Crear y Notificar":** Llama a la mutación pasando `true` para guardar/crear el evento y gatillar automáticamente los correos de invitación desde Google Calendar.
+- Desplegar la Edge Function `google-calendar-sync` siempre con el flag `--no-verify-jwt` para evitar bloqueos por falta de sesión del navegador en los procesos de sincronización en segundo plano.
+
+---
+
 ## Historial de incidentes
 
 | Fecha | Causa | Horas perdidas | Regla que lo previene |
@@ -93,3 +108,4 @@ Si la URL no coincide con un proyecto de la tabla → cerrar esa pestaña.
 | 2026-05-15 | RPC `set_autonomy_level` sin función SQL | ~5 horas | Regla 1 |
 | 2026-05-15 | Navegó a proyecto `ikofyypxphrqkncimszt` incorrecto | incluidas arriba | Regla 6 |
 | 2026-05-08 | `ai_score` en SELECT sin existir en prod | desconocido | Regla 3 |
+| 2026-05-30 | Enlace externo a Google Calendar para editar reuniones | Varias horas | Regla 7 |
