@@ -141,7 +141,7 @@ export default function GoogleMeetScheduler({
         return true;
     });
 
-    const [sendInvites, setSendInvites] = useState(true);
+    const [sendInvites] = useState(true);
     const [copied, setCopied] = useState(false);
     const [createdMeet, setCreatedMeet] = useState<{
         meet_link: string | null;
