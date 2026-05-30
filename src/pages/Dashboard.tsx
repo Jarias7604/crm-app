@@ -2260,24 +2260,39 @@ export default function Dashboard() {
                             }));
 
                             const totalLost = stageLossData.reduce((sum, s) => sum + s.count, 0);
+                            const displayedStages = stageLossData.slice(0, 5);
 
                             return totalLost > 0 ? (
-                                stageLossData.map((item, index) => (
-                                    <div
-                                        key={index}
-                                        className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-all cursor-pointer group/item"
-                                        onClick={() => navigate('/leads', { state: { status: 'Perdido', lostAtStage: item.stage, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
-                                    >
-                                        <div className={`w-3 h-3 rounded-full ${item.color} shadow-sm group-hover/item:scale-125 transition-transform`} />
-                                        <div className="flex-1">
-                                            <p className="text-xs font-black text-slate-700 group-hover/item:text-indigo-600 transition-colors">{item.stage}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-sm font-black text-red-600">{item.count}</p>
-                                            <p className="text-[8px] font-black text-slate-300 uppercase">Perdidos</p>
-                                        </div>
+                                <>
+                                    <div className="space-y-1.5 flex-grow">
+                                        {displayedStages.map((item, index) => (
+                                            <div
+                                                key={index}
+                                                className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-all cursor-pointer group/item"
+                                                onClick={() => navigate('/leads', { state: { status: 'Perdido', lostAtStage: item.stage, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
+                                            >
+                                                <div className={`w-3 h-3 rounded-full ${item.color} shadow-sm group-hover/item:scale-125 transition-transform`} />
+                                                <div className="flex-1">
+                                                    <p className="text-xs font-black text-slate-700 group-hover/item:text-indigo-600 transition-colors">{item.stage}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-sm font-black text-red-600">{item.count}</p>
+                                                    <p className="text-[8px] font-black text-slate-300 uppercase">Perdidos</p>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))
+                                    {stageLossData.length > 5 && (
+                                        <div className="pt-2 border-t border-slate-100 mt-auto">
+                                            <button
+                                                onClick={() => navigate('/leads', { state: { status: 'Perdido', startDate: dateRange.startDate, endDate: dateRange.endDate } })}
+                                                className="w-full text-center py-2 text-[9px] font-black text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50/50 rounded-xl transition-all border border-indigo-100/50 uppercase tracking-widest"
+                                            >
+                                                Ver todos los leads perdidos →
+                                            </button>
+                                        </div>
+                                    )}
+                                </>
                             ) : (
                                 <div className="h-full flex flex-col items-center justify-center py-12 opacity-30">
                                     <CheckCircle className="w-10 h-10 mb-2 text-green-400" />
@@ -2343,7 +2358,7 @@ export default function Dashboard() {
 
                             const totalReasonsCount = reasonData.reduce((sum, r) => sum + r.count, 0);
                             const filteredReasons = reasonData.filter(r => r.count > 0);
-                            const displayedReasons = showAllLossReasons ? filteredReasons : filteredReasons.slice(0, 6);
+                            const displayedReasons = filteredReasons.slice(0, 5);
 
                             return totalReasonsCount > 0 ? (
                                 <>
@@ -2370,16 +2385,15 @@ export default function Dashboard() {
                                             </div>
                                         ))}
                                     </div>
-                                    {filteredReasons.length > 6 && (
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setShowAllLossReasons(!showAllLossReasons);
-                                            }}
-                                            className="w-full text-center py-2 text-[9px] font-black text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50/50 rounded-xl transition-all border border-indigo-100/50 mt-2 uppercase tracking-widest"
-                                        >
-                                            {showAllLossReasons ? 'Ver menos ↑' : `Ver más (${filteredReasons.length - 6} más) ↓`}
-                                        </button>
+                                    {filteredReasons.length > 5 && (
+                                        <div className="pt-2 border-t border-slate-100 mt-auto">
+                                            <button
+                                                onClick={() => navigate('/leads', { state: { status: 'Perdido', startDate: dateRange.startDate, endDate: dateRange.endDate } })}
+                                                className="w-full text-center py-2 text-[9px] font-black text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50/50 rounded-xl transition-all border border-indigo-100/50 uppercase tracking-widest"
+                                            >
+                                                Ver todos los motivos de pérdida →
+                                            </button>
+                                        </div>
                                     )}
                                 </>
                             ) : (
