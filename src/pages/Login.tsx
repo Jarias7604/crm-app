@@ -114,41 +114,41 @@ export default function Login() {
     return (
         <div className="space-y-6">
             <div className="text-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">{t('auth.loginTitle')}</h2>
-                <p className="mt-1 text-sm text-gray-500">{t('auth.loginSubtitle')}</p>
+                <h2 className="text-2xl font-black text-white">{t('auth.loginTitle')}</h2>
+                <p className="mt-1.5 text-xs text-slate-400">{t('auth.loginSubtitle')}</p>
             </div>
 
-            {/* Toggle Modes */}
-            <div className="flex bg-gray-100 p-1 rounded-xl mb-6">
+            {/* Toggle Modes - Premium Dark Theme */}
+            <div className="flex bg-slate-900 border border-white/5 p-1 rounded-xl mb-6">
                 <button
-                    className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg transition-all ${loginMode === 'password' ? 'bg-white shadow-sm text-indigo-700' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-all ${loginMode === 'password' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/10' : 'text-slate-400 hover:text-slate-200'}`}
                     onClick={() => { setLoginMode('password'); setError(null); }}
                 >
-                    <KeyRound className="w-4 h-4" />
+                    <KeyRound className="w-3.5 h-3.5" />
                     Contraseña
                 </button>
                 <button
-                    className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-lg transition-all ${loginMode === 'otp' ? 'bg-white shadow-sm text-indigo-700' : 'text-gray-500 hover:text-gray-700'}`}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-all ${loginMode === 'otp' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/10' : 'text-slate-400 hover:text-slate-200'}`}
                     onClick={() => { setLoginMode('otp'); setError(null); }}
                 >
-                    <Mail className="w-4 h-4" />
+                    <Mail className="w-3.5 h-3.5" />
                     Código (OTP)
                 </button>
             </div>
 
-            <form className="space-y-6" onSubmit={
+            <form className="space-y-5" onSubmit={
                 loginMode === 'password' 
                     ? handlePasswordLogin 
                     : (otpSent ? handleVerifyOtp : handleSendOtp)
             }>
                 {error && (
-                    <div className="bg-red-50 border-l-4 border-red-400 p-4">
-                        <p className="text-sm text-red-700">{error}</p>
+                    <div className="bg-red-500/10 border-l-4 border-red-500 p-4 rounded-r-xl">
+                        <p className="text-xs text-red-400 font-semibold">{error}</p>
                     </div>
                 )}
 
                 <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                    <label htmlFor="email" className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">
                         {t('auth.emailLabel')}
                     </label>
                     <Input
@@ -158,13 +158,13 @@ export default function Login() {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         disabled={loginMode === 'otp' && otpSent}
-                        className="mt-1 block w-full h-12 rounded-xl border-gray-100 bg-gray-50/50 disabled:opacity-50"
+                        className="mt-1 block w-full h-12 rounded-xl border-white/10 bg-slate-900 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:opacity-40"
                     />
                 </div>
 
                 {loginMode === 'password' && (
                     <div className="relative">
-                        <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                        <label htmlFor="password" className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">
                             {t('auth.passwordLabel')}
                         </label>
                         <div className="relative mt-1">
@@ -174,11 +174,11 @@ export default function Login() {
                                 required
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="pr-12 block w-full h-12 rounded-xl border-gray-100 bg-gray-50/50"
+                                className="pr-12 block w-full h-12 rounded-xl border-white/10 bg-slate-900 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                             />
                             <button
                                 type="button"
-                                className="absolute inset-y-0 right-0 h-full w-12 flex items-center justify-center bg-indigo-50/80 text-indigo-600 hover:bg-[#4449AA] hover:text-white rounded-r-xl border-l border-gray-100 transition-all"
+                                className="absolute inset-y-0 right-0 h-full w-12 flex items-center justify-center bg-white/5 text-slate-400 hover:text-white rounded-r-xl border-l border-white/5 transition-all"
                                 onClick={() => setShowPassword(!showPassword)}
                                 title={showPassword ? "Ocultar Contraseña" : "Ver Contraseña"}
                             >
@@ -194,7 +194,7 @@ export default function Login() {
 
                 {loginMode === 'otp' && otpSent && (
                     <div className="space-y-2">
-                        <label htmlFor="otp" className="block text-sm font-medium text-gray-700">
+                        <label htmlFor="otp" className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">
                             Código de Verificación (6 dígitos)
                         </label>
                         <Input
@@ -204,19 +204,19 @@ export default function Login() {
                             placeholder="Ej. 123456"
                             value={otp}
                             onChange={(e) => setOtp(e.target.value)}
-                            className="text-center font-mono text-xl tracking-[0.5em] block w-full h-14 rounded-xl border-gray-200 bg-white"
+                            className="text-center font-mono text-xl tracking-[0.5em] block w-full h-14 rounded-xl border-white/10 bg-slate-900 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                         />
                         <button 
                             type="button" 
                             onClick={() => { setOtpSent(false); setOtp(''); }}
-                            className="text-xs text-indigo-600 hover:underline w-full text-center mt-2 block"
+                            className="text-xs text-blue-400 hover:text-blue-300 hover:underline w-full text-center mt-2 block font-bold"
                         >
                             ¿No recibiste el código? Volver a intentar
                         </button>
                     </div>
                 )}
 
-                <Button type="submit" disabled={loading} className="w-full">
+                <Button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black h-12 rounded-xl transition-all shadow-lg shadow-blue-600/25 border-0">
                     {loading 
                         ? (loginMode === 'otp' && !otpSent ? 'Enviando...' : 'Procesando...') 
                         : (loginMode === 'password' 
@@ -225,17 +225,17 @@ export default function Login() {
                 </Button>
             </form>
 
-            <div className="flex flex-col items-center gap-2">
+            <div className="flex flex-col items-center gap-2 pt-2">
                 {loginMode === 'password' && (
                     <button
                         type="button"
                         onClick={() => { setLoginMode('otp'); setError(null); }}
-                        className="text-sm text-slate-400 hover:text-indigo-600 transition-colors font-medium"
+                        className="text-xs text-slate-400 hover:text-blue-400 transition-colors font-semibold"
                     >
-                        ¿Olvidaste tu contraseña? <span className="text-indigo-600 font-bold">Entra con código mágico</span>
+                        ¿Olvidaste tu contraseña? <span className="text-blue-400 font-bold hover:underline">Entra con código mágico</span>
                     </button>
                 )}
-                <Link to="/register" className="text-sm font-medium text-indigo-600 hover:text-indigo-500">
+                <Link to="/register" className="text-xs font-bold text-blue-400 hover:text-blue-300 hover:underline">
                     {t('auth.registerLink')}
                 </Link>
             </div>

@@ -63,56 +63,62 @@ export default function SignUp() {
     return (
         <div className="space-y-6">
             <div className="text-center">
-                <h2 className="text-2xl font-bold text-gray-900">{t('auth.signUpTitle')}</h2>
-                <p className="mt-1 text-sm text-gray-500">{t('auth.signUpSubtitle')}</p>
+                <h2 className="text-2xl font-black text-white">{t('auth.signUpTitle')}</h2>
+                <p className="mt-1.5 text-xs text-slate-400">{t('auth.signUpSubtitle')}</p>
             </div>
 
-            <form className="space-y-6" onSubmit={handleSignUp}>
+            <form className="space-y-5" onSubmit={handleSignUp}>
                 {error && (
-                    <div className="bg-red-50 border-l-4 border-red-400 p-4">
-                        <p className="text-sm text-red-700">{error}</p>
+                    <div className="bg-red-500/10 border-l-4 border-red-500 p-4 rounded-r-xl">
+                        <p className="text-xs text-red-400 font-semibold">{error}</p>
                     </div>
                 )}
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700">{t('auth.companyNameLabel')}</label>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">
+                        {t('auth.companyNameLabel')}
+                    </label>
                     <Input
                         required
                         value={companyName}
                         onChange={(e) => setCompanyName(e.target.value)}
-                        className="mt-1"
+                        className="mt-1 block w-full h-12 rounded-xl border-white/10 bg-slate-900 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700">{t('auth.emailLabel')}</label>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">
+                        {t('auth.emailLabel')}
+                    </label>
                     <Input
                         type="email"
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="mt-1"
+                        className="mt-1 block w-full h-12 rounded-xl border-white/10 bg-slate-900 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     />
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium text-gray-700">{t('auth.passwordLabel')}</label>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2">
+                        {t('auth.passwordLabel')}
+                    </label>
                     <Input
                         type="password"
                         required
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="mt-1"
+                        className="mt-1 block w-full h-12 rounded-xl border-white/10 bg-slate-900 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     />
                 </div>
 
-                <Button type="submit" disabled={loading} className="w-full">
+                <Button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black h-12 rounded-xl transition-all shadow-lg shadow-blue-600/25 border-0">
                     {loading ? t('auth.creatingAccount') : t('auth.createAccountButton')}
                 </Button>
             </form>
 
-            <div className="text-center">
-                <Link to="/login" className="text-sm font-medium text-indigo-600 hover:text-indigo-500">
+            <div className="text-center pt-2">
+                <Link to="/login" className="text-xs font-bold text-blue-400 hover:text-blue-300 hover:underline">
                     {t('auth.loginLink')}
                 </Link>
             </div>
