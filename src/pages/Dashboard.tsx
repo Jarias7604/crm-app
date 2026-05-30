@@ -1647,138 +1647,98 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* ── Lead Alert KPIs: 2 stacked cards ── */}
-                <div className="lg:col-span-4 flex flex-col gap-3">
+                {/* ── Lead Health Pulse: 3 KPIs en una sola fila compacta ── */}
+                <div className="lg:col-span-4 flex flex-col h-full">
+                    <div className="bg-white rounded-2xl border border-slate-200/60 shadow-[0_2px_15px_rgb(0,0,0,0.03)] overflow-hidden flex flex-col h-full">
+                        {/* Header */}
+                        <div className="px-4 pt-3 pb-2 border-b border-slate-100/80 flex items-center gap-2">
+                            <Zap className="w-3 h-3 text-indigo-500" />
+                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Lead Health Pulse</span>
+                        </div>
 
-                    {/* KPI 1: Seguimientos vencidos */}
-                    {(() => {
-                        const overdueLeads = upcomingFollowUps.filter((f: any) => {
-                            try { return new Date(f.next_followup_date) < new Date(); } catch { return false; }
-                        });
-                        const urgentCount = overdueLeads.length;
-                        return (
-                            <div
-                                onClick={() => navigate('/leads', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } })}
-                                className="flex-1 bg-white rounded-2xl border border-slate-200/60 shadow-[0_2px_15px_rgb(0,0,0,0.03)] p-4 cursor-pointer hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 group flex flex-col justify-between min-h-[120px]"
-                            >
-                                <div className="flex items-start justify-between">
-                                    <div>
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1 flex items-center gap-1.5">
-                                            <Clock className="w-3 h-3" /> Seguimientos vencidos
-                                        </p>
-                                        <p className="text-[10px] text-gray-400 font-medium">Pendientes sin atender</p>
-                                    </div>
-                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${ urgentCount > 5 ? 'bg-red-100' : urgentCount > 0 ? 'bg-amber-100' : 'bg-emerald-100' }`}>
-                                        <Clock className={`w-4 h-4 ${ urgentCount > 5 ? 'text-red-600' : urgentCount > 0 ? 'text-amber-600' : 'text-emerald-600' }`} />
-                                    </div>
-                                </div>
-                                <div className="mt-3 flex items-end justify-between">
-                                    <div className="flex items-baseline gap-2">
-                                        <span className={`text-4xl font-black tracking-tighter ${ urgentCount > 5 ? 'text-red-600' : urgentCount > 0 ? 'text-amber-600' : 'text-emerald-600' }`}>{urgentCount}</span>
-                                        <span className="text-[10px] font-bold text-slate-400">leads</span>
-                                    </div>
-                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${ urgentCount > 5 ? 'bg-red-50 text-red-600' : urgentCount > 0 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600' }`}>
-                                        { urgentCount > 5 ? '🔴 Urgente' : urgentCount > 0 ? '⚠️ Revisar' : '✅ Al día' }
-                                    </span>
-                                </div>
-                                <div className="mt-3 h-1 bg-slate-100 rounded-full overflow-hidden">
-                                    <div className={`h-full rounded-full transition-all duration-1000 ${ urgentCount > 5 ? 'bg-red-500' : urgentCount > 0 ? 'bg-amber-500' : 'bg-emerald-500' }`}
-                                        style={{ width: urgentCount > 0 ? `${Math.min(100, (urgentCount / Math.max(upcomingFollowUps.length, 1)) * 100)}%` : '100%' }}
-                                    />
-                                </div>
-                            </div>
-                        );
-                    })()}
+                        {/* 3 métricas en horizontal */}
+                        <div className="grid grid-cols-3 divide-x divide-slate-100">
 
-                    {/* KPI 2: Leads sin actividad +15d */}
-                    {(() => {
-                        const staleCount = funnelData
-                            .filter((s: any) => !['Cerrado', 'Cliente', 'Perdido', 'Erróneo'].includes(s.key))
-                            .reduce((sum: number, s: any) => sum + (s.value || 0), 0);
-                        const noFollowup = escalationLeads.length;
-                        return (
-                            <div
-                                onClick={() => navigate('/leads')}
-                                className="flex-1 bg-white rounded-2xl border border-slate-200/60 shadow-[0_2px_15px_rgb(0,0,0,0.03)] p-4 cursor-pointer hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 group flex flex-col justify-between min-h-[120px]"
-                            >
-                                <div className="flex items-start justify-between">
-                                    <div>
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1 flex items-center gap-1.5">
-                                            <AlertTriangle className="w-3 h-3" /> Pipeline activo
-                                        </p>
-                                        <p className="text-[10px] text-gray-400 font-medium">Leads en etapas abiertas</p>
-                                    </div>
-                                    <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
-                                        <Target className="w-4 h-4 text-indigo-600" />
-                                    </div>
-                                </div>
-                                <div className="mt-3 flex items-end justify-between">
-                                    <div className="flex items-baseline gap-2">
-                                        <span className="text-4xl font-black tracking-tighter text-indigo-600">{staleCount}</span>
-                                        <span className="text-[10px] font-bold text-slate-400">activos</span>
-                                    </div>
-                                    {noFollowup > 0 && (
-                                        <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-orange-50 text-orange-600">
-                                            ⚠️ {noFollowup} en escalación
+                            {/* KPI 1 — Seguimientos vencidos */}
+                            {(() => {
+                                const overdueLeads = upcomingFollowUps.filter((f: any) => {
+                                    try { return new Date(f.next_followup_date) < new Date(); } catch { return false; }
+                                });
+                                const urgentCount = overdueLeads.length;
+                                const color = urgentCount > 5 ? 'text-red-600' : urgentCount > 0 ? 'text-amber-500' : 'text-emerald-500';
+                                const bg = urgentCount > 5 ? 'bg-red-50' : urgentCount > 0 ? 'bg-amber-50' : 'bg-emerald-50';
+                                const badge = urgentCount > 5 ? '🔴 Urgente' : urgentCount > 0 ? '⚠️ Revisar' : '✅ Al día';
+                                return (
+                                    <button
+                                        onClick={() => navigate('/leads', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } })}
+                                        className="flex flex-col items-center gap-1 py-4 px-2 hover:bg-slate-50/70 transition-colors group/kpi"
+                                    >
+                                        <Clock className={`w-4 h-4 ${color} mb-0.5`} />
+                                        <span className={`text-3xl font-black tracking-tighter ${color}`}>{urgentCount}</span>
+                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider text-center leading-tight">Seguimientos<br/>vencidos</span>
+                                        <span className={`mt-1 text-[8px] font-black px-2 py-0.5 rounded-full ${bg} ${color}`}>{badge}</span>
+                                    </button>
+                                );
+                            })()}
+
+                            {/* KPI 2 — Pipeline activo */}
+                            {(() => {
+                                const staleCount = funnelData
+                                    .filter((s: any) => !['Cerrado', 'Cliente', 'Perdido', 'Erróneo'].includes(s.key))
+                                    .reduce((sum: number, s: any) => sum + (s.value || 0), 0);
+                                const noFollowup = escalationLeads.length;
+                                return (
+                                    <button
+                                        onClick={() => navigate('/leads')}
+                                        className="flex flex-col items-center gap-1 py-4 px-2 hover:bg-slate-50/70 transition-colors group/kpi"
+                                    >
+                                        <Target className="w-4 h-4 text-indigo-500 mb-0.5" />
+                                        <span className="text-3xl font-black tracking-tighter text-indigo-600">{staleCount}</span>
+                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider text-center leading-tight">Pipeline<br/>activo</span>
+                                        <span className={`mt-1 text-[8px] font-black px-2 py-0.5 rounded-full ${noFollowup > 0 ? 'bg-orange-50 text-orange-600' : 'bg-indigo-50 text-indigo-500'}`}>
+                                            {noFollowup > 0 ? `⚠️ ${noFollowup} escal.` : `${stats.conversionRate}% conv.`}
                                         </span>
-                                    )}
-                                </div>
-                                <div className="mt-3 flex items-center gap-2">
-                                    <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                        <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${stats.conversionRate}%` }} />
-                                    </div>
-                                    <span className="text-[9px] font-black text-indigo-600 shrink-0">{stats.conversionRate}% conv.</span>
-                                </div>
-                            </div>
-                        );
-                    })()}
+                                    </button>
+                                );
+                            })()}
 
-                    {/* KPI 3: Leads sin asignar */}
-                    {(() => {
-                        const count = unassignedLeads.length;
-                        let oldestDateLabel = '';
-                        if (count > 0) {
-                            const oldest = unassignedLeads.reduce((oldest, l) => {
-                                return new Date(l.created_at) < new Date(oldest.created_at) ? l : oldest;
-                            });
-                            try {
-                                const diff = formatDistanceToNow(new Date(oldest.created_at), { addSuffix: true, locale: es });
-                                oldestDateLabel = diff;
-                            } catch (e) {
-                                oldestDateLabel = 'recientemente';
-                            }
-                        }
-                        return (
-                            <div
-                                onClick={() => setIsUnassignedModalOpen(true)}
-                                className="flex-1 bg-white rounded-2xl border border-slate-200/60 shadow-[0_2px_15px_rgb(0,0,0,0.03)] p-4 cursor-pointer hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 group flex flex-col justify-between min-h-[120px]"
-                            >
-                                <div className="flex items-start justify-between">
-                                    <div>
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1 flex items-center gap-1.5">
-                                            <UserMinus className="w-3 h-3 text-amber-500" /> Leads sin asignar
-                                        </p>
-                                        <p className="text-[10px] text-gray-400 font-medium">Bandeja de entrada pendiente</p>
-                                    </div>
-                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${ count > 0 ? 'bg-amber-100 animate-pulse' : 'bg-emerald-100' }`}>
-                                        <UserMinus className={`w-4 h-4 ${ count > 0 ? 'text-amber-600' : 'text-emerald-600' }`} />
-                                    </div>
-                                </div>
-                                <div className="mt-3 flex items-end justify-between">
-                                    <div className="flex items-baseline gap-2">
-                                        <span className={`text-4xl font-black tracking-tighter ${ count > 0 ? 'text-amber-600' : 'text-emerald-600' }`}>{count}</span>
-                                        <span className="text-[10px] font-bold text-slate-400">sin asignar</span>
-                                    </div>
-                                    {count > 0 && (
-                                        <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
-                                            Antiguo: {oldestDateLabel}
+                            {/* KPI 3 — Sin asignar */}
+                            {(() => {
+                                const count = unassignedLeads.length;
+                                let oldestDateLabel = '';
+                                if (count > 0) {
+                                    const oldest = unassignedLeads.reduce((o, l) =>
+                                        new Date(l.created_at) < new Date(o.created_at) ? l : o
+                                    );
+                                    try { oldestDateLabel = formatDistanceToNow(new Date(oldest.created_at), { addSuffix: false, locale: es }); } catch { oldestDateLabel = '—'; }
+                                }
+                                const color = count > 0 ? 'text-amber-600' : 'text-emerald-500';
+                                const bg = count > 0 ? 'bg-amber-50' : 'bg-emerald-50';
+                                return (
+                                    <button
+                                        onClick={() => setIsUnassignedModalOpen(true)}
+                                        className="flex flex-col items-center gap-1 py-4 px-2 hover:bg-slate-50/70 transition-colors group/kpi"
+                                    >
+                                        <UserMinus className={`w-4 h-4 ${color} mb-0.5 ${count > 0 ? 'animate-pulse' : ''}`} />
+                                        <span className={`text-3xl font-black tracking-tighter ${color}`}>{count}</span>
+                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider text-center leading-tight">Sin<br/>asignar</span>
+                                        <span className={`mt-1 text-[8px] font-black px-2 py-0.5 rounded-full ${bg} ${color}`}>
+                                            {count > 0 ? `Más viejo: ${oldestDateLabel}` : '✅ Todo asignado'}
                                         </span>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })()}
+                                    </button>
+                                );
+                            })()}
 
+                        </div>
+
+                        {/* Filler — ocupa el espacio restante con un gradiente sutil */}
+                        <div className="flex-grow border-t border-slate-50 bg-gradient-to-b from-slate-50/30 to-transparent flex items-center justify-center">
+                            <div className="flex items-center gap-1.5 opacity-30">
+                                <Zap className="w-3 h-3 text-indigo-400" />
+                                <span className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em]">Live · actualización en tiempo real</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Control de Pagos (CxC) Widget */}
