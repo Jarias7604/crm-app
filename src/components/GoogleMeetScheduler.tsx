@@ -277,7 +277,9 @@ export default function GoogleMeetScheduler({
 
     // Mutation — handle create/update follow-up + Google Calendar event
     const mutation = useMutation({
-        mutationFn: async () => {
+        mutationFn: async (sendInvitesOverride?: boolean) => {
+            const finalSendInvites = sendInvitesOverride !== undefined ? sendInvitesOverride : sendInvites;
+
             if (isEditMode) {
                 if (!googleIntegration) throw new Error('No Google Calendar integration connected');
 
@@ -306,7 +308,7 @@ Reunión modificada desde Arias CRM.`;
                             start: startISO,
                             end: endISO,
                             attendees,
-                            send_invites: sendInvites,
+                            send_invites: finalSendInvites,
                             timezone: selectedTimezone,
                         }
                     }
@@ -352,7 +354,7 @@ Reunión programada automáticamente desde Arias CRM.`;
                     end: endISO,
                     attendees,
                     addMeetLink: true,
-                    sendInvites,
+                    sendInvites: finalSendInvites,
                     timezone: selectedTimezone,
                 });
                 return { isEdit: false, meetResult: result };
@@ -845,67 +847,58 @@ Reunión programada automáticamente desde Arias CRM.`;
                                     }`} />
                                 </button>
                             </div>
-
-                            {/* Send invites toggle */}
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2.5">
-                                    <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center">
-                                        <Mail className="w-4 h-4 text-emerald-600" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-bold text-gray-800">Notificar asistentes</p>
-                                        <p className="text-xs text-gray-500">Google envía email con el invite</p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => setSendInvites(!sendInvites)}
-                                    className={`relative w-12 h-6 rounded-full transition-all duration-300 ${
-                                        sendInvites ? 'bg-emerald-500' : 'bg-gray-300'
-                                    }`}
-                                >
-                                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-300 ${
-                                        sendInvites ? 'translate-x-6' : 'translate-x-0'
-                                    }`} />
-                                </button>
-                            </div>
                         </div>
                     )}
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex gap-3 shrink-0">
+                <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex gap-3 shrink-0 items-center">
                     <button
                         onClick={onClose}
-                        className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-100 transition-all"
+                        className="px-5 py-3 rounded-xl border border-gray-200 text-gray-600 font-bold text-sm hover:bg-gray-100 transition-all shrink-0"
                     >
                         Cancelar
                     </button>
-                    <button
-                        onClick={() => mutation.mutate()}
-                        disabled={mutation.isPending || !title.trim()}
-                        className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-                            isEditMode
-                                ? 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg shadow-indigo-100'
-                                : googleIntegration && addMeetLink
-                                    ? 'bg-[#4285F4] hover:bg-[#3367d6] text-white shadow-lg shadow-[#4285F4]/30'
-                                    : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200'
-                        } disabled:opacity-50 disabled:cursor-not-allowed`}
-                    >
-                        {mutation.isPending ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : googleIntegration && addMeetLink ? (
-                            <Video className="w-4 h-4" />
-                        ) : (
-                            <Calendar className="w-4 h-4" />
-                        )}
-                        {mutation.isPending
-                            ? isEditMode ? 'Guardando...' : 'Creando...'
-                            : isEditMode
-                                ? sendInvites ? 'Guardar y Notificar' : 'Solo Guardar'
-                                : googleIntegration && addMeetLink
-                                    ? 'Crear con Google Meet'
-                                    : 'Agendar Reunión'}
-                    </button>
+                    
+                    <div className="flex-1 flex gap-3 justify-end min-w-0">
+                        <button
+                            onClick={() => mutation.mutate(false)}
+                            disabled={mutation.isPending || !title.trim()}
+                            className="px-4 py-3 rounded-xl font-bold text-sm bg-gray-100 hover:bg-gray-200 text-gray-600 transition-all flex items-center justify-center gap-2 disabled:opacity-50 min-w-[130px] shrink-0"
+                        >
+                            {mutation.isPending ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Calendar className="w-4 h-4" />
+                            )}
+                            {isEditMode ? 'Solo Guardar' : 'Solo Agendar'}
+                        </button>
+                        
+                        <button
+                            onClick={() => mutation.mutate(true)}
+                            disabled={mutation.isPending || !title.trim()}
+                            className={`px-5 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                                isEditMode
+                                    ? 'bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg shadow-indigo-100'
+                                    : googleIntegration && addMeetLink
+                                        ? 'bg-[#4285F4] hover:bg-[#3367d6] text-white shadow-lg shadow-[#4285F4]/30'
+                                        : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200'
+                            } disabled:opacity-50 min-w-[170px] shrink-0`}
+                        >
+                            {mutation.isPending ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : googleIntegration && addMeetLink ? (
+                                <Video className="w-4 h-4" />
+                            ) : (
+                                <Calendar className="w-4 h-4" />
+                            )}
+                            {isEditMode 
+                                ? 'Guardar y Notificar' 
+                                : googleIntegration && addMeetLink 
+                                    ? 'Crear con Meet y Notificar' 
+                                    : 'Agendar y Notificar'}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
