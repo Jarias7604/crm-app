@@ -170,6 +170,13 @@ export default function LandingPage() {
   // Accordion state
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
 
+  // Interactive Feature Toggles for HubSpot Stack Comparison
+  const [toggleAds, setToggleAds] = useState(true);
+  const [toggleAI, setToggleAI] = useState(true);
+  const [toggleQuote, setToggleQuote] = useState(true);
+  const [toggleHunter, setToggleHunter] = useState(true);
+  const [toggleInbox, setToggleInbox] = useState(true);
+
   const handleSimulate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!simName || !simPhone) return;
@@ -185,6 +192,14 @@ export default function LandingPage() {
   const closedCompetitor = Math.round(leads * closingRateCompetitor);
   const closedArias = Math.round(leads * closingRateArias);
   const extraRevenue = (closedArias - closedCompetitor) * leadVal;
+
+  // Dyn calculations for comparison toggles
+  let hsEquivalent = 90; // HubSpot Base Professional
+  if (toggleAds) hsEquivalent += 120;
+  if (toggleAI) hsEquivalent += 250;
+  if (toggleQuote) hsEquivalent += 150;
+  if (toggleHunter) hsEquivalent += 120;
+  if (toggleInbox) hsEquivalent += 150;
 
   return (
     <div className="min-h-screen bg-[#07070d] text-white font-sans antialiased overflow-x-hidden" style={{fontFamily:"'Inter','system-ui',sans-serif"}}>
@@ -632,48 +647,164 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─── COMPARISON TABLE ────────────────────────────────────────────────── */}
+      {/* ─── INTERACTIVE COMPARISON STACK WITH Futuristic TOGGLE SWITCHES ────────── */}
       <section className="py-28 bg-[#040408] border-b border-white/[0.05]">
-        <div className="max-w-3xl mx-auto px-6">
-          <div className="mb-14">
-            <span className="text-xs font-black text-indigo-400 uppercase tracking-[0.25em] mb-4 block">Tabla Comparativa</span>
-            <h2 className="text-4xl font-black text-white leading-tight">¿Por qué no HubSpot<br />o respond.io?</h2>
+        <div className="max-w-5xl mx-auto px-6">
+          
+          <div className="text-center mb-16">
+            <span className="text-xs font-black text-indigo-400 uppercase tracking-[0.25em]">El Stack Tecnológico Definitivo</span>
+            <h2 className="text-4xl lg:text-5xl font-black text-white mt-3 leading-tight">
+              ¿Por qué gastar fortunas en<br />HubSpot o respond.io?
+            </h2>
+            <p className="text-slate-500 mt-3 max-w-xl mx-auto text-sm">
+              Activa o desactiva las herramientas que necesitas para ver el costo acumulado de armar el mismo stack en otras plataformas frente a la tarifa única de Arias CRM.
+            </p>
           </div>
 
-          <div className="rounded-3xl overflow-hidden border border-white/[0.06]">
-            {/* Header */}
-            <div className="grid grid-cols-4 border-b border-white/[0.06] bg-white/[0.02]">
-              <div className="p-4" />
-              <div className="p-4 text-center border-l border-white/[0.06] bg-indigo-500/[0.08]">
-                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Arias CRM</p>
+          <div className="grid lg:grid-cols-12 gap-8 items-stretch">
+            
+            {/* Left Col: The High-Tech Toggle Matrix */}
+            <div className="lg:col-span-7 bg-[#080812]/50 border border-white/5 rounded-3xl p-8 space-y-6 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-[200px] h-[200px] bg-indigo-500/5 blur-[80px] pointer-events-none" />
+              
+              <p className="text-xs font-black text-slate-500 uppercase tracking-widest border-b border-white/5 pb-3">Herramientas & Integraciones</p>
+              
+              {/* Toggle 1 */}
+              <div className="flex items-center justify-between gap-6 p-4 rounded-2xl bg-white/[0.01] border border-white/5 hover:border-white/10 transition-all">
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-white">Captura Automatizada de Ads (TikTok/FB/IG)</p>
+                  <p className="text-xs text-slate-400">Ingestión inmediata de leads sin Zapier ($120/mes de ahorro).</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input 
+                    type="checkbox" 
+                    checked={toggleAds} 
+                    onChange={() => setToggleAds(!toggleAds)} 
+                    className="sr-only peer" 
+                  />
+                  <div className="w-11 h-6 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600"></div>
+                </label>
               </div>
-              <div className="p-4 text-center border-l border-white/[0.06]">
-                <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">HubSpot</p>
+
+              {/* Toggle 2 */}
+              <div className="flex items-center justify-between gap-6 p-4 rounded-2xl bg-white/[0.01] border border-white/5 hover:border-white/10 transition-all">
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-emerald-400 flex items-center gap-1.5">
+                    AI Agent Conversacional 24/7 (WhatsApp) <Sparkles className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
+                  </p>
+                  <p className="text-xs text-slate-400">Bot autónomo que califica y agenda citas ($250/mes de ahorro).</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input 
+                    type="checkbox" 
+                    checked={toggleAI} 
+                    onChange={() => setToggleAI(!toggleAI)} 
+                    className="sr-only peer" 
+                  />
+                  <div className="w-11 h-6 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600"></div>
+                </label>
               </div>
-              <div className="p-4 text-center border-l border-white/[0.06]">
-                <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">respond.io</p>
+
+              {/* Toggle 3 */}
+              <div className="flex items-center justify-between gap-6 p-4 rounded-2xl bg-white/[0.01] border border-white/5 hover:border-white/10 transition-all">
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-white">Cotizador Integrado con PDF Pro</p>
+                  <p className="text-xs text-slate-400">Presupuestos interactivos editables en segundos ($150/mes de ahorro).</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input 
+                    type="checkbox" 
+                    checked={toggleQuote} 
+                    onChange={() => setToggleQuote(!toggleQuote)} 
+                    className="sr-only peer" 
+                  />
+                  <div className="w-11 h-6 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600"></div>
+                </label>
               </div>
+
+              {/* Toggle 4 */}
+              <div className="flex items-center justify-between gap-6 p-4 rounded-2xl bg-white/[0.01] border border-white/5 hover:border-white/10 transition-all">
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-white">Extractor Lead Hunter (Google Maps)</p>
+                  <p className="text-xs text-slate-400">Minería de prospectos B2B en frío ilimitada ($120/mes de ahorro).</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input 
+                    type="checkbox" 
+                    checked={toggleHunter} 
+                    onChange={() => setToggleHunter(!toggleHunter)} 
+                    className="sr-only peer" 
+                  />
+                  <div className="w-11 h-6 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+
+              {/* Toggle 5 */}
+              <div className="flex items-center justify-between gap-6 p-4 rounded-2xl bg-white/[0.01] border border-white/5 hover:border-white/10 transition-all">
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-white">Inbox Omnicanal WhatsApp / Telegram</p>
+                  <p className="text-xs text-slate-400">Bandeja compartida para múltiples agentes ($150/mes de ahorro).</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input 
+                    type="checkbox" 
+                    checked={toggleInbox} 
+                    onChange={() => setToggleInbox(!toggleInbox)} 
+                    className="sr-only peer" 
+                  />
+                  <div className="w-11 h-6 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600"></div>
+                </label>
+              </div>
+
             </div>
 
-            {VS_ROWS.map((row, i) => (
-              <div key={row.f} className={`grid grid-cols-4 border-b border-white/[0.04] hover:bg-white/[0.015] transition-colors ${i === VS_ROWS.length-1?'border-0':''}`}>
-                <div className="p-4 pl-5 flex items-center">
-                  <span className="text-[13px] text-slate-400">{row.f}</span>
+            {/* Right Col: The Live Comparative Price Counter */}
+            <div className="lg:col-span-5 bg-[#0c0c1b]/30 border border-indigo-500/20 rounded-3xl p-8 flex flex-col justify-between relative overflow-hidden shadow-[0_0_50px_-12px_rgba(99,102,241,0.2)]">
+              <div className="absolute top-0 right-0 w-[180px] h-[180px] bg-indigo-500/10 blur-[60px] pointer-events-none" />
+              
+              <div className="space-y-6">
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-white/5 pb-3">Comparativa de Costo Mensual</p>
+                
+                {/* Competitor price card */}
+                <div className="bg-slate-950/80 border border-white/5 p-5 rounded-2xl">
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Stack HubSpot + respond.io</p>
+                  <p className="text-4xl font-black text-slate-300 tracking-tight mt-1 animate-fadeIn">
+                    ${hsEquivalent} <span className="text-xs font-semibold text-slate-600">USD/mes</span>
+                  </p>
+                  <p className="text-[10px] text-red-400 mt-2">⚠️ Requiere contratos anuales obligatorios.</p>
                 </div>
-                <div className="p-4 flex items-center justify-center border-l border-white/[0.04] bg-indigo-500/[0.04]">
-                  {typeof row.us === 'boolean' ? (row.us ? <Tick /> : <Cross />) : <span className="text-indigo-300 font-bold text-xs">{row.us}</span>}
+
+                {/* Arias CRM flat price card */}
+                <div className="bg-indigo-950/20 border border-indigo-500/30 p-5 rounded-2xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-8 h-8 bg-emerald-500/10 rounded-full blur-md" />
+                  <p className="text-[10px] text-indigo-400 font-black uppercase tracking-wider flex items-center gap-1">
+                    Arias CRM <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded uppercase font-black tracking-normal">Tarifa Única</span>
+                  </p>
+                  <p className="text-4xl font-black text-emerald-400 tracking-tight mt-1">
+                    $65 <span className="text-xs font-semibold text-emerald-600">USD/mes</span>
+                  </p>
+                  <p className="text-[10px] text-emerald-400 mt-2 font-semibold">✅ Todo incluido. Cancela cuando quieras.</p>
                 </div>
-                <div className="p-4 flex items-center justify-center border-l border-white/[0.04]">
-                  {typeof row.hub === 'boolean' ? (row.hub ? <Tick /> : <Cross />) : <span className="text-red-400 font-bold text-xs">{row.hub}</span>}
-                </div>
-                <div className="p-4 flex items-center justify-center border-l border-white/[0.04]">
-                  {typeof row.res === 'boolean' ? (row.res ? <Tick /> : <Cross />) : <span className="text-slate-500 font-bold text-xs">{row.res}</span>}
+
+                {/* Savings highlights */}
+                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+                  <p className="text-[11px] text-slate-300 font-semibold">¡Ahorras hasta con esta configuración!</p>
+                  <p className="text-2xl font-black text-emerald-400 mt-1">
+                    -${(hsEquivalent - 65)} USD/mes
+                  </p>
                 </div>
               </div>
-            ))}
+
+              <div className="mt-8 pt-6 border-t border-white/5">
+                <button onClick={() => navigate('/register')} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 rounded-xl text-xs transition-all shadow-lg shadow-indigo-600/30">
+                  Obtener todo el stack por $65/mes
+                </button>
+              </div>
+
+            </div>
+
           </div>
 
-          <p className="text-slate-500 text-[11px] mt-6 text-center">HubSpot Professional requiere contratos anuales forzosos. Arias CRM ofrece flexibilidad mensual.</p>
         </div>
       </section>
 
