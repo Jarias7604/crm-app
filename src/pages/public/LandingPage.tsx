@@ -58,6 +58,21 @@ const PLANS = [
   },
 ];
 
+const FEATURES = [
+  { icon: '◈', title: 'Cotizador + PDF', body: 'Genera cotizaciones profesionales con tu branding, envíalas por link y recibe pagos. Nadie más lo tiene integrado al CRM.' },
+  { icon: '◉', title: 'Lead Hunter', body: 'Encuentra prospectos en Google Maps por industria y zona. 500 leads en 60 segundos. Exclusivo nuestro.' },
+  { icon: '◐', title: 'Flyer Studio IA', body: 'Diseña materiales de marketing con inteligencia artificial, sin salir de la plataforma.' },
+];
+
+const WHY = [
+  { t:'3× más cierres',    b:'AI scoring, seguimientos automáticos y cotizador integrado hacen que tu equipo cierre sin esfuerzo extra.' },
+  { t:'Seguridad enterprise', b:'Multi-tenant con Row Level Security. Datos 100% aislados por empresa, nunca mezclados.' },
+  { t:'Todo en uno',       b:'CRM + Marketing + Cotizador + AI Agents + Lead Hunter. Sin pagar 5 herramientas diferentes.' },
+  { t:'Multi-empresa',     b:'Agencias y franquicias gestionan múltiples clientes desde una sola plataforma.' },
+  { t:'Analytics en vivo', b:'Dashboard con Health Pulse, tendencias de venta y análisis completo de leads perdidos.' },
+  { t:'Soporte real',      b:'Onboarding en español, soporte en vivo y un equipo que entiende el mercado latinoamericano.' },
+];
+
 const FAQS = [
   { q: '¿Cómo funciona la captura de leads de TikTok e Instagram?', a: 'Nos conectamos directamente a las APIs oficiales de TikTok Events y Meta Leads. Cuando un usuario llena un anuncio de formulario, el lead se inyecta en milisegundos en Arias CRM y activa opcionalmente el AI bot para contactarlo al instante.' },
   { q: '¿Qué es el Lead Hunter?', a: 'Es nuestro extractor exclusivo de datos. Te permite ingresar un sector (ej: "Gimnasios") y una ubicación (ej: "Ciudad de México"), y extrae automáticamente nombres, teléfonos oficiales, direcciones y coordenadas de Google Maps, inyectando cientos de leads cualificados en un clic.' },
