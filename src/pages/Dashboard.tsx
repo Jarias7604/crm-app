@@ -57,6 +57,34 @@ const SIA_PERIOD_LABELS: Record<string, string> = {
 
 const PIE_COLORS = [THEME.primary, THEME.success, THEME.accent, THEME.chart2, THEME.chart3, '#94A3B8'];
 
+/** Reusable info-tooltip component — shows a ? icon with dark card on hover */
+const InfoTip = ({ text, position = 'top' }: { text: string; position?: 'top' | 'bottom' | 'left' }) => (
+    <div className="relative group/tip inline-flex items-center" onClick={(e) => e.stopPropagation()}>
+        <HelpCircle className="w-3 h-3 text-slate-300 hover:text-indigo-500 cursor-help transition-colors shrink-0" />
+        <div className={`
+            pointer-events-none absolute z-[9999] w-56 bg-slate-900 text-white rounded-xl p-3
+            text-[10px] font-medium leading-relaxed shadow-2xl
+            opacity-0 group-hover/tip:opacity-100 transition-opacity duration-200
+            ${position === 'bottom'
+                ? 'top-full left-1/2 -translate-x-1/2 mt-2'
+                : position === 'left'
+                    ? 'right-full top-1/2 -translate-y-1/2 mr-2'
+                    : 'bottom-full left-1/2 -translate-x-1/2 mb-2'
+            }
+        `}>
+            {text}
+            <div className={`absolute w-2 h-2 bg-slate-900 rotate-45
+                ${position === 'bottom'
+                    ? '-top-1 left-1/2 -translate-x-1/2'
+                    : position === 'left'
+                        ? '-right-1 top-1/2 -translate-y-1/2'
+                        : '-bottom-1 left-1/2 -translate-x-1/2'
+                }
+            `} />
+        </div>
+    </div>
+);
+
 const FunnelInfographic = ({ data, onStageClick, hideClientAmount, hideAmounts }: {
     data: any[];
     onStageClick: (status: string) => void;
@@ -1123,7 +1151,8 @@ export default function Dashboard() {
                         bg: 'bg-emerald-50/50',
                         trend: `${stats.wonDealsTrend > 0 ? '+' : ''}${stats.wonDealsTrend}%`,
                         trendColor: stats.wonDealsTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
-                        onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'] } })
+                        onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'] } }),
+                        tooltip: 'Número de prospectos que ya compraron o cerraron trato en el período. Cada uno representa dinero real que entró. ¡Más es mejor!'
                     },
                     {
                         name: t('dashboard.crm.totalPipeline'),
@@ -1133,7 +1162,8 @@ export default function Dashboard() {
                         bg: 'bg-indigo-50/50',
                         trend: `${stats.totalPipelineTrend > 0 ? '+' : ''}${stats.totalPipelineTrend}%`,
                         trendColor: stats.totalPipelineTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
-                        onClick: () => navigate('/cotizaciones', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } })
+                        onClick: () => navigate('/cotizaciones', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } }),
+                        tooltip: 'Suma total del valor de todos los negocios que podrías cerrar. Es dinero que ya está "en camino" — si tu equipo cierra bien, todo eso entra a caja.'
                     },
                     {
                         name: t('dashboard.crm.conversionRate'),
@@ -1143,7 +1173,8 @@ export default function Dashboard() {
                         bg: 'bg-amber-50/50',
                         trend: `${stats.conversionRateTrend > 0 ? '+' : ''}${stats.conversionRateTrend}%`,
                         trendColor: stats.conversionRateTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
-                        onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'] } })
+                        onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'] } }),
+                        tooltip: 'De cada 100 prospectos que entran, ¿cuántos terminan comprando? Si es 10%, necesitas 10 leads para vender 1. Mientras más alto, más eficiente es tu equipo.'
                     },
                     {
                         name: t('dashboard.crm.totalLeads'),
@@ -1153,7 +1184,8 @@ export default function Dashboard() {
                         bg: 'bg-blue-50/50',
                         trend: `${stats.totalLeadsTrend > 0 ? '+' : ''}${stats.totalLeadsTrend}%`,
                         trendColor: stats.totalLeadsTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
-                        onClick: () => navigate('/leads', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } })
+                        onClick: () => navigate('/leads', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } }),
+                        tooltip: 'Total de prospectos registrados en el período seleccionado. Incluye todos los estados: nuevos, en proceso, cerrados y perdidos.'
                     },
                     {
                         name: t('dashboard.crm.erroneousLeads'),
@@ -1162,8 +1194,9 @@ export default function Dashboard() {
                         color: 'text-rose-400',
                         bg: 'bg-rose-500/10',
                         trend: `${stats.erroneousLeadsTrend > 0 ? '+' : ''}${stats.erroneousLeadsTrend}%`,
-                        trendColor: stats.erroneousLeadsTrend <= 0 ? 'text-emerald-500' : 'text-rose-500', // Inverse for errors
-                        onClick: () => navigate('/leads', { state: { status: 'Erróneo' } })
+                        trendColor: stats.erroneousLeadsTrend <= 0 ? 'text-emerald-500' : 'text-rose-500',
+                        onClick: () => navigate('/leads', { state: { status: 'Erróneo' } }),
+                        tooltip: 'Prospectos marcados como datos inválidos: número equivocado, duplicado, o que pidieron no ser contactados. Mantener este número bajo asegura que tu base de datos sea limpia.'
                     },
                 ].map((item) => {
                     return (
@@ -1215,7 +1248,12 @@ export default function Dashboard() {
                                 </div>
 
                                 <div className="flex-grow">
-                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] mb-1 text-slate-400">{item.name}</h3>
+                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] mb-1 text-slate-400 flex items-center gap-1">
+                                        {item.name}
+                                        {'tooltip' in item && item.tooltip && (
+                                            <InfoTip text={item.tooltip as string} position="bottom" />
+                                        )}
+                                    </h3>
                                     {item.name === t('dashboard.crm.wonDeals') ? (
                                         <div className="space-y-1.5 mt-1">
                                             <div className="flex items-baseline gap-2">
@@ -1296,7 +1334,10 @@ export default function Dashboard() {
                 <div className={`bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 lg:col-span-5 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'funnel' ? 'z-[50]' : 'z-0'}`}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex flex-col">
-                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('dashboard.crm.funnelTitle')}</h3>
+                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-1">
+                                {t('dashboard.crm.funnelTitle')}
+                                <InfoTip text="Muestra cuántos prospectos hay en cada etapa del proceso de ventas. Si una etapa tiene muchos más que la siguiente, ahí está el cuello de botella que debes atacar." />
+                            </h3>
                             <p className="text-[10px] text-gray-400 font-medium">Conversión por etapa</p>
                         </div>
                         <div className="bg-indigo-50 px-2 py-0.5 rounded-full text-[8px] font-black text-indigo-600 tracking-wider">KPI</div>
@@ -1580,8 +1621,9 @@ export default function Dashboard() {
                 <div className="lg:col-span-8 bg-white p-4 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative z-0">
                     <div className="flex justify-between items-center mb-4">
                         <div className="flex flex-col">
-                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-1">
                                 <TrendingUp className="w-3.5 h-3.5" /> Tendencia de Ventas (Días)
+                                <InfoTip text="Gráfico de ingresos reales cerrados día a día. Un pico indica que hubo muchos cierres ese día. Si la línea es plana, tu equipo no está cerrando ventas." />
                             </h3>
                             <p className="text-[10px] text-gray-400 font-medium">Volumen de cierres a lo largo del tiempo</p>
                         </div>
@@ -1654,6 +1696,7 @@ export default function Dashboard() {
                         <div className="px-4 pt-3 pb-2 border-b border-slate-100/80 flex items-center gap-2">
                             <Zap className="w-3 h-3 text-indigo-500" />
                             <span className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Lead Health Pulse</span>
+                            <InfoTip text="Panel de salud de tu pipeline en tiempo real. De un vistazo sabes cuántos seguimientos se vencieron, cuántos leads están activos y cuántos aún no tienen un agente asignado." position="bottom" />
                         </div>
 
                         {/* 3 métricas en horizontal */}
@@ -1676,6 +1719,7 @@ export default function Dashboard() {
                                         <Clock className={`w-4 h-4 ${color} mb-0.5`} />
                                         <span className={`text-3xl font-black tracking-tighter ${color}`}>{urgentCount}</span>
                                         <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider text-center leading-tight">Seguimientos<br/>vencidos</span>
+                                        <InfoTip text="Seguimientos cuya fecha límite ya pasó y nadie los atendió. Cada día que pasan sin contacto, el lead se enfría. ¡Estos son los más urgentes!" position="top" />
                                         <span className={`mt-1 text-[8px] font-black px-2 py-0.5 rounded-full ${bg} ${color}`}>{badge}</span>
                                     </button>
                                 );
@@ -1695,6 +1739,7 @@ export default function Dashboard() {
                                         <Target className="w-4 h-4 text-indigo-500 mb-0.5" />
                                         <span className="text-3xl font-black tracking-tighter text-indigo-600">{staleCount}</span>
                                         <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider text-center leading-tight">Pipeline<br/>activo</span>
+                                        <InfoTip text="Cuántos prospectos están en etapas abiertas (aún no cerrados ni perdidos). Este es tu inventario de oportunidades vivas. Si este número baja, hay que generar más leads." position="top" />
                                         <span className={`mt-1 text-[8px] font-black px-2 py-0.5 rounded-full ${noFollowup > 0 ? 'bg-orange-50 text-orange-600' : 'bg-indigo-50 text-indigo-500'}`}>
                                             {noFollowup > 0 ? `⚠️ ${noFollowup} escal.` : `${stats.conversionRate}% conv.`}
                                         </span>
@@ -1722,6 +1767,7 @@ export default function Dashboard() {
                                         <UserMinus className={`w-4 h-4 ${color} mb-0.5 ${count > 0 ? 'animate-pulse' : ''}`} />
                                         <span className={`text-3xl font-black tracking-tighter ${color}`}>{count}</span>
                                         <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider text-center leading-tight">Sin<br/>asignar</span>
+                                        <InfoTip text="Leads que llegaron pero ningún agente los tiene asignados. Un lead sin dueño es un lead perdido — mientras más tiempo sin asignar, menor la probabilidad de cerrar." position="top" />
                                         <span className={`mt-1 text-[8px] font-black px-2 py-0.5 rounded-full ${bg} ${color}`}>
                                             {count > 0 ? `Más viejo: ${oldestDateLabel}` : '✅ Todo asignado'}
                                         </span>
@@ -2172,7 +2218,10 @@ export default function Dashboard() {
                 <div className={`bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'lostByStage' ? 'z-[50]' : 'z-0'}`}>
                     <div className="flex justify-between items-start mb-4">
                         <div className="flex flex-col">
-                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Leads Perdidos por Etapa</h3>
+                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-1">
+                                Leads Perdidos por Etapa
+                                <InfoTip text="En qué punto del proceso de ventas se te están yendo los prospectos. Si muchos se pierden en 'Prospecto', el problema es la calificación inicial. Si es en 'Negociación', el problema es el precio o el cierre." />
+                            </h3>
                             <p className="text-[10px] text-gray-400 font-medium mt-0.5">Dónde se están perdiendo las oportunidades</p>
                         </div>
                         <div className="relative" ref={activeCardFilter === 'lostByStage' ? cardFilterRef : null}>
@@ -2268,7 +2317,10 @@ export default function Dashboard() {
                 <div className={`bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'lostByReason' ? 'z-[50]' : 'z-0'}`}>
                     <div className="flex justify-between items-start mb-4">
                         <div className="flex flex-col">
-                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Motivos de Pérdida</h3>
+                            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-1">
+                                Motivos de Pérdida
+                                <InfoTip text="Las razones exactas por las que los prospectos no compraron. Si 'precio' aparece seguido, necesitas revisar tu oferta de valor. Si 'no contesta', el problema es el seguimiento." />
+                            </h3>
                             <p className="text-[10px] text-gray-400 font-medium mt-0.5">Por qué se están perdiendo</p>
                         </div>
                         <div className="relative" ref={activeCardFilter === 'lostByReason' ? cardFilterRef : null}>
