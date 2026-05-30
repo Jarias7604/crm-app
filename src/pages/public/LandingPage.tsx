@@ -1,77 +1,133 @@
 import { useNavigate } from 'react-router-dom';
-import { PlayCircle, CheckCircle2, Building2, Users, Database, Bot, ArrowRight, Zap, Target, LineChart, MessageSquare, Briefcase, TrendingUp, Shield, Clock, BarChart3, Sparkles, Star } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle2, ArrowRight, Zap, Target, Bot, TrendingUp, Shield, Star, X, MessageSquare, Users, BarChart3, Instagram } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../auth/AuthProvider';
 import LandingNavbar from '../../components/landing/LandingNavbar';
 import LandingFooter from '../../components/landing/LandingFooter';
 import AriasAgent from '../../components/landing/AriasAgent';
 import Login from '../Login';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../../services/supabase';
-import { useState } from 'react';
-import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-const formatPrice = (price: number) =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(price);
+const PLANS = [
+  {
+    name: 'Starter',
+    slug: 'starter',
+    annual: 49,
+    monthly: 65,
+    users: 3,
+    desc: 'Para equipos pequeños que quieren vender más.',
+    features: ['Pipeline visual + Kanban','Cotizador + PDF profesional','1 AI Bot (Telegram/WhatsApp)','Email campaigns','Reportes básicos'],
+    color: 'border-slate-200',
+    badge: null,
+  },
+  {
+    name: 'Growth',
+    slug: 'growth',
+    annual: 99,
+    monthly: 129,
+    users: 8,
+    desc: 'Para equipos en crecimiento que quieren automatizar.',
+    features: ['Todo en Starter','Campañas multi-canal','WhatsApp + Telegram + Email','Flyer Studio con IA','Lead Hunter (Google Places)','Reportes avanzados','TikTok + Facebook + Instagram Leads'],
+    color: 'border-indigo-500',
+    badge: 'Más Popular',
+  },
+  {
+    name: 'Pro',
+    slug: 'pro',
+    annual: 159,
+    monthly: 199,
+    users: 15,
+    desc: 'Para equipos avanzados con alto volumen.',
+    features: ['Todo en Growth','Workflows visuales','API REST + Webhooks','Inbox omnicanal','Multi-workspace','Onboarding dedicado','SLA 99.9%'],
+    color: 'border-slate-200',
+    badge: null,
+  },
+];
+
+const CHANNELS = [
+  { label: 'TikTok', emoji: '🎵', color: 'from-pink-500 to-red-500' },
+  { label: 'Instagram', emoji: '📸', color: 'from-purple-500 to-pink-500' },
+  { label: 'Facebook', emoji: '👤', color: 'from-blue-600 to-blue-400' },
+  { label: 'WhatsApp', emoji: '💬', color: 'from-emerald-500 to-green-400' },
+  { label: 'Telegram', emoji: '✈️', color: 'from-sky-500 to-blue-400' },
+  { label: 'Email', emoji: '📧', color: 'from-slate-600 to-slate-400' },
+  { label: 'Web Forms', emoji: '🌐', color: 'from-indigo-500 to-violet-500' },
+];
+
+const VS_ROWS = [
+  { feature: 'Cotizador + PDF profesional', us: true, hubspot: false, respond: false },
+  { feature: 'Lead Hunter (Google Places)', us: true, hubspot: false, respond: false },
+  { feature: 'Flyer Studio con IA', us: true, hubspot: false, respond: false },
+  { feature: 'TikTok/IG/FB Leads automáticos', us: true, hubspot: false, respond: true },
+  { feature: 'Pipeline visual (Kanban)', us: true, hubspot: true, respond: false },
+  { feature: 'AI Agent 24/7', us: true, hubspot: true, respond: true },
+  { feature: 'Campañas multi-canal', us: true, hubspot: true, respond: true },
+  { feature: 'Precio mensual base', us: '$65/mo', hubspot: '$890/mo', respond: '$99/mo' },
+];
 
 export default function LandingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { i18n } = useTranslation();
-  const en = i18n.language !== 'es';
-  const [showLoginModal, setShowLoginModal] = useState(false);
-
-  const { data: plans = [], isLoading } = useQuery({
-    queryKey: ['saas_plans_public'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('saas_plans').select('*').eq('is_active', true).order('sort_order', { ascending: true });
-      if (error) throw error;
-      return data;
-    }
-  });
+  const [annual, setAnnual] = useState(true);
+  const [showLogin, setShowLogin] = useState(false);
 
   return (
-    <div className="min-h-screen bg-white font-sans selection:bg-blue-500 selection:text-white">
-      <LandingNavbar onLoginClick={() => setShowLoginModal(true)} />
+    <div className="min-h-screen bg-white font-sans selection:bg-indigo-500 selection:text-white">
+      <LandingNavbar onLoginClick={() => setShowLogin(true)} />
 
       {/* ═══ HERO ═══ */}
-      <section className="relative pt-28 pb-16 lg:pt-36 lg:pb-24 bg-gradient-to-br from-[#0f172a] via-[#1e293b] to-[#0f172a] overflow-hidden">
-        <div className="absolute inset-0 opacity-20" style={{backgroundImage:'radial-gradient(circle at 25% 50%, rgba(59,130,246,0.3) 0%, transparent 50%), radial-gradient(circle at 75% 50%, rgba(16,185,129,0.2) 0%, transparent 50%)'}} />
+      <section className="relative pt-28 pb-20 lg:pt-40 lg:pb-32 overflow-hidden" style={{background:'linear-gradient(135deg,#0f0c29 0%,#1a1560 40%,#0d1117 100%)'}}>
+        <div className="absolute inset-0" style={{backgroundImage:'radial-gradient(ellipse at 20% 50%,rgba(99,102,241,0.25) 0%,transparent 55%),radial-gradient(ellipse at 80% 20%,rgba(16,185,129,0.15) 0%,transparent 55%)'}} />
+        {/* Animated dots grid */}
+        <div className="absolute inset-0 opacity-[0.04]" style={{backgroundImage:'radial-gradient(circle,#fff 1px,transparent 1px)',backgroundSize:'28px 28px'}} />
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="relative order-2 lg:order-1">
-              <img src="/hero_professional.png" alt="Arias CRM" className="w-full rounded-2xl shadow-2xl border border-white/10" />
+          <div className="text-center max-w-4xl mx-auto">
+            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur border border-white/20 rounded-full px-4 py-1.5 mb-8">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-sm font-semibold text-emerald-300">El CRM #1 para equipos en Latinoamérica</span>
             </div>
-            <div className="order-1 lg:order-2">
-              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-1.5 mb-6">
-                <Sparkles className="w-4 h-4 text-blue-400" />
-                <span className="text-sm font-medium text-blue-200">{en ? '#1 AI-Powered CRM Platform' : 'Plataforma CRM con IA #1'}</span>
-              </div>
-              <h1 className="text-4xl lg:text-6xl font-extrabold text-white tracking-tight leading-[1.1] mb-6">
-                {en ? 'Sell smarter.' : 'Vende mejor.'}<br/>
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
-                  {en ? 'Grow faster.' : 'Crece más rápido.'}
-                </span>
-              </h1>
-              <p className="text-lg text-slate-300 mb-8 max-w-xl leading-relaxed">
-                {en ? 'The complete CRM platform that unifies sales, marketing, service & AI agents — so your team closes more deals in less time.' : 'La plataforma CRM completa que unifica ventas, marketing, servicio y agentes IA — para que tu equipo cierre más tratos en menos tiempo.'}
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3">
-                {user ? (
-                  <Button onClick={() => navigate('/dashboard')} size="lg" className="bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg px-8 py-4 h-auto">
-                    {en ? 'Go to Dashboard' : 'Ir al Dashboard'} <ArrowRight className="ml-2 w-5 h-5" />
+
+            <h1 className="text-5xl lg:text-7xl font-black text-white tracking-tight leading-[1.05] mb-6">
+              Captura leads de<br/>
+              <span className="text-transparent bg-clip-text" style={{backgroundImage:'linear-gradient(90deg,#818cf8,#34d399,#f472b6)'}}>
+                TikTok, Instagram,<br/>Facebook y más
+              </span>
+            </h1>
+
+            <p className="text-xl text-slate-300 mb-10 max-w-2xl mx-auto leading-relaxed">
+              El único CRM que unifica captura de leads desde redes sociales, cotizador profesional, AI agents y campañas multi-canal.
+              <strong className="text-white"> 40% más barato que HubSpot y respond.io.</strong>
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              {user ? (
+                <Button onClick={() => navigate('/dashboard')} size="lg" className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-10 py-4 h-auto rounded-xl shadow-2xl shadow-indigo-600/30">
+                  Ir al Dashboard <ArrowRight className="ml-2 w-5 h-5" />
+                </Button>
+              ) : (
+                <>
+                  <Button onClick={() => navigate('/register')} size="lg" className="bg-indigo-600 hover:bg-indigo-500 text-white font-black px-10 py-4 h-auto rounded-xl text-lg shadow-2xl shadow-indigo-600/30 transition-all hover:scale-105">
+                    Prueba 14 días gratis → Sin tarjeta
                   </Button>
-                ) : (
-                  <>
-                    <Button onClick={() => navigate('/register')} size="lg" className="bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg px-8 py-4 h-auto shadow-lg shadow-blue-600/30">
-                      {en ? 'Start free trial' : 'Prueba gratis'}
-                    </Button>
-                    <Button variant="outline" size="lg" className="bg-white/5 hover:bg-white/10 border-white/20 text-white font-semibold rounded-lg px-8 py-4 h-auto">
-                      <PlayCircle className="w-5 h-5 mr-2" />{en ? 'Watch demo' : 'Ver demo'}
-                    </Button>
-                  </>
-                )}
+                  <Button variant="outline" size="lg" onClick={() => setShowLogin(true)} className="bg-white/5 hover:bg-white/10 border-white/20 text-white font-semibold px-8 py-4 h-auto rounded-xl">
+                    Ver demo
+                  </Button>
+                </>
+              )}
+            </div>
+
+            {/* Channel pills */}
+            <div className="mt-14 flex flex-wrap justify-center gap-3">
+              {CHANNELS.map((c) => (
+                <div key={c.label} className={`flex items-center gap-2 bg-gradient-to-r ${c.color} text-white text-sm font-bold px-4 py-2 rounded-full shadow-lg`}>
+                  <span>{c.emoji}</span>{c.label}
+                </div>
+              ))}
+              <div className="flex items-center gap-2 bg-white/10 border border-white/20 text-white text-sm font-bold px-4 py-2 rounded-full">
+                + más canales
               </div>
             </div>
           </div>
@@ -79,114 +135,197 @@ export default function LandingPage() {
       </section>
 
       {/* ═══ STATS BAR ═══ */}
-      <section className="py-12 bg-white border-b border-slate-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            {[
-              { num: '10,000+', label: en ? 'Leads Managed' : 'Leads Gestionados' },
-              { num: '98%', label: en ? 'Uptime SLA' : 'Disponibilidad SLA' },
-              { num: '3x', label: en ? 'Faster Deal Closing' : 'Cierre de Tratos Más Rápido' },
-              { num: '500+', label: en ? 'Companies Trust Us' : 'Empresas Confían en Nosotros' },
-            ].map((s, i) => (
-              <div key={i}>
-                <p className="text-3xl font-extrabold text-slate-900">{s.num}</p>
-                <p className="text-sm text-slate-500 mt-1">{s.label}</p>
-              </div>
-            ))}
-          </div>
+      <section className="py-14 bg-white border-b border-slate-100">
+        <div className="max-w-6xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+          {[
+            { num: '40%', label: 'Más barato que HubSpot y respond.io' },
+            { num: '7', label: 'Canales de captura de leads' },
+            { num: '3x', label: 'Más rápido para cerrar tratos' },
+            { num: '24/7', label: 'AI Agents trabajando por ti' },
+          ].map((s) => (
+            <div key={s.label}>
+              <p className="text-4xl font-black text-indigo-600">{s.num}</p>
+              <p className="text-sm text-slate-500 mt-1 font-medium">{s.label}</p>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* ═══ PRODUCTS ═══ */}
-      <section className="py-20 bg-white">
+      {/* ═══ SOCIAL LEAD CAPTURE ═══ */}
+      <section className="py-24 bg-slate-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl font-bold text-slate-900 mb-3">{en ? 'Everything you need to grow' : 'Todo lo que necesitas para crecer'}</h2>
-            <p className="text-lg text-slate-500 max-w-2xl mx-auto">{en ? 'One platform for sales, marketing, service, and AI automation.' : 'Una plataforma para ventas, marketing, servicio y automatización con IA.'}</p>
+          <div className="text-center mb-16">
+            <span className="text-sm font-black text-indigo-600 uppercase tracking-widest">Captura de Leads Social</span>
+            <h2 className="text-4xl font-black text-slate-900 mt-3 mb-4">
+              Donde está tu cliente,<br/>ahí capturamos su lead
+            </h2>
+            <p className="text-lg text-slate-500 max-w-2xl mx-auto">
+              Conecta tus anuncios de TikTok, Facebook e Instagram. Cada formulario completado crea automáticamente un lead en tu CRM — sin copiar y pegar.
+            </p>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
+
+          <div className="grid md:grid-cols-3 gap-6">
             {[
-              { title: 'Sales Cloud', icon: Target, desc: en ? 'Pipeline management, quotes, and deal tracking.' : 'Gestión de pipeline, cotizaciones y seguimiento.', color: 'text-blue-600', bg: 'bg-blue-50' },
-              { title: 'Marketing Hub', icon: Zap, desc: en ? 'Email campaigns, lead hunter, and AI flyers.' : 'Campañas email, lead hunter y flyers con IA.', color: 'text-orange-600', bg: 'bg-orange-50' },
-              { title: 'Service Desk', icon: MessageSquare, desc: en ? 'Ticket management and SLA tracking.' : 'Gestión de tickets y seguimiento SLA.', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-              { title: 'AI Agents', icon: Bot, desc: en ? 'Autonomous agents that work 24/7.' : 'Agentes autónomos que trabajan 24/7.', color: 'text-purple-600', bg: 'bg-purple-50' },
-            ].map((p, i) => (
-              <div key={i} className="group p-6 rounded-2xl bg-white border border-slate-200 hover:shadow-lg hover:border-slate-300 transition-all duration-300 cursor-pointer">
-                <div className={`w-12 h-12 ${p.bg} rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
-                  <p.icon className={`w-6 h-6 ${p.color}`} />
+              { emoji: '🎵', platform: 'TikTok Ads', color: 'from-pink-500 to-red-500', desc: 'Leads de TikTok Lead Generation entran al CRM en segundos. El AI bot los contacta automáticamente.' },
+              { emoji: '📸', platform: 'Instagram / Facebook Ads', color: 'from-purple-500 to-blue-500', desc: 'Conecta tu página de Meta. Los formularios de Lead Ads crean prospectos con toda su info y el anuncio de origen.' },
+              { emoji: '💬', platform: 'WhatsApp + Telegram', color: 'from-emerald-500 to-teal-500', desc: 'El AI Agent responde, califica y agenda reuniones 24/7. El lead queda registrado con el historial completo.' },
+            ].map((item) => (
+              <div key={item.platform} className="bg-white rounded-2xl p-7 border border-slate-200 shadow-sm hover:shadow-xl transition-all hover:-translate-y-1">
+                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${item.color} flex items-center justify-center text-2xl mb-5 shadow-lg`}>
+                  {item.emoji}
                 </div>
-                <h3 className="text-lg font-bold text-slate-900 mb-2">{p.title}</h3>
-                <p className="text-slate-500 text-sm leading-relaxed mb-4">{p.desc}</p>
-                <span className="flex items-center text-blue-600 font-semibold text-sm group-hover:translate-x-1 transition-transform">
-                  {en ? 'Learn more' : 'Saber más'} <ArrowRight className="w-4 h-4 ml-1" />
-                </span>
+                <h3 className="text-lg font-black text-slate-900 mb-2">{item.platform}</h3>
+                <p className="text-slate-500 text-sm leading-relaxed">{item.desc}</p>
+                <div className="mt-4 flex items-center gap-1.5 text-emerald-600 text-xs font-black">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> Activo en producción
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ═══ FEATURE: DASHBOARD ═══ */}
-      <section className="py-20 bg-slate-50">
+      {/* ═══ EXCLUSIVOS ═══ */}
+      <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <span className="text-sm font-bold text-blue-600 uppercase tracking-wider">{en ? 'Sales Intelligence' : 'Inteligencia de Ventas'}</span>
-              <h2 className="text-3xl font-bold text-slate-900 mt-3 mb-4">{en ? 'See your entire pipeline at a glance' : 'Ve todo tu pipeline de un vistazo'}</h2>
-              <p className="text-slate-500 mb-6 leading-relaxed">{en ? 'Track every deal from first contact to close. Kanban boards, revenue forecasting, and AI-powered insights help your team prioritize what matters.' : 'Sigue cada trato desde el primer contacto al cierre. Tableros Kanban, pronósticos de ingresos e insights con IA ayudan a tu equipo a priorizar lo que importa.'}</p>
-              <ul className="space-y-3">
-                {(en ? ['Drag & drop pipeline management', 'AI lead scoring & prioritization', 'Real-time revenue forecasting', 'Automated follow-up sequences'] : ['Gestión de pipeline drag & drop', 'Scoring de leads con IA', 'Pronóstico de ingresos en tiempo real', 'Secuencias de seguimiento automatizadas']).map((f, i) => (
-                  <li key={i} className="flex items-center gap-3 text-sm text-slate-700"><CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />{f}</li>
-                ))}
-              </ul>
-            </div>
-            <div className="relative">
-              <img src="/feature_dashboard.png" alt="Dashboard" className="w-full rounded-2xl shadow-xl border border-slate-200" />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══ FEATURE: ANALYTICS (reversed) ═══ */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="order-2 lg:order-1">
-              <img src="/feature_analytics.png" alt="Analytics" className="w-full rounded-2xl shadow-xl border border-slate-200" />
-            </div>
-            <div className="order-1 lg:order-2">
-              <span className="text-sm font-bold text-purple-600 uppercase tracking-wider">{en ? 'Marketing Automation' : 'Automatización de Marketing'}</span>
-              <h2 className="text-3xl font-bold text-slate-900 mt-3 mb-4">{en ? 'Campaigns that convert, powered by AI' : 'Campañas que convierten, potenciadas por IA'}</h2>
-              <p className="text-slate-500 mb-6 leading-relaxed">{en ? 'Launch multi-channel campaigns, discover new leads with Lead Hunter, and let AI agents handle the rest. Every interaction is tracked.' : 'Lanza campañas multicanal, descubre nuevos leads con Lead Hunter, y deja que los agentes IA se encarguen del resto.'}</p>
-              <ul className="space-y-3">
-                {(en ? ['Multi-channel email & SMS campaigns', 'AI-powered Lead Hunter discovery', 'Smart audience segmentation', 'Real-time campaign analytics'] : ['Campañas email y SMS multicanal', 'Descubrimiento de leads con IA', 'Segmentación inteligente de audiencia', 'Analítica de campañas en tiempo real']).map((f, i) => (
-                  <li key={i} className="flex items-center gap-3 text-sm text-slate-700"><CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />{f}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══ WHY ARIAS ═══ */}
-      <section className="py-20 bg-slate-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl font-bold text-slate-900 mb-3">{en ? 'Why companies choose Arias CRM' : 'Por qué las empresas eligen Arias CRM'}</h2>
-            <p className="text-lg text-slate-500 max-w-2xl mx-auto">{en ? 'Built for teams that want results, not complexity.' : 'Hecho para equipos que quieren resultados, no complejidad.'}</p>
+          <div className="text-center mb-16">
+            <span className="text-sm font-black text-amber-600 uppercase tracking-widest">Solo en Arias CRM</span>
+            <h2 className="text-4xl font-black text-slate-900 mt-3 mb-4">Features que HubSpot no tiene</h2>
+            <p className="text-lg text-slate-500">Y que respond.io nunca tendrá.</p>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {[
-              { icon: TrendingUp, title: en ? '3x Faster Growth' : '3x Más Rápido', desc: en ? 'Companies using Arias CRM close deals 3x faster than industry average.' : 'Las empresas que usan Arias CRM cierran tratos 3x más rápido.' },
-              { icon: Shield, title: en ? 'Enterprise Security' : 'Seguridad Enterprise', desc: en ? 'Row-level security, SOC 2 compliance, and multi-tenant data isolation.' : 'Seguridad por filas, cumplimiento SOC 2, aislamiento de datos multi-tenant.' },
-              { icon: Clock, title: en ? '24/7 AI Agents' : 'Agentes IA 24/7', desc: en ? 'AI agents handle inquiries, qualify leads, and book meetings around the clock.' : 'Los agentes IA gestionan consultas, califican leads y agendan reuniones 24/7.' },
-              { icon: BarChart3, title: en ? 'Real-Time Analytics' : 'Analítica en Tiempo Real', desc: en ? 'Live dashboards, revenue forecasting, and team performance tracking.' : 'Dashboards en vivo, pronósticos de ingresos y seguimiento de rendimiento.' },
-              { icon: Zap, title: en ? 'Automation First' : 'Automatización Primero', desc: en ? 'Automate follow-ups, campaigns, and workflows. Less manual work.' : 'Automatiza seguimientos, campañas y flujos. Menos trabajo manual.' },
-              { icon: Star, title: en ? 'Premium Support' : 'Soporte Premium', desc: en ? 'Dedicated success manager, onboarding, and 99.9% uptime guarantee.' : 'Gerente de éxito dedicado, onboarding y garantía de 99.9% uptime.' },
-            ].map((item, i) => (
-              <div key={i} className="bg-white rounded-2xl p-6 border border-slate-200 hover:shadow-md transition-shadow">
-                <item.icon className="w-8 h-8 text-blue-600 mb-4" />
-                <h3 className="text-lg font-bold text-slate-900 mb-2">{item.title}</h3>
+              { icon: '📄', title: 'Cotizador + PDF Profesional', desc: 'Crea cotizaciones en segundos, envía PDFs con tu branding y recibe pagos desde el portal del cliente. Ningún CRM lo tiene así de completo.' },
+              { icon: '🔍', title: 'Lead Hunter', desc: 'Busca prospectos en Google Maps por industria y zona. Importa 500 leads en 1 minuto. Exclusivo nuestro.' },
+              { icon: '🎨', title: 'Flyer Studio con IA', desc: 'Diseña materiales de marketing con IA directamente en el CRM. Sin salir a Canva, sin perder tiempo.' },
+            ].map((f) => (
+              <div key={f.title} className="group p-8 rounded-2xl border-2 border-slate-100 hover:border-indigo-200 hover:shadow-xl transition-all hover:-translate-y-1 cursor-pointer bg-gradient-to-b from-white to-slate-50/50">
+                <div className="text-4xl mb-5">{f.icon}</div>
+                <h3 className="text-xl font-black text-slate-900 mb-3">{f.title}</h3>
+                <p className="text-slate-500 leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ VS COMPARISON ═══ */}
+      <section className="py-24" style={{background:'linear-gradient(135deg,#0f0c29 0%,#1a1560 100%)'}}>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14">
+            <h2 className="text-4xl font-black text-white mb-4">¿Por qué no HubSpot o respond.io?</h2>
+            <p className="text-slate-400 text-lg">Compara y decide tú mismo.</p>
+          </div>
+          <div className="bg-white/5 backdrop-blur border border-white/10 rounded-2xl overflow-hidden">
+            <div className="grid grid-cols-4 bg-white/10">
+              <div className="p-4 text-slate-400 text-xs font-black uppercase tracking-wider">Feature</div>
+              <div className="p-4 text-indigo-300 text-xs font-black uppercase tracking-wider text-center">Arias CRM ✨</div>
+              <div className="p-4 text-slate-400 text-xs font-black uppercase tracking-wider text-center">HubSpot</div>
+              <div className="p-4 text-slate-400 text-xs font-black uppercase tracking-wider text-center">respond.io</div>
+            </div>
+            {VS_ROWS.map((row, i) => (
+              <div key={row.feature} className={`grid grid-cols-4 items-center border-t border-white/5 ${i % 2 === 0 ? 'bg-white/[0.02]' : ''}`}>
+                <div className="p-4 text-white text-sm font-medium">{row.feature}</div>
+                <div className="p-4 text-center">
+                  {typeof row.us === 'boolean'
+                    ? (row.us ? <span className="text-emerald-400 text-lg">✅</span> : <span className="text-red-400 text-lg">❌</span>)
+                    : <span className="text-emerald-300 font-black text-sm">{row.us}</span>}
+                </div>
+                <div className="p-4 text-center">
+                  {typeof row.hubspot === 'boolean'
+                    ? (row.hubspot ? <span className="text-emerald-400 text-lg">✅</span> : <span className="text-red-400 text-lg">❌</span>)
+                    : <span className="text-red-300 font-black text-sm">{row.hubspot}</span>}
+                </div>
+                <div className="p-4 text-center">
+                  {typeof row.respond === 'boolean'
+                    ? (row.respond ? <span className="text-emerald-400 text-lg">✅</span> : <span className="text-red-400 text-lg">❌</span>)
+                    : <span className="text-amber-300 font-black text-sm">{row.respond}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-center text-slate-500 text-sm mt-6">HubSpot Professional empieza en $890/mo. Nosotros en $65/mo.</p>
+        </div>
+      </section>
+
+      {/* ═══ PRICING ═══ */}
+      <section id="pricing" className="py-24 bg-white scroll-mt-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-4xl font-black text-slate-900 mb-4">Precios simples. Sin sorpresas.</h2>
+            {/* Toggle */}
+            <div className="inline-flex items-center gap-3 bg-slate-100 rounded-full p-1.5">
+              <button onClick={() => setAnnual(true)} className={`px-5 py-2 rounded-full text-sm font-black transition-all ${annual ? 'bg-indigo-600 text-white shadow' : 'text-slate-500 hover:text-slate-900'}`}>
+                Anual — 20% off
+              </button>
+              <button onClick={() => setAnnual(false)} className={`px-5 py-2 rounded-full text-sm font-black transition-all ${!annual ? 'bg-indigo-600 text-white shadow' : 'text-slate-500 hover:text-slate-900'}`}>
+                Mensual
+              </button>
+            </div>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto items-start">
+            {PLANS.map((plan) => {
+              const price = annual ? plan.annual : plan.monthly;
+              const isPop = plan.badge;
+              return (
+                <div key={plan.slug} className={`relative rounded-2xl border-2 p-8 bg-white ${isPop ? 'border-indigo-500 shadow-2xl shadow-indigo-100 scale-[1.03] z-10' : 'border-slate-200 shadow-sm'}`}>
+                  {isPop && <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-indigo-600 text-white text-xs font-black px-4 py-1.5 rounded-full uppercase tracking-wider shadow-lg">{plan.badge}</div>}
+                  <h3 className="text-xl font-black text-slate-900">{plan.name}</h3>
+                  <p className="text-slate-500 text-sm mt-1 mb-5">{plan.desc}</p>
+                  <div className="mb-2">
+                    <span className="text-5xl font-black text-slate-900">${price}</span>
+                    <span className="text-slate-400 font-medium">/mo</span>
+                  </div>
+                  {annual && <p className="text-xs text-emerald-600 font-black mb-6">Facturado ${price * 12}/año · Ahorras ${(plan.monthly - plan.annual) * 12}/año</p>}
+                  {!annual && <p className="text-xs text-slate-400 mb-6">Sin contrato anual · Cancela cuando quieras</p>}
+                  <Button onClick={() => navigate('/register')} className={`w-full font-black py-3 rounded-xl mb-6 ${isPop ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-900'}`}>
+                    Prueba 14 días gratis
+                  </Button>
+                  <ul className="space-y-2.5">
+                    <li className="flex items-start gap-2 text-sm text-slate-600">
+                      <CheckCircle2 className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                      <span>Hasta <strong>{plan.users}</strong> usuarios (+$12/usuario extra)</span>
+                    </li>
+                    <li className="flex items-start gap-2 text-sm text-slate-600">
+                      <CheckCircle2 className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                      <span><strong>Contactos ilimitados</strong> — sin cobro por contacto</span>
+                    </li>
+                    {plan.features.map((f) => (
+                      <li key={f} className="flex items-start gap-2 text-sm text-slate-600">
+                        <CheckCircle2 className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />{f}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="text-center mt-10">
+            <p className="text-slate-500 text-sm">¿Necesitas más de 15 usuarios o White Label? <button onClick={() => navigate('/register')} className="text-indigo-600 font-black hover:underline">Habla con ventas →</button></p>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ WHY US ═══ */}
+      <section className="py-20 bg-slate-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14">
+            <h2 className="text-4xl font-black text-slate-900 mb-3">Por qué Arias CRM</h2>
+          </div>
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              { icon: TrendingUp, title: '3x Más Cierres', desc: 'AI scoring, seguimientos automáticos y cotizador integrado = tu equipo cierra más sin más esfuerzo.' },
+              { icon: Shield, title: 'Seguridad Enterprise', desc: 'Multi-tenant con Row Level Security. Tus datos 100% aislados. Nunca mezclados con otros clientes.' },
+              { icon: Star, title: 'Soporte Real', desc: 'Onboarding en español, soporte en vivo y un equipo que entiende el mercado latinoamericano.' },
+              { icon: Zap, title: 'Todo en Uno', desc: 'CRM + Marketing + Cotizador + AI Agents + Lead Hunter. Sin pagar 5 herramientas diferentes.' },
+              { icon: Users, title: 'Multi-empresa', desc: 'Agencias y franquicias pueden gestionar múltiples clientes desde una sola plataforma.' },
+              { icon: BarChart3, title: 'Analytics en Tiempo Real', desc: 'Dashboard premium con Health Pulse, tendencias de venta y análisis de leads perdidos.' },
+            ].map((item) => (
+              <div key={item.title} className="bg-white p-6 rounded-2xl border border-slate-200 hover:shadow-md transition-shadow">
+                <item.icon className="w-8 h-8 text-indigo-600 mb-4" />
+                <h3 className="text-lg font-black text-slate-900 mb-2">{item.title}</h3>
                 <p className="text-sm text-slate-500 leading-relaxed">{item.desc}</p>
               </div>
             ))}
@@ -194,64 +333,30 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ═══ PRICING ═══ */}
-      <section id="pricing" className="py-20 bg-white scroll-mt-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl font-bold text-slate-900 mb-3">{en ? 'Simple, transparent pricing' : 'Precios simples y transparentes'}</h2>
-            <p className="text-lg text-slate-500 max-w-2xl mx-auto">{en ? 'Start free. Upgrade when you need more.' : 'Empieza gratis. Mejora cuando necesites más.'}</p>
-          </div>
-          {isLoading ? (
-            <div className="flex justify-center"><div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" /></div>
-          ) : (
-            <div className="grid md:grid-cols-3 gap-6 items-start max-w-5xl mx-auto">
-              {plans.map((plan) => {
-                const isPro = plan.slug === 'pro';
-                return (
-                  <div key={plan.id} className={`relative bg-white rounded-2xl p-7 border ${isPro ? 'border-blue-600 shadow-xl shadow-blue-900/10 scale-[1.03] z-10' : 'border-slate-200 shadow-sm'}`}>
-                    {isPro && <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-blue-600 text-white px-4 py-1 rounded-full text-xs font-bold uppercase">{en ? 'Most Popular' : 'Más Popular'}</div>}
-                    <h3 className="text-xl font-bold text-slate-900 mb-1">{plan.name}</h3>
-                    <p className="text-sm text-slate-500 mb-5 min-h-[36px]">{plan.description}</p>
-                    <div className="mb-6">
-                      <span className="text-4xl font-extrabold text-slate-900">{formatPrice(plan.price_monthly)}</span>
-                      <span className="text-slate-500 font-medium">/{en ? 'mo' : 'mes'}</span>
-                    </div>
-                    <Button className={`w-full mb-6 font-bold py-5 rounded-xl ${isPro ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-900'}`} onClick={() => navigate('/register')}>
-                      {en ? 'Start Free Trial' : 'Prueba Gratis'}
-                    </Button>
-                    <ul className="space-y-2.5">
-                      <li className="flex items-center gap-2 text-sm text-slate-600"><CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />{en ? 'Up to' : 'Hasta'} <strong>{plan.max_users}</strong> {en ? 'users' : 'usuarios'}</li>
-                      <li className="flex items-center gap-2 text-sm text-slate-600"><CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" /><strong>{plan.max_leads.toLocaleString()}</strong> leads</li>
-                      <li className="flex items-center gap-2 text-sm text-slate-600"><CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" /><strong>{plan.max_ai_tokens.toLocaleString()}</strong> AI tokens</li>
-                      {plan.features.map((f: string, i: number) => (
-                        <li key={i} className="flex items-center gap-2 text-sm text-slate-600"><CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />{f}</li>
-                      ))}
-                    </ul>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </section>
-
       {/* ═══ CTA ═══ */}
-      <section className="py-20 bg-[#0f172a] text-center px-4">
-        <h2 className="text-3xl md:text-4xl font-extrabold text-white mb-4">{en ? 'Ready to transform your business?' : '¿Listo para transformar tu negocio?'}</h2>
-        <p className="text-lg text-slate-400 mb-8 max-w-xl mx-auto">{en ? 'Join thousands of companies growing faster with Arias CRM.' : 'Únete a miles de empresas que crecen más rápido con Arias CRM.'}</p>
-        <Button size="lg" onClick={() => navigate('/register')} className="bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-lg px-10 py-5 text-lg shadow-xl shadow-blue-600/30">
-          {en ? 'Start your free trial' : 'Inicia tu prueba gratis'}
-        </Button>
+      <section className="py-24 text-center px-4" style={{background:'linear-gradient(135deg,#0f0c29 0%,#1a1560 100%)'}}>
+        <div className="max-w-3xl mx-auto">
+          <h2 className="text-4xl md:text-5xl font-black text-white mb-6 leading-tight">
+            Empieza a capturar leads de<br/>
+            <span className="text-transparent bg-clip-text" style={{backgroundImage:'linear-gradient(90deg,#818cf8,#34d399)'}}>
+              TikTok, Instagram y Facebook
+            </span><br/>hoy mismo
+          </h2>
+          <p className="text-slate-400 text-lg mb-10">14 días gratis. Sin tarjeta de crédito. Configuración en 5 minutos.</p>
+          <Button size="lg" onClick={() => navigate('/register')} className="bg-indigo-600 hover:bg-indigo-500 text-white font-black px-12 py-5 text-lg rounded-xl shadow-2xl shadow-indigo-600/30 transition-all hover:scale-105">
+            Crear cuenta gratis →
+          </Button>
+          <p className="text-slate-600 text-sm mt-5">40% más barato que HubSpot · Más features que respond.io</p>
+        </div>
       </section>
 
       <LandingFooter />
       <AriasAgent />
 
-      {/* Login Modal */}
-      {showLoginModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+      {showLogin && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md">
           <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden">
-            <button onClick={() => setShowLoginModal(false)} className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors z-10">
+            <button onClick={() => setShowLogin(false)} className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors z-10">
               <X className="w-5 h-5" />
             </button>
             <div className="p-8"><Login /></div>
