@@ -4,7 +4,7 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
-import { BadgeDollarSign, TrendingUp, Users, Target, Building, Building2, Calendar, Clock, CheckCircle, ChevronDown, Edit2, Settings, AlertTriangle, PhoneOff, ArrowRight, Sprout, CreditCard, Brain, Sparkles, MessageSquare, Crosshair, Flame, Zap } from 'lucide-react';
+import { BadgeDollarSign, TrendingUp, Users, Target, Building, Building2, Calendar, Clock, CheckCircle, ChevronDown, Edit2, Settings, AlertTriangle, PhoneOff, ArrowRight, Sprout, CreditCard, Brain, Sparkles, MessageSquare, Crosshair, Flame, Zap, HelpCircle } from 'lucide-react';
 import { adminService } from '../services/admin';
 import { supabase } from '../services/supabase';
 import { useEffect, useState, useRef, useMemo } from 'react';
@@ -1323,6 +1323,7 @@ export default function Dashboard() {
                             value: biggestStuck.label || biggestStuck.key,
                             sub: `${biggestStuck.value} leads estancados`,
                             action: biggestStuck.key,
+                            tooltip: 'La etapa activa que tiene más prospectos acumulados hoy. Representa el cuello de botella más grande de tu equipo.',
                         },
                         closestToClose && {
                             icon: Target,
@@ -1332,6 +1333,7 @@ export default function Dashboard() {
                             value: closestToClose.label || closestToClose.key,
                             sub: `${closestToClose.value} lead${closestToClose.value > 1 ? 's' : ''} listo${closestToClose.value > 1 ? 's' : ''}`,
                             action: closestToClose.key,
+                            tooltip: 'La etapa más avanzada que contiene leads activos. Estos prospectos están muy cerca de comprar; dales prioridad total hoy.',
                         },
                         avgTicket > 0 && canViewActiveFinancials && {
                             icon: Zap,
@@ -1341,8 +1343,9 @@ export default function Dashboard() {
                             value: `$${potentialUnlock.toLocaleString()}`,
                             sub: `Si cierras leads de ${biggestStuck?.label || '—'}`,
                             action: biggestStuck?.key || '',
+                            tooltip: 'Valor financiero estimado que puedes ganar si cierras todos los prospectos de la etapa con mayor acumulación.',
                         },
-                    ].filter(Boolean) as { icon: any; color: string; bg: string; label: string; value: string; sub: string; action: string }[];
+                    ].filter(Boolean) as { icon: any; color: string; bg: string; label: string; value: string; sub: string; action: string; tooltip: string }[];
 
                     return (
                         <div className="bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 lg:col-span-4 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500">
@@ -1376,7 +1379,16 @@ export default function Dashboard() {
                                                 <item.icon className={`w-4 h-4 ${item.color}`} />
                                             </div>
                                             <div className="min-w-0 flex-1">
-                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">{item.label}</p>
+                                                <div className="flex items-center gap-1">
+                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">{item.label}</p>
+                                                    <div className="relative group/tooltip">
+                                                        <HelpCircle className="w-2.5 h-2.5 text-slate-300 hover:text-indigo-500 cursor-help transition-colors" />
+                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tooltip:block w-48 bg-slate-900 text-white text-[8px] p-2 rounded-lg font-bold leading-normal shadow-xl z-[999] text-center normal-case tracking-normal">
+                                                            {item.tooltip}
+                                                            <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900"></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                                 <p className="text-[13px] font-black text-slate-800 leading-tight truncate group-hover/item:text-indigo-600 transition-colors">{item.value}</p>
                                                 <p className="text-[9px] text-slate-400 font-medium mt-0.5">{item.sub}</p>
                                             </div>
@@ -1389,7 +1401,16 @@ export default function Dashboard() {
                             {/* Top opportunity CTA */}
                             {topOpportunities.length > 0 && (
                                 <div className="mt-3 pt-2.5 border-t border-slate-100">
-                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1.5">🏆 Mejor Oportunidad</p>
+                                    <div className="flex items-center gap-1.5 mb-1.5">
+                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">🏆 Mejor Oportunidad</p>
+                                        <div className="relative group/tooltip">
+                                            <HelpCircle className="w-2.5 h-2.5 text-slate-300 hover:text-indigo-500 cursor-help transition-colors" />
+                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tooltip:block w-48 bg-slate-900 text-white text-[8px] p-2 rounded-lg font-bold leading-normal shadow-xl z-[999] text-center normal-case tracking-normal">
+                                                El lead activo con el valor económico más alto de todo tu pipeline hoy. Tu prioridad VIP del día.
+                                                <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-x-4 border-x-transparent border-t-4 border-t-slate-900"></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div
                                         onClick={() => navigate('/leads', { state: { leadId: topOpportunities[0].id } })}
                                         className="flex items-center gap-2 p-2 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100/60 cursor-pointer hover:border-indigo-200 transition-all"
