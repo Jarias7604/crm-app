@@ -81,18 +81,23 @@ export default function PublicBookingPage() {
         if (!link || !selectedSlot || !form.name || !form.email) return;
         setSubmitting(true);
         try {
+            // Client-side sanitization
+            const cleanEmail = form.email.trim().toLowerCase().replace(/[,;.\s]+$/, '').replace(/^[,;.\s]+/, '');
+            const cleanPhone = (form.phone || '').trim().replace(/[,;.\s]+$/, '').replace(/^[,;.\s]+/, '');
+
             const start = new Date(selectedSlot);
             const end = new Date(start.getTime() + link.duration_minutes * 60000);
             await bookingService.createAppointment({
                 booking_link_id: link.id, company_id: link.company_id, user_id: link.user_id,
-                guest_name: form.name, guest_email: form.email,
-                guest_phone: form.phone || undefined, guest_company: form.company || undefined,
+                guest_name: form.name, guest_email: cleanEmail,
+                guest_phone: cleanPhone || undefined, guest_company: form.company || undefined,
                 notes: form.notes || undefined,
                 start_time: start.toISOString(), end_time: end.toISOString(),
                 duration_minutes: link.duration_minutes, timezone: link.timezone,
             });
             setStep('confirmed');
-        } catch {
+        } catch (err) {
+            console.error('Error al agendar cita:', err);
             toast.error('Error al agendar. Por favor intenta de nuevo.');
         } finally {
             setSubmitting(false);
@@ -139,28 +144,113 @@ export default function PublicBookingPage() {
             {/* ── CONFIRMED ── */}
             {step === 'confirmed' ? (
                 <div className="flex-1 flex items-center justify-center p-6">
-                    <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-12 max-w-md w-full text-center">
-                        <div className="w-20 h-20 rounded-full bg-green-50 flex items-center justify-center mx-auto mb-6">
-                            <Check className="w-10 h-10 text-green-500" />
+                    <div className="bg-white rounded-[32px] shadow-2xl border border-gray-100 p-8 md:p-12 max-w-lg w-full text-center animate-in zoom-in-95 duration-200">
+                        <div className="w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-6 border border-emerald-100">
+                            <Check className="w-10 h-10 text-emerald-500" />
                         </div>
-                        <h2 className="text-2xl font-bold text-gray-900 mb-2">¡Reunión Confirmada!</h2>
-                        <p className="text-gray-400 mb-8">Se ha enviado una confirmación a tu correo electrónico.</p>
-                        <div className="bg-gray-50 rounded-xl p-5 text-left space-y-3 mb-8">
+                        <h2 className="text-2xl font-black text-gray-900 mb-2">¡Reunión Confirmada!</h2>
+                        <p className="text-sm text-gray-400 mb-8 font-medium">Se ha enviado una confirmación con todos los detalles a tu correo electrónico.</p>
+                        
+                        <div className="bg-gray-50 rounded-2xl p-6 text-left space-y-3.5 mb-8 border border-gray-100/50">
                             <div className="flex items-center gap-3 text-gray-700">
                                 <CalIcon className="w-5 h-5 text-gray-400 shrink-0" />
-                                <span className="font-medium">{selectedDate && format(selectedDate, "EEEE dd 'de' MMMM, yyyy", { locale: es })}</span>
+                                <span className="font-bold text-sm">{selectedDate && format(selectedDate, "EEEE dd 'de' MMMM, yyyy", { locale: es })}</span>
                             </div>
                             <div className="flex items-center gap-3 text-gray-700">
                                 <Clock className="w-5 h-5 text-gray-400 shrink-0" />
-                                <span className="font-medium">{selectedSlot && format(new Date(selectedSlot), 'h:mm a')} — {link.duration_minutes} min</span>
+                                <span className="font-bold text-sm">{selectedSlot && format(new Date(selectedSlot), 'h:mm a')} — {link.duration_minutes} min</span>
                             </div>
                             <div className="flex items-center gap-3 text-gray-700">
                                 <Video className="w-5 h-5 text-gray-400 shrink-0" />
-                                <span className="font-medium">{link.location}</span>
+                                <span className="font-bold text-sm">{link.location}</span>
                             </div>
                         </div>
+
+                        {/* 📅 BOTONES DE AÑADIR A CALENDARIO */}
+                        <div className="space-y-3 mb-8 border-t border-b border-gray-100 py-6 text-left">
+                            <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-3 text-center">Añadir a mi Calendario</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {/* Google Calendar */}
+                                <a 
+                                    href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(link.title || 'Reunión')}&dates=${(() => {
+                                        if (!selectedSlot) return '';
+                                        const start = new Date(selectedSlot);
+                                        const end = new Date(start.getTime() + link.duration_minutes * 60000);
+                                        const formatUTC = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+                                        return `${formatUTC(start)}/${formatUTC(end)}`;
+                                    })()}&details=${encodeURIComponent(link.description || 'Reunión agendada vía web.')}&location=${encodeURIComponent(link.location || 'Videollamada')}`}
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-blue-100 bg-blue-50/20 hover:bg-blue-50 text-blue-700 font-bold text-xs transition-all active:scale-95 text-center"
+                                >
+                                    <Globe className="w-4 h-4 text-blue-500" />
+                                    Google Calendar
+                                </a>
+
+                                {/* Outlook */}
+                                <a 
+                                    href={`https://outlook.live.com/calendar/0/deeplink/compose?path=/calendar/action/compose&rru=addevent&subject=${encodeURIComponent(link.title || 'Reunión')}&startdt=${(() => {
+                                        if (!selectedSlot) return '';
+                                        return encodeURIComponent(new Date(selectedSlot).toISOString());
+                                    })()}&enddt=${(() => {
+                                        if (!selectedSlot) return '';
+                                        const start = new Date(selectedSlot);
+                                        const end = new Date(start.getTime() + link.duration_minutes * 60000);
+                                        return encodeURIComponent(end.toISOString());
+                                    })()}&body=${encodeURIComponent(link.description || 'Reunión agendada vía web.')}&location=${encodeURIComponent(link.location || 'Videollamada')}`}
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-sky-100 bg-sky-50/20 hover:bg-sky-50 text-sky-700 font-bold text-xs transition-all active:scale-95 text-center"
+                                >
+                                    <Mail className="w-4 h-4 text-sky-500" />
+                                    Outlook / O365
+                                </a>
+                            </div>
+
+                            {/* Download ICS file */}
+                            <button 
+                                onClick={() => {
+                                    if (!selectedSlot || !link) return;
+                                    const start = new Date(selectedSlot);
+                                    const end = new Date(start.getTime() + link.duration_minutes * 60000);
+                                    const formatICS = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+                                    
+                                    const icsContent = [
+                                        'BEGIN:VCALENDAR',
+                                        'VERSION:2.0',
+                                        'PROID:-//Arias CRM//NONSGML Booking//EN',
+                                        'BEGIN:VEVENT',
+                                        `UID:${Date.now()}@ariasdefense.com`,
+                                        `DTSTAMP:${formatICS(new Date())}`,
+                                        `DTSTART:${formatICS(start)}`,
+                                        `DTEND:${formatICS(end)}`,
+                                        `SUMMARY:${link.title || 'Reunión'}`,
+                                        `DESCRIPTION:${link.description || 'Reunión agendada vía web.'}`,
+                                        `LOCATION:${link.location || 'Videollamada'}`,
+                                        'END:VEVENT',
+                                        'END:VCALENDAR'
+                                    ].join('\r\n');
+                                    
+                                    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8;' });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `cita-${link.slug}.ics`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                    URL.revokeObjectURL(url);
+                                    toast.success('¡Archivo de cita descargado!');
+                                }}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-bold text-xs transition-all active:scale-95 text-center"
+                            >
+                                <CalIcon className="w-4 h-4 text-gray-400" />
+                                Descargar Archivo de Cita (.ics)
+                            </button>
+                        </div>
+
                         <button onClick={() => { setStep('calendar'); setSelectedDate(null); setSelectedSlot(null); setForm({ name:'',email:'',phone:'',company:'',notes:'' }); }}
-                            className="text-sm font-semibold hover:underline" style={{ color: brandColor }}>
+                            className="text-xs font-black uppercase tracking-wider hover:underline" style={{ color: brandColor }}>
                             Agendar otra reunión
                         </button>
                     </div>

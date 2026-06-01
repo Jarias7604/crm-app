@@ -230,9 +230,16 @@ export const bookingService = {
         duration_minutes: number;
         timezone: string;
     }): Promise<BookingAppointment> {
+        // Sanitize Email: remove accidental trailing commas, periods, semicolons, spaces
+        let emailLower = appointment.guest_email.trim().toLowerCase();
+        emailLower = emailLower.replace(/[,;.\s]+$/, '').replace(/^[,;.\s]+/, '');
+
+        // Sanitize Phone: remove accidental punctuation/spaces at ends
+        let phoneCleaned = (appointment.guest_phone || '').trim();
+        phoneCleaned = phoneCleaned.replace(/[,;.\s]+$/, '').replace(/^[,;.\s]+/, '');
+
         // 1. Check if lead already exists by email
         let leadId = '';
-        const emailLower = appointment.guest_email.trim().toLowerCase();
         
         const { data: existingLead } = await supabase
             .from('leads')
@@ -251,7 +258,7 @@ export const bookingService = {
                     company_id: appointment.company_id,
                     name: appointment.guest_name,
                     email: emailLower,
-                    phone: appointment.guest_phone || null,
+                    phone: phoneCleaned || null,
                     company_name: appointment.guest_company || null,
                     assigned_to: appointment.user_id,
                     source: 'Agendador Web',
@@ -269,6 +276,8 @@ export const bookingService = {
             .from('booking_appointments')
             .insert({
                 ...appointment,
+                guest_email: emailLower,
+                guest_phone: phoneCleaned || null,
                 lead_id: leadId,
                 status: 'confirmed'
             })
@@ -345,6 +354,12 @@ export const bookingService = {
                     timeZone: 'America/El_Salvador'
                 });
 
+                // Generate Google Calendar Link for the email confirmation
+                const startDt = new Date(appointment.start_time);
+                const endDt = new Date(startDt.getTime() + appointment.duration_minutes * 60000);
+                const formatUTC = (d: Date) => d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+                const emailGCalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('Cita Agendada: ' + appointment.guest_name)}&dates=${formatUTC(startDt)}/${formatUTC(endDt)}&details=${encodeURIComponent(appointment.notes || 'Reunión agendada vía web.')}&location=${encodeURIComponent('Videollamada')}`;
+
                 const htmlContent = `
                     <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #f0f0f0; border-radius: 16px; background-color: #ffffff;">
                         <h2 style="color: #10B981; font-weight: 800; margin-bottom: 20px; font-size: 24px;">¡Reunión Confirmada!</h2>
@@ -370,6 +385,12 @@ export const bookingService = {
                                     <td style="padding: 8px 0; color: #1F2937; font-size: 14px; font-weight: 600;">Videollamada (Enlace enviado por el agente)</td>
                                 </tr>
                             </table>
+                        </div>
+                        
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="${emailGCalUrl}" target="_blank" style="background-color: #4285F4; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: bold; padding: 12px 28px; border-radius: 10px; display: inline-block; box-shadow: 0 4px 12px rgba(66, 133, 244, 0.25);">
+                                📅 Agregar a Google Calendar
+                            </a>
                         </div>
                         
                         <p style="color: #4B5563; font-size: 14px; line-height: 1.6; margin-bottom: 25px;">
