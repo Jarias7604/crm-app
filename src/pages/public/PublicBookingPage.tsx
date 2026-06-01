@@ -70,7 +70,7 @@ export default function PublicBookingPage() {
         setLoadingSlots(true);
         const dateStr = format(selectedDate, 'yyyy-MM-dd');
         bookingService.getBookedSlots(link.id, dateStr).then(booked => {
-            const s = bookingService.generateSlots(link.availability, booked, dateStr, link.duration_minutes, link.buffer_minutes);
+            const s = bookingService.generateSlots(link.availability, booked, dateStr, link.duration_minutes, link.buffer_minutes, link.max_per_day);
             setSlots(s);
             setSelectedSlot(null);
             setLoadingSlots(false);

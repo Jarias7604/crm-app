@@ -434,7 +434,13 @@ export const bookingService = {
         date: string,
         durationMinutes: number,
         bufferMinutes: number,
+        maxPerDay?: number,
     ): string[] {
+        // If we've reached the maximum appointments for the day, show no slots
+        if (maxPerDay && bookedSlots.length >= maxPerDay) {
+            return [];
+        }
+
         const d = new Date(date + 'T00:00:00');
         const dayOfWeek = d.getDay(); // 0=Sun...6=Sat
         const avail = availability.find(a => a.day === dayOfWeek);
@@ -475,6 +481,11 @@ export const bookingService = {
             }
 
             cursor = new Date(cursor.getTime() + (durationMinutes + bufferMinutes) * 60000);
+        }
+
+        // Limit the slots offered to the user's expected maxPerDay to keep the UI clean and exclusive
+        if (maxPerDay && slots.length > maxPerDay) {
+            return slots.slice(0, maxPerDay);
         }
 
         return slots;
