@@ -44,6 +44,7 @@ export interface BookingAppointment {
 export const bookingService = {
     // === BOOKING LINKS ===
 
+    /** Get the first booking link (backward compat) */
     async getMyBookingLink(): Promise<BookingLink | null> {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return null;
@@ -51,8 +52,37 @@ export const bookingService = {
             .from('booking_links')
             .select('*')
             .eq('user_id', user.id)
+            .order('created_at', { ascending: true })
+            .limit(1)
             .maybeSingle();
         return data;
+    },
+
+    /** Get ALL booking links for the current user */
+    async getMyBookingLinks(): Promise<BookingLink[]> {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return [];
+        const { data } = await supabase
+            .from('booking_links')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: true });
+        return data || [];
+    },
+
+    /** Delete a booking link by ID */
+    async deleteBookingLink(id: string): Promise<void> {
+        const { error } = await supabase
+            .from('booking_links')
+            .delete()
+            .eq('id', id);
+        if (error) throw error;
+    },
+
+    /** Duplicate a booking link with a new slug */
+    async duplicateBookingLink(source: BookingLink, newSlug: string): Promise<BookingLink> {
+        const { id: _id, created_at: _ca, updated_at: _ua, slug: _slug, ...rest } = source;
+        return this.upsertBookingLink({ ...rest, slug: newSlug, title: `${source.title} (copia)`, is_active: false });
     },
 
     async upsertBookingLink(link: Partial<BookingLink>): Promise<BookingLink> {
