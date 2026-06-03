@@ -49,7 +49,7 @@ interface Task {
 
 interface Profile {
   id: string;
-  full_name: string;
+  full_name: string | null;
   avatar_url: string | null;
   email: string;
 }
@@ -1100,13 +1100,13 @@ export default function ProjectManagement() {
                               {assigned ? (
                                 <>
                                   {assigned.avatar_url ? (
-                                    <img src={assigned.avatar_url} alt={assigned.full_name} className="w-6 h-6 rounded-full object-cover" />
+                                    <img src={assigned.avatar_url} alt={assigned.full_name || 'Usuario'} className="w-6 h-6 rounded-full object-cover" />
                                   ) : (
                                     <span className="w-6 h-6 rounded-full bg-[#4449AA]/10 text-[#4449AA] flex items-center justify-center text-[10px] font-bold">
-                                      {assigned.full_name.charAt(0)}
+                                      {(assigned.full_name || assigned.email || 'U').charAt(0)}
                                     </span>
                                   )}
-                                  <span className="text-xs text-gray-500 font-semibold">{assigned.full_name.split(' ')[0]}</span>
+                                  <span className="text-xs text-gray-500 font-semibold">{(assigned.full_name || assigned.email || 'Usuario').split(' ')[0]}</span>
                                 </>
                               ) : (
                                 <span className="text-xs text-gray-400 flex items-center gap-1"><User size={11} /> Sin asignar</span>
@@ -1261,9 +1261,9 @@ export default function ProjectManagement() {
                       {assigned ? (
                         <div className="flex items-center gap-2">
                           <div className="w-7 h-7 rounded-full bg-[#4449AA]/10 text-[#4449AA] flex items-center justify-center text-xs font-black shrink-0">
-                            {assigned.full_name.charAt(0)}
+                            {(assigned.full_name || assigned.email || 'U').charAt(0)}
                           </div>
-                          <span className="text-xs text-gray-600 font-semibold truncate">{assigned.full_name.split(' ')[0]}</span>
+                          <span className="text-xs text-gray-600 font-semibold truncate">{(assigned.full_name || assigned.email || 'Usuario').split(' ')[0]}</span>
                         </div>
                       ) : (
                         <span className="text-xs text-gray-300 flex items-center gap-1.5"><User size={12} /> —</span>
@@ -1483,7 +1483,7 @@ export default function ProjectManagement() {
                           >
                             <option value="">Sin Asignar</option>
                             {profiles.map(p => (
-                              <option key={p.id} value={p.id}>{p.full_name}</option>
+                              <option key={p.id} value={p.id}>{p.full_name || p.email || 'Sin nombre'}</option>
                             ))}
                           </select>
                         </div>
