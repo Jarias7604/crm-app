@@ -39,7 +39,7 @@ interface Task {
   status: 'todo' | 'in_progress' | 'paused' | 'completed';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   estimated_hours: number;
-  actual_hours: number;
+  actual_hours: number | null;
   start_date: string | null;
   due_date: string | null;
   completed_at: string | null;
@@ -721,7 +721,7 @@ export default function ProjectManagement() {
 
   const getDeviations = (task: Task) => {
     const limit = task.estimated_hours || 1;
-    const ratio = (task.actual_hours / limit) * 100;
+    const ratio = ((task.actual_hours ?? 0) / limit) * 100;
     
     // Default: On Track (A tiempo)
     let color = 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20';
@@ -753,7 +753,7 @@ export default function ProjectManagement() {
       }
 
       // Hours budget check
-      if (task.actual_hours > task.estimated_hours && task.estimated_hours > 0) {
+      if ((task.actual_hours ?? 0) > (task.estimated_hours ?? 0) && (task.estimated_hours ?? 0) > 0) {
         color = 'text-rose-500 bg-rose-500/10 border-rose-500/20';
         label = 'Retraso Horas';
       }
@@ -1079,16 +1079,16 @@ export default function ProjectManagement() {
                           <div className="space-y-1.5 mb-4">
                             <div className="flex justify-between items-center text-xs">
                               <span className="text-gray-400 font-medium">Uso Horas</span>
-                              <span className="text-gray-700 font-bold">{task.actual_hours.toFixed(1)}h / {task.estimated_hours}h</span>
+                              <span className="text-gray-700 font-bold">{(task.actual_hours ?? 0).toFixed(1)}h / {task.estimated_hours ?? 0}h</span>
                             </div>
                             <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
                               <div 
                                 className={`h-full rounded-full transition-all duration-300 ${
-                                  task.actual_hours > task.estimated_hours 
+                                  (task.actual_hours ?? 0) > (task.estimated_hours ?? 0)
                                     ? (efficiency.ratio > 120 ? 'bg-rose-500' : 'bg-amber-500')
                                     : 'bg-emerald-500'
                                 }`}
-                                style={{ width: `${Math.min((task.actual_hours / (task.estimated_hours || 1)) * 100, 100)}%` }}
+                                style={{ width: `${Math.min(((task.actual_hours ?? 0) / (task.estimated_hours || 1)) * 100, 100)}%` }}
                               />
                             </div>
                           </div>
@@ -1199,8 +1199,8 @@ export default function ProjectManagement() {
               const isExpanded = expandedTaskIds.has(task.id);
               const hasChildren = sub.length > 0;
               const sc = statusCfg[task.status] ?? statusCfg.todo;
-              const pct = task.estimated_hours > 0 ? Math.min((task.actual_hours / task.estimated_hours) * 100, 100) : 0;
-              const overBudget = task.actual_hours > task.estimated_hours;
+              const pct = (task.estimated_hours ?? 0) > 0 ? Math.min(((task.actual_hours ?? 0) / (task.estimated_hours ?? 1)) * 100, 100) : 0;
+              const overBudget = (task.actual_hours ?? 0) > (task.estimated_hours ?? 0);
 
               return (
                 <>
@@ -1299,7 +1299,7 @@ export default function ProjectManagement() {
                     {/* Real */}
                     <div className="flex items-center">
                       <span className={`text-xs font-bold ${overBudget ? 'text-rose-500' : 'text-gray-700'}`}>
-                        {task.actual_hours.toFixed(1)}h
+                        {(task.actual_hours ?? 0).toFixed(1)}h
                       </span>
                     </div>
 
