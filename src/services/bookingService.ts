@@ -205,14 +205,16 @@ export const bookingService = {
     async getBookedSlots(bookingLinkId: string, date: string): Promise<{ start: string; end: string }[]> {
         const dayStart = `${date}T00:00:00.000Z`;
         const dayEnd   = `${date}T23:59:59.999Z`;
-        const { data } = await supabase
-            .from('booking_appointments')
-            .select('start_time, end_time')
-            .eq('booking_link_id', bookingLinkId)
-            .eq('status', 'confirmed')
-            .gte('start_time', dayStart)
-            .lte('start_time', dayEnd);
-        return (data || []).map(d => ({ start: d.start_time, end: d.end_time }));
+        const { data, error } = await supabase.rpc('get_public_booked_slots', {
+            p_booking_link_id: bookingLinkId,
+            p_start_date: dayStart,
+            p_end_date: dayEnd
+        });
+        if (error) {
+            console.error('Error fetching public booked slots:', error);
+            return [];
+        }
+        return (data || []).map((d: any) => ({ start: d.start_time, end: d.end_time }));
     },
 
     /** Create a new public booking */
@@ -238,90 +240,40 @@ export const bookingService = {
         let phoneCleaned = (appointment.guest_phone || '').trim();
         phoneCleaned = phoneCleaned.replace(/[,;.\s]+$/, '').replace(/^[,;.\s]+/, '');
 
-        // 1. Check if lead already exists by email
-        let leadId = '';
-        
-        const { data: existingLead } = await supabase
-            .from('leads')
-            .select('id')
-            .eq('company_id', appointment.company_id)
-            .eq('email', emailLower)
-            .maybeSingle();
+        // Call the secure RPC that runs with SECURITY DEFINER to bypass RLS for public bookings
+        const { data, error } = await supabase.rpc('create_public_booking', {
+            p_booking_link_id: appointment.booking_link_id,
+            p_company_id: appointment.company_id,
+            p_user_id: appointment.user_id,
+            p_guest_name: appointment.guest_name,
+            p_guest_email: emailLower,
+            p_guest_phone: phoneCleaned || null,
+            p_guest_company: appointment.guest_company || null,
+            p_notes: appointment.notes || null,
+            p_start_time: appointment.start_time,
+            p_end_time: appointment.end_time,
+            p_duration_minutes: appointment.duration_minutes,
+            p_timezone: appointment.timezone
+        });
 
-        if (existingLead) {
-            leadId = existingLead.id;
-        } else {
-            // Create a new Lead
-            const { data: newLead, error: newLeadError } = await supabase
-                .from('leads')
-                .insert({
-                    company_id: appointment.company_id,
-                    name: appointment.guest_name,
-                    email: emailLower,
-                    phone: phoneCleaned || null,
-                    company_name: appointment.guest_company || null,
-                    assigned_to: appointment.user_id,
-                    source: 'Agendador Web',
-                    status: 'Prospecto'
-                })
-                .select('id')
-                .single();
+        if (error) throw error;
+        if (!data) throw new Error('No data returned from create_public_booking');
 
-            if (newLeadError) throw newLeadError;
-            leadId = newLead.id;
-        }
+        // Extract result fields returned from RPC
+        const apptData = data as BookingAppointment & {
+            follow_up_id: string;
+            google_integration_id: string | null;
+            google_email: string | null;
+        };
 
-        // 2. Insert the appointment associated with the lead_id
-        const { data: apptData, error: apptError } = await supabase
-            .from('booking_appointments')
-            .insert({
-                ...appointment,
-                guest_email: emailLower,
-                guest_phone: phoneCleaned || null,
-                lead_id: leadId,
-                status: 'confirmed'
-            })
-            .select()
-            .single();
-
-        if (apptError) throw apptError;
-
-        // 3. Create a matching FollowUp in the follow_ups table (this places it on the CRM Calendar)
-        const { data: followUp, error: followUpError } = await supabase
-            .from('follow_ups')
-            .insert({
-                lead_id: leadId,
-                company_id: appointment.company_id,
-                user_id: appointment.user_id,
-                assigned_to: appointment.user_id,
-                date: appointment.start_time,
-                notes: appointment.notes || `Reunión agendada vía web por ${appointment.guest_name}`,
-                action_type: 'meeting',
-                completed: false
-            })
-            .select()
-            .single();
-
-        if (followUpError) {
-            console.error('Error creating CRM follow_up:', followUpError);
-        }
-
-        // 4. Try to sync with Google Calendar if integrated
-        const { data: googleIntegration } = await supabase
-            .from('calendar_integrations')
-            .select('id, google_email')
-            .eq('user_id', appointment.user_id)
-            .eq('provider', 'google')
-            .eq('is_active', true)
-            .maybeSingle();
-
-        if (googleIntegration && followUp) {
+        // Try to sync with Google Calendar if integrated
+        if (apptData.google_integration_id && apptData.follow_up_id) {
             try {
                 // Call google-calendar-sync edge function exactly like GoogleMeetScheduler does
                 await supabase.functions.invoke('google-calendar-sync', {
                     body: {
                         action: 'create_event',
-                        integration_id: googleIntegration.id,
+                        integration_id: apptData.google_integration_id,
                         event: {
                             title: `Reunión: ${appointment.guest_name}`,
                             description: appointment.notes || 'Reunión agendada vía web.',
@@ -330,7 +282,7 @@ export const bookingService = {
                             attendees: [emailLower],
                             add_meet_link: true,
                             send_invites: true,
-                            follow_up_id: followUp.id,
+                            follow_up_id: apptData.follow_up_id,
                             timezone: 'America/El_Salvador',
                         },
                     },
@@ -339,7 +291,7 @@ export const bookingService = {
                 console.error('Error calling google-calendar-sync:', err);
             }
         } else {
-            // Fallback: Send a professional Resend email through marketing queue
+            // Fallback: Send a professional Resend email through marketing queue via safe RPC
             try {
                 const formattedDate = new Date(appointment.start_time).toLocaleDateString('es-ES', {
                     weekday: 'long',
@@ -403,17 +355,14 @@ export const bookingService = {
                     </div>
                 `;
 
-                await supabase
-                    .from('marketing_message_queue')
-                    .insert({
-                        company_id: appointment.company_id,
-                        lead_id: leadId,
-                        channel: 'email',
-                        subject: 'Confirmación de tu cita - Arias Defense',
-                        content: htmlContent,
-                        status: 'pending',
-                        scheduled_at: new Date().toISOString()
-                    });
+                // Call secure enqueue RPC
+                await supabase.rpc('enqueue_public_message', {
+                    p_company_id: appointment.company_id,
+                    p_lead_id: apptData.lead_id,
+                    p_channel: 'email',
+                    p_subject: 'Confirmación de tu cita - Arias Defense',
+                    p_content: htmlContent
+                });
 
                 // Trigger queue immediately
                 supabase.functions.invoke('process-message-queue');
