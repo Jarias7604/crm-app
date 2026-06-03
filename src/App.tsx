@@ -75,6 +75,8 @@ const Reports           = lazy(() => import('./pages/Reports'));
 const PlanManager       = lazy(() => import('./pages/admin/PlanManager'));
 const BookingSettings   = lazy(() => import('./pages/calendar/BookingSettings'));
 const PublicBookingPage = lazy(() => import('./pages/public/PublicBookingPage'));
+const PrivacyPolicy     = lazy(() => import('./pages/public/PrivacyPolicy'));
+
 
 // ─── Skeleton Screen (técnica Netflix) ───────────────────────────────────────
 // Muestra estructura visual inmediatamente mientras carga el JS del módulo.
@@ -287,6 +289,7 @@ function App() {
               <Route path="/book/:slug" element={<PublicBookingPage />} />
               <Route path="/update-password" element={<UpdatePassword />} />
               <Route path="/support/manual" element={<ManualPage />} />
+              <Route path="/privacy" element={<PrivacyPolicy />} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
