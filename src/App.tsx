@@ -56,6 +56,7 @@ const Tickets           = lazy(() => import('./pages/support/Tickets'));
 const OverdueTickets    = lazy(() => import('./pages/support/OverdueTickets'));
 const Clientes          = lazy(() => import('./pages/clientes/Clientes'));
 const ClientPortal      = lazy(() => import('./pages/clientes/ClientPortal'));
+const ProjectManagement = lazy(() => import('./pages/ProjectManagement'));
 const PipelineConfig    = lazy(() => import('./pages/admin/PipelineConfig'));
 const CallBot           = lazy(() => import('./pages/admin/CallBot'));
 const ManualPage        = lazy(() => import('./pages/support/ManualPage'));
@@ -266,6 +267,9 @@ function App() {
 
                   {/* Clientes Module */}
                   <Route path="/clientes" element={<Clientes />} />
+
+                  {/* Proyectos Module */}
+                  <Route path="/proyectos" element={<ProjectManagement />} />
 
                   {/* Finanzas Module */}
                   <Route path="/finanzas" element={<Finanzas />} />
