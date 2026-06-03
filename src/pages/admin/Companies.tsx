@@ -50,6 +50,7 @@ const MODULES_CONFIG = [
     { key: 'items', label: 'Catálogo CRM', icon: Layers, color: 'text-sky-600', bg: 'bg-sky-50' },
     { key: 'financial_rules', label: 'Reglas Financ.', icon: CreditCard, color: 'text-emerald-600', bg: 'bg-emerald-50' },
     { key: 'loss_reasons', label: 'Motivos de Pérdida', icon: XCircle, color: 'text-slate-600', bg: 'bg-slate-50' },
+    { key: 'proyectos', label: 'Gestión de Proyectos', icon: Layers, color: 'text-indigo-700', bg: 'bg-indigo-50' },
 ];
 
 // ─── Default module sets by license plan ──────────────────────────────────────
@@ -58,8 +59,8 @@ const MODULES_CONFIG = [
 // This prevents new tenants from seeing a completely empty CRM.
 const PLAN_DEFAULT_MODULES: Record<string, string[]> = {
     trial:       ['leads', 'quotes', 'calendar', 'loss_reasons'],
-    active:      ['leads', 'quotes', 'calendar', 'marketing', 'chat', 'loss_reasons', 'pricing', 'paquetes', 'items'],
-    manual_hold: ['leads', 'quotes', 'calendar', 'loss_reasons'],
+    active:      ['leads', 'quotes', 'calendar', 'marketing', 'chat', 'loss_reasons', 'pricing', 'paquetes', 'items', 'proyectos'],
+    manual_hold: ['leads', 'quotes', 'calendar', 'loss_reasons', 'proyectos'],
     expired:     [],
     suspended:   [],
 };

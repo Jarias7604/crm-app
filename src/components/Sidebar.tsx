@@ -154,7 +154,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         navigation.push({ name: 'Clientes', href: '/clientes', icon: UserCheck, current: location.pathname.startsWith('/clientes') });
     }
 
-    if (canAccess('projects') || profile?.role === 'super_admin' || profile?.role === 'company_admin') {
+    if (canAccess('proyectos') || profile?.role === 'super_admin' || profile?.role === 'company_admin') {
         navigation.push({ name: 'Proyectos', href: '/proyectos', icon: Layers, current: location.pathname.startsWith('/proyectos') });
     }
 
