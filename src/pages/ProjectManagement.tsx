@@ -84,6 +84,7 @@ export default function ProjectManagement() {
   const [ganttWeekOffset, setGanttWeekOffset] = useState(0);
   const [ganttExpandedGroups, setGanttExpandedGroups] = useState<Set<string>>(new Set());
   const [ganttTaskOrder, setGanttTaskOrder] = useState<string[]>([]); // custom sort order by task id
+  const [ganttSubtaskOrder, setGanttSubtaskOrder] = useState<Record<string, string[]>>({}); // custom sort order for subtasks by parent id
   const [ganttDragOverride, setGanttDragOverride] = useState<Record<string, { left: number; width: number }>>({});
   const ganttDragRef = useRef<{
     type: 'move' | 'resize';
@@ -789,16 +790,35 @@ export default function ProjectManagement() {
         setGanttRowDragging(null);
         setGanttRowDragOver(null);
         if (hoveredId && hoveredId !== rd.taskId) {
-          setGanttTaskOrder(prev => {
-            const ordered = prev.length ? prev : tasks.filter(t => !t.parent_task_id).map(t => t.id);
-            const from = ordered.indexOf(rd.taskId);
-            const to   = ordered.indexOf(hoveredId);
-            if (from === -1 || to === -1) return prev;
-            const next = [...ordered];
-            next.splice(from, 1);
-            next.splice(to, 0, rd.taskId);
-            return next;
-          });
+          const draggedTask = tasks.find(t => t.id === rd.taskId);
+          const hoveredTask = tasks.find(t => t.id === hoveredId);
+          if (draggedTask && hoveredTask && draggedTask.parent_task_id === hoveredTask.parent_task_id) {
+            const parentId = draggedTask.parent_task_id;
+            if (parentId) {
+              setGanttSubtaskOrder(prev => {
+                const siblings = tasks.filter(t => t.parent_task_id === parentId);
+                const ordered = prev[parentId] ?? siblings.map(t => t.id);
+                const from = ordered.indexOf(rd.taskId);
+                const to = ordered.indexOf(hoveredId);
+                if (from === -1 || to === -1) return prev;
+                const next = [...ordered];
+                next.splice(from, 1);
+                next.splice(to, 0, rd.taskId);
+                return { ...prev, [parentId]: next };
+              });
+            } else {
+              setGanttTaskOrder(prev => {
+                const ordered = prev.length ? prev : tasks.filter(t => !t.parent_task_id).map(t => t.id);
+                const from = ordered.indexOf(rd.taskId);
+                const to   = ordered.indexOf(hoveredId);
+                if (from === -1 || to === -1) return prev;
+                const next = [...ordered];
+                next.splice(from, 1);
+                next.splice(to, 0, rd.taskId);
+                return next;
+              });
+            }
+          }
         }
       }
     };
@@ -1859,26 +1879,49 @@ export default function ProjectManagement() {
                       </div>
 
                       {/* Children (collapsed by default) */}
-                      {expanded && children.map(child => {
-                        const ca  = getAssignedProfile(child.assigned_to);
-                        const csc = SC[child.status] ?? SC.todo;
-                        return (
-                          <div
-                            key={child.id}
-                            data-gantt-row={child.id}
-                            className={`flex border-b border-gray-50 group/row transition-all ${PB[child.priority] ?? ''} hover:bg-blue-50/20 bg-gray-50/40`}
-                            style={{ height: ROW_H - 10 }}
-                          >
-                            <div className="shrink-0 flex items-center gap-2 px-2 border-r border-gray-100" style={{ width: LEFT_W }}>
-                              {/* indent line */}
-                              <div className="w-4 shrink-0 flex justify-center relative">
-                                <div className="absolute top-0 bottom-0 left-1/2 w-px bg-indigo-200/60" />
-                                <div className="absolute top-1/2 left-1/2 w-2 h-px bg-indigo-200/60" />
-                              </div>
-                              <div className="w-5 shrink-0" /> {/* chevron placeholder */}
-                              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: csc.hex, opacity: 0.8 }} />
-                              <div className="min-w-0 flex-1">
-                                <p className="text-[10px] font-semibold text-gray-600 truncate">{child.title}</p>
+                      {expanded && (() => {
+                        const subtaskIds = ganttSubtaskOrder[parent.id] ?? [];
+                        const sortedChildren = subtaskIds.length
+                          ? [...children].sort((a, b) => {
+                              const ai = subtaskIds.indexOf(a.id); const bi = subtaskIds.indexOf(b.id);
+                              return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+                            })
+                          : children;
+                        return sortedChildren.map(child => {
+                          const ca  = getAssignedProfile(child.assigned_to);
+                          const csc = SC[child.status] ?? SC.todo;
+                          const isDragTarget = ganttRowDragOver === child.id;
+                          return (
+                            <div
+                              key={child.id}
+                              data-gantt-row={child.id}
+                              className={`flex border-b border-gray-50 group/row transition-all ${PB[child.priority] ?? ''}
+                                ${isDragTarget ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-300' : 'hover:bg-blue-50/20 bg-gray-50/40'}`}
+                              style={{ height: ROW_H - 10 }}
+                            >
+                              <div className="shrink-0 flex items-center gap-2 px-2 border-r border-gray-100 bg-white" style={{ width: LEFT_W }}>
+                                {/* indent line */}
+                                <div className="w-4 shrink-0 flex justify-center relative">
+                                  <div className="absolute top-0 bottom-0 left-1/2 w-px bg-indigo-200/60" />
+                                  <div className="absolute top-1/2 left-1/2 w-2 h-px bg-indigo-200/60" />
+                                </div>
+                                {/* Row drag handle for child task */}
+                                <div
+                                  className={`transition-all shrink-0 w-5 h-5 rounded flex items-center justify-center
+                                    ${ganttRowDragging === child.id
+                                      ? 'text-white bg-indigo-500 shadow-md shadow-indigo-200 ring-2 ring-indigo-300'
+                                      : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                  style={{
+                                    cursor: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%238b5cf6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v5'/><path d='M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6'/><path d='M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v9'/><path d='M6 14.5V11a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6c0 5.5 4.5 10 10 10h1a10 10 0 0 0 10-10v-3.5a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2V12'/></svg>") 12 12, grab`
+                                  }}
+                                  onMouseDown={(e) => startRowDrag(e, child)}
+                                  title="Arrastrar para reordenar subtarea"
+                                >
+                                  <GripVertical size={11} />
+                                </div>
+                                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: csc.hex, opacity: 0.8 }} />
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-[10px] font-semibold text-gray-600 truncate">{child.title}</p>
                                 <div className="flex items-center gap-1.5 mt-0.5">
                                   <span className={`text-[8px] font-black uppercase px-1 py-0.5 rounded ${priorCfg[child.priority]}`}>{child.priority}</span>
                                   {child.due_date
@@ -1898,7 +1941,8 @@ export default function ProjectManagement() {
                             </div>
                           </div>
                         );
-                      })}
+                      });
+                    })()}
                     </React.Fragment>
                   );
                 })}
