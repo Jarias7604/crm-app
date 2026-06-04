@@ -1550,24 +1550,40 @@ export default function ProjectManagement() {
         };
 
         const calcBar = (task: Task) => {
-          const start = task.start_date ? new Date(task.start_date) : task.created_at ? new Date(task.created_at) : null;
-          const end   = task.due_date   ? new Date(task.due_date)   : null;
-          if (!start || !end) return null;
-          start.setHours(0,0,0,0);
-          end.setHours(0,0,0,0);
+          // Smart fallbacks: always produce a bar
+          const rawStart = task.start_date
+            ? new Date(task.start_date)
+            : new Date(task.created_at);
+
+          // Duration: due_date OR estimated_hours converted to days (8h/day) OR 3 day default
+          let rawEnd: Date;
+          if (task.due_date) {
+            rawEnd = new Date(task.due_date);
+          } else if (task.estimated_hours && task.estimated_hours > 0) {
+            rawEnd = new Date(rawStart);
+            rawEnd.setDate(rawStart.getDate() + Math.max(1, Math.ceil(task.estimated_hours / 8)));
+          } else {
+            rawEnd = new Date(rawStart);
+            rawEnd.setDate(rawStart.getDate() + 3); // default 3-day placeholder
+          }
+
+          const start = new Date(rawStart); start.setHours(0,0,0,0);
+          const end   = new Date(rawEnd);   end.setHours(0,0,0,0);
+          const isFallback = !task.due_date; // using estimated/default duration
 
           const clampedStart = start < ganttStart ? ganttStart : start;
           const clampedEnd   = end   > ganttEnd   ? ganttEnd   : end;
-          if (clampedStart >= clampedEnd) return null;
 
-          const offsetDays = Math.round((clampedStart.getTime() - ganttStart.getTime()) / 86400000);
-          const durationDays = Math.round((clampedEnd.getTime() - clampedStart.getTime()) / 86400000) + 1;
+          // Task starts after visible window
+          if (clampedStart >= ganttEnd) return null;
+          // Task ends before visible window
+          if (clampedEnd <= ganttStart) return null;
 
-          return { left: offsetDays * DAY_W, width: durationDays * DAY_W };
+          const offsetDays   = Math.round((clampedStart.getTime() - ganttStart.getTime()) / 86400000);
+          const durationDays = Math.max(1, Math.round((clampedEnd.getTime() - clampedStart.getTime()) / 86400000) + 1);
+
+          return { left: offsetDays * DAY_W, width: durationDays * DAY_W, isFallback };
         };
-
-        const tasksWithDates = filteredTasks.filter(t => t.due_date || t.start_date);
-        const tasksNoDates   = filteredTasks.filter(t => !t.due_date && !t.start_date);
 
         const todayOffset = Math.round((today.getTime() - ganttStart.getTime()) / 86400000);
         const showTodayLine = todayOffset >= 0 && todayOffset < DAYS;
@@ -1627,19 +1643,27 @@ export default function ProjectManagement() {
                   </div>
                 </div>
 
-                {/* Task rows */}
-                {tasksWithDates.length === 0 && tasksNoDates.length > 0 ? (
+                {/* Task rows — ALL tasks, fallback bars for those without due_date */}
+                {filteredTasks.length === 0 ? (
                   <div className="py-12 text-center text-gray-400 text-xs font-semibold border-b border-gray-50">
-                    <CalendarIcon size={28} className="mx-auto mb-2 opacity-30" />
-                    Ninguna tarea tiene fecha de inicio/límite definida — agrégalas en el detalle de cada tarea.
+                    <Layers size={28} className="mx-auto mb-2 opacity-30" />
+                    No hay tareas en este proyecto.
                   </div>
                 ) : (
                   <>
-                    {tasksWithDates.map(task => {
+                    {/* Legend */}
+                    <div className="flex items-center gap-5 px-5 py-2 border-b border-gray-50 bg-gray-50/40">
+                      <div className="flex items-center gap-1.5"><div className="w-8 h-3 rounded bg-blue-500 opacity-80" /><span className="text-[9px] text-gray-500 font-bold">Barra real (con fecha límite)</span></div>
+                      <div className="flex items-center gap-1.5"><div className="w-8 h-3 rounded border-2 border-dashed border-gray-400 bg-gray-200 opacity-60" /><span className="text-[9px] text-gray-400 font-bold">Estimada (sin fecha límite)</span></div>
+                      <div className="ml-auto flex items-center gap-1.5"><div className="w-0.5 h-4 bg-indigo-500" /><span className="text-[9px] text-gray-400 font-bold">Hoy</span></div>
+                    </div>
+
+                    {filteredTasks.map(task => {
                       const bar = calcBar(task);
                       const assigned = getAssignedProfile(task.assigned_to);
                       const barColor = statusBarColor[task.status] ?? 'bg-gray-300';
                       const isParent = !task.parent_task_id;
+                      const isFallback = bar?.isFallback ?? false;
                       const pctFill = task.estimated_hours && task.estimated_hours > 0
                         ? Math.min(((task.actual_hours ?? 0) / task.estimated_hours) * 100, 100)
                         : 0;
@@ -1663,10 +1687,12 @@ export default function ProjectManagement() {
                                 <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${priorCfg[task.priority]}`}>
                                   {task.priority}
                                 </span>
-                                {task.due_date && (
-                                  <span className="text-[9px] text-gray-400 font-semibold">
+                                {task.due_date ? (
+                                  <span className="text-[9px] text-gray-500 font-bold">
                                     {new Date(task.due_date).toLocaleDateString('es', { day:'2-digit', month:'short' })}
                                   </span>
+                                ) : (
+                                  <span className="text-[9px] text-amber-500 font-bold">sin fecha</span>
                                 )}
                               </div>
                             </div>
@@ -1696,68 +1722,40 @@ export default function ProjectManagement() {
                             )}
 
                             {/* Task bar */}
-                            {bar && (
+                            {bar ? (
                               <div
-                                className="absolute top-1/2 -translate-y-1/2 rounded-lg cursor-pointer group/bar"
-                                style={{ left: bar.left + 2, width: Math.max(bar.width - 4, 20), height: 28 }}
+                                className={`absolute top-1/2 -translate-y-1/2 rounded-lg cursor-pointer hover:brightness-110 transition-all ${isFallback ? 'opacity-55' : 'opacity-90'}`}
+                                style={{ left: bar.left + 2, width: Math.max(bar.width - 4, 24), height: 26 }}
                                 onClick={() => openTaskModal(task)}
-                                title={task.title}
+                                title={`${task.title}${isFallback ? ' (duración estimada, sin fecha límite)' : ''}`}
                               >
-                                {/* Background bar */}
-                                <div className={`absolute inset-0 rounded-lg opacity-20 ${barColor}`} />
-                                {/* Progress fill */}
+                                {/* Background */}
+                                <div className={`absolute inset-0 rounded-lg ${barColor} opacity-25`} />
+                                {/* Dashed border for fallback */}
+                                {isFallback && (
+                                  <div className="absolute inset-0 rounded-lg" style={{ border: '2px dashed rgba(0,0,0,0.25)' }} />
+                                )}
+                                {/* Solid fill with progress */}
                                 <div
-                                  className={`absolute top-0 left-0 bottom-0 rounded-lg ${barColor} opacity-80 transition-all`}
-                                  style={{ width: `${pctFill}%` }}
+                                  className={`absolute top-0 left-0 bottom-0 rounded-lg ${barColor} transition-all`}
+                                  style={{ width: `${isFallback ? 100 : Math.max(pctFill, 3)}%`, opacity: isFallback ? 0.35 : 0.85 }}
                                 />
                                 {/* Label */}
                                 <div className="relative h-full flex items-center px-2 overflow-hidden">
-                                  <span className="text-[9px] font-black text-white whitespace-nowrap drop-shadow truncate">
+                                  <span className={`text-[9px] font-black whitespace-nowrap truncate drop-shadow ${isFallback ? 'text-gray-700' : 'text-white'}`}>
                                     {task.title}
                                   </span>
                                 </div>
                               </div>
+                            ) : (
+                              /* Bar out of visible window — show indicator at edge */
+                              null
                             )}
                           </div>
                         </div>
                       );
                     })}
 
-                    {/* Tasks without dates section */}
-                    {tasksNoDates.length > 0 && (
-                      <>
-                        <div className="px-5 py-2 bg-amber-50 border-y border-amber-100 flex items-center gap-2">
-                          <AlertTriangle size={12} className="text-amber-500" />
-                          <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest">
-                            {tasksNoDates.length} tarea(s) sin fechas — no aparecen en el timeline
-                          </span>
-                        </div>
-                        {tasksNoDates.map(task => (
-                          <div key={task.id} className="flex border-b border-gray-50 hover:bg-gray-50/40 transition-colors opacity-50">
-                            <div className="w-[320px] shrink-0 flex items-center gap-3 px-5 py-3 border-r border-gray-100">
-                              <div className="w-2 h-2 rounded-full shrink-0 bg-gray-300" />
-                              <div className="min-w-0 flex-1">
-                                <p
-                                  onClick={() => openTaskModal(task)}
-                                  className="text-xs font-bold text-gray-500 hover:text-[#4449AA] cursor-pointer truncate"
-                                >
-                                  {task.title}
-                                </p>
-                                <span className="text-[9px] text-gray-400">Sin fecha límite</span>
-                              </div>
-                            </div>
-                            <div className="flex-1 flex items-center px-4">
-                              <button
-                                onClick={() => openTaskModal(task)}
-                                className="text-[10px] font-bold text-indigo-500 hover:text-indigo-700 flex items-center gap-1 hover:underline"
-                              >
-                                <Plus size={10} /> Asignar fechas
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </>
-                    )}
                   </>
                 )}
 
