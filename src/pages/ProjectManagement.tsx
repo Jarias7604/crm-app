@@ -1896,7 +1896,7 @@ export default function ProjectManagement() {
                         <div className="border-t border-gray-100 pt-4 space-y-3">
 
                           {/* Developer: Submit for approval */}
-                          {!isSupervisor && taskStatus !== 'pending_approval' && (
+                          {taskStatus !== 'pending_approval' && (
                             <div>
                               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
                                 Flujo de Aprobación
@@ -1928,15 +1928,19 @@ export default function ProjectManagement() {
                           )}
 
                           {/* Supervisor: Approve / Reject panel */}
-                          {isSupervisor && taskStatus === 'pending_approval' && (
+                          {isSupervisor && (
                             <div className="bg-violet-50 border border-violet-200 rounded-2xl p-4 space-y-3">
                               <div className="flex items-center gap-2">
                                 <div className="w-7 h-7 rounded-xl bg-violet-500 flex items-center justify-center">
                                   <Sparkles size={13} className="text-white" />
                                 </div>
                                 <div>
-                                  <p className="text-[11px] font-black text-violet-800 uppercase tracking-widest">Revisión del Supervisor</p>
-                                  <p className="text-[10px] text-violet-500">Revisa los tests y aprueba o rechaza</p>
+                                  <p className="text-[11px] font-black text-violet-800 uppercase tracking-widest">
+                                    {taskStatus === 'pending_approval' ? 'Revisión del Supervisor' : 'Control de Supervisor (Acceso Directo)'}
+                                  </p>
+                                  <p className="text-[10px] text-violet-500">
+                                    {taskStatus === 'pending_approval' ? 'Revisa los tests y aprueba o rechaza' : 'Aprueba o rechaza directamente esta tarea'}
+                                  </p>
                                 </div>
                               </div>
                               <div className="flex gap-2">
@@ -1966,10 +1970,10 @@ export default function ProjectManagement() {
                             </div>
                           )}
 
-                          {/* Supervisor viewing non-pending task */}
-                          {isSupervisor && taskStatus !== 'pending_approval' && taskStatus !== 'completed' && (
+                          {/* Developer: Waiting for approval */}
+                          {!isSupervisor && taskStatus === 'pending_approval' && (
                             <div className="text-center py-3 text-[11px] text-gray-400 font-medium">
-                              La tarea debe ser enviada para revisión por el desarrollador
+                              Esperando revisión del supervisor
                             </div>
                           )}
                         </div>
