@@ -36,7 +36,8 @@ interface Task {
   assigned_avatar?: string;
   title: string;
   description: string;
-  status: 'todo' | 'in_progress' | 'paused' | 'completed';
+  /** todo | in_progress | paused | pending_approval | rejected | completed */
+  status: 'todo' | 'in_progress' | 'paused' | 'pending_approval' | 'rejected' | 'completed';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   estimated_hours: number;
   actual_hours: number | null;
@@ -45,6 +46,11 @@ interface Task {
   completed_at: string | null;
   checklist?: TaskChecklistItem[];
   created_at: string;
+  // Supervisor approval workflow
+  rejection_reason?: string | null;
+  approved_by?: string | null;
+  approved_at?: string | null;
+  submitted_at?: string | null;
 }
 
 interface Profile {
@@ -100,6 +106,8 @@ export default function ProjectManagement() {
     parent_task_id: '',
     checklist: [] as TaskChecklistItem[]
   });
+  // Supervisor rejection reason input
+  const [rejectionInput, setRejectionInput] = useState('');
 
   // Load Initial Data
   useEffect(() => {
@@ -393,7 +401,7 @@ export default function ProjectManagement() {
     }
   };
 
-  // Task Actions
+  // ── Task Actions ────────────────────────────────────────────
   const openTaskModal = (task: Task | null = null, parentTaskId: string | null = null) => {
     if (task) {
       setSelectedTask(task);
@@ -420,7 +428,129 @@ export default function ProjectManagement() {
         checklist: []
       });
     }
+    setRejectionInput('');
     setIsTaskModalOpen(true);
+  };
+
+  // ── QA Checklist item change with auto-rejection logic ───────
+  const handleChecklistItemChange = async (
+    idx: number,
+    field: 'status' | 'text',
+    value: string
+  ) => {
+    const newChks = [...taskForm.checklist];
+    (newChks[idx] as any)[field] = value;
+    setTaskForm(prev => ({ ...prev, checklist: newChks }));
+
+    // Auto-reject task if any test is marked failed
+    if (field === 'status' && value === 'failed' && selectedTask) {
+      const reason = `Test automaticamente fallido: "${newChks[idx].text || 'Sin nombre'}"`;
+      try {
+        if (dbAvailable) {
+          const { data, error } = await supabase
+            .from('crm_tasks')
+            .update({ status: 'rejected', rejection_reason: reason, checklist: newChks, updated_at: new Date().toISOString() })
+            .eq('id', selectedTask.id)
+            .select().single();
+          if (!error && data) {
+            setTasks(prev => prev.map(t => t.id === selectedTask.id ? data : t));
+            setSelectedTask(data);
+          }
+        }
+        toast.error('❌ Test fallido — tarea rechazada automáticamente');
+      } catch (err) { console.error(err); }
+    }
+
+    // Auto-clear rejection if ALL items now pass
+    if (field === 'status' && value !== 'failed' && selectedTask) {
+      const allPass = newChks.every(c => c.status === 'passed');
+      if (allPass && selectedTask.status === 'rejected') {
+        try {
+          if (dbAvailable) {
+            const { data, error } = await supabase
+              .from('crm_tasks')
+              .update({ status: 'in_progress', rejection_reason: null, checklist: newChks, updated_at: new Date().toISOString() })
+              .eq('id', selectedTask.id)
+              .select().single();
+            if (!error && data) {
+              setTasks(prev => prev.map(t => t.id === selectedTask.id ? data : t));
+              setSelectedTask(data);
+            }
+          }
+          toast.success('✅ Todos los tests pasados — listo para enviar');
+        } catch (err) { console.error(err); }
+      }
+    }
+  };
+
+  // ── Submit task for supervisor approval ──────────────────────
+  const handleSubmitForApproval = async () => {
+    if (!selectedTask) return;
+    const hasFailures = taskForm.checklist.some(c => c.status === 'failed');
+    const hasPending  = taskForm.checklist.some(c => c.status === 'pending');
+    if (hasFailures) { toast.error('Corrige los tests fallidos antes de enviar'); return; }
+    if (hasPending)  { toast.error('Completa todos los casos de prueba antes de enviar'); return; }
+    if (taskForm.checklist.length === 0) { toast.error('Agrega al menos un caso de prueba'); return; }
+    try {
+      const now = new Date().toISOString();
+      if (dbAvailable) {
+        const { data, error } = await supabase
+          .from('crm_tasks')
+          .update({ status: 'pending_approval', submitted_at: now, rejection_reason: null, checklist: taskForm.checklist, updated_at: now })
+          .eq('id', selectedTask.id)
+          .select().single();
+        if (error) throw error;
+        setTasks(prev => prev.map(t => t.id === selectedTask.id ? data : t));
+        setSelectedTask(data);
+      }
+      toast.success('📋 Tarea enviada para revisión del supervisor');
+    } catch (err) {
+      toast.error('Error al enviar para aprobación');
+    }
+  };
+
+  // ── Supervisor: Approve task ─────────────────────────────────
+  const handleApproveTask = async () => {
+    if (!selectedTask || !profile?.id) return;
+    try {
+      const now = new Date().toISOString();
+      if (dbAvailable) {
+        const { data, error } = await supabase
+          .from('crm_tasks')
+          .update({ status: 'completed', approved_by: profile.id, approved_at: now, rejection_reason: null, completed_at: now, updated_at: now })
+          .eq('id', selectedTask.id)
+          .select().single();
+        if (error) throw error;
+        setTasks(prev => prev.map(t => t.id === selectedTask.id ? data : t));
+        setSelectedTask(data);
+      }
+      toast.success('✅ Tarea aprobada y marcada como completada');
+    } catch (err) {
+      toast.error('Error al aprobar tarea');
+    }
+  };
+
+  // ── Supervisor: Reject task ──────────────────────────────────
+  const handleRejectTask = async () => {
+    if (!selectedTask) return;
+    if (!rejectionInput.trim()) { toast.error('Escribe el motivo del rechazo'); return; }
+    try {
+      const now = new Date().toISOString();
+      if (dbAvailable) {
+        const { data, error } = await supabase
+          .from('crm_tasks')
+          .update({ status: 'rejected', rejection_reason: rejectionInput.trim(), approved_by: null, approved_at: null, updated_at: now })
+          .eq('id', selectedTask.id)
+          .select().single();
+        if (error) throw error;
+        setTasks(prev => prev.map(t => t.id === selectedTask.id ? data : t));
+        setSelectedTask(data);
+      }
+      setRejectionInput('');
+      toast.error(`🚫 Tarea rechazada: ${rejectionInput.trim()}`);
+    } catch (err) {
+      toast.error('Error al rechazar tarea');
+    }
   };
 
   const handleSaveTask = async (e: React.FormEvent) => {
@@ -784,10 +914,12 @@ export default function ProjectManagement() {
 
   // ── LIST VIEW HELPERS ── defined OUTSIDE return() so React keeps stable references
   const statusCfg: Record<string, { label: string; dot: string; bg: string; text: string }> = {
-    todo: { label: 'Pendiente', dot: 'bg-slate-400', bg: 'bg-slate-50', text: 'text-slate-600' },
-    in_progress: { label: 'En Progreso', dot: 'bg-blue-500', bg: 'bg-blue-50', text: 'text-blue-700' },
-    paused: { label: 'Pausada', dot: 'bg-amber-400', bg: 'bg-amber-50', text: 'text-amber-700' },
-    completed: { label: 'Completada', dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700' },
+    todo:             { label: 'Pendiente',       dot: 'bg-slate-400',  bg: 'bg-slate-50',  text: 'text-slate-600'  },
+    in_progress:      { label: 'En Progreso',     dot: 'bg-blue-500',   bg: 'bg-blue-50',   text: 'text-blue-700'   },
+    paused:           { label: 'Pausada',         dot: 'bg-amber-400',  bg: 'bg-amber-50',  text: 'text-amber-700'  },
+    pending_approval: { label: 'En Revisión',     dot: 'bg-violet-500', bg: 'bg-violet-50', text: 'text-violet-700' },
+    rejected:         { label: 'Rechazada',       dot: 'bg-rose-600',   bg: 'bg-rose-50',   text: 'text-rose-700'   },
+    completed:        { label: 'Completada',      dot: 'bg-emerald-500',bg: 'bg-emerald-50',text: 'text-emerald-700'},
   };
 
   const priorCfg: Record<string, string> = {
@@ -1553,93 +1685,298 @@ export default function ProjectManagement() {
                         </div>
                       </div>
                    </div>
-                 ) : (
-                   <div className="space-y-4 animate-in fade-in duration-300">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                          Escenarios de Prueba
-                        </label>
-                        <button 
-                          type="button"
-                          onClick={() => setTaskForm(prev => ({ 
-                            ...prev, 
-                            checklist: [...(prev.checklist || []), { id: `chk-${Date.now()}`, text: '', status: 'pending' }] 
-                          }))}
-                          className="text-xs text-emerald-600 font-bold hover:text-emerald-700 flex items-center gap-1 bg-emerald-50 px-2 py-1 rounded-md transition-colors"
-                        >
-                          <Plus className="w-3 h-3" /> Añadir Caso
-                        </button>
-                      </div>
-                      
-                      {taskForm.checklist && taskForm.checklist.length > 0 ? (
-                        <div className="space-y-2">
-                          {taskForm.checklist.map((item, idx) => (
-                            <div key={item.id} className="flex items-center gap-2 group p-2 rounded-lg hover:bg-gray-50 transition-colors border border-transparent hover:border-gray-100">
-                              <select
-                                value={item.status}
-                                onChange={(e) => {
-                                  const newChks = [...taskForm.checklist!];
-                                  newChks[idx].status = e.target.value as 'pending' | 'passed' | 'failed';
-                                  setTaskForm({ ...taskForm, checklist: newChks });
-                                }}
-                                className={`flex-shrink-0 w-[90px] h-7 text-[9px] font-black uppercase rounded-md border text-center appearance-none cursor-pointer outline-none transition-colors shadow-sm ${
-                                  item.status === 'passed' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 
-                                  item.status === 'failed' ? 'bg-rose-50 border-rose-200 text-rose-700' : 
-                                  'bg-white border-gray-200 text-gray-500'
-                                }`}
-                              >
-                                <option value="pending">PENDIENTE</option>
-                                <option value="passed">APROBADO</option>
-                                <option value="failed">REHACER</option>
-                              </select>
-                              
-                              <input 
-                                type="text" 
-                                placeholder="Ej: Validar guardado en BD"
-                                value={item.text}
-                                onChange={e => {
-                                  const newChks = [...taskForm.checklist!];
-                                  newChks[idx].text = e.target.value;
-                                  setTaskForm({ ...taskForm, checklist: newChks });
-                                }}
-                                className={`flex-1 bg-transparent text-[13px] border-b border-transparent hover:border-gray-200 focus:border-[#4449AA]/40 outline-none px-1 py-1 transition-all ${item.status === 'passed' ? 'line-through text-emerald-700/60' : item.status === 'failed' ? 'text-rose-700 font-medium' : 'text-gray-700'}`}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setTaskForm({ 
-                                    ...taskForm, 
-                                    checklist: taskForm.checklist!.filter(c => c.id !== item.id) 
-                                  });
-                                }}
-                                className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-all"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50">
-                          <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm border border-gray-100">
-                            <CheckCircle2 className="text-emerald-400 w-5 h-5" />
+                 ) : (() => {
+                    // Derived values for QA tab
+                    const est  = selectedTask?.estimated_hours ?? taskForm.estimated_hours ?? 0;
+                    const act  = selectedTask?.actual_hours ?? 0;
+                    const pct  = est > 0 ? Math.min((act / est) * 100, 150) : 0;
+                    const over = act > est && est > 0;
+                    const passed  = taskForm.checklist.filter(c => c.status === 'passed').length;
+                    const failed  = taskForm.checklist.filter(c => c.status === 'failed').length;
+                    const pending = taskForm.checklist.filter(c => c.status === 'pending').length;
+                    const allPass = taskForm.checklist.length > 0 && passed === taskForm.checklist.length;
+                    const isSupervisor = profile?.role === 'company_admin' || profile?.role === 'super_admin';
+                    const taskStatus  = selectedTask?.status ?? 'todo';
+
+                    return (
+                    <div className="space-y-5 animate-in fade-in duration-300">
+
+                      {/* ── TIME COMPARISON WIDGET ── */}
+                      <div className="rounded-2xl border border-gray-100 bg-gradient-to-br from-slate-50 to-white p-4 shadow-sm">
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                          <Clock size={12} className="text-indigo-400" /> Tiempo & Rendimiento
+                        </p>
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                          <div className="bg-white rounded-xl border border-gray-100 p-3 text-center shadow-sm">
+                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider">Estimado</p>
+                            <p className="text-xl font-black text-gray-800 mt-0.5">{est}h</p>
                           </div>
-                          <span className="text-[13px] text-gray-500 block mb-3 font-medium">No hay escenarios de prueba definidos.</span>
-                          <button 
-                            type="button"
-                            onClick={() => setTaskForm(prev => ({ 
-                              ...prev, 
-                              checklist: [...(prev.checklist || []), { id: `chk-${Date.now()}`, text: '', status: 'pending' }] 
-                            }))}
-                            className="text-xs bg-white text-emerald-600 font-bold px-4 py-2 rounded-lg border border-emerald-100 hover:bg-emerald-50 transition-colors shadow-sm"
-                          >
-                            Agregar Caso de Prueba
-                          </button>
+                          <div className={`rounded-xl border p-3 text-center shadow-sm ${over ? 'bg-rose-50 border-rose-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                            <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider">Ejecutado</p>
+                            <p className={`text-xl font-black mt-0.5 ${over ? 'text-rose-600' : 'text-emerald-700'}`}>{act.toFixed(1)}h</p>
+                          </div>
+                        </div>
+                        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${over ? 'bg-gradient-to-r from-rose-400 to-rose-600' : 'bg-gradient-to-r from-emerald-400 to-emerald-600'}`}
+                            style={{ width: `${Math.min(pct, 100)}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between items-center mt-1.5">
+                          <span className="text-[10px] text-gray-400 font-semibold">{pct.toFixed(0)}% del presupuesto</span>
+                          <span className={`text-[10px] font-black uppercase tracking-wider ${over ? 'text-rose-500' : 'text-emerald-600'}`}>
+                            {over ? '⚠ Sobre presupuesto' : est === 0 ? '—' : '✓ En rango'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* ── REJECTION BANNER ── */}
+                      {taskStatus === 'rejected' && selectedTask?.rejection_reason && (
+                        <div className="flex items-start gap-3 p-3.5 bg-rose-50 border border-rose-200 rounded-xl">
+                          <div className="w-7 h-7 rounded-lg bg-rose-100 flex items-center justify-center shrink-0 mt-0.5">
+                            <AlertCircle size={14} className="text-rose-600" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">Tarea Rechazada</p>
+                            <p className="text-xs text-rose-700 mt-0.5 font-medium">{selectedTask.rejection_reason}</p>
+                            <p className="text-[10px] text-rose-400 mt-1">Corrige los errores y vuelve a enviar para aprobación.</p>
+                          </div>
                         </div>
                       )}
-                   </div>
-                 )}
+
+                      {/* ── PENDING APPROVAL BANNER ── */}
+                      {taskStatus === 'pending_approval' && (
+                        <div className="flex items-start gap-3 p-3.5 bg-violet-50 border border-violet-200 rounded-xl">
+                          <div className="w-7 h-7 rounded-lg bg-violet-100 flex items-center justify-center shrink-0 mt-0.5">
+                            <Sparkles size={14} className="text-violet-600" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-violet-600 uppercase tracking-widest">En Revisión del Supervisor</p>
+                            <p className="text-xs text-violet-700 mt-0.5">
+                              Enviada el {selectedTask?.submitted_at ? new Date(selectedTask.submitted_at).toLocaleDateString('es-SV', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—'}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ── APPROVED BANNER ── */}
+                      {taskStatus === 'completed' && selectedTask?.approved_by && (
+                        <div className="flex items-start gap-3 p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl">
+                          <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
+                            <CheckCircle2 size={14} className="text-emerald-600" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">✓ Aprobada por Supervisor</p>
+                            <p className="text-xs text-emerald-700 mt-0.5">
+                              {selectedTask?.approved_at ? new Date(selectedTask.approved_at).toLocaleDateString('es-SV', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ── TEST CASES ── */}
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Casos de Prueba</p>
+                            <div className="flex items-center gap-1">
+                              {passed  > 0 && <span className="text-[9px] font-black bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full">{passed} ✓</span>}
+                              {failed  > 0 && <span className="text-[9px] font-black bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-full">{failed} ✗</span>}
+                              {pending > 0 && <span className="text-[9px] font-black bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">{pending} ○</span>}
+                            </div>
+                          </div>
+                          {taskStatus !== 'completed' && taskStatus !== 'pending_approval' && (
+                            <button
+                              type="button"
+                              onClick={() => setTaskForm(prev => ({
+                                ...prev,
+                                checklist: [...(prev.checklist || []), { id: `chk-${Date.now()}`, text: '', status: 'pending' }]
+                              }))}
+                              className="text-xs text-indigo-600 font-bold hover:text-indigo-700 flex items-center gap-1 bg-indigo-50 px-2.5 py-1 rounded-lg transition-colors"
+                            >
+                              <Plus className="w-3 h-3" /> Añadir
+                            </button>
+                          )}
+                        </div>
+
+                        {taskForm.checklist.length > 0 ? (
+                          <div className="space-y-2">
+                            {taskForm.checklist.map((item, idx) => (
+                              <div
+                                key={item.id}
+                                className={`flex items-center gap-3 group px-3 py-2.5 rounded-xl border transition-all ${
+                                  item.status === 'passed' ? 'bg-emerald-50/60 border-emerald-200/60' :
+                                  item.status === 'failed' ? 'bg-rose-50/60 border-rose-200/60' :
+                                  'bg-white border-gray-100 hover:border-gray-200'
+                                }`}
+                              >
+                                {/* Pass / Fail buttons */}
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button
+                                    type="button"
+                                    disabled={taskStatus === 'completed' || taskStatus === 'pending_approval'}
+                                    onClick={() => handleChecklistItemChange(idx, 'status', item.status === 'passed' ? 'pending' : 'passed')}
+                                    className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black transition-all ${
+                                      item.status === 'passed'
+                                        ? 'bg-emerald-500 text-white shadow-sm'
+                                        : 'bg-gray-100 text-gray-400 hover:bg-emerald-100 hover:text-emerald-600'
+                                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                    title="Marcar como PASADO"
+                                  >✓</button>
+                                  <button
+                                    type="button"
+                                    disabled={taskStatus === 'completed' || taskStatus === 'pending_approval'}
+                                    onClick={() => handleChecklistItemChange(idx, 'status', item.status === 'failed' ? 'pending' : 'failed')}
+                                    className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black transition-all ${
+                                      item.status === 'failed'
+                                        ? 'bg-rose-500 text-white shadow-sm'
+                                        : 'bg-gray-100 text-gray-400 hover:bg-rose-100 hover:text-rose-600'
+                                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                    title="Marcar como FALLIDO (auto-rechaza)"
+                                  >✗</button>
+                                </div>
+
+                                {/* Test description */}
+                                <input
+                                  type="text"
+                                  placeholder="Ej: Validar guardado en BD"
+                                  value={item.text}
+                                  disabled={taskStatus === 'completed' || taskStatus === 'pending_approval'}
+                                  onChange={e => handleChecklistItemChange(idx, 'text', e.target.value)}
+                                  className={`flex-1 bg-transparent text-[13px] outline-none px-1 transition-all disabled:cursor-default ${
+                                    item.status === 'passed' ? 'line-through text-emerald-700/70 font-medium' :
+                                    item.status === 'failed' ? 'text-rose-700 font-semibold' :
+                                    'text-gray-700'
+                                  }`}
+                                />
+
+                                {/* Status badge */}
+                                <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ${
+                                  item.status === 'passed' ? 'bg-emerald-100 text-emerald-700' :
+                                  item.status === 'failed' ? 'bg-rose-100 text-rose-700' :
+                                  'bg-gray-100 text-gray-400'
+                                }`}>
+                                  {item.status === 'passed' ? 'Pasó' : item.status === 'failed' ? 'Falló' : 'Pendiente'}
+                                </span>
+
+                                {/* Delete */}
+                                {taskStatus !== 'completed' && taskStatus !== 'pending_approval' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setTaskForm({ ...taskForm, checklist: taskForm.checklist.filter(c => c.id !== item.id) })}
+                                    className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-rose-500 rounded-lg transition-all"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-xl bg-gray-50/50">
+                            <CheckCircle2 size={24} className="text-gray-300 mx-auto mb-2" />
+                            <p className="text-[13px] text-gray-400 font-medium mb-3">Sin casos de prueba aún</p>
+                            <button
+                              type="button"
+                              onClick={() => setTaskForm(prev => ({
+                                ...prev,
+                                checklist: [...(prev.checklist || []), { id: `chk-${Date.now()}`, text: '', status: 'pending' }]
+                              }))}
+                              className="text-xs bg-indigo-50 text-indigo-600 font-bold px-4 py-2 rounded-lg border border-indigo-100 hover:bg-indigo-100 transition-colors"
+                            >
+                              + Agregar Caso de Prueba
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* ── WORKFLOW ACTION SECTION ── */}
+                      {selectedTask && taskStatus !== 'completed' && (
+                        <div className="border-t border-gray-100 pt-4 space-y-3">
+
+                          {/* Developer: Submit for approval */}
+                          {!isSupervisor && taskStatus !== 'pending_approval' && (
+                            <div>
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                                Flujo de Aprobación
+                              </p>
+                              <div className="flex items-center gap-2 mb-3">
+                                {['Desarrollo', 'Tests', 'Revisión', 'Aprobado'].map((step, i) => {
+                                  const stepActive = i === 0 ? true : i === 1 ? taskForm.checklist.length > 0 : i === 2 ? allPass : false;
+                                  return (
+                                    <React.Fragment key={step}>
+                                      <div className={`flex items-center gap-1.5 ${stepActive ? 'opacity-100' : 'opacity-30'}`}>
+                                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black ${stepActive ? 'bg-indigo-500 text-white' : 'bg-gray-200 text-gray-400'}`}>{i + 1}</div>
+                                        <span className={`text-[9px] font-bold ${stepActive ? 'text-gray-700' : 'text-gray-400'}`}>{step}</span>
+                                      </div>
+                                      {i < 3 && <div className={`flex-1 h-px ${stepActive ? 'bg-indigo-200' : 'bg-gray-100'}`} />}
+                                    </React.Fragment>
+                                  );
+                                })}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={handleSubmitForApproval}
+                                disabled={!allPass || taskForm.checklist.length === 0}
+                                className="w-full h-11 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 disabled:from-gray-200 disabled:to-gray-200 disabled:text-gray-400 text-white font-bold text-xs uppercase tracking-widest rounded-xl transition-all shadow-md shadow-indigo-900/10 disabled:shadow-none disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                              >
+                                <Sparkles size={14} />
+                                {allPass ? 'Enviar para Aprobación del Supervisor' : failed > 0 ? 'Corrige los tests fallidos primero' : pending > 0 ? `Completa ${pending} test(s) pendiente(s)` : 'Agrega casos de prueba primero'}
+                              </button>
+                            </div>
+                          )}
+
+                          {/* Supervisor: Approve / Reject panel */}
+                          {isSupervisor && taskStatus === 'pending_approval' && (
+                            <div className="bg-violet-50 border border-violet-200 rounded-2xl p-4 space-y-3">
+                              <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-xl bg-violet-500 flex items-center justify-center">
+                                  <Sparkles size={13} className="text-white" />
+                                </div>
+                                <div>
+                                  <p className="text-[11px] font-black text-violet-800 uppercase tracking-widest">Revisión del Supervisor</p>
+                                  <p className="text-[10px] text-violet-500">Revisa los tests y aprueba o rechaza</p>
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={handleApproveTask}
+                                  className="flex-1 h-10 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5"
+                                >
+                                  <CheckCircle2 size={14} /> Aprobar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleRejectTask}
+                                  disabled={!rejectionInput.trim()}
+                                  className="flex-1 h-10 bg-rose-500 hover:bg-rose-600 disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 disabled:cursor-not-allowed"
+                                >
+                                  <AlertCircle size={14} /> Rechazar
+                                </button>
+                              </div>
+                              <textarea
+                                placeholder="Motivo del rechazo (obligatorio para rechazar)..."
+                                value={rejectionInput}
+                                onChange={e => setRejectionInput(e.target.value)}
+                                rows={2}
+                                className="w-full p-3 bg-white border border-violet-200 rounded-xl text-xs text-gray-700 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-violet-300 resize-none"
+                              />
+                            </div>
+                          )}
+
+                          {/* Supervisor viewing non-pending task */}
+                          {isSupervisor && taskStatus !== 'pending_approval' && taskStatus !== 'completed' && (
+                            <div className="text-center py-3 text-[11px] text-gray-400 font-medium">
+                              La tarea debe ser enviada para revisión por el desarrollador
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                    </div>
+                    );
+                 })()}
               </div>
 
               {/* Footer */}
