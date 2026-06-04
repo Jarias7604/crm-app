@@ -782,6 +782,189 @@ export default function ProjectManagement() {
   const filteredTasks = getFilteredTasks();
   const metrics = getTaskTotalMetrics();
 
+  // ── LIST VIEW HELPERS ── defined OUTSIDE return() so React keeps stable references
+  const statusCfg: Record<string, { label: string; dot: string; bg: string; text: string }> = {
+    todo: { label: 'Pendiente', dot: 'bg-slate-400', bg: 'bg-slate-50', text: 'text-slate-600' },
+    in_progress: { label: 'En Progreso', dot: 'bg-blue-500', bg: 'bg-blue-50', text: 'text-blue-700' },
+    paused: { label: 'Pausada', dot: 'bg-amber-400', bg: 'bg-amber-50', text: 'text-amber-700' },
+    completed: { label: 'Completada', dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700' },
+  };
+
+  const priorCfg: Record<string, string> = {
+    urgent: 'bg-rose-100 text-rose-600',
+    high: 'bg-amber-100 text-amber-700',
+    medium: 'bg-indigo-50 text-indigo-600',
+    low: 'bg-gray-100 text-gray-500',
+  };
+
+  const parentTasks = filteredTasks.filter(t => !t.parent_task_id);
+  const getSubtasksOf = (parentId: string) => filteredTasks.filter(t => t.parent_task_id === parentId);
+
+  const renderTaskRow = (task: Task, isSubtask = false): React.ReactNode => {
+    const assigned = getAssignedProfile(task.assigned_to);
+    const health = getDeviations(task);
+    const sub = getSubtasksOf(task.id);
+    const isExpanded = expandedTaskIds.has(task.id);
+    const hasChildren = sub.length > 0;
+    const sc = statusCfg[task.status] ?? statusCfg.todo;
+    const pct = (task.estimated_hours ?? 0) > 0 ? Math.min(((task.actual_hours ?? 0) / (task.estimated_hours ?? 1)) * 100, 100) : 0;
+    const overBudget = (task.actual_hours ?? 0) > (task.estimated_hours ?? 0);
+
+    return (
+      <React.Fragment key={task.id}>
+        <div
+          className={`group grid grid-cols-[minmax(0,1fr)_130px_150px_100px_90px_90px_110px_95px] px-5 py-4 border-b border-gray-50 hover:bg-gray-50/60 transition-colors ${isSubtask ? 'bg-gray-50/30' : ''}`}
+        >
+          {/* Task name + expand toggle */}
+          <div className={`flex items-center gap-2.5 min-w-0 ${isSubtask ? 'pl-6' : ''}`}>
+            {/* Checkbox-style completion toggle */}
+            <button
+              type="button"
+              onClick={() => handleUpdateStatus(task.id, task.status === 'completed' ? 'todo' : 'completed')}
+              className={`w-4.5 h-4.5 rounded border flex items-center justify-center shrink-0 transition-all ${
+                task.status === 'completed'
+                  ? 'bg-emerald-500 border-emerald-500'
+                  : 'border-gray-300 hover:border-[#4449AA]'
+              }`}
+            >
+              {task.status === 'completed' && <CheckCircle2 size={11} className="text-white" />}
+            </button>
+
+            {/* Expand chevron for parent tasks */}
+            {hasChildren && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); e.preventDefault(); toggleExpand(task.id); }}
+                className="text-indigo-400 hover:text-indigo-600 shrink-0 transition-colors p-0.5 rounded hover:bg-indigo-50"
+                aria-expanded={isExpanded}
+                aria-controls={`subtasks-${task.id}`}
+                title={isExpanded ? 'Colapsar subtareas' : 'Expandir subtareas'}
+              >
+                <ChevronRight size={15} className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+              </button>
+            )}
+            {!hasChildren && <span className="w-4.5 shrink-0" />}
+
+            {/* Title & description */}
+            <div className="min-w-0">
+              <button
+                type="button"
+                onClick={() => openTaskModal(task)}
+                className={`text-sm font-bold text-left truncate block max-w-full hover:text-[#4449AA] transition-colors ${task.status === 'completed' ? 'line-through text-gray-400' : 'text-gray-800'}`}
+              >
+                {task.title}
+              </button>
+              {task.description && !isSubtask && (
+                <span className="text-xs text-gray-400 line-clamp-1 block leading-tight mt-1">{task.description}</span>
+              )}
+              {task.checklist && task.checklist.length > 0 && (
+                <div className="flex items-center gap-1 mt-1 text-xs font-semibold text-gray-400">
+                  <CheckCircle2 size={12} className={task.checklist.every(c => c.status === 'passed') ? "text-emerald-500" : "text-indigo-400"} />
+                  {task.checklist.filter(c => c.status === 'passed').length}/{task.checklist.length}
+                </div>
+              )}
+              {/* Progress bar */}
+              <div className="w-full h-1 bg-gray-100 rounded-full mt-1.5 overflow-hidden max-w-[180px]">
+                <div
+                  className={`h-full rounded-full transition-all ${overBudget ? 'bg-rose-400' : 'bg-emerald-400'}`}
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Assigned */}
+          <div className="flex items-center">
+            {assigned ? (
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-full bg-[#4449AA]/10 text-[#4449AA] flex items-center justify-center text-xs font-black shrink-0">
+                  {(assigned.full_name || assigned.email || 'U').charAt(0)}
+                </div>
+                <span className="text-xs text-gray-600 font-semibold truncate">{(assigned.full_name || assigned.email || 'Usuario').split(' ')[0]}</span>
+              </div>
+            ) : (
+              <span className="text-xs text-gray-300 flex items-center gap-1.5"><User size={12} /> —</span>
+            )}
+          </div>
+
+          {/* Status pill */}
+          <div className="flex items-center">
+            <select
+              value={task.status}
+              onChange={e => handleUpdateStatus(task.id, e.target.value as Task['status'])}
+              className={`text-[10px] font-black uppercase tracking-wide px-2.5 py-1 rounded-xl border border-gray-200/40 outline-none cursor-pointer ${sc.bg} ${sc.text}`}
+            >
+              <option value="todo">Pendiente</option>
+              <option value="in_progress">En Progreso</option>
+              <option value="paused">Pausada</option>
+              <option value="completed">Completada</option>
+            </select>
+          </div>
+
+          {/* Priority */}
+          <div className="flex items-center">
+            <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-xl ${priorCfg[task.priority] ?? priorCfg.low}`}>
+              {task.priority === 'urgent' ? '🔥 Urg' : task.priority === 'high' ? '⚡ Alt' : task.priority}
+            </span>
+          </div>
+
+          {/* Est. */}
+          <div className="flex items-center">
+            <span className="text-xs font-semibold text-gray-500">{task.estimated_hours}h</span>
+          </div>
+
+          {/* Real */}
+          <div className="flex items-center">
+            <span className={`text-xs font-bold ${overBudget ? 'text-rose-500' : 'text-gray-700'}`}>
+              {(task.actual_hours ?? 0).toFixed(1)}h
+            </span>
+          </div>
+
+          {/* Health badge */}
+          <div className="flex items-center">
+            <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-xl border ${health.color}`}>
+              {health.label}
+            </span>
+          </div>
+
+          {/* Timer action */}
+          <div className="flex items-center justify-end gap-1.5">
+            {task.status !== 'completed' && (
+              activeTimerTaskId === task.id ? (
+                <button type="button" onClick={() => handleStopTimer(task.id)} className="p-1.5 rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100 transition-colors" title="Detener">
+                  <Square size={13} fill="currentColor" />
+                </button>
+              ) : (
+                <button type="button" onClick={() => handleStartTimer(task.id)} className="p-1.5 rounded-lg bg-emerald-50 text-emerald-500 hover:bg-emerald-100 transition-colors opacity-0 group-hover:opacity-100" title="Iniciar">
+                  <Play size={13} fill="currentColor" />
+                </button>
+              )
+            )}
+            <button type="button" onClick={() => openTaskModal(task)} className="p-1.5 rounded-lg text-gray-300 hover:text-gray-600 hover:bg-gray-100 transition-colors opacity-0 group-hover:opacity-100" title="Editar">
+              <Plus size={13} className="rotate-45" />
+            </button>
+          </div>
+        </div>
+
+        {/* Subtasks (expanded) - rendered inline, no component redefinition */}
+        {isExpanded && sub.map(st => renderTaskRow(st, true))}
+
+        {/* Add subtask row */}
+        {isExpanded && !isSubtask && (
+          <div key={`add-${task.id}`} className="pl-16 pr-5 py-2.5 border-b border-gray-50 bg-gray-50/20">
+            <button
+              type="button"
+              onClick={() => openTaskModal(null, task.id)}
+              className="flex items-center gap-2 text-xs text-gray-400 hover:text-[#4449AA] font-bold transition-colors"
+            >
+              <Plus size={12} /> Agregar subtarea
+            </button>
+          </div>
+        )}
+      </React.Fragment>
+    );
+  };
+
   return (
     <div className="w-full max-w-[1600px] mx-auto space-y-5 animate-in fade-in duration-300 pb-12">
 
@@ -1174,183 +1357,7 @@ export default function ProjectManagement() {
               <Layers size={32} />
               <p className="text-xs font-semibold mt-3">No hay tareas que coincidan</p>
             </div>
-          ) : (() => {
-            const parentTasks = filteredTasks.filter(t => !t.parent_task_id);
-            const getSubtasks = (parentId: string) => filteredTasks.filter(t => t.parent_task_id === parentId);
-
-            const statusCfg: Record<string, { label: string; dot: string; bg: string; text: string }> = {
-              todo: { label: 'Pendiente', dot: 'bg-slate-400', bg: 'bg-slate-50', text: 'text-slate-600' },
-              in_progress: { label: 'En Progreso', dot: 'bg-blue-500', bg: 'bg-blue-50', text: 'text-blue-700' },
-              paused: { label: 'Pausada', dot: 'bg-amber-400', bg: 'bg-amber-50', text: 'text-amber-700' },
-              completed: { label: 'Completada', dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700' },
-            };
-
-            const priorCfg: Record<string, string> = {
-              urgent: 'bg-rose-100 text-rose-600',
-              high: 'bg-amber-100 text-amber-700',
-              medium: 'bg-indigo-50 text-indigo-600',
-              low: 'bg-gray-100 text-gray-500',
-            };
-
-            const TaskRow = ({ task, isSubtask = false }: { task: Task; isSubtask?: boolean }) => {
-              const assigned = getAssignedProfile(task.assigned_to);
-              const health = getDeviations(task);
-              const sub = getSubtasks(task.id);
-              const isExpanded = expandedTaskIds.has(task.id);
-              const hasChildren = sub.length > 0;
-              const sc = statusCfg[task.status] ?? statusCfg.todo;
-              const pct = (task.estimated_hours ?? 0) > 0 ? Math.min(((task.actual_hours ?? 0) / (task.estimated_hours ?? 1)) * 100, 100) : 0;
-              const overBudget = (task.actual_hours ?? 0) > (task.estimated_hours ?? 0);
-
-              return (
-                <>
-                  <div
-                    className={`group grid grid-cols-[minmax(0,1fr)_130px_150px_100px_90px_90px_110px_95px] px-5 py-4 border-b border-gray-50 hover:bg-gray-50/60 transition-colors ${isSubtask ? 'bg-gray-50/30' : ''}`}
-                  >
-                    {/* Task name + expand toggle */}
-                    <div className={`flex items-center gap-2.5 min-w-0 ${isSubtask ? 'pl-6' : ''}`}>
-                      {/* Checkbox-style completion toggle */}
-                      <button
-                        onClick={() => handleUpdateStatus(task.id, task.status === 'completed' ? 'todo' : 'completed')}
-                        className={`w-4.5 h-4.5 rounded border flex items-center justify-center shrink-0 transition-all ${
-                          task.status === 'completed'
-                            ? 'bg-emerald-500 border-emerald-500'
-                            : 'border-gray-300 hover:border-[#4449AA]'
-                        }`}
-                      >
-                        {task.status === 'completed' && <CheckCircle2 size={11} className="text-white" />}
-                      </button>
-
-                      {/* Expand chevron for parent tasks */}
-                      {hasChildren && (
-                        <button onClick={() => toggleExpand(task.id)} className="text-gray-400 hover:text-gray-600 shrink-0">
-                          <ChevronRight size={14} className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                        </button>
-                      )}
-                      {!hasChildren && <span className="w-4.5 shrink-0" />}
-
-                      {/* Title & description */}
-                      <div className="min-w-0">
-                        <button
-                          onClick={() => openTaskModal(task)}
-                          className={`text-sm font-bold text-left truncate block max-w-full hover:text-[#4449AA] transition-colors ${task.status === 'completed' ? 'line-through text-gray-400' : 'text-gray-800'}`}
-                        >
-                          {task.title}
-                        </button>
-                        {task.description && !isSubtask && (
-                          <span className="text-xs text-gray-400 line-clamp-1 block leading-tight mt-1">{task.description}</span>
-                        )}
-                        {task.checklist && task.checklist.length > 0 && (
-                          <div className="flex items-center gap-1 mt-1 text-xs font-semibold text-gray-400">
-                            <CheckCircle2 size={12} className={task.checklist.every(c => c.status === 'passed') ? "text-emerald-500" : "text-indigo-400"} />
-                            {task.checklist.filter(c => c.status === 'passed').length}/{task.checklist.length}
-                          </div>
-                        )}
-                        {/* Progress bar */}
-                        <div className="w-full h-1 bg-gray-100 rounded-full mt-1.5 overflow-hidden max-w-[180px]">
-                          <div
-                            className={`h-full rounded-full transition-all ${overBudget ? 'bg-rose-400' : 'bg-emerald-400'}`}
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Assigned */}
-                    <div className="flex items-center">
-                      {assigned ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-[#4449AA]/10 text-[#4449AA] flex items-center justify-center text-xs font-black shrink-0">
-                            {(assigned.full_name || assigned.email || 'U').charAt(0)}
-                          </div>
-                          <span className="text-xs text-gray-600 font-semibold truncate">{(assigned.full_name || assigned.email || 'Usuario').split(' ')[0]}</span>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-gray-300 flex items-center gap-1.5"><User size={12} /> —</span>
-                      )}
-                    </div>
-
-                    {/* Status pill */}
-                    <div className="flex items-center">
-                      <select
-                        value={task.status}
-                        onChange={e => handleUpdateStatus(task.id, e.target.value as Task['status'])}
-                        className={`text-[10px] font-black uppercase tracking-wide px-2.5 py-1 rounded-xl border border-gray-200/40 outline-none cursor-pointer ${sc.bg} ${sc.text}`}
-                      >
-                        <option value="todo">Pendiente</option>
-                        <option value="in_progress">En Progreso</option>
-                        <option value="paused">Pausada</option>
-                        <option value="completed">Completada</option>
-                      </select>
-                    </div>
-
-                    {/* Priority */}
-                    <div className="flex items-center">
-                      <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-xl ${priorCfg[task.priority] ?? priorCfg.low}`}>
-                        {task.priority === 'urgent' ? '🔥 Urg' : task.priority === 'high' ? '⚡ Alt' : task.priority}
-                      </span>
-                    </div>
-
-                    {/* Est. */}
-                    <div className="flex items-center">
-                      <span className="text-xs font-semibold text-gray-500">{task.estimated_hours}h</span>
-                    </div>
-
-                    {/* Real */}
-                    <div className="flex items-center">
-                      <span className={`text-xs font-bold ${overBudget ? 'text-rose-500' : 'text-gray-700'}`}>
-                        {(task.actual_hours ?? 0).toFixed(1)}h
-                      </span>
-                    </div>
-
-                    {/* Health badge */}
-                    <div className="flex items-center">
-                      <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-xl border ${health.color}`}>
-                        {health.label}
-                      </span>
-                    </div>
-
-                    {/* Timer action */}
-                    <div className="flex items-center justify-end gap-1.5">
-                      {task.status !== 'completed' && (
-                        activeTimerTaskId === task.id ? (
-                          <button onClick={() => handleStopTimer(task.id)} className="p-1.5 rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100 transition-colors" title="Detener">
-                            <Square size={13} fill="currentColor" />
-                          </button>
-                        ) : (
-                          <button onClick={() => handleStartTimer(task.id)} className="p-1.5 rounded-lg bg-emerald-50 text-emerald-500 hover:bg-emerald-100 transition-colors opacity-0 group-hover:opacity-100" title="Iniciar">
-                            <Play size={13} fill="currentColor" />
-                          </button>
-                        )
-                      )}
-                      <button onClick={() => openTaskModal(task)} className="p-1.5 rounded-lg text-gray-300 hover:text-gray-600 hover:bg-gray-100 transition-colors opacity-0 group-hover:opacity-100" title="Editar">
-                        <Plus size={13} className="rotate-45" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Subtasks (expanded) */}
-                  {isExpanded && sub.map(st => (
-                    <TaskRow key={st.id} task={st} isSubtask />
-                  ))}
-
-                  {/* Add subtask row */}
-                  {isExpanded && !isSubtask && (
-                    <div className="pl-16 pr-5 py-2.5 border-b border-gray-50 bg-gray-50/20">
-                      <button
-                        onClick={() => openTaskModal(null, task.id)}
-                        className="flex items-center gap-2 text-xs text-gray-400 hover:text-[#4449AA] font-bold transition-colors"
-                      >
-                        <Plus size={12} /> Agregar subtarea
-                      </button>
-                    </div>
-                  )}
-                </>
-              );
-            };
-
-            return parentTasks.map(task => <TaskRow key={task.id} task={task} />);
-          })()}
+          ) : parentTasks.map(task => renderTaskRow(task))}
         </section>
       )}
 
