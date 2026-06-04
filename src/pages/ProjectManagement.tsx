@@ -1671,7 +1671,7 @@ export default function ProjectManagement() {
 
         const startRowDrag = (e: React.MouseEvent, task: Task) => {
           e.preventDefault();
-          document.body.style.cursor = 'grabbing';
+          document.body.style.cursor = `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 24 24' fill='none' stroke='%238b5cf6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v5'/><path d='M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6'/><path d='M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v9'/><path d='M6 14.5V11a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6c0 5.5 4.5 10 10 10h1a10 10 0 0 0 10-10v-3.5a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2V12'/></svg>") 12 12, grabbing`;
           document.body.style.userSelect = 'none';
           setGanttRowDragging(task.id);
           ganttRowDragRef.current = { taskId: task.id, startY: e.clientY, currentIdx: 0 };
@@ -1698,16 +1698,18 @@ export default function ProjectManagement() {
               style={{ left: bar.left + 3, width: Math.max(bar.width - 6, DAY_W), height: 28 }}
               onMouseDown={(e) => startBarDrag(e, task, 'move')}
             >
-              {/* track bg */}
-              <div className="absolute inset-0 rounded-full" style={{ backgroundColor: sc.hex, opacity: 0.15 }} />
+              {/* Solid bar background using status color */}
+              <div className="absolute inset-0 rounded-full" style={{ backgroundColor: sc.hex, opacity: 0.85 }} />
               {/* dashed for fallback */}
-              {isFb && <div className="absolute inset-0 rounded-full" style={{ border: `2px dashed ${sc.hex}99` }} />}
-              {/* progress fill */}
-              <div className="absolute top-0 left-0 bottom-0 rounded-full transition-all" style={{ width: `${isFb ? 100 : Math.max(pct, 4)}%`, backgroundColor: sc.hex, opacity: isFb ? 0.3 : 0.9 }} />
-              {/* label */}
+              {isFb && <div className="absolute inset-0 rounded-full" style={{ border: '2px dashed rgba(255, 255, 255, 0.4)' }} />}
+              {/* progress fill as a darker overlay */}
+              {!isFb && pct > 0 && (
+                <div className="absolute top-0 left-0 bottom-0 rounded-full bg-black/20 transition-all" style={{ width: `${pct}%` }} />
+              )}
+              {/* label: always white and drop-shadowed for maximum contrast */}
               <div className="relative h-full flex items-center px-2.5 gap-1 overflow-hidden">
-                <span className={`text-[9px] font-black truncate whitespace-nowrap drop-shadow-sm ${isFb ? 'text-gray-700' : 'text-white'}`}>{task.title}</span>
-                {!isFb && pct > 0 && <span className="text-[8px] text-white/60 font-bold shrink-0">{Math.round(pct)}%</span>}
+                <span className="text-[9px] font-black truncate whitespace-nowrap text-white drop-shadow-sm">{task.title}</span>
+                {!isFb && pct > 0 && <span className="text-[8px] text-white/80 font-bold shrink-0">{Math.round(pct)}%</span>}
               </div>
               {/* resize handle */}
               <div
@@ -1804,10 +1806,13 @@ export default function ProjectManagement() {
                         <div className="shrink-0 flex items-center gap-2 px-2 border-r border-gray-100 bg-white" style={{ width: LEFT_W }}>
                           {/* Row drag handle */}
                           <div
-                            className={`cursor-grab active:cursor-grabbing transition-all shrink-0 w-6 h-6 rounded-md flex items-center justify-center
+                            className={`transition-all shrink-0 w-6 h-6 rounded-md flex items-center justify-center
                               ${ganttRowDragging === parent.id
                                 ? 'text-white bg-indigo-500 shadow-lg shadow-indigo-200 ring-2 ring-indigo-300'
-                                : 'text-gray-300 hover:text-indigo-500 hover:bg-indigo-50'}`}
+                                : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                            style={{
+                              cursor: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%238b5cf6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v5'/><path d='M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6'/><path d='M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v9'/><path d='M6 14.5V11a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6c0 5.5 4.5 10 10 10h1a10 10 0 0 0 10-10v-3.5a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2V12'/></svg>") 12 12, grab`
+                            }}
                             onMouseDown={(e) => startRowDrag(e, parent)}
                             title="Arrastrar para reordenar"
                           >
