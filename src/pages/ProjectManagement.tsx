@@ -80,7 +80,8 @@ export default function ProjectManagement() {
   // Filter States
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [searchFilter, setSearchFilter] = useState<string>('');
-  const [viewMode, setViewMode] = useState<'kanban' | 'list'>('list');
+  const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'timeline'>('list');
+  const [ganttWeekOffset, setGanttWeekOffset] = useState(0); // offset from today's week
   const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
 
   const toggleExpand = (id: string) => {
@@ -1287,8 +1288,9 @@ export default function ProjectManagement() {
         {/* View Toggle + CTA */}
         <div className="flex items-center gap-2 ml-auto">
           <div className="flex rounded-xl bg-gray-50 p-1 border border-gray-100">
-            <button onClick={() => setViewMode('kanban')} className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'kanban' ? 'bg-white text-[#4449AA] shadow-sm border border-gray-200/50' : 'text-gray-400 hover:text-gray-600'}`}>Kanban</button>
-            <button onClick={() => setViewMode('list')} className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'list' ? 'bg-white text-[#4449AA] shadow-sm border border-gray-200/50' : 'text-gray-400 hover:text-gray-600'}`}>Lista</button>
+            <button onClick={() => setViewMode('kanban')} className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'kanban' ? 'bg-white text-[#4449AA] shadow-sm border border-gray-200/50' : 'text-gray-400 hover:text-gray-600'}`}><KanbanSquare size={13} className="inline mr-1" />Kanban</button>
+            <button onClick={() => setViewMode('list')} className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'list' ? 'bg-white text-[#4449AA] shadow-sm border border-gray-200/50' : 'text-gray-400 hover:text-gray-600'}`}><ListTodo size={13} className="inline mr-1" />Lista</button>
+            <button onClick={() => setViewMode('timeline')} className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'timeline' ? 'bg-white text-[#4449AA] shadow-sm border border-gray-200/50' : 'text-gray-400 hover:text-gray-600'}`}><BarChart4 size={13} className="inline mr-1" />Gantt</button>
           </div>
           <button
             onClick={() => openTaskModal()}
@@ -1494,7 +1496,279 @@ export default function ProjectManagement() {
         </section>
       )}
 
+      {/* ── GANTT / TIMELINE VIEW ──────────────────────────────── */}
+      {viewMode === 'timeline' && (() => {
+        // Build 8-week window anchored to today + offset
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        // Anchor to Monday of current week
+        const dayOfWeek = today.getDay(); // 0=Sun
+        const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        const anchorMonday = new Date(today);
+        anchorMonday.setDate(today.getDate() + mondayOffset + ganttWeekOffset * 7);
+
+        const WEEKS = 8;
+        const DAYS  = WEEKS * 7;
+        const DAY_W = 38; // px per day
+
+        // Build day headers
+        const days: Date[] = [];
+        for (let i = 0; i < DAYS; i++) {
+          const d = new Date(anchorMonday);
+          d.setDate(anchorMonday.getDate() + i);
+          days.push(d);
+        }
+
+        const weeks: { label: string; days: Date[] }[] = [];
+        for (let w = 0; w < WEEKS; w++) {
+          const wDays = days.slice(w * 7, w * 7 + 7);
+          const startD = wDays[0];
+          weeks.push({
+            label: `Semana ${startD.getDate()}/${startD.getMonth() + 1}`,
+            days: wDays,
+          });
+        }
+
+        const ganttStart = anchorMonday;
+        const ganttEnd = new Date(anchorMonday);
+        ganttEnd.setDate(anchorMonday.getDate() + DAYS);
+
+        const statusBarColor: Record<string, string> = {
+          todo: 'bg-slate-300',
+          in_progress: 'bg-blue-500',
+          paused: 'bg-amber-400',
+          pending_approval: 'bg-violet-500',
+          rejected: 'bg-rose-500',
+          completed: 'bg-emerald-500',
+        };
+
+        const priorityBorderColor: Record<string, string> = {
+          urgent: 'border-l-4 border-rose-500',
+          high: 'border-l-4 border-amber-500',
+          medium: 'border-l-4 border-indigo-400',
+          low: 'border-l-4 border-gray-300',
+        };
+
+        const calcBar = (task: Task) => {
+          const start = task.start_date ? new Date(task.start_date) : task.created_at ? new Date(task.created_at) : null;
+          const end   = task.due_date   ? new Date(task.due_date)   : null;
+          if (!start || !end) return null;
+          start.setHours(0,0,0,0);
+          end.setHours(0,0,0,0);
+
+          const clampedStart = start < ganttStart ? ganttStart : start;
+          const clampedEnd   = end   > ganttEnd   ? ganttEnd   : end;
+          if (clampedStart >= clampedEnd) return null;
+
+          const offsetDays = Math.round((clampedStart.getTime() - ganttStart.getTime()) / 86400000);
+          const durationDays = Math.round((clampedEnd.getTime() - clampedStart.getTime()) / 86400000) + 1;
+
+          return { left: offsetDays * DAY_W, width: durationDays * DAY_W };
+        };
+
+        const tasksWithDates = filteredTasks.filter(t => t.due_date || t.start_date);
+        const tasksNoDates   = filteredTasks.filter(t => !t.due_date && !t.start_date);
+
+        const todayOffset = Math.round((today.getTime() - ganttStart.getTime()) / 86400000);
+        const showTodayLine = todayOffset >= 0 && todayOffset < DAYS;
+
+        return (
+          <section className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <p className="text-sm font-black text-gray-800">Timeline del Proyecto</p>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{tasks.length} tareas</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setGanttWeekOffset(0)} className="px-3 h-7 text-[10px] font-black uppercase tracking-widest bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-all">Hoy</button>
+                <button onClick={() => setGanttWeekOffset(g => g - 1)} className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-50 border border-gray-100 hover:bg-gray-100 transition-all text-gray-500">
+                  <ChevronRight size={14} className="rotate-180" />
+                </button>
+                <button onClick={() => setGanttWeekOffset(g => g + 1)} className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-50 border border-gray-100 hover:bg-gray-100 transition-all text-gray-500">
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <div style={{ minWidth: 320 + DAYS * DAY_W }}>
+
+                {/* Week header row */}
+                <div className="flex border-b border-gray-100 bg-gray-50/60">
+                  {/* Left label col */}
+                  <div className="w-[320px] shrink-0 px-5 py-2 border-r border-gray-100">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tarea</span>
+                  </div>
+                  {/* Week columns */}
+                  <div className="flex" style={{ width: DAYS * DAY_W }}>
+                    {weeks.map((w, wi) => (
+                      <div key={wi} className="border-r border-gray-100" style={{ width: 7 * DAY_W }}>
+                        <div className="px-2 py-1.5 text-[10px] font-black text-gray-500 uppercase tracking-wider border-b border-gray-100">{w.label}</div>
+                        <div className="flex">
+                          {w.days.map((d, di) => {
+                            const isToday = d.toDateString() === today.toDateString();
+                            const isSat = d.getDay() === 6;
+                            const isSun = d.getDay() === 0;
+                            return (
+                              <div
+                                key={di}
+                                style={{ width: DAY_W }}
+                                className={`py-1 text-center text-[9px] font-bold border-r border-gray-50 ${isToday ? 'bg-indigo-500 text-white rounded-t' : (isSat || isSun) ? 'bg-gray-100 text-gray-400' : 'text-gray-400'}`}
+                              >
+                                {['D','L','M','X','J','V','S'][d.getDay()]}
+                                <div className={`text-[8px] ${isToday ? 'text-indigo-100' : ''}`}>{d.getDate()}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Task rows */}
+                {tasksWithDates.length === 0 && tasksNoDates.length > 0 ? (
+                  <div className="py-12 text-center text-gray-400 text-xs font-semibold border-b border-gray-50">
+                    <CalendarIcon size={28} className="mx-auto mb-2 opacity-30" />
+                    Ninguna tarea tiene fecha de inicio/límite definida — agrégalas en el detalle de cada tarea.
+                  </div>
+                ) : (
+                  <>
+                    {tasksWithDates.map(task => {
+                      const bar = calcBar(task);
+                      const assigned = getAssignedProfile(task.assigned_to);
+                      const barColor = statusBarColor[task.status] ?? 'bg-gray-300';
+                      const isParent = !task.parent_task_id;
+                      const pctFill = task.estimated_hours && task.estimated_hours > 0
+                        ? Math.min(((task.actual_hours ?? 0) / task.estimated_hours) * 100, 100)
+                        : 0;
+
+                      return (
+                        <div
+                          key={task.id}
+                          className={`flex border-b border-gray-50 hover:bg-gray-50/40 transition-colors group ${!isParent ? 'bg-gray-50/30' : ''}`}
+                        >
+                          {/* Left: task info */}
+                          <div className={`w-[320px] shrink-0 flex items-center gap-3 px-5 py-3 border-r border-gray-100 ${!isParent ? 'pl-10' : ''}`}>
+                            <div className={`w-2 h-2 rounded-full shrink-0 ${barColor}`} />
+                            <div className="min-w-0 flex-1">
+                              <p
+                                onClick={() => openTaskModal(task)}
+                                className="text-xs font-bold text-gray-800 hover:text-[#4449AA] cursor-pointer truncate leading-tight"
+                              >
+                                {task.title}
+                              </p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${priorCfg[task.priority]}`}>
+                                  {task.priority}
+                                </span>
+                                {task.due_date && (
+                                  <span className="text-[9px] text-gray-400 font-semibold">
+                                    {new Date(task.due_date).toLocaleDateString('es', { day:'2-digit', month:'short' })}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {assigned && (
+                              <div
+                                className="w-6 h-6 rounded-full bg-gradient-to-br from-[#4449AA] to-indigo-400 flex items-center justify-center text-white text-[8px] font-black shrink-0"
+                                title={assigned.full_name ?? assigned.email}
+                              >
+                                {(assigned.full_name ?? assigned.email)[0].toUpperCase()}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Right: Gantt bar area */}
+                          <div className="relative flex-1" style={{ width: DAYS * DAY_W, height: 56 }}>
+                            {/* Weekend shading */}
+                            {days.map((d, di) => (d.getDay() === 0 || d.getDay() === 6) ? (
+                              <div key={di} className="absolute top-0 bottom-0 bg-gray-50/80" style={{ left: di * DAY_W, width: DAY_W }} />
+                            ) : null)}
+
+                            {/* Today line */}
+                            {showTodayLine && (
+                              <div
+                                className="absolute top-0 bottom-0 w-px bg-indigo-500/60 z-10"
+                                style={{ left: todayOffset * DAY_W }}
+                              />
+                            )}
+
+                            {/* Task bar */}
+                            {bar && (
+                              <div
+                                className="absolute top-1/2 -translate-y-1/2 rounded-lg cursor-pointer group/bar"
+                                style={{ left: bar.left + 2, width: Math.max(bar.width - 4, 20), height: 28 }}
+                                onClick={() => openTaskModal(task)}
+                                title={task.title}
+                              >
+                                {/* Background bar */}
+                                <div className={`absolute inset-0 rounded-lg opacity-20 ${barColor}`} />
+                                {/* Progress fill */}
+                                <div
+                                  className={`absolute top-0 left-0 bottom-0 rounded-lg ${barColor} opacity-80 transition-all`}
+                                  style={{ width: `${pctFill}%` }}
+                                />
+                                {/* Label */}
+                                <div className="relative h-full flex items-center px-2 overflow-hidden">
+                                  <span className="text-[9px] font-black text-white whitespace-nowrap drop-shadow truncate">
+                                    {task.title}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Tasks without dates section */}
+                    {tasksNoDates.length > 0 && (
+                      <>
+                        <div className="px-5 py-2 bg-amber-50 border-y border-amber-100 flex items-center gap-2">
+                          <AlertTriangle size={12} className="text-amber-500" />
+                          <span className="text-[10px] font-black text-amber-700 uppercase tracking-widest">
+                            {tasksNoDates.length} tarea(s) sin fechas — no aparecen en el timeline
+                          </span>
+                        </div>
+                        {tasksNoDates.map(task => (
+                          <div key={task.id} className="flex border-b border-gray-50 hover:bg-gray-50/40 transition-colors opacity-50">
+                            <div className="w-[320px] shrink-0 flex items-center gap-3 px-5 py-3 border-r border-gray-100">
+                              <div className="w-2 h-2 rounded-full shrink-0 bg-gray-300" />
+                              <div className="min-w-0 flex-1">
+                                <p
+                                  onClick={() => openTaskModal(task)}
+                                  className="text-xs font-bold text-gray-500 hover:text-[#4449AA] cursor-pointer truncate"
+                                >
+                                  {task.title}
+                                </p>
+                                <span className="text-[9px] text-gray-400">Sin fecha límite</span>
+                              </div>
+                            </div>
+                            <div className="flex-1 flex items-center px-4">
+                              <button
+                                onClick={() => openTaskModal(task)}
+                                className="text-[10px] font-bold text-indigo-500 hover:text-indigo-700 flex items-center gap-1 hover:underline"
+                              >
+                                <Plus size={10} /> Asignar fechas
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </>
+                )}
+
+              </div>
+            </div>
+          </section>
+        );
+      })()}
+
       {/* 📁 Create Project Modal */}
+
       <Modal isOpen={isProjectModalOpen} onClose={() => setIsProjectModalOpen(false)} title="Crear Nuevo Proyecto" className="max-w-md">
         <form onSubmit={handleCreateProject} className="space-y-6 p-6">
           <div className="space-y-2">
