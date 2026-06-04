@@ -5,7 +5,8 @@ import {
   Layers, Plus, Play, Square, Clock, AlertTriangle, CheckCircle, 
   Trash2, User, Calendar as CalendarIcon, MessageSquare, Tag, 
   ChevronRight, ArrowRight, Loader2, Sparkles, Filter, CheckCircle2,
-  ListTodo, KanbanSquare, BarChart4, AlertCircle, X, Search
+  ListTodo, KanbanSquare, BarChart4, AlertCircle, X, Search,
+  Check, TrendingUp, TrendingDown, ShieldCheck, ShieldX
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '../components/ui/Button';
@@ -1816,24 +1817,24 @@ export default function ProjectManagement() {
                                     type="button"
                                     disabled={taskStatus === 'completed' || taskStatus === 'pending_approval'}
                                     onClick={() => handleChecklistItemChange(idx, 'status', item.status === 'passed' ? 'pending' : 'passed')}
-                                    className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black transition-all ${
+                                    className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
                                       item.status === 'passed'
                                         ? 'bg-emerald-500 text-white shadow-sm'
                                         : 'bg-gray-100 text-gray-400 hover:bg-emerald-100 hover:text-emerald-600'
                                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                                     title="Marcar como PASADO"
-                                  >✓</button>
+                                  ><Check size={12} /></button>
                                   <button
                                     type="button"
                                     disabled={taskStatus === 'completed' || taskStatus === 'pending_approval'}
                                     onClick={() => handleChecklistItemChange(idx, 'status', item.status === 'failed' ? 'pending' : 'failed')}
-                                    className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-black transition-all ${
+                                    className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
                                       item.status === 'failed'
                                         ? 'bg-rose-500 text-white shadow-sm'
                                         : 'bg-gray-100 text-gray-400 hover:bg-rose-100 hover:text-rose-600'
                                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                                     title="Marcar como FALLIDO (auto-rechaza)"
-                                  >✗</button>
+                                  ><X size={12} /></button>
                                 </div>
 
                                 {/* Test description */}
@@ -1882,9 +1883,9 @@ export default function ProjectManagement() {
                                 ...prev,
                                 checklist: [...(prev.checklist || []), { id: `chk-${Date.now()}`, text: '', status: 'pending' }]
                               }))}
-                              className="text-xs bg-indigo-50 text-indigo-600 font-bold px-4 py-2 rounded-lg border border-indigo-100 hover:bg-indigo-100 transition-colors"
+                              className="text-xs bg-indigo-50 text-indigo-600 font-bold px-4 py-2 rounded-lg border border-indigo-100 hover:bg-indigo-100 transition-colors flex items-center gap-1.5 mx-auto"
                             >
-                              + Agregar Caso de Prueba
+                              <Plus size={12} /> Agregar Caso de Prueba
                             </button>
                           </div>
                         )}
