@@ -1806,8 +1806,8 @@ export default function ProjectManagement() {
                           <div
                             className={`cursor-grab active:cursor-grabbing transition-all shrink-0 w-6 h-6 rounded-md flex items-center justify-center
                               ${ganttRowDragging === parent.id
-                                ? 'text-white bg-indigo-500 opacity-100 shadow-lg shadow-indigo-300 ring-2 ring-indigo-300'
-                                : 'opacity-0 group-hover/row:opacity-100 text-gray-300 hover:text-indigo-500 hover:bg-indigo-50'}`}
+                                ? 'text-white bg-indigo-500 shadow-lg shadow-indigo-200 ring-2 ring-indigo-300'
+                                : 'text-gray-300 hover:text-indigo-500 hover:bg-indigo-50'}`}
                             onMouseDown={(e) => startRowDrag(e, parent)}
                             title="Arrastrar para reordenar"
                           >
