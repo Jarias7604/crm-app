@@ -13,9 +13,11 @@ description: Reglas de seguridad para NO romper producción — LEER ANTES DE CA
 
 | Ambiente | Supabase URL | Project Ref | Uso |
 |----------|-------------|-------------|-----|
-| **Edge Functions / AI** | `ikofyypxphrqkncimszt` | `ikofyypxphrqkncimszt` | Sofía, Telegram, Orchestrator, todas las Edge Fn |
-| **CRM Producción** | `mtxqqamitglhehaktgxm.supabase.co` | `mtxqqamitglhehaktgxm` | Datos reales: leads, usuarios, cotizaciones |
+| **Edge Functions / AI** | `ikofyypxphrqkncimszt` | `ikofyypxphrqkncimszt` | Sofía, Telegram, Orchestrator, Edge Fn — **NUNCA bases de datos CRM** |
+| **CRM Producción** | `mtxqqamitglhehaktgxm.supabase.co` | `mtxqqamitglhehaktgxm` | Datos reales: leads, usuarios, cotizaciones, tareas |
 | **Testing / Local** | `ubqscyfefgfbmndnypbp.supabase.co` | `ubqscyfefgfbmndnypbp` | Activo en `.env.local`. Dev y pruebas |
+
+> ⛔ **PROHIBIDO ABSOLUTO:** Ejecutar cualquier SQL de schema (ALTER TABLE, CREATE TABLE, DROP) en `ikofyypxphrqkncimszt`. Ese proyecto es SOLO para Edge Functions. Confundirlo con la base de datos del CRM ha causado incidentes reales.
 
 **ANTES de ejecutar cualquier SQL en Supabase: abrir `.env.local` y confirmar el URL.**
 Si el project ref no está en esta tabla → NO PROCEDER.
@@ -101,6 +103,23 @@ Si la URL no coincide con un proyecto de la tabla → cerrar esa pestaña.
 
 ---
 
+## REGLA 8 — NUNCA ejecutar SQL de esquema en ikofyypxphrqkncimszt
+
+**`ikofyypxphrqkncimszt` es SOLO para Edge Functions.** No es una base de datos del CRM.
+
+**PROHIBIDO:**
+- ALTER TABLE / CREATE TABLE / DROP en ese proyecto
+- Ejecutar migraciones de schema (crm_tasks, profiles, leads, etc.) ahí
+- Abrir ese proyecto en el SQL Editor para operaciones del CRM
+
+**Las ÚNICAS bases de datos del CRM son:**
+- Producción → `mtxqqamitglhehaktgxm`
+- Testing → `ubqscyfefgfbmndnypbp`
+
+Si el agente abre `ikofyypxphrqkncimszt` para algo que no sea deployment de Edge Functions → **PARAR INMEDIATAMENTE**.
+
+---
+
 ## Historial de incidentes
 
 | Fecha | Causa | Horas perdidas | Regla que lo previene |
@@ -109,3 +128,4 @@ Si la URL no coincide con un proyecto de la tabla → cerrar esa pestaña.
 | 2026-05-15 | Navegó a proyecto `ikofyypxphrqkncimszt` incorrecto | incluidas arriba | Regla 6 |
 | 2026-05-08 | `ai_score` en SELECT sin existir en prod | desconocido | Regla 3 |
 | 2026-05-30 | Enlace externo a Google Calendar para editar reuniones | Varias horas | Regla 7 |
+| 2026-06-04 | Subagente ejecutó SQL en `ikofyypxphrqkncimszt` (Edge Functions) creyendo que era CRM | tiempo real | Regla 8 |
