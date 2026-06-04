@@ -1628,7 +1628,15 @@ export default function ProjectManagement() {
         const anchorMonday = new Date(today);
         anchorMonday.setDate(today.getDate() + (dow === 0 ? -6 : 1 - dow) + ganttWeekOffset * 7);
 
-        const WEEKS = 10, DAYS = WEEKS * 7, DAY_W = 36, ROW_H = 58, LEFT_W = 360;
+        const formatHours = (h?: number | null) => {
+          if (!h || h <= 0) return '0h';
+          const hrs = Math.floor(h);
+          const mins = Math.round((h - hrs) * 60);
+          if (mins === 0) return `${hrs}h`;
+          return `${hrs}h ${mins}m`;
+        };
+
+        const WEEKS = 10, DAYS = WEEKS * 7, DAY_W = 36, ROW_H = 58, LEFT_W = 480;
 
         const days: Date[] = Array.from({ length: DAYS }, (_, i) => {
           const d = new Date(anchorMonday); d.setDate(anchorMonday.getDate() + i); return d;
@@ -1779,8 +1787,10 @@ export default function ProjectManagement() {
               <div style={{ minWidth: LEFT_W + DAYS * DAY_W }}>
                 {/* Header */}
                 <div className="flex sticky top-0 z-20 border-b-2 border-gray-200 bg-white">
-                  <div className="shrink-0 flex items-end px-4 pb-2 border-r border-gray-200 bg-gray-50/80" style={{ width: LEFT_W }}>
-                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Tarea / Asignado</span>
+                  <div className="shrink-0 flex items-end px-3 pb-2 border-r border-gray-200 bg-gray-50/80 text-[9px] font-black text-gray-400 uppercase tracking-widest gap-2" style={{ width: LEFT_W }}>
+                    <div className="flex-1 text-left">Tarea</div>
+                    <div className="w-[80px] shrink-0 border-l border-gray-200 pl-2 text-left">Asignado</div>
+                    <div className="w-[60px] shrink-0 border-l border-gray-200 pl-2 text-right">Horas</div>
                   </div>
                   <div className="flex" style={{ width: DAYS * DAY_W }}>
                     {weeks.map((w, wi) => (
@@ -1823,52 +1833,67 @@ export default function ProjectManagement() {
                         style={{ height: ROW_H }}
                       >
                         {/* Left panel */}
-                        <div className="shrink-0 flex items-center gap-2 px-2 border-r border-gray-100 bg-white" style={{ width: LEFT_W }}>
-                          {/* Row drag handle */}
-                          <div
-                            className={`transition-all shrink-0 w-6 h-6 rounded-md flex items-center justify-center
-                              ${ganttRowDragging === parent.id
-                                ? 'text-white bg-indigo-500 shadow-lg shadow-indigo-200 ring-2 ring-indigo-300'
-                                : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'}`}
-                            style={{
-                              cursor: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%238b5cf6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v5'/><path d='M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6'/><path d='M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v9'/><path d='M6 14.5V11a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6c0 5.5 4.5 10 10 10h1a10 10 0 0 0 10-10v-3.5a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2V12'/></svg>") 12 12, grab`
-                            }}
-                            onMouseDown={(e) => startRowDrag(e, parent)}
-                            title="Arrastrar para reordenar"
-                          >
-                            <GripVertical size={14} />
-                          </div>
-                          {/* Chevron */}
-                          <button
-                            onClick={() => setGanttExpandedGroups(p => { const n = new Set(p); n.has(parent.id) ? n.delete(parent.id) : n.add(parent.id); return n; })}
-                            className={`w-5 h-5 rounded flex items-center justify-center shrink-0 transition-all ${children.length > 0 ? 'text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 cursor-pointer' : 'opacity-0 pointer-events-none'}`}
-                          >
-                            {children.length > 0 && <ChevronRight size={12} className={`transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`} />}
-                          </button>
-                          {/* Status dot */}
-                          <div className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: sc.hex }} />
-                          {/* Task info */}
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[11px] font-bold text-gray-800 truncate leading-snug">{parent.title}</p>
-                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                              <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md ${priorCfg[parent.priority]}`}>{parent.priority}</span>
-                              {parent.due_date
-                                ? <span className="text-[8px] text-gray-400 font-semibold">{new Date(parent.due_date).toLocaleDateString('es',{day:'2-digit',month:'short'})}</span>
-                                : <span className="text-[8px] text-amber-500 font-bold">sin fecha</span>
-                              }
-                              {children.length > 0 && <span className="text-[8px] text-indigo-400 font-black">{children.length} subtareas</span>}
+                        <div className="shrink-0 flex items-center px-2 border-r border-gray-100 bg-white gap-2" style={{ width: LEFT_W }}>
+                          {/* Col 1: Tarea */}
+                          <div className="flex-1 flex items-center gap-2 min-w-0">
+                            {/* Row drag handle */}
+                            <div
+                              className={`transition-all shrink-0 w-6 h-6 rounded-md flex items-center justify-center
+                                ${ganttRowDragging === parent.id
+                                  ? 'text-white bg-indigo-500 shadow-lg shadow-indigo-200 ring-2 ring-indigo-300'
+                                  : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                              style={{
+                                cursor: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%238b5cf6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v5'/><path d='M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6'/><path d='M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v9'/><path d='M6 14.5V11a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6c0 5.5 4.5 10 10 10h1a10 10 0 0 0 10-10v-3.5a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2V12'/></svg>") 12 12, grab`
+                              }}
+                              onMouseDown={(e) => startRowDrag(e, parent)}
+                              title="Arrastrar para reordenar"
+                            >
+                              <GripVertical size={14} />
+                            </div>
+                            {/* Chevron */}
+                            <button
+                              onClick={() => setGanttExpandedGroups(p => { const n = new Set(p); n.has(parent.id) ? n.delete(parent.id) : n.add(parent.id); return n; })}
+                              className={`w-5 h-5 rounded flex items-center justify-center shrink-0 transition-all ${children.length > 0 ? 'text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 cursor-pointer' : 'opacity-0 pointer-events-none'}`}
+                            >
+                              {children.length > 0 && <ChevronRight size={12} className={`transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`} />}
+                            </button>
+                            {/* Status dot */}
+                            <div className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: sc.hex }} />
+                            {/* Title & Info & Edit */}
+                            <div className="min-w-0 flex-1 flex items-center gap-1.5 group/title">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[11px] font-bold text-gray-800 truncate leading-snug">{parent.title}</p>
+                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                  <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md ${priorCfg[parent.priority]}`}>{parent.priority}</span>
+                                  {parent.due_date
+                                    ? <span className="text-[8px] text-gray-400 font-semibold">{new Date(parent.due_date).toLocaleDateString('es',{day:'2-digit',month:'short'})}</span>
+                                    : <span className="text-[8px] text-amber-500 font-bold">sin fecha</span>
+                                  }
+                                  {children.length > 0 && <span className="text-[8px] text-indigo-400 font-black">{children.length} subtareas</span>}
+                                </div>
+                              </div>
+                              <button onClick={() => openTaskModal(parent)} className="opacity-0 group-hover/row:opacity-100 w-6 h-6 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-400 hover:text-indigo-600 flex items-center justify-center transition-all shrink-0" title="Editar">
+                                <Pencil size={11} />
+                              </button>
                             </div>
                           </div>
-                          {/* Edit + avatar */}
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <button onClick={() => openTaskModal(parent)} className="opacity-0 group-hover/row:opacity-100 w-6 h-6 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-400 hover:text-indigo-600 flex items-center justify-center transition-all" title="Editar">
-                              <Pencil size={11} />
-                            </button>
-                            {assigned && (
-                              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#4449AA] to-indigo-400 flex items-center justify-center text-white text-[8px] font-black shrink-0 ring-2 ring-white" title={assigned.full_name ?? assigned.email}>
+
+                          {/* Col 2: Asignado */}
+                          <div className="w-[80px] shrink-0 border-l border-gray-100 pl-2 flex items-center justify-start">
+                            {assigned ? (
+                              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-[9px] font-bold shadow-sm ring-1 ring-white" title={assigned.full_name ?? assigned.email}>
                                 {(assigned.full_name ?? assigned.email)[0].toUpperCase()}
                               </div>
+                            ) : (
+                              <div className="w-6 h-6 rounded-full border border-dashed border-gray-200 flex items-center justify-center text-gray-300 text-[9px]" title="Sin asignar">
+                                +
+                              </div>
                             )}
+                          </div>
+
+                          {/* Col 3: Horas */}
+                          <div className="w-[60px] shrink-0 border-l border-gray-100 pl-2 text-right text-[10px] font-semibold text-gray-500">
+                            {formatHours(parent.actual_hours)}
                           </div>
                         </div>
                         {/* Gantt area */}
@@ -1899,42 +1924,63 @@ export default function ProjectManagement() {
                                 ${isDragTarget ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-300' : 'hover:bg-blue-50/20 bg-gray-50/40'}`}
                               style={{ height: ROW_H - 10 }}
                             >
-                              <div className="shrink-0 flex items-center gap-2 px-2 border-r border-gray-100 bg-white" style={{ width: LEFT_W }}>
-                                {/* indent line */}
-                                <div className="w-4 shrink-0 flex justify-center relative">
-                                  <div className="absolute top-0 bottom-0 left-1/2 w-px bg-indigo-200/60" />
-                                  <div className="absolute top-1/2 left-1/2 w-2 h-px bg-indigo-200/60" />
+                              <div className="shrink-0 flex items-center px-2 border-r border-gray-100 bg-white gap-2" style={{ width: LEFT_W }}>
+                                {/* Col 1: Tarea */}
+                                <div className="flex-1 flex items-center gap-2 min-w-0">
+                                  {/* indent line */}
+                                  <div className="w-4 shrink-0 flex justify-center relative self-stretch">
+                                    <div className="absolute top-0 bottom-0 left-1/2 w-px bg-indigo-200/60" />
+                                    <div className="absolute top-1/2 left-1/2 w-2 h-px bg-indigo-200/60" />
+                                  </div>
+                                  {/* Row drag handle for child task */}
+                                  <div
+                                    className={`transition-all shrink-0 w-5 h-5 rounded flex items-center justify-center
+                                      ${ganttRowDragging === child.id
+                                        ? 'text-white bg-indigo-500 shadow-md shadow-indigo-200 ring-2 ring-indigo-300'
+                                        : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                    style={{
+                                      cursor: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%238b5cf6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v5'/><path d='M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6'/><path d='M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v9'/><path d='M6 14.5V11a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6c0 5.5 4.5 10 10 10h1a10 10 0 0 0 10-10v-3.5a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2V12'/></svg>") 12 12, grab`
+                                    }}
+                                    onMouseDown={(e) => startRowDrag(e, child)}
+                                    title="Arrastrar para reordenar subtarea"
+                                  >
+                                    <GripVertical size={11} />
+                                  </div>
+                                  <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: csc.hex, opacity: 0.8 }} />
+                                  {/* Title & Info & Edit */}
+                                  <div className="min-w-0 flex-1 flex items-center gap-1.5 group/title">
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-[10px] font-semibold text-gray-600 truncate">{child.title}</p>
+                                      <div className="flex items-center gap-1.5 mt-0.5">
+                                        <span className={`text-[8px] font-black uppercase px-1 py-0.5 rounded ${priorCfg[child.priority]}`}>{child.priority}</span>
+                                        {child.due_date
+                                          ? <span className="text-[8px] text-gray-400 font-semibold">{new Date(child.due_date).toLocaleDateString('es',{day:'2-digit',month:'short'})}</span>
+                                          : <span className="text-[8px] text-amber-400 font-bold">sin fecha</span>
+                                        }
+                                      </div>
+                                    </div>
+                                    <button onClick={() => openTaskModal(child)} className="opacity-0 group-hover/row:opacity-100 w-5 h-5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-400 flex items-center justify-center transition-all shrink-0"><Pencil size={10}/></button>
+                                  </div>
                                 </div>
-                                {/* Row drag handle for child task */}
-                                <div
-                                  className={`transition-all shrink-0 w-5 h-5 rounded flex items-center justify-center
-                                    ${ganttRowDragging === child.id
-                                      ? 'text-white bg-indigo-500 shadow-md shadow-indigo-200 ring-2 ring-indigo-300'
-                                      : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'}`}
-                                  style={{
-                                    cursor: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%238b5cf6' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v5'/><path d='M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6'/><path d='M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v9'/><path d='M6 14.5V11a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v6c0 5.5 4.5 10 10 10h1a10 10 0 0 0 10-10v-3.5a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2V12'/></svg>") 12 12, grab`
-                                  }}
-                                  onMouseDown={(e) => startRowDrag(e, child)}
-                                  title="Arrastrar para reordenar subtarea"
-                                >
-                                  <GripVertical size={11} />
+
+                                {/* Col 2: Asignado */}
+                                <div className="w-[80px] shrink-0 border-l border-gray-100 pl-2 flex items-center justify-start">
+                                  {ca ? (
+                                    <div className="w-5 h-5 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-[8px] font-bold shadow-sm ring-1 ring-white" title={ca.full_name ?? ca.email}>
+                                      {(ca.full_name ?? ca.email)[0].toUpperCase()}
+                                    </div>
+                                  ) : (
+                                    <div className="w-5 h-5 rounded-full border border-dashed border-gray-200 flex items-center justify-center text-gray-300 text-[8px]" title="Sin asignar">
+                                      +
+                                    </div>
+                                  )}
                                 </div>
-                                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: csc.hex, opacity: 0.8 }} />
-                                <div className="min-w-0 flex-1">
-                                  <p className="text-[10px] font-semibold text-gray-600 truncate">{child.title}</p>
-                                <div className="flex items-center gap-1.5 mt-0.5">
-                                  <span className={`text-[8px] font-black uppercase px-1 py-0.5 rounded ${priorCfg[child.priority]}`}>{child.priority}</span>
-                                  {child.due_date
-                                    ? <span className="text-[8px] text-gray-400 font-semibold">{new Date(child.due_date).toLocaleDateString('es',{day:'2-digit',month:'short'})}</span>
-                                    : <span className="text-[8px] text-amber-400 font-bold">sin fecha</span>
-                                  }
+
+                                {/* Col 3: Horas */}
+                                <div className="w-[60px] shrink-0 border-l border-gray-100 pl-2 text-right text-[10px] font-semibold text-gray-500">
+                                  {formatHours(child.actual_hours)}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <button onClick={() => openTaskModal(child)} className="opacity-0 group-hover/row:opacity-100 w-5 h-5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-400 flex items-center justify-center transition-all"><Pencil size={10}/></button>
-                                {ca && <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#4449AA] to-indigo-400 flex items-center justify-center text-white text-[7px] font-black shrink-0 ring-2 ring-white">{(ca.full_name ?? ca.email)[0].toUpperCase()}</div>}
-                              </div>
-                            </div>
                             <div className="relative overflow-hidden" style={{ width: DAYS * DAY_W, height: ROW_H - 10 }}>
                               {renderGanttBg(ROW_H - 10)}
                               {renderBar(child)}
