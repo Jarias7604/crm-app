@@ -6,7 +6,7 @@ import {
   Trash2, User, Calendar as CalendarIcon, MessageSquare, Tag, 
   ChevronRight, ArrowRight, Loader2, Sparkles, Filter, CheckCircle2,
   ListTodo, KanbanSquare, BarChart4, AlertCircle, X, Search,
-  Check, TrendingUp, TrendingDown, ShieldCheck, ShieldX
+  Check, TrendingUp, TrendingDown, ShieldCheck, ShieldX, Pencil, GripVertical
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Button } from '../components/ui/Button';
@@ -81,7 +81,22 @@ export default function ProjectManagement() {
   const [priorityFilter, setPriorityFilter] = useState<string>('all');
   const [searchFilter, setSearchFilter] = useState<string>('');
   const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'timeline'>('list');
-  const [ganttWeekOffset, setGanttWeekOffset] = useState(0); // offset from today's week
+  const [ganttWeekOffset, setGanttWeekOffset] = useState(0);
+  const [ganttExpandedGroups, setGanttExpandedGroups] = useState<Set<string>>(new Set());
+  const [ganttTaskOrder, setGanttTaskOrder] = useState<string[]>([]); // custom sort order by task id
+  const [ganttDragOverride, setGanttDragOverride] = useState<Record<string, { left: number; width: number }>>({});
+  const ganttDragRef = useRef<{
+    type: 'move' | 'resize';
+    taskId: string;
+    startX: number;
+    origLeft: number;
+    origWidth: number;
+    origStartDate: Date;
+    origEndDate: Date;
+    dayW: number;
+  } | null>(null);
+  const ganttRowDragRef = useRef<{ taskId: string; startY: number; currentIdx: number } | null>(null);
+  const [ganttRowDragOver, setGanttRowDragOver] = useState<string | null>(null); // taskId of drop target
   const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
 
   const toggleExpand = (id: string) => {
@@ -705,6 +720,91 @@ export default function ProjectManagement() {
       toast.error("Error al actualizar estado");
     }
   };
+
+  // ── Gantt: save date changes after horizontal bar drag ──
+  const handleUpdateTaskDates = async (taskId: string, startDate: Date, dueDate: Date) => {
+    const upd = { start_date: startDate.toISOString(), due_date: dueDate.toISOString(), updated_at: new Date().toISOString() };
+    if (dbAvailable) {
+      const { data, error } = await supabase.from('crm_tasks').update(upd).eq('id', taskId).select().single();
+      if (!error && data) setTasks(prev => prev.map(t => t.id === taskId ? data : t));
+    } else {
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...upd } : t));
+    }
+  };
+
+  // ── Gantt: global mouse handlers for bar drag & row reorder ──
+  useEffect(() => {
+    const DAY_W = 36;
+    const ROW_H = 58;
+
+    const onMove = (e: MouseEvent) => {
+      // Horizontal bar drag
+      const d = ganttDragRef.current;
+      if (d) {
+        const dx = e.clientX - d.startX;
+        const days = Math.round(dx / d.dayW);
+        if (d.type === 'move') {
+          setGanttDragOverride(p => ({ ...p, [d.taskId]: { left: Math.max(0, d.origLeft + days * d.dayW), width: d.origWidth } }));
+        } else {
+          setGanttDragOverride(p => ({ ...p, [d.taskId]: { left: d.origLeft, width: Math.max(d.dayW, d.origWidth + days * d.dayW) } }));
+        }
+      }
+      // Vertical row drag
+      const rd = ganttRowDragRef.current;
+      if (rd) {
+        const dy = e.clientY - rd.startY;
+        const rowDelta = Math.round(dy / ROW_H);
+        rd.currentIdx = rowDelta;
+        // find which task we're hovering over
+        const el = document.elementFromPoint(e.clientX, e.clientY);
+        const rowEl = el?.closest('[data-gantt-row]');
+        const hoveredId = rowEl?.getAttribute('data-gantt-row') ?? null;
+        setGanttRowDragOver(hoveredId);
+      }
+    };
+
+    const onUp = async (e: MouseEvent) => {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+
+      // Horizontal: save dates
+      const d = ganttDragRef.current;
+      if (d) {
+        const dx = e.clientX - d.startX;
+        const days = Math.round(dx / d.dayW);
+        const ns = new Date(d.origStartDate); ns.setDate(ns.getDate() + (d.type === 'move' ? days : 0));
+        const ne = new Date(d.origEndDate);   ne.setDate(ne.getDate() + days);
+        if (ne <= ns) ne.setDate(ns.getDate() + 1);
+        ganttDragRef.current = null;
+        setGanttDragOverride(p => { const n = {...p}; delete n[d.taskId]; return n; });
+        await handleUpdateTaskDates(d.taskId, ns, ne);
+      }
+
+      // Vertical: reorder
+      const rd = ganttRowDragRef.current;
+      if (rd) {
+        const hoveredId = ganttRowDragOver;
+        ganttRowDragRef.current = null;
+        setGanttRowDragOver(null);
+        if (hoveredId && hoveredId !== rd.taskId) {
+          setGanttTaskOrder(prev => {
+            const ordered = prev.length ? prev : tasks.filter(t => !t.parent_task_id).map(t => t.id);
+            const from = ordered.indexOf(rd.taskId);
+            const to   = ordered.indexOf(hoveredId);
+            if (from === -1 || to === -1) return prev;
+            const next = [...ordered];
+            next.splice(from, 1);
+            next.splice(to, 0, rd.taskId);
+            return next;
+          });
+        }
+      }
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+  }, [tasks, ganttRowDragOver]);
 
   const handleDeleteTask = async (taskId: string) => {
     if (!confirm("¿Estás seguro de eliminar esta tarea?")) return;
@@ -1499,159 +1599,177 @@ export default function ProjectManagement() {
       )}
 
 
-      {/* ── GANTT / TIMELINE VIEW ──────────────────────────────── */}
+      {/* ── PREMIUM GANTT / TIMELINE VIEW ────────────────────────── */}
       {viewMode === 'timeline' && (() => {
-        // Build 8-week window anchored to today + offset
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        // Anchor to Monday of current week
-        const dayOfWeek = today.getDay(); // 0=Sun
-        const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        const today = new Date(); today.setHours(0,0,0,0);
+        const dow = today.getDay();
         const anchorMonday = new Date(today);
-        anchorMonday.setDate(today.getDate() + mondayOffset + ganttWeekOffset * 7);
+        anchorMonday.setDate(today.getDate() + (dow === 0 ? -6 : 1 - dow) + ganttWeekOffset * 7);
 
-        const WEEKS = 8;
-        const DAYS  = WEEKS * 7;
-        const DAY_W = 38; // px per day
+        const WEEKS = 10, DAYS = WEEKS * 7, DAY_W = 36, ROW_H = 58, LEFT_W = 360;
 
-        // Build day headers
-        const days: Date[] = [];
-        for (let i = 0; i < DAYS; i++) {
-          const d = new Date(anchorMonday);
-          d.setDate(anchorMonday.getDate() + i);
-          days.push(d);
-        }
+        const days: Date[] = Array.from({ length: DAYS }, (_, i) => {
+          const d = new Date(anchorMonday); d.setDate(anchorMonday.getDate() + i); return d;
+        });
+        const weeks = Array.from({ length: WEEKS }, (_, w) => {
+          const wd = days.slice(w * 7, w * 7 + 7);
+          return { label: `Sem ${wd[0].getDate()}/${wd[0].getMonth()+1}`, days: wd };
+        });
 
-        const weeks: { label: string; days: Date[] }[] = [];
-        for (let w = 0; w < WEEKS; w++) {
-          const wDays = days.slice(w * 7, w * 7 + 7);
-          const startD = wDays[0];
-          weeks.push({
-            label: `Semana ${startD.getDate()}/${startD.getMonth() + 1}`,
-            days: wDays,
-          });
-        }
+        const ganttStart = new Date(anchorMonday);
+        const ganttEnd   = new Date(anchorMonday); ganttEnd.setDate(anchorMonday.getDate() + DAYS);
+        const todayOff   = Math.round((today.getTime() - ganttStart.getTime()) / 86400000);
+        const showToday  = todayOff >= 0 && todayOff < DAYS;
 
-        const ganttStart = anchorMonday;
-        const ganttEnd = new Date(anchorMonday);
-        ganttEnd.setDate(anchorMonday.getDate() + DAYS);
-
-        const statusBarColor: Record<string, string> = {
-          todo: 'bg-slate-300',
-          in_progress: 'bg-blue-500',
-          paused: 'bg-amber-400',
-          pending_approval: 'bg-violet-500',
-          rejected: 'bg-rose-500',
-          completed: 'bg-emerald-500',
+        const SC: Record<string, { tw: string; hex: string }> = {
+          todo:             { tw: 'bg-slate-400',   hex: '#94a3b8' },
+          in_progress:      { tw: 'bg-blue-500',    hex: '#3b82f6' },
+          paused:           { tw: 'bg-amber-400',   hex: '#f59e0b' },
+          pending_approval: { tw: 'bg-violet-500',  hex: '#8b5cf6' },
+          rejected:         { tw: 'bg-rose-500',    hex: '#ef4444' },
+          completed:        { tw: 'bg-emerald-500', hex: '#10b981' },
         };
 
-        const priorityBorderColor: Record<string, string> = {
-          urgent: 'border-l-4 border-rose-500',
-          high: 'border-l-4 border-amber-500',
-          medium: 'border-l-4 border-indigo-400',
-          low: 'border-l-4 border-gray-300',
+        const PB: Record<string, string> = {
+          urgent: 'border-l-[3px] border-rose-500',
+          high:   'border-l-[3px] border-amber-500',
+          medium: 'border-l-[3px] border-indigo-400',
+          low:    'border-l-[3px] border-gray-300',
         };
 
         const calcBar = (task: Task) => {
-          // If task has explicit start_date, use it. Otherwise anchor to TODAY
-          // (never use created_at — it's months in the past and lands outside the window)
-          const hasRealStart = !!task.start_date;
-          const hasRealEnd   = !!task.due_date;
-
-          let rawStart: Date;
-          let rawEnd: Date;
-
-          if (hasRealStart) {
-            rawStart = new Date(task.start_date!);
-          } else if (hasRealEnd) {
-            // Work backwards: end - estimated hours
-            rawStart = new Date(task.due_date!);
-            const days = task.estimated_hours && task.estimated_hours > 0
-              ? Math.max(1, Math.ceil(task.estimated_hours / 8))
-              : 3;
-            rawStart.setDate(rawStart.getDate() - days);
-          } else {
-            // No dates at all → anchor to today so bar is always visible
-            rawStart = new Date(today);
-          }
-
-          if (hasRealEnd) {
-            rawEnd = new Date(task.due_date!);
-          } else if (task.estimated_hours && task.estimated_hours > 0) {
-            rawEnd = new Date(rawStart);
-            rawEnd.setDate(rawStart.getDate() + Math.max(1, Math.ceil(task.estimated_hours / 8)));
-          } else {
-            rawEnd = new Date(rawStart);
-            rawEnd.setDate(rawStart.getDate() + 3); // default 3-day placeholder
-          }
-
-          const start = new Date(rawStart); start.setHours(0,0,0,0);
-          const end   = new Date(rawEnd);   end.setHours(0,0,0,0);
-          const isFallback = !hasRealEnd; // no confirmed due date
-
-          const clampedStart = start < ganttStart ? ganttStart : start;
-          const clampedEnd   = end   > ganttEnd   ? ganttEnd   : end;
-
-          // Task entirely outside visible window
-          if (clampedStart >= ganttEnd)   return null;
-          if (clampedEnd   <= ganttStart) return null;
-
-          const offsetDays   = Math.max(0, Math.round((clampedStart.getTime() - ganttStart.getTime()) / 86400000));
-          const durationDays = Math.max(1, Math.round((clampedEnd.getTime() - clampedStart.getTime()) / 86400000) + 1);
-
-          return { left: offsetDays * DAY_W, width: durationDays * DAY_W, isFallback };
+          const ov = ganttDragOverride[task.id];
+          const hasStart = !!task.start_date, hasEnd = !!task.due_date;
+          let rs: Date;
+          if (hasStart)    rs = new Date(task.start_date!);
+          else if (hasEnd) { rs = new Date(task.due_date!); rs.setDate(rs.getDate() - Math.max(1, Math.ceil((task.estimated_hours ?? 8) / 8))); }
+          else             rs = new Date(today);
+          let re: Date;
+          if (hasEnd)                                   re = new Date(task.due_date!);
+          else if (task.estimated_hours && task.estimated_hours > 0) { re = new Date(rs); re.setDate(rs.getDate() + Math.max(1, Math.ceil(task.estimated_hours / 8))); }
+          else                                          { re = new Date(rs); re.setDate(rs.getDate() + 3); }
+          const s = new Date(rs); s.setHours(0,0,0,0);
+          const e = new Date(re); e.setHours(0,0,0,0);
+          const cs = s < ganttStart ? ganttStart : s;
+          const ce = e > ganttEnd   ? ganttEnd   : e;
+          if (cs >= ganttEnd || ce <= ganttStart) return null;
+          const off = Math.max(0, Math.round((cs.getTime() - ganttStart.getTime()) / 86400000));
+          const dur = Math.max(1, Math.round((ce.getTime() - cs.getTime()) / 86400000) + 1);
+          const base = { left: ov ? ov.left : off * DAY_W, width: ov ? ov.width : dur * DAY_W, isFallback: !hasEnd, origStart: s, origEnd: e };
+          return base;
         };
 
+        const startBarDrag = (e: React.MouseEvent, task: Task, type: 'move' | 'resize') => {
+          e.preventDefault(); e.stopPropagation();
+          const bar = calcBar(task); if (!bar) return;
+          document.body.style.cursor = type === 'resize' ? 'ew-resize' : 'grabbing';
+          document.body.style.userSelect = 'none';
+          ganttDragRef.current = { type, taskId: task.id, startX: e.clientX, origLeft: bar.left, origWidth: bar.width, origStartDate: bar.origStart, origEndDate: bar.origEnd, dayW: DAY_W };
+        };
 
-        const todayOffset = Math.round((today.getTime() - ganttStart.getTime()) / 86400000);
-        const showTodayLine = todayOffset >= 0 && todayOffset < DAYS;
+        const startRowDrag = (e: React.MouseEvent, task: Task) => {
+          e.preventDefault();
+          document.body.style.cursor = 'grabbing';
+          document.body.style.userSelect = 'none';
+          ganttRowDragRef.current = { taskId: task.id, startY: e.clientY, currentIdx: 0 };
+        };
+
+        // Sort parents by ganttTaskOrder if set
+        const allParents = filteredTasks.filter(t => !t.parent_task_id);
+        const parents = ganttTaskOrder.length
+          ? [...allParents].sort((a, b) => {
+              const ai = ganttTaskOrder.indexOf(a.id); const bi = ganttTaskOrder.indexOf(b.id);
+              return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+            })
+          : allParents;
+        const childrenOf = (pid: string) => filteredTasks.filter(t => t.parent_task_id === pid);
+
+        const renderBar = (task: Task) => {
+          const bar = calcBar(task); if (!bar) return null;
+          const sc   = SC[task.status] ?? SC.todo;
+          const pct  = task.estimated_hours && task.estimated_hours > 0 ? Math.min(((task.actual_hours ?? 0) / task.estimated_hours) * 100, 100) : 0;
+          const isFb = bar.isFallback;
+          return (
+            <div
+              className={`absolute top-1/2 -translate-y-1/2 rounded-full group/bar select-none cursor-grab active:cursor-grabbing hover:shadow-lg transition-shadow ${isFb ? 'opacity-55' : 'opacity-95'}`}
+              style={{ left: bar.left + 3, width: Math.max(bar.width - 6, DAY_W), height: 28 }}
+              onMouseDown={(e) => startBarDrag(e, task, 'move')}
+            >
+              {/* track bg */}
+              <div className="absolute inset-0 rounded-full" style={{ backgroundColor: sc.hex, opacity: 0.15 }} />
+              {/* dashed for fallback */}
+              {isFb && <div className="absolute inset-0 rounded-full" style={{ border: `2px dashed ${sc.hex}99` }} />}
+              {/* progress fill */}
+              <div className="absolute top-0 left-0 bottom-0 rounded-full transition-all" style={{ width: `${isFb ? 100 : Math.max(pct, 4)}%`, backgroundColor: sc.hex, opacity: isFb ? 0.3 : 0.9 }} />
+              {/* label */}
+              <div className="relative h-full flex items-center px-2.5 gap-1 overflow-hidden">
+                <span className={`text-[9px] font-black truncate whitespace-nowrap drop-shadow-sm ${isFb ? 'text-gray-700' : 'text-white'}`}>{task.title}</span>
+                {!isFb && pct > 0 && <span className="text-[8px] text-white/60 font-bold shrink-0">{Math.round(pct)}%</span>}
+              </div>
+              {/* resize handle */}
+              <div
+                className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize rounded-r-full opacity-0 group-hover/bar:opacity-100 flex items-center justify-center gap-0.5 transition-opacity"
+                onMouseDown={(e) => { e.stopPropagation(); startBarDrag(e, task, 'resize'); }}
+              >
+                <div className="w-0.5 h-3.5 rounded-full bg-white/50" />
+                <div className="w-0.5 h-3.5 rounded-full bg-white/50" />
+              </div>
+            </div>
+          );
+        };
+
+        const renderGanttBg = (h: number) => (
+          <>
+            {days.map((d, di) => (d.getDay()===0||d.getDay()===6) && <div key={di} className="absolute inset-y-0 bg-gray-50/80" style={{ left: di*DAY_W, width: DAY_W }} />)}
+            {days.map((_,di) => <div key={`gl${di}`} className="absolute inset-y-0 w-px bg-gray-100/70" style={{ left: di*DAY_W }} />)}
+            {showToday && <div className="absolute inset-y-0 w-0.5 bg-indigo-500/70 z-10" style={{ left: todayOff*DAY_W }} />}
+          </>
+        );
 
         return (
-          <section className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+          <section className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden" style={{ userSelect: 'none' }}>
+            {/* Top bar */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
               <div className="flex items-center gap-3">
-                <p className="text-sm font-black text-gray-800">Timeline del Proyecto</p>
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{tasks.length} tareas</span>
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-[#4449AA] flex items-center justify-center shadow-md shadow-indigo-200">
+                  <BarChart4 size={15} className="text-white" />
+                </div>
+                <div>
+                  <p className="text-[13px] font-black text-gray-900 leading-none">Timeline del Proyecto</p>
+                  <p className="text-[10px] text-gray-400 font-semibold mt-0.5">{filteredTasks.length} tareas · arrastra barras (←→) o filas (↑↓)</p>
+                </div>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => setGanttWeekOffset(0)} className="px-3 h-7 text-[10px] font-black uppercase tracking-widest bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-all">Hoy</button>
-                <button onClick={() => setGanttWeekOffset(g => g - 1)} className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-50 border border-gray-100 hover:bg-gray-100 transition-all text-gray-500">
-                  <ChevronRight size={14} className="rotate-180" />
-                </button>
-                <button onClick={() => setGanttWeekOffset(g => g + 1)} className="w-7 h-7 flex items-center justify-center rounded-lg bg-gray-50 border border-gray-100 hover:bg-gray-100 transition-all text-gray-500">
-                  <ChevronRight size={14} />
-                </button>
+                <div className="flex items-center gap-3 mr-2 pr-3 border-r border-gray-100">
+                  <div className="flex items-center gap-1.5"><div className="w-7 h-2.5 rounded-full bg-blue-500 opacity-80"/><span className="text-[9px] font-bold text-gray-400">Con fecha</span></div>
+                  <div className="flex items-center gap-1.5"><div className="w-7 h-2.5 rounded-full border-2 border-dashed border-gray-300"/><span className="text-[9px] font-bold text-gray-400">Estimada</span></div>
+                </div>
+                <button onClick={() => setGanttWeekOffset(0)} className="px-3 h-7 text-[10px] font-black uppercase tracking-wider bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-all shadow-sm shadow-indigo-200">Hoy</button>
+                <button onClick={() => setGanttWeekOffset(g => g-1)} className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-500"><ChevronRight size={13} className="rotate-180"/></button>
+                <button onClick={() => setGanttWeekOffset(g => g+1)} className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-500"><ChevronRight size={13}/></button>
               </div>
             </div>
 
             <div className="overflow-x-auto">
-              <div style={{ minWidth: 320 + DAYS * DAY_W }}>
-
-                {/* Week header row */}
-                <div className="flex border-b border-gray-100 bg-gray-50/60">
-                  {/* Left label col */}
-                  <div className="w-[320px] shrink-0 px-5 py-2 border-r border-gray-100">
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tarea</span>
+              <div style={{ minWidth: LEFT_W + DAYS * DAY_W }}>
+                {/* Header */}
+                <div className="flex sticky top-0 z-20 border-b-2 border-gray-200 bg-white">
+                  <div className="shrink-0 flex items-end px-4 pb-2 border-r border-gray-200 bg-gray-50/80" style={{ width: LEFT_W }}>
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Tarea / Asignado</span>
                   </div>
-                  {/* Week columns */}
                   <div className="flex" style={{ width: DAYS * DAY_W }}>
                     {weeks.map((w, wi) => (
-                      <div key={wi} className="border-r border-gray-100" style={{ width: 7 * DAY_W }}>
-                        <div className="px-2 py-1.5 text-[10px] font-black text-gray-500 uppercase tracking-wider border-b border-gray-100">{w.label}</div>
+                      <div key={wi} className="border-r border-gray-200" style={{ width: 7 * DAY_W }}>
+                        <div className="px-2 py-1 text-[9px] font-black text-gray-500 uppercase tracking-wider border-b border-gray-100 bg-gray-50">{w.label}</div>
                         <div className="flex">
                           {w.days.map((d, di) => {
-                            const isToday = d.toDateString() === today.toDateString();
-                            const isSat = d.getDay() === 6;
-                            const isSun = d.getDay() === 0;
+                            const isT = d.toDateString() === today.toDateString();
+                            const isW = d.getDay() === 0 || d.getDay() === 6;
                             return (
-                              <div
-                                key={di}
-                                style={{ width: DAY_W }}
-                                className={`py-1 text-center text-[9px] font-bold border-r border-gray-50 ${isToday ? 'bg-indigo-500 text-white rounded-t' : (isSat || isSun) ? 'bg-gray-100 text-gray-400' : 'text-gray-400'}`}
-                              >
+                              <div key={di} style={{ width: DAY_W }}
+                                className={`py-1 text-center text-[9px] font-bold border-r border-gray-50 ${isT ? 'bg-indigo-500 text-white rounded-t-md' : isW ? 'bg-gray-100/80 text-gray-400' : 'bg-white text-gray-400'}`}>
                                 {['D','L','M','X','J','V','S'][d.getDay()]}
-                                <div className={`text-[8px] ${isToday ? 'text-indigo-100' : ''}`}>{d.getDate()}</div>
+                                <div className={`text-[8px] leading-none ${isT ? 'text-indigo-100' : ''}`}>{d.getDate()}</div>
                               </div>
                             );
                           })}
@@ -1661,129 +1779,126 @@ export default function ProjectManagement() {
                   </div>
                 </div>
 
-                {/* Task rows — ALL tasks, fallback bars for those without due_date */}
+                {/* Rows */}
                 {filteredTasks.length === 0 ? (
-                  <div className="py-12 text-center text-gray-400 text-xs font-semibold border-b border-gray-50">
-                    <Layers size={28} className="mx-auto mb-2 opacity-30" />
-                    No hay tareas en este proyecto.
-                  </div>
-                ) : (
-                  <>
-                    {/* Legend */}
-                    <div className="flex items-center gap-5 px-5 py-2 border-b border-gray-50 bg-gray-50/40">
-                      <div className="flex items-center gap-1.5"><div className="w-8 h-3 rounded bg-blue-500 opacity-80" /><span className="text-[9px] text-gray-500 font-bold">Barra real (con fecha límite)</span></div>
-                      <div className="flex items-center gap-1.5"><div className="w-8 h-3 rounded border-2 border-dashed border-gray-400 bg-gray-200 opacity-60" /><span className="text-[9px] text-gray-400 font-bold">Estimada (sin fecha límite)</span></div>
-                      <div className="ml-auto flex items-center gap-1.5"><div className="w-0.5 h-4 bg-indigo-500" /><span className="text-[9px] text-gray-400 font-bold">Hoy</span></div>
-                    </div>
+                  <div className="py-20 text-center text-gray-300"><Layers size={36} className="mx-auto mb-3 opacity-30"/><p className="text-xs font-semibold">No hay tareas</p></div>
+                ) : parents.map(parent => {
+                  const children  = childrenOf(parent.id);
+                  const expanded  = ganttExpandedGroups.has(parent.id);
+                  const assigned  = getAssignedProfile(parent.assigned_to);
+                  const sc        = SC[parent.status] ?? SC.todo;
+                  const isDragTarget = ganttRowDragOver === parent.id;
 
-                    {filteredTasks.map(task => {
-                      const bar = calcBar(task);
-                      const assigned = getAssignedProfile(task.assigned_to);
-                      const barColor = statusBarColor[task.status] ?? 'bg-gray-300';
-                      const isParent = !task.parent_task_id;
-                      const isFallback = bar?.isFallback ?? false;
-                      const pctFill = task.estimated_hours && task.estimated_hours > 0
-                        ? Math.min(((task.actual_hours ?? 0) / task.estimated_hours) * 100, 100)
-                        : 0;
-
-                      return (
-                        <div
-                          key={task.id}
-                          className={`flex border-b border-gray-50 hover:bg-gray-50/40 transition-colors group ${!isParent ? 'bg-gray-50/30' : ''}`}
-                        >
-                          {/* Left: task info */}
-                          <div className={`w-[320px] shrink-0 flex items-center gap-3 px-5 py-3 border-r border-gray-100 ${!isParent ? 'pl-10' : ''}`}>
-                            <div className={`w-2 h-2 rounded-full shrink-0 ${barColor}`} />
-                            <div className="min-w-0 flex-1">
-                              <p
-                                onClick={() => openTaskModal(task)}
-                                className="text-xs font-bold text-gray-800 hover:text-[#4449AA] cursor-pointer truncate leading-tight"
-                              >
-                                {task.title}
-                              </p>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${priorCfg[task.priority]}`}>
-                                  {task.priority}
-                                </span>
-                                {task.due_date ? (
-                                  <span className="text-[9px] text-gray-500 font-bold">
-                                    {new Date(task.due_date).toLocaleDateString('es', { day:'2-digit', month:'short' })}
-                                  </span>
-                                ) : (
-                                  <span className="text-[9px] text-amber-500 font-bold">sin fecha</span>
-                                )}
-                              </div>
+                  return (
+                    <React.Fragment key={parent.id}>
+                      {/* Parent row */}
+                      <div
+                        data-gantt-row={parent.id}
+                        className={`flex border-b border-gray-100 group/row transition-all duration-150 ${PB[parent.priority] ?? ''} ${isDragTarget ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-300' : 'hover:bg-slate-50/60'}`}
+                        style={{ height: ROW_H }}
+                      >
+                        {/* Left panel */}
+                        <div className="shrink-0 flex items-center gap-2 px-2 border-r border-gray-100 bg-white" style={{ width: LEFT_W }}>
+                          {/* Row drag handle */}
+                          <div
+                            className="cursor-grab active:cursor-grabbing opacity-0 group-hover/row:opacity-100 transition-opacity text-gray-300 hover:text-gray-500 shrink-0"
+                            onMouseDown={(e) => startRowDrag(e, parent)}
+                            title="Arrastrar para reordenar"
+                          >
+                            <GripVertical size={14} />
+                          </div>
+                          {/* Chevron */}
+                          <button
+                            onClick={() => setGanttExpandedGroups(p => { const n = new Set(p); n.has(parent.id) ? n.delete(parent.id) : n.add(parent.id); return n; })}
+                            className={`w-5 h-5 rounded flex items-center justify-center shrink-0 transition-all ${children.length > 0 ? 'text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 cursor-pointer' : 'opacity-0 pointer-events-none'}`}
+                          >
+                            {children.length > 0 && <ChevronRight size={12} className={`transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`} />}
+                          </button>
+                          {/* Status dot */}
+                          <div className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: sc.hex }} />
+                          {/* Task info */}
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[11px] font-bold text-gray-800 truncate leading-snug">{parent.title}</p>
+                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                              <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md ${priorCfg[parent.priority]}`}>{parent.priority}</span>
+                              {parent.due_date
+                                ? <span className="text-[8px] text-gray-400 font-semibold">{new Date(parent.due_date).toLocaleDateString('es',{day:'2-digit',month:'short'})}</span>
+                                : <span className="text-[8px] text-amber-500 font-bold">sin fecha</span>
+                              }
+                              {children.length > 0 && <span className="text-[8px] text-indigo-400 font-black">{children.length} subtareas</span>}
                             </div>
+                          </div>
+                          {/* Edit + avatar */}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button onClick={() => openTaskModal(parent)} className="opacity-0 group-hover/row:opacity-100 w-6 h-6 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-400 hover:text-indigo-600 flex items-center justify-center transition-all" title="Editar">
+                              <Pencil size={11} />
+                            </button>
                             {assigned && (
-                              <div
-                                className="w-6 h-6 rounded-full bg-gradient-to-br from-[#4449AA] to-indigo-400 flex items-center justify-center text-white text-[8px] font-black shrink-0"
-                                title={assigned.full_name ?? assigned.email}
-                              >
+                              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[#4449AA] to-indigo-400 flex items-center justify-center text-white text-[8px] font-black shrink-0 ring-2 ring-white" title={assigned.full_name ?? assigned.email}>
                                 {(assigned.full_name ?? assigned.email)[0].toUpperCase()}
                               </div>
                             )}
                           </div>
+                        </div>
+                        {/* Gantt area */}
+                        <div className="relative overflow-hidden" style={{ width: DAYS * DAY_W, height: ROW_H }}>
+                          {renderGanttBg(ROW_H)}
+                          {renderBar(parent)}
+                        </div>
+                      </div>
 
-                          {/* Right: Gantt bar area */}
-                          <div className="relative flex-1" style={{ width: DAYS * DAY_W, height: 56 }}>
-                            {/* Weekend shading */}
-                            {days.map((d, di) => (d.getDay() === 0 || d.getDay() === 6) ? (
-                              <div key={di} className="absolute top-0 bottom-0 bg-gray-50/80" style={{ left: di * DAY_W, width: DAY_W }} />
-                            ) : null)}
-
-                            {/* Today line */}
-                            {showTodayLine && (
-                              <div
-                                className="absolute top-0 bottom-0 w-px bg-indigo-500/60 z-10"
-                                style={{ left: todayOffset * DAY_W }}
-                              />
-                            )}
-
-                            {/* Task bar */}
-                            {bar ? (
-                              <div
-                                className={`absolute top-1/2 -translate-y-1/2 rounded-lg cursor-pointer hover:brightness-110 transition-all ${isFallback ? 'opacity-55' : 'opacity-90'}`}
-                                style={{ left: bar.left + 2, width: Math.max(bar.width - 4, 24), height: 26 }}
-                                onClick={() => openTaskModal(task)}
-                                title={`${task.title}${isFallback ? ' (duración estimada, sin fecha límite)' : ''}`}
-                              >
-                                {/* Background */}
-                                <div className={`absolute inset-0 rounded-lg ${barColor} opacity-25`} />
-                                {/* Dashed border for fallback */}
-                                {isFallback && (
-                                  <div className="absolute inset-0 rounded-lg" style={{ border: '2px dashed rgba(0,0,0,0.25)' }} />
-                                )}
-                                {/* Solid fill with progress */}
-                                <div
-                                  className={`absolute top-0 left-0 bottom-0 rounded-lg ${barColor} transition-all`}
-                                  style={{ width: `${isFallback ? 100 : Math.max(pctFill, 3)}%`, opacity: isFallback ? 0.35 : 0.85 }}
-                                />
-                                {/* Label */}
-                                <div className="relative h-full flex items-center px-2 overflow-hidden">
-                                  <span className={`text-[9px] font-black whitespace-nowrap truncate drop-shadow ${isFallback ? 'text-gray-700' : 'text-white'}`}>
-                                    {task.title}
-                                  </span>
+                      {/* Children (collapsed by default) */}
+                      {expanded && children.map(child => {
+                        const ca  = getAssignedProfile(child.assigned_to);
+                        const csc = SC[child.status] ?? SC.todo;
+                        return (
+                          <div
+                            key={child.id}
+                            data-gantt-row={child.id}
+                            className={`flex border-b border-gray-50 group/row transition-all ${PB[child.priority] ?? ''} hover:bg-blue-50/20 bg-gray-50/40`}
+                            style={{ height: ROW_H - 10 }}
+                          >
+                            <div className="shrink-0 flex items-center gap-2 px-2 border-r border-gray-100" style={{ width: LEFT_W }}>
+                              {/* indent line */}
+                              <div className="w-4 shrink-0 flex justify-center relative">
+                                <div className="absolute top-0 bottom-0 left-1/2 w-px bg-indigo-200/60" />
+                                <div className="absolute top-1/2 left-1/2 w-2 h-px bg-indigo-200/60" />
+                              </div>
+                              <div className="w-5 shrink-0" /> {/* chevron placeholder */}
+                              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: csc.hex, opacity: 0.8 }} />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[10px] font-semibold text-gray-600 truncate">{child.title}</p>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className={`text-[8px] font-black uppercase px-1 py-0.5 rounded ${priorCfg[child.priority]}`}>{child.priority}</span>
+                                  {child.due_date
+                                    ? <span className="text-[8px] text-gray-400 font-semibold">{new Date(child.due_date).toLocaleDateString('es',{day:'2-digit',month:'short'})}</span>
+                                    : <span className="text-[8px] text-amber-400 font-bold">sin fecha</span>
+                                  }
                                 </div>
                               </div>
-                            ) : (
-                              /* Bar out of visible window — show indicator at edge */
-                              null
-                            )}
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button onClick={() => openTaskModal(child)} className="opacity-0 group-hover/row:opacity-100 w-5 h-5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-400 flex items-center justify-center transition-all"><Pencil size={10}/></button>
+                                {ca && <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[#4449AA] to-indigo-400 flex items-center justify-center text-white text-[7px] font-black shrink-0 ring-2 ring-white">{(ca.full_name ?? ca.email)[0].toUpperCase()}</div>}
+                              </div>
+                            </div>
+                            <div className="relative overflow-hidden" style={{ width: DAYS * DAY_W, height: ROW_H - 10 }}>
+                              {renderGanttBg(ROW_H - 10)}
+                              {renderBar(child)}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
-
-                  </>
-                )}
-
+                        );
+                      })}
+                    </React.Fragment>
+                  );
+                })}
               </div>
             </div>
           </section>
         );
       })()}
 
-      {/* 📁 Create Project Modal */}
+
+
 
       <Modal isOpen={isProjectModalOpen} onClose={() => setIsProjectModalOpen(false)} title="Crear Nuevo Proyecto" className="max-w-md">
         <form onSubmit={handleCreateProject} className="space-y-6 p-6">
