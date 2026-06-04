@@ -1550,15 +1550,30 @@ export default function ProjectManagement() {
         };
 
         const calcBar = (task: Task) => {
-          // Smart fallbacks: always produce a bar
-          const rawStart = task.start_date
-            ? new Date(task.start_date)
-            : new Date(task.created_at);
+          // If task has explicit start_date, use it. Otherwise anchor to TODAY
+          // (never use created_at — it's months in the past and lands outside the window)
+          const hasRealStart = !!task.start_date;
+          const hasRealEnd   = !!task.due_date;
 
-          // Duration: due_date OR estimated_hours converted to days (8h/day) OR 3 day default
+          let rawStart: Date;
           let rawEnd: Date;
-          if (task.due_date) {
-            rawEnd = new Date(task.due_date);
+
+          if (hasRealStart) {
+            rawStart = new Date(task.start_date!);
+          } else if (hasRealEnd) {
+            // Work backwards: end - estimated hours
+            rawStart = new Date(task.due_date!);
+            const days = task.estimated_hours && task.estimated_hours > 0
+              ? Math.max(1, Math.ceil(task.estimated_hours / 8))
+              : 3;
+            rawStart.setDate(rawStart.getDate() - days);
+          } else {
+            // No dates at all → anchor to today so bar is always visible
+            rawStart = new Date(today);
+          }
+
+          if (hasRealEnd) {
+            rawEnd = new Date(task.due_date!);
           } else if (task.estimated_hours && task.estimated_hours > 0) {
             rawEnd = new Date(rawStart);
             rawEnd.setDate(rawStart.getDate() + Math.max(1, Math.ceil(task.estimated_hours / 8)));
@@ -1569,21 +1584,21 @@ export default function ProjectManagement() {
 
           const start = new Date(rawStart); start.setHours(0,0,0,0);
           const end   = new Date(rawEnd);   end.setHours(0,0,0,0);
-          const isFallback = !task.due_date; // using estimated/default duration
+          const isFallback = !hasRealEnd; // no confirmed due date
 
           const clampedStart = start < ganttStart ? ganttStart : start;
           const clampedEnd   = end   > ganttEnd   ? ganttEnd   : end;
 
-          // Task starts after visible window
-          if (clampedStart >= ganttEnd) return null;
-          // Task ends before visible window
-          if (clampedEnd <= ganttStart) return null;
+          // Task entirely outside visible window
+          if (clampedStart >= ganttEnd)   return null;
+          if (clampedEnd   <= ganttStart) return null;
 
-          const offsetDays   = Math.round((clampedStart.getTime() - ganttStart.getTime()) / 86400000);
+          const offsetDays   = Math.max(0, Math.round((clampedStart.getTime() - ganttStart.getTime()) / 86400000));
           const durationDays = Math.max(1, Math.round((clampedEnd.getTime() - clampedStart.getTime()) / 86400000) + 1);
 
           return { left: offsetDays * DAY_W, width: durationDays * DAY_W, isFallback };
         };
+
 
         const todayOffset = Math.round((today.getTime() - ganttStart.getTime()) / 86400000);
         const showTodayLine = todayOffset >= 0 && todayOffset < DAYS;
