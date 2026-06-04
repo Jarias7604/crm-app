@@ -1663,8 +1663,8 @@ export default function ProjectManagement() {
         const PB: Record<string, string> = {
           urgent: 'border-l-[3px] border-rose-500',
           high:   'border-l-[3px] border-amber-500',
-          medium: 'border-l-[3px] border-indigo-400',
-          low:    'border-l-[3px] border-gray-300',
+          medium: 'border-l-[3px] border-slate-300',
+          low:    'border-l-[3px] border-slate-200',
         };
 
         const calcBar = (task: Task) => {
@@ -1753,9 +1753,9 @@ export default function ProjectManagement() {
 
         const renderGanttBg = (h: number) => (
           <>
-            {days.map((d, di) => (d.getDay()===0||d.getDay()===6) && <div key={di} className="absolute inset-y-0 bg-gray-50/80" style={{ left: di*DAY_W, width: DAY_W }} />)}
-            {days.map((_,di) => <div key={`gl${di}`} className="absolute inset-y-0 w-px bg-gray-100/70" style={{ left: di*DAY_W }} />)}
-            {showToday && <div className="absolute inset-y-0 w-0.5 bg-indigo-500/70 z-10" style={{ left: todayOff*DAY_W }} />}
+            {days.map((d, di) => (d.getDay()===0||d.getDay()===6) && <div key={di} className="absolute inset-y-0 bg-slate-50/30" style={{ left: di*DAY_W, width: DAY_W }} />)}
+            {days.map((_,di) => <div key={`gl${di}`} className="absolute inset-y-0 w-px bg-slate-100/45" style={{ left: di*DAY_W }} />)}
+            {showToday && <div className="absolute inset-y-0 w-0.5 bg-indigo-500/35 z-10" style={{ left: todayOff*DAY_W }} />}
           </>
         );
 
@@ -1829,7 +1829,7 @@ export default function ProjectManagement() {
                       {/* Parent row */}
                       <div
                         data-gantt-row={parent.id}
-                        className={`flex border-b border-gray-100 group/row transition-all duration-150 ${PB[parent.priority] ?? ''} ${isDragTarget ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-300' : 'hover:bg-slate-50/60'}`}
+                        className={`flex border-b border-slate-100 group/row transition-all duration-150 ${PB[parent.priority] ?? ''} ${isDragTarget ? 'bg-slate-50 ring-1 ring-inset ring-slate-200' : 'hover:bg-slate-50/50 bg-white'}`}
                         style={{ height: ROW_H }}
                       >
                         {/* Left panel */}
@@ -1920,8 +1920,8 @@ export default function ProjectManagement() {
                             <div
                               key={child.id}
                               data-gantt-row={child.id}
-                              className={`flex border-b border-gray-50 group/row transition-all ${PB[child.priority] ?? ''}
-                                ${isDragTarget ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-300' : 'hover:bg-blue-50/20 bg-gray-50/40'}`}
+                              className={`flex border-b border-slate-100/60 group/row transition-all ${PB[child.priority] ?? ''}
+                                ${isDragTarget ? 'bg-slate-50 ring-1 ring-inset ring-slate-200' : 'hover:bg-slate-50/50 bg-white'}`}
                               style={{ height: ROW_H - 10 }}
                             >
                               <div className="shrink-0 flex items-center px-2 border-r border-gray-100 bg-white gap-2" style={{ width: LEFT_W }}>
@@ -1929,8 +1929,8 @@ export default function ProjectManagement() {
                                 <div className="flex-1 flex items-center gap-2 min-w-0">
                                   {/* indent line */}
                                   <div className="w-4 shrink-0 flex justify-center relative self-stretch">
-                                    <div className="absolute top-0 bottom-0 left-1/2 w-px bg-indigo-200/60" />
-                                    <div className="absolute top-1/2 left-1/2 w-2 h-px bg-indigo-200/60" />
+                                    <div className="absolute top-0 bottom-0 left-1/2 w-px bg-slate-200" />
+                                    <div className="absolute top-1/2 left-1/2 w-2 h-px bg-slate-200" />
                                   </div>
                                   {/* Row drag handle for child task */}
                                   <div
