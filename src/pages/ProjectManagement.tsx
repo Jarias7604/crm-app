@@ -1302,7 +1302,7 @@ export default function ProjectManagement() {
       </div>
 
       {/* Notion Board (Kanban) View */}
-      {viewMode === 'kanban' ? (
+      {viewMode === 'kanban' && (
         <section className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
           
           {/* Columns */}
@@ -1472,8 +1472,10 @@ export default function ProjectManagement() {
           })}
 
         </section>
-      ) : (
-        /* ── NOTION-STYLE LIST VIEW ── */
+      )}
+
+      {/* ── NOTION-STYLE LIST VIEW ── */}
+      {viewMode === 'list' && (
         <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           {/* Column Headers */}
           <div className="grid grid-cols-[minmax(0,1fr)_130px_150px_100px_90px_90px_110px_95px] border-b border-gray-100 bg-gray-50/60 px-5 py-3">
@@ -1495,6 +1497,7 @@ export default function ProjectManagement() {
           ) : parentTasks.map(task => renderTaskRow(task))}
         </section>
       )}
+
 
       {/* ── GANTT / TIMELINE VIEW ──────────────────────────────── */}
       {viewMode === 'timeline' && (() => {
