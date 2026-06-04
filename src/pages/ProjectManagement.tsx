@@ -1801,7 +1801,7 @@ export default function ProjectManagement() {
                         <div className="shrink-0 flex items-center gap-2 px-2 border-r border-gray-100 bg-white" style={{ width: LEFT_W }}>
                           {/* Row drag handle */}
                           <div
-                            className="cursor-grab active:cursor-grabbing opacity-0 group-hover/row:opacity-100 transition-opacity text-gray-300 hover:text-gray-500 shrink-0"
+                            className="cursor-grab active:cursor-grabbing opacity-0 group-hover/row:opacity-100 transition-all shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 active:text-white active:bg-indigo-500"
                             onMouseDown={(e) => startRowDrag(e, parent)}
                             title="Arrastrar para reordenar"
                           >
