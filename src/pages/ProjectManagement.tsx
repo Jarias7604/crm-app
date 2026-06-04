@@ -96,7 +96,8 @@ export default function ProjectManagement() {
     dayW: number;
   } | null>(null);
   const ganttRowDragRef = useRef<{ taskId: string; startY: number; currentIdx: number } | null>(null);
-  const [ganttRowDragOver, setGanttRowDragOver] = useState<string | null>(null); // taskId of drop target
+  const [ganttRowDragOver, setGanttRowDragOver] = useState<string | null>(null);
+  const [ganttRowDragging, setGanttRowDragging] = useState<string | null>(null); // taskId being dragged
   const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
 
   const toggleExpand = (id: string) => {
@@ -785,6 +786,7 @@ export default function ProjectManagement() {
       if (rd) {
         const hoveredId = ganttRowDragOver;
         ganttRowDragRef.current = null;
+        setGanttRowDragging(null);
         setGanttRowDragOver(null);
         if (hoveredId && hoveredId !== rd.taskId) {
           setGanttTaskOrder(prev => {
@@ -1671,6 +1673,7 @@ export default function ProjectManagement() {
           e.preventDefault();
           document.body.style.cursor = 'grabbing';
           document.body.style.userSelect = 'none';
+          setGanttRowDragging(task.id);
           ganttRowDragRef.current = { taskId: task.id, startY: e.clientY, currentIdx: 0 };
         };
 
@@ -1801,7 +1804,10 @@ export default function ProjectManagement() {
                         <div className="shrink-0 flex items-center gap-2 px-2 border-r border-gray-100 bg-white" style={{ width: LEFT_W }}>
                           {/* Row drag handle */}
                           <div
-                            className="cursor-grab active:cursor-grabbing opacity-0 group-hover/row:opacity-100 transition-all shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-gray-300 hover:text-indigo-500 hover:bg-indigo-50 active:text-white active:bg-indigo-500"
+                            className={`cursor-grab active:cursor-grabbing transition-all shrink-0 w-6 h-6 rounded-md flex items-center justify-center
+                              ${ganttRowDragging === parent.id
+                                ? 'text-white bg-indigo-500 opacity-100 shadow-lg shadow-indigo-300 ring-2 ring-indigo-300'
+                                : 'opacity-0 group-hover/row:opacity-100 text-gray-300 hover:text-indigo-500 hover:bg-indigo-50'}`}
                             onMouseDown={(e) => startRowDrag(e, parent)}
                             title="Arrastrar para reordenar"
                           >
