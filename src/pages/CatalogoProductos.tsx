@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Plus, Edit, Trash2, Save, X, Search, Box, Layers, Zap, ArrowUpDown, Tag, DollarSign, Copy } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Edit, Trash2, Save, X, Search, Box, Layers, Zap, ArrowUpDown, Tag, DollarSign, Copy, Clock, Hash, RefreshCw, Repeat } from 'lucide-react';
 import { pricingService } from '../services/pricing';
 import type { PricingItem } from '../types/pricing';
 import { useAuth } from '../auth/AuthProvider';
@@ -202,9 +202,9 @@ export default function CatalogoProductos() {
                         <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
                             <Box className="w-6 h-6" />
                         </div>
-                        <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Catálogo de Productos</h1>
+                        <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Catálogo de Servicios y Productos</h1>
                     </div>
-                    <p className="text-gray-500 font-medium ml-14">Gestión unificada de planes, servicios y módulos para cotizaciones.</p>
+                    <p className="text-gray-500 font-medium ml-14">Servicios, productos, suscripciones y módulos para cualquier industria.</p>
                 </div>
                 
                 {canEdit && !showForm && (
@@ -365,35 +365,67 @@ export default function CatalogoProductos() {
 
                             {/* Columna Derecha: Pricing & Settings */}
                             <div className="lg:col-span-4 space-y-6">
-                                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
-                                    <h4 className="text-sm font-black text-gray-900 mb-5 flex items-center gap-2 uppercase tracking-wider">
-                                        <DollarSign className="w-4 h-4 text-green-500" /> Modelos de Precio
+                                {/* MODELO DE PRECIO — selector visual */}
+                                <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
+                                    <h4 className="text-xs font-black text-gray-500 mb-3 uppercase tracking-wider flex items-center gap-2">
+                                        <DollarSign className="w-3.5 h-3.5 text-green-500" /> Modelo de Precio
                                     </h4>
-                                    
-                                    <div className="space-y-5">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {([
+                                            { value: 'precio_fijo',        label: 'Precio Fijo',    icon: '💰', hint: 'Honorario, proyecto' },
+                                            { value: 'por_hora',           label: 'Por Hora',       icon: '⏱️', hint: 'Consultoría, legal' },
+                                            { value: 'por_unidad',         label: 'Por Unidad',     icon: '📦', hint: 'Docs, productos' },
+                                            { value: 'suscripcion_mensual',label: 'Mensual',        icon: '🔁', hint: 'SaaS, mantenimiento' },
+                                            { value: 'suscripcion_anual',  label: 'Anual',          icon: '📅', hint: 'Licencia anual' },
+                                            { value: 'implementacion',     label: 'Setup+Recur.',  icon: '🚀', hint: 'Inicio + mensual' },
+                                        ] as const).map(m => (
+                                            <button
+                                                key={m.value}
+                                                type="button"
+                                                onClick={() => setFormData(prev => ({ ...prev, modelo_precio: m.value } as any))}
+                                                title={m.hint}
+                                                className={`p-2.5 rounded-xl border-2 text-left transition-all ${
+                                                    (formData as any).modelo_precio === m.value
+                                                        ? 'border-[#4449AA] bg-[#4449AA]/5 shadow-sm'
+                                                        : 'border-gray-200 hover:border-gray-300 bg-white'
+                                                }`}
+                                            >
+                                                <span className="text-base">{m.icon}</span>
+                                                <p className={`text-[11px] font-black mt-0.5 ${ (formData as any).modelo_precio === m.value ? 'text-[#4449AA]' : 'text-gray-700' }`}>{m.label}</p>
+                                                <p className="text-[10px] text-gray-400 leading-tight">{m.hint}</p>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+                                    <h4 className="text-sm font-black text-gray-900 mb-4 flex items-center gap-2 uppercase tracking-wider">
+                                        <DollarSign className="w-4 h-4 text-green-500" /> Precios
+                                    </h4>
+                                    <div className="space-y-4">
                                         <div>
-                                            <label className="text-xs font-bold text-gray-500 mb-1.5 block">Precio de Lista Anual ($)</label>
+                                            <label className="text-xs font-bold text-gray-500 mb-1.5 block">Precio Anual / Fijo ($)</label>
                                             <div className="relative">
                                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
                                                 <Input type="number" value={formData.precio_anual} onChange={(e) => setFormData({ ...formData, precio_anual: Number(e.target.value) })} className="pl-8 text-lg font-black text-gray-900 bg-white" />
                                             </div>
                                         </div>
                                         <div>
-                                            <label className="text-xs font-bold text-gray-500 mb-1.5 block">Precio Mensual ($)</label>
+                                            <label className="text-xs font-bold text-gray-500 mb-1.5 block">Precio Mensual / Por Hora ($)</label>
                                             <div className="relative">
                                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
                                                 <Input type="number" value={formData.precio_mensual} onChange={(e) => setFormData({ ...formData, precio_mensual: Number(e.target.value) })} className="pl-8 text-lg font-black text-gray-900 bg-white" />
                                             </div>
                                         </div>
                                         <div>
-                                            <label className="text-xs font-bold text-gray-500 mb-1.5 block">Costo Único / Implementación ($)</label>
+                                            <label className="text-xs font-bold text-gray-500 mb-1.5 block">Costo Único / Setup ($)</label>
                                             <div className="relative">
                                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
                                                 <Input type="number" value={formData.costo_unico} onChange={(e) => setFormData({ ...formData, costo_unico: Number(e.target.value) })} className="pl-8 font-bold bg-white" />
                                             </div>
                                         </div>
                                         <div>
-                                            <label className="text-xs font-bold text-gray-500 mb-1.5 block">SKU / Código Interno (Opcional)</label>
+                                            <label className="text-xs font-bold text-gray-500 mb-1.5 block">SKU / Código (Opcional)</label>
                                             <Input value={formData.codigo} onChange={(e) => setFormData({ ...formData, codigo: e.target.value })} placeholder="Ej. SKU-123" className="uppercase font-mono text-sm bg-white" />
                                         </div>
                                     </div>
@@ -492,9 +524,8 @@ export default function CatalogoProductos() {
                                         <div className="flex items-center gap-1">Producto <ArrowUpDown className="w-3 h-3" /></div>
                                     </th>
                                     <th className="py-4 px-6 text-xs font-black text-gray-400 uppercase tracking-widest">Tipo</th>
-                                    <th className="py-4 px-6 text-xs font-black text-gray-400 uppercase tracking-widest text-right">Anual</th>
-                                    <th className="py-4 px-6 text-xs font-black text-gray-400 uppercase tracking-widest text-right">Mensual</th>
-                                    <th className="py-4 px-6 text-xs font-black text-gray-400 uppercase tracking-widest text-right">Único</th>
+                                    <th className="py-4 px-6 text-xs font-black text-gray-400 uppercase tracking-widest">Modelo</th>
+                                    <th className="py-4 px-6 text-xs font-black text-gray-400 uppercase tracking-widest text-right">Precio</th>
                                     <th className="py-4 px-6 text-xs font-black text-gray-400 uppercase tracking-widest text-center">Estado</th>
                                     <th className="py-4 px-6 text-xs font-black text-gray-400 uppercase tracking-widest text-right">Acciones</th>
                                 </tr>
@@ -524,14 +555,32 @@ export default function CatalogoProductos() {
                                                 {getName(item.tipo)}
                                             </span>
                                         </td>
-                                        <td className="py-4 px-6 text-right">
-                                            <span className="text-sm font-black text-gray-900">${(item.precio_anual || 0).toLocaleString()}</span>
+                                        <td className="py-4 px-6">
+                                            {(() => {
+                                                const m = (item as any).modelo_precio || 'precio_fijo';
+                                                const MAP: Record<string,{label:string,color:string}> = {
+                                                    precio_fijo:         { label: 'Fijo',      color: '#6366f1' },
+                                                    por_hora:            { label: 'Por Hora',  color: '#f59e0b' },
+                                                    por_unidad:          { label: 'Por Unidad',color: '#10b981' },
+                                                    suscripcion_mensual: { label: 'Mensual',   color: '#3b82f6' },
+                                                    suscripcion_anual:   { label: 'Anual',     color: '#8b5cf6' },
+                                                    implementacion:      { label: 'Setup+',   color: '#ef4444' },
+                                                    por_volumen:         { label: 'Volumen',   color: '#14b8a6' },
+                                                };
+                                                const meta = MAP[m] || MAP.precio_fijo;
+                                                return (
+                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black" style={{ backgroundColor: `${meta.color}15`, color: meta.color }}>
+                                                        {meta.label}
+                                                    </span>
+                                                );
+                                            })()}
                                         </td>
                                         <td className="py-4 px-6 text-right">
-                                            <span className="text-sm font-bold text-gray-500">${(item.precio_mensual || 0).toLocaleString()}</span>
-                                        </td>
-                                        <td className="py-4 px-6 text-right">
-                                            <span className="text-sm font-bold text-gray-400">${(item.costo_unico || 0).toLocaleString()}</span>
+                                            <div className="text-right">
+                                                {item.precio_anual > 0 && <p className="text-sm font-black text-gray-900">${item.precio_anual.toLocaleString()}<span className="text-xs font-normal text-gray-400">/año</span></p>}
+                                                {item.precio_mensual > 0 && <p className="text-sm font-bold text-gray-500">${item.precio_mensual.toLocaleString()}<span className="text-xs font-normal text-gray-400">/mes</span></p>}
+                                                {item.costo_unico > 0 && <p className="text-sm font-bold text-amber-600">${item.costo_unico.toLocaleString()}<span className="text-xs font-normal text-gray-400"> único</span></p>}
+                                            </div>
                                         </td>
                                         <td className="py-4 px-6 text-center">
                                             <div className="flex justify-center">

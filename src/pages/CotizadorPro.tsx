@@ -854,177 +854,168 @@ export default function CotizadorPro() {
                         </div>
                     )}
 
-                    {/* PASO 3: Módulos y Servicios */}
-                    {pasoActual === 3 && (
-                        <div className="space-y-6">
-                            <div>
-                                <h2 className="text-lg font-bold text-[#4449AA] mb-4">📌 Módulos Adicionales</h2>
-                                <div className="space-y-2">
-                                    {modulos.map((modulo) => (
-                                        <label
-                                            key={modulo.id}
-                                            className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={formData.modulos_ids.includes(modulo.id)}
-                                                    onChange={() => toggleModulo(modulo.id)}
-                                                    className="w-5 h-5 text-blue-600 rounded"
-                                                />
-                                                <div>
-                                                    <p className="font-semibold text-gray-800">{modulo.nombre}</p>
-                                                    {modulo.descripcion && (
-                                                        <p className="text-xs text-gray-500">{modulo.descripcion}</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-4">
-                                                <div className="text-right">
-                                                    <div className="text-right flex flex-col items-end">
-                                                        {formData.modulos_ids.includes(modulo.id) && canEditPrices ? (
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-xs text-gray-400 font-bold">$</span>
-                                                                <input
-                                                                    type="number"
-                                                                    className="w-24 text-right font-bold text-green-600 border border-blue-200 rounded px-2 py-1 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                                                                    value={overrides[modulo.id] ?? modulo.precio_anual}
-                                                                    onChange={(e) => {
-                                                                        setOverrides({ ...overrides, [modulo.id]: Number(e.target.value) });
-                                                                    }}
-                                                                />
-                                                                <span className="text-[10px] text-gray-400 font-bold uppercase">/año</span>
-                                                            </div>
-                                                        ) : (
-                                                            <>
-                                                                <p className="font-bold text-green-600">
-                                                                    ${(overrides[modulo.id] ?? modulo.precio_anual).toFixed(2)}/año
-                                                                </p>
-                                                                <p className="text-xs text-gray-500">
-                                                                    ${modulo.precio_mensual.toFixed(2)}/mes
-                                                                </p>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
+                    {/* PASO 3: Cat\u00e1logo — \u00cdtems, M\u00f3dulos y Servicios (Multi-industria) */}
+                    {pasoActual === 3 && (() => {
+                        const todosLosItems = [...modulos, ...servicios];
+                        const MODELO_LABELS: Record<string, { label: string; color: string; icon: string }> = {
+                            precio_fijo:         { label: 'Fijo',      color: '#6366f1', icon: '💰' },
+                            por_hora:            { label: 'Por Hora',  color: '#f59e0b', icon: '⏱️' },
+                            por_unidad:          { label: 'Und.',      color: '#10b981', icon: '📦' },
+                            suscripcion_mensual: { label: 'Mensual',   color: '#3b82f6', icon: '🔁' },
+                            suscripcion_anual:   { label: 'Anual',     color: '#8b5cf6', icon: '📅' },
+                            implementacion:      { label: 'Setup+',    color: '#ef4444', icon: '🚀' },
+                            por_volumen:         { label: 'Volumen',   color: '#14b8a6', icon: '📊' },
+                        };
 
-                            <div>
-                                <h2 className="text-lg font-bold text-[#4449AA] mb-4">🔧 Servicios Adicionales</h2>
-                                <div className="space-y-2">
-                                    {servicios.map((servicio) => (
-                                        <label
-                                            key={servicio.id}
-                                            className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={formData.servicios_ids.includes(servicio.id)}
-                                                    onChange={() => toggleServicio(servicio.id)}
-                                                    className="w-5 h-5 text-blue-600 rounded"
-                                                />
-                                                <div>
-                                                    <p className="font-semibold text-gray-800">{servicio.nombre}</p>
-                                                    {servicio.descripcion && (
-                                                        <p className="text-xs text-gray-500">{servicio.descripcion}</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <div className="text-right flex flex-col items-end">
-                                                {formData.servicios_ids.includes(servicio.id) && canEditPrices ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xs text-gray-400 font-bold">$</span>
-                                                        <input
-                                                            type="number"
-                                                            className="w-24 text-right font-bold text-green-600 border border-blue-200 rounded px-2 py-1 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                                                            value={overrides[servicio.id] ?? (
-                                                                servicio.precio_por_dte > 0
-                                                                    ? (formData.volumen_dtes * servicio.precio_por_dte)
-                                                                    : (servicio.pago_unico > 0 ? servicio.pago_unico : servicio.precio_anual)
-                                                            )}
-                                                            onChange={(e) => {
-                                                                setOverrides({ ...overrides, [servicio.id]: Number(e.target.value) });
-                                                            }}
-                                                        />
-                                                        <span className="text-[10px] text-gray-400 font-bold uppercase">
-                                                            {servicio.pago_unico > 0 ? 'Único' : '/año'}
-                                                        </span>
-                                                    </div>
-                                                ) : (
-                                                    <>
-                                                        {(() => {
-                                                            const currentPrice = overrides[servicio.id] ?? (
-                                                                servicio.precio_por_dte > 0
-                                                                    ? (formData.volumen_dtes * servicio.precio_por_dte)
-                                                                    : (servicio.pago_unico > 0 ? servicio.pago_unico : servicio.precio_anual)
-                                                            );
-                                                            return (
-                                                                <>
-                                                                    <p className="font-bold text-green-600">
-                                                                        ${currentPrice.toFixed(2)}
-                                                                    </p>
-                                                                    {servicio.precio_por_dte > 0 && !overrides[servicio.id] && (
-                                                                        <p className="text-xs text-gray-500">
-                                                                            {formData.volumen_dtes.toLocaleString()} × ${servicio.precio_por_dte}
-                                                                        </p>
-                                                                    )}
-                                                                    {servicio.pago_unico > 0 && (
-                                                                        <p className="text-xs text-gray-500">Pago único</p>
-                                                                    )}
-                                                                    {servicio.precio_anual > 0 && !servicio.pago_unico && !servicio.precio_por_dte && (
-                                                                        <p className="text-xs text-gray-500">/año</p>
-                                                                    )}
-                                                                </>
-                                                            );
-                                                        })()}
-                                                    </>
-                                                )}
-                                            </div>
-                                        </label>
-                                    ))}
-                                </div>
-                            </div>
+                        const renderItemRow = (item: typeof todosLosItems[0], isModulo: boolean) => {
+                            const isSelected = isModulo
+                                ? formData.modulos_ids.includes(item.id)
+                                : formData.servicios_ids.includes(item.id);
+                            const toggle = isModulo ? () => toggleModulo(item.id) : () => toggleServicio(item.id);
+                            const defaultPrice = item.precio_por_dte > 0
+                                ? (formData.volumen_dtes * item.precio_por_dte)
+                                : (item.pago_unico > 0 ? item.pago_unico : item.precio_anual);
+                            const currentPrice = overrides[item.id] ?? defaultPrice;
+                            const modelo = (item as any).modelo_precio || (item.pago_unico > 0 ? 'precio_fijo' : 'suscripcion_anual');
+                            const meta = MODELO_LABELS[modelo] || MODELO_LABELS.precio_fijo;
 
-                            {/* Toggle Implementación */}
-                            {(() => {
-                                const paqueteSeleccionado = paquetes.find(p => p.id === formData.paquete_id);
-                                const costoImp = paqueteSeleccionado?.costo_implementacion || 0;
-                                return costoImp > 0 ? (
-                                    <div className="mt-4 flex items-center justify-between p-4 bg-amber-50 border border-amber-200 rounded-xl">
-                                        <div>
-                                            <p className="font-bold text-sm text-amber-800">🔧 Costo de Implementación</p>
-                                            <p className="text-xs text-amber-600 mt-0.5">
-                                                ${costoImp.toFixed(2)} — pago único al activar
-                                            </p>
+                            return (
+                                <div
+                                    key={item.id}
+                                    onClick={toggle}
+                                    className={`relative flex items-center justify-between p-4 rounded-2xl border-2 cursor-pointer transition-all duration-150 group ${
+                                        isSelected
+                                            ? 'border-[#4449AA] bg-[#4449AA]/5 shadow-sm'
+                                            : 'border-gray-100 hover:border-gray-200 bg-white hover:bg-gray-50/50'
+                                    }`}
+                                >
+                                    {/* Checkbox + Info */}
+                                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                                            isSelected ? 'bg-[#4449AA] border-[#4449AA]' : 'border-gray-300'
+                                        }`}>
+                                            {isSelected && <Check className="w-3 h-3 text-white" />}
                                         </div>
-                                        <label className="flex items-center gap-3 cursor-pointer">
-                                            <span className={`text-xs font-bold ${formData.incluir_implementacion ? 'text-green-600' : 'text-gray-400'}`}>
-                                                {formData.incluir_implementacion ? 'INCLUIDA' : 'EXCLUIDA'}
-                                            </span>
-                                            <div
-                                                onClick={() => {
-                                                    const turningOn = !formData.incluir_implementacion;
-                                                    // Auto-reset to original price if turning ON with price at 0
-                                                    if (turningOn && implementationOverride === 0) {
-                                                        setImplementationOverride(costoImp);
-                                                    }
-                                                    setFormData({ ...formData, incluir_implementacion: turningOn });
-                                                }}
-                                                className={`relative w-11 h-6 rounded-full transition-colors duration-200 cursor-pointer ${formData.incluir_implementacion ? 'bg-green-500' : 'bg-gray-300'}`}
-                                            >
-                                                <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${formData.incluir_implementacion ? 'translate-x-5' : 'translate-x-0'}`} />
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <p className={`text-sm font-bold truncate ${isSelected ? 'text-[#4449AA]' : 'text-gray-800'}`}>
+                                                    {item.nombre}
+                                                </p>
+                                                <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: `${meta.color}15`, color: meta.color }}>
+                                                    {meta.icon} {meta.label}
+                                                </span>
                                             </div>
-                                        </label>
+                                            {item.descripcion && (
+                                                <p className="text-[11px] text-gray-400 mt-0.5 line-clamp-1">{item.descripcion}</p>
+                                            )}
+                                        </div>
                                     </div>
-                                ) : null;
-                            })()}
-                        </div>
-                    )}
+
+                                    {/* Precio editable */}
+                                    <div className="flex items-center gap-2 flex-shrink-0 ml-4" onClick={e => e.stopPropagation()}>
+                                        {isSelected && canEditPrices ? (
+                                            <div className="flex items-center gap-1">
+                                                <span className="text-xs text-gray-400 font-bold">$</span>
+                                                <input
+                                                    type="number"
+                                                    className="w-24 text-right font-bold text-[#4449AA] border border-[#4449AA]/30 rounded-lg px-2 py-1 bg-white focus:ring-2 focus:ring-[#4449AA]/30 outline-none text-sm"
+                                                    value={overrides[item.id] ?? defaultPrice}
+                                                    onChange={e => setOverrides({ ...overrides, [item.id]: Number(e.target.value) })}
+                                                />
+                                                <span className="text-[10px] text-gray-400 font-bold">
+                                                    {item.pago_unico > 0 ? 'único' : item.precio_por_dte > 0 ? '/vol' : '/año'}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <div className="text-right">
+                                                <p className={`text-sm font-black ${isSelected ? 'text-[#4449AA]' : 'text-gray-700'}`}>
+                                                    ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                                </p>
+                                                {item.precio_por_dte > 0 && !overrides[item.id] && (
+                                                    <p className="text-[10px] text-gray-400">{formData.volumen_dtes} × ${item.precio_por_dte}</p>
+                                                )}
+                                                <p className="text-[10px] text-gray-400">
+                                                    {item.pago_unico > 0 ? 'Pago único' : item.precio_por_dte > 0 ? 'Por volumen' : '/año'}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        };
+
+                        return (
+                            <div className="space-y-5">
+                                <div className="flex items-start justify-between">
+                                    <div>
+                                        <h2 className="text-lg font-bold text-[#4449AA]">Servicios e Ítems Adicionales</h2>
+                                        <p className="text-xs text-gray-400 mt-0.5">Selecciona los ítems que forman esta propuesta</p>
+                                    </div>
+                                    {(formData.modulos_ids.length + formData.servicios_ids.length) > 0 && (
+                                        <span className="text-xs font-black text-[#4449AA] bg-[#4449AA]/10 px-3 py-1 rounded-full">
+                                            {formData.modulos_ids.length + formData.servicios_ids.length} seleccionados
+                                        </span>
+                                    )}
+                                </div>
+
+                                {todosLosItems.length === 0 ? (
+                                    <div className="py-12 text-center bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
+                                        <p className="text-gray-500 font-bold mb-1">Sin ítems en el catálogo aún</p>
+                                        <p className="text-sm text-gray-400">Ve a <strong>Configuración → Catálogo</strong> para agregar tus servicios y productos.</p>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {/* Módulos */}
+                                        {modulos.length > 0 && (
+                                            <div className="space-y-2">
+                                                <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider px-1">Módulos</h3>
+                                                {modulos.map(m => renderItemRow(m, true))}
+                                            </div>
+                                        )}
+                                        {/* Servicios */}
+                                        {servicios.length > 0 && (
+                                            <div className="space-y-2">
+                                                <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider px-1">Servicios</h3>
+                                                {servicios.map(s => renderItemRow(s, false))}
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        );
+                    })()}
+
+                    {pasoActual === 3 && (() => {
+                        const paqueteSeleccionado = paquetes.find(p => p.id === formData.paquete_id);
+                        const costoImp = paqueteSeleccionado?.costo_implementacion || 0;
+                        return costoImp > 0 ? (
+                            <div className="mt-4 flex items-center justify-between p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                                <div>
+                                    <p className="font-bold text-sm text-amber-800">🔧 Costo de Implementación</p>
+                                    <p className="text-xs text-amber-600 mt-0.5">
+                                        ${costoImp.toFixed(2)} — pago único al activar
+                                    </p>
+                                </div>
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <span className={`text-xs font-bold ${formData.incluir_implementacion ? 'text-green-600' : 'text-gray-400'}`}>
+                                        {formData.incluir_implementacion ? 'INCLUIDA' : 'EXCLUIDA'}
+                                    </span>
+                                    <div
+                                        onClick={() => {
+                                            const turningOn = !formData.incluir_implementacion;
+                                            if (turningOn && implementationOverride === 0) {
+                                                setImplementationOverride(costoImp);
+                                            }
+                                            setFormData({ ...formData, incluir_implementacion: turningOn });
+                                        }}
+                                        className={`relative w-11 h-6 rounded-full transition-colors duration-200 cursor-pointer ${formData.incluir_implementacion ? 'bg-green-500' : 'bg-gray-300'}`}
+                                    >
+                                        <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${formData.incluir_implementacion ? 'translate-x-5' : 'translate-x-0'}`} />
+                                    </div>
+                                </label>
+                            </div>
+                        ) : null;
+                    })()}
 
                     {/* PASO 4: Resumen */}
                     {pasoActual === 4 && (
