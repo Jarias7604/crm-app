@@ -325,11 +325,12 @@ export default function CotizadorPro() {
             setTotales(null);
             return;
         }
-        // Si no hay paquete, usar un paquete ficticio con precio 0
+        // Si no hay paquete seleccionado, usar paquete neutro de precio $0
+        // (sin terminología DTE — aplica a cualquier industria)
         const paqueteBase: CotizadorPaquete = paqueteSeleccionado ?? {
             id: '__items_only__',
             company_id: profile?.company_id ?? null,
-            paquete: 'Personalizado',
+            paquete: 'Propuesta Personalizada',
             cantidad_dtes: 0,
             costo_paquete_anual: 0,
             costo_paquete_mensual: 0,
@@ -1073,20 +1074,27 @@ export default function CotizadorPro() {
                     {/* PASO 4: Resumen */}
                     {pasoActual === 4 && (
                         <div className="space-y-6">
-                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                                 <h2 className="text-lg font-bold text-[#4449AA]">💰 Resumen de Cotización</h2>
-                                <div className="sm:text-right">
-                                    <p className="text-xs text-gray-500 font-bold uppercase">Volumen Contratado</p>
-                                    <p className="text-sm font-black text-blue-600">
-                                        {formData.volumen_dtes.toLocaleString()} DTEs/año
-                                        <span className="text-gray-400 font-normal ml-2">({Math.round(formData.volumen_dtes / 12).toLocaleString()} mes)</span>
-                                    </p>
-                                </div>
+                                {formData.volumen_dtes > 0 && (
+                                    <div className="sm:text-right">
+                                        <p className="text-xs text-gray-500 font-bold uppercase">Volumen Contratado</p>
+                                        <p className="text-sm font-black text-blue-600">
+                                            {formData.volumen_dtes.toLocaleString()} DTEs/año
+                                            <span className="text-gray-400 font-normal ml-2">({Math.round(formData.volumen_dtes / 12).toLocaleString()} mes)</span>
+                                        </p>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Desglose Premium */}
                             <div className="space-y-3">
-                                {totales?.desglose.map((item, idx) => (
+                                {totales?.desglose
+                                    // Ocultar el paquete base sintético que se usa cuando
+                                    // el tenant no tiene paquetes — es solo un contenedor de cálculo,
+                                    // no debe mostrarse al cliente en el resumen
+                                    .filter(item => !(item.tipo === 'Paquete' && item.precio_anual === 0))
+                                    .map((item, idx) => (
                                     <div key={idx} className="group relative bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
                                         <div className="flex justify-between items-start gap-2">
                                             <div className="flex gap-3 flex-1 min-w-0">
