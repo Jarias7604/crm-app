@@ -496,9 +496,11 @@ export default function CotizacionDetalle() {
                                         {cotizacion.plan_nombre}
                                     </p>
                                     <div className="h-px bg-slate-200 my-3 mx-4"></div>
-                                    <p className="text-xs text-slate-600 font-medium">
-                                        Volumen: <span className="font-bold text-slate-900">{(cotizacion.volumen_dtes || 0).toLocaleString()} DTEs/año</span>
-                                    </p>
+                                    {(cotizacion.volumen_dtes || 0) > 0 && (
+                                        <p className="text-xs text-slate-600 font-medium">
+                                            Volumen: <span className="font-bold text-slate-900">{cotizacion.volumen_dtes.toLocaleString()} DTEs/año</span>
+                                        </p>
+                                    )}
                                     <div className="mt-3 flex justify-center">
                                         <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest flex items-center gap-2 border ${cotizacion.estado === 'aceptada' ? 'bg-green-50 text-green-600 border-green-100' :
                                             cotizacion.estado === 'enviada' ? 'bg-blue-50 text-blue-600 border-blue-100' :
@@ -529,7 +531,8 @@ export default function CotizacionDetalle() {
                                 </div>
                                 {/* iOS-style items — price uses flex-shrink-0 → always visible */}
                                 <div className="divide-y divide-slate-100">
-                                    {/* Licencia Anual */}
+                                {/* Licencia Anual — solo si tiene costo base (no para cotizaciones de solo pago único) */}
+                                    {Number(cotizacion.costo_plan_anual) > 0 && (
                                     <div className="flex items-start gap-3 sm:gap-4 px-3 sm:px-6 py-4 sm:py-5 hover:bg-slate-50/50 transition-colors">
                                         <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center flex-shrink-0 text-indigo-600 mt-0.5">
                                             <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -544,6 +547,7 @@ export default function CotizacionDetalle() {
                                             ${(Number(cotizacion.costo_plan_anual) || 0).toLocaleString()}
                                         </span>
                                     </div>
+                                    )}
                                     {/* Implementación */}
                                     {cotizacion.incluir_implementacion && (
                                         <div className="flex items-center gap-3 sm:gap-4 px-3 sm:px-6 py-4 sm:py-5 hover:bg-slate-50/50 transition-colors">
@@ -640,6 +644,13 @@ export default function CotizacionDetalle() {
 
                                         {plansToShow.length > 0 && (
                                             <>
+                                                {/* Solo mostrar opciones de pago si hay base recurrente (no para cotizaciones de solo pago único) */}
+                                                {plansToShow.some(plan => {
+                                                    const planCuotas = Number((plan as any).cuotas) || 1;
+                                                    const pf = calculateQuoteFinancialsV2({ ...cotizacion, cuotas: planCuotas }, plan);
+                                                    return pf.totalLicencia > 0;
+                                                }) && (
+                                                    <>
                                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">OPCIONES DE PAGO</p>
                                                 <div className={`grid gap-4 ${plansToShow.length === 1 ? 'grid-cols-1 max-w-sm' : 'grid-cols-1 md:grid-cols-2'}`}>
                                                     {plansToShow.map((plan, idx) => {
@@ -740,7 +751,7 @@ export default function CotizacionDetalle() {
                                                                         <span>${pf.totalLicencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                                     </div>
                                                                 </div>
-                                                                <div className={`w-full h-9 rounded-xl flex items-center justify-center text-[10px] font-black uppercase tracking-widest ${isMainPlan ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25' : 'bg-slate-100 text-slate-600'}`}>
+                                                <div className={`w-full h-9 rounded-xl flex items-center justify-center text-[10px] font-black uppercase tracking-widest ${isMainPlan ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25' : 'bg-slate-100 text-slate-600'}`}>
                                                                     {isMainPlan ? <><CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />PLAN ACTIVO</> : 'ALTERNATIVA'}
                                                                 </div>
                                                             </div>
@@ -749,6 +760,8 @@ export default function CotizacionDetalle() {
                                                 </div>
                                             </>
                                         )}
+                                    </>
+                                )}
 
                                         {(implementacionBase > 0 || serviciosUnicos.length > 0) && (
                                             <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl p-5 sm:p-6 shadow-sm border-2 border-orange-200">

@@ -242,8 +242,14 @@ export const calculateQuoteFinancialsV2 = (
     const cuotaMensual = cuotas > 1 ? totalLicencia / cuotas : totalLicencia;
 
     // 5. CÁLCULOS DE IMPLEMENTACIÓN
-    const ivaImplementacion = implementacion * ivaPct;
-    const totalImplementacion = implementacion + ivaImplementacion;
+    // Si licenciaAnual = 0 (solo pago único) y hay descuento de plan,
+    // aplicar el descuento al total de implementación (como HubSpot/Salesforce: descuento a la orden total)
+    let implementacionAjustada = implementacion;
+    if (tipoAjuste === 'discount' && ajustePct > 0 && licenciaAnual === 0 && implementacion > 0) {
+        implementacionAjustada = implementacion * (1 - ajustePct);
+    }
+    const ivaImplementacion = implementacionAjustada * ivaPct;
+    const totalImplementacion = implementacionAjustada + ivaImplementacion;
 
     // 6. DISPLAY
     const planTitulo = financingPlan?.titulo || cotizacion.descripcion_pago || (isPagoUnico ? '1 Solo pago' : `${cuotas} Meses`);
@@ -253,7 +259,7 @@ export const calculateQuoteFinancialsV2 = (
         cuotas,
         isPagoUnico,
         licenciaAnual,
-        implementacion,
+        implementacion: implementacionAjustada,
         ivaPct,
         ajustePct,
         tipoAjuste,
