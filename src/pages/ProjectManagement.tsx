@@ -1636,6 +1636,31 @@ export default function ProjectManagement() {
           return `${hrs}h ${mins}m`;
         };
 
+        const calcProgress = (t: Task) => {
+          if (t.status === 'completed') return 100;
+          const sub = filteredTasks.filter(s => s.parent_task_id === t.id);
+          if (sub.length > 0) {
+            const done = sub.filter(s => s.status === 'completed').length;
+            return Math.round((done / sub.length) * 100);
+          }
+          if (t.status === 'in_progress' || t.status === 'pending_approval') return 50;
+          if (t.status === 'paused') return 25;
+          return 0;
+        };
+
+        const isOverdue = (t: Task) => {
+          if (t.status === 'completed') return false;
+          if (!t.due_date) return false;
+          const d = new Date(t.due_date);
+          d.setHours(23, 59, 59, 999);
+          return d < today;
+        };
+
+        const isOverBudget = (t: Task) => {
+          if (!t.estimated_hours || t.estimated_hours <= 0) return false;
+          return (t.actual_hours ?? 0) > t.estimated_hours;
+        };
+
         const WEEKS = 10, DAYS = WEEKS * 7, DAY_W = 36, ROW_H = 58, LEFT_W = 480;
 
         const days: Date[] = Array.from({ length: DAYS }, (_, i) => {
@@ -1718,11 +1743,14 @@ export default function ProjectManagement() {
         const renderBar = (task: Task) => {
           const bar = calcBar(task); if (!bar) return null;
           const sc   = SC[task.status] ?? SC.todo;
-          const pct  = task.estimated_hours && task.estimated_hours > 0 ? Math.min(((task.actual_hours ?? 0) / task.estimated_hours) * 100, 100) : 0;
+          const progress = calcProgress(task);
           const isFb = bar.isFallback;
+          const overdue = isOverdue(task);
+          const overBudget = isOverBudget(task);
+
           return (
             <div
-              className={`absolute top-1/2 -translate-y-1/2 rounded-full group/bar select-none cursor-grab active:cursor-grabbing hover:shadow-lg transition-shadow ${isFb ? 'opacity-55' : 'opacity-95'}`}
+              className={`absolute top-1/2 -translate-y-1/2 rounded-full group/bar select-none cursor-grab active:cursor-grabbing hover:shadow-lg transition-all ${isFb ? 'opacity-55' : 'opacity-95'} ${overdue ? 'ring-2 ring-rose-500 ring-offset-1 shadow-md z-10' : ''}`}
               style={{ left: bar.left + 3, width: Math.max(bar.width - 6, DAY_W), height: 28 }}
               onMouseDown={(e) => startBarDrag(e, task, 'move')}
             >
@@ -1731,13 +1759,21 @@ export default function ProjectManagement() {
               {/* dashed for fallback */}
               {isFb && <div className="absolute inset-0 rounded-full" style={{ border: '2px dashed rgba(255, 255, 255, 0.4)' }} />}
               {/* progress fill as a darker overlay */}
-              {!isFb && pct > 0 && (
-                <div className="absolute top-0 left-0 bottom-0 rounded-full bg-black/20 transition-all" style={{ width: `${pct}%` }} />
+              {!isFb && progress > 0 && (
+                <div className="absolute top-0 left-0 bottom-0 rounded-full bg-black/20 transition-all" style={{ width: `${progress}%` }} />
               )}
               {/* label: always white and drop-shadowed for maximum contrast */}
-              <div className="relative h-full flex items-center px-2.5 gap-1 overflow-hidden">
-                <span className="text-[9px] font-black truncate whitespace-nowrap text-white drop-shadow-sm">{task.title}</span>
-                {!isFb && pct > 0 && <span className="text-[8px] text-white/80 font-bold shrink-0">{Math.round(pct)}%</span>}
+              <div className="relative h-full flex items-center px-2.5 gap-1 overflow-hidden justify-between w-full">
+                <span className="text-[9px] font-black truncate whitespace-nowrap text-white drop-shadow-sm flex items-center gap-1">
+                  {overdue && <span className="text-white drop-shadow-sm shrink-0" title="Vencida">⚠️</span>}
+                  {overBudget && <span className="text-white drop-shadow-sm shrink-0" title="Exceso de horas">⏳</span>}
+                  {task.title}
+                </span>
+                {!isFb && (
+                  <span className="text-[8px] text-white/90 font-black shrink-0 ml-1 bg-black/15 px-1 rounded">
+                    {progress}%
+                  </span>
+                )}
               </div>
               {/* resize handle */}
               <div
@@ -1862,11 +1898,16 @@ export default function ProjectManagement() {
                             {/* Title & Info & Edit */}
                             <div className="min-w-0 flex-1 flex items-center gap-1.5 group/title">
                               <div className="min-w-0 flex-1">
-                                <p className="text-[11px] font-bold text-gray-800 truncate leading-snug">{parent.title}</p>
+                                <p className="text-[11px] font-bold text-gray-800 truncate leading-snug flex items-center gap-1.5">
+                                  {isOverdue(parent) && (
+                                    <span className="text-[7.5px] font-black bg-rose-50 text-rose-600 px-1 py-0.2 rounded border border-rose-100 uppercase tracking-wider shrink-0">⚠️ Vencida</span>
+                                  )}
+                                  {parent.title}
+                                </p>
                                 <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                                   <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md ${priorCfg[parent.priority]}`}>{parent.priority}</span>
                                   {parent.due_date
-                                    ? <span className="text-[8px] text-gray-400 font-semibold">{new Date(parent.due_date).toLocaleDateString('es',{day:'2-digit',month:'short'})}</span>
+                                    ? <span className={`text-[8px] font-semibold ${isOverdue(parent) ? 'text-rose-500 font-bold' : 'text-gray-400'}`}>{new Date(parent.due_date).toLocaleDateString('es',{day:'2-digit',month:'short'})}</span>
                                     : <span className="text-[8px] text-amber-500 font-bold">sin fecha</span>
                                   }
                                   {children.length > 0 && <span className="text-[8px] text-indigo-400 font-black">{children.length} subtareas</span>}
@@ -1892,8 +1933,24 @@ export default function ProjectManagement() {
                           </div>
 
                           {/* Col 3: Horas */}
-                          <div className="w-[60px] shrink-0 border-l border-gray-100 pl-2 text-right text-[10px] font-semibold text-gray-500">
-                            {formatHours(parent.actual_hours)}
+                          <div className="w-[60px] shrink-0 border-l border-gray-100 pl-2 flex items-center justify-end text-right">
+                            {(() => {
+                              const act = parent.actual_hours ?? 0;
+                              const est = parent.estimated_hours ?? 0;
+                              const over = isOverBudget(parent);
+                              if (est > 0) {
+                                return (
+                                  <div className={`flex flex-col text-right ${over ? 'text-rose-600' : 'text-gray-500'}`} title={over ? '¡Exceso de horas!' : 'Horas (Real / Estimado)'}>
+                                    <div className="text-[10px] font-bold flex items-center justify-end gap-0.5">
+                                      {over && <span className="text-[9px]">⚠️</span>}
+                                      {formatHours(act)}
+                                    </div>
+                                    <div className="text-[8px] opacity-75 leading-none">/ {formatHours(est)}</div>
+                                  </div>
+                                );
+                              }
+                              return <span className="text-[10px] font-semibold text-gray-500">{formatHours(act)}</span>;
+                            })()}
                           </div>
                         </div>
                         {/* Gantt area */}
@@ -1950,12 +2007,17 @@ export default function ProjectManagement() {
                                   {/* Title & Info & Edit */}
                                   <div className="min-w-0 flex-1 flex items-center gap-1.5 group/title">
                                     <div className="min-w-0 flex-1">
-                                      <p className="text-[10px] font-semibold text-gray-600 truncate">{child.title}</p>
+                                      <p className="text-[10px] font-semibold text-gray-600 truncate flex items-center gap-1">
+                                        {isOverdue(child) && (
+                                          <span className="text-[7px] font-black bg-rose-50 text-rose-600 px-1 py-0.2 rounded border border-rose-100 uppercase shrink-0">⚠️ Vencida</span>
+                                        )}
+                                        {child.title}
+                                      </p>
                                       <div className="flex items-center gap-1.5 mt-0.5">
                                         <span className={`text-[8px] font-black uppercase px-1 py-0.5 rounded ${priorCfg[child.priority]}`}>{child.priority}</span>
                                         {child.due_date
-                                          ? <span className="text-[8px] text-gray-400 font-semibold">{new Date(child.due_date).toLocaleDateString('es',{day:'2-digit',month:'short'})}</span>
-                                          : <span className="text-[8px] text-amber-400 font-bold">sin fecha</span>
+                                          ? <span className={`text-[8px] font-semibold ${isOverdue(child) ? 'text-rose-500 font-bold' : 'text-gray-400'}`}>{new Date(child.due_date).toLocaleDateString('es',{day:'2-digit',month:'short'})}</span>
+                                          : <span className="text-[8px] text-amber-450 font-bold">sin fecha</span>
                                         }
                                       </div>
                                     </div>
@@ -1977,8 +2039,24 @@ export default function ProjectManagement() {
                                 </div>
 
                                 {/* Col 3: Horas */}
-                                <div className="w-[60px] shrink-0 border-l border-gray-100 pl-2 text-right text-[10px] font-semibold text-gray-500">
-                                  {formatHours(child.actual_hours)}
+                                <div className="w-[60px] shrink-0 border-l border-gray-100 pl-2 flex items-center justify-end text-right">
+                                  {(() => {
+                                    const act = child.actual_hours ?? 0;
+                                    const est = child.estimated_hours ?? 0;
+                                    const over = isOverBudget(child);
+                                    if (est > 0) {
+                                      return (
+                                        <div className={`flex flex-col text-right ${over ? 'text-rose-600' : 'text-gray-500'}`} title={over ? '¡Exceso de horas!' : 'Horas (Real / Estimado)'}>
+                                          <div className="text-[9px] font-bold flex items-center justify-end gap-0.5">
+                                            {over && <span className="text-[8.5px]">⚠️</span>}
+                                            {formatHours(act)}
+                                          </div>
+                                          <div className="text-[7.5px] opacity-75 leading-none">/ {formatHours(est)}</div>
+                                        </div>
+                                      );
+                                    }
+                                    return <span className="text-[9.5px] font-semibold text-gray-500">{formatHours(act)}</span>;
+                                  })()}
                                 </div>
                               </div>
                             <div className="relative overflow-hidden" style={{ width: DAYS * DAY_W, height: ROW_H - 10 }}>
