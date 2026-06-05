@@ -1743,24 +1743,24 @@ export default function ProjectManagement() {
         const getBarColor = (task: Task) => {
           const dev = getDeviations(task);
           if (dev.label.includes('Atrasado') || dev.label.includes('Retraso')) {
-            return { bg: '#ffe4e6', text: 'text-rose-950', border: 'border border-rose-350', textBg: 'bg-rose-950/10' };
+            return { bg: '#ffe4e6', text: 'text-rose-950', textBg: 'bg-rose-950/10' };
           }
           if (dev.label.includes('Tarde') || dev.label.includes('Riesgo')) {
-            return { bg: '#fef3c7', text: 'text-amber-950', border: 'border border-amber-350', textBg: 'bg-amber-950/10' };
+            return { bg: '#fef3c7', text: 'text-amber-950', textBg: 'bg-amber-950/10' };
           }
           if (dev.label.includes('Completo') || dev.label.includes('tiempo')) {
-            return { bg: '#d1fae5', text: 'text-emerald-950', border: 'border border-emerald-350', textBg: 'bg-emerald-950/10' };
+            return { bg: '#d1fae5', text: 'text-emerald-950', textBg: 'bg-emerald-950/10' };
           }
           if (task.status === 'in_progress') {
-            return { bg: '#dbeafe', text: 'text-blue-950', border: 'border border-blue-300', textBg: 'bg-blue-950/10' };
+            return { bg: '#dbeafe', text: 'text-blue-950', textBg: 'bg-blue-950/10' };
           }
           if (task.status === 'pending_approval') {
-            return { bg: '#ede9fe', text: 'text-violet-950', border: 'border border-violet-300', textBg: 'bg-violet-950/10' };
+            return { bg: '#ede9fe', text: 'text-violet-950', textBg: 'bg-violet-950/10' };
           }
           if (task.status === 'rejected') {
-            return { bg: '#fee2e2', text: 'text-red-950', border: 'border border-red-300', textBg: 'bg-red-950/10' };
+            return { bg: '#fee2e2', text: 'text-red-950', textBg: 'bg-red-950/10' };
           }
-          return { bg: '#f1f5f9', text: 'text-slate-900', border: 'border border-slate-300', textBg: 'bg-slate-900/10' };
+          return { bg: '#f1f5f9', text: 'text-slate-900', textBg: 'bg-slate-900/10' };
         };
 
         const renderBar = (task: Task) => {
@@ -1773,17 +1773,17 @@ export default function ProjectManagement() {
 
           return (
             <div
-              className={`absolute top-1/2 -translate-y-1/2 rounded-full group/bar select-none cursor-grab active:cursor-grabbing hover:shadow-lg transition-all ${isFb ? 'opacity-55' : 'opacity-95'} ${overdue ? 'ring-2 ring-rose-500 ring-offset-1 shadow-md z-10' : ''}`}
-              style={{ left: bar.left + 3, width: Math.max(bar.width - 6, DAY_W), height: 28 }}
+              className={`absolute top-1/2 -translate-y-1/2 rounded-md group/bar select-none cursor-grab active:cursor-grabbing hover:shadow-lg transition-all ${isFb ? 'opacity-55' : 'opacity-95'} ${overdue ? 'ring-2 ring-rose-500 ring-offset-1 shadow-md z-10' : ''}`}
+              style={{ left: bar.left + 3, width: Math.max(bar.width - 6, DAY_W), height: 22 }}
               onMouseDown={(e) => startBarDrag(e, task, 'move')}
             >
               {/* Solid bar background using dynamic health color */}
-              <div className={`absolute inset-0 rounded-full ${colorCfg.border}`} style={{ backgroundColor: colorCfg.bg }} />
+              <div className="absolute inset-0 rounded-md" style={{ backgroundColor: colorCfg.bg }} />
               {/* dashed for fallback */}
-              {isFb && <div className="absolute inset-0 rounded-full" style={{ border: '1px dashed rgba(0, 0, 0, 0.25)' }} />}
+              {isFb && <div className="absolute inset-0 rounded-md animate-[pulse_2s_infinite]" style={{ border: '1px dashed rgba(0, 0, 0, 0.25)' }} />}
               {/* progress fill as a darker overlay */}
               {!isFb && progress > 0 && (
-                <div className="absolute top-0 left-0 bottom-0 rounded-full bg-black/5 transition-all" style={{ width: `${progress}%` }} />
+                <div className="absolute top-0 left-0 bottom-0 rounded-l-md bg-black/5 transition-all" style={{ width: `${progress}%` }} />
               )}
               {/* label: colored high contrast text */}
               <div className="relative h-full flex items-center px-2.5 gap-1 overflow-hidden justify-between w-full">
@@ -1800,11 +1800,11 @@ export default function ProjectManagement() {
               </div>
               {/* resize handle */}
               <div
-                className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize rounded-r-full opacity-0 group-hover/bar:opacity-100 flex items-center justify-center gap-0.5 transition-opacity"
+                className="absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize rounded-r-md opacity-0 group-hover/bar:opacity-100 flex items-center justify-center gap-0.5 transition-opacity"
                 onMouseDown={(e) => { e.stopPropagation(); startBarDrag(e, task, 'resize'); }}
               >
-                <div className="w-0.5 h-3.5 rounded-full bg-black/25" />
-                <div className="w-0.5 h-3.5 rounded-full bg-black/25" />
+                <div className="w-0.5 h-3 rounded-full bg-black/20" />
+                <div className="w-0.5 h-3 rounded-full bg-black/20" />
               </div>
             </div>
           );
