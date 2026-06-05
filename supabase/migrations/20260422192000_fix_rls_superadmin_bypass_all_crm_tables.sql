@@ -111,8 +111,8 @@ CREATE POLICY financing_plans_update ON financing_plans FOR UPDATE TO authentica
 -- 14. marketing_ai_agents
 DROP POLICY IF EXISTS hubspot_style_marketing_agents_isolation ON marketing_ai_agents;
 CREATE POLICY hubspot_style_marketing_agents_isolation ON marketing_ai_agents FOR ALL TO authenticated
-  USING (company_id = get_my_company_id())
-  WITH CHECK (company_id = get_my_company_id());
+  USING (company_id = get_auth_company_id())
+  WITH CHECK (company_id = get_auth_company_id());
 
 -- 15. marketing_conversations
 DROP POLICY IF EXISTS marketing_conversations_tenant_policy ON marketing_conversations;
@@ -232,7 +232,7 @@ CREATE POLICY ticket_categories_tenant_policy ON ticket_categories FOR ALL TO au
 DROP POLICY IF EXISTS "Users can view updates from their company" ON ticket_updates;
 CREATE POLICY "Users can view updates from their company" ON ticket_updates FOR SELECT TO authenticated
   USING (
-    ticket_id IN (SELECT tickets.id FROM tickets WHERE tickets.company_id = get_my_company_v4())
+    ticket_id IN (SELECT tickets.id FROM tickets WHERE tickets.company_id = get_auth_company_id())
   );
 
 -- 30. loss_reasons
