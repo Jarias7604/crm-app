@@ -1445,7 +1445,8 @@ export default function CotizadorPro() {
                                             </div>
                                         )}
 
-                                        {/* 2. PAGO RECURRENTE (BLUE/GREEN) */}
+                                        {/* 2. PAGO RECURRENTE (BLUE/GREEN) — solo visible si hay ítems recurrentes con precio > 0 */}
+                                        {totales.subtotal_recurrente_base > 0 && (
                                         <div className={`${formData.forma_pago === 'mensual' ? 'bg-blue-50 border-blue-200' : 'bg-green-50 border-green-200'} border rounded-2xl p-5 shadow-sm`}>
                                             <div className="flex justify-between items-center mb-3">
                                                 <div>
@@ -1462,7 +1463,7 @@ export default function CotizadorPro() {
                                                 {(() => {
                                                     const selectedPlan = financingPlans.find(p => p.id === selectedPlanId);
                                                     const showBreakdown = selectedPlan?.show_breakdown ?? true;
-                                                    const recurrentes = totales.desglose.filter((d: any) => !d.es_pago_unico);
+                                                    const recurrentes = totales.desglose.filter((d: any) => !d.es_pago_unico && d.precio_anual > 0);
                                                     if (!showBreakdown) {
                                                         return (
                                                             <div className="flex justify-between text-[11px] text-gray-500 font-medium leading-none">
@@ -1593,6 +1594,7 @@ export default function CotizadorPro() {
                                                 </div>
                                             </div>
                                         </div>
+                                        )}
 
                                         {/* 3. INVERSIÓN TOTAL (PURPLE) */}
                                         <div className="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl p-5 text-white shadow-lg relative overflow-hidden group">

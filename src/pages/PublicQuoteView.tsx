@@ -315,13 +315,13 @@ export default function PublicQuoteView() {
                                     ) : (
                                         <div className="flex items-center gap-2 text-indigo-400">
                                             <Building2 className="w-10 h-10" />
-                                            <span className="text-2xl font-black uppercase tracking-tighter italic">ARIAS DEFENSE</span>
+                                            <span className="text-2xl font-black uppercase tracking-tighter italic">{cotizacion.company?.name || 'MI EMPRESA'}</span>
                                         </div>
                                     )}
                                 </div>
                                 <div className="space-y-1">
-                                    <h2 className="text-xl font-black uppercase tracking-tight opacity-90">{cotizacion.company?.name || 'ARIAS DEFENSE COMPONENTS'}</h2>
-                                    <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em]">{cotizacion.company?.website?.replace(/^https?:\/\//, '') || 'WWW.ARIASDEFENSE.COM'}</p>
+                                    <h2 className="text-xl font-black uppercase tracking-tight opacity-90">{cotizacion.company?.name || ''}</h2>
+                                    <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em]">{cotizacion.company?.website?.replace(/^https?:\/\//, '') || ''}</p>
                                 </div>
                             </div>
 
@@ -364,8 +364,8 @@ export default function PublicQuoteView() {
                                 </h3>
                                 <p className="text-xs opacity-90 leading-relaxed font-medium max-w-lg m-0">
                                     {isPaid 
-                                        ? `Hemos recibido el pago inicial de $${totalImplementacion.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} vía Stripe. Tu proyecto de facturación ya está en proceso de activación.`
-                                        : `Tu propuesta ha sido aceptada y firmada digitalmente. Para iniciar la implementación de tu DTE y módulos, realiza el pago inicial de $${totalImplementacion.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} con Stripe.`
+                                        ? `Hemos recibido el pago inicial de $${totalImplementacion.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}. Tu proyecto ya está en proceso de activación.`
+                                        : `Tu propuesta ha sido aceptada y firmada digitalmente. Para iniciar la activación, realiza el pago inicial de $${totalImplementacion.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`
                                     }
                                 </p>
                             </div>
@@ -420,7 +420,9 @@ export default function PublicQuoteView() {
                                 <p className="text-[10px] font-black uppercase tracking-widest opacity-80 mb-1">SOFTWARE PLAN</p>
                                 <p className="text-2xl font-black tracking-tight uppercase leading-none">{cotizacion.plan_nombre}</p>
                                 <div className="w-full h-px bg-white/20 my-4"></div>
-                                <p className="text-[10px] font-bold">{(cotizacion.volumen_dtes || 0).toLocaleString()} DTEs/AÑO</p>
+                                {(cotizacion.volumen_dtes || 0) > 0 && (
+                                    <p className="text-[10px] font-bold">{cotizacion.volumen_dtes.toLocaleString()} DTEs/AÑO</p>
+                                )}
                             </div>
                         </div>
                     </div>

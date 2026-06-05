@@ -287,10 +287,16 @@ class CotizadorService {
         desglose.push({
             es_pago_unico: false,
             tipo: 'Paquete',
-            nombre: `${paquete.paquete} (${paquete.cantidad_dtes} DTEs)`,
+            // Solo agregar sufijo de DTEs si el paquete usa volumen DTE (industria facturación electrónica)
+            // Para otras industrias (legal, médica, servicios) el nombre es limpio sin "(0 DTEs)"
+            nombre: paquete.cantidad_dtes > 0
+                ? `${paquete.paquete} (${paquete.cantidad_dtes} DTEs)`
+                : paquete.paquete,
             precio_anual: paquete.costo_paquete_anual,
             precio_mensual: paquete.costo_paquete_mensual,
-            descripcion: 'Licencia de facturación electrónica'
+            descripcion: paquete.cantidad_dtes > 0
+                ? 'Licencia de facturación electrónica'
+                : 'Plan base de servicios'
         });
 
         // 3. ITEMS (separar únicos de recurrentes)
