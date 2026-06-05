@@ -1740,13 +1740,28 @@ export default function ProjectManagement() {
           : allParents;
         const childrenOf = (pid: string) => filteredTasks.filter(t => t.parent_task_id === pid);
 
+        const getBarColor = (task: Task) => {
+          const dev = getDeviations(task);
+          if (dev.label.includes('Atrasado') || dev.label.includes('Retraso')) {
+            return { bg: '#f43f5e', text: 'text-white' };
+          }
+          if (dev.label.includes('Tarde') || dev.label.includes('Riesgo')) {
+            return { bg: '#f59e0b', text: 'text-white' };
+          }
+          if (dev.label.includes('Completo') || dev.label.includes('tiempo')) {
+            return { bg: '#10b981', text: 'text-white' };
+          }
+          const sc = SC[task.status] ?? SC.todo;
+          return { bg: sc.hex, text: 'text-white' };
+        };
+
         const renderBar = (task: Task) => {
           const bar = calcBar(task); if (!bar) return null;
-          const sc   = SC[task.status] ?? SC.todo;
           const progress = calcProgress(task);
           const isFb = bar.isFallback;
           const overdue = isOverdue(task);
           const overBudget = isOverBudget(task);
+          const colorCfg = getBarColor(task);
 
           return (
             <div
@@ -1754,8 +1769,8 @@ export default function ProjectManagement() {
               style={{ left: bar.left + 3, width: Math.max(bar.width - 6, DAY_W), height: 28 }}
               onMouseDown={(e) => startBarDrag(e, task, 'move')}
             >
-              {/* Solid bar background using status color */}
-              <div className="absolute inset-0 rounded-full" style={{ backgroundColor: sc.hex, opacity: 0.85 }} />
+              {/* Solid bar background using dynamic health color */}
+              <div className="absolute inset-0 rounded-full" style={{ backgroundColor: colorCfg.bg, opacity: 0.85 }} />
               {/* dashed for fallback */}
               {isFb && <div className="absolute inset-0 rounded-full" style={{ border: '2px dashed rgba(255, 255, 255, 0.4)' }} />}
               {/* progress fill as a darker overlay */}
@@ -1825,8 +1840,9 @@ export default function ProjectManagement() {
                 <div className="flex sticky top-0 z-20 border-b-2 border-gray-200 bg-white">
                   <div className="shrink-0 flex items-end px-3 pb-2 border-r border-gray-200 bg-gray-50/80 text-[9px] font-black text-gray-400 uppercase tracking-widest gap-2" style={{ width: LEFT_W }}>
                     <div className="flex-1 text-left">Tarea</div>
-                    <div className="w-[80px] shrink-0 border-l border-gray-200 pl-2 text-left">Asignado</div>
-                    <div className="w-[60px] shrink-0 border-l border-gray-200 pl-2 text-right">Horas</div>
+                    <div className="w-[65px] shrink-0 border-l border-gray-200 pl-2 text-left">Asignado</div>
+                    <div className="w-[65px] shrink-0 border-l border-gray-200 pl-2 text-right">Horas</div>
+                    <div className="w-[85px] shrink-0 border-l border-gray-200 pl-2 text-center">Salud</div>
                   </div>
                   <div className="flex" style={{ width: DAYS * DAY_W }}>
                     {weeks.map((w, wi) => (
@@ -1920,7 +1936,7 @@ export default function ProjectManagement() {
                           </div>
 
                           {/* Col 2: Asignado */}
-                          <div className="w-[80px] shrink-0 border-l border-gray-100 pl-2 flex items-center justify-start">
+                          <div className="w-[65px] shrink-0 border-l border-gray-100 pl-2 flex items-center justify-start">
                             {assigned ? (
                               <div className="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-[9px] font-bold shadow-sm ring-1 ring-white" title={assigned.full_name ?? assigned.email}>
                                 {(assigned.full_name ?? assigned.email)[0].toUpperCase()}
@@ -1933,7 +1949,7 @@ export default function ProjectManagement() {
                           </div>
 
                           {/* Col 3: Horas */}
-                          <div className="w-[60px] shrink-0 border-l border-gray-100 pl-2 flex items-center justify-end text-right">
+                          <div className="w-[65px] shrink-0 border-l border-gray-100 pl-2 flex items-center justify-end text-right">
                             {(() => {
                               const act = parent.actual_hours ?? 0;
                               const est = parent.estimated_hours ?? 0;
@@ -1950,6 +1966,18 @@ export default function ProjectManagement() {
                                 );
                               }
                               return <span className="text-[10px] font-semibold text-gray-500">{formatHours(act)}</span>;
+                            })()}
+                          </div>
+
+                          {/* Col 4: Salud */}
+                          <div className="w-[85px] shrink-0 border-l border-gray-100 pl-2 flex items-center justify-center">
+                            {(() => {
+                              const dev = getDeviations(parent);
+                              return (
+                                <span className={`text-[7.5px] font-black uppercase px-2 py-0.5 rounded-full border ${dev.color} tracking-wider shrink-0 whitespace-nowrap text-center`}>
+                                  {dev.label}
+                                </span>
+                              );
                             })()}
                           </div>
                         </div>
@@ -2026,7 +2054,7 @@ export default function ProjectManagement() {
                                 </div>
 
                                 {/* Col 2: Asignado */}
-                                <div className="w-[80px] shrink-0 border-l border-gray-100 pl-2 flex items-center justify-start">
+                                <div className="w-[65px] shrink-0 border-l border-gray-100 pl-2 flex items-center justify-start">
                                   {ca ? (
                                     <div className="w-5 h-5 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-[8px] font-bold shadow-sm ring-1 ring-white" title={ca.full_name ?? ca.email}>
                                       {(ca.full_name ?? ca.email)[0].toUpperCase()}
@@ -2039,7 +2067,7 @@ export default function ProjectManagement() {
                                 </div>
 
                                 {/* Col 3: Horas */}
-                                <div className="w-[60px] shrink-0 border-l border-gray-100 pl-2 flex items-center justify-end text-right">
+                                <div className="w-[65px] shrink-0 border-l border-gray-100 pl-2 flex items-center justify-end text-right">
                                   {(() => {
                                     const act = child.actual_hours ?? 0;
                                     const est = child.estimated_hours ?? 0;
@@ -2056,6 +2084,18 @@ export default function ProjectManagement() {
                                       );
                                     }
                                     return <span className="text-[9.5px] font-semibold text-gray-500">{formatHours(act)}</span>;
+                                  })()}
+                                </div>
+
+                                {/* Col 4: Salud */}
+                                <div className="w-[85px] shrink-0 border-l border-gray-100 pl-2 flex items-center justify-center">
+                                  {(() => {
+                                    const dev = getDeviations(child);
+                                    return (
+                                      <span className={`text-[7.5px] font-black uppercase px-2 py-0.5 rounded-full border ${dev.color} tracking-wider shrink-0 whitespace-nowrap text-center`}>
+                                        {dev.label}
+                                      </span>
+                                    );
                                   })()}
                                 </div>
                               </div>
