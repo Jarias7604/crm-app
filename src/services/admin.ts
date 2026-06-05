@@ -43,22 +43,42 @@ export const adminService = {
         admin_password?: string | null;
         admin_full_name?: string | null;
     }) {
-        const { data, error } = await supabase.rpc('provision_new_tenant', {
+        // ── Step 1: Create the company only (no user inside the RPC) ──────────
+        // We avoid creating the user inside PL/pgSQL because direct auth.users
+        // inserts leave internal Supabase Auth fields (identities, etc.) incomplete,
+        // causing a 500 "Database error querying schema" on first login.
+        const { data: companyData, error: companyError } = await supabase.rpc('provision_new_tenant', {
             p_company_name: params.company_name,
             p_license_status: params.company_license_status,
-            p_rnc: params.company_tax_id,
-            p_telefono: params.company_phone,
+            p_rnc: params.company_tax_id ?? null,
+            p_telefono: params.company_phone ?? null,
             p_email: null,
-            p_direccion: params.company_address,
+            p_direccion: params.company_address ?? null,
             p_max_users: params.company_max_users,
             p_allowed_permissions: params.company_allowed_permissions,
-            p_admin_email: params.admin_email,
-            p_admin_password: params.admin_password,
-            p_admin_full_name: params.admin_full_name
+            // Always null — admin created separately below via addCompanyAdmin
+            p_admin_email: null,
+            p_admin_password: null,
+            p_admin_full_name: null,
         });
 
-        if (error) throw error;
-        return data;
+        if (companyError) throw companyError;
+
+        const companyId = (companyData as any).company_id as string;
+
+        // ── Step 2: Create admin user via the safe addCompanyAdmin path ────────
+        // admin_create_user() RPC handles auth.users + auth.identities + profiles
+        // atomically with the correct identity data for login to work.
+        if (params.admin_email && params.admin_password) {
+            await this.addCompanyAdmin({
+                email: params.admin_email,
+                password: params.admin_password,
+                full_name: params.admin_full_name ?? null,
+                company_id: companyId,
+            });
+        }
+
+        return companyData;
     },
 
     async addCompanyAdmin(params: {
@@ -75,7 +95,7 @@ export const adminService = {
             new_company_id: params.company_id,
             new_phone: null,
             new_custom_role_id: null,
-            new_birth_date: null,
+            new_address_date: null,
             new_address: null
         });
 
