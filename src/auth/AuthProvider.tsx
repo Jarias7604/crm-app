@@ -37,6 +37,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [profile, setProfile] = useState<Profile | null>(null);
     const [loading, setLoading] = useState(true);
+    // SECURITY: Only read simulation state if user is super_admin.
+    // localStorage persists between sessions — if a company_admin logs in after a super_admin
+    // used the simulation debugger, they must NOT inherit the simulated company/role.
+    // The actual enforcement happens in fetchProfile (isSimulationEligible check),
+    // but we also guard the initial state to prevent leaks in the Sidebar's loadCompany().
     const [simulatedCompanyId, setSimulatedCompanyId] = useState<string | null>(localStorage.getItem('simulated_company_id'));
     const [simulatedRole, setSimulatedRole] = useState<Role | null>(localStorage.getItem('simulated_role') as any);
 
@@ -350,6 +355,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 }
             }
 
+            // SECURITY: If the final profile is NOT super_admin, clear any residual
+            // simulation state from localStorage that might have been left by a previous
+            // super_admin session. This prevents company_admin from seeing the wrong company.
+            if (finalProfile.role !== 'super_admin') {
+                if (localStorage.getItem('simulated_company_id') || localStorage.getItem('simulated_role')) {
+                    console.warn('🛡️ Clearing residual simulation state for non-super_admin user');
+                    localStorage.removeItem('simulated_company_id');
+                    localStorage.removeItem('simulated_role');
+                    setSimulatedCompanyId(null);
+                    setSimulatedRole(null);
+                }
+            }
             setProfile(finalProfile);
         } catch (err) {
             console.error('Unexpected error fetching profile:', err);
