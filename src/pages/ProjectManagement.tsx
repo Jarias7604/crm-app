@@ -1787,13 +1787,13 @@ export default function ProjectManagement() {
               )}
               {/* label: colored high contrast text */}
               <div className="relative h-full flex items-center px-2.5 gap-1 overflow-hidden justify-between w-full">
-                <span className={`text-[9px] font-black truncate whitespace-nowrap flex items-center gap-1 ${colorCfg.text}`}>
+                <span className={`text-[10px] font-black truncate whitespace-nowrap flex items-center gap-1 ${colorCfg.text}`}>
                   {overdue && <span className="shrink-0" title="Vencida">⚠️</span>}
                   {overBudget && <span className="shrink-0" title="Exceso de horas">⏳</span>}
                   {task.title}
                 </span>
                 {!isFb && (
-                  <span className={`text-[8px] font-black shrink-0 ml-1 px-1 rounded ${colorCfg.textBg}`}>
+                  <span className={`text-[9px] font-black shrink-0 ml-1 px-1 rounded ${colorCfg.textBg}`}>
                     {progress}%
                   </span>
                 )}
@@ -1922,19 +1922,19 @@ export default function ProjectManagement() {
                             {/* Title & Info & Edit */}
                             <div className="min-w-0 flex-1 flex items-center gap-1.5 group/title">
                               <div className="min-w-0 flex-1">
-                                <p className="text-[11px] font-bold text-gray-800 truncate leading-snug flex items-center gap-1.5">
+                                <p className="text-[12px] font-bold text-gray-800 truncate leading-snug flex items-center gap-1.5">
                                   {isOverdue(parent) && (
-                                    <span className="text-[7.5px] font-black bg-rose-50 text-rose-600 px-1 py-0.2 rounded border border-rose-100 uppercase tracking-wider shrink-0">⚠️ Vencida</span>
+                                    <span className="text-[9px] font-black bg-rose-50 text-rose-600 px-1 py-0.5 rounded border border-rose-100 uppercase tracking-wider shrink-0">⚠️ Vencida</span>
                                   )}
                                   {parent.title}
                                 </p>
                                 <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                  <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md ${priorCfg[parent.priority]}`}>{parent.priority}</span>
+                                  <span className={`text-[9.5px] font-black uppercase px-1.5 py-0.5 rounded-md ${priorCfg[parent.priority]}`}>{parent.priority}</span>
                                   {parent.due_date
-                                    ? <span className={`text-[8px] font-semibold ${isOverdue(parent) ? 'text-rose-500 font-bold' : 'text-gray-400'}`}>{new Date(parent.due_date).toLocaleDateString('es',{day:'2-digit',month:'short'})}</span>
-                                    : <span className="text-[8px] text-amber-500 font-bold">sin fecha</span>
+                                    ? <span className={`text-[9.5px] font-semibold ${isOverdue(parent) ? 'text-rose-500 font-bold' : 'text-gray-400'}`}>{new Date(parent.due_date).toLocaleDateString('es',{day:'2-digit',month:'short'})}</span>
+                                    : <span className="text-[9.5px] text-amber-550 font-bold">sin fecha</span>
                                   }
-                                  {children.length > 0 && <span className="text-[8px] text-indigo-400 font-black">{children.length} subtareas</span>}
+                                  {children.length > 0 && <span className="text-[9.5px] text-indigo-500 font-black">{children.length} subtareas</span>}
                                 </div>
                               </div>
                               <button onClick={() => openTaskModal(parent)} className="opacity-0 group-hover/row:opacity-100 w-6 h-6 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-400 hover:text-indigo-600 flex items-center justify-center transition-all shrink-0" title="Editar">
@@ -1965,15 +1965,15 @@ export default function ProjectManagement() {
                               if (est > 0) {
                                 return (
                                   <div className={`flex flex-col text-right ${over ? 'text-rose-600' : 'text-gray-500'}`} title={over ? '¡Exceso de horas!' : 'Horas (Real / Estimado)'}>
-                                    <div className="text-[10px] font-bold flex items-center justify-end gap-0.5">
-                                      {over && <span className="text-[9px]">⚠️</span>}
+                                    <div className="text-[11px] font-bold flex items-center justify-end gap-0.5">
+                                      {over && <span className="text-[9.5px]">⚠️</span>}
                                       {formatHours(act)}
                                     </div>
-                                    <div className="text-[8px] opacity-75 leading-none">/ {formatHours(est)}</div>
+                                    <div className="text-[9px] opacity-75 leading-none">/ {formatHours(est)}</div>
                                   </div>
                                 );
                               }
-                              return <span className="text-[10px] font-semibold text-gray-500">{formatHours(act)}</span>;
+                              return <span className="text-[11px] font-semibold text-gray-500">{formatHours(act)}</span>;
                             })()}
                           </div>
 
@@ -1982,7 +1982,7 @@ export default function ProjectManagement() {
                             {(() => {
                               const dev = getDeviations(parent);
                               return (
-                                <span className={`text-[7.5px] font-black uppercase px-2 py-0.5 rounded-full border ${dev.color} tracking-wider shrink-0 whitespace-nowrap text-center`}>
+                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${dev.color} tracking-wider shrink-0 whitespace-nowrap text-center`}>
                                   {dev.label}
                                 </span>
                               );
@@ -2043,17 +2043,17 @@ export default function ProjectManagement() {
                                   {/* Title & Info & Edit */}
                                   <div className="min-w-0 flex-1 flex items-center gap-1.5 group/title">
                                     <div className="min-w-0 flex-1">
-                                      <p className="text-[10px] font-semibold text-gray-600 truncate flex items-center gap-1">
+                                      <p className="text-[11.5px] font-bold text-gray-700 truncate flex items-center gap-1">
                                         {isOverdue(child) && (
-                                          <span className="text-[7px] font-black bg-rose-50 text-rose-600 px-1 py-0.2 rounded border border-rose-100 uppercase shrink-0">⚠️ Vencida</span>
+                                          <span className="text-[9px] font-black bg-rose-50 text-rose-600 px-1 py-0.5 rounded border border-rose-100 uppercase shrink-0">⚠️ Vencida</span>
                                         )}
                                         {child.title}
                                       </p>
                                       <div className="flex items-center gap-1.5 mt-0.5">
-                                        <span className={`text-[8px] font-black uppercase px-1 py-0.5 rounded ${priorCfg[child.priority]}`}>{child.priority}</span>
+                                        <span className={`text-[9.5px] font-black uppercase px-1 py-0.5 rounded ${priorCfg[child.priority]}`}>{child.priority}</span>
                                         {child.due_date
-                                          ? <span className={`text-[8px] font-semibold ${isOverdue(child) ? 'text-rose-500 font-bold' : 'text-gray-400'}`}>{new Date(child.due_date).toLocaleDateString('es',{day:'2-digit',month:'short'})}</span>
-                                          : <span className="text-[8px] text-amber-450 font-bold">sin fecha</span>
+                                          ? <span className={`text-[9.5px] font-semibold ${isOverdue(child) ? 'text-rose-500 font-bold' : 'text-gray-400'}`}>{new Date(child.due_date).toLocaleDateString('es',{day:'2-digit',month:'short'})}</span>
+                                          : <span className="text-[9.5px] text-amber-500 font-bold">sin fecha</span>
                                         }
                                       </div>
                                     </div>
@@ -2083,15 +2083,15 @@ export default function ProjectManagement() {
                                     if (est > 0) {
                                       return (
                                         <div className={`flex flex-col text-right ${over ? 'text-rose-600' : 'text-gray-500'}`} title={over ? '¡Exceso de horas!' : 'Horas (Real / Estimado)'}>
-                                          <div className="text-[9px] font-bold flex items-center justify-end gap-0.5">
-                                            {over && <span className="text-[8.5px]">⚠️</span>}
+                                          <div className="text-[10px] font-bold flex items-center justify-end gap-0.5">
+                                            {over && <span className="text-[9px]">⚠️</span>}
                                             {formatHours(act)}
                                           </div>
-                                          <div className="text-[7.5px] opacity-75 leading-none">/ {formatHours(est)}</div>
+                                          <div className="text-[8.5px] opacity-75 leading-none">/ {formatHours(est)}</div>
                                         </div>
                                       );
                                     }
-                                    return <span className="text-[9.5px] font-semibold text-gray-500">{formatHours(act)}</span>;
+                                    return <span className="text-[10px] font-semibold text-gray-500">{formatHours(act)}</span>;
                                   })()}
                                 </div>
 
@@ -2100,7 +2100,7 @@ export default function ProjectManagement() {
                                   {(() => {
                                     const dev = getDeviations(child);
                                     return (
-                                      <span className={`text-[7.5px] font-black uppercase px-2 py-0.5 rounded-full border ${dev.color} tracking-wider shrink-0 whitespace-nowrap text-center`}>
+                                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${dev.color} tracking-wider shrink-0 whitespace-nowrap text-center`}>
                                         {dev.label}
                                       </span>
                                     );
