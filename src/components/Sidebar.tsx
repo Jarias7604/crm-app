@@ -101,9 +101,13 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
 
     const loadCompany = async () => {
         try {
-            // CRITICAL FIX: When in simulation mode, load the SIMULATED company's branding,
-            // not the master account's branding. This ensures the correct logo shows.
-            const effectiveCompanyId = simulatedCompanyId || profile?.company_id;
+            // SECURITY: Only apply simulatedCompanyId when the user is super_admin.
+            // If simulatedCompanyId is in localStorage from a previous super_admin session,
+            // a company_admin must NEVER inherit it — always use their own profile.company_id.
+            const isSuperAdmin = profile?.role === 'super_admin';
+            const effectiveCompanyId = (isSuperAdmin && simulatedCompanyId) 
+                ? simulatedCompanyId 
+                : profile?.company_id;
 
             if (!effectiveCompanyId) return;
 
