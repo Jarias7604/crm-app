@@ -187,11 +187,11 @@ export default function ProjectManagement() {
         setSelectedProjectId(defaultProjId);
         await loadTasks(defaultProjId);
       } else {
-        // No projects, trigger automatic seeding of ERP - Gasolineras
-        toast.loading('Iniciando entorno de proyectos y cargando proyecto demo...', { id: 'seed' });
-        await seedDemoProject(profile!.company_id);
-        toast.success('¡Módulo inicializado con Proyecto ERP Gasolineras!', { id: 'seed' });
-        loadData();
+        // SaaS: New tenant with no projects yet — show empty state.
+        // NEVER auto-seed demo data — each tenant's workspace must be isolated.
+        setProjects([]);
+        setSelectedProjectId('');
+        setTasks([]);
       }
     } catch (err) {
       console.error("Error loading project management:", err);
@@ -1262,6 +1262,28 @@ export default function ProjectManagement() {
           </button>
         </div>
       </div>
+
+      {/* ── EMPTY STATE (New tenant, no projects yet) ──── */}
+      {!loading && projects.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-24 gap-6 animate-in fade-in duration-500">
+          <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-[#4449AA]/10 to-indigo-100 flex items-center justify-center border border-indigo-200/40">
+            <Layers size={36} className="text-[#4449AA]/60" />
+          </div>
+          <div className="text-center max-w-md">
+            <h2 className="text-xl font-black text-gray-800 mb-2">Sin proyectos aún</h2>
+            <p className="text-sm text-gray-500 leading-relaxed">
+              Tu espacio de trabajo está listo. Crea tu primer proyecto para comenzar a organizar tareas, asignar responsables y hacer seguimiento del tiempo.
+            </p>
+          </div>
+          <button
+            onClick={() => setIsProjectModalOpen(true)}
+            className="flex items-center gap-2 px-6 py-3 bg-[#4449AA] hover:bg-[#3a3f99] text-white font-bold rounded-xl shadow-lg shadow-indigo-900/20 transition-all hover:scale-105 active:scale-95"
+          >
+            <Plus size={18} />
+            Crear primer proyecto
+          </button>
+        </div>
+      )}
 
       {/* ── METRICS GRID ────────────────────────────────── */}
       {selectedProjectId && (
