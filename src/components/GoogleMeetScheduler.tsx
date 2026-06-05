@@ -291,10 +291,21 @@ Email: ${hostEmail}
 Reunión modificada desde Arias CRM.`;
 
                 // extract actual google event ID (from format `google-{real_id}-{group}`)
-                let rawId = initialEvent.id;
-                if (rawId.startsWith('google-')) {
-                    const parts = rawId.split('-');
-                    rawId = parts[1]; // get {real_id}
+                let rawId = initialEvent._rawEvent?.id;
+                if (!rawId) {
+                    const idStr = initialEvent.id;
+                    if (idStr.startsWith('google-')) {
+                        const firstHyphen = idStr.indexOf('-');
+                        const lastHyphen = idStr.lastIndexOf('-');
+                        if (firstHyphen !== -1 && lastHyphen !== -1 && lastHyphen > firstHyphen) {
+                            rawId = idStr.substring(firstHyphen + 1, lastHyphen);
+                        } else {
+                            const parts = idStr.split('-');
+                            rawId = parts[1];
+                        }
+                    } else {
+                        rawId = idStr;
+                    }
                 }
 
                 const { data, error } = await supabase.functions.invoke('google-calendar-sync', {
