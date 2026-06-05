@@ -1,0 +1,701 @@
+diff --git a/src/pages/ProjectManagement.tsx b/src/pages/ProjectManagement.tsx
+index 9591ffe3..551dbc5c 100644
+--- a/src/pages/ProjectManagement.tsx
++++ b/src/pages/ProjectManagement.tsx
+@@ -5,7 +5,7 @@ import {
+   Layers, Plus, Play, Square, Clock, AlertTriangle, CheckCircle, 
+   Trash2, User, Calendar as CalendarIcon, MessageSquare, Tag, 
+   ChevronRight, ArrowRight, Loader2, Sparkles, Filter, CheckCircle2,
+-  ListTodo, KanbanSquare, BarChart4, AlertCircle, X
++  ListTodo, KanbanSquare, BarChart4, AlertCircle, X, Search
+ } from 'lucide-react';
+ import toast from 'react-hot-toast';
+ import { Button } from '../components/ui/Button';
+@@ -177,30 +177,36 @@ export default function ProjectManagement() {
+   const loadTasks = async (projectId: string) => {
+     if (!projectId) return;
+     try {
+-      const { data: tsks, error } = await supabase
+-        .from('crm_tasks')
+-        .select('*')
+-        .eq('project_id', projectId)
+-        .order('created_at', { ascending: true });
++      if (dbAvailable) {
++        const { data: tsks, error } = await supabase
++          .from('crm_tasks')
++          .select('*')
++          .eq('project_id', projectId)
++          .order('created_at', { ascending: true });
+ 
+-      if (error) throw error;
+-      
+-      // Fetch active timer log if any
+-      const { data: activeLogs } = await supabase
+-        .from('crm_task_time_logs')
+-        .select('task_id, started_at')
+-        .is('stopped_at', null)
+-        .limit(1);
+-
+-      if (activeLogs && activeLogs.length > 0) {
+-        setActiveTimerTaskId(activeLogs[0].task_id);
+-        const elapsed = Math.floor((Date.now() - new Date(activeLogs[0].started_at).getTime()) / 1000);
+-        setTimerSeconds(elapsed > 0 ? elapsed : 0);
++        if (error) throw error;
++        
++        // Fetch active timer log if any
++        const { data: activeLogs } = await supabase
++          .from('crm_task_time_logs')
++          .select('task_id, started_at')
++          .is('stopped_at', null)
++          .limit(1);
++
++        if (activeLogs && activeLogs.length > 0) {
++          setActiveTimerTaskId(activeLogs[0].task_id);
++          const elapsed = Math.floor((Date.now() - new Date(activeLogs[0].started_at).getTime()) / 1000);
++          setTimerSeconds(elapsed > 0 ? elapsed : 0);
++        } else {
++          setActiveTimerTaskId(null);
++        }
++
++        setTasks(tsks || []);
+       } else {
+-        setActiveTimerTaskId(null);
++        // Mock Mode Fallback
++        const mockTasks: Task[] = JSON.parse(localStorage.getItem('mock_tasks') || '[]');
++        setTasks(mockTasks.filter(t => t.project_id === projectId));
+       }
+-
+-      setTasks(tsks || []);
+     } catch (err) {
+       console.error("Error loading tasks:", err);
+     }
+@@ -271,7 +277,8 @@ export default function ProjectManagement() {
+       setTasks(initialTasks);
+     } else {
+       setProjects(mockProjs);
+-      const defaultProjId = mockProjs[0].id;
++      const savedProjId = localStorage.getItem('last_project_id');
++      const defaultProjId = mockProjs.find(p => p.id === savedProjId)?.id || mockProjs[0].id;
+       setSelectedProjectId(defaultProjId);
+       setTasks(mockTasks.filter(t => t.project_id === defaultProjId));
+     }
+@@ -776,12 +783,12 @@ export default function ProjectManagement() {
+   const metrics = getTaskTotalMetrics();
+ 
+   return (
+-    <div className="w-full max-w-[1600px] mx-auto space-y-3 animate-in fade-in duration-300 pb-12">
++    <div className="w-full max-w-[1600px] mx-auto space-y-5 animate-in fade-in duration-300 pb-12">
+ 
+       {/* Demo Mode Banner */}
+       {!dbAvailable && (
+-        <div className="flex items-center gap-2.5 px-4 py-2.5 bg-amber-50 border border-amber-200/60 rounded-xl text-amber-700 text-[11px] font-medium">
+-          <AlertCircle size={13} className="shrink-0 text-amber-500" />
++        <div className="flex items-center gap-2.5 px-4 py-2.5 bg-amber-50 border border-amber-200/60 rounded-xl text-amber-700 text-xs font-medium">
++          <AlertCircle size={14} className="shrink-0 text-amber-500" />
+           <span><strong>Demo Local</strong> — Tablas aún no migradas en Supabase. Los cambios persisten en tu navegador.</span>
+         </div>
+       )}
+@@ -789,20 +796,20 @@ export default function ProjectManagement() {
+       {/* ── HEADER ROW ─────────────────────────────────── */}
+       <div className="flex items-center justify-between gap-3">
+         {/* Left: Title */}
+-        <div className="flex items-center gap-2.5 min-w-0">
+-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#4449AA] to-[#6c71e8] flex items-center justify-center shadow-sm shadow-indigo-900/20 shrink-0">
+-            <Layers size={15} className="text-white" />
++        <div className="flex items-center gap-3 min-w-0">
++          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#4449AA] to-[#6c71e8] flex items-center justify-center shadow-lg shadow-indigo-900/20 shrink-0">
++            <Layers size={18} className="text-white" />
+           </div>
+           <div className="min-w-0">
+-            <h1 className="text-[15px] font-black text-gray-900 tracking-tight leading-none">Gestión de Proyectos</h1>
+-            <p className="text-[10px] text-gray-400 font-medium mt-0.5 truncate">Control de tiempo · Seguimiento de tareas · Cumplimiento</p>
++            <h1 className="text-2xl font-black text-[#4449AA] tracking-tight leading-none">Gestión de Proyectos</h1>
++            <p className="text-xs text-gray-500 font-semibold mt-1">Control de tiempo · Seguimiento de tareas · Cumplimiento</p>
+           </div>
+         </div>
+ 
+         {/* Right: Project selector + New Project */}
+         <div className="flex items-center gap-2 shrink-0">
+           <select
+-            className="h-8 px-2.5 rounded-lg border border-gray-200 bg-white text-[11px] font-semibold text-gray-700 outline-none focus:ring-2 focus:ring-[#4449AA]/20 max-w-[180px] cursor-pointer"
++            className="h-9 md:h-10 px-3 rounded-xl border border-gray-200 bg-white text-xs font-semibold text-gray-700 outline-none focus:ring-2 focus:ring-[#4449AA]/20 max-w-[180px] cursor-pointer"
+             value={selectedProjectId}
+             onChange={(e) => { setSelectedProjectId(e.target.value); localStorage.setItem('last_project_id', e.target.value); loadTasks(e.target.value); }}
+           >
+@@ -810,91 +817,133 @@ export default function ProjectManagement() {
+           </select>
+           <button
+             onClick={() => setIsProjectModalOpen(true)}
+-            className="h-8 px-3 flex items-center gap-1.5 bg-white border border-gray-200 hover:border-[#4449AA]/40 hover:text-[#4449AA] text-gray-600 rounded-lg text-[11px] font-semibold transition-all"
++            className="h-9 md:h-10 px-4 flex items-center gap-1.5 bg-white border border-gray-200 hover:border-[#4449AA]/40 hover:text-[#4449AA] text-gray-600 rounded-xl text-xs font-semibold transition-all shadow-sm"
+           >
+-            <Plus size={13} /> Nuevo
++            <Plus size={14} /> Nuevo
+           </button>
+         </div>
+       </div>
+ 
+-      {/* ── METRICS STRIP ──────────────────────────────── */}
++      {/* ── METRICS GRID ────────────────────────────────── */}
+       {selectedProjectId && (
+-        <div className="flex flex-wrap items-center gap-1.5 bg-white border border-gray-100 rounded-xl px-3 py-2 shadow-sm">
++        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+           {[
+-            { icon: <CheckCircle2 size={11} className="text-[#4449AA]" />, label: 'Completadas', value: `${metrics.completedCount}/${tasks.length}`, sub: `${metrics.progressPercent.toFixed(0)}%` },
+-            { icon: <ListTodo size={11} className="text-blue-500" />, label: 'Planificado', value: `${metrics.totalEst.toFixed(1)}h`, sub: null },
+-            { icon: <Clock size={11} className="text-violet-500" />, label: 'Ejecutado', value: `${metrics.totalAct.toFixed(1)}h`, sub: null },
+-            { icon: <BarChart4 size={11} className={metrics.totalAct > metrics.totalEst ? 'text-rose-500' : 'text-emerald-500'} />, label: 'Eficiencia', value: `${metrics.totalEst > 0 ? ((metrics.totalAct / metrics.totalEst) * 100).toFixed(0) : 0}%`, sub: null },
++            { 
++              icon: <CheckCircle2 size={16} className="text-[#4449AA]" />, 
++              bg: 'bg-[#4449AA]/10',
++              label: 'Completadas', 
++              value: `${metrics.completedCount}/${tasks.length}`, 
++              sub: `${metrics.progressPercent.toFixed(0)}% completado`,
++              progress: metrics.progressPercent
++            },
++            { 
++              icon: <ListTodo size={16} className="text-blue-500" />, 
++              bg: 'bg-blue-50',
++              label: 'Tiempo Planificado', 
++              value: `${metrics.totalEst.toFixed(1)}h`, 
++              sub: 'Total estimaciones',
++              progress: null 
++            },
++            { 
++              icon: <Clock size={16} className="text-violet-500" />, 
++              bg: 'bg-violet-50',
++              label: 'Tiempo Ejecutado', 
++              value: `${metrics.totalAct.toFixed(1)}h`, 
++              sub: 'Total horas logueadas',
++              progress: null 
++            },
++            { 
++              icon: <BarChart4 size={16} className={metrics.totalAct > metrics.totalEst ? 'text-rose-500' : 'text-emerald-500'} />, 
++              bg: metrics.totalAct > metrics.totalEst ? 'bg-rose-50' : 'bg-emerald-50',
++              label: 'Eficiencia', 
++              value: `${metrics.totalEst > 0 ? ((metrics.totalAct / metrics.totalEst) * 100).toFixed(0) : 0}%`, 
++              sub: metrics.totalAct > metrics.totalEst ? 'Desviación de tiempo' : 'Dentro del presupuesto',
++              progress: null 
++            },
+           ].map((m, i) => (
+-            <div key={i} className="flex items-center gap-1.5 bg-gray-50/80 border border-gray-100 px-2.5 py-1 rounded-lg">
+-              {m.icon}
+-              <span className="text-[10px] text-gray-400 font-semibold">{m.label}</span>
+-              <span className="text-[11px] font-black text-gray-800">{m.value}</span>
+-              {m.sub && <span className="text-[9px] text-gray-400 font-bold">({m.sub})</span>}
++            <div key={i} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-all flex flex-col justify-between">
++              <div className="flex items-start justify-between">
++                <div className="min-w-0">
++                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">{m.label}</p>
++                  <p className="text-xl md:text-2xl font-black text-gray-900 mt-1">{m.value}</p>
++                </div>
++                <div className={`w-8 h-8 rounded-xl ${m.bg} flex items-center justify-center shrink-0`}>
++                  {m.icon}
++                </div>
++              </div>
++              <div className="mt-3">
++                {m.progress !== null ? (
++                  <div className="space-y-1.5">
++                    <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
++                      <div
++                        className="h-full rounded-full bg-gradient-to-r from-[#4449AA] to-indigo-400 transition-all duration-700"
++                        style={{ width: `${m.progress}%` }}
++                      />
++                    </div>
++                    <p className="text-[10px] text-gray-400 font-bold">{m.sub}</p>
++                  </div>
++                ) : (
++                  <p className="text-[10px] text-gray-400 font-bold">{m.sub}</p>
++                )}
++              </div>
+             </div>
+           ))}
+-
+-          {/* Inline progress bar */}
+-          <div className="flex-1 min-w-[80px] max-w-[140px] h-1.5 bg-gray-100 rounded-full overflow-hidden ml-1">
+-            <div
+-              className="h-full rounded-full bg-gradient-to-r from-[#4449AA] to-indigo-400 transition-all duration-700"
+-              style={{ width: `${metrics.progressPercent}%` }}
+-            />
+-          </div>
+         </div>
+       )}
+ 
+       {/* ── LIVE TIMER BANNER ──────────────────────────── */}
+       {activeTimerTaskId && (
+-        <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-xl bg-gradient-to-r from-slate-900 to-[#2e3187] border border-indigo-900/40 shadow-lg shadow-indigo-900/10">
++        <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-xl bg-gradient-to-r from-slate-900 to-[#2e3187] border border-indigo-900/40 shadow-lg shadow-indigo-900/10 animate-in slide-in-from-top duration-300">
+           <div className="flex items-center gap-3 min-w-0">
+-            <div className="w-7 h-7 rounded-lg bg-indigo-500/20 flex items-center justify-center shrink-0">
+-              <Clock size={14} className="text-indigo-300 animate-pulse" />
++            <div className="w-8 h-8 rounded-xl bg-indigo-500/20 flex items-center justify-center shrink-0 animate-pulse">
++              <Clock size={16} className="text-indigo-300" />
+             </div>
+             <div className="min-w-0">
+-              <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">Tiempo en ejecución</p>
+-              <p className="text-[12px] font-bold text-white truncate leading-tight">{tasks.find(t => t.id === activeTimerTaskId)?.title}</p>
++              <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Tiempo en ejecución</p>
++              <p className="text-sm font-bold text-white truncate leading-tight mt-0.5">{tasks.find(t => t.id === activeTimerTaskId)?.title}</p>
+             </div>
+           </div>
+           <div className="flex items-center gap-3 shrink-0">
+             <span className="font-mono text-lg font-black text-white tracking-widest">{formatTimer(timerSeconds)}</span>
+             <button
+               onClick={() => handleStopTimer(activeTimerTaskId)}
+-              className="flex items-center gap-1.5 px-3 h-8 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all shadow-sm"
++              className="flex items-center gap-1.5 px-4 h-9 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm"
+             >
+-              <Square size={10} fill="white" /> Detener
++              <Square size={11} fill="white" /> Detener
+             </button>
+           </div>
+         </div>
+       )}
+ 
+       {/* ── FILTER + VIEW TOOLBAR ──────────────────────── */}
+-      <div className="flex flex-wrap items-center justify-between gap-2 bg-white border border-gray-100 rounded-xl px-3 py-2 shadow-sm">
++      <div className="flex flex-wrap items-center justify-between gap-3 bg-white border border-gray-100 rounded-2xl px-4 py-3 shadow-sm">
+         {/* Search */}
+-        <div className="relative min-w-[160px] max-w-[220px]">
+-          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"><Clock size={12} /></span>
++        <div className="relative min-w-[200px] max-w-[280px]">
++          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
++            <Search size={14} />
++          </span>
+           <input
+             type="text"
+             placeholder="Buscar tarea..."
+             value={searchFilter}
+             onChange={e => setSearchFilter(e.target.value)}
+-            className="w-full pl-7 pr-3 h-7 bg-gray-50 border border-gray-100 rounded-lg text-[11px] font-medium text-gray-700 outline-none focus:ring-1 focus:ring-[#4449AA]/20 focus:bg-white"
++            className="w-full pl-9 pr-3 h-9 bg-gray-50 border border-gray-100 rounded-xl text-xs font-semibold text-gray-700 outline-none focus:ring-2 focus:ring-[#4449AA]/20 focus:bg-white transition-all"
+           />
+         </div>
+ 
+         {/* Priority chips */}
+-        <div className="flex items-center gap-1 bg-gray-50 rounded-lg border border-gray-100 p-0.5">
++        <div className="flex items-center gap-1 bg-gray-50 rounded-xl border border-gray-100 p-1">
+           {[
+             { key: 'all', label: 'Todos' },
+-            { key: 'urgent', label: '🔥' },
+-            { key: 'high', label: '⚡ Alta' },
++            { key: 'urgent', label: '🔥 Urgentes' },
++            { key: 'high', label: '⚡ Altas' },
+             { key: 'medium', label: 'Media' },
+             { key: 'low', label: 'Baja' },
+           ].map(p => (
+             <button
+               key={p.key}
+               onClick={() => setPriorityFilter(p.key)}
+-              className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${priorityFilter === p.key ? 'bg-white text-[#4449AA] shadow-sm border border-gray-200/60' : 'text-gray-500 hover:text-gray-700'}`}
++              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${priorityFilter === p.key ? 'bg-white text-[#4449AA] shadow-sm border border-gray-200/60' : 'text-gray-500 hover:text-gray-700'}`}
+             >
+               {p.label}
+             </button>
+@@ -902,7 +951,7 @@ export default function ProjectManagement() {
+         </div>
+ 
+         {/* Status filter chips */}
+-        <div className="flex items-center gap-1">
++        <div className="flex items-center gap-1.5">
+           {[
+             { status: 'todo', label: 'Pendiente', dot: 'bg-slate-400' },
+             { status: 'in_progress', label: 'En Curso', dot: 'bg-blue-500' },
+@@ -910,8 +959,8 @@ export default function ProjectManagement() {
+           ].map(s => {
+             const count = tasks.filter(t => t.status === s.status).length;
+             return (
+-              <div key={s.status} className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-gray-50 border border-gray-100 text-[10px] font-bold text-gray-500">
+-                <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
++              <div key={s.status} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-50 border border-gray-100 text-xs font-bold text-gray-500">
++                <span className={`w-2 h-2 rounded-full ${s.dot}`} />
+                 {s.label}
+                 <span className="text-gray-400 font-black">{count}</span>
+               </div>
+@@ -920,16 +969,16 @@ export default function ProjectManagement() {
+         </div>
+ 
+         {/* View Toggle + CTA */}
+-        <div className="flex items-center gap-1.5 ml-auto">
+-          <div className="flex rounded-lg bg-gray-50 p-0.5 border border-gray-100">
+-            <button onClick={() => setViewMode('kanban')} className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all ${viewMode === 'kanban' ? 'bg-white text-[#4449AA] shadow-sm border border-gray-200/50' : 'text-gray-400 hover:text-gray-600'}`}>Kanban</button>
+-            <button onClick={() => setViewMode('list')} className={`px-2.5 py-1 rounded text-[10px] font-bold transition-all ${viewMode === 'list' ? 'bg-white text-[#4449AA] shadow-sm border border-gray-200/50' : 'text-gray-400 hover:text-gray-600'}`}>Lista</button>
++        <div className="flex items-center gap-2 ml-auto">
++          <div className="flex rounded-xl bg-gray-50 p-1 border border-gray-100">
++            <button onClick={() => setViewMode('kanban')} className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'kanban' ? 'bg-white text-[#4449AA] shadow-sm border border-gray-200/50' : 'text-gray-400 hover:text-gray-600'}`}>Kanban</button>
++            <button onClick={() => setViewMode('list')} className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === 'list' ? 'bg-white text-[#4449AA] shadow-sm border border-gray-200/50' : 'text-gray-400 hover:text-gray-600'}`}>Lista</button>
+           </div>
+           <button
+             onClick={() => openTaskModal()}
+-            className="flex items-center gap-1.5 h-7 px-3 bg-[#4449AA] hover:bg-[#383d8f] text-white text-[10px] font-black uppercase tracking-widest rounded-lg transition-all shadow-sm shadow-indigo-900/20"
++            className="flex items-center gap-2 h-9 px-4 bg-[#4449AA] hover:bg-[#383d8f] text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-indigo-900/10"
+           >
+-            <Plus size={11} /> Nueva Tarea
++            <Plus size={14} /> Nueva Tarea
+           </button>
+         </div>
+       </div>
+@@ -942,24 +991,24 @@ export default function ProjectManagement() {
+           {(['todo', 'in_progress', 'paused', 'completed'] as Task['status'][]).map(status => {
+             const statusTasks = filteredTasks.filter(t => t.status === status);
+             const columnsConfig = {
+-              todo: { title: 'Pendientes', color: 'bg-slate-200 text-slate-700 border-slate-300' },
+-              in_progress: { title: 'En Progreso', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+-              paused: { title: 'Pausadas', color: 'bg-amber-100 text-amber-700 border-amber-200' },
+-              completed: { title: 'Completadas', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' }
++              todo: { title: 'Pendientes', color: 'bg-slate-100 text-slate-700 border-slate-200' },
++              in_progress: { title: 'En Progreso', color: 'bg-blue-50 text-blue-700 border-blue-100' },
++              paused: { title: 'Pausadas', color: 'bg-amber-50 text-amber-700 border-amber-100' },
++              completed: { title: 'Completadas', color: 'bg-emerald-50 text-emerald-700 border-emerald-100' }
+             };
+             const config = columnsConfig[status];
+ 
+             return (
+-              <div key={status} className="bg-gray-50/50 p-4 rounded-2xl border border-gray-200/50 flex flex-col space-y-4 min-h-[500px]">
+-                <div className="flex items-center justify-between border-b border-gray-200 pb-2">
+-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${config.color}`}>
++              <div key={status} className="bg-gray-50/50 p-5 rounded-2xl border border-gray-200/60 flex flex-col space-y-4 min-h-[550px]">
++                <div className="flex items-center justify-between border-b border-gray-200/60 pb-2.5">
++                  <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border ${config.color}`}>
+                     {config.title} ({statusTasks.length})
+                   </span>
+                 </div>
+ 
+-                <div className="flex flex-col space-y-3 overflow-y-auto max-h-[70vh] pr-1">
++                <div className="flex flex-col space-y-3.5 overflow-y-auto max-h-[70vh] pr-1">
+                   {statusTasks.length === 0 ? (
+-                    <div className="p-8 border-2 border-dashed border-gray-200 rounded-2xl text-center text-gray-400 text-xs font-medium">
++                    <div className="p-10 border-2 border-dashed border-gray-200 rounded-2xl text-center text-gray-400 text-xs font-medium bg-white/40">
+                       Vacío
+                     </div>
+                   ) : (
+@@ -970,12 +1019,12 @@ export default function ProjectManagement() {
+                       return (
+                         <div
+                           key={task.id}
+-                          className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 transition-all duration-300 relative group"
++                          className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 transition-all duration-300 relative group"
+                         >
+                           {/* Priority & Health Badges */}
+-                          <div className="flex items-center justify-between mb-2">
++                          <div className="flex items-center justify-between mb-3">
+                             <div className="flex items-center gap-1.5">
+-                              <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${
++                              <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${
+                                 task.priority === 'urgent' ? 'bg-red-100 text-red-600' :
+                                 task.priority === 'high' ? 'bg-amber-100 text-amber-600' :
+                                 task.priority === 'medium' ? 'bg-indigo-50 text-indigo-500' :
+@@ -984,7 +1033,7 @@ export default function ProjectManagement() {
+                                 {task.priority}
+                               </span>
+                               
+-                              <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border ${efficiency.color}`}>
++                              <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${efficiency.color}`}>
+                                 {efficiency.label}
+                               </span>
+                             </div>
+@@ -993,7 +1042,7 @@ export default function ProjectManagement() {
+                             <select
+                               value={task.status}
+                               onChange={(e) => handleUpdateStatus(task.id, e.target.value as Task['status'])}
+-                              className="text-[9px] font-bold text-gray-400 uppercase tracking-wide bg-transparent border-0 focus:ring-0 outline-none cursor-pointer hover:text-[#4449AA]"
++                              className="text-[10px] font-bold text-gray-400 uppercase tracking-wide bg-transparent border-0 focus:ring-0 outline-none cursor-pointer hover:text-[#4449AA]"
+                             >
+                               <option value="todo">Pendiente</option>
+                               <option value="in_progress">En Progreso</option>
+@@ -1004,31 +1053,31 @@ export default function ProjectManagement() {
+ 
+                           {/* Task Content */}
+                           {task.parent_task_id && (
+-                            <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded-md mb-1.5">
++                            <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-md mb-2">
+                               Subtarea de: {tasks.find(t => t.id === task.parent_task_id)?.title || 'Tarea principal'}
+                             </span>
+                           )}
+                           <h4 
+                             onClick={() => openTaskModal(task)}
+-                            className="font-bold text-[13px] text-gray-800 hover:text-[#4449AA] cursor-pointer line-clamp-2 leading-snug mb-1"
++                            className="font-bold text-sm text-gray-800 hover:text-[#4449AA] cursor-pointer line-clamp-2 leading-snug mb-1.5"
+                           >
+                             {task.title}
+                           </h4>
+                           {task.checklist && task.checklist.length > 0 && (
+-                            <div className="flex items-center gap-1.5 text-[10px] font-semibold text-gray-500 mb-2">
+-                              <CheckCircle2 size={12} className={task.checklist.every(c => c.status === 'passed') ? "text-emerald-500" : "text-indigo-400"} />
++                            <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 mb-2.5">
++                              <CheckCircle2 size={13} className={task.checklist.every(c => c.status === 'passed') ? "text-emerald-500" : "text-indigo-400"} />
+                               <span>{task.checklist.filter(c => c.status === 'passed').length}/{task.checklist.length} pruebas</span>
+                             </div>
+                           )}
+                           {task.description && (
+-                            <p className="text-[11px] text-gray-400 line-clamp-2 leading-relaxed mb-4">
++                            <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed mb-4">
+                               {task.description}
+                             </p>
+                           )}
+ 
+                           {/* Time progress bar */}
+-                          <div className="space-y-1 mb-4">
+-                            <div className="flex justify-between items-center text-[10px]">
++                          <div className="space-y-1.5 mb-4">
++                            <div className="flex justify-between items-center text-xs">
+                               <span className="text-gray-400 font-medium">Uso Horas</span>
+                               <span className="text-gray-700 font-bold">{task.actual_hours.toFixed(1)}h / {task.estimated_hours}h</span>
+                             </div>
+@@ -1045,22 +1094,22 @@ export default function ProjectManagement() {
+                           </div>
+ 
+                           {/* Footer details */}
+-                          <div className="flex items-center justify-between pt-2 border-t border-gray-50">
++                          <div className="flex items-center justify-between pt-2.5 border-t border-gray-100">
+                             {/* Assigned Profile */}
+-                            <div className="flex items-center gap-1.5">
++                            <div className="flex items-center gap-2">
+                               {assigned ? (
+                                 <>
+                                   {assigned.avatar_url ? (
+-                                    <img src={assigned.avatar_url} alt={assigned.full_name} className="w-5 h-5 rounded-full object-cover" />
++                                    <img src={assigned.avatar_url} alt={assigned.full_name} className="w-6 h-6 rounded-full object-cover" />
+                                   ) : (
+-                                    <span className="w-5 h-5 rounded-full bg-[#4449AA]/10 text-[#4449AA] flex items-center justify-center text-[9px] font-bold">
++                                    <span className="w-6 h-6 rounded-full bg-[#4449AA]/10 text-[#4449AA] flex items-center justify-center text-[10px] font-bold">
+                                       {assigned.full_name.charAt(0)}
+                                     </span>
+                                   )}
+-                                  <span className="text-[10px] text-gray-500 font-semibold">{assigned.full_name.split(' ')[0]}</span>
++                                  <span className="text-xs text-gray-500 font-semibold">{assigned.full_name.split(' ')[0]}</span>
+                                 </>
+                               ) : (
+-                                <span className="text-[10px] text-gray-400 flex items-center gap-1"><User size={10} /> Sin asignar</span>
++                                <span className="text-xs text-gray-400 flex items-center gap-1"><User size={11} /> Sin asignar</span>
+                               )}
+                             </div>
+ 
+@@ -1073,15 +1122,15 @@ export default function ProjectManagement() {
+                                     className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-500 transition-colors"
+                                     title="Detener tiempo"
+                                   >
+-                                    <Square size={12} fill="currentColor" />
++                                    <Square size={13} fill="currentColor" />
+                                   </button>
+                                 ) : (
+                                   <button
+-                                    onClick={() => handleUpdateStatus(task.id, 'in_progress')}
++                                    onClick={() => handleStartTimer(task.id)}
+                                     className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-500 transition-colors"
+                                     title="Iniciar tiempo"
+                                   >
+-                                    <Play size={12} fill="currentColor" />
++                                    <Play size={13} fill="currentColor" />
+                                   </button>
+                                 )
+                               )}
+@@ -1090,7 +1139,7 @@ export default function ProjectManagement() {
+                                 className="p-1.5 rounded-lg bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                                 title="Eliminar"
+                               >
+-                                <Trash2 size={12} />
++                                <Trash2 size={13} />
+                               </button>
+                             </div>
+                           </div>
+@@ -1107,17 +1156,17 @@ export default function ProjectManagement() {
+         </section>
+       ) : (
+         /* ── NOTION-STYLE LIST VIEW ── */
+-        <section className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
++        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+           {/* Column Headers */}
+-          <div className="grid grid-cols-[minmax(0,1fr)_120px_140px_90px_100px_100px_110px_80px] border-b border-gray-100 bg-gray-50/60 px-4 py-2.5">
+-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Tarea</span>
+-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Responsable</span>
+-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Estado</span>
+-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Prioridad</span>
+-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Est.</span>
+-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Real</span>
+-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Salud</span>
+-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">⏱</span>
++          <div className="grid grid-cols-[minmax(0,1fr)_130px_150px_100px_90px_90px_110px_95px] border-b border-gray-100 bg-gray-50/60 px-5 py-3">
++            <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Tarea</span>
++            <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Responsable</span>
++            <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Estado</span>
++            <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Prioridad</span>
++            <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Est.</span>
++            <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Real</span>
++            <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest">Salud</span>
++            <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest text-right">⏱</span>
+           </div>
+ 
+           {filteredTasks.length === 0 ? (
+@@ -1156,49 +1205,49 @@ export default function ProjectManagement() {
+               return (
+                 <>
+                   <div
+-                    className={`group grid grid-cols-[minmax(0,1fr)_120px_140px_90px_100px_100px_110px_80px] px-4 py-2.5 border-b border-gray-50 hover:bg-gray-50/60 transition-colors ${isSubtask ? 'bg-gray-50/30' : ''}`}
++                    className={`group grid grid-cols-[minmax(0,1fr)_130px_150px_100px_90px_90px_110px_95px] px-5 py-4 border-b border-gray-50 hover:bg-gray-50/60 transition-colors ${isSubtask ? 'bg-gray-50/30' : ''}`}
+                   >
+                     {/* Task name + expand toggle */}
+-                    <div className={`flex items-center gap-2 min-w-0 ${isSubtask ? 'pl-6' : ''}`}>
++                    <div className={`flex items-center gap-2.5 min-w-0 ${isSubtask ? 'pl-6' : ''}`}>
+                       {/* Checkbox-style completion toggle */}
+                       <button
+                         onClick={() => handleUpdateStatus(task.id, task.status === 'completed' ? 'todo' : 'completed')}
+-                        className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all ${
++                        className={`w-4.5 h-4.5 rounded border flex items-center justify-center shrink-0 transition-all ${
+                           task.status === 'completed'
+                             ? 'bg-emerald-500 border-emerald-500'
+                             : 'border-gray-300 hover:border-[#4449AA]'
+                         }`}
+                       >
+-                        {task.status === 'completed' && <CheckCircle2 size={10} className="text-white" />}
++                        {task.status === 'completed' && <CheckCircle2 size={11} className="text-white" />}
+                       </button>
+ 
+                       {/* Expand chevron for parent tasks */}
+                       {hasChildren && (
+                         <button onClick={() => toggleExpand(task.id)} className="text-gray-400 hover:text-gray-600 shrink-0">
+-                          <ChevronRight size={13} className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
++                          <ChevronRight size={14} className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                         </button>
+                       )}
+-                      {!hasChildren && <span className="w-4 shrink-0" />}
++                      {!hasChildren && <span className="w-4.5 shrink-0" />}
+ 
+                       {/* Title & description */}
+                       <div className="min-w-0">
+                         <button
+                           onClick={() => openTaskModal(task)}
+-                          className={`text-[13px] font-semibold text-left truncate block max-w-full hover:text-[#4449AA] transition-colors ${task.status === 'completed' ? 'line-through text-gray-400' : 'text-gray-800'}`}
++                          className={`text-sm font-bold text-left truncate block max-w-full hover:text-[#4449AA] transition-colors ${task.status === 'completed' ? 'line-through text-gray-400' : 'text-gray-800'}`}
+                         >
+                           {task.title}
+                         </button>
+                         {task.description && !isSubtask && (
+-                          <span className="text-[11px] text-gray-400 line-clamp-1 block leading-tight mt-0.5">{task.description}</span>
++                          <span className="text-xs text-gray-400 line-clamp-1 block leading-tight mt-1">{task.description}</span>
+                         )}
+                         {task.checklist && task.checklist.length > 0 && (
+-                          <div className="flex items-center gap-1 mt-0.5 text-[10px] font-semibold text-gray-400">
+-                            <CheckCircle2 size={10} className={task.checklist.every(c => c.status === 'passed') ? "text-emerald-500" : "text-indigo-400"} />
++                          <div className="flex items-center gap-1 mt-1 text-xs font-semibold text-gray-400">
++                            <CheckCircle2 size={12} className={task.checklist.every(c => c.status === 'passed') ? "text-emerald-500" : "text-indigo-400"} />
+                             {task.checklist.filter(c => c.status === 'passed').length}/{task.checklist.length}
+                           </div>
+                         )}
+                         {/* Progress bar */}
+-                        <div className="w-full h-1 bg-gray-100 rounded-full mt-1 overflow-hidden max-w-[160px]">
++                        <div className="w-full h-1 bg-gray-100 rounded-full mt-1.5 overflow-hidden max-w-[180px]">
+                           <div
+                             className={`h-full rounded-full transition-all ${overBudget ? 'bg-rose-400' : 'bg-emerald-400'}`}
+                             style={{ width: `${pct}%` }}
+@@ -1210,14 +1259,14 @@ export default function ProjectManagement() {
+                     {/* Assigned */}
+                     <div className="flex items-center">
+                       {assigned ? (
+-                        <div className="flex items-center gap-1.5">
+-                          <div className="w-5 h-5 rounded-full bg-[#4449AA]/10 text-[#4449AA] flex items-center justify-center text-[9px] font-black shrink-0">
++                        <div className="flex items-center gap-2">
++                          <div className="w-7 h-7 rounded-full bg-[#4449AA]/10 text-[#4449AA] flex items-center justify-center text-xs font-black shrink-0">
+                             {assigned.full_name.charAt(0)}
+                           </div>
+-                          <span className="text-xs text-gray-600 font-medium truncate">{assigned.full_name.split(' ')[0]}</span>
++                          <span className="text-xs text-gray-600 font-semibold truncate">{assigned.full_name.split(' ')[0]}</span>
+                         </div>
+                       ) : (
+-                        <span className="text-[10px] text-gray-300 flex items-center gap-1"><User size={10} /> —</span>
++                        <span className="text-xs text-gray-300 flex items-center gap-1.5"><User size={12} /> —</span>
+                       )}
+                     </div>
+ 
+@@ -1226,7 +1275,7 @@ export default function ProjectManagement() {
+                       <select
+                         value={task.status}
+                         onChange={e => handleUpdateStatus(task.id, e.target.value as Task['status'])}
+-                        className={`text-[9px] font-black uppercase tracking-wide px-2 py-1 rounded-lg border-0 outline-none cursor-pointer ${sc.bg} ${sc.text}`}
++                        className={`text-[10px] font-black uppercase tracking-wide px-2.5 py-1 rounded-xl border border-gray-200/40 outline-none cursor-pointer ${sc.bg} ${sc.text}`}
+                       >
+                         <option value="todo">Pendiente</option>
+                         <option value="in_progress">En Progreso</option>
+@@ -1237,45 +1286,45 @@ export default function ProjectManagement() {
+ 
+                     {/* Priority */}
+                     <div className="flex items-center">
+-                      <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded ${priorCfg[task.priority] ?? priorCfg.low}`}>
+-                        {task.priority === 'urgent' ? '🔥' : task.priority === 'high' ? '⚡' : task.priority}
++                      <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-xl ${priorCfg[task.priority] ?? priorCfg.low}`}>
++                        {task.priority === 'urgent' ? '🔥 Urg' : task.priority === 'high' ? '⚡ Alt' : task.priority}
+                       </span>
+                     </div>
+ 
+                     {/* Est. */}
+                     <div className="flex items-center">
+-                      <span className="text-[11px] font-semibold text-gray-500">{task.estimated_hours}h</span>
++                      <span className="text-xs font-semibold text-gray-500">{task.estimated_hours}h</span>
+                     </div>
+ 
+                     {/* Real */}
+                     <div className="flex items-center">
+-                      <span className={`text-[11px] font-bold ${overBudget ? 'text-rose-500' : 'text-gray-700'}`}>
++                      <span className={`text-xs font-bold ${overBudget ? 'text-rose-500' : 'text-gray-700'}`}>
+                         {task.actual_hours.toFixed(1)}h
+                       </span>
+                     </div>
+ 
+                     {/* Health badge */}
+                     <div className="flex items-center">
+-                      <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border ${health.color}`}>
++                      <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-xl border ${health.color}`}>
+                         {health.label}
+                       </span>
+                     </div>
+ 
+                     {/* Timer action */}
+-                    <div className="flex items-center justify-end gap-1">
++                    <div className="flex items-center justify-end gap-1.5">
+                       {task.status !== 'completed' && (
+                         activeTimerTaskId === task.id ? (
+-                          <button onClick={() => handleStopTimer(task.id)} className="p-1 rounded bg-rose-50 text-rose-500 hover:bg-rose-100 transition-colors" title="Detener">
+-                            <Square size={11} fill="currentColor" />
++                          <button onClick={() => handleStopTimer(task.id)} className="p-1.5 rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100 transition-colors" title="Detener">
++                            <Square size={13} fill="currentColor" />
+                           </button>
+                         ) : (
+-                          <button onClick={() => handleStartTimer(task.id)} className="p-1 rounded bg-emerald-50 text-emerald-500 hover:bg-emerald-100 transition-colors opacity-0 group-hover:opacity-100" title="Iniciar">
+-                            <Play size={11} fill="currentColor" />
++                          <button onClick={() => handleStartTimer(task.id)} className="p-1.5 rounded-lg bg-emerald-50 text-emerald-500 hover:bg-emerald-100 transition-colors opacity-0 group-hover:opacity-100" title="Iniciar">
++                            <Play size={13} fill="currentColor" />
+                           </button>
+                         )
+                       )}
+-                      <button onClick={() => openTaskModal(task)} className="p-1 rounded text-gray-300 hover:text-gray-600 hover:bg-gray-100 transition-colors opacity-0 group-hover:opacity-100" title="Editar">
+-                        <Plus size={11} className="rotate-45" />
++                      <button onClick={() => openTaskModal(task)} className="p-1.5 rounded-lg text-gray-300 hover:text-gray-600 hover:bg-gray-100 transition-colors opacity-0 group-hover:opacity-100" title="Editar">
++                        <Plus size={13} className="rotate-45" />
+                       </button>
+                     </div>
+                   </div>
+@@ -1287,12 +1336,12 @@ export default function ProjectManagement() {
+ 
+                   {/* Add subtask row */}
+                   {isExpanded && !isSubtask && (
+-                    <div className="pl-14 pr-4 py-1.5 border-b border-gray-50 bg-gray-50/20">
++                    <div className="pl-16 pr-5 py-2.5 border-b border-gray-50 bg-gray-50/20">
+                       <button
+                         onClick={() => openTaskModal(null, task.id)}
+-                        className="flex items-center gap-1.5 text-[11px] text-gray-400 hover:text-[#4449AA] font-bold transition-colors"
++                        className="flex items-center gap-2 text-xs text-gray-400 hover:text-[#4449AA] font-bold transition-colors"
+                       >
+-                        <Plus size={10} /> Agregar subtarea
++                        <Plus size={12} /> Agregar subtarea
+                       </button>
+                     </div>
+                   )}
+@@ -1355,7 +1404,7 @@ export default function ProjectManagement() {
+           />
+           
+           {/* Panel */}
+-          <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
++          <div className="relative w-full max-w-xl bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+             {/* Premium Dark Header */}
+             <div className="bg-[#26285A] text-white shrink-0 shadow-sm relative z-10">
+                <div className="flex items-start justify-between px-6 pt-6 pb-4">
