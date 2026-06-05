@@ -225,7 +225,12 @@ export const pdfService = {
             doc.text((cotizacion.plan_nombre || 'PLAN').toUpperCase(), sX + 32.5, sY + 5, { align: 'center' });
             doc.setTextColor(100, 116, 139);
             doc.setFontSize(6);
-            doc.text(`${(cotizacion.volumen_dtes || 0).toLocaleString()} DTEs/año`, sX + 32.5, sY + 10, { align: 'center' });
+            // Solo mostrar DTEs/año si el tenant usa volumen DTE (facturación electrónica)
+            if ((cotizacion.volumen_dtes || 0) > 0) {
+                doc.setTextColor(100, 116, 139);
+                doc.setFontSize(6);
+                doc.text(`${(cotizacion.volumen_dtes || 0).toLocaleString()} DTEs/año`, sX + 32.5, sY + 10, { align: 'center' });
+            }
 
             currentY = Math.max(currentY + 15, sY + 25);
 
