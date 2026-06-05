@@ -367,9 +367,15 @@ export default function OnboardingWizard() {
     try {
       const { error } = await supabase
         .from('companies')
-        .update({ name: companyData.companyName })
+        .update({
+          name: companyData.companyName,
+          industry: companyData.industry || null,
+          country: companyData.country || null,
+        })
         .eq('id', profile.company_id);
       if (error) throw error;
+      // Notify Sidebar to reload company name immediately
+      window.dispatchEvent(new CustomEvent('company-branding-updated'));
     } catch {
       toast.error('No se pudo guardar el nombre. Continúa y edítalo después.');
     } finally {
