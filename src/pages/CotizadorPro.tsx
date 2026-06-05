@@ -315,10 +315,28 @@ export default function CotizadorPro() {
 
     const calcularTotales = () => {
         const paqueteSeleccionado = paquetes.find(p => p.id === formData.paquete_id);
-        if (!paqueteSeleccionado) {
+        // Paquete es OPCIONAL: si no hay paquete pero sí hay módulos/servicios, calcular igual
+        // usando un paquete vacío (precio 0) como base.
+        const tieneItems = formData.modulos_ids.length > 0 || formData.servicios_ids.length > 0;
+        if (!paqueteSeleccionado && !tieneItems) {
             setTotales(null);
             return;
         }
+        // Si no hay paquete, usar un paquete ficticio con precio 0
+        const paqueteBase: CotizadorPaquete = paqueteSeleccionado ?? {
+            id: '__items_only__',
+            company_id: profile?.company_id ?? null,
+            paquete: 'Personalizado',
+            cantidad_dtes: 0,
+            costo_paquete_anual: 0,
+            costo_paquete_mensual: 0,
+            costo_implementacion: 0,
+            orden: 0,
+            activo: true,
+            metadata: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
 
         const itemsSeleccionados = [
             ...modulos.filter(m => formData.modulos_ids.includes(m.id)),
@@ -345,7 +363,7 @@ export default function CotizadorPro() {
 
         // Aplicar override de paquete (precio del plan) y/o implementación
         const packageWithOverride = {
-            ...paqueteSeleccionado,
+            ...paqueteBase,
             ...(paqueteOverride !== null ? { costo_paquete_anual: paqueteOverride } : {}),
             ...(implementationOverride !== null ? { costo_implementacion: implementationOverride } : {})
         };
@@ -379,10 +397,10 @@ export default function CotizadorPro() {
             toast.error('Ingresa el nombre del cliente');
             return;
         }
-        if (pasoActual === 2 && !formData.paquete_id) {
-            toast.error('Selecciona un paquete');
-            return;
-        }
+        // Paso 2: Paquete es OPCIONAL — si no hay paquetes configurados o el tenant no usa paquetes,
+        // puede avanzar directamente a agregar módulos/servicios individuales.
+        // Solo bloquear si hay paquetes disponibles y el tenant no ha seleccionado ninguno.
+        // Sin paquetes = cotización basada en ítems individuales (servicios/productos).
 
         if (pasoActual < 4) {
             setPasoActual(pasoActual + 1);
@@ -415,11 +433,8 @@ export default function CotizadorPro() {
 
     const handleGenerar = async () => {
         try {
-            const paqueteSeleccionado = paquetes.find(p => p.id === formData.paquete_id);
-            if (!paqueteSeleccionado) {
-                toast.error('Debe seleccionar un paquete');
-                return;
-            }
+            const paqueteSeleccionado = paquetes.find(p => p.id === formData.paquete_id) || null;
+            // Paquete es OPCIONAL — cotización puede basarse solo en módulos/servicios individuales
 
             if (!formData.cliente_nombre) {
                 toast.error('Debe ingresar el nombre del cliente');
@@ -495,10 +510,11 @@ export default function CotizadorPro() {
                 telefono_cliente: formData.cliente_telefono,
                 direccion_cliente: formData.cliente_direccion,
                 volumen_dtes: formData.volumen_dtes,
-                plan_nombre: paqueteSeleccionado.paquete,
-                costo_plan_anual: paqueteOverride ?? paqueteSeleccionado.costo_paquete_anual,
-                costo_plan_mensual: paqueteSeleccionado.costo_paquete_mensual,
-                costo_implementacion: formData.incluir_implementacion
+                // Si no hay paquete seleccionado, usar nombre genérico basado en ítems
+                plan_nombre: paqueteSeleccionado?.paquete || 'Cotización Personalizada',
+                costo_plan_anual: paqueteSeleccionado ? (paqueteOverride ?? paqueteSeleccionado.costo_paquete_anual) : 0,
+                costo_plan_mensual: paqueteSeleccionado?.costo_paquete_mensual ?? 0,
+                costo_implementacion: paqueteSeleccionado && formData.incluir_implementacion
                     ? (implementationOverride ?? paqueteSeleccionado.costo_implementacion)
                     : 0,
                 modulos_adicionales: todosLosItems,
@@ -606,7 +622,7 @@ export default function CotizadorPro() {
                 {/* Header — compact on mobile */}
                 <div>
                     <h1 className="text-lg sm:text-2xl font-extrabold text-[#4449AA]">📋 Nueva Cotización</h1>
-                    <p className="text-xs sm:text-sm text-gray-400 mt-0.5">Sistema dinámico basado en paquetes</p>
+                    <p className="text-xs sm:text-sm text-gray-400 mt-0.5">Sistema de cotización profesional — Servicios, Productos y Paquetes</p>
                 </div>
 
                 {/* ── Indicador de Pasos: Progressive Compact ── */}
@@ -779,15 +795,36 @@ export default function CotizadorPro() {
                         </div>
                     )}
 
-                    {/* PASO 2: Paquete */}
+                    {/* PASO 2: Paquete (Opcional) */}
                     {pasoActual === 2 && (
                         <div className="space-y-4">
-                            <h2 className="text-lg font-bold text-[#4449AA]">Seleccionar Paquete Base</h2>
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <h2 className="text-lg font-bold text-[#4449AA]">Seleccionar Paquete Base</h2>
+                                    <p className="text-xs text-gray-400 mt-0.5">Opcional — puedes cotizar solo con servicios o productos individuales</p>
+                                </div>
+                                {formData.paquete_id && (
+                                    <button
+                                        onClick={() => setFormData(prev => ({ ...prev, paquete_id: '' }))}
+                                        className="text-xs text-gray-400 hover:text-red-500 transition-colors shrink-0 flex items-center gap-1"
+                                    >
+                                        <X className="w-3 h-3" /> Quitar selección
+                                    </button>
+                                )}
+                            </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {paquetes.length === 0 ? (
-                                    <div className="col-span-full py-10 text-center bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                                        <p className="text-gray-500 font-medium">No se encontraron paquetes.</p>
+                                    <div className="col-span-full py-10 text-center bg-indigo-50 rounded-2xl border-2 border-dashed border-indigo-200">
+                                        <Package className="w-10 h-10 text-indigo-300 mx-auto mb-3" />
+                                        <p className="text-gray-700 font-bold mb-1">Sin paquetes configurados</p>
+                                        <p className="text-sm text-gray-500 mb-4">No hay problema — puedes agregar servicios y productos individuales en el siguiente paso.</p>
+                                        <button
+                                            onClick={handleSiguiente}
+                                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#4449AA] text-white text-sm font-bold rounded-xl shadow-md hover:bg-[#3a3f99] transition-all"
+                                        >
+                                            Continuar sin paquete <ArrowRight className="w-4 h-4" />
+                                        </button>
                                     </div>
                                 ) : (
                                     paquetes.map((paquete) => (
