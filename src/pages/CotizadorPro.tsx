@@ -81,6 +81,8 @@ export default function CotizadorPro() {
     // Estados para edición de etiqueta inline
     const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
     const [tempLabelValue, setTempLabelValue] = useState<string>('');
+    // Cantidades por ítem (para modelos por_hora, por_unidad)
+    const [itemQtys, setItemQtys] = useState<Record<string, number>>({});
 
     // Permisos de Cotizaciones — controlados desde Matriz de Seguridad (Roles y Permisos).
     // super_admin y company_admin tienen estos permisos habilitados por defecto vía migration.
@@ -216,6 +218,7 @@ export default function CotizadorPro() {
         formData.iva_porcentaje,
         formData.recargo_mensual_porcentaje,
         overrides,
+        itemQtys,
         implementationOverride,
         paqueteOverride,
         selectedPlanId,
@@ -392,22 +395,38 @@ export default function CotizadorPro() {
         setTotales(cotizacion);
     };
 
+    // —————————————————————————————————————————————————————
+    // WIZARD INTELIGENTE: Paso 2 (Paquete) es OPCIONAL.
+    // Si el tenant no tiene paquetes configurados, se salta automáticamente 1 → 3 → 4.
+    // Si el tenant tiene paquetes, el flujo es normal: 1 → 2 → 3 → 4.
+    // —————————————————————————————————————————————————————
+    const tienePaquetes = paquetes.length > 0;
+
     const handleSiguiente = () => {
         if (pasoActual === 1 && !formData.cliente_nombre) {
             toast.error('Ingresa el nombre del cliente');
             return;
         }
-        // Paso 2: Paquete es OPCIONAL — si no hay paquetes configurados o el tenant no usa paquetes,
-        // puede avanzar directamente a agregar módulos/servicios individuales.
-        // Solo bloquear si hay paquetes disponibles y el tenant no ha seleccionado ninguno.
-        // Sin paquetes = cotización basada en ítems individuales (servicios/productos).
-
+        // Auto-skip Paso 2 si el tenant no usa paquetes
+        if (pasoActual === 1 && !tienePaquetes) {
+            setPasoActual(3);
+            return;
+        }
+        if (pasoActual === 2 && !tienePaquetes) {
+            setPasoActual(3);
+            return;
+        }
         if (pasoActual < 4) {
             setPasoActual(pasoActual + 1);
         }
     };
 
     const handleAnterior = () => {
+        // Al retroceder desde Paso 3 sin paquetes, volver directo a Paso 1
+        if (pasoActual === 3 && !tienePaquetes) {
+            setPasoActual(1);
+            return;
+        }
         if (pasoActual > 1) {
             setPasoActual(pasoActual - 1);
         }
@@ -628,13 +647,15 @@ export default function CotizadorPro() {
                 {/* ── Indicador de Pasos: Progressive Compact ── */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-4 py-5">
                     <div className="flex items-center w-full">
-                        {[1, 2, 3, 4].map((paso) => {
-                            const LABELS: Record<number, string> = { 1: 'Cliente', 2: 'Paquete', 3: 'Módulos', 4: 'Resumen' };
-                            const isCompleted = paso < pasoActual;
+                        {/* Si no tiene paquetes: mostrar 3 pasos en lugar de 4 */}
+                        {(tienePaquetes ? [1, 2, 3, 4] : [1, 3, 4]).map((paso, idx, arr) => {
+                            const LABELS: Record<number, string> = { 1: 'Cliente', 2: 'Paquete', 3: 'Ítems', 4: 'Resumen' };
+                            const visualIndex = idx + 1;
+                            const isCompleted = pasoActual > paso;
                             const isActive = paso === pasoActual;
 
                             return (
-                                <div key={paso} className={`flex items-center ${paso < 4 ? 'flex-1' : ''}`}>
+                                <div key={paso} className={`flex items-center ${idx < arr.length - 1 ? 'flex-1' : ''}`}>
                                     {/* ── Step node ── */}
                                     {isCompleted ? (
                                         // Completed → micro checkmark
@@ -646,20 +667,20 @@ export default function CotizadorPro() {
                                     ) : isActive ? (
                                         // Active → branded pill with label
                                         <div className="flex-shrink-0 flex items-center gap-1.5 bg-[#4449AA] text-white px-3 py-1.5 rounded-full shadow-md shadow-[#4449AA]/25 transition-all duration-500">
-                                            <span className="text-[11px] font-black w-4 h-4 bg-white/20 rounded-full flex items-center justify-center leading-none">{paso}</span>
+                                            <span className="text-[11px] font-black w-4 h-4 bg-white/20 rounded-full flex items-center justify-center leading-none">{visualIndex}</span>
                                             <span className="text-[11px] font-black tracking-wide">{LABELS[paso]}</span>
                                         </div>
                                     ) : (
                                         // Future → small circle + mini label
                                         <div className="flex-shrink-0 flex flex-col items-center gap-0.5">
                                             <div className="w-7 h-7 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center transition-all duration-300">
-                                                <span className="text-xs font-bold text-gray-400">{paso}</span>
+                                                <span className="text-xs font-bold text-gray-400">{visualIndex}</span>
                                             </div>
                                         </div>
                                     )}
 
                                     {/* ── Connecting line ── */}
-                                    {paso < 4 && (
+                                    {idx < arr.length - 1 && (
                                         <div className="flex-1 mx-2 h-[2px] bg-gray-100 relative overflow-hidden rounded-full">
                                             <div
                                                 className="absolute inset-y-0 left-0 bg-[#4449AA] rounded-full transition-all duration-700 ease-out"
@@ -872,12 +893,21 @@ export default function CotizadorPro() {
                                 ? formData.modulos_ids.includes(item.id)
                                 : formData.servicios_ids.includes(item.id);
                             const toggle = isModulo ? () => toggleModulo(item.id) : () => toggleServicio(item.id);
-                            const defaultPrice = item.precio_por_dte > 0
-                                ? (formData.volumen_dtes * item.precio_por_dte)
-                                : (item.pago_unico > 0 ? item.pago_unico : item.precio_anual);
-                            const currentPrice = overrides[item.id] ?? defaultPrice;
                             const modelo = (item as any).modelo_precio || (item.pago_unico > 0 ? 'precio_fijo' : 'suscripcion_anual');
                             const meta = MODELO_LABELS[modelo] || MODELO_LABELS.precio_fijo;
+                            const needsQty = modelo === 'por_hora' || modelo === 'por_unidad';
+                            const qty = itemQtys[item.id] ?? 1;
+                            // Precio base por unidad/hora
+                            const baseUnitPrice = item.precio_por_dte > 0
+                                ? item.precio_por_dte
+                                : (item.precio_mensual > 0 ? item.precio_mensual : (item.pago_unico > 0 ? item.pago_unico : item.precio_anual));
+                            const defaultPrice = item.precio_por_dte > 0
+                                ? (formData.volumen_dtes * item.precio_por_dte)
+                                : needsQty
+                                    ? baseUnitPrice * qty
+                                    : (item.pago_unico > 0 ? item.pago_unico : item.precio_anual);
+                            const currentPrice = overrides[item.id] ?? defaultPrice;
+                            const unitLabel = modelo === 'por_hora' ? 'hr' : modelo === 'por_unidad' ? 'und' : '';
 
                             return (
                                 <div
@@ -911,9 +941,32 @@ export default function CotizadorPro() {
                                         </div>
                                     </div>
 
-                                    {/* Precio editable */}
+                                    {/* Precio + Cantidad (para por_hora / por_unidad) */}
                                     <div className="flex items-center gap-2 flex-shrink-0 ml-4" onClick={e => e.stopPropagation()}>
-                                        {isSelected && canEditPrices ? (
+                                        {isSelected && needsQty ? (
+                                            /* Modo cantidad: qty × base_price */
+                                            <div className="flex flex-col items-end gap-1">
+                                                <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1">
+                                                    <input
+                                                        type="number"
+                                                        min={1}
+                                                        className="w-12 text-center font-black text-amber-700 bg-transparent outline-none text-sm"
+                                                        value={qty}
+                                                        onChange={e => {
+                                                            const newQty = Math.max(1, Number(e.target.value));
+                                                            setItemQtys(prev => ({ ...prev, [item.id]: newQty }));
+                                                            // Actualizar override con precio × nueva cantidad
+                                                            setOverrides(prev => ({ ...prev, [item.id]: baseUnitPrice * newQty }));
+                                                        }}
+                                                    />
+                                                    <span className="text-[10px] text-amber-500 font-bold">{unitLabel}</span>
+                                                </div>
+                                                <p className="text-sm font-black text-[#4449AA]">
+                                                    ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                                </p>
+                                                <p className="text-[10px] text-gray-400">${baseUnitPrice}/{unitLabel}</p>
+                                            </div>
+                                        ) : isSelected && canEditPrices ? (
                                             <div className="flex items-center gap-1">
                                                 <span className="text-xs text-gray-400 font-bold">$</span>
                                                 <input
@@ -935,7 +988,7 @@ export default function CotizadorPro() {
                                                     <p className="text-[10px] text-gray-400">{formData.volumen_dtes} × ${item.precio_por_dte}</p>
                                                 )}
                                                 <p className="text-[10px] text-gray-400">
-                                                    {item.pago_unico > 0 ? 'Pago único' : item.precio_por_dte > 0 ? 'Por volumen' : '/año'}
+                                                    {needsQty ? `por ${unitLabel}` : item.pago_unico > 0 ? 'Pago único' : item.precio_por_dte > 0 ? 'Por volumen' : '/año'}
                                                 </p>
                                             </div>
                                         )}
