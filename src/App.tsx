@@ -141,23 +141,25 @@ function NewAdminOnboardingGuard() {
   const location = useLocation();
 
   useEffect(() => {
-    // Only trigger for company_admin, not super_admin or collaborators
+    // ⛔ super_admin NEVER goes to onboarding — they use Admin → Companies panel
     if (profile?.role !== 'company_admin') return;
     // Skip if already in onboarding
     if (location.pathname === '/onboarding') return;
-    // Skip if user has been around for more than 2 hours
+    // Skip if user has been around for more than 6 hours (not brand new)
     const createdAt = new Date(profile.created_at).getTime();
-    const twoHoursAgo = Date.now() - 2 * 60 * 60 * 1000;
-    if (createdAt < twoHoursAgo) return;
+    const sixHoursAgo = Date.now() - 6 * 60 * 60 * 1000;
+    if (createdAt < sixHoursAgo) return;
 
-    // Check if company has a logo (indicates onboarding was completed)
+    // Check if company name has been set (indicates onboarding was completed)
+    // Logo is optional — don't gate on it
     supabase
       .from('companies')
-      .select('logo_url')
+      .select('name, logo_url, industry')
       .eq('id', profile.company_id)
       .single()
       .then(({ data }) => {
-        if (!data?.logo_url) {
+        // If company has no industry set, it hasn't been through onboarding yet
+        if (!data?.industry) {
           navigate('/onboarding', { replace: true });
         }
       });
