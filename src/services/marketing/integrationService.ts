@@ -3,11 +3,15 @@ import { supabase } from '../supabase';
 export interface MarketingIntegration {
     id: string;
     company_id: string;
-    provider: 'openai' | 'telegram'; // Solo soportamos estos 2 por ahora
+    provider: 'openai' | 'telegram' | 'whatsapp' | 'resend' | 'gmail' | 'outlook' | 'twilio' | 'meta';
     name?: string; // Optional if not in DB
     credentials: {
         apiKey?: string;
         token?: string;
+        phoneNumberId?: string;
+        senderName?: string;
+        senderEmail?: string;
+        alertChatId?: string;
     };
     is_active: boolean;
 }

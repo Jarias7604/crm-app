@@ -33,7 +33,14 @@ export default function MarketingSettings() {
         try {
             if (!profile?.company_id) return;
             const data = await integrationService.getIntegrations(profile.company_id);
-            setIntegrations(data);
+            // Mapear el proveedor 'whatsapp' de la DB al proveedor 'meta' para la UI
+            const mappedData = data.map(item => {
+                if (item.provider === ('whatsapp' as any)) {
+                    return { ...item, provider: 'meta' as any };
+                }
+                return item;
+            });
+            setIntegrations(mappedData);
         } catch (error) {
             console.error(error);
             toast.error('Error cargando configuraciones');
