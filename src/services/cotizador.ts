@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { simGuard } from './simGuard';
 
 // =====================================================
 // TIPOS
@@ -108,6 +109,10 @@ class CotizadorService {
             query = query.eq('activo', true);
         }
 
+        // En modo simulación, filtrar por empresa simulada O ítems globales (company_id IS NULL)
+        // Fuera de simulación, el RLS lo maneja automáticamente
+        query = simGuard(query);
+
         const { data, error } = await query;
 
         if (error) throw error;
@@ -183,6 +188,9 @@ class CotizadorService {
         if (!incluirInactivos) {
             query = query.eq('activo', true);
         }
+
+        // En modo simulación, filtrar por empresa simulada
+        query = simGuard(query);
 
         const { data, error } = await query;
 

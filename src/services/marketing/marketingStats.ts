@@ -1,5 +1,5 @@
 import { supabase } from '../supabase';
-import { simGuard } from '../simGuard';
+import { simGuard, getSimulatedCompanyId } from '../simGuard';
 
 export interface MarketingStats {
     totalImpacts: number;
@@ -49,13 +49,18 @@ export const marketingStatsService = {
 
         let totalRecipients = 0;
         if (campaignId) {
-            // For a single campaign, get real-time sent count from marketing_messages
-            const { count } = await simGuard(
-                supabase
-                    .from('marketing_messages')
-                    .select('id', { count: 'exact', head: true })
-                    .eq('metadata->>campaign_id', campaignId)
-            );
+            // For a single campaign, get real-time sent count from marketing_messages scoped to tenant
+            let msgQuery = supabase
+                .from('marketing_messages')
+                .select('id, marketing_conversations!inner(company_id)', { count: 'exact', head: true })
+                .eq('metadata->>campaign_id', campaignId);
+            
+            const simId = getSimulatedCompanyId();
+            if (simId) {
+                msgQuery = msgQuery.eq('marketing_conversations.company_id', simId);
+            }
+            
+            const { count } = await msgQuery;
             totalRecipients = count || campaigns?.[0]?.total_recipients || 0;
         } else {
             totalRecipients = campaigns?.reduce((acc, c) => acc + (c.total_recipients || 0), 0) || 0;
@@ -64,12 +69,17 @@ export const marketingStatsService = {
         // Get leads associated with this campaign (if campaignId is provided)
         let eligibleLeadIds: string[] = [];
         if (campaignId) {
-            const { data: campaignMsgs } = await simGuard(
-                supabase
-                    .from('marketing_messages')
-                    .select('metadata')
-                    .eq('metadata->>campaign_id', campaignId)
-            );
+            let msgQuery = supabase
+                .from('marketing_messages')
+                .select('metadata, marketing_conversations!inner(company_id)')
+                .eq('metadata->>campaign_id', campaignId);
+            
+            const simId = getSimulatedCompanyId();
+            if (simId) {
+                msgQuery = msgQuery.eq('marketing_conversations.company_id', simId);
+            }
+
+            const { data: campaignMsgs } = await msgQuery;
             
             const ids = (campaignMsgs || []).map(m => (m.metadata as any)?.lead_id).filter(Boolean);
             eligibleLeadIds = Array.from(new Set(ids)) as string[];
@@ -127,12 +137,16 @@ export const marketingStatsService = {
     async getHeatmapLeads(campaignId?: string): Promise<HeatmapLead[]> {
         try {
             // 1. Get real data from marketing_messages
-            let query = simGuard(
-                supabase
-                    .from('marketing_messages')
-                    .select('metadata, status')
-            ).order('created_at', { ascending: false })
-             .limit(1000);
+            let query = supabase
+                .from('marketing_messages')
+                .select('metadata, status, marketing_conversations!inner(company_id)');
+
+            const simId = getSimulatedCompanyId();
+            if (simId) {
+                query = query.eq('marketing_conversations.company_id', simId);
+            }
+
+            query = query.order('created_at', { ascending: false }).limit(1000);
 
             if (campaignId) {
                 query = query.eq('metadata->>campaign_id', campaignId);

@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { simGuard } from '../simGuard';
 
 export interface ChatConversation {
     id: string;
@@ -86,13 +87,14 @@ export const chatService = {
     },
 
     async getConversations() {
-        // RLS handles company filtering automatically
-        const { data, error } = await supabase
+        let query = supabase
             .from('marketing_conversations')
             .select(`
                 *,
                 lead:leads(id, name, email, company_name, phone, company_id)
-            `)
+            `);
+
+        const { data, error } = await simGuard(query)
             .order('last_message_at', { ascending: false });
 
         if (error) throw error;

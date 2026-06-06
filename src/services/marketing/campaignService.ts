@@ -1,5 +1,5 @@
 import { supabase } from '../supabase';
-import { simGuard } from '../simGuard';
+import { simGuard, getSimulatedCompanyId } from '../simGuard';
 
 export interface Campaign {
     id: string;
@@ -33,10 +33,18 @@ export const campaignService = {
         if (error) throw error;
 
         // Fetch real-time stats from marketing_messages — scoped to same tenant
-        const { data: messages } = await simGuard(
-            supabase.from('marketing_messages').select('status, metadata')
-        ).order('created_at', { ascending: false })
-         .limit(5000);
+        let msgQuery = supabase
+            .from('marketing_messages')
+            .select('status, metadata, marketing_conversations!inner(company_id)');
+        
+        const simId = getSimulatedCompanyId();
+        if (simId) {
+            msgQuery = msgQuery.eq('marketing_conversations.company_id', simId);
+        }
+        
+        const { data: messages } = await msgQuery
+            .order('created_at', { ascending: false })
+            .limit(5000);
 
         // Aggregate stats by campaign_id
         const realStats: Record<string, { sent: number, opened: number, clicked: number }> = {};
@@ -76,9 +84,17 @@ export const campaignService = {
         const campaign = c as Campaign;
 
         // Fetch real-time stats for this campaign — scoped to same tenant
-        const { data: messages } = await simGuard(
-            supabase.from('marketing_messages').select('status')
-        ).eq('metadata->>campaign_id', id);
+        let msgQuery = supabase
+            .from('marketing_messages')
+            .select('status, marketing_conversations!inner(company_id)')
+            .eq('metadata->>campaign_id', id);
+        
+        const simId = getSimulatedCompanyId();
+        if (simId) {
+            msgQuery = msgQuery.eq('marketing_conversations.company_id', simId);
+        }
+        
+        const { data: messages } = await msgQuery;
 
         if (messages) {
             campaign.stats = {
@@ -215,10 +231,17 @@ export const campaignService = {
      */
     async getCampaignRecipients(campaignId: string) {
         // 1. Fetch all messages belonging to this campaign — scoped to active tenant
-        const { data: messages, error } = await simGuard(
-            supabase.from('marketing_messages').select('metadata, status, sent_at, created_at')
-        ).eq('metadata->>campaign_id', campaignId)
-         .order('created_at', { ascending: false });
+        let msgQuery = supabase
+            .from('marketing_messages')
+            .select('metadata, status, sent_at, created_at, marketing_conversations!inner(company_id)')
+            .eq('metadata->>campaign_id', campaignId);
+        
+        const simId = getSimulatedCompanyId();
+        if (simId) {
+            msgQuery = msgQuery.eq('marketing_conversations.company_id', simId);
+        }
+        
+        const { data: messages, error } = await msgQuery.order('created_at', { ascending: false });
 
         if (error) throw error;
 

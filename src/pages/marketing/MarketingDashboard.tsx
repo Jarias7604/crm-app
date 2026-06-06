@@ -18,6 +18,7 @@ import { useState, useEffect } from 'react';
 import { marketingStatsService, type MarketingStats, type HeatmapLead, type ActiveCampaign } from '../../services/marketing/marketingStats';
 import { cn } from '../../lib/utils';
 import { supabase } from '../../services/supabase';
+import { simGuard } from '../../services/simGuard';
 
 
 export default function MarketingDashboard() {
@@ -39,7 +40,7 @@ export default function MarketingDashboard() {
                     marketingStatsService.getOverviewStats(),
                     marketingStatsService.getHeatmapLeads(),
                     marketingStatsService.getActiveCampaign(),
-                    supabase.from('marketing_campaigns').select('id, name').order('created_at', { ascending: false })
+                    simGuard(supabase.from('marketing_campaigns').select('id, name')).order('created_at', { ascending: false })
                 ]);
                 setStats(s);
                 setHeatmapLeads(h);
