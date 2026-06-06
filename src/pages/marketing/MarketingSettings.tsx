@@ -432,12 +432,13 @@ function ProviderButton({ icon: Icon, color, title, desc, onClick }: any) {
     );
 }
 
-function InputBlock({ label, type, value, onChange, placeholder, hint, required = true }: any) {
+function InputBlock({ label, type, value, onChange, placeholder, hint, required = true, autoComplete }: any) {
     return (
         <div>
             <label className="block text-sm font-bold text-gray-700 mb-2">{label}</label>
             <input
                 type={type}
+                autoComplete={autoComplete || (type === 'password' ? 'new-password' : 'off')}
                 className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-medium"
                 placeholder={placeholder}
                 required={required}
