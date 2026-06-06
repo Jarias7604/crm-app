@@ -49,25 +49,11 @@ export interface RecommendIdeasParams {
 
 export const flyerService = {
   async recommendIdeas(params: RecommendIdeasParams): Promise<FlyerIdea[]> {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw new Error('No autenticado');
-    const res = await fetch(
-      `https://ikofyypxphrqkncimszt.supabase.co/functions/v1/flyer-recommend`,
-      { 
-        method: 'POST', 
-        headers: { 
-          'Content-Type': 'application/json', 
-          Authorization: `Bearer ${session.access_token}` 
-        }, 
-        body: JSON.stringify(params) 
-      }
-    );
-    if (!res.ok) { 
-      const err = await res.json().catch(() => ({ error: res.statusText })); 
-      throw new Error(err.error || 'Error al obtener ideas'); 
-    }
-    const data = await res.json();
-    return (data.ideas || []) as FlyerIdea[];
+    const { data, error } = await supabase.functions.invoke('flyer-recommend', {
+      body: params
+    });
+    if (error) throw new Error(error.message || 'Error al obtener ideas');
+    return (data?.ideas || []) as FlyerIdea[];
   },
 
   async listFlyers(companyId: string, limit = 20): Promise<FlyerAsset[]> {

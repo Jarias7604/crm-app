@@ -17,27 +17,27 @@ GOOGLE_PLACES_API_KEY=AIzaSyC85B9gJA5QT6glExecwxttKlQYNZrteF8
 
 **Cómo verificar que está configurado:**
 ```bash
-npx supabase secrets list --project-ref ikofyypxphrqkncimszt
+npx supabase secrets list --project-ref mtxqqamitglhehaktgxm
 ```
 
 **Cómo configurarlo si falta:**
 ```bash
-npx supabase secrets set GOOGLE_PLACES_API_KEY=AIzaSyC85B9gJA5QT6glExecwxttKlQYNZrteF8 --project-ref ikofyypxphrqkncimszt
+npx supabase secrets set GOOGLE_PLACES_API_KEY=AIzaSyC85B9gJA5QT6glExecwxttKlQYNZrteF8 --project-ref mtxqqamitglhehaktgxm
 ```
 
 ## ✅ Checklist ANTES de Deploy
 
-- [ ] Verificar secretos: `npx supabase secrets list --project-ref ikofyypxphrqkncimszt`
+- [ ] Verificar secretos: `npx supabase secrets list --project-ref mtxqqamitglhehaktgxm`
 - [ ] Si falta alguno, configurar con comando de arriba
-- [ ] Deploy function: `npx supabase functions deploy [nombre] --project-ref ikofyypxphrqkncimszt`
+- [ ] Deploy function: `npx supabase functions deploy [nombre] --project-ref mtxqqamitglhehaktgxm`
 - [ ] Verificar logs en Supabase Dashboard
 - [ ] Probar manualmente en producción
 
 ## 🆘 Si algo deja de funcionar
 
-1. Ejecutar: `npx supabase secrets list --project-ref ikofyypxphrqkncimszt`
+1. Ejecutar: `npx supabase secrets list --project-ref mtxqqamitglhehaktgxm`
 2. Si NO aparece `GOOGLE_PLACES_API_KEY`, ejecutar el comando de configuración de arriba
-3. Redeploy: `npx supabase functions deploy search-businesses --project-ref ikofyypxphrqkncimszt`
+3. Redeploy: `npx supabase functions deploy search-businesses --project-ref mtxqqamitglhehaktgxm`
 4. Probar en https://crm-app-v2.vercel.app/marketing/lead-hunter
 
 ---

@@ -25,11 +25,16 @@ export const leadsService = {
 
     // Get leads with lightweight payload (optimized for List/Kanban views)
     // PROTECTED by safeSelect — if ANY column is missing, auto-fallback to SELECT *
-    async getLeads(page = 1, pageSize = 1000) {
+    async getLeads(page = 1, pageSize = 1000, companyId?: string) {
         const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date, contact_count, closing_amount, address, lost_reason_id, lost_at_stage, lost_notes, next_action_notes';
 
         const from = (page - 1) * pageSize;
         const to = from + pageSize - 1;
+
+        const resolvedCompanyId = companyId || (await this.getActiveCompanyId());
+        const filters = resolvedCompanyId
+            ? [{ column: 'company_id', op: 'eq' as const, value: resolvedCompanyId }]
+            : [];
 
         const result = await safeSelect<Lead>({
             table: 'leads',
@@ -39,6 +44,7 @@ export const leadsService = {
             orderAsc: false,
             rangeFrom: from,
             rangeTo: to,
+            filters,
         });
 
         return { data: result.data, count: result.count };
@@ -46,12 +52,18 @@ export const leadsService = {
 
     // Cursor-based Pagination for ultra-fast performance on millions of rows
     // PROTECTED by safeSelect
-    async getLeadsCursor(limit = 50, cursor?: string) {
+    async getLeadsCursor(limit = 50, cursor?: string, companyId?: string) {
         const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date, contact_count, closing_amount, address, lost_reason_id, lost_at_stage, lost_notes, next_action_notes, last_follow_up_at, first_follow_up_at';
 
-        const filters = cursor
-            ? [{ column: 'created_at', op: 'lt' as const, value: cursor }]
-            : undefined;
+        const resolvedCompanyId = companyId || (await this.getActiveCompanyId());
+        const filters: any[] = [];
+
+        if (resolvedCompanyId) {
+            filters.push({ column: 'company_id', op: 'eq' as const, value: resolvedCompanyId });
+        }
+        if (cursor) {
+            filters.push({ column: 'created_at', op: 'lt' as const, value: cursor });
+        }
 
         const result = await safeSelect<Lead>({
             table: 'leads',
@@ -59,7 +71,7 @@ export const leadsService = {
             orderBy: 'created_at',
             orderAsc: false,
             limit,
-            filters,
+            filters: filters.length > 0 ? filters : undefined,
         });
 
         const nextCursor = result.data.length === limit ? result.data[result.data.length - 1].created_at : undefined;

@@ -235,7 +235,7 @@ export const callBotService = {
                 maxTokens: 120,
                 messages: [{ role: 'system', content: systemPrompt }],
             },
-            serverUrl: `https://ikofyypxphrqkncimszt.supabase.co/functions/v1/sofia-voice-bot?company_id=${companyId}`,
+            serverUrl: `${import.meta.env.VITE_SUPABASE_URL || 'https://mtxqqamitglhehaktgxm.supabase.co'}/functions/v1/sofia-voice-bot?company_id=${companyId}`,
         };
 
         const res = await fetch('https://api.vapi.ai/assistant', {
@@ -358,25 +358,14 @@ export const callBotService = {
 
     async triggerCall(queueId: string): Promise<{ success: boolean; call_id?: string; error?: string }> {
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            const supabaseUrl = 'https://ikofyypxphrqkncimszt.supabase.co';
-            const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-
-            const res = await fetch(`${supabaseUrl}/functions/v1/sofia-voice-bot/initiate`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session?.access_token || anonKey}`
-                },
-                body: JSON.stringify({ queue_id: queueId })
+            const { data, error } = await supabase.functions.invoke('sofia-voice-bot/initiate', {
+                body: { queue_id: queueId }
             });
 
-            if (!res.ok) {
-                const errText = await res.text();
-                return { success: false, error: errText };
+            if (error) {
+                return { success: false, error: error.message || error };
             }
-            const data = await res.json();
-            return { success: true, call_id: data.call_control_id || data.call_leg_id };
+            return { success: true, call_id: data?.call_control_id || data?.call_leg_id };
         } catch (e: any) {
             return { success: false, error: e.message };
         }
@@ -494,32 +483,16 @@ export const callBotService = {
 
         if (insertError) throw insertError;
 
-        // Fetch nativo con sanitización extrema de URL
-        const { data: { session } } = await supabase.auth.getSession();
-        const supabaseUrl = 'https://ikofyypxphrqkncimszt.supabase.co';
-        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-        const targetUrl = `${supabaseUrl}/functions/v1/sofia-voice-bot/initiate`;
-
-
         try {
-            const res = await fetch(targetUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session?.access_token || anonKey}`
-                },
-                body: JSON.stringify({ queue_id: qItem.id, test_phone: phone, config })
+            const { error } = await supabase.functions.invoke('sofia-voice-bot/initiate', {
+                body: { queue_id: qItem.id, test_phone: phone, config }
             });
 
-            if (!res.ok) {
-                const errText = await res.text();
-                throw new Error(`Bot Error (${res.status}): ${errText}`);
+            if (error) {
+                throw new Error(`Bot Error: ${error.message || error}`);
             }
         } catch (e: any) {
-            console.error('Fetch error:', e);
-            if (e.message.includes('Failed to fetch')) {
-                 throw new Error(`Fallo de Red. Revisa si hay bloqueadores o problemas de CORS con la URL: ${targetUrl}`);
-            }
+            console.error('Test Call error:', e);
             throw e;
         }
     }

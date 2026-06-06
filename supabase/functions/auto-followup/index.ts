@@ -205,6 +205,78 @@ async function sendWhatsAppMessage(phone: string, message: string, log: (...a: a
     } catch (e: any) { log(`❌ WhatsApp error: ${e.message}`); return false; }
 }
 
+// ── Slack Sender ─────────────────────────────────────────────────────────────
+async function sendSlackMessage(webhookUrl: string, message: string, log: (...a: any[]) => void): Promise<boolean> {
+    try {
+        const resp = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: message }),
+        });
+        if (resp.ok) { log(`✅ Slack notification sent`); return true; }
+        log(`❌ Slack error: ${resp.status} ${await resp.text()}`);
+        return false;
+    } catch (e: any) { log(`❌ Slack error: ${e.message}`); return false; }
+}
+
+// ── WhatsApp Escalation Sender ───────────────────────────────────────────────
+async function sendWhatsAppEscalationMessage(
+    phone: string,
+    message: string,
+    customToken: string | null,
+    log: (...a: any[]) => void
+): Promise<boolean> {
+    const waToken = customToken || Deno.env.get('WHATSAPP_TOKEN');
+    const phoneNumberId = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID');
+    if (!phoneNumberId || !waToken) {
+        log(`⚠️ WhatsApp no configurado para escalación`); return false;
+    }
+    try {
+        const resp = await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${waToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                messaging_product: 'whatsapp', recipient_type: 'individual',
+                to: phone.replace(/\D/g, ''), type: 'text',
+                text: { preview_url: false, body: message },
+            }),
+        });
+        const result = await resp.json();
+        if (result?.messages?.[0]?.id) { log(`✅ WhatsApp escalation sent to ${phone}`); return true; }
+        log(`❌ WhatsApp escalation API: ${JSON.stringify(result)}`); return false;
+    } catch (e: any) { log(`❌ WhatsApp escalation error: ${e.message}`); return false; }
+}
+
+// ── DND Checker ──────────────────────────────────────────────────────────────
+function isDndActive(settings: any): boolean {
+    if (!settings.escalation_dnd_enabled) return false;
+    try {
+        const tz = settings.timezone || 'America/El_Salvador';
+        const now = new Date();
+        const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: tz, hour: 'numeric', minute: 'numeric', hour12: false
+        });
+        const parts = formatter.formatToParts(now);
+        const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
+        const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
+        const currentMinutes = hour * 60 + minute;
+
+        const [startH, startM] = (settings.escalation_dnd_start || '22:00').split(':').map(Number);
+        const [endH, endM] = (settings.escalation_dnd_end || '07:00').split(':').map(Number);
+        const startMinutes = startH * 60 + startM;
+        const endMinutes = endH * 60 + endM;
+
+        if (startMinutes > endMinutes) {
+            return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+        } else {
+            return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+        }
+    } catch (e) {
+        console.error('Error checking DND active:', e);
+        return false;
+    }
+}
+
 // ── FORCE SEND mode (unchanged logic) ───────────────────────────────────────
 async function handleForceSend(body: any, log: (...a: any[]) => void): Promise<Response> {
     const { force_lead_id: forceLeadId, custom_message: customMessage } = body;
@@ -276,8 +348,8 @@ Deno.serve(async (req) => {
         const getSettings = async (companyId: string) => {
             if (settingsCache[companyId]) return settingsCache[companyId];
             const { data } = await supabase.from('ai_followup_settings')
-                .select('*').eq('company_id', companyId).eq('is_active', true).maybeSingle();
-            settingsCache[companyId] = data ? { ...DEFAULT_SETTINGS, ...data } : DEFAULT_SETTINGS;
+                .select('*').eq('company_id', companyId).maybeSingle();
+            settingsCache[companyId] = data ? { ...DEFAULT_SETTINGS, ...data } : { ...DEFAULT_SETTINGS, is_active: false };
             return settingsCache[companyId];
         };
 
@@ -349,35 +421,110 @@ Deno.serve(async (req) => {
 
                 // Escalate if max reached
                 if (followupCount >= settings.max_followups) {
+                    if (isDndActive(settings)) {
+                        log(`Conv ${conv.id}: DND active (${settings.escalation_dnd_start} - ${settings.escalation_dnd_end}), delaying escalation notification.`);
+                        skipped++;
+                        continue;
+                    }
+
                     if (settings.auto_escalate) {
                         log(`Conv ${conv.id}: escalating after ${followupCount} followups`);
+                        
+                        // 1. Update lead memory to set next action and pause auto follow-ups
                         await supabase.rpc('upsert_lead_memory', {
                             p_lead_id: conv.lead_id, p_company_id: conv.company_id,
                             p_next_action: 'escalar_humano', p_stage: 'seguimiento'
                         });
+                        
+                        await supabase.from('lead_ai_memory').update({
+                            followup_paused: true
+                        }).eq('lead_id', conv.lead_id);
+
+                        // 2. Update lead status and notes in the CRM
                         await supabase.from('leads').update({
                             notes: `⚠️ IA escaló: sin respuesta tras ${settings.max_followups} seguimientos. Último contacto: ${new Date(conv.last_message_at).toLocaleDateString('es')}`,
                             status: 'En seguimiento', updated_at: now.toISOString()
                         }).eq('id', conv.lead_id);
 
-                        // Notify assigned agent
+                        // 3. Dispatch Multi-Channel Escalation Alerts
                         try {
                             const { data: leadData } = await supabase.from('leads')
-                                .select('assigned_to, name, phone').eq('id', conv.lead_id).maybeSingle();
-                            if (leadData?.assigned_to) {
-                                const { data: agentProf } = await supabase.from('profiles')
-                                    .select('full_name, telegram_chat_id').eq('id', leadData.assigned_to).maybeSingle();
-                                if (agentProf?.telegram_chat_id) {
+                                .select('*').eq('id', conv.lead_id).maybeSingle();
+
+                            if (leadData) {
+                                // Fetch assigned agent profile
+                                let agentProf = null;
+                                if (leadData.assigned_to) {
+                                    const { data } = await supabase.from('profiles')
+                                        .select('full_name, telegram_chat_id').eq('id', leadData.assigned_to).maybeSingle();
+                                    agentProf = data;
+                                }
+
+                                // Fetch Telegram integration bot token if needed
+                                let tgToken = null;
+                                if (settings.escalation_ch_agent_tg || settings.escalation_ch_group_tg) {
                                     const { data: tgInt } = await supabase.from('marketing_integrations')
                                         .select('settings').eq('company_id', conv.company_id)
                                         .eq('provider', 'telegram').eq('is_active', true).maybeSingle();
-                                    if (tgInt?.settings?.token) {
-                                        const alert = `🚨 *ESCALACIÓN DE LEAD*\n\n👤 Lead: *${leadData.name}*\n📱 Tel: ${leadData.phone || 'N/A'}\n🔁 Intentos: ${followupCount}\n\nSofía agotó los seguimientos. Este lead necesita contacto humano.`;
-                                        await sendTelegramMessage(agentProf.telegram_chat_id, alert, tgInt.settings.token, log);
+                                    tgToken = tgInt?.settings?.token || null;
+                                }
+
+                                const agentName = agentProf?.full_name || 'Agente no asignado';
+                                const alertText = `🚨 *ESCALACIÓN DE LEAD*\n\n` +
+                                    `👤 *Lead:* ${leadData.name || 'N/A'}\n` +
+                                    `📱 *Teléfono:* ${leadData.phone || 'N/A'}\n` +
+                                    `🏢 *Empresa:* ${leadData.company_name || 'N/A'}\n` +
+                                    `💼 *Agente:* ${agentName}\n` +
+                                    `🔁 *Intentos de IA:* ${followupCount}\n\n` +
+                                    `Sofía agotó los seguimientos automáticos sin respuesta. El lead ha sido pausado de seguimientos de IA y requiere atención humana inmediata.`;
+
+                                const leadDept = leadData.department || leadData.metadata?.department || null;
+
+                                // A. Telegram Direct Agent Notification
+                                if (settings.escalation_ch_agent_tg && tgToken) {
+                                    let destinationChatId = agentProf?.telegram_chat_id;
+                                    // Fallback to backup agent if direct agent doesn't have Telegram configured
+                                    if (!destinationChatId && settings.escalation_backup_agent_id) {
+                                        const { data: backupProf } = await supabase.from('profiles')
+                                            .select('telegram_chat_id').eq('id', settings.escalation_backup_agent_id).maybeSingle();
+                                        destinationChatId = backupProf?.telegram_chat_id;
+                                    }
+                                    if (destinationChatId) {
+                                        await sendTelegramMessage(destinationChatId, alertText, tgToken, log);
+                                    }
+                                }
+
+                                // B. Telegram Central Group Notification (or Department Routing)
+                                if (settings.escalation_ch_group_tg && tgToken) {
+                                    const deptChatId = leadDept ? settings.dept_routing?.[leadDept]?.telegram : null;
+                                    const destGroupChatId = deptChatId || settings.escalation_telegram_chat_id;
+                                    if (destGroupChatId) {
+                                        await sendTelegramMessage(destGroupChatId, alertText, tgToken, log);
+                                    }
+                                }
+
+                                // C. WhatsApp Notification
+                                if (settings.escalation_ch_whatsapp) {
+                                    const deptPhone = leadDept ? settings.dept_routing?.[leadDept]?.whatsapp : null;
+                                    const destPhone = deptPhone || settings.escalation_whatsapp_number;
+                                    if (destPhone) {
+                                        await sendWhatsAppEscalationMessage(destPhone, alertText.replace(/\*/g, ''), settings.escalation_whatsapp_token, log);
+                                    }
+                                }
+
+                                // D. Slack / Teams Notification
+                                if (settings.escalation_ch_slack) {
+                                    const deptSlackWebhook = leadDept ? settings.dept_routing?.[leadDept]?.slack : null;
+                                    const destWebhook = deptSlackWebhook || settings.escalation_webhook_url;
+                                    if (destWebhook) {
+                                        await sendSlackMessage(destWebhook, alertText, log);
                                     }
                                 }
                             }
-                        } catch (e: any) { log(`Escalation notify error: ${e.message}`); }
+                        } catch (e: any) {
+                            log(`Escalation dispatch notify error: ${e.message}`);
+                        }
+                        
                         escalationsCreated++;
                     }
                     continue;

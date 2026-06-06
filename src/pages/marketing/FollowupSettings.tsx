@@ -210,6 +210,7 @@ export default function FollowupSettingsPage() {
     const [lastRun, setLastRun] = useState<{ sent: number; evaluated: number } | null>(null);
     const [profiles, setProfiles] = useState<any[]>([]);
     const [hubTab, setHubTab] = useState<'telegram'|'whatsapp'|'slack'|'sla'>('telegram');
+    const [selectedNodeId, setSelectedNodeId] = useState<'lead_in' | 'followup1' | 'followup2' | 'followup3' | 'escalate'>('followup1');
 
     const load = useCallback(async () => {
         if (!profile?.company_id) return;
@@ -342,158 +343,415 @@ export default function FollowupSettingsPage() {
                 {/* LEFT: Timing + Limits */}
                 <div className="lg:col-span-2 space-y-4">
 
-                    {/* Timing Card */}
+                    {/* Workflow Node Pipeline Card */}
                     <div className="bg-white p-6 rounded-[24px] border border-gray-100 shadow-xl space-y-6">
-                        <h2 className="text-sm font-black text-gray-900 flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-blue-500" />
-                            Tiempos de Seguimiento
-                        </h2>
-
-                        <HourSelector
-                            label="1er Seguimiento — ¿Cuándo?"
-                            value={settings.first_followup_hours}
-                            onChange={v => update('first_followup_hours', v)}
-                            description="Horas de inactividad antes de enviar el primer mensaje de seguimiento"
-                        />
-                        <HourSelector
-                            label="2do Seguimiento — ¿Cuándo?"
-                            value={settings.second_followup_hours}
-                            onChange={v => update('second_followup_hours', v)}
-                            description="Horas adicionales antes del segundo intento si no hay respuesta"
-                        />
-                        <HourSelector
-                            label="3er Seguimiento — ¿Cuándo?"
-                            value={settings.third_followup_hours}
-                            onChange={v => update('third_followup_hours', v)}
-                            description="Horas antes del mensaje final antes de escalar a un humano"
-                        />
-
-                        {/* Max followups */}
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Máx. intentos antes de escalar</label>
-                                <span className="text-xs font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">{settings.max_followups} mensajes</span>
-                            </div>
-                            <div className="flex gap-2">
-                                {[1, 2, 3, 4, 5].map(n => (
-                                    <button
-                                        key={n}
-                                        onClick={() => update('max_followups', n)}
-                                        className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all ${
-                                            settings.max_followups === n
-                                                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-                                                : 'bg-slate-50 text-slate-400 hover:bg-slate-100'
-                                        }`}
-                                    >
-                                        {n}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Message Templates */}
-                    <div className="bg-white p-6 rounded-[24px] border border-gray-100 shadow-xl space-y-3">
-                        <h2 className="text-sm font-black text-gray-900 flex items-center gap-2 mb-4">
-                            <MessageSquare className="w-4 h-4 text-purple-500" />
-                            Templates de Mensajes
-                            <span className="text-[9px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full ml-1">Opcional — usa inteligencia automática si está vacío</span>
-                        </h2>
-                        <TemplateEditor num={1} value={settings.followup_1_template} onChange={v => update('followup_1_template', v)} />
-                        <TemplateEditor num={2} value={settings.followup_2_template} onChange={v => update('followup_2_template', v)} />
-                        <TemplateEditor num={3} value={settings.followup_3_template} onChange={v => update('followup_3_template', v)} />
-                    </div>
-
-                    {/* ── A/B Testing Panel ─────────────────────────────── */}
-                    <div className="bg-white p-6 rounded-[24px] border border-gray-100 shadow-xl space-y-4">
                         <div className="flex items-center justify-between">
                             <h2 className="text-sm font-black text-gray-900 flex items-center gap-2">
-                                <FlaskConical className="w-4 h-4 text-violet-500" />
-                                A/B Testing de Templates
-                                <span className="text-[9px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full ml-1">Experimental</span>
+                                <Clock className="w-4 h-4 text-blue-500" />
+                                Canalización del Flujo (Workflow Builder)
                             </h2>
-                            <button
-                                onClick={() => update('ab_testing_enabled', !settings.ab_testing_enabled)}
-                                className="ml-4 shrink-0"
-                            >
-                                {settings.ab_testing_enabled
-                                    ? <ToggleRight className="w-8 h-8 text-violet-500" />
-                                    : <ToggleLeft  className="w-8 h-8 text-slate-300" />}
-                            </button>
+                            <span className="text-[9px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-full">
+                                {settings.is_active ? '🤖 EN EJECUCIÓN' : '⏸ PAUSADO'}
+                            </span>
                         </div>
 
-                        {settings.ab_testing_enabled ? (
-                            <>
-                                <div className="bg-violet-50 border border-violet-100 rounded-xl p-3 text-[11px] text-violet-700 font-medium leading-relaxed">
-                                    🧪 Sofía alternará automáticamente entre <strong>Template A</strong> (los de arriba) y <strong>Template B</strong> (los de abajo). El sistema registra cuál genera más respuestas.
-                                </div>
-
-                                {/* Template B editors */}
-                                <div className="space-y-3">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Variante B</p>
-                                    {[1, 2, 3].map(num => {
-                                        const key = `followup_${num}_template_b` as keyof typeof settings;
-                                        const val = settings[key] as string | null;
-                                        return (
-                                            <TemplateEditor
-                                                key={`b-${num}`}
-                                                num={num}
-                                                value={val}
-                                                onChange={v => update(key, v)}
-                                            />
-                                        );
-                                    })}
-                                </div>
-
-                                {/* Live A/B Stats */}
-                                <div className="bg-slate-50 rounded-2xl p-4 space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-                                            <BarChart2 className="w-3.5 h-3.5" /> Estadísticas en vivo
-                                        </p>
-                                        <button
-                                            onClick={async () => {
-                                                if (!confirm('¿Reiniciar contadores A/B a cero?')) return;
-                                                await followupSettingsService.resetAbStats(settings.company_id);
-                                                update('ab_stats', { a_sent: 0, b_sent: 0, a_responses: 0, b_responses: 0 });
-                                                toast.success('Contadores reiniciados');
-                                            }}
-                                            className="text-[9px] text-slate-400 hover:text-red-500 flex items-center gap-1 transition-colors"
-                                        >
-                                            <RotateCcw className="w-3 h-3" /> Reiniciar
-                                        </button>
+                        {/* Node Flowchart */}
+                        <div className="bg-slate-50/50 border border-slate-100/80 rounded-3xl p-5 mb-6 overflow-hidden">
+                            <div className="flex items-center justify-between gap-2 overflow-x-auto pb-2 no-scrollbar">
+                                {/* Node: Lead Entrante */}
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedNodeId('lead_in')}
+                                    className={`flex flex-col items-center gap-2 p-3 rounded-2xl transition-all outline-none shrink-0 ${
+                                        selectedNodeId === 'lead_in'
+                                            ? 'bg-emerald-50 border-emerald-200/50 shadow-md shadow-emerald-500/5 ring-2 ring-emerald-500/20'
+                                            : 'bg-white hover:bg-slate-50 border border-slate-100'
+                                    }`}
+                                    style={{ width: '105px' }}
+                                >
+                                    <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+                                        selectedNodeId === 'lead_in'
+                                            ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 scale-110'
+                                            : 'bg-emerald-50 text-emerald-500'
+                                    }`}>
+                                        <Zap className="w-4.5 h-4.5" />
                                     </div>
-                                    {(['a', 'b'] as const).map(variant => {
-                                        const sent      = settings.ab_stats?.[`${variant}_sent`]      || 0;
-                                        const responses = settings.ab_stats?.[`${variant}_responses`] || 0;
-                                        const rate      = sent > 0 ? Math.round((responses / sent) * 100) : 0;
-                                        const barColor  = variant === 'a' ? 'bg-blue-500' : 'bg-violet-500';
-                                        const textColor = variant === 'a' ? 'text-blue-600' : 'text-violet-600';
-                                        return (
-                                            <div key={variant}>
-                                                <div className="flex items-center justify-between mb-1">
-                                                    <span className={`text-[10px] font-black uppercase ${textColor}`}>Variante {variant.toUpperCase()}</span>
-                                                    <span className="text-[10px] text-slate-400">{sent} enviados · {responses} respuestas · <strong className={textColor}>{rate}% respuesta</strong></span>
+                                    <div className="text-center">
+                                        <p className="text-[9px] font-black text-slate-700 leading-tight">Lead Entrante</p>
+                                        <p className="text-[8px] text-slate-400 font-bold mt-0.5">Inicio</p>
+                                    </div>
+                                </button>
+
+                                {/* Connector 1 */}
+                                <div className="flex-1 min-w-[20px] flex items-center justify-center shrink-0">
+                                    <div className="w-full h-0.5 border-t-2 border-dashed border-slate-200 relative">
+                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-slate-300 animate-ping" />
+                                    </div>
+                                </div>
+
+                                {/* Node: 1er Seguimiento */}
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedNodeId('followup1')}
+                                    className={`flex flex-col items-center gap-2 p-3 rounded-2xl transition-all outline-none shrink-0 ${
+                                        selectedNodeId === 'followup1'
+                                            ? 'bg-blue-50 border-blue-200/50 shadow-md shadow-blue-500/5 ring-2 ring-blue-500/20'
+                                            : 'bg-white hover:bg-slate-50 border border-slate-100'
+                                    }`}
+                                    style={{ width: '105px' }}
+                                >
+                                    <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+                                        selectedNodeId === 'followup1'
+                                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30 scale-110'
+                                            : 'bg-blue-50 text-blue-600'
+                                    }`}>
+                                        <MessageSquare className="w-4.5 h-4.5" />
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-[9px] font-black text-slate-700 leading-tight">1er Seguimiento</p>
+                                        <p className="text-[8px] text-blue-500 font-bold mt-0.5">espera: {settings.first_followup_hours}h</p>
+                                    </div>
+                                </button>
+
+                                {/* Connector 2 */}
+                                <div className="flex-1 min-w-[20px] flex items-center justify-center shrink-0">
+                                    <div className="w-full h-0.5 border-t-2 border-dashed border-slate-200 relative">
+                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-slate-300 animate-ping" />
+                                    </div>
+                                </div>
+
+                                {/* Node: 2do Seguimiento */}
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedNodeId('followup2')}
+                                    className={`flex flex-col items-center gap-2 p-3 rounded-2xl transition-all outline-none shrink-0 ${
+                                        selectedNodeId === 'followup2'
+                                            ? 'bg-indigo-50 border-indigo-200/50 shadow-md shadow-indigo-500/5 ring-2 ring-indigo-500/20'
+                                            : 'bg-white hover:bg-slate-50 border border-slate-100'
+                                    }`}
+                                    style={{ width: '105px' }}
+                                >
+                                    <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+                                        selectedNodeId === 'followup2'
+                                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 scale-110'
+                                            : 'bg-indigo-50 text-indigo-600'
+                                    }`}>
+                                        <MessageSquare className="w-4.5 h-4.5" />
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-[9px] font-black text-slate-700 leading-tight">2do Seguimiento</p>
+                                        <p className="text-[8px] text-indigo-500 font-bold mt-0.5">espera: +{settings.second_followup_hours}h</p>
+                                    </div>
+                                </button>
+
+                                {/* Connector 3 */}
+                                <div className="flex-1 min-w-[20px] flex items-center justify-center shrink-0">
+                                    <div className="w-full h-0.5 border-t-2 border-dashed border-slate-200 relative">
+                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-slate-300 animate-ping" />
+                                    </div>
+                                </div>
+
+                                {/* Node: 3er Seguimiento */}
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedNodeId('followup3')}
+                                    className={`flex flex-col items-center gap-2 p-3 rounded-2xl transition-all outline-none shrink-0 ${
+                                        selectedNodeId === 'followup3'
+                                            ? 'bg-violet-50 border-violet-200/50 shadow-md shadow-violet-500/5 ring-2 ring-violet-500/20'
+                                            : 'bg-white hover:bg-slate-50 border border-slate-100'
+                                    }`}
+                                    style={{ width: '105px' }}
+                                >
+                                    <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+                                        selectedNodeId === 'followup3'
+                                            ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/30 scale-110'
+                                            : 'bg-violet-50 text-violet-600'
+                                    }`}>
+                                        <MessageSquare className="w-4.5 h-4.5" />
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-[9px] font-black text-slate-700 leading-tight">3er Seguimiento</p>
+                                        <p className="text-[8px] text-violet-500 font-bold mt-0.5">espera: +{settings.third_followup_hours}h</p>
+                                    </div>
+                                </button>
+
+                                {/* Connector 4 */}
+                                <div className="flex-1 min-w-[20px] flex items-center justify-center shrink-0">
+                                    <div className="w-full h-0.5 border-t-2 border-dashed border-slate-200 relative">
+                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-slate-300 animate-ping" />
+                                    </div>
+                                </div>
+
+                                {/* Node: Escalación */}
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedNodeId('escalate')}
+                                    className={`flex flex-col items-center gap-2 p-3 rounded-2xl transition-all outline-none shrink-0 ${
+                                        selectedNodeId === 'escalate'
+                                            ? 'bg-amber-50 border-amber-200/50 shadow-md shadow-amber-500/5 ring-2 ring-amber-500/20'
+                                            : 'bg-white hover:bg-slate-50 border border-slate-100'
+                                    }`}
+                                    style={{ width: '105px' }}
+                                >
+                                    <div className={`w-9 h-9 rounded-full flex items-center justify-center transition-all ${
+                                        selectedNodeId === 'escalate'
+                                            ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30 scale-110'
+                                            : 'bg-amber-50 text-amber-500'
+                                    }`}>
+                                        <ShieldAlert className="w-4.5 h-4.5" />
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-[9px] font-black text-slate-700 leading-tight">Escalación</p>
+                                        <p className="text-[8px] text-amber-500 font-bold mt-0.5">{settings.max_followups} intentos</p>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Inspector / Node Configuration Panel */}
+                        <div className="border border-slate-100 rounded-[20px] p-5 bg-slate-50/10">
+
+                            {/* INSPECTOR: LEAD ENTRANTE */}
+                            {selectedNodeId === 'lead_in' && (
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center shrink-0">
+                                            <Zap className="w-5 h-5 text-emerald-600" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xs font-black text-slate-800">Lead Entrante (Paso 0)</h3>
+                                            <p className="text-[9px] text-slate-400">Inicio de la automatización</p>
+                                        </div>
+                                    </div>
+                                    <p className="text-[11px] text-slate-500 leading-relaxed bg-white border border-slate-100 p-4 rounded-2xl">
+                                        Cuando entra un prospecto al CRM desde Meta Ads, TikTok Ads, formularios web o WhatsApp, Sofía comienza a monitorear la conversación de manera autónoma. Si el prospecto no responde al primer contacto o el agente humano no interviene, se disparará el <strong>1er Seguimiento</strong> al expirar el tiempo de espera configurado en el siguiente nodo.
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* INSPECTOR: FOLLOWUPS (1, 2, 3) */}
+                            {(selectedNodeId === 'followup1' || selectedNodeId === 'followup2' || selectedNodeId === 'followup3') && (
+                                <div className="space-y-5">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+                                            selectedNodeId === 'followup1' ? 'bg-blue-50 text-blue-600' :
+                                            selectedNodeId === 'followup2' ? 'bg-indigo-50 text-indigo-600' :
+                                            'bg-violet-50 text-violet-600'
+                                        }`}>
+                                            <MessageSquare className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xs font-black text-slate-800">
+                                                {selectedNodeId === 'followup1' ? '1er Seguimiento' : selectedNodeId === 'followup2' ? '2do Seguimiento' : '3er Seguimiento'}
+                                            </h3>
+                                            <p className="text-[9px] text-slate-400">Configuración de tiempo de espera y plantilla de mensaje</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Hour Selector */}
+                                    <HourSelector
+                                        label="Tiempo de espera en inactividad"
+                                        value={
+                                            selectedNodeId === 'followup1' ? settings.first_followup_hours :
+                                            selectedNodeId === 'followup2' ? settings.second_followup_hours :
+                                            settings.third_followup_hours
+                                        }
+                                        onChange={v => {
+                                            const key = selectedNodeId === 'followup1' ? 'first_followup_hours' :
+                                                        selectedNodeId === 'followup2' ? 'second_followup_hours' :
+                                                        'third_followup_hours';
+                                            update(key, v);
+                                        }}
+                                        description={
+                                            selectedNodeId === 'followup1'
+                                                ? 'Horas de inactividad del lead antes de enviar este primer seguimiento'
+                                                : selectedNodeId === 'followup2'
+                                                ? 'Horas adicionales de inactividad antes de enviar este segundo seguimiento'
+                                                : 'Horas finales de espera antes de mandar la advertencia final y escalar'
+                                        }
+                                    />
+
+                                    {/* Template Editors */}
+                                    <div className="space-y-4 pt-3 border-t border-slate-100">
+                                        <div>
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Plantilla de Mensaje (Variante A)</p>
+                                            <p className="text-[9px] text-slate-400 mt-0.5">Si se deja vacío, Sofía generará el mensaje de forma autónoma con GPT-4o</p>
+                                        </div>
+                                        <TemplateEditor
+                                            num={selectedNodeId === 'followup1' ? 1 : selectedNodeId === 'followup2' ? 2 : 3}
+                                            value={
+                                                selectedNodeId === 'followup1' ? settings.followup_1_template :
+                                                selectedNodeId === 'followup2' ? settings.followup_2_template :
+                                                settings.followup_3_template
+                                            }
+                                            onChange={v => {
+                                                const key = selectedNodeId === 'followup1' ? 'followup_1_template' :
+                                                            selectedNodeId === 'followup2' ? 'followup_2_template' :
+                                                            'followup_3_template';
+                                                update(key, v);
+                                            }}
+                                        />
+                                    </div>
+
+                                    {/* A/B Testing Option inside Node Inspector */}
+                                    <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <h4 className="text-[10px] font-black text-slate-600 uppercase tracking-widest flex items-center gap-1.5">
+                                                    <FlaskConical className="w-3.5 h-3.5 text-violet-500" />
+                                                    A/B Testing en este paso
+                                                </h4>
+                                                <p className="text-[9px] text-slate-400">Alternar entre variante A y variante B para medir conversiones</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => update('ab_testing_enabled', !settings.ab_testing_enabled)}
+                                                className="focus:outline-none"
+                                            >
+                                                {settings.ab_testing_enabled
+                                                    ? <ToggleRight className="w-7 h-7 text-violet-500" />
+                                                    : <ToggleLeft  className="w-7 h-7 text-slate-300" />}
+                                            </button>
+                                        </div>
+
+                                        {settings.ab_testing_enabled && (
+                                            <div className="space-y-4 pt-3 border-t border-slate-200/40">
+                                                <div>
+                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Plantilla de Mensaje (Variante B)</p>
                                                 </div>
-                                                <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                                                    <div
-                                                        className={`h-full rounded-full transition-all ${barColor}`}
-                                                        style={{ width: `${Math.min(rate, 100)}%` }}
-                                                    />
+                                                <TemplateEditor
+                                                    num={selectedNodeId === 'followup1' ? 1 : selectedNodeId === 'followup2' ? 2 : 3}
+                                                    value={
+                                                        selectedNodeId === 'followup1' ? settings.followup_1_template_b :
+                                                        selectedNodeId === 'followup2' ? settings.followup_2_template_b :
+                                                        settings.followup_3_template_b
+                                                    }
+                                                    onChange={v => {
+                                                        const key = selectedNodeId === 'followup1' ? 'followup_1_template_b' :
+                                                                    selectedNodeId === 'followup2' ? 'followup_2_template_b' :
+                                                                    'followup_3_template_b';
+                                                        update(key, v);
+                                                    }}
+                                                />
+
+                                                {/* Stats for this specific node */}
+                                                <div className="bg-white rounded-xl p-3 border border-slate-100 space-y-3">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Estadísticas A/B (Generales)</span>
+                                                        <button
+                                                            onClick={async () => {
+                                                                if (!confirm('¿Reiniciar contadores A/B a cero?')) return;
+                                                                await followupSettingsService.resetAbStats(settings.company_id);
+                                                                update('ab_stats', { a_sent: 0, b_sent: 0, a_responses: 0, b_responses: 0 });
+                                                                toast.success('Contadores reiniciados');
+                                                            }}
+                                                            className="text-[9px] text-slate-400 hover:text-red-500 flex items-center gap-1 transition-colors"
+                                                        >
+                                                            <RotateCcw className="w-3 h-3" /> Reiniciar
+                                                        </button>
+                                                    </div>
+                                                    {(['a', 'b'] as const).map(variant => {
+                                                        const sent      = settings.ab_stats?.[`${variant}_sent`]      || 0;
+                                                        const responses = settings.ab_stats?.[`${variant}_responses`] || 0;
+                                                        const rate      = sent > 0 ? Math.round((responses / sent) * 100) : 0;
+                                                        const barColor  = variant === 'a' ? 'bg-blue-500' : 'bg-violet-500';
+                                                        const textColor = variant === 'a' ? 'text-blue-600' : 'text-violet-600';
+                                                        return (
+                                                            <div key={variant}>
+                                                                <div className="flex items-center justify-between mb-1">
+                                                                    <span className={`text-[9px] font-black uppercase ${textColor}`}>Variante {variant.toUpperCase()}</span>
+                                                                    <span className="text-[9px] text-slate-400">{sent} enviados · {responses} respuestas · <strong className={textColor}>{rate}%</strong></span>
+                                                                </div>
+                                                                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                                    <div
+                                                                        className={`h-full rounded-full transition-all ${barColor}`}
+                                                                        style={{ width: `${Math.min(rate, 100)}%` }}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    {(settings.ab_stats?.a_sent || 0) + (settings.ab_stats?.b_sent || 0) === 0 && (
+                                                        <p className="text-[9px] text-slate-400 text-center">Los datos aparecerán al iniciar los envíos.</p>
+                                                    )}
                                                 </div>
                                             </div>
-                                        );
-                                    })}
-                                    {(settings.ab_stats?.a_sent || 0) + (settings.ab_stats?.b_sent || 0) === 0 && (
-                                        <p className="text-[10px] text-slate-400 text-center pt-1">Los datos aparecerán cuando Sofía empiece a enviar seguimientos.</p>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
-                            </>
-                        ) : (
-                            <p className="text-[11px] text-slate-400">
-                                Activa el A/B testing para que Sofía pruebe dos versiones de cada mensaje y descubras cuál convierte mejor.
-                            </p>
-                        )}
+                            )}
+
+                            {/* INSPECTOR: ESCALACION */}
+                            {selectedNodeId === 'escalate' && (
+                                <div className="space-y-5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-2xl bg-amber-50 flex items-center justify-center shrink-0">
+                                            <ShieldAlert className="w-5 h-5 text-amber-500" />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xs font-black text-slate-800">Escalación a Humano (Fin del Flujo)</h3>
+                                            <p className="text-[9px] text-slate-400">Pausar IA y notificar a los agentes en sus canales</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Auto Escalate Toggle */}
+                                    <div className="flex items-center justify-between py-3 border-b border-slate-100">
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-700">Notificar Escalación</p>
+                                            <p className="text-[9px] text-slate-400 mt-0.5">Disparar alertas al Hub de Alertas cuando el lead sea escalado</p>
+                                        </div>
+                                        <button onClick={() => update('auto_escalate', !settings.auto_escalate)} className="shrink-0 focus:outline-none">
+                                            {settings.auto_escalate
+                                                ? <ToggleRight className="w-8 h-8 text-emerald-500" />
+                                                : <ToggleLeft  className="w-8 h-8 text-slate-300" />
+                                            }
+                                        </button>
+                                    </div>
+
+                                    {/* Max attempts */}
+                                    <div className="space-y-2.5">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Máx. intentos antes de escalar</label>
+                                            <span className="text-xs font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">{settings.max_followups} mensajes</span>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            {[1, 2, 3, 4, 5].map(n => (
+                                                <button
+                                                    key={n}
+                                                    type="button"
+                                                    onClick={() => update('max_followups', n)}
+                                                    className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all ${
+                                                        settings.max_followups === n
+                                                            ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20'
+                                                            : 'bg-slate-50 text-slate-400 hover:bg-slate-100'
+                                                    }`}
+                                                >
+                                                    {n}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Hub Alertas Jump Button */}
+                                    <div className="pt-3 border-t border-slate-100 space-y-3">
+                                        <div className="bg-amber-50/50 border border-amber-100/50 p-4 rounded-2xl">
+                                            <p className="text-[11px] text-amber-700 leading-relaxed">
+                                                Al alcanzar los <strong>{settings.max_followups}</strong> intentos de seguimiento sin respuesta del lead, Sofía declarará la conversación en estado de <em>escalar_humano</em>, pausará los seguimientos automáticos y enviará las notificaciones al Hub de Alertas.
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setHubTab('telegram')}
+                                            className="w-full py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200/60 rounded-xl text-xs font-black text-slate-600 flex items-center justify-center gap-2 transition-all outline-none"
+                                        >
+                                            <Bell className="w-3.5 h-3.5 text-blue-500 animate-bounce" />
+                                            Configurar Destinatarios en Hub de Alertas
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                        </div>
                     </div>
 
                     {/* ── NOTIFICATION HUB ── */}

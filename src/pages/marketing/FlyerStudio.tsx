@@ -316,19 +316,17 @@ export default function FlyerStudio() {
   const generateImage = async (idea: FlyerIdea) => {
     setIsLoadingImg(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`https://ikofyypxphrqkncimszt.supabase.co/functions/v1/flyer-generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session!.access_token}` },
-        body: JSON.stringify({ idea, industria: selectedIndustries.join(', '), oferta, tono, seed: Date.now() }),
+      const { data, error } = await supabase.functions.invoke('flyer-generate', {
+        body: { idea, industria: selectedIndustries.join(', '), oferta, tono, seed: Date.now() }
       });
-      const data = await res.json();
-      if (data.fondo_url) {
+      if (error) throw error;
+      if (data?.fondo_url) {
         setFlyerData(prev => ({ ...prev, bgImageUrl: data.fondo_url }));
       } else {
         toast.error('Imagen IA no disponible — usando diseño estructural');
       }
-    } catch {
+    } catch (err) {
+      console.error('generateImage error:', err);
       toast.error('Usando diseño sin foto de fondo');
     } finally {
       setIsLoadingImg(false);

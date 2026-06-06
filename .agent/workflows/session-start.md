@@ -20,11 +20,11 @@ Leer `.agent/PROJECT_IDENTITY.md` para confirmar en qué proyecto estamos trabaj
 
 Verificar:
 - **Ruta:** `c:\Users\jaria\OneDrive\DELL\Desktop\crm-app`
-- **Supabase PRODUCCIÓN (TODO):** `ikofyypxphrqkncimszt` — frontend, edge functions, auth, datos reales
-- **Supabase ANTERIOR (ignorar):** `mtxqqamitglhehaktgxm` — era producción antes de mayo 2026, YA NO SE USA
+- **Supabase PRODUCCIÓN (TODO):** `mtxqqamitglhehaktgxm` — frontend, edge functions, auth, datos reales
+- **Supabase SECUNDARIO (retirado):** `ikofyypxphrqkncimszt` — legacy, dar de baja de forma segura
 - **Supabase TESTING:** `ubqscyfefgfbmndnypbp` — solo desarrollo local
 
-> ⚠️ REGLA: TODO va a `ikofyypxphrqkncimszt`. Nunca a `mtxqqamitglhehaktgxm`.
+> ⚠️ REGLA: TODO va a `mtxqqamitglhehaktgxm`. Nunca a `ikofyypxphrqkncimszt`.
 
 ## Paso 3: Verificar Project ID de Supabase
 

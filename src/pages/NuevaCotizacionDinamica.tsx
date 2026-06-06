@@ -91,7 +91,7 @@ export default function NuevaCotizacionDinamica() {
 
     const loadLeads = async () => {
         try {
-            const { data } = await leadsService.getLeads();
+            const { data } = await leadsService.getLeads(1, 1000, profile?.company_id || undefined);
             setLeads(data || []);
         } catch (error) {
             console.error('Error loading leads:', error);

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { leadMemoryService, type CockpitMetrics, type LeadMemory, type ConversionReport } from '../../services/marketing/leadMemoryService';
 import { useAuth } from '../../auth/AuthProvider';
+import { supabase } from '../../services/supabase';
 import toast from 'react-hot-toast';
 import PredictiveBoard from './PredictiveBoard';
 import AuditLogViewer from './AuditLogViewer';
@@ -161,25 +162,15 @@ export default function AiAgentCockpit() {
             setIsRunning(true);
             toast.loading('🤖 Orquestador ejecutando: Oracle → Atlas → Maya...', { id: 'followup-run' });
 
-            // ✅ ALWAYS calls ikofyypxphrqkncimszt (Edge Functions project)
-            const EDGE_URL = 'https://ikofyypxphrqkncimszt.supabase.co/functions/v1/agent-orchestrator';
-            const EDGE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlrb2Z5eXB4cGhycWtuY2ltc3p0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NjU5OTUsImV4cCI6MjA4NDM0MTk5NX0.pSXAndXDDYOdfHqX0LK9l9LNHcW5U73veFM3ybp-jdU';
-            
-            const resp = await fetch(EDGE_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${EDGE_ANON_KEY}`,
-                },
-                body: JSON.stringify({ company_id: profile.company_id }),
+            const { data: resultData, error: invokeError } = await supabase.functions.invoke('agent-orchestrator', {
+                body: { company_id: profile.company_id }
             });
 
-            if (!resp.ok) {
-                const errText = await resp.text();
-                throw new Error(`Orchestrator HTTP ${resp.status}: ${errText.substring(0, 200)}`);
+            if (invokeError) {
+                throw new Error(`Orchestrator error: ${invokeError.message || invokeError}`);
             }
 
-            const result = await resp.json() as {
+            const result = resultData as {
                 success: boolean; message: string;
                 leads_evaluated?: number; leads_selected?: number;
                 tasks_created?: number; tasks_auto_executed?: number;

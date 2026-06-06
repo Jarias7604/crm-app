@@ -178,7 +178,7 @@ export default function ChatHub() {
 
     const loadInitialLeads = async () => {
         try {
-            const { data } = await leadsService.getLeads(1, 40);
+            const { data } = await leadsService.getLeads(1, 40, profile?.company_id || undefined);
             setAvailableLeads(data || []);
         } catch (e) {
             console.error('Error loading initial leads:', e);

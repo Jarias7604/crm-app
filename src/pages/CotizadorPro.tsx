@@ -284,7 +284,7 @@ export default function CotizadorPro() {
 
     const loadLeads = async () => {
         try {
-            const { data } = await leadsService.getLeads();
+            const { data } = await leadsService.getLeads(1, 1000, profile?.company_id || undefined);
             setLeads(data || []);
         } catch (error) {
             logger.error('Error loading leads', error, { action: 'loadLeads' });

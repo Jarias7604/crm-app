@@ -9,14 +9,14 @@ import { useAuth } from '../auth/AuthProvider';
  * Hook to fetch paginated leads with automatic caching
  */
 export function useLeads(page = 1, pageSize = 50) {
-    const { profile } = useAuth();
-    const companyId = profile?.company_id || '';
+    const { profile, simulatedCompanyId } = useAuth();
+    const companyId = simulatedCompanyId || profile?.company_id || '';
 
     return useQuery({
         queryKey: queryKeys.leads.list(companyId, page, pageSize),
         queryFn: async () => {
             logger.debug('Fetching leads', { page, pageSize });
-            return leadsService.getLeads(page, pageSize);
+            return leadsService.getLeads(page, pageSize, companyId);
         },
         staleTime: 2 * 60 * 1000, // 2 minutes
     });

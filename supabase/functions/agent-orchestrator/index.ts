@@ -18,6 +18,16 @@ const supabase = createClient(
 // ── VERIFIED COLUMNS from production leads table ──────────────────────────────
 const LEAD_FIELDS = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, contact_count';
 
+function isBusinessHours(tz: string): boolean {
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz, hour: 'numeric', hour12: false, weekday: 'short'
+    }).formatToParts(now);
+    const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '12');
+    const day  = parts.find(p => p.type === 'weekday')?.value || 'Mon';
+    return !['Sat', 'Sun'].includes(day) && hour >= 8 && hour < 18;
+}
+
 // ── ORACLE: Score a lead for urgency/priority ─────────────────────────────────
 function oracleScore(lead: any, daysSinceContact: number): number {
     let score = 50;
@@ -117,6 +127,38 @@ async function processCompany(companyId: string, log: (...args: any[]) => void) 
 
     const autonomyLevel = autonomyRow?.autonomy_level || 'copilot';
 
+    // ── STEP 1.5: Get follow-up settings and check if active ───────────────
+    const { data: followSettings } = await supabase
+        .from('ai_followup_settings')
+        .select('is_active, only_business_hours, timezone')
+        .eq('company_id', companyId)
+        .maybeSingle();
+
+    const isFollowupActive = followSettings ? followSettings.is_active : false;
+    if (!isFollowupActive) {
+        log(`⏭️  Follow-ups are globally inactive for company ${companyId}. Skipping orchestrator run.`);
+        return {
+            company_id: companyId,
+            success: true,
+            message: `Follow-ups are globally inactive for this company.`,
+            autonomy_level: autonomyLevel,
+            skipped: true
+        };
+    }
+
+    const tz = followSettings?.timezone || 'America/El_Salvador';
+    const onlyBiz = followSettings?.only_business_hours || false;
+    if (onlyBiz && !isBusinessHours(tz)) {
+        log(`⏭️  Outside business hours for company ${companyId}. Skipping orchestrator run.`);
+        return {
+            company_id: companyId,
+            success: true,
+            message: `Outside business hours (Timezone: ${tz}).`,
+            autonomy_level: autonomyLevel,
+            skipped: true
+        };
+    }
+
     // ── STEP 2: Get OpenAI key for this company ───────────────────────────
     const { data: openaiInt } = await supabase
         .from('marketing_integrations')
@@ -159,10 +201,33 @@ async function processCompany(companyId: string, log: (...args: any[]) => void) 
 
     log(`📊 Oracle scored ${leads?.length || 0} leads → ${scored.length} selected for action`);
 
+    // ── STEP 3.2: Filter out leads with paused follow-up memory ───────────
+    let activeScored = scored;
+    if (scored.length > 0) {
+        const leadIds = scored.map(s => s.lead.id);
+        const { data: memories } = await supabase
+            .from('lead_ai_memory')
+            .select('lead_id, followup_paused')
+            .in('lead_id', leadIds);
+
+        const pausedLeadIds = new Set(
+            (memories || []).filter((m: any) => m.followup_paused).map((m: any) => m.lead_id)
+        );
+
+        activeScored = scored.filter(s => {
+            if (pausedLeadIds.has(s.lead.id)) {
+                log(`⏭️  Skipping lead ${s.lead.name} (${s.lead.id}) — follow-ups are paused (followup_paused = true)`);
+                return false;
+            }
+            return true;
+        });
+        log(`📊 Active scored leads after filtering paused ones: ${activeScored.length}`);
+    }
+
     // ── STEP 3.5: Auto-create conversations for leads without one ─────────
     // This ensures 100% of leads (including manually-entered ones) enter the flow
     {
-        const leadIds = scored.map(s => s.lead.id);
+        const leadIds = activeScored.map(s => s.lead.id);
         const { data: existingConvs } = await supabase
             .from('marketing_conversations')
             .select('lead_id')
@@ -170,7 +235,7 @@ async function processCompany(companyId: string, log: (...args: any[]) => void) 
             .eq('status', 'active');
 
         const existingLeadIds = new Set((existingConvs || []).map((c: any) => c.lead_id));
-        const leadsWithoutConv = scored.filter(s => !existingLeadIds.has(s.lead.id));
+        const leadsWithoutConv = activeScored.filter(s => !existingLeadIds.has(s.lead.id));
 
         if (leadsWithoutConv.length > 0) {
             log(`🔗 Auto-creating conversations for ${leadsWithoutConv.length} leads without active channel`);
@@ -241,7 +306,7 @@ async function processCompany(companyId: string, log: (...args: any[]) => void) 
     // Get the auto-followup URL for real dispatch
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 
-    for (const { lead, score, daysSince } of scored) {
+    for (const { lead, score, daysSince } of activeScored) {
         try {
             // Skip if this lead already has an active task in the last 24h
             if (activeLeadIds.has(lead.id)) {
@@ -336,7 +401,7 @@ async function processCompany(companyId: string, log: (...args: any[]) => void) 
         success: true,
         autonomy_level: autonomyLevel,
         leads_evaluated: leads?.length || 0,
-        leads_selected: scored.length,
+        leads_selected: activeScored.length,
         tasks_created: tasksCreated,
         tasks_auto_executed: tasksAutoExecuted,
         messages_sent: messagesSent,

@@ -62,7 +62,7 @@ export default function Leads() {
     } = useInfiniteQuery({
         queryKey: ['leads', activeCompanyId],
         queryFn: async ({ pageParam }) => {
-            const result = await leadsService.getLeadsCursor(1000, pageParam as string | undefined);
+            const result = await leadsService.getLeadsCursor(1000, pageParam as string | undefined, activeCompanyId);
             return result;
         },
         initialPageParam: undefined as string | undefined,
