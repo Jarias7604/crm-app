@@ -846,39 +846,56 @@ ${technicalRules}`;
         }
 
         // ===========================================
-        // 11. SEND TO TELEGRAM
+        // 11. SEND TO CHANNEL (Telegram or WhatsApp)
         // ===========================================
-        if (chatId) {
-            const { data: tgInt } = await supabase.from('marketing_integrations')
-                .select('settings').eq('company_id', companyId).eq('provider', 'telegram').eq('is_active', true).maybeSingle();
-            const botToken = tgInt?.settings?.token;
+        if (chatId && savedMsg) {
+            const channel = conv?.channel || 'telegram';
+            log(`Routing outbound message to channel: ${channel}`);
 
-            if (botToken && cleanText?.trim().length > 0) {
+            if (channel === 'whatsapp') {
                 try {
-                    const tgResp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ chat_id: chatId, text: cleanText, parse_mode: 'Markdown' })
+                    log(`Invoking send-whatsapp-message for message ID: ${savedMsg.id}`);
+                    const { error: fnError } = await supabase.functions.invoke('send-whatsapp-message', {
+                        body: { record: savedMsg }
                     });
-                    const tgResult = await tgResp.json();
-                    if (!tgResult.ok) {
-                        // Retry without markdown
-                        const r2 = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                    if (fnError) throw fnError;
+                    log(`✅ send-whatsapp-message invoked successfully`);
+                } catch (e) {
+                    console.error('WhatsApp send invocation error:', e);
+                }
+            } else {
+                // Telegram Channel
+                const { data: tgInt } = await supabase.from('marketing_integrations')
+                    .select('settings').eq('company_id', companyId).eq('provider', 'telegram').eq('is_active', true).maybeSingle();
+                const botToken = tgInt?.settings?.token;
+
+                if (botToken && cleanText?.trim().length > 0) {
+                    try {
+                        const tgResp = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ chat_id: chatId, text: cleanText })
+                            body: JSON.stringify({ chat_id: chatId, text: cleanText, parse_mode: 'Markdown' })
                         });
-                        const r2Result = await r2.json();
-                        if (r2Result.ok && savedMsg?.id) {
-                            await supabase.from('marketing_messages').update({ status: 'delivered' }).eq('id', savedMsg.id);
+                        const tgResult = await tgResp.json();
+                        if (!tgResult.ok) {
+                            // Retry without markdown
+                            const r2 = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ chat_id: chatId, text: cleanText })
+                            });
+                            const r2Result = await r2.json();
+                            if (r2Result.ok && savedMsg?.id) {
+                                await supabase.from('marketing_messages').update({ status: 'delivered' }).eq('id', savedMsg.id);
+                            }
+                        } else {
+                            if (savedMsg?.id) await supabase.from('marketing_messages').update({ status: 'delivered' }).eq('id', savedMsg.id);
+                            log(`✅ Message delivered to Telegram chat: ${chatId}`);
                         }
-                    } else {
-                        if (savedMsg?.id) await supabase.from('marketing_messages').update({ status: 'delivered' }).eq('id', savedMsg.id);
-                        log(`✅ Message delivered to Telegram chat: ${chatId}`);
-                    }
-                } catch (e) { console.error('Telegram send error:', e); }
-            } else if (!botToken) {
-                console.error('No Telegram token for company:', companyId);
+                    } catch (e) { console.error('Telegram send error:', e); }
+                } else if (!botToken) {
+                    console.error('No Telegram token for company:', companyId);
+                }
             }
         }
 

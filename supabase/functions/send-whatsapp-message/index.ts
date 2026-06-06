@@ -45,15 +45,15 @@ Deno.serve(async (req) => {
 
         // 2. Fetch Meta Credentials (Multi-tenant)
         const { data: integration } = await supabase
-            .from('company_integrations')
-            .select('credentials')
+            .from('marketing_integrations')
+            .select('settings')
             .eq('company_id', companyId)
             .eq('provider', 'whatsapp')
             .eq('is_active', true)
-            .single();
+            .maybeSingle();
 
         // Check for required keys (token + phoneNumberId)
-        if (!integration?.credentials?.token || !integration?.credentials?.phoneNumberId) {
+        if (!integration?.settings?.token || !integration?.settings?.phoneNumberId) {
             console.error(`Missing WhatsApp credentials for company ${companyId}`);
             await supabase.from('marketing_messages').update({
                 status: 'failed',
@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
             return new Response('Credentials missing', { status: 400, headers: corsHeaders });
         }
 
-        const { token, phoneNumberId } = integration.credentials;
+        const { token, phoneNumberId } = integration.settings;
 
         // 3. Prepare Payload for Meta Graph API
         const url = `https://graph.facebook.com/v17.0/${phoneNumberId}/messages`;
