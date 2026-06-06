@@ -55,20 +55,29 @@ interface SafeQueryResult<T> {
 export async function safeSelect<T = any>(opts: SafeQueryOptions): Promise<SafeQueryResult<T>> {
     const { table, fields, count = false, orderBy, orderAsc = false, rangeFrom, rangeTo, filters, limit } = opts;
 
+    // ── SIMULATION GUARD ────────────────────────────────────────────────
+    // When simulation mode is active, the JWT still carries the real tenant's company_id.
+    // Supabase RLS reads from the JWT, NOT from localStorage. Without this guard, queries
+    // leak real tenant data to the simulated company view.
+    // SOLUTION: Inject an explicit company_id filter at the query layer.
+    const simCompanyId = localStorage.getItem('simulated_company_id');
+    const simFilters = simCompanyId
+        ? [{ column: 'company_id', op: 'eq' as const, value: simCompanyId }]
+        : [];
+    const allFilters = [...simFilters, ...(filters || [])];
+
     // ── Attempt 1: Full field list ──────────────────────────────────────
     try {
         let query = supabase
             .from(table)
             .select(fields, count ? { count: 'exact' } : undefined);
 
-        // Apply filters
-        if (filters) {
-            for (const f of filters) {
-                if (f.op === 'or') {
-                    query = query.or(f.value);
-                } else {
-                    query = (query as any)[f.op](f.column, f.value);
-                }
+        // Apply filters (includes simulation guard)
+        for (const f of allFilters) {
+            if (f.op === 'or') {
+                query = query.or(f.value);
+            } else {
+                query = (query as any)[f.op](f.column, f.value);
             }
         }
 
@@ -102,13 +111,12 @@ export async function safeSelect<T = any>(opts: SafeQueryOptions): Promise<SafeQ
             .from(table)
             .select('*', count ? { count: 'exact' } : undefined);
 
-        if (filters) {
-            for (const f of filters) {
-                if (f.op === 'or') {
-                    fallbackQuery = fallbackQuery.or(f.value);
-                } else {
-                    fallbackQuery = (fallbackQuery as any)[f.op](f.column, f.value);
-                }
+        // Apply filters (includes simulation guard)
+        for (const f of allFilters) {
+            if (f.op === 'or') {
+                fallbackQuery = fallbackQuery.or(f.value);
+            } else {
+                fallbackQuery = (fallbackQuery as any)[f.op](f.column, f.value);
             }
         }
 

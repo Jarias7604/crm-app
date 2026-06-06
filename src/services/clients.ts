@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { simGuard } from './simGuard';
 import type {
   Client,
   ClientPipelineStage,
@@ -16,10 +17,11 @@ import type {
 // ─────────────────────────────────────
 export const pipelineStagesService = {
   async getAll(includeInactive = false): Promise<ClientPipelineStage[]> {
-    let q = supabase
-      .from('client_pipeline_stages')
-      .select('*, document_types:client_stage_document_types(*), assigned_profile:profiles!assigned_to(id, full_name, email)')
-      .order('orden', { ascending: true });
+    let q = simGuard(
+      supabase
+        .from('client_pipeline_stages')
+        .select('*, document_types:client_stage_document_types(*), assigned_profile:profiles!assigned_to(id, full_name, email)')
+    ).order('orden', { ascending: true });
     if (!includeInactive) q = q.eq('activo', true);
     const { data, error } = await q;
     if (error) throw error;
@@ -112,17 +114,18 @@ export const stageDocTypesService = {
 // ─────────────────────────────────────
 export const clientsService = {
   async getAll(filters?: { esActivo?: boolean }): Promise<Client[]> {
-    let q = supabase
-      .from('clients')
-      .select(`
-        *,
-        etapa_actual:client_pipeline_stages(*),
-        assigned_profile:profiles(id, full_name, email),
-        doc_count:client_documents(count),
-        stage_history:client_stage_history(stage_id, entered_at, exited_at),
-        lead:leads(fecha_cierre)
-      `)
-      .order('created_at', { ascending: false });
+    let q = simGuard(
+      supabase
+        .from('clients')
+        .select(`
+          *,
+          etapa_actual:client_pipeline_stages(*),
+          assigned_profile:profiles(id, full_name, email),
+          doc_count:client_documents(count),
+          stage_history:client_stage_history(stage_id, entered_at, exited_at),
+          lead:leads(fecha_cierre)
+        `)
+    ).order('created_at', { ascending: false });
 
     if (filters?.esActivo !== undefined) {
       q = q.eq('es_activo', filters.esActivo);

@@ -62,7 +62,8 @@ interface Profile {
 }
 
 export default function ProjectManagement() {
-  const { profile } = useAuth();
+  const { profile, simulatedCompanyId } = useAuth();
+  const activeCompanyId = simulatedCompanyId || profile?.company_id;
   
   // State
   const [projects, setProjects] = useState<Project[]>([]);
@@ -130,10 +131,10 @@ export default function ProjectManagement() {
 
   // Load Initial Data
   useEffect(() => {
-    if (profile?.company_id) {
+    if (activeCompanyId) {
       loadData();
     }
-  }, [profile?.company_id]);
+  }, [activeCompanyId]);
 
   // Real-time Timer Counter
   useEffect(() => {
@@ -159,15 +160,16 @@ export default function ProjectManagement() {
       const { data: profs, error: profsError } = await supabase
         .from('profiles')
         .select('id, full_name, avatar_url, email')
-        .eq('company_id', profile?.company_id);
+        .eq('company_id', activeCompanyId);
       if (!profsError && profs) {
         setProfiles(profs);
       }
 
-      // Load Projects
+      // Load Projects — filter by active company to prevent cross-tenant leak
       const { data: projs, error: projsError } = await supabase
         .from('crm_projects')
         .select('*')
+        .eq('company_id', activeCompanyId)
         .order('created_at', { ascending: false });
 
       if (projsError) {

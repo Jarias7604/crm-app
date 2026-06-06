@@ -53,6 +53,7 @@ export default function CotizadorPro() {
         descuento_porcentaje: 0,
         iva_porcentaje: 13,
         incluir_implementacion: true,
+        porcentaje_anticipo: undefined as number | undefined,
 
         // Forma de pago
         forma_pago: 'mensual' as 'anual' | 'mensual',
@@ -176,6 +177,7 @@ export default function CotizadorPro() {
                 descuento_porcentaje: cot.descuento_porcentaje,
                 iva_porcentaje: cot.iva_porcentaje,
                 incluir_implementacion: cot.incluir_implementacion,
+                porcentaje_anticipo: cot.metadata?.porcentaje_anticipo !== undefined ? cot.metadata.porcentaje_anticipo : undefined,
                 paquete_id: paqueteFound?.id || prev.paquete_id,
                 modulos_ids: modulosIds,
                 notas: (cot as any).notas || ''
@@ -383,7 +385,10 @@ export default function CotizadorPro() {
             tasa_ajuste: selectedPlan?.interes_porcentaje || 0,
             descuento_manual: formData.descuento_porcentaje || 0, // Descuento manual del campo UI
             iva_porcentaje: formData.iva_porcentaje,
-            incluir_implementacion: formData.incluir_implementacion
+            incluir_implementacion: formData.incluir_implementacion,
+            metadata: {
+                porcentaje_anticipo: formData.porcentaje_anticipo
+            }
         };
 
         const cotizacion = cotizadorService.calcularCotizacion(
@@ -577,6 +582,9 @@ export default function CotizadorPro() {
                 notas: formData.notas?.trim() || undefined,
 
                 incluir_implementacion: formData.incluir_implementacion,
+                metadata: {
+                    porcentaje_anticipo: formData.porcentaje_anticipo
+                },
                 estado: 'borrador' as const
             };
 
@@ -1356,6 +1364,73 @@ export default function CotizadorPro() {
 
 
                             {/* CONFIGURACIÓN AVANZADA REMOVIDA A PETICIÓN */}
+
+                            {totales?.es_financiado && (
+                                <div className="bg-white border border-gray-150 rounded-2xl p-5 shadow-sm space-y-4">
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <h4 className="text-sm font-black text-gray-800 uppercase tracking-wider">
+                                                Anticipo / Prima Requerida
+                                            </h4>
+                                            <p className="text-[10px] text-gray-400">
+                                                Porcentaje del total del contrato a pagar por adelantado
+                                            </p>
+                                        </div>
+                                        <span className="text-xs font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-xl">
+                                            {formData.porcentaje_anticipo !== undefined ? `${formData.porcentaje_anticipo}%` : 'SaaS Estándar (Implementación upfront)'}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex flex-wrap gap-2">
+                                        {[
+                                            { label: 'SaaS Estándar', value: undefined },
+                                            { label: 'Totalmente Financiado (0%)', value: 0 },
+                                            { label: '10%', value: 10 },
+                                            { label: '25%', value: 25 },
+                                            { label: '50%', value: 50 }
+                                        ].map((opt, idx) => (
+                                            <button
+                                                key={idx}
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, porcentaje_anticipo: opt.value })}
+                                                className={`px-3 py-2 text-xs font-bold rounded-xl transition-all ${
+                                                    formData.porcentaje_anticipo === opt.value
+                                                        ? 'bg-[#4449AA] text-white shadow-md'
+                                                        : 'bg-gray-100 text-gray-650 hover:bg-gray-200'
+                                                }`}
+                                            >
+                                                {opt.label}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {formData.porcentaje_anticipo !== undefined && (
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-xs text-gray-400 font-bold">Porcentaje Personalizado:</span>
+                                            <input
+                                                type="range"
+                                                min="0"
+                                                max="100"
+                                                step="5"
+                                                value={formData.porcentaje_anticipo}
+                                                onChange={(e) => setFormData({ ...formData, porcentaje_anticipo: Number(e.target.value) })}
+                                                className="flex-1 accent-[#4449AA] h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                            />
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                value={formData.porcentaje_anticipo}
+                                                onChange={(e) => {
+                                                    const val = Math.max(0, Math.min(100, Number(e.target.value)));
+                                                    setFormData({ ...formData, porcentaje_anticipo: val });
+                                                }}
+                                                className="w-16 h-8 text-center text-xs font-black text-gray-900 border border-gray-250 rounded-lg outline-none"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {/* Descuento */}

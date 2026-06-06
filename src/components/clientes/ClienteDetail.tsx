@@ -59,12 +59,17 @@ export default function ClienteDetail({ clientId, onClose, onUpdated }: Props) {
     // Cargar equipo de la empresa
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return;
-      const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single();
-      if (!profile?.company_id) return;
+      const simId = localStorage.getItem('simulated_company_id');
+      let companyId = simId;
+      if (!companyId) {
+        const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single();
+        companyId = profile?.company_id || null;
+      }
+      if (!companyId) return;
       const { data: team } = await supabase
         .from('profiles')
         .select('id, full_name, email')
-        .eq('company_id', profile.company_id)
+        .eq('company_id', companyId)
         .order('full_name');
       if (team) setTeamMembers(team as TeamMember[]);
     });

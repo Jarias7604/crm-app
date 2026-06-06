@@ -1,8 +1,17 @@
 import { supabase } from './supabase';
+import { getSimulatedCompanyId } from './simGuard';
 import type { Company } from '../types';
 
 export const brandingService = {
   async getMyCompany(): Promise<Company> {
+    // SIMULATION GUARD: use simulated company if active
+    const simId = getSimulatedCompanyId();
+    if (simId) {
+      const { data, error } = await supabase.from('companies').select('*').eq('id', simId).single();
+      if (error) throw error;
+      return data as Company;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 

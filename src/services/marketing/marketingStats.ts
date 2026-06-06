@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { simGuard } from '../simGuard';
 
 export interface MarketingStats {
     totalImpacts: number;
@@ -33,10 +34,12 @@ export interface ActiveCampaign {
 
 export const marketingStatsService = {
     async getOverviewStats(campaignId?: string): Promise<MarketingStats> {
-        // 1. Get total impacts from campaigns
-        let campaignQuery = supabase
-            .from('marketing_campaigns')
-            .select('stats, total_recipients');
+        // 1. Get total impacts from campaigns — scoped to active company
+        let campaignQuery = simGuard(
+            supabase
+                .from('marketing_campaigns')
+                .select('stats, total_recipients')
+        );
 
         if (campaignId) {
             campaignQuery = campaignQuery.eq('id', campaignId);
@@ -47,10 +50,12 @@ export const marketingStatsService = {
         let totalRecipients = 0;
         if (campaignId) {
             // For a single campaign, get real-time sent count from marketing_messages
-            const { count } = await supabase
-                .from('marketing_messages')
-                .select('id', { count: 'exact', head: true })
-                .eq('metadata->>campaign_id', campaignId);
+            const { count } = await simGuard(
+                supabase
+                    .from('marketing_messages')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('metadata->>campaign_id', campaignId)
+            );
             totalRecipients = count || campaigns?.[0]?.total_recipients || 0;
         } else {
             totalRecipients = campaigns?.reduce((acc, c) => acc + (c.total_recipients || 0), 0) || 0;
@@ -59,19 +64,23 @@ export const marketingStatsService = {
         // Get leads associated with this campaign (if campaignId is provided)
         let eligibleLeadIds: string[] = [];
         if (campaignId) {
-            const { data: campaignMsgs } = await supabase
-                .from('marketing_messages')
-                .select('metadata')
-                .eq('metadata->>campaign_id', campaignId);
+            const { data: campaignMsgs } = await simGuard(
+                supabase
+                    .from('marketing_messages')
+                    .select('metadata')
+                    .eq('metadata->>campaign_id', campaignId)
+            );
             
             const ids = (campaignMsgs || []).map(m => (m.metadata as any)?.lead_id).filter(Boolean);
             eligibleLeadIds = Array.from(new Set(ids)) as string[];
         }
 
         // 2. Get Opportunities & Pipeline from cotizaciones
-        let quotesQuery = supabase
-            .from('cotizaciones')
-            .select('id, total_anual, lead_id, estado');
+        let quotesQuery = simGuard(
+            supabase
+                .from('cotizaciones')
+                .select('id, total_anual, lead_id, estado')
+        );
 
         if (campaignId && eligibleLeadIds.length > 0) {
             quotesQuery = quotesQuery.in('lead_id', eligibleLeadIds);
@@ -118,11 +127,12 @@ export const marketingStatsService = {
     async getHeatmapLeads(campaignId?: string): Promise<HeatmapLead[]> {
         try {
             // 1. Get real data from marketing_messages
-            let query = supabase
-                .from('marketing_messages')
-                .select('metadata, status')
-                .order('created_at', { ascending: false })
-                .limit(1000);
+            let query = simGuard(
+                supabase
+                    .from('marketing_messages')
+                    .select('metadata, status')
+            ).order('created_at', { ascending: false })
+             .limit(1000);
 
             if (campaignId) {
                 query = query.eq('metadata->>campaign_id', campaignId);
@@ -155,7 +165,7 @@ export const marketingStatsService = {
                     return [];
                 }
                 // Fallback to most recent leads
-                const { data: recentLeads } = await supabase.from('leads').select('id, name, email').limit(20);
+                const { data: recentLeads } = await simGuard(supabase.from('leads').select('id, name, email')).limit(20);
                 return (recentLeads || []).map(l => ({
                     id: l.id,
                     name: l.name || 'Sin nombre',
@@ -165,10 +175,11 @@ export const marketingStatsService = {
             }
 
             // Get lead details
-            const { data: leads, error: leadsError } = await supabase
-                .from('leads')
-                .select('id, name, email, engagement_score')
-                .in('id', leadIds);
+            const { data: leads, error: leadsError } = await simGuard(
+                supabase
+                    .from('leads')
+                    .select('id, name, email, engagement_score')
+            ).in('id', leadIds);
 
             if (leadsError) throw leadsError;
 
@@ -184,12 +195,13 @@ export const marketingStatsService = {
 
             // Complete with recent leads up to 20 total
             if (!campaignId && realLeads.length < 20) {
-                const { data: moreLeads } = await supabase
-                    .from('leads')
-                    .select('id, name, email')
-                    .not('id', 'in', `(${leadIds.join(',')})`)
-                    .order('created_at', { ascending: false })
-                    .limit(20 - realLeads.length);
+                const { data: moreLeads } = await simGuard(
+                    supabase
+                        .from('leads')
+                        .select('id, name, email')
+                ).not('id', 'in', `(${leadIds.join(',')})`)
+                 .order('created_at', { ascending: false })
+                 .limit(20 - realLeads.length);
 
                 const additionalLeads = (moreLeads || []).map(l => ({
                     id: l.id,
@@ -210,12 +222,13 @@ export const marketingStatsService = {
 
     async getActiveCampaign(): Promise<ActiveCampaign | null> {
         try {
-            const { data, error } = await supabase
-                .from('marketing_campaigns')
-                .select('id, name, total_recipients, stats, status')
-                .or('status.eq.running,status.eq.sent')
-                .order('created_at', { ascending: false })
-                .limit(1)
+            const { data, error } = await simGuard(
+                supabase
+                    .from('marketing_campaigns')
+                    .select('id, name, total_recipients, stats, status')
+                    .or('status.eq.running,status.eq.sent')
+            ).order('created_at', { ascending: false })
+             .limit(1)
                 .single();
 
             if (error || !data) return null;

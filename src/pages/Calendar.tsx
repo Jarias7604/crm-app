@@ -190,10 +190,12 @@ export default function Calendar() {
     // Cargar perfiles para filtro de responsable (solo admins)
     useEffect(() => {
         if (!isAdmin || !profile?.company_id) return;
+        const simId = localStorage.getItem('simulated_company_id');
+        const companyId = simId || profile.company_id;
         supabase
             .from('profiles')
             .select('id, full_name, role, avatar_url')
-            .eq('company_id', profile.company_id)
+            .eq('company_id', companyId)
             .eq('is_active', true)
             .order('full_name')
             .then(({ data }) => { if (data) setCalendarCollabProfiles(data); });

@@ -71,6 +71,7 @@ export interface AutopilotContext {
     daysSinceLastContact: number;
     daysSinceLost: number;
     daysSinceCreation: number;
+    companyName?: string;          // Tenant company name
 }
 
 // ─── Razones de pérdida → Estrategias de venta ──────────────────────────────
@@ -183,7 +184,7 @@ Si tus necesidades evolucionaron, me encantaría retomar la conversación.
 Sin presiones. Solo me importa que encuentres la mejor solución.
 
 Saludos,
-El equipo de Arias Defense`;
+El equipo de ${ctx.companyName || 'nuestra empresa'}`;
         },
     },
 
@@ -202,7 +203,7 @@ Entiendo que estás evaluando opciones — ¡es lo correcto para tu empresa!
 
 Para ayudarte a comparar mejor, te comparto lo que nos diferencia:
 
-⚡ *Por qué elegir Arias:*
+⚡ *Por qué elegir ${ctx.companyName || 'nuestra solución'}:*
 ✅ Implementación en 5 días (el mercado promedio: 30 días)
 ✅ Soporte local en español, respuesta en < 2 horas
 ✅ Sin contratos anuales forzosos

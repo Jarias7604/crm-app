@@ -266,7 +266,7 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                 ) : (
                                     <QuickActionLogger
                                         lead={selectedLead}
-                                        companyId={profile?.company_id || ''}
+                                        companyId={localStorage.getItem('simulated_company_id') || profile?.company_id || ''}
                                         teamMembers={teamMembers}
                                         callStartedAt={callStartedAt ?? undefined}
                                         onCallLogged={async (statusChanged, newStatus) => {

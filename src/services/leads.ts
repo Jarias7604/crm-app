@@ -3,13 +3,31 @@ import type { Lead, FollowUp } from '../types';
 import { logger } from '../utils/logger';
 import { calculateLeadScore, persistLeadScore } from './leadScoringService';
 import { safeSelect } from './safeQuery';
+import { simGuard } from './simGuard';
 
 export const leadsService = {
+    // Helper to get active company ID (respects simulation mode)
+    async getActiveCompanyId() {
+        const simId = localStorage.getItem('simulated_company_id');
+        if (simId) return simId;
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return null;
+
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('company_id')
+            .eq('id', user.id)
+            .single();
+
+        return profile?.company_id || null;
+    },
+
     // Get leads with lightweight payload (optimized for List/Kanban views)
     // PROTECTED by safeSelect — if ANY column is missing, auto-fallback to SELECT *
     async getLeads(page = 1, pageSize = 1000) {
         const fields = 'id, name, company_name, email, phone, status, priority, value, assigned_to, created_at, source, next_followup_date, industry, document_path, internal_won_date, contact_count, closing_amount, address, lost_reason_id, lost_at_stage, lost_notes, next_action_notes';
-        
+
         const from = (page - 1) * pageSize;
         const to = from + pageSize - 1;
 
@@ -43,24 +61,25 @@ export const leadsService = {
             limit,
             filters,
         });
-            
+
         const nextCursor = result.data.length === limit ? result.data[result.data.length - 1].created_at : undefined;
-            
+
         return { data: result.data, nextCursor };
     },
 
     // Global search leveraging pg_trgm indices (Cmd+K Omni-Search)
     async searchLeads(query: string, limit = 10) {
         if (!query || query.trim().length < 2) return [];
-        
+
         const searchTerm = `%${query.trim()}%`;
         const fields = 'id, name, company_name, email, phone, status, priority, value';
-        
-        const { data, error } = await supabase
-            .from('leads')
-            .select(fields)
-            .or(`name.ilike.${searchTerm},company_name.ilike.${searchTerm},email.ilike.${searchTerm},phone.ilike.${searchTerm}`)
-            .limit(limit);
+
+        const { data, error } = await simGuard(
+            supabase
+                .from('leads')
+                .select(fields)
+                .or(`name.ilike.${searchTerm},company_name.ilike.${searchTerm},email.ilike.${searchTerm},phone.ilike.${searchTerm}`)
+        ).limit(limit);
 
         if (error) {
             logger.error('Error in searchLeads', error, { query });
@@ -75,21 +94,22 @@ export const leadsService = {
             const now = new Date();
             const firstDayThisMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
             const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
-            
+
             // Get all Won (Ganado/Cerrado) leads for the last two months
             // Using a single query to minimize latency
-            const { data, error } = await supabase
-                .from('leads')
-                .select('id, created_at, status, value')
-                .gte('created_at', firstDayLastMonth);
+            const { data, error } = await simGuard(
+                supabase
+                    .from('leads')
+                    .select('id, created_at, status, value')
+            ).gte('created_at', firstDayLastMonth);
 
             if (error) throw error;
 
             const leads = data || [];
-            
+
             // Note: Adjust the exact status name if 'Ganado' is different in your DB
             const wonStatuses = ['Ganado', 'Cerrado', 'Cerrado Ganado', 'Venta'];
-            
+
             let wonThisMonth = 0;
             let valueThisMonth = 0;
             let wonLastMonth = 0;
@@ -109,10 +129,10 @@ export const leadsService = {
             });
 
             // Calculate growth
-            const growthPercentage = wonLastMonth === 0 
-                ? (wonThisMonth > 0 ? 100 : 0) 
+            const growthPercentage = wonLastMonth === 0
+                ? (wonThisMonth > 0 ? 100 : 0)
                 : Math.round(((wonThisMonth - wonLastMonth) / wonLastMonth) * 100);
-                
+
             const valueGrowth = valueLastMonth === 0
                 ? (valueThisMonth > 0 ? 100 : 0)
                 : Math.round(((valueThisMonth - valueLastMonth) / valueLastMonth) * 100);
@@ -153,26 +173,29 @@ export const leadsService = {
             const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()).toISOString();
 
             // 1. Get Overdue (pending and date < todayStart)
-            const { count: overdueCount } = await supabase
-                .from('follow_ups')
-                .select('*', { count: 'exact', head: true })
-                .eq('completed', false)
-                .lt('date', todayStart);
+            const { count: overdueCount } = await simGuard(
+                supabase
+                    .from('follow_ups')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('completed', false)
+            ).lt('date', todayStart);
 
             // 2. Get Pending Today (pending and date >= todayStart and date <= todayEnd)
-            const { count: todayCount } = await supabase
-                .from('follow_ups')
-                .select('*', { count: 'exact', head: true })
-                .eq('completed', false)
-                .gte('date', todayStart)
-                .lte('date', todayEnd);
+            const { count: todayCount } = await simGuard(
+                supabase
+                    .from('follow_ups')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('completed', false)
+                    .gte('date', todayStart)
+            ).lte('date', todayEnd);
 
             // 3. Get Completed This Week
-            const { count: completedWeekCount } = await supabase
-                .from('follow_ups')
-                .select('*', { count: 'exact', head: true })
-                .eq('completed', true)
-                .gte('date', weekStart);
+            const { count: completedWeekCount } = await simGuard(
+                supabase
+                    .from('follow_ups')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('completed', true)
+            ).gte('date', weekStart);
 
             const overdue = overdueCount || 0;
             const today = todayCount || 0;
@@ -227,10 +250,13 @@ export const leadsService = {
     // Get lead statistics for Dashboard - Optimized selection
     async getLeadStats(startDate?: string, endDate?: string) {
         try {
+            const companyId = await this.getActiveCompanyId();
+
             // First, get leads created in range — exclude statuses hidden by default in Leads.tsx
             // (Erróneo, Perdido, En Nutrición are auto-hidden unless explicitly filtered)
             let createdQuery = supabase.from('leads').select('id, value, created_at')
                 .not('status', 'in', '("Erróneo","Perdido","En Nutrición")');
+            if (companyId) createdQuery = createdQuery.eq('company_id', companyId);
             if (startDate) createdQuery = createdQuery.gte('created_at', startDate);
             if (endDate) createdQuery = createdQuery.lte('created_at', endDate);
 
@@ -240,6 +266,7 @@ export const leadsService = {
             // Second, get leads WON in range (using internal_won_date)
             let wonQuery = supabase.from('leads').select('id, status, value, closing_amount, internal_won_date')
                 .or('status.eq.Cerrado,status.eq.Cliente');
+            if (companyId) wonQuery = wonQuery.eq('company_id', companyId);
 
             if (startDate) wonQuery = wonQuery.gte('internal_won_date', startDate);
             if (endDate) wonQuery = wonQuery.lte('internal_won_date', endDate);
@@ -266,9 +293,11 @@ export const leadsService = {
 
     // Get leads grouped by status for funnel chart
     async getLeadsByStatus(startDate?: string, endDate?: string) {
+        const companyId = await this.getActiveCompanyId();
         let query = supabase
             .from('leads')
             .select('status, created_at');
+        if (companyId) query = query.eq('company_id', companyId);
 
         if (startDate) query = query.gte('created_at', startDate);
         if (endDate) query = query.lte('created_at', endDate);
@@ -288,9 +317,11 @@ export const leadsService = {
 
     // Get leads grouped by source for pie chart
     async getLeadsBySource(startDate?: string, endDate?: string) {
+        const companyId = await this.getActiveCompanyId();
         let query = supabase
             .from('leads')
             .select('source, created_at');
+        if (companyId) query = query.eq('company_id', companyId);
 
         if (startDate) query = query.gte('created_at', startDate);
         if (endDate) query = query.lte('created_at', endDate);
@@ -310,9 +341,11 @@ export const leadsService = {
 
     // Get leads grouped by priority for charts
     async getLeadsByPriority(startDate?: string, endDate?: string) {
+        const companyId = await this.getActiveCompanyId();
         let query = supabase
             .from('leads')
             .select('priority, created_at');
+        if (companyId) query = query.eq('company_id', companyId);
 
         if (startDate) query = query.gte('created_at', startDate);
         if (endDate) query = query.lte('created_at', endDate);
@@ -332,11 +365,13 @@ export const leadsService = {
 
     // Get top opportunities (highest value leads)
     async getTopOpportunities(limit = 5, startDate?: string, endDate?: string) {
+        const companyId = await this.getActiveCompanyId();
         let query = supabase
             .from('leads')
-            .select('id, name, company_name, status, value, created_at, source')
-            .order('value', { ascending: false })
-            .limit(limit);
+            .select('id, name, company_name, status, value, created_at, source');
+        if (companyId) query = query.eq('company_id', companyId);
+
+        query = query.order('value', { ascending: false }).limit(limit);
 
         if (startDate) query = query.gte('created_at', startDate);
         if (endDate) query = query.lte('created_at', endDate);
@@ -348,47 +383,54 @@ export const leadsService = {
     },
 
     // Create a new lead with self-healing profile
+    // Create a new lead with self-healing profile
     async createLead(lead: Partial<Lead>) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('Not authenticated');
 
-        let { data: profile } = await supabase
-            .from('profiles')
-            .select('company_id')
-            .eq('id', user.id)
-            .single();
+        let companyId = await this.getActiveCompanyId();
 
-        // Self-healing for missing profile
-        if (!profile) {
-            let { data: company } = await supabase.from('companies').select('id').limit(1).single();
-
-            if (!company) {
-                const { data: newCompany, error: companyError } = await supabase
-                    .from('companies')
-                    .insert({ name: 'Mi Empresa CRM', license_status: 'active' })
-                    .select('id')
-                    .single();
-                if (companyError) throw new Error(`Failed to create company: ${companyError.message}`);
-                company = newCompany;
-            }
-
-            const { data: newProfile, error: profileError } = await supabase
+        // Self-healing fallback if no company ID was found
+        if (!companyId) {
+            let { data: profile } = await supabase
                 .from('profiles')
-                .insert({
-                    id: user.id,
-                    email: user.email,
-                    role: 'super_admin',
-                    company_id: company?.id,
-                    status: 'active'
-                })
                 .select('company_id')
+                .eq('id', user.id)
                 .single();
 
-            if (profileError) throw new Error(`Failed to create profile: ${profileError.message} `);
-            profile = newProfile;
+            if (!profile) {
+                let { data: company } = await supabase.from('companies').select('id').limit(1).single();
+
+                if (!company) {
+                    const { data: newCompany, error: companyError } = await supabase
+                        .from('companies')
+                        .insert({ name: 'Mi Empresa CRM', license_status: 'active' })
+                        .select('id')
+                        .single();
+                    if (companyError) throw new Error(`Failed to create company: ${companyError.message}`);
+                    company = newCompany;
+                }
+
+                const { data: newProfile, error: profileError } = await supabase
+                    .from('profiles')
+                    .insert({
+                        id: user.id,
+                        email: user.email,
+                        role: 'super_admin',
+                        company_id: company?.id,
+                        status: 'active'
+                    })
+                    .select('company_id')
+                    .single();
+
+                if (profileError) throw new Error(`Failed to create profile: ${profileError.message} `);
+                profile = newProfile;
+            }
+
+            companyId = profile?.company_id || null;
         }
 
-        if (!profile?.company_id) {
+        if (!companyId) {
             throw new Error('Usuario sin empresa asignada.');
         }
 
@@ -396,7 +438,7 @@ export const leadsService = {
             .from('leads')
             .insert({
                 ...lead,
-                company_id: profile.company_id,
+                company_id: companyId,
                 assigned_to: lead.assigned_to || user.id, // Auto-assign to creator if not specified
                 priority: lead.priority || 'medium',
                 value: lead.value || 0
@@ -411,14 +453,14 @@ export const leadsService = {
         supabase.functions.invoke('dispatch-webhooks', {
             body: {
                 event_type: 'lead.created',
-                company_id: profile.company_id,
+                company_id: companyId,
                 payload: { id: data.id, name: data.name, status: data.status, value: data.value }
             }
-        }).catch(() => {/* webhook errors are silently ignored */});
+        }).catch(() => {/* webhook errors are silently ignored */ });
 
         // AI Lead Scoring — fire-and-forget, never blocks UI
         const score = calculateLeadScore(data as Partial<Lead>);
-        persistLeadScore(data.id, score.total).catch(() => {});
+        persistLeadScore(data.id, score.total).catch(() => { });
 
         return data as Lead;
     },
@@ -430,13 +472,9 @@ export const leadsService = {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('Not authenticated');
 
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('company_id')
-                .eq('id', user.id)
-                .single();
+            const companyId = await this.getActiveCompanyId();
 
-            if (!profile?.company_id) {
+            if (!companyId) {
                 throw new Error('Usuario sin empresa asignada.');
             }
 
@@ -450,7 +488,7 @@ export const leadsService = {
 
             const leadsToInsert = leads.map(lead => {
                 const cleanedLead: any = {
-                    company_id: profile.company_id,
+                    company_id: companyId,
                     assigned_to: lead.assigned_to || user.id,
                     priority: lead.priority || 'medium',
                     status: lead.status || 'Prospecto',
@@ -554,12 +592,12 @@ export const leadsService = {
                     company_id: data.company_id,
                     payload: { id: data.id, name: data.name, status: data.status, value: data.closing_amount || data.value }
                 }
-            }).catch(() => {});
+            }).catch(() => { });
         }
 
         // AI Lead Scoring — recalculate on every update
         const score = calculateLeadScore(data as Partial<Lead>);
-        persistLeadScore(data.id, score.total).catch(() => {});
+        persistLeadScore(data.id, score.total).catch(() => { });
 
         return data as Lead;
     },
@@ -588,20 +626,17 @@ export const leadsService = {
 
     // Create a new follow-up (with assigned_to support)
     // Auto-marks previous follow-ups for the same lead as completed
+    // Create a new follow-up (with assigned_to support)
+    // Auto-marks previous follow-ups for the same lead as completed
     async createFollowUp(followUp: Partial<FollowUp>, assignedTo?: string) {
         const { data: { user } } = await supabase.auth.getUser();
 
         // Resolve company_id — required by RLS CHECK (company_id = get_auth_company_id()).
-        // If not explicitly passed, fetch from the user's profile so the INSERT
+        // If not explicitly passed, fetch the active/simulated company ID so the INSERT
         // is never rejected by RLS and the record is visible in calendar queries.
         let companyId = followUp.company_id;
-        if (!companyId && user?.id) {
-            const { data: p } = await supabase
-                .from('profiles')
-                .select('company_id')
-                .eq('id', user.id)
-                .single();
-            companyId = p?.company_id ?? undefined;
+        if (!companyId) {
+            companyId = (await this.getActiveCompanyId()) || undefined;
         }
 
         const { data, error } = await supabase
@@ -624,10 +659,10 @@ export const leadsService = {
             const nowIso = new Date().toISOString();
             await supabase
                 .from('follow_ups')
-                .update({ 
-                    completed: true, 
+                .update({
+                    completed: true,
                     completed_at: nowIso,
-                    completed_by: user?.id 
+                    completed_by: user?.id
                 })
                 .eq('lead_id', followUp.lead_id)
                 .eq('completed', false)
@@ -649,19 +684,14 @@ export const leadsService = {
 
     // Get team members for assignee dropdown
     async getTeamMembers() {
-        const { data: { user } } = await supabase.auth.getUser();
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('company_id')
-            .eq('id', user?.id)
-            .single();
+        const companyId = await this.getActiveCompanyId();
 
-        if (!profile) return [];
+        if (!companyId) return [];
 
         const { data, error } = await supabase
             .from('profiles')
             .select('id, email, role, full_name, avatar_url')
-            .eq('company_id', profile.company_id);
+            .eq('company_id', companyId);
 
         if (error) throw error;
         return data;
@@ -672,6 +702,7 @@ export const leadsService = {
     // Used to render count badges and action-type dots instantly while Phase 2 loads
     // ~10x faster than getCalendarFollowUps because it avoids JOIN to leads + profiles
     async getCalendarFastCounts(startDate: string, endDate: string, assignedTo?: string) {
+        const companyId = await this.getActiveCompanyId();
         let query = supabase
             .from('follow_ups')
             .select('id, date, action_type, completed, assigned_to')
@@ -680,6 +711,7 @@ export const leadsService = {
             .order('date', { ascending: false })
             .limit(2000);
 
+        if (companyId) query = query.eq('company_id', companyId);
         if (assignedTo) query = query.eq('assigned_to', assignedTo);
 
         const { data, error } = await query;
@@ -709,7 +741,9 @@ export const leadsService = {
         defaultEnd.setDate(0); // Last day of month+1
 
         const from = startDate ?? defaultStart.toISOString();
-        const to   = endDate   ?? defaultEnd.toISOString();
+        const to = endDate ?? defaultEnd.toISOString();
+
+        const companyId = await this.getActiveCompanyId();
 
         let followUpsQuery = supabase
             .from('follow_ups')
@@ -723,6 +757,9 @@ export const leadsService = {
             .order('date', { ascending: false })
             .limit(2000); // Reduced from 5000 — a month window never exceeds this
 
+        if (companyId) {
+            followUpsQuery = followUpsQuery.eq('company_id', companyId);
+        }
         if (assignedTo) {
             followUpsQuery = followUpsQuery.eq('assigned_to', assignedTo);
         }
@@ -731,9 +768,14 @@ export const leadsService = {
         // Profiles is tiny (team members only, filtered by RLS automatically).
         // Fetching all of them in parallel is faster than waiting for follow_ups
         // to complete first, extracting IDs, then doing a second sequential query.
+        let profilesQuery = supabase.from('profiles').select('id, full_name, avatar_url');
+        if (companyId) {
+            profilesQuery = profilesQuery.eq('company_id', companyId);
+        }
+
         const [followUpsResult, profilesResult] = await Promise.all([
             followUpsQuery,
-            supabase.from('profiles').select('id, full_name, avatar_url')
+            profilesQuery
         ]);
 
         if (followUpsResult.error) throw followUpsResult.error;

@@ -149,6 +149,7 @@ export interface QuoteFinancialsV2 {
     // Descuento manual del agente
     descuentoManualPct: number;        // Porcentaje (ej: 10)
     descuentoManualMonto: number;      // Monto en $ del descuento manual
+    descuentoImplementacionMonto: number; // Monto en $ del descuento sobre implementación/pago único
 }
 
 export const calculateQuoteFinancialsV2 = (
@@ -212,10 +213,87 @@ export const calculateQuoteFinancialsV2 = (
 
     const ivaPct = (cotizacion.iva_porcentaje || 13) / 100;
 
-    // 3. AJUSTES DE FINANCIAMIENTO
     const ajustePct = Number(financingPlan?.interes_porcentaje || cotizacion.recargo_mensual_porcentaje || 0) / 100;
     const tipoAjuste = financingPlan?.tipo_ajuste || (ajustePct > 0 ? 'recharge' : 'none');
 
+    const pctAnticipo = cotizacion.metadata?.porcentaje_anticipo !== undefined && cotizacion.metadata?.porcentaje_anticipo !== null
+        ? Number(cotizacion.metadata.porcentaje_anticipo)
+        : null;
+
+    if (pctAnticipo !== null) {
+        // --- MODELO GENERAL DE PROYECTO / SERVICIO CON ANTICIPO DINÁMICO ---
+        const totalBase = licenciaAnual + implementacion;
+
+        let totalBaseAjustado = totalBase;
+        let recargoMonto = 0;
+        let descuentoPlanMonto = 0;
+        let ajusteLabel = '';
+
+        if (tipoAjuste === 'discount') {
+            descuentoPlanMonto = totalBase * ajustePct;
+            totalBaseAjustado = totalBase - descuentoPlanMonto;
+            ajusteLabel = `Descuento ${Math.round(ajustePct * 100)}%`;
+        } else if (tipoAjuste === 'recharge' && ajustePct > 0) {
+            recargoMonto = totalBase * ajustePct;
+            totalBaseAjustado = totalBase + recargoMonto;
+            ajusteLabel = `Financiamiento (${Math.round(ajustePct * 100)}%)`;
+        }
+
+        const descuentoManualPct = Number(cotizacion.descuento_porcentaje || 0);
+        const descuentoManualMonto = descuentoManualPct > 0
+            ? totalBaseAjustado * (descuentoManualPct / 100)
+            : 0;
+        const totalBaseFinal = totalBaseAjustado - descuentoManualMonto;
+
+        // Total general con IVA incluido
+        const totalGeneralIVA = totalBaseFinal * (1 + ivaPct);
+
+        // Desglose de anticipo/prima
+        const totalAnticipoConIVA = totalGeneralIVA * (pctAnticipo / 100);
+        const implementacionAjustada = totalAnticipoConIVA / (1 + ivaPct);
+        const ivaImplementacion = totalAnticipoConIVA - implementacionAjustada;
+
+        // Desglose financiado
+        const totalFinanciadoConIVA = totalGeneralIVA - totalAnticipoConIVA;
+        const licenciaConDescuento = totalFinanciadoConIVA / (1 + ivaPct);
+        const ivaLicencia = totalFinanciadoConIVA - licenciaConDescuento;
+
+        // Cuotas periódicas
+        const cuotaMensual = cuotas > 1 ? totalFinanciadoConIVA / cuotas : totalFinanciadoConIVA;
+
+        const planTitulo = financingPlan?.titulo || cotizacion.descripcion_pago || (isPagoUnico ? '1 Solo pago' : `${cuotas} Meses`);
+        const planDescripcion = financingPlan?.descripcion || (isPagoUnico ? 'Pago único adelantado' : `${cuotas} cuotas consecutivas`);
+
+        // Descuento prorrateado para el pago inicial (para visualización)
+        const descuentoImplementacionMonto = (descuentoPlanMonto + descuentoManualMonto) * (pctAnticipo / 100);
+
+        return {
+            cuotas,
+            isPagoUnico,
+            licenciaAnual: licenciaConDescuento,
+            implementacion: implementacionAjustada,
+            ivaPct,
+            ajustePct,
+            tipoAjuste,
+            recargoMonto,
+            ajusteLabel,
+            licenciaAjustada: licenciaConDescuento,
+            ivaLicencia,
+            totalLicencia: totalFinanciadoConIVA,
+            cuotaMensual,
+            ivaImplementacion,
+            totalImplementacion: totalAnticipoConIVA,
+            planTitulo,
+            planDescripcion,
+            descuentoManualPct,
+            descuentoManualMonto,
+            descuentoImplementacionMonto
+        };
+    }
+
+    const baseLicenseCost = Number(cotizacion.costo_plan_anual) || 0;
+
+    // 3. AJUSTES DE FINANCIAMIENTO (SaaS / CLÁSICO)
     let licenciaAjustada = licenciaAnual;
     let ajusteLabel = '';
     let recargoMonto = 0;
@@ -229,25 +307,47 @@ export const calculateQuoteFinancialsV2 = (
         ajusteLabel = `Financiamiento (${Math.round(ajustePct * 100)}%)`;
     }
 
-    // 3b. DESCUENTO MANUAL DEL AGENTE (aplicado sobre licenciaAjustada)
+    // 5. CÁLCULOS DE IMPLEMENTACIÓN & DESCUENTOS DE PLAN CROSS-ITEM
+    let implementacionAjustada = implementacion;
+    let descuentoImplementacionMonto = 0;
+    if (tipoAjuste === 'discount' && ajustePct > 0 && implementacion > 0) {
+        if (baseLicenseCost === 0 || licenciaAnual === 0) {
+            descuentoImplementacionMonto = implementacion * ajustePct;
+            implementacionAjustada = implementacion - descuentoImplementacionMonto;
+        }
+    }
+
+    // 3b. DESCUENTO MANUAL DEL AGENTE (aplicado sobre licenciaAjustada, y sobre implementacionAjustada si el costo de licencia base es cero/null)
     const descuentoManualPct = Number(cotizacion.descuento_porcentaje || 0);
-    const descuentoManualMonto = descuentoManualPct > 0
-        ? licenciaAjustada * (descuentoManualPct / 100)
-        : 0;
-    const licenciaConDescuento = licenciaAjustada - descuentoManualMonto;
+    let descuentoManualMonto = 0;
+    let licenciaConDescuento = licenciaAjustada;
+
+    if (baseLicenseCost === 0) {
+        if (descuentoManualPct > 0) {
+            const descPct = descuentoManualPct / 100;
+            descuentoManualMonto = (licenciaAjustada + implementacionAjustada) * descPct;
+            licenciaConDescuento = licenciaAjustada * (1 - descPct);
+            implementacionAjustada = implementacionAjustada * (1 - descPct);
+        }
+    } else {
+        if (licenciaAnual > 0) {
+            descuentoManualMonto = descuentoManualPct > 0
+                ? licenciaAjustada * (descuentoManualPct / 100)
+                : 0;
+            licenciaConDescuento = licenciaAjustada - descuentoManualMonto;
+        } else if (implementacion > 0) {
+            descuentoManualMonto = descuentoManualPct > 0
+                ? implementacionAjustada * (descuentoManualPct / 100)
+                : 0;
+            implementacionAjustada = implementacionAjustada - descuentoManualMonto;
+        }
+    }
 
     // 4. CÁLCULOS DE LICENCIA
     const ivaLicencia = licenciaConDescuento * ivaPct;
     const totalLicencia = licenciaConDescuento + ivaLicencia;
     const cuotaMensual = cuotas > 1 ? totalLicencia / cuotas : totalLicencia;
 
-    // 5. CÁLCULOS DE IMPLEMENTACIÓN
-    // Si licenciaAnual = 0 (solo pago único) y hay descuento de plan,
-    // aplicar el descuento al total de implementación (como HubSpot/Salesforce: descuento a la orden total)
-    let implementacionAjustada = implementacion;
-    if (tipoAjuste === 'discount' && ajustePct > 0 && licenciaAnual === 0 && implementacion > 0) {
-        implementacionAjustada = implementacion * (1 - ajustePct);
-    }
     const ivaImplementacion = implementacionAjustada * ivaPct;
     const totalImplementacion = implementacionAjustada + ivaImplementacion;
 
@@ -274,7 +374,8 @@ export const calculateQuoteFinancialsV2 = (
         planTitulo,
         planDescripcion,
         descuentoManualPct,
-        descuentoManualMonto
+        descuentoManualMonto,
+        descuentoImplementacionMonto
     };
 };
 
@@ -288,3 +389,21 @@ export const parseModules = (modules: any): CotizacionItem[] => {
     }
     return [];
 };
+
+export function getVolumeLabel(industry?: string | null): string {
+    if (!industry) return 'DTEs/año';
+    const ind = industry.toLowerCase();
+    if (ind.includes('defensa') || ind.includes('seguridad') || ind.includes('dte') || ind.includes('factura')) {
+        return 'DTEs/año';
+    }
+    if (ind.includes('tecnología') || ind.includes('retail') || ind.includes('comercio') || ind.includes('manufactura')) {
+        return 'Transacciones/año';
+    }
+    if (ind.includes('iglesia') || ind.includes('ministerio') || ind.includes('educación')) {
+        return 'Miembros/año';
+    }
+    if (ind.includes('servicios') || ind.includes('salud') || ind.includes('profesionales')) {
+        return 'Contactos/año';
+    }
+    return 'DTEs/año';
+}

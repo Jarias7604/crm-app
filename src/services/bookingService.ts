@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { simGuard } from './simGuard';
 
 export interface BookingLink {
     id: string;
@@ -48,13 +49,14 @@ export const bookingService = {
     async getMyBookingLink(): Promise<BookingLink | null> {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return null;
-        const { data } = await supabase
-            .from('booking_links')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: true })
-            .limit(1)
-            .maybeSingle();
+        const { data } = await simGuard(
+            supabase
+                .from('booking_links')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: true })
+                .limit(1)
+        ).maybeSingle();
         return data;
     },
 
@@ -62,11 +64,12 @@ export const bookingService = {
     async getMyBookingLinks(): Promise<BookingLink[]> {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return [];
-        const { data } = await supabase
-            .from('booking_links')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: true });
+        const { data } = await simGuard(
+            supabase
+                .from('booking_links')
+                .select('*')
+                .eq('user_id', user.id)
+        ).order('created_at', { ascending: true });
         return data || [];
     },
 
@@ -293,6 +296,14 @@ export const bookingService = {
         } else {
             // Fallback: Send a professional Resend email through marketing queue via safe RPC
             try {
+                // Fetch company details for branding
+                const { data: company } = await supabase
+                    .from('companies')
+                    .select('name')
+                    .eq('id', appointment.company_id)
+                    .maybeSingle();
+                const companyName = company?.name || 'nuestra empresa';
+
                 const formattedDate = new Date(appointment.start_time).toLocaleDateString('es-ES', {
                     weekday: 'long',
                     year: 'numeric',
@@ -350,7 +361,7 @@ export const bookingService = {
                         </p>
                         
                         <p style="color: #9CA3AF; font-size: 11px; margin-top: 30px; border-top: 1px solid #E5E7EB; padding-top: 15px; text-align: center;">
-                            Este es un mensaje automático de confirmación enviado por Arias CRM.
+                            Este es un mensaje automático de confirmación enviado por el CRM de ${companyName}.
                         </p>
                     </div>
                 `;
@@ -360,7 +371,7 @@ export const bookingService = {
                     p_company_id: appointment.company_id,
                     p_lead_id: apptData.lead_id,
                     p_channel: 'email',
-                    p_subject: 'Confirmación de tu cita - Arias Defense',
+                    p_subject: `Confirmación de tu cita - ${companyName}`,
                     p_content: htmlContent
                 });
 
