@@ -62,7 +62,7 @@ export default function Leads() {
     } = useInfiniteQuery({
         queryKey: ['leads', activeCompanyId],
         queryFn: async ({ pageParam }) => {
-            const result = await leadsService.getLeadsCursor(5000, pageParam as string | undefined);
+            const result = await leadsService.getLeadsCursor(1000, pageParam as string | undefined);
             return result;
         },
         initialPageParam: undefined as string | undefined,
@@ -71,6 +71,13 @@ export default function Leads() {
         gcTime: 10 * 60 * 1000,
     });
     const leads = leadsData?.pages.flatMap(page => page.data) ?? [];
+
+    // Auto-fetch remaining pages if they exceed the 1000 row Supabase API limit
+    useEffect(() => {
+        if (hasNextPage && !isFetchingNextPage) {
+            fetchNextPage();
+        }
+    }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
