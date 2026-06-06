@@ -1256,7 +1256,24 @@ export default function Dashboard() {
                                             <InfoTip text={item.tooltip as string} position="bottom" />
                                         )}
                                     </h3>
-                                    {item.name === t('dashboard.crm.wonDeals') ? (
+                                    {item.name === t('dashboard.crm.totalLeads') ? (
+                                        <div className="space-y-2 mt-1">
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-3xl font-black tracking-tighter text-slate-900">{item.value}</span>
+                                            </div>
+                                            <div 
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    navigate('/leads', { state: { assignedFilter: 'unassigned' } });
+                                                }}
+                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-600 font-bold transition-all border border-orange-100/30 group/badge"
+                                            >
+                                                <UserMinus className="w-3.5 h-3.5 group-hover/badge:-translate-x-0.5 transition-transform" />
+                                                <span className="text-[9px] uppercase tracking-wider">Sin Asignar:</span>
+                                                <span className="text-[10px] font-black bg-orange-200/50 text-orange-700 px-1.5 py-0.2 rounded-md">{unassignedLeads.length}</span>
+                                            </div>
+                                        </div>
+                                    ) : item.name === t('dashboard.crm.wonDeals') ? (
                                         <div className="space-y-1.5 mt-1">
                                             <div className="flex items-baseline gap-2">
                                                 <span className="text-3xl font-black tracking-tighter text-slate-900">{item.value}</span>
