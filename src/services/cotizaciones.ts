@@ -88,7 +88,7 @@ class CotizacionesService {
                 *,
                 lead:leads(id, name, email, company_name, phone),
                 creator:profiles!created_by(full_name, email, avatar_url),
-                company:companies(id, name, logo_url, website, address, phone)
+                company:companies(id, name, logo_url, website, address, phone, industry)
             `)
             .eq('id', id)
             .single();

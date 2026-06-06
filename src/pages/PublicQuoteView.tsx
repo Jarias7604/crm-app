@@ -434,23 +434,25 @@ export default function PublicQuoteView() {
 
                     {/* Items List */}
                     <div className="space-y-3">
-                        <div className="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm flex items-start justify-between group active:scale-[0.98] transition-all">
-                            <div className="flex items-start gap-4 flex-1">
-                                <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 flex-shrink-0">
-                                    <FileText className="w-6 h-6" />
+                        {Number(cotizacion.costo_plan_anual) > 0 && (
+                            <div className="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm flex items-start justify-between group active:scale-[0.98] transition-all">
+                                <div className="flex items-start gap-4 flex-1">
+                                    <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 flex-shrink-0">
+                                        <FileText className="w-6 h-6" />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <p className="font-black text-slate-900 text-sm leading-none m-0 uppercase">Licenciamiento Anual</p>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase">PLAN {cotizacion.plan_nombre}</p>
+                                        {pricingItemDescripcion && (
+                                            <p className="text-[10px] text-slate-500 font-medium leading-relaxed mt-1">{pricingItemDescripcion}</p>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="flex flex-col gap-1">
-                                    <p className="font-black text-slate-900 text-sm leading-none m-0 uppercase">Licenciamiento Anual</p>
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase">PLAN {cotizacion.plan_nombre}</p>
-                                    {pricingItemDescripcion && (
-                                        <p className="text-[10px] text-slate-500 font-medium leading-relaxed mt-1">{pricingItemDescripcion}</p>
-                                    )}
-                                </div>
+                                <span className="text-lg font-black text-slate-900 tracking-tight flex-shrink-0">${Number(cotizacion.costo_plan_anual).toLocaleString()}</span>
                             </div>
-                            <span className="text-lg font-black text-slate-900 tracking-tight flex-shrink-0">${Number(cotizacion.costo_plan_anual).toLocaleString()}</span>
-                        </div>
+                        )}
 
-                        {cotizacion.incluir_implementacion && (
+                        {cotizacion.incluir_implementacion && Number(cotizacion.costo_implementacion) > 0 && (
                             <div className="bg-white p-5 rounded-2xl border border-slate-200/60 shadow-sm flex items-center justify-between group active:scale-[0.98] transition-all">
                                 <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-600">
@@ -542,7 +544,11 @@ export default function PublicQuoteView() {
                                 const isSelected = clientSelectedPlanId === plan.id;
                                 const isAgentPick = plan.id === financingPlan?.id;
                                 const isDiscount = plan.tipo_ajuste === 'discount';
-                                const displayAmt = pf.isPagoUnico ? pf.totalLicencia : pf.cuotaMensual;
+                                const isServiceOnly = (Number(cotizacion.costo_plan_anual) || 0) === 0 &&
+                                    (parseModules(cotizacion.modulos_adicionales)).every((mod: any) => !(Number(mod.costo_anual || mod.costo) > 0));
+                                const displayAmt = isServiceOnly
+                                    ? (pf.isPagoUnico ? pf.totalImplementacion : pf.totalImplementacion / pf.cuotas)
+                                    : (pf.isPagoUnico ? pf.totalLicencia : pf.cuotaMensual);
                                 return (
                                     <button
                                         key={plan.id}
@@ -584,10 +590,12 @@ export default function PublicQuoteView() {
                                         {/* Desglose — módulos individuales + financiamiento */}
                                         <div className="space-y-1.5 mb-5">
                                             {/* Licencia base del plan */}
-                                            <div className="flex justify-between text-[10px] text-slate-500 font-medium">
-                                                <span className="truncate">Licencia {cotizacion.plan_nombre}</span>
-                                                <span className="font-bold text-slate-700 ml-2 flex-shrink-0">${Number(cotizacion.costo_plan_anual).toLocaleString()}</span>
-                                            </div>
+                                            {Number(cotizacion.costo_plan_anual) > 0 && (
+                                                <div className="flex justify-between text-[10px] text-slate-500 font-medium">
+                                                    <span className="truncate">Licencia {cotizacion.plan_nombre}</span>
+                                                    <span className="font-bold text-slate-700 ml-2 flex-shrink-0">${Number(cotizacion.costo_plan_anual).toLocaleString()}</span>
+                                                </div>
+                                            )}
                                             {/* Módulos adicionales recurrentes — uno por línea */}
                                             {plan.show_breakdown !== false && (cotizacion.modulos_adicionales || [])
                                                 .filter((mod: any) => !(Number(mod.pago_unico) > 0) && (Number(mod.costo_anual || mod.costo) > 0))
@@ -600,6 +608,25 @@ export default function PublicQuoteView() {
                                                     </div>
                                                 ))
                                             }
+                                            {/* Servicios de pago único (si es solo servicio/proyecto) */}
+                                            {isServiceOnly && plan.show_breakdown !== false && (cotizacion.modulos_adicionales || [])
+                                                .filter((mod: any) => Number(mod.pago_unico) > 0)
+                                                .map((mod: any, modIdx: number) => (
+                                                    <div key={modIdx} className="flex justify-between text-[10px] text-slate-500 font-medium">
+                                                        <span className="truncate">{mod.nombre}</span>
+                                                        <span className="font-bold text-slate-700 ml-2 flex-shrink-0">
+                                                            ${Number(mod.pago_unico).toLocaleString()}
+                                                        </span>
+                                                    </div>
+                                                ))
+                                            }
+                                            {/* Implementación base (si es solo servicio/proyecto y costo_implementacion > 0) */}
+                                            {isServiceOnly && Number(cotizacion.costo_implementacion) > 0 && (
+                                                <div className="flex justify-between text-[10px] text-slate-500 font-medium">
+                                                    <span className="truncate">Implementación</span>
+                                                    <span className="font-bold text-slate-700 ml-2 flex-shrink-0">${Number(cotizacion.costo_implementacion).toLocaleString()}</span>
+                                                </div>
+                                            )}
                                             {/* WhatsApp si aplica */}
                                             {plan.show_breakdown !== false && cotizacion.servicio_whatsapp && Number(cotizacion.costo_whatsapp) > 0 && (
                                                 <div className="flex justify-between text-[10px] text-slate-500 font-medium">
@@ -624,10 +651,10 @@ export default function PublicQuoteView() {
                                                 </div>
                                             )}
                                             {/* Descuento del plan (tipo discount) */}
-                                            {!pf.isPagoUnico && pf.tipoAjuste === 'discount' && pf.ajustePct > 0 && (
+                                            {pf.tipoAjuste === 'discount' && pf.ajustePct > 0 && (
                                                 <div className="flex justify-between text-[10px] text-emerald-600 font-medium">
                                                     <span>- {plan.etiqueta_ajuste?.trim() || 'Descuento anticipado'} ({Math.round(pf.ajustePct * 100)}%)</span>
-                                                    <span>-${(pf.licenciaAnual * pf.ajustePct).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                    <span>-${((isServiceOnly ? pf.implementacion : pf.licenciaAnual) * pf.ajustePct).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                 </div>
                                             )}
                                             {/* Descuento manual del agente */}
@@ -640,12 +667,16 @@ export default function PublicQuoteView() {
                                             {/* IVA */}
                                             <div className="flex justify-between text-[10px] text-slate-400 font-medium">
                                                 <span>IVA ({Math.round(pf.ivaPct * 100)}%)</span>
-                                                <span className={pf.isPagoUnico ? 'text-emerald-500' : 'text-blue-500'}>+${pf.ivaLicencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                <span className={pf.isPagoUnico ? 'text-emerald-500' : 'text-blue-500'}>
+                                                    +${(isServiceOnly ? pf.ivaImplementacion : pf.ivaLicencia).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </span>
                                             </div>
                                             {/* Total */}
                                             <div className="pt-2 border-t border-slate-100 flex justify-between text-[11px] font-bold text-slate-700">
                                                 <span>Total {pf.isPagoUnico ? 'a pagar' : `(${pf.cuotas} cuotas)`}</span>
-                                                <span>${pf.totalLicencia.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                <span>
+                                                    ${(isServiceOnly ? pf.totalImplementacion : pf.totalLicencia).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </span>
                                             </div>
                                         </div>
 
@@ -670,7 +701,7 @@ export default function PublicQuoteView() {
                         const implementacionBase = Number(cotizacion.costo_implementacion) || 0;
                         const modulos = cotizacion.modulos_adicionales || [];
                         const serviciosUnicos = modulos.filter((m: any) => (Number(m.pago_unico) || 0) > 0);
-                        const { ivaPct, ivaImplementacion } = financials;
+                        const { ivaPct, ivaImplementacion, descuentoImplementacionMonto, ajusteLabel } = financials;
                         if (implementacionBase === 0 && serviciosUnicos.length === 0) return null;
                         return (
                             <div className="mt-6 bg-gradient-to-br from-orange-50 to-amber-50 rounded-[2rem] p-6 shadow-sm border-2 border-orange-200">
@@ -696,6 +727,12 @@ export default function PublicQuoteView() {
                                             <span className="font-bold text-slate-800 whitespace-nowrap">${Number(serv.pago_unico).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                         </div>
                                     ))}
+                                    {descuentoImplementacionMonto > 0 && (
+                                        <div className="flex justify-between items-center text-[11px] text-emerald-600 font-bold gap-2">
+                                            <span className="truncate flex-1">{ajusteLabel || 'Descuento aplicado'}</span>
+                                            <span className="font-bold whitespace-nowrap">-${descuentoImplementacionMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        </div>
+                                    )}
                                     <div className="flex justify-between items-center text-[11px] text-slate-500 font-medium gap-2">
                                         <span className="truncate flex-1">IVA ({Math.round(ivaPct * 100)}%)</span>
                                         <span className="font-bold text-orange-500 whitespace-nowrap">+$ {ivaImplementacion.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>

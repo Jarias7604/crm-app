@@ -42,7 +42,8 @@ import { PipelineIntelligenceBar, applyPipelineFilter } from '../components/lead
 import type { PipelineFilter } from '../components/leads/PipelineIntelligenceBar';
 
 export default function Leads() {
-    const { profile } = useAuth();
+    const { profile, simulatedCompanyId } = useAuth();
+    const activeCompanyId = simulatedCompanyId || profile?.company_id || '';
     const { hasPermission } = usePermissions();
     const isAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
     // Direct check — bypasses usePermissions inheritance (where 'leads' base would grant 'leads_view_all')
@@ -51,6 +52,7 @@ export default function Leads() {
     const { tableRef: leadsTableRef, wrapperRef: leadsWrapperRef } = useAriasTables();
     const queryClient = useQueryClient();
     const [searchParams, setSearchParams] = useSearchParams();
+
     const { 
         data: leadsData, 
         isLoading: loading,
@@ -58,7 +60,7 @@ export default function Leads() {
         hasNextPage,
         isFetchingNextPage
     } = useInfiniteQuery({
-        queryKey: ['leads'],
+        queryKey: ['leads', activeCompanyId],
         queryFn: async ({ pageParam }) => {
             const result = await leadsService.getLeadsCursor(1000, pageParam as string | undefined);
             return result;
@@ -634,18 +636,21 @@ export default function Leads() {
         const applyReadyFilter = async () => {
             try {
                 const { data: { user } } = await supabase.auth.getUser();
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('company_id')
-                    .eq('id', user?.id)
-                    .single();
-
-                if (!profile?.company_id) return;
-
+                const simId = localStorage.getItem('simulated_company_id');
+                let companyId = simId;
+                if (!companyId && user) {
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('company_id')
+                        .eq('id', user.id)
+                        .single();
+                    companyId = profile?.company_id || null;
+                }
+                if (!companyId) return;
                 const { data: aiLeads } = await supabase
                     .from('lead_ai_memory')
                     .select('lead_id')
-                    .eq('company_id', profile.company_id)
+                    .eq('company_id', companyId)
                     .eq('next_action', 'cierre_inminente');
 
                 const hotIds = (aiLeads || []).map((r: any) => r.lead_id).filter(Boolean);
@@ -759,7 +764,8 @@ export default function Leads() {
     };
 
     const loadLeads = () => {
-        queryClient.invalidateQueries({ queryKey: ['leads'] });
+        // Uses exact: false to match ['leads', anyCompanyId] — required after queryKey was scoped per company
+        queryClient.invalidateQueries({ queryKey: ['leads'], exact: false });
     };
 
     const handleDownloadTemplate = () => {

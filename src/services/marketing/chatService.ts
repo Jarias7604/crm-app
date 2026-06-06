@@ -49,11 +49,16 @@ export const chatService = {
             if (lead?.company_id) {
                 finalCompanyId = lead.company_id;
             } else {
-                // Fallback to current user's profile
+                // Fallback to current user's profile or simulated company ID
                 const { data: { user } } = await supabase.auth.getUser();
                 if (user) {
-                    const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single();
-                    finalCompanyId = profile?.company_id;
+                    const simId = localStorage.getItem('simulated_company_id');
+                    if (simId) {
+                        finalCompanyId = simId;
+                    } else {
+                        const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single();
+                        finalCompanyId = profile?.company_id;
+                    }
                 }
             }
         }

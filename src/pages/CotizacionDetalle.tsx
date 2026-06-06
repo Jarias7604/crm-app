@@ -549,7 +549,7 @@ export default function CotizacionDetalle() {
                                     </div>
                                     )}
                                     {/* Implementación */}
-                                    {cotizacion.incluir_implementacion && (
+                                    {cotizacion.incluir_implementacion && Number(cotizacion.costo_implementacion) > 0 && (
                                         <div className="flex items-center gap-3 sm:gap-4 px-3 sm:px-6 py-4 sm:py-5 hover:bg-slate-50/50 transition-colors">
                                             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center flex-shrink-0 text-orange-600">
                                                 <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -624,7 +624,7 @@ export default function CotizacionDetalle() {
                             {/* Section 4: Plan Comparison Cards */}
                             {(() => {
                                 const financials = calculateQuoteFinancialsV2(cotizacion, financingPlan || undefined);
-                                const { ivaPct, ivaImplementacion, totalImplementacion } = financials;
+                                const { ivaPct, ivaImplementacion, totalImplementacion, descuentoImplementacionMonto, ajusteLabel } = financials;
                                 const planesComparativa = ((cotizacion as any).planes_comparativa || null) as string[] | null;
                                 const plansToShow: FinancingPlan[] = (() => {
                                     if (planesComparativa && planesComparativa.length >= 1 && allPlans.length > 0) return allPlans;
@@ -687,10 +687,12 @@ export default function CotizacionDetalle() {
                                                                 </p>
                                                                 <div className="space-y-1.5 mb-4 border-t border-slate-100 pt-3">
                                                                     {/* Licencia base */}
-                                                                    <div className="flex justify-between text-[10px] text-slate-500 font-medium">
-                                                                        <span className="truncate">Licencia {cotizacion.plan_nombre}</span>
-                                                                        <span className="font-bold text-slate-700 ml-2 flex-shrink-0">${Number(cotizacion.costo_plan_anual).toLocaleString()}</span>
-                                                                    </div>
+                                                                    {Number(cotizacion.costo_plan_anual) > 0 && (
+                                                                        <div className="flex justify-between text-[10px] text-slate-500 font-medium">
+                                                                            <span className="truncate">Licencia {cotizacion.plan_nombre}</span>
+                                                                            <span className="font-bold text-slate-700 ml-2 flex-shrink-0">${Number(cotizacion.costo_plan_anual).toLocaleString()}</span>
+                                                                        </div>
+                                                                    )}
                                                                     {/* Módulos adicionales recurrentes — uno por línea */}
                                                                     {plan.show_breakdown !== false && modulosArr
                                                                         .filter((mod: any) => !(Number(mod.pago_unico) > 0) && (Number(mod.costo_anual || mod.costo) > 0))
@@ -787,6 +789,12 @@ export default function CotizacionDetalle() {
                                                             <span className="font-bold text-slate-800 whitespace-nowrap">${serv.monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                                         </div>
                                                     ))}
+                                                    {descuentoImplementacionMonto > 0 && (
+                                                        <div className="flex justify-between items-center text-[11px] text-emerald-600 font-bold gap-2">
+                                                            <span className="truncate flex-1">{ajusteLabel || 'Descuento aplicado'}</span>
+                                                            <span className="font-bold whitespace-nowrap">-${descuentoImplementacionMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                                        </div>
+                                                    )}
                                                     <div className="flex justify-between items-center text-[11px] text-slate-500 font-medium gap-2">
                                                         <span className="truncate flex-1">IVA ({Math.round(ivaPct * 100)}%)</span>
                                                         <span className="font-bold text-orange-500 whitespace-nowrap">+$ {ivaImplementacion.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>

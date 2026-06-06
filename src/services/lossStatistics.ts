@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { logger } from '../utils/logger';
+import { getSimulatedCompanyId } from './simGuard';
 
 export interface LossStatistic {
     reason_id: string;
@@ -21,8 +22,10 @@ export const lossStatisticsService = {
         endDate?: Date
     ): Promise<LossStatistic[]> {
         try {
+            // SIMULATION GUARD: pass active company so RPC scopes correctly
+            const companyId = getSimulatedCompanyId() || null;
             const { data, error } = await supabase.rpc('get_loss_statistics', {
-                p_company_id: null,
+                p_company_id: companyId,
                 p_start_date: startDate?.toISOString() || null,
                 p_end_date: endDate?.toISOString() || null
             });
@@ -54,8 +57,10 @@ export const lossStatisticsService = {
         endDate?: Date
     ): Promise<{ stage_name: string; loss_count: number; percentage: number }[]> {
         try {
+            // SIMULATION GUARD: pass active company so RPC scopes correctly
+            const companyId = getSimulatedCompanyId() || null;
             const { data, error } = await supabase.rpc('get_loss_stage_statistics', {
-                p_company_id: null,
+                p_company_id: companyId,
                 p_start_date: startDate?.toISOString() || null,
                 p_end_date: endDate?.toISOString() || null
             });

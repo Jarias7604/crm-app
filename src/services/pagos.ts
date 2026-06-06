@@ -1,5 +1,21 @@
 import { supabase } from './supabase';
 
+async function getActiveCompanyId() {
+  const simId = localStorage.getItem('simulated_company_id');
+  if (simId) return simId;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: profile } = await supabase
+      .from('profiles')
+      .select('company_id')
+      .eq('id', user.id)
+      .single();
+
+  return profile?.company_id || null;
+}
+
 export type TipoPago = 'anticipo' | 'cuota' | 'mensualidad' | 'otro';
 export type MetodoPago = 'transferencia' | 'efectivo' | 'cheque' | 'tarjeta' | 'otro';
 
@@ -76,15 +92,12 @@ export const pagosService = {
     notas?: string | null;
   }): Promise<Pago> {
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('company_id')
-      .eq('id', user!.id)
-      .single();
+    const companyId = await getActiveCompanyId();
+    if (!companyId) throw new Error('Usuario sin empresa asignada.');
 
     const { data, error } = await supabase
       .from('pagos')
-      .insert({ ...pago, company_id: profile!.company_id, registrado_por: user!.id })
+      .insert({ ...pago, company_id: companyId, registrado_por: user!.id })
       .select()
       .single();
     if (error) throw error;
@@ -334,17 +347,14 @@ export const gastosService = {
 
   async create(gasto: Partial<Gasto>): Promise<Gasto> {
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('company_id')
-      .eq('id', user!.id)
-      .single();
+    const companyId = await getActiveCompanyId();
+    if (!companyId) throw new Error('Usuario sin empresa asignada.');
 
     const { data, error } = await supabase
       .from('gastos')
       .insert({
         ...gasto,
-        company_id: profile!.company_id,
+        company_id: companyId,
         registrado_por: user!.id,
       })
       .select()
@@ -407,7 +417,8 @@ export const planPagoService = {
   async generarPlanAmortizacion(plan: Partial<PlanPago>): Promise<{ plan: PlanPago, cuotas: CuotaEsperada[] }> {
     // Call Supabase RPC or do math locally. Since we need to insert rows safely, we can calculate locally and insert in batch.
     const { data: { user } } = await supabase.auth.getUser();
-    const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user!.id).single();
+    const companyId = await getActiveCompanyId();
+    if (!companyId) throw new Error('Usuario sin empresa asignada.');
     
     // 1. Calculate the Amortization Table
     const cuotas: Partial<CuotaEsperada>[] = [];
@@ -474,13 +485,13 @@ export const planPagoService = {
     // 2. Insert Plan
     const { data: planData, error: planError } = await supabase.from('planes_pago').insert({
       ...plan,
-      company_id: profile!.company_id,
+      company_id: companyId,
       estado: 'activo'
     }).select().single();
     if (planError) throw planError;
 
     // 3. Insert Cuotas
-    const cuotasToInsert = cuotas.map(c => ({ ...c, plan_pago_id: planData.id, company_id: profile!.company_id }));
+    const cuotasToInsert = cuotas.map(c => ({ ...c, plan_pago_id: planData.id, company_id: companyId }));
     const { data: cuotasData, error: cuotasError } = await supabase.from('cuotas_esperadas').insert(cuotasToInsert).select();
     if (cuotasError) throw cuotasError;
 

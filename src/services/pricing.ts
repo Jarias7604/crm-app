@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { simGuard } from './simGuard';
 import type { PricingItem, PricingConfig, PaymentSettings, FinancingPlan } from '../types/pricing';
 
 class PricingService {
@@ -66,11 +67,12 @@ class PricingService {
     }
     // Obtener toda la configuración de precios
     async getPricingConfig(): Promise<PricingConfig> {
-        const { data, error } = await supabase
-            .from('pricing_items')
-            .select('*')
-            .eq('activo', true)
-            .order('orden', { ascending: true });
+        const { data, error } = await simGuard(
+            supabase
+                .from('pricing_items')
+                .select('*')
+                .eq('activo', true)
+        ).order('orden', { ascending: true });
 
         if (error) throw error;
 
@@ -86,12 +88,13 @@ class PricingService {
 
     // Obtener todos los ítems de un tipo específico
     async getItemsByTipo(tipo: PricingItem['tipo']): Promise<PricingItem[]> {
-        const { data, error } = await supabase
-            .from('pricing_items')
-            .select('*')
-            .eq('tipo', tipo)
-            .eq('activo', true)
-            .order('orden', { ascending: true });
+        const { data, error } = await simGuard(
+            supabase
+                .from('pricing_items')
+                .select('*')
+                .eq('tipo', tipo)
+                .eq('activo', true)
+        ).order('orden', { ascending: true });
 
         if (error) throw error;
         return data || [];
@@ -152,11 +155,12 @@ class PricingService {
     }
 
     async getAllPricingItems(includeInactive = false): Promise<PricingItem[]> {
-        let query = supabase
-            .from('pricing_items')
-            .select('*')
-            .order('tipo', { ascending: true })
-            .order('orden', { ascending: true });
+        let query = simGuard(
+            supabase
+                .from('pricing_items')
+                .select('*')
+        ).order('tipo', { ascending: true })
+         .order('orden', { ascending: true });
 
         if (!includeInactive) {
             query = query.eq('activo', true);

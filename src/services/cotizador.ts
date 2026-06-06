@@ -262,6 +262,7 @@ class CotizadorService {
             iva_porcentaje: number;
             incluir_implementacion: boolean;
             cuotas?: number; // V3: Cantidad de pagos (divisor)
+            metadata?: any;
         }
     ): CotizacionCalculada {
 
@@ -336,39 +337,169 @@ class CotizadorService {
             }
         });
 
-        // 4. LÓGICA FINANCIERA UNIFICADA (V2)
+        // V4: Anticipo dinámico
+        const pctAnticipo = config.metadata?.porcentaje_anticipo !== undefined && config.metadata?.porcentaje_anticipo !== null
+            ? Number(config.metadata.porcentaje_anticipo)
+            : null;
+
+        if (pctAnticipo !== null) {
+            // --- MODELO GENERAL DE PROYECTO / SERVICIO CON ANTICIPO DINÁMICO ---
+            const totalBase = subtotal_recurrente_base + subtotal_pagos_unicos;
+            const ivaPct = config.iva_porcentaje / 100;
+
+            let totalBaseAjustado = totalBase;
+            let recargo_monto = 0;
+            let descuento_monto = 0;
+            let ahorro_total = 0;
+
+            if (config.tipo_ajuste === 'discount') {
+                descuento_monto = totalBase * (config.tasa_ajuste / 100);
+                totalBaseAjustado = totalBase - descuento_monto;
+                ahorro_total = descuento_monto;
+            } else if (config.tipo_ajuste === 'recharge' && config.tasa_ajuste > 0) {
+                recargo_monto = totalBase * (config.tasa_ajuste / 100);
+                totalBaseAjustado = totalBase + recargo_monto;
+            }
+
+            // Descuento manual
+            let descuento_manual_monto_val = 0;
+            if (config.descuento_manual && config.descuento_manual > 0) {
+                descuento_manual_monto_val = totalBaseAjustado * (config.descuento_manual / 100);
+                descuento_monto += descuento_manual_monto_val;
+                totalBaseAjustado -= descuento_manual_monto_val;
+                ahorro_total += descuento_manual_monto_val;
+            }
+
+            const totalGeneralIVA = totalBaseAjustado * (1 + ivaPct);
+
+            // Desglose de anticipo/prima
+            const totalAnticipoConIVA = totalGeneralIVA * (pctAnticipo / 100);
+            const subtotal_pagos_unicos_final = totalAnticipoConIVA / (1 + ivaPct);
+            const iva_pagos_unicos = totalAnticipoConIVA - subtotal_pagos_unicos_final;
+
+            // Desglose financiado
+            const totalFinanciadoConIVA = totalGeneralIVA - totalAnticipoConIVA;
+            const precio_recurrente_final = totalFinanciadoConIVA / (1 + ivaPct);
+            const iva_recurrente = totalFinanciadoConIVA - precio_recurrente_final;
+
+            // Divisor cuotas
+            let divisor_cuotas = 1;
+            if (config.cuotas !== undefined && config.cuotas !== null && config.cuotas >= 1) {
+                divisor_cuotas = config.cuotas;
+            } else if (config.meses && config.meses > 1) {
+                divisor_cuotas = config.meses;
+            }
+
+            const es_financiado = divisor_cuotas > 1;
+            const frecuencia_pago = es_financiado ? 1 : config.meses;
+            const cuota_periodo = totalFinanciadoConIVA / divisor_cuotas;
+
+            return {
+                subtotal_pagos_unicos: Number(subtotal_pagos_unicos_final.toFixed(2)),
+                iva_pagos_unicos: Number(iva_pagos_unicos.toFixed(2)),
+                total_pagos_unicos: Number(totalAnticipoConIVA.toFixed(2)),
+
+                subtotal_recurrente_base: Number(precio_recurrente_final.toFixed(2)),
+
+                // Mapeo legacy para compatibilidad visual
+                recargo_mensual_porcentaje: config.tipo_ajuste === 'recharge' ? config.tasa_ajuste : 0,
+                recargo_aplicado_porcentaje: config.tipo_ajuste === 'recharge' ? config.tasa_ajuste : 0,
+                recargo_mensual_monto: Number(recargo_monto.toFixed(2)),
+
+                forma_pago: config.forma_pago,
+                meses_pago: frecuencia_pago,
+
+                cuotas: divisor_cuotas,
+                es_financiado: es_financiado,
+
+                precio_anual_sin_recargo: Number(precio_recurrente_final.toFixed(2)),
+                precio_anual_con_recargo: Number(precio_recurrente_final.toFixed(2)),
+
+                cuota_mensual: Number(cuota_periodo.toFixed(2)),
+
+                ahorro_pago_anual: Number(ahorro_total.toFixed(2)),
+
+                descuento_porcentaje: config.tipo_ajuste === 'discount' ? config.tasa_ajuste : 0,
+                descuento_monto: Number(descuento_monto.toFixed(2)),
+                descuento_manual_monto: Number(descuento_manual_monto_val.toFixed(2)),
+
+                iva_porcentaje: config.iva_porcentaje,
+                iva_monto_recurrente: Number(iva_recurrente.toFixed(2)),
+
+                total_recurrente: Number(totalFinanciadoConIVA.toFixed(2)),
+                total_general: Number(totalGeneralIVA.toFixed(2)),
+
+                paquete,
+                items_seleccionados: items,
+                desglose
+            };
+        }
+
         // Ya no hay caminos separados para "Anual" o "Mensual", todo depende de tipo_ajuste y tasa.
 
         let precio_recurrente_final = subtotal_recurrente_base;
         let descuento_monto = 0;
         let recargo_monto = 0;
         let ahorro_total = 0;
-
-        // Base para cálculos visuales de ahorro (asume que el precio de lista es lo que paga si es 'none' o 'recharge')
-        // Si hay descuento, el ahorro es tangible.
-
-        if (config.tipo_ajuste === 'discount') {
-            // APLICA DESCUENTO DEL PLAN
-            descuento_monto = subtotal_recurrente_base * (config.tasa_ajuste / 100);
-            precio_recurrente_final = subtotal_recurrente_base - descuento_monto;
-            ahorro_total = descuento_monto;
-        } else if (config.tipo_ajuste === 'recharge') {
-            // APLICA RECARGO DEL PLAN
-            recargo_monto = subtotal_recurrente_base * (config.tasa_ajuste / 100);
-            precio_recurrente_final = subtotal_recurrente_base + recargo_monto;
-            // No hay ahorro real, es un costo extra
-        } else {
-            // NEUTRO ('none') o cualquier otro
-            // Precio de lista.
-        }
-
-        // DESCUENTO MANUAL (campo UI — se aplica sobre el precio ya ajustado por el plan)
         let descuento_manual_monto_val = 0;
-        if (config.descuento_manual && config.descuento_manual > 0) {
-            descuento_manual_monto_val = precio_recurrente_final * (config.descuento_manual / 100);
-            descuento_monto += descuento_manual_monto_val;
-            precio_recurrente_final -= descuento_manual_monto_val;
-            ahorro_total += descuento_manual_monto_val;
+
+        const isBasePackageNull = (paquete.costo_paquete_anual || 0) === 0;
+
+        if (subtotal_recurrente_base === 0 && subtotal_pagos_unicos > 0) {
+            let implementacionAjustada = subtotal_pagos_unicos;
+            if (config.tipo_ajuste === 'discount') {
+                const descPlan = subtotal_pagos_unicos * (config.tasa_ajuste / 100);
+                descuento_monto += descPlan;
+                implementacionAjustada -= descPlan;
+                ahorro_total += descPlan;
+            }
+            if (config.descuento_manual && config.descuento_manual > 0) {
+                descuento_manual_monto_val = implementacionAjustada * (config.descuento_manual / 100);
+                descuento_monto += descuento_manual_monto_val;
+                implementacionAjustada -= descuento_manual_monto_val;
+                ahorro_total += descuento_manual_monto_val;
+            }
+            subtotal_pagos_unicos = implementacionAjustada;
+        } else if (isBasePackageNull) {
+            // Cross-item discount applied to total transaction value (both licensing/recurring and implementation)
+            if (config.tipo_ajuste === 'discount') {
+                const descRecurrente = subtotal_recurrente_base * (config.tasa_ajuste / 100);
+                const descUnico = subtotal_pagos_unicos * (config.tasa_ajuste / 100);
+                
+                descuento_monto += descRecurrente + descUnico;
+                precio_recurrente_final = subtotal_recurrente_base - descRecurrente;
+                subtotal_pagos_unicos = subtotal_pagos_unicos - descUnico;
+                ahorro_total += descRecurrente + descUnico;
+            } else if (config.tipo_ajuste === 'recharge') {
+                recargo_monto = subtotal_recurrente_base * (config.tasa_ajuste / 100);
+                precio_recurrente_final = subtotal_recurrente_base + recargo_monto;
+            }
+            
+            if (config.descuento_manual && config.descuento_manual > 0) {
+                const descRecurrenteManual = precio_recurrente_final * (config.descuento_manual / 100);
+                const descUnicoManual = subtotal_pagos_unicos * (config.descuento_manual / 100);
+                
+                descuento_manual_monto_val = descRecurrenteManual + descUnicoManual;
+                descuento_monto += descuento_manual_monto_val;
+                precio_recurrente_final -= descRecurrenteManual;
+                subtotal_pagos_unicos -= descUnicoManual;
+                ahorro_total += descuento_manual_monto_val;
+            }
+        } else {
+            if (config.tipo_ajuste === 'discount') {
+                descuento_monto = subtotal_recurrente_base * (config.tasa_ajuste / 100);
+                precio_recurrente_final = subtotal_recurrente_base - descuento_monto;
+                ahorro_total = descuento_monto;
+            } else if (config.tipo_ajuste === 'recharge') {
+                recargo_monto = subtotal_recurrente_base * (config.tasa_ajuste / 100);
+                precio_recurrente_final = subtotal_recurrente_base + recargo_monto;
+            }
+            if (config.descuento_manual && config.descuento_manual > 0) {
+                descuento_manual_monto_val = precio_recurrente_final * (config.descuento_manual / 100);
+                descuento_monto += descuento_manual_monto_val;
+                precio_recurrente_final -= descuento_manual_monto_val;
+                ahorro_total += descuento_manual_monto_val;
+            }
         }
 
         // 5. CÁLCULO DE CUOTAS

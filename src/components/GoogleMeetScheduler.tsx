@@ -341,7 +341,7 @@ Reunión modificada desde Arias CRM.`;
                     date: startISO,
                     notes: description || `Reunión: ${title}`,
                     action_type: 'meeting',
-                    company_id: profile?.company_id,
+                    company_id: localStorage.getItem('simulated_company_id') || profile?.company_id,
                 }, profile?.id);
                 followUpId = followUp.id;
             }

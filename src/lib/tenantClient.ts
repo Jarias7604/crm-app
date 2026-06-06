@@ -40,6 +40,10 @@ const isDev = import.meta.env.MODE === 'development';
  * Primero intenta JWT app_metadata (más rápido), luego el perfil local
  */
 export async function getCurrentCompanyId(): Promise<string | null> {
+  // SIMULATION GUARD: super_admin simulating another tenant — always read from localStorage first
+  const simId = localStorage.getItem('simulated_company_id');
+  if (simId) return simId;
+
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) return null;
 
@@ -62,6 +66,10 @@ export async function getCurrentCompanyId(): Promise<string | null> {
  * const { data } = await tenantQuery('leads', companyId).select('*');
  */
 export function tenantQuery(table: string, companyId: string | null | undefined) {
+  // SIMULATION GUARD: override with simulated company if active
+  const simId = localStorage.getItem('simulated_company_id');
+  const effectiveCompanyId = simId || companyId;
+
   const builder = supabase.from(table as any);
 
   if (EXEMPT_TABLES.has(table) || PORTAL_TABLES.has(table)) {
@@ -93,7 +101,7 @@ export function tenantQuery(table: string, companyId: string | null | undefined)
 
   // Para columnas directas de company_id, agregar filtro
   if (!COLUMN_MAP[table]) {
-    return (builder as any).eq(tenantColumn, companyId);
+    return (builder as any).eq(tenantColumn, effectiveCompanyId);
   }
 
   // Para tablas con join indirecto, el RLS ya lo maneja — solo lograr en DEV

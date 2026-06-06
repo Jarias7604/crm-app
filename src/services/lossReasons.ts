@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { logger } from '../utils/logger';
+import { simGuard } from './simGuard';
 import type { LossReason } from '../types';
 
 /**
@@ -11,11 +12,12 @@ export const lossReasonsService = {
      */
     async getLossReasons(): Promise<LossReason[]> {
         try {
-            const { data, error } = await supabase
-                .from('loss_reasons')
-                .select('*')
-                .eq('is_active', true)
-                .order('display_order', { ascending: true });
+            const { data, error } = await simGuard(
+                supabase
+                    .from('loss_reasons')
+                    .select('*')
+                    .eq('is_active', true)
+            ).order('display_order', { ascending: true });
 
             if (error) {
                 logger.error('Failed to fetch loss reasons', error, { action: 'getLossReasons' });

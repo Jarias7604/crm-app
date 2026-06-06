@@ -7,7 +7,9 @@ import toast from 'react-hot-toast';
 
 export default function LeadHunter() {
     const navigate = useNavigate();
-    const { profile } = useAuth();
+    const { profile, simulatedCompanyId } = useAuth();
+    // SIMULATION GUARD: always use the active company, not the JWT tenant
+    const activeCompanyId = simulatedCompanyId || profile?.company_id;
     const [query, setQuery] = useState('');
     const [location, setLocation] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -83,7 +85,7 @@ export default function LeadHunter() {
     };
 
     const handleImportBulk = async (shouldRedirect = false) => {
-        if (!profile?.company_id) {
+        if (!activeCompanyId) {
             toast.error('No se pudo identificar tu empresa.');
             return;
         }
@@ -98,7 +100,7 @@ export default function LeadHunter() {
         try {
             if (toImport.length > 0) {
                 toast.loading(`Importando ${toImport.length} leads...`, { id: 'bulkImport' });
-                const stats = await leadDiscoveryService.importLeadsBulk(toImport, profile.company_id);
+                const stats = await leadDiscoveryService.importLeadsBulk(toImport, activeCompanyId);
 
                 setResults(prev => prev.map(r =>
                     selectedIds.has(r.id) ? { ...r, is_imported: true } : r
@@ -131,13 +133,13 @@ export default function LeadHunter() {
     };
 
     const handleImportSingle = async (lead: DiscoveredLead) => {
-        if (!profile?.company_id) {
+        if (!activeCompanyId) {
             toast.error('Acceso denegado o empresa no configurada.');
             return;
         }
 
         try {
-            await leadDiscoveryService.importLead(lead, profile.company_id);
+            await leadDiscoveryService.importLead(lead, activeCompanyId);
             setResults(prev => prev.map(r =>
                 r.id === lead.id ? { ...r, is_imported: true } : r
             ));

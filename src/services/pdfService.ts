@@ -288,7 +288,7 @@ export const pdfService = {
 
             // Main Items
             drawRow(`Licencia Anual ${cotizacion.plan_nombre}`, cotizacion.costo_plan_anual || 0, false, planDescription);
-            if (cotizacion.incluir_implementacion) {
+            if (cotizacion.incluir_implementacion && Number(cotizacion.costo_implementacion) > 0) {
                 drawRow('Implementación y Configuración', cotizacion.costo_implementacion || 0, true);
             }
             if (cotizacion.servicio_whatsapp) {
@@ -390,7 +390,9 @@ export const pdfService = {
                 planTitulo,
                 planDescripcion,
                 descuentoManualPct,
-                descuentoManualMonto
+                descuentoManualMonto,
+                descuentoImplementacionMonto,
+                ajusteLabel
             } = financialsV2;
 
             // Adaptar al formato que espera el código del PDF
@@ -427,7 +429,7 @@ export const pdfService = {
                 const implementacionBase = Number(cotizacion.costo_implementacion) || 0;
 
                 // Calcular número de líneas que se van a dibujar
-                let numLineasInicial = (implementacionBase > 0 ? 1 : 0) + serviciosUnicos.length + 1; // +1 para IVA
+                let numLineasInicial = (implementacionBase > 0 ? 1 : 0) + serviciosUnicos.length + (descuentoImplementacionMonto > 0 ? 1 : 0) + 1; // +1 para IVA
                 let numLineasRecurrente = 1 + serviciosRec.length + (costoWhatsApp > 0 ? 1 : 0) + (financials.recargoFinanciamiento > 0 ? 1 : 0) + (descuentoManualMonto > 0 ? 1 : 0) + 1 + 1; // Licencia + módulos + WhatsApp + Financiamiento + Descuento + IVA + Total Plan
 
                 const numLineas = isRecurrent ? numLineasRecurrente : numLineasInicial;
@@ -490,7 +492,15 @@ export const pdfService = {
                         lineY += lineHeight;
                     });
 
-                    const subtotalIni = pagoInicial / (1 + financials.ivaPct);
+                    if (descuentoImplementacionMonto > 0) {
+                        doc.setTextColor(22, 163, 74); // green-600
+                        doc.text(ajusteLabel || 'Descuento aplicado', x + 7, lineY);
+                        doc.text(`-$ ${descuentoImplementacionMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, x + boxW - 7, lineY, { align: 'right' });
+                        doc.setTextColor(148, 163, 184);
+                        lineY += lineHeight;
+                    }
+
+                    const subtotalIni = (pagoInicial / (1 + financials.ivaPct));
                     const ivaIni = pagoInicial - subtotalIni;
 
                     doc.text(`IVA (${Math.round(financials.ivaPct * 100)}%)`, x + 7, lineY);
@@ -801,8 +811,9 @@ export const pdfService = {
                     const modulosArr = Array.isArray(cotizacion.modulos_adicionales) ? cotizacion.modulos_adicionales : [];
                     const serviciosUnicos = modulosArr.filter((m: any) => (Number(m.pago_unico) || 0) > 0);
                     const subtotalBase = implementacionBase + serviciosUnicos.reduce((s: number, m: any) => s + (Number(m.pago_unico) || 0), 0);
-                    const ivaInit = pagoInicial - subtotalBase;
-                    const initRowCount = 1 + serviciosUnicos.length + 1; // impl + servicios + IVA
+                    const subtotalAjustado = subtotalBase - descuentoImplementacionMonto;
+                    const ivaInit = subtotalAjustado * financialsV2.ivaPct;
+                    const initRowCount = (implementacionBase > 0 ? 1 : 0) + serviciosUnicos.length + (descuentoImplementacionMonto > 0 ? 1 : 0) + 1; // impl + servicios + descuento + IVA
                     const initH = 14 + (initRowCount * 5) + 12;
 
                     if (by + initH > pageHeight - 40) { drawFooter(1); doc.addPage(); by = 20; }
@@ -847,6 +858,16 @@ export const pdfService = {
                         doc.text(`$${monto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, margin + totalW2 - 6, iy, { align: 'right' });
                         iy += 5;
                     });
+
+                    if (descuentoImplementacionMonto > 0) {
+                        doc.setTextColor(22, 163, 74); // green-600
+                        doc.setFontSize(iFontSize);
+                        doc.setFont('helvetica', 'normal');
+                        doc.text(ajusteLabel || 'Descuento aplicado', margin + 6, iy);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text(`-$${descuentoImplementacionMonto.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, margin + totalW2 - 6, iy, { align: 'right' });
+                        iy += 5;
+                    }
 
                     doc.setTextColor(100, 116, 139);
                     doc.setFontSize(iFontSize);

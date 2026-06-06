@@ -540,12 +540,13 @@ export default function Dashboard() {
             setSalesTrendData(dashboardData.salesTrend || []);
 
             // Fetch industry distribution
-            const industryQuery = supabase
+            let industryQuery = supabase
                 .from('leads')
                 .select('industry')
                 .not('industry', 'is', null)
                 .neq('industry', '');
-            if (dashboardAssignedTo) industryQuery.eq('assigned_to', dashboardAssignedTo);
+            if (profile?.company_id) industryQuery = industryQuery.eq('company_id', profile.company_id);
+            if (dashboardAssignedTo) industryQuery = industryQuery.eq('assigned_to', dashboardAssignedTo);
             industryQuery.then(({ data: leadsWithIndustry }) => {
                     if (leadsWithIndustry && leadsWithIndustry.length > 0) {
                         const counts: Record<string, number> = {};
@@ -558,7 +559,7 @@ export default function Dashboard() {
                                 name,
                                 count,
                                 percentage: Math.round((count / total) * 100)
-                            }))
+                              }))
                             .sort((a, b) => b.count - a.count);
                         setIndustryData(mapped);
                     }
@@ -567,14 +568,15 @@ export default function Dashboard() {
         }
 
         // Load escalation leads (Llamada fría with 6+ contact attempts)
-        const escalationQuery = supabase
+        let escalationQuery = supabase
             .from('leads')
             .select('id, name, company_name, phone, email, contact_count, created_at, assigned_to')
             .eq('status', 'Llamada fría')
             .gte('contact_count', 6)
             .order('contact_count', { ascending: false })
             .limit(10);
-        if (dashboardAssignedTo) escalationQuery.eq('assigned_to', dashboardAssignedTo);
+        if (profile?.company_id) escalationQuery = escalationQuery.eq('company_id', profile.company_id);
+        if (dashboardAssignedTo) escalationQuery = escalationQuery.eq('assigned_to', dashboardAssignedTo);
         escalationQuery.then(({ data }) => {
                 setEscalationLeads(data || []);
             });

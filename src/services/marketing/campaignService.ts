@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { simGuard } from '../simGuard';
 
 export interface Campaign {
     id: string;
@@ -25,19 +26,17 @@ export interface Campaign {
 
 export const campaignService = {
     async getCampaigns() {
-        const { data: campaigns, error } = await supabase
-            .from('marketing_campaigns')
-            .select('*')
-            .order('created_at', { ascending: false });
+        const { data: campaigns, error } = await simGuard(
+            supabase.from('marketing_campaigns').select('*')
+        ).order('created_at', { ascending: false });
 
         if (error) throw error;
 
-        // Fetch real-time stats from marketing_messages
-        const { data: messages } = await supabase
-            .from('marketing_messages')
-            .select('status, metadata')
-            .order('created_at', { ascending: false })
-            .limit(5000);
+        // Fetch real-time stats from marketing_messages — scoped to same tenant
+        const { data: messages } = await simGuard(
+            supabase.from('marketing_messages').select('status, metadata')
+        ).order('created_at', { ascending: false })
+         .limit(5000);
 
         // Aggregate stats by campaign_id
         const realStats: Record<string, { sent: number, opened: number, clicked: number }> = {};
@@ -69,20 +68,17 @@ export const campaignService = {
     },
 
     async getCampaignById(id: string) {
-        const { data: c, error } = await supabase
-            .from('marketing_campaigns')
-            .select('*')
-            .eq('id', id)
-            .single();
+        const { data: c, error } = await simGuard(
+            supabase.from('marketing_campaigns').select('*')
+        ).eq('id', id).single();
 
         if (error) throw error;
         const campaign = c as Campaign;
 
-        // Fetch real-time stats for this campaign
-        const { data: messages } = await supabase
-            .from('marketing_messages')
-            .select('status')
-            .eq('metadata->>campaign_id', id);
+        // Fetch real-time stats for this campaign — scoped to same tenant
+        const { data: messages } = await simGuard(
+            supabase.from('marketing_messages').select('status')
+        ).eq('metadata->>campaign_id', id);
 
         if (messages) {
             campaign.stats = {
@@ -218,12 +214,11 @@ export const campaignService = {
      * Returns each recipient with their status: sent, opened, or clicked.
      */
     async getCampaignRecipients(campaignId: string) {
-        // 1. Fetch all messages belonging to this campaign
-        const { data: messages, error } = await supabase
-            .from('marketing_messages')
-            .select('metadata, status, sent_at, created_at')
-            .eq('metadata->>campaign_id', campaignId)
-            .order('created_at', { ascending: false });
+        // 1. Fetch all messages belonging to this campaign — scoped to active tenant
+        const { data: messages, error } = await simGuard(
+            supabase.from('marketing_messages').select('metadata, status, sent_at, created_at')
+        ).eq('metadata->>campaign_id', campaignId)
+         .order('created_at', { ascending: false });
 
         if (error) throw error;
 
@@ -261,10 +256,9 @@ export const campaignService = {
         if (leadIds.length === 0) return [];
 
         // 3. Fetch lead details
-        const { data: leads, error: leadsError } = await supabase
-            .from('leads')
-            .select('id, name, email, phone, company_name, status')
-            .in('id', leadIds);
+        const { data: leads, error: leadsError } = await simGuard(
+            supabase.from('leads').select('id, name, email, phone, company_name, status')
+        ).in('id', leadIds);
 
         if (leadsError) throw leadsError;
 
