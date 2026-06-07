@@ -73,6 +73,7 @@ const GoogleCallback    = lazy(() => import('./pages/company/GoogleCallback'));
 const OutlookCallback   = lazy(() => import('./pages/company/OutlookCallback'));
 const Reports           = lazy(() => import('./pages/Reports'));
 const PlanManager       = lazy(() => import('./pages/admin/PlanManager'));
+const BillingManager    = lazy(() => import('./pages/admin/BillingManager'));
 const BookingSettings   = lazy(() => import('./pages/calendar/BookingSettings'));
 const PublicBookingPage = lazy(() => import('./pages/public/PublicBookingPage'));
 const PrivacyPolicy     = lazy(() => import('./pages/public/PrivacyPolicy'));
@@ -231,6 +232,7 @@ function App() {
                     <Route path="/admin/audit-log" element={<AuditLog />} />
                     <Route path="/admin/observatory" element={<Observatory />} />
                     <Route path="/admin/plans" element={<PlanManager />} />
+                    <Route path="/admin/billing" element={<BillingManager />} />
                     <Route path="/company/billing" element={<Billing />} />
                   </Route>
 

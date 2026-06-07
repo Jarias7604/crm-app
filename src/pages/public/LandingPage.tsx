@@ -413,8 +413,11 @@ export default function LandingPage() {
   };
 
   // Dynamic prices for comparison
-  const flatPrice = plans.find(p => p.slug === 'pro')?.monthly || 75;
-  const flatPriceAnnual = plans.find(p => p.slug === 'pro')?.price_annual || (flatPrice * 12);
+  const proPlan = plans.find(p => p.slug === 'pro');
+  const proMonthly = proPlan ? proPlan.monthly : 75;
+  const proAnnual = proPlan ? proPlan.annual : 60;
+  const flatPrice = annual ? proAnnual : proMonthly;
+  const flatPriceAnnual = annual ? (proPlan?.price_annual || 720) : (proMonthly * 12);
 
   // Math models for ROI
   const closingRateCompetitor = 0.12; // 12% standard follow up
@@ -892,6 +895,28 @@ export default function LandingPage() {
             <p className="text-slate-500 mt-3 max-w-xl mx-auto text-sm">
               Activa o desactiva las herramientas que necesitas para ver el costo acumulado de armar el mismo stack en otras plataformas frente a la tarifa única de Arias CRM.
             </p>
+            <div className="flex justify-center mt-6">
+              <div className="inline-flex items-center gap-1 bg-white/5 rounded-full p-1 border border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setAnnual(true)}
+                  className={`px-4 py-1.5 rounded-full text-[10px] font-black transition-all ${
+                    annual ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Anual (20% OFF)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAnnual(false)}
+                  className={`px-4 py-1.5 rounded-full text-[10px] font-black transition-all ${
+                    !annual ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Mensual
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="grid lg:grid-cols-12 gap-8 items-stretch">
@@ -1013,10 +1038,25 @@ export default function LandingPage() {
                   <p className="text-[10px] text-indigo-400 font-black uppercase tracking-wider flex items-center gap-1">
                     Arias CRM <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded uppercase font-black tracking-normal">Tarifa Única</span>
                   </p>
-                  <p className="text-4xl font-black text-emerald-400 tracking-tight mt-1">
-                    ${flatPrice} <span className="text-xs font-semibold text-emerald-600">USD/mes</span>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    {annual && (
+                      <span className="text-sm text-slate-500 line-through font-semibold">${proMonthly}</span>
+                    )}
+                    <p className="text-4xl font-black text-emerald-400 tracking-tight">
+                      ${flatPrice} <span className="text-xs font-semibold text-emerald-600">USD/mes</span>
+                    </p>
+                    {annual && (
+                      <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.2 rounded font-black uppercase tracking-wider">
+                        -20% OFF
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-emerald-400 mt-2 font-semibold">
+                    {annual 
+                      ? `✅ Todo incluido (Facturado anual: $${flatPriceAnnual} USD/año)` 
+                      : '✅ Todo incluido. Cancela cuando quieras.'
+                    }
                   </p>
-                  <p className="text-[10px] text-emerald-400 mt-2 font-semibold">✅ Todo incluido. Cancela cuando quieras.</p>
                 </div>
 
                 {/* Savings highlights */}
@@ -1391,6 +1431,28 @@ export default function LandingPage() {
               <p className="text-slate-400 mt-4 max-w-2xl mx-auto text-sm">
                 Analiza de forma honesta el costo y las prestaciones de las tres alternativas líderes. Arias CRM te ofrece el stack de ventas completo de alta gama a una fracción de su costo ordinario.
               </p>
+              <div className="flex justify-center mt-6">
+                <div className="inline-flex items-center gap-1 bg-white/5 rounded-full p-1 border border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setAnnual(true)}
+                    className={`px-4 py-1.5 rounded-full text-[10px] font-black transition-all ${
+                      annual ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Anual (20% OFF)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAnnual(false)}
+                    className={`px-4 py-1.5 rounded-full text-[10px] font-black transition-all ${
+                      !annual ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Mensual
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="grid md:grid-cols-3 gap-8 items-stretch">
@@ -1460,7 +1522,9 @@ export default function LandingPage() {
                   <ul className="space-y-4 mb-8">
                     <li className="flex items-start gap-3 text-xs text-slate-200">
                       <Tick />
-                      <span><strong>${flatPrice}/mes</strong> (Tarifa única plana sin cargos ocultos)</span>
+                      <span>
+                        <strong>${flatPrice}/mes</strong> {annual ? '(Facturación Anual - 20% OFF)' : '(Facturación Mensual)'}
+                      </span>
                     </li>
                     <li className="flex items-start gap-3 text-xs text-slate-200">
                       <Tick />
@@ -1482,7 +1546,9 @@ export default function LandingPage() {
                 </div>
 
                 <div className="border-t border-indigo-500/20 pt-6 text-center">
-                  <p className="text-xs text-indigo-300 font-semibold uppercase tracking-wider">Costo Anual Fijo:</p>
+                  <p className="text-xs text-indigo-300 font-semibold uppercase tracking-wider">
+                    {annual ? 'Costo Anual Fijo:' : 'Costo Anual Proyectado:'}
+                  </p>
                   <p className="text-4xl font-black text-emerald-400 mt-1.5">${flatPriceAnnual} USD</p>
                 </div>
               </div>
