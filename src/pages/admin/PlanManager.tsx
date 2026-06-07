@@ -419,7 +419,15 @@ export default function PlanManager() {
                     <input 
                       type="number" 
                       value={editingPlan.price_monthly} 
-                      onChange={e => setEditingPlan({...editingPlan, price_monthly: Number(e.target.value)})} 
+                      onChange={e => {
+                        const monthlyVal = Number(e.target.value);
+                        const calculatedAnnual = Math.round((monthlyVal * 12) * 0.8);
+                        setEditingPlan({
+                          ...editingPlan,
+                          price_monthly: monthlyVal,
+                          price_annual: calculatedAnnual
+                        });
+                      }} 
                       className="w-full rounded-xl border-slate-200 pl-8 focus:border-indigo-500 focus:ring-indigo-500 text-sm font-black p-2.5" 
                     />
                   </div>
@@ -435,6 +443,12 @@ export default function PlanManager() {
                       className="w-full rounded-xl border-slate-200 pl-8 focus:border-indigo-500 focus:ring-indigo-500 text-sm font-black p-2.5" 
                     />
                   </div>
+                </div>
+                <div className="col-span-2 text-[10px] text-slate-500 font-semibold flex items-center gap-1.5 mt-1">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span>
+                    El precio anual se calcula automáticamente aplicando un <strong>20% de descuento</strong> (ahorro de ${editingPlan.price_monthly * 2.4} USD al año). Si lo deseas, puedes editar el monto anual de forma manual.
+                  </span>
                 </div>
               </div>
 

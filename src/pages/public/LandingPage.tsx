@@ -311,6 +311,7 @@ export default function LandingPage() {
       slug: 'starter',
       annual: 24,  
       monthly: 29,  
+      price_annual: 288,
       users: 3,  
       max_leads: 500,
       desc: 'Esencial para agencias y equipos que inician su aceleración.',
@@ -321,6 +322,7 @@ export default function LandingPage() {
       slug: 'pro',
       annual: 60,  
       monthly: 75, 
+      price_annual: 720,
       users: 10,  
       max_leads: 4000,
       pop: true,
@@ -332,6 +334,7 @@ export default function LandingPage() {
       slug: 'enterprise',
       annual: 149, 
       monthly: 199, 
+      price_annual: 1788,
       users: 100, 
       max_leads: 999999,
       desc: 'Arquitectura empresarial para grandes operaciones de volumen.',
@@ -358,6 +361,7 @@ export default function LandingPage() {
             description: p.description || '',
             annual: Math.round(Number(p.price_annual) / 12),
             monthly: Math.round(Number(p.price_monthly)),
+            price_annual: Number(p.price_annual),
             users: p.max_users || 0,
             max_leads: p.max_leads || 0,
             features: Array.isArray(p.features) ? p.features : [],
@@ -1110,11 +1114,32 @@ export default function LandingPage() {
                             </span>
                           )}
                           <p className={`text-xs font-black uppercase tracking-wider mb-2 ${isHighlighted ? 'text-indigo-400 mt-1' : 'text-slate-500'}`}>{plan.name}</p>
-                          <div className="flex items-baseline justify-center gap-0.5 mb-4">
-                            <span className={`text-3xl font-black ${isHighlighted ? 'text-emerald-400' : 'text-white'}`}>
-                              ${annual ? plan.annual : plan.monthly}
-                            </span>
-                            <span className="text-[10px] text-slate-500">/mes</span>
+                          <div className="flex flex-col items-center justify-center gap-1 mb-4 min-h-[64px]">
+                            {annual && plan.annual < plan.monthly ? (
+                              <div className="flex items-center gap-1.5 h-4 mb-0.5">
+                                <span className="text-xs text-slate-500 line-through font-semibold">${plan.monthly}</span>
+                                <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1 py-0.2 rounded font-black uppercase tracking-wider">
+                                  -{Math.round(((plan.monthly - plan.annual) / plan.monthly) * 100)}%
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="h-4 mb-0.5" />
+                            )}
+                            <div className="flex items-baseline justify-center gap-0.5">
+                              <span className={`text-3xl font-black ${isHighlighted ? 'text-emerald-400' : 'text-white'}`}>
+                                ${annual ? plan.annual : plan.monthly}
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-bold">/mes</span>
+                            </div>
+                            {annual ? (
+                              <span className="text-[8px] text-slate-400 font-black uppercase tracking-wider mt-0.5">
+                                Facturado anual: ${plan.price_annual || (plan.annual * 12)}/año
+                              </span>
+                            ) : (
+                              <span className="text-[8px] text-slate-500 font-black uppercase tracking-wider mt-0.5">
+                                Facturado mensual
+                              </span>
+                            )}
                           </div>
                           <button
                             onClick={() => navigate('/register')}
