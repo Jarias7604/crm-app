@@ -1,5 +1,5 @@
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
 import { CheckCircle2, ArrowRight, X, Sparkles, Shield, Zap, TrendingUp, Users, Smartphone, Globe, MessageSquare } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../auth/AuthProvider';
@@ -7,6 +7,7 @@ import LandingNavbar from '../../components/landing/LandingNavbar';
 import LandingFooter from '../../components/landing/LandingFooter';
 import AriasAgent from '../../components/landing/AriasAgent';
 import Login from '../Login';
+import { supabase } from '../../services/supabase';
 
 // ─── DATA & SCHEMAS ──────────────────────────────────────────────────────────
 const CHANNELS = [
@@ -303,6 +304,76 @@ export default function LandingPage() {
   const [annual, setAnnual] = useState(true);
   const [showLogin, setShowLogin] = useState(false);
 
+  // Dynamic Plans from database
+  const [plans, setPlans] = useState<any[]>([
+    { 
+      name: 'Starter',  
+      slug: 'starter',
+      annual: 24,  
+      monthly: 29,  
+      users: 3,  
+      max_leads: 500,
+      desc: 'Esencial para agencias y equipos que inician su aceleración.',
+      features: ['Pipeline visual Kanban', 'Cotizador + PDF profesional', '1 AI Bot (Telegram/WhatsApp)', 'Email marketing campaigns', 'Reportes de ventas básicos'] 
+    },
+    { 
+      name: 'Pro',   
+      slug: 'pro',
+      annual: 60,  
+      monthly: 75, 
+      users: 10,  
+      max_leads: 4000,
+      pop: true,
+      desc: 'La suite completa de automatización para escalar sin límites.',
+      features: ['Todo en Starter', 'Canales ilimitados de mensajería', 'Flyer Studio con IA', 'Lead Hunter (Google Places)', 'Captura nativa de TikTok + Meta Leads', 'Reportes analíticos avanzados'] 
+    },
+    { 
+      name: 'Enterprise',      
+      slug: 'enterprise',
+      annual: 149, 
+      monthly: 199, 
+      users: 100, 
+      max_leads: 999999,
+      desc: 'Arquitectura empresarial para grandes operaciones de volumen.',
+      features: ['Todo en Pro', 'Workflows visuales automatizados', 'API REST & Webhooks avanzados', 'Inbox omnicanal unificado', 'Multi-workspace corporativo', 'SLA garantizado 99.9%'] 
+    },
+  ]);
+  const [loadingPlans, setLoadingPlans] = useState(true);
+
+  useEffect(() => {
+    async function fetchPlans() {
+      try {
+        const { data, error } = await supabase
+          .from('saas_plans')
+          .select('*')
+          .eq('is_active', true)
+          .order('sort_order', { ascending: true });
+        
+        if (error) throw error;
+        if (data && data.length > 0) {
+          const formattedPlans = data.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            slug: p.slug,
+            description: p.description || '',
+            annual: Math.round(Number(p.price_annual) / 12),
+            monthly: Math.round(Number(p.price_monthly)),
+            users: p.max_users || 0,
+            max_leads: p.max_leads || 0,
+            features: Array.isArray(p.features) ? p.features : [],
+            pop: p.slug === 'pro'
+          }));
+          setPlans(formattedPlans);
+        }
+      } catch (err) {
+        console.error('Error fetching plans from supabase:', err);
+      } finally {
+        setLoadingPlans(false);
+      }
+    }
+    fetchPlans();
+  }, []);
+
   // Live Interactive Testing Lead Capture Simulator
   const [simName, setSimName] = useState('');
   const [simPhone, setSimPhone] = useState('');
@@ -336,6 +407,9 @@ export default function LandingPage() {
       setSimStatus('captured');
     }, 1200);
   };
+
+  // Dynamic prices for comparison
+  const flatPrice = plans.find(p => p.slug === 'pro')?.monthly || 75;
 
   // Math models for ROI
   const closingRateCompetitor = 0.12; // 12% standard follow up
@@ -935,7 +1009,7 @@ export default function LandingPage() {
                     Arias CRM <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded uppercase font-black tracking-normal">Tarifa Única</span>
                   </p>
                   <p className="text-4xl font-black text-emerald-400 tracking-tight mt-1">
-                    $65 <span className="text-xs font-semibold text-emerald-600">USD/mes</span>
+                    ${flatPrice} <span className="text-xs font-semibold text-emerald-600">USD/mes</span>
                   </p>
                   <p className="text-[10px] text-emerald-400 mt-2 font-semibold">✅ Todo incluido. Cancela cuando quieras.</p>
                 </div>
@@ -944,14 +1018,14 @@ export default function LandingPage() {
                 <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
                   <p className="text-[11px] text-slate-300 font-semibold">¡Ahorras hasta con esta configuración!</p>
                   <p className="text-2xl font-black text-emerald-400 mt-1">
-                    -${(hsEquivalent - 65)} USD/mes
+                    -${(hsEquivalent - flatPrice)} USD/mes
                   </p>
                 </div>
               </div>
 
               <div className="mt-8 pt-6 border-t border-white/5">
                 <button onClick={() => navigate('/register')} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 rounded-xl text-xs transition-all shadow-lg shadow-indigo-600/30">
-                  Obtener todo el stack por $65/mes
+                  Obtener todo el stack por ${flatPrice}/mes
                 </button>
               </div>
 
@@ -1019,56 +1093,42 @@ export default function LandingPage() {
                     <th className="lg:sticky lg:top-[96px] z-30 lg:bg-[#07070d]/95 lg:backdrop-blur-md p-6 text-sm font-black text-slate-500 uppercase tracking-widest w-[30%] border-b border-white/10">
                       Características
                     </th>
-                    
-                    {/* Starter Header */}
-                    <th className="lg:sticky lg:top-[96px] z-30 lg:bg-[#07070d]/95 lg:backdrop-blur-md p-6 text-center w-[17.5%] border-r border-b border-white/10">
-                      <p className="text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Starter</p>
-                      <div className="flex items-baseline justify-center gap-0.5 mb-4">
-                        <span className="text-3xl font-black text-white">${annual ? 49 : 65}</span>
-                        <span className="text-[10px] text-slate-500">/mes</span>
-                      </div>
-                      <button onClick={() => navigate('/register')} className="w-full bg-white/5 hover:bg-white/10 text-white border border-white/10 text-[10px] font-bold py-2 rounded-xl transition-all">
-                        Iniciar Prueba
-                      </button>
-                    </th>
-
-                    {/* Growth Header (Highlighted) */}
-                    <th className="lg:sticky lg:top-[96px] z-30 lg:bg-[#0c0c22]/95 lg:backdrop-blur-md p-6 text-center w-[20%] border-x border-b border-indigo-500/25 relative shadow-[0_4px_30px_rgba(99,102,241,0.08)]">
-                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-[8px] font-black bg-indigo-600 text-white px-2.5 py-1 rounded-full uppercase tracking-widest shadow-md">
-                        Recomendado
-                      </span>
-                      <p className="text-xs font-black text-indigo-400 uppercase tracking-wider mb-2 mt-1">Growth</p>
-                      <div className="flex items-baseline justify-center gap-0.5 mb-4">
-                        <span className="text-3xl font-black text-emerald-400">${annual ? 99 : 129}</span>
-                        <span className="text-[10px] text-slate-500">/mes</span>
-                      </div>
-                      <button onClick={() => navigate('/register')} className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[10px] font-black py-2 rounded-xl transition-all shadow-lg shadow-emerald-500/10">
-                        Iniciar Prueba
-                      </button>
-                    </th>
-
-                    {/* Pro Header */}
-                    <th className="lg:sticky lg:top-[96px] z-30 lg:bg-[#07070d]/95 lg:backdrop-blur-md p-6 text-center w-[17.5%] border-x border-b border-white/10">
-                      <p className="text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Pro</p>
-                      <div className="flex items-baseline justify-center gap-0.5 mb-4">
-                        <span className="text-3xl font-black text-white">${annual ? 159 : 199}</span>
-                        <span className="text-[10px] text-slate-500">/mes</span>
-                      </div>
-                      <button onClick={() => navigate('/register')} className="w-full bg-white/5 hover:bg-white/10 text-white border border-white/10 text-[10px] font-bold py-2 rounded-xl transition-all">
-                        Iniciar Prueba
-                      </button>
-                    </th>
-
-                    {/* Enterprise Header */}
-                    <th className="lg:sticky lg:top-[96px] z-30 lg:bg-[#07070d]/95 lg:backdrop-blur-md p-6 text-center w-[15%] border-b border-white/10">
-                      <p className="text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Enterprise</p>
-                      <div className="flex items-baseline justify-center gap-0.5 mb-4 h-9 items-center">
-                        <span className="text-sm font-black text-indigo-300 uppercase tracking-wider">Personalizado</span>
-                      </div>
-                      <button onClick={() => navigate('/register')} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-bold py-2 rounded-xl transition-all">
-                        Contactar
-                      </button>
-                    </th>
+                    {plans.map((plan) => {
+                      const isHighlighted = plan.slug === 'pro';
+                      return (
+                        <th
+                          key={plan.id || plan.slug}
+                          className={`lg:sticky lg:top-[96px] z-30 p-6 text-center border-b border-white/10 ${
+                            isHighlighted
+                              ? 'lg:bg-[#0c0c22]/95 border-x border-b border-indigo-500/25 relative shadow-[0_4px_30px_rgba(99,102,241,0.08)] w-[20%]'
+                              : 'lg:bg-[#07070d]/95 border-r border-white/10 w-[17.5%]'
+                          }`}
+                        >
+                          {isHighlighted && (
+                            <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-[8px] font-black bg-indigo-600 text-white px-2.5 py-1 rounded-full uppercase tracking-widest shadow-md">
+                              Recomendado
+                            </span>
+                          )}
+                          <p className={`text-xs font-black uppercase tracking-wider mb-2 ${isHighlighted ? 'text-indigo-400 mt-1' : 'text-slate-500'}`}>{plan.name}</p>
+                          <div className="flex items-baseline justify-center gap-0.5 mb-4">
+                            <span className={`text-3xl font-black ${isHighlighted ? 'text-emerald-400' : 'text-white'}`}>
+                              ${annual ? plan.annual : plan.monthly}
+                            </span>
+                            <span className="text-[10px] text-slate-500">/mes</span>
+                          </div>
+                          <button
+                            onClick={() => navigate('/register')}
+                            className={`w-full text-[10px] font-black py-2 rounded-xl transition-all ${
+                              isHighlighted
+                                ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/10'
+                                : 'bg-white/5 hover:bg-white/10 text-white border border-white/10'
+                            }`}
+                          >
+                            Iniciar Prueba
+                          </button>
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
 
@@ -1077,38 +1137,71 @@ export default function LandingPage() {
                   
                   {/* CATEGORY 1: CAPACIDAD Y USO */}
                   <tr className="bg-white/[0.02] border-b border-white/5">
-                    <td colSpan={5} className="p-5 pl-6 text-xs lg:text-sm font-black text-indigo-400 uppercase tracking-[0.2em]">
+                    <td colSpan={plans.length + 1} className="p-5 pl-6 text-xs lg:text-sm font-black text-indigo-400 uppercase tracking-[0.2em]">
                       Capacidad y Uso
                     </td>
                   </tr>
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
                     <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Asesores Incluidos</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">3 asesores</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-emerald-400 font-extrabold bg-indigo-500/[0.03] border-x border-indigo-500/20">8 asesores</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">15 asesores</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-indigo-300 font-extrabold">Ilimitados</td>
+                    {plans.map((plan) => {
+                      const isHighlighted = plan.slug === 'pro';
+                      return (
+                        <td
+                          key={plan.id || plan.slug}
+                          className={`p-6 text-center text-sm lg:text-base ${
+                            isHighlighted
+                              ? 'text-emerald-400 font-extrabold bg-indigo-500/[0.03] border-x border-indigo-500/20'
+                              : 'text-slate-300 border-r border-white/5'
+                          }`}
+                        >
+                          {plan.users >= 100 ? 'Ilimitados' : `${plan.users} asesores`}
+                        </td>
+                      );
+                    })}
                   </tr>
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
                     <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Contactos en CRM</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">Ilimitados</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-emerald-400 font-extrabold bg-indigo-500/[0.03] border-x border-indigo-500/20">Ilimitados</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">Ilimitados</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-indigo-300 font-extrabold">Personalizado</td>
+                    {plans.map((plan) => {
+                      const isHighlighted = plan.slug === 'pro';
+                      return (
+                        <td
+                          key={plan.id || plan.slug}
+                          className={`p-6 text-center text-sm lg:text-base ${
+                            isHighlighted
+                              ? 'text-emerald-400 font-extrabold bg-indigo-500/[0.03] border-x border-indigo-500/20'
+                              : 'text-slate-300 border-r border-white/5'
+                          }`}
+                        >
+                          {plan.max_leads >= 999999 ? 'Ilimitados' : `${plan.max_leads.toLocaleString()} contactos`}
+                        </td>
+                      );
+                    })}
                   </tr>
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
                     <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Workspaces Multi-Empresa</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">1 workspace</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 bg-indigo-500/[0.03] border-x border-indigo-500/20">3 workspaces</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">10 workspaces</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-indigo-300 font-extrabold">Ilimitados</td>
+                    {plans.map((plan) => {
+                      const isHighlighted = plan.slug === 'pro';
+                      return (
+                        <td
+                          key={plan.id || plan.slug}
+                          className={`p-6 text-center text-sm lg:text-base ${
+                            isHighlighted
+                              ? 'text-slate-300 bg-indigo-500/[0.03] border-x border-indigo-500/20 font-semibold'
+                              : 'text-slate-300 border-r border-white/5'
+                          }`}
+                        >
+                          {plan.slug === 'starter' ? '1 workspace' : plan.slug === 'pro' ? '10 workspaces' : 'Ilimitados'}
+                        </td>
+                      );
+                    })}
                   </tr>
 
                   {/* CATEGORY 2: CANALES INCLUIDOS */}
                   <tr className="bg-white/[0.02] border-b border-white/5">
-                    <td colSpan={5} className="p-5 pl-6 text-xs lg:text-sm font-black text-indigo-400 uppercase tracking-[0.2em]">
+                    <td colSpan={plans.length + 1} className="p-5 pl-6 text-xs lg:text-sm font-black text-indigo-400 uppercase tracking-[0.2em]">
                       Canales Oficiales
                     </td>
                   </tr>
@@ -1117,112 +1210,133 @@ export default function LandingPage() {
                     <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold flex items-center gap-2.5">
                       <BrandIcon name="WhatsApp" /> WhatsApp API Oficial
                     </td>
-                    <td className="p-6 text-center border-r border-white/5"><Tick /></td>
-                    <td className="p-6 text-center bg-indigo-500/[0.03] border-x border-indigo-500/20"><Tick /></td>
-                    <td className="p-6 text-center border-r border-white/5"><Tick /></td>
-                    <td className="p-6 text-center"><Tick /></td>
+                    {plans.map((plan) => (
+                      <td key={plan.id || plan.slug} className={`p-6 text-center ${plan.slug === 'pro' ? 'bg-indigo-500/[0.03] border-x border-indigo-500/20' : 'border-r border-white/5'}`}><Tick /></td>
+                    ))}
                   </tr>
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
                     <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold flex items-center gap-2.5">
                       <BrandIcon name="Instagram" /> Instagram Direct
                     </td>
-                    <td className="p-6 text-center border-r border-white/5"><Tick /></td>
-                    <td className="p-6 text-center bg-indigo-500/[0.03] border-x border-indigo-500/20"><Tick /></td>
-                    <td className="p-6 text-center border-r border-white/5"><Tick /></td>
-                    <td className="p-6 text-center"><Tick /></td>
+                    {plans.map((plan) => (
+                      <td key={plan.id || plan.slug} className={`p-6 text-center ${plan.slug === 'pro' ? 'bg-indigo-500/[0.03] border-x border-indigo-500/20' : 'border-r border-white/5'}`}><Tick /></td>
+                    ))}
                   </tr>
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
                     <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold flex items-center gap-2.5">
                       <BrandIcon name="Facebook" /> Facebook Messenger
                     </td>
-                    <td className="p-6 text-center border-r border-white/5"><Tick /></td>
-                    <td className="p-6 text-center bg-indigo-500/[0.03] border-x border-indigo-500/20"><Tick /></td>
-                    <td className="p-6 text-center border-r border-white/5"><Tick /></td>
-                    <td className="p-6 text-center"><Tick /></td>
+                    {plans.map((plan) => (
+                      <td key={plan.id || plan.slug} className={`p-6 text-center ${plan.slug === 'pro' ? 'bg-indigo-500/[0.03] border-x border-indigo-500/20' : 'border-r border-white/5'}`}><Tick /></td>
+                    ))}
                   </tr>
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
                     <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold flex items-center gap-2.5">
                       <BrandIcon name="TikTok" /> TikTok Leads API
                     </td>
-                    <td className="p-6 text-center border-r border-white/5"><Cross /></td>
-                    <td className="p-6 text-center bg-indigo-500/[0.03] border-x border-indigo-500/20"><Tick /></td>
-                    <td className="p-6 text-center border-r border-white/5"><Tick /></td>
-                    <td className="p-6 text-center"><Tick /></td>
+                    {plans.map((plan) => (
+                      <td key={plan.id || plan.slug} className={`p-6 text-center ${plan.slug === 'pro' ? 'bg-indigo-500/[0.03] border-x border-indigo-500/20' : 'border-r border-white/5'}`}>
+                        {plan.slug !== 'starter' ? <Tick /> : <Cross />}
+                      </td>
+                    ))}
                   </tr>
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
                     <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold flex items-center gap-2.5">
                       <BrandIcon name="Telegram" /> Telegram Bot
                     </td>
-                    <td className="p-6 text-center border-r border-white/5"><Tick /></td>
-                    <td className="p-6 text-center bg-indigo-500/[0.03] border-x border-indigo-500/20"><Tick /></td>
-                    <td className="p-6 text-center border-r border-white/5"><Tick /></td>
-                    <td className="p-6 text-center"><Tick /></td>
+                    {plans.map((plan) => (
+                      <td key={plan.id || plan.slug} className={`p-6 text-center ${plan.slug === 'pro' ? 'bg-indigo-500/[0.03] border-x border-indigo-500/20' : 'border-r border-white/5'}`}><Tick /></td>
+                    ))}
                   </tr>
 
                   {/* CATEGORY 3: AI & AUTOMATIZACION */}
                   <tr className="bg-white/[0.02] border-b border-white/5">
-                    <td colSpan={5} className="p-5 pl-6 text-[10px] font-black text-indigo-400 uppercase tracking-widest">
+                    <td colSpan={plans.length + 1} className="p-5 pl-6 text-[10px] font-black text-indigo-400 uppercase tracking-widest">
                       AI & Automatización
                     </td>
                   </tr>
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
                     <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">AI Sales Agent Bot</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">1 bot activo</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-emerald-400 font-extrabold bg-indigo-500/[0.03] border-x border-indigo-500/20">Bots Ilimitados</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">Bots Ilimitados</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-indigo-300 font-bold">Bots Dedicados</td>
+                    {plans.map((plan) => {
+                      const isHighlighted = plan.slug === 'pro';
+                      return (
+                        <td
+                          key={plan.id || plan.slug}
+                          className={`p-6 text-center text-sm lg:text-base ${
+                            isHighlighted
+                              ? 'text-emerald-400 font-extrabold bg-indigo-500/[0.03] border-x border-indigo-500/20'
+                              : 'text-slate-300 border-r border-white/5'
+                          }`}
+                        >
+                          {plan.slug === 'starter' ? '1 bot activo' : plan.slug === 'pro' ? 'Bots Ilimitados' : 'Bots Dedicados'}
+                        </td>
+                      );
+                    })}
                   </tr>
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
                     <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Cotizador PDF Profesional</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">Básico</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-emerald-400 font-extrabold bg-indigo-500/[0.03] border-x border-indigo-500/20">Avanzado + Logo</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">Avanzado + Multi-moneda</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-indigo-300 font-bold">API de Cotización</td>
+                    {plans.map((plan) => (
+                      <td key={plan.id || plan.slug} className={`p-6 text-center ${plan.slug === 'pro' ? 'bg-indigo-500/[0.03] border-x border-indigo-500/20' : 'border-r border-white/5'}`}><Tick /></td>
+                    ))}
                   </tr>
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
                     <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Lead Hunter (Google Maps)</td>
-                    <td className="p-6 text-center border-r border-white/5"><Cross /></td>
-                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 bg-indigo-500/[0.03] border-x border-indigo-500/20">✓ (500 leads/min)</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">✓ (Ilimitado)</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-indigo-300 font-bold">✓ (Ilimitado)</td>
+                    {plans.map((plan) => (
+                      <td key={plan.id || plan.slug} className={`p-6 text-center ${plan.slug === 'pro' ? 'bg-indigo-500/[0.03] border-x border-indigo-500/20' : 'border-r border-white/5'}`}>
+                        {plan.slug !== 'starter' ? <Tick /> : <Cross />}
+                      </td>
+                    ))}
                   </tr>
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
                     <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Flyer Studio con IA</td>
-                    <td className="p-6 text-center border-r border-white/5"><Cross /></td>
-                    <td className="p-6 text-center bg-indigo-500/[0.03] border-x border-indigo-500/20"><Tick /></td>
-                    <td className="p-6 text-center border-r border-white/5"><Tick /></td>
-                    <td className="p-6 text-center"><Tick /></td>
+                    {plans.map((plan) => (
+                      <td key={plan.id || plan.slug} className={`p-6 text-center ${plan.slug === 'pro' ? 'bg-indigo-500/[0.03] border-x border-indigo-500/20' : 'border-r border-white/5'}`}>
+                        {plan.slug !== 'starter' ? <Tick /> : <Cross />}
+                      </td>
+                    ))}
                   </tr>
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
                     <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Workflows Automatizados</td>
-                    <td className="p-6 text-center border-r border-white/5"><Cross /></td>
-                    <td className="p-6 text-center bg-indigo-500/[0.03] border-x border-indigo-500/20"><Cross /></td>
-                    <td className="p-6 text-center border-r border-white/5"><Tick /></td>
-                    <td className="p-6 text-center"><Tick /></td>
+                    {plans.map((plan) => (
+                      <td key={plan.id || plan.slug} className={`p-6 text-center ${plan.slug === 'pro' ? 'bg-indigo-500/[0.03] border-x border-indigo-500/20' : 'border-r border-white/5'}`}>
+                        {plan.slug === 'enterprise' ? <Tick /> : <Cross />}
+                      </td>
+                    ))}
                   </tr>
 
                   {/* CATEGORY 4: SOPORTE Y GARANTIAS */}
                   <tr className="bg-white/[0.02] border-b border-white/5">
-                    <td colSpan={5} className="p-5 pl-6 text-[10px] font-black text-indigo-400 uppercase tracking-widest">
+                    <td colSpan={plans.length + 1} className="p-5 pl-6 text-[10px] font-black text-indigo-400 uppercase tracking-widest">
                       Soporte y Garantías
                     </td>
                   </tr>
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
                     <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Canal de Soporte</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">Email</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-emerald-400 font-extrabold bg-indigo-500/[0.03] border-x border-indigo-500/20">WhatsApp + Email</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">Soporte 24/7</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-indigo-300 font-bold">SLA Dedicado 24/7</td>
+                    {plans.map((plan) => {
+                      const isHighlighted = plan.slug === 'pro';
+                      return (
+                        <td
+                          key={plan.id || plan.slug}
+                          className={`p-6 text-center text-sm lg:text-base ${
+                            isHighlighted
+                              ? 'text-emerald-400 font-extrabold bg-indigo-500/[0.03] border-x border-indigo-500/20'
+                              : 'text-slate-300 border-r border-white/5'
+                          }`}
+                        >
+                          {plan.slug === 'starter' ? 'Email' : plan.slug === 'pro' ? 'WhatsApp + Email' : 'SLA Dedicado 24/7'}
+                        </td>
+                      );
+                    })}
                   </tr>
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
