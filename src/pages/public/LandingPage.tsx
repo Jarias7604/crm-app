@@ -414,6 +414,7 @@ export default function LandingPage() {
 
   // Dynamic prices for comparison
   const flatPrice = plans.find(p => p.slug === 'pro')?.monthly || 75;
+  const flatPriceAnnual = plans.find(p => p.slug === 'pro')?.price_annual || (flatPrice * 12);
 
   // Math models for ROI
   const closingRateCompetitor = 0.12; // 12% standard follow up
@@ -1459,7 +1460,7 @@ export default function LandingPage() {
                   <ul className="space-y-4 mb-8">
                     <li className="flex items-start gap-3 text-xs text-slate-200">
                       <Tick />
-                      <span><strong>$65/mes</strong> (Tarifa única plana sin cargos ocultos)</span>
+                      <span><strong>${flatPrice}/mes</strong> (Tarifa única plana sin cargos ocultos)</span>
                     </li>
                     <li className="flex items-start gap-3 text-xs text-slate-200">
                       <Tick />
@@ -1482,7 +1483,7 @@ export default function LandingPage() {
 
                 <div className="border-t border-indigo-500/20 pt-6 text-center">
                   <p className="text-xs text-indigo-300 font-semibold uppercase tracking-wider">Costo Anual Fijo:</p>
-                  <p className="text-4xl font-black text-emerald-400 mt-1.5">$780 USD</p>
+                  <p className="text-4xl font-black text-emerald-400 mt-1.5">${flatPriceAnnual} USD</p>
                 </div>
               </div>
 
