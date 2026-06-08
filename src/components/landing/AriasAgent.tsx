@@ -7,13 +7,22 @@ interface Message {
   text: string;
 }
 
-const PET_QUOTES = [
+const PET_QUOTES_ES = [
   "¿Cansado de Zapier lento? Déjamelo a mí, inyecto leads en 120ms. ⚡",
   "¡Meta Ads conectado! Mis sensores detectaron 5 nuevos leads listos. 🔥",
   "Arias CRM cuesta solo $65. ¡Ahorra hasta $800 con HubSpot! 💸",
   "Lead Hunter activo. ¿Quieres extraer prospectos de El Salvador? 🇸🇻",
   "¡Hola! Soy Ari, tu Sales Sentinel. ¿Listo para cerrar tratos hoy? 🤖",
   "Cotizador Pro listo para generar propuestas impecables en 1 minuto. 📄"
+];
+
+const PET_QUOTES_EN = [
+  "Tired of slow Zapier? Leave it to me, I inject leads in 120ms. ⚡",
+  "Meta Ads connected! My sensors detected 5 new leads ready. 🔥",
+  "Arias CRM costs only $65. Save up to $800 compared to HubSpot! 💸",
+  "Lead Hunter active. Want to extract prospects from El Salvador? 🇸🇻",
+  "Hi! I am Ari, your Sales Sentinel. Ready to close deals today? 🤖",
+  "Quote Generator Pro ready to generate flawless proposals in 1 minute. 📄"
 ];
 
 const RESPONSES_EN = {
@@ -37,7 +46,7 @@ const RESPONSES_ES = {
 };
 
 function getResponse(input: string, lang: string): string {
-  const responses = lang === 'es' ? RESPONSES_ES : RESPONSES_EN;
+  const responses = lang?.startsWith('es') ? RESPONSES_ES : RESPONSES_EN;
   const lower = input.toLowerCase();
   if (/hola|hey|hi|hello|buenas|ari/i.test(lower)) return responses.hi;
   if (/preci|price|cost|plan|paquete|cuanto/i.test(lower)) return responses.price;
@@ -51,7 +60,9 @@ function getResponse(input: string, lang: string): string {
 export default function AriasAgent() {
   const [isOpen, setIsOpen] = useState(false);
   const { i18n } = useTranslation();
-  const en = i18n.language !== 'es';
+  const isSpanish = i18n.language?.startsWith('es');
+  const en = !isSpanish;
+  const quotes = en ? PET_QUOTES_EN : PET_QUOTES_ES;
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
@@ -68,12 +79,12 @@ export default function AriasAgent() {
     const interval = setInterval(() => {
       setShowQuote(false);
       setTimeout(() => {
-        setQuoteIndex(prev => (prev + 1) % PET_QUOTES.length);
+        setQuoteIndex(prev => (prev + 1) % quotes.length);
         setShowQuote(true);
       }, 500);
     }, 8500);
     return () => clearInterval(interval);
-  }, []);
+  }, [quotes]);
 
   useEffect(() => {
     if (isOpen && messages.length === 0) {
@@ -222,7 +233,7 @@ export default function AriasAgent() {
           {showQuote && (
             <div className="bg-slate-900/90 backdrop-blur-md border border-blue-500/20 text-white px-4 py-2.5 rounded-2xl shadow-xl max-w-[240px] text-[10px] leading-relaxed relative animate-fadeIn">
               <p className="font-bold text-blue-400 mb-0.5">Ari, Sales Sentinel:</p>
-              <p className="text-slate-200">{PET_QUOTES[quoteIndex]}</p>
+              <p className="text-slate-200">{quotes[quoteIndex]}</p>
               
               {/* Pointer triangle */}
               <div className="absolute right-[-6px] top-1/2 -translate-y-1/2 w-0 h-0 border-t-[6px] border-t-transparent border-b-[6px] border-b-transparent border-l-[6px] border-l-slate-900" />

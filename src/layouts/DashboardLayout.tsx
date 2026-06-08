@@ -53,7 +53,7 @@ export default function DashboardLayout() {
                                     <span className="animate-bounce text-[12px]">✨</span>
                                 </h2>
                                 <p className="text-[8px] font-black text-gray-400 uppercase tracking-[0.25em] opacity-70 group-hover:opacity-100 transition-opacity">
-                                    {new Date().toLocaleDateString(i18n.language === 'es' ? 'es-ES' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                                    {new Date().toLocaleDateString(i18n.language?.startsWith('es') ? 'es-ES' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                                 </p>
                             </div>
                             {/* Role badge + Notification Bell + Profile */}

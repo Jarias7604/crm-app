@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 
 export default function LandingFooter() {
   const { i18n } = useTranslation();
-  const en = i18n.language !== 'es';
+  const en = !i18n.language?.startsWith('es');
 
   return (
     <footer className="bg-[#0f172a] text-slate-300 py-14 border-t border-white/10">

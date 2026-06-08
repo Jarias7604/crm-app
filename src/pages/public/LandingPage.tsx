@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, ArrowRight, X, Sparkles, Shield, Zap, TrendingUp, Users, Smartphone, Globe, MessageSquare } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../auth/AuthProvider';
+import { useTranslation } from 'react-i18next';
 import LandingNavbar from '../../components/landing/LandingNavbar';
 import LandingFooter from '../../components/landing/LandingFooter';
 import AriasAgent from '../../components/landing/AriasAgent';
@@ -20,7 +21,7 @@ const CHANNELS = [
   { name: 'Google Sheets', color: '#0F9D58', bg: 'rgba(15,157,88,0.06)', active: true },
 ];
 
-const VS_ROWS = [
+const VS_ROWS_ES = [
   { f: 'Captura Automatizada de Ads (TikTok/FB/IG)', us: true,  hub: false, res: true  },
   { f: 'AI Agent Conversacional 24/7 (WhatsApp)',   us: true,  hub: false, res: true  },
   { f: 'Cotizador Integrado con Generación de PDF', us: true,  hub: false, res: false },
@@ -31,41 +32,104 @@ const VS_ROWS = [
   { f: 'Precio Base Mensual sin contrato',          us: '$65', hub: '$890', res: '$99' },
 ];
 
-const PLANS = [
+const VS_ROWS_EN = [
+  { f: 'Automated Ads Capture (TikTok/FB/IG)', us: true,  hub: false, res: true  },
+  { f: '24/7 Conversational AI Agent (WhatsApp)',   us: true,  hub: false, res: true  },
+  { f: 'Integrated Quote Generator + PDF', us: true,  hub: false, res: false },
+  { f: 'Lead Hunter (Google Maps Data Extractor)',  us: true,  hub: false, res: false },
+  { f: 'Flyer Studio with Artificial Intelligence',  us: true,  hub: false, res: false },
+  { f: 'Visual Kanban Pipeline Multi-workspace',    us: true,  hub: true,  res: false },
+  { f: 'Omni-channel Collaborative Inbox',              us: true,  hub: true,  res: true  },
+  { f: 'Monthly Base Price without contract',          us: '$65', hub: '$890', res: '$99' },
+];
+
+const PLANS_ES = [
   { 
     name: 'Starter',  
+    slug: 'starter',
     annual: 49,  
     monthly: 65,  
+    price_annual: 588,
     users: 3,  
+    max_leads: 500,
     desc: 'Esencial para agencias y equipos que inician su aceleración.',
     features: ['Pipeline visual Kanban', 'Cotizador + PDF profesional', '1 AI Bot (Telegram/WhatsApp)', 'Email marketing campaigns', 'Reportes de ventas básicos'] 
   },
   { 
     name: 'Growth',   
+    slug: 'growth',
     annual: 99,  
     monthly: 129, 
+    price_annual: 1188,
     users: 8,  
+    max_leads: 4000,
     pop: true,
     desc: 'La suite completa de automatización para escalar sin límites.',
     features: ['Todo en Starter', 'Canales ilimitados de mensajería', 'Flyer Studio con IA', 'Lead Hunter (Google Places)', 'Captura nativa de TikTok + Meta Leads', 'Reportes analíticos avanzados'] 
   },
   { 
     name: 'Pro',      
+    slug: 'pro',
     annual: 159, 
     monthly: 199, 
-    users: 15, 
+    price_annual: 1908,
+    users: 15,  
+    max_leads: 999999,
     desc: 'Arquitectura empresarial para grandes operaciones de volumen.',
     features: ['Todo en Growth', 'Workflows visuales automatizados', 'API REST & Webhooks avanzados', 'Inbox omnicanal unificado', 'Multi-workspace corporativo', 'SLA garantizado 99.9%'] 
   },
 ];
 
-const FEATURES = [
+const PLANS_EN = [
+  { 
+    name: 'Starter',  
+    slug: 'starter',
+    annual: 49,  
+    monthly: 65,  
+    price_annual: 588,
+    users: 3,  
+    max_leads: 500,
+    desc: 'Essential for agencies and teams starting their acceleration.',
+    features: ['Visual Kanban pipeline', 'Professional quote generator + PDF', '1 AI Bot (Telegram/WhatsApp)', 'Email marketing campaigns', 'Basic sales reports'] 
+  },
+  { 
+    name: 'Growth',   
+    slug: 'growth',
+    annual: 99,  
+    monthly: 129, 
+    price_annual: 1188,
+    users: 8,  
+    max_leads: 4000,
+    pop: true,
+    desc: 'The complete automation suite to scale without limits.',
+    features: ['Everything in Starter', 'Unlimited messaging channels', 'Flyer Studio with AI', 'Lead Hunter (Google Places)', 'Native TikTok + Meta Leads capture', 'Advanced analytical reports'] 
+  },
+  { 
+    name: 'Pro',      
+    slug: 'pro',
+    annual: 159, 
+    monthly: 199, 
+    price_annual: 1908,
+    users: 15,  
+    max_leads: 999999,
+    desc: 'Enterprise architecture for large-scale operations.',
+    features: ['Everything in Growth', 'Automated visual workflows', 'Advanced REST API & Webhooks', 'Unified omni-channel Inbox', 'Multi-workspace corporate', 'Guaranteed SLA 99.9%'] 
+  },
+];
+
+const FEATURES_ES = [
   { icon: '◈', title: 'Cotizador + PDF', body: 'Genera cotizaciones profesionales con tu branding, envíalas por link y recibe pagos. Nadie más lo tiene integrado al CRM.' },
   { icon: '◉', title: 'Lead Hunter', body: 'Encuentra prospectos en Google Maps por industria y zona. 500 leads en 60 segundos. Exclusivo nuestro.' },
   { icon: '◐', title: 'Flyer Studio IA', body: 'Diseña materiales de marketing con inteligencia artificial, sin salir de la plataforma.' },
 ];
 
-const WHY = [
+const FEATURES_EN = [
+  { icon: '◈', title: 'Quote Generator + PDF', body: 'Generate professional quotes with your branding, send them via link and receive payments. No one else has it integrated into the CRM.' },
+  { icon: '◉', title: 'Lead Hunter', body: 'Find prospects on Google Maps by industry and area. 500 leads in 60 seconds. Exclusively ours.' },
+  { icon: '◐', title: 'Flyer Studio AI', body: 'Design marketing materials with artificial intelligence, without leaving the platform.' },
+];
+
+const WHY_ES = [
   { t:'3× más cierres',    b:'AI scoring, seguimientos automáticos y cotizador integrado hacen que tu equipo cierre sin esfuerzo extra.' },
   { t:'Seguridad enterprise', b:'Multi-tenant con Row Level Security. Datos 100% aislados por empresa, nunca mezclados.' },
   { t:'Todo en uno',       b:'CRM + Marketing + Cotizador + AI Agents + Lead Hunter. Sin pagar 5 herramientas diferentes.' },
@@ -74,11 +138,27 @@ const WHY = [
   { t:'Soporte real',      b:'Onboarding en español, soporte en vivo y un equipo que entiende el mercado latinoamericano.' },
 ];
 
-const FAQS = [
+const WHY_EN = [
+  { t:'3× more closes',    b:'AI scoring, automated follow-ups and integrated quote generator make your team close without extra effort.' },
+  { t:'Enterprise security', b:'Multi-tenant with Row Level Security. 100% isolated data by company, never mixed.' },
+  { t:'All in one',       b:'CRM + Marketing + Quote Generator + AI Agents + Lead Hunter. Without paying for 5 different tools.' },
+  { t:'Multi-company',     b:'Agencies and franchises manage multiple clients from a single platform.' },
+  { t:'Live Analytics', b:'Dashboard with Health Pulse, sales trends and complete analysis of lost leads.' },
+  { t:'Real Support',      b:'Onboarding in Spanish, live support and a team that understands the Latin American market.' },
+];
+
+const FAQS_ES = [
   { q: '¿Cómo funciona la captura de leads de TikTok e Instagram?', a: 'Nos conectamos directamente a las APIs oficiales de TikTok Events y Meta Leads. Cuando un usuario llena un anuncio de formulario, el lead se inyecta en milisegundos en Arias CRM y activa opcionalmente el AI bot para contactarlo al instante.' },
   { q: '¿Qué es el Lead Hunter?', a: 'Es nuestro extractor exclusivo de datos. Te permite ingresar un sector (ej: "Gimnasios") y una ubicación (ej: "Ciudad de México"), y extrae automáticamente nombres, teléfonos oficiales, direcciones y coordenadas de Google Maps, inyectando cientos de leads cualificados en un clic.' },
   { q: '¿Tengo que firmar un contrato a largo plazo?', a: 'No. El plan mensual se puede cancelar en cualquier momento sin penalizaciones. Si eliges el plan anual, obtienes un 20% de descuento directo en tu facturación.' },
   { q: '¿El AI Agent funciona con mi propio número de WhatsApp?', a: 'Sí, puedes conectar tu número empresarial o usar nuestras integraciones oficiales para interactuar sin riesgos de bloqueo y con soporte multi-agente.' },
+];
+
+const FAQS_EN = [
+  { q: 'How does lead capture from TikTok and Instagram work?', a: 'We connect directly to the official APIs of TikTok Events and Meta Leads. When a user fills out a lead form ad, the lead is injected in milliseconds into Arias CRM and optionally activates the AI bot to contact them instantly.' },
+  { q: 'What is the Lead Hunter?', a: 'It is our exclusive data extractor. It allows you to enter a industry (e.g. "Gyms") and a location (e.g. "Mexico City"), and automatically extracts names, official phone numbers, addresses and coordinates from Google Maps, injecting hundreds of qualified leads in one click.' },
+  { q: 'Do I have to sign a long-term contract?', a: 'No. The monthly plan can be canceled at any time without penalties. If you choose the annual plan, you get a direct 20% discount on your billing.' },
+  { q: 'Does the AI Agent work with my own WhatsApp number?', a: 'Yes, you can connect your business number or use our official integrations to interact without risk of blockages and with multi-agent support.' },
 ];
 
 // ─── SVG BRAND LOGOS ─────────────────────────────────────────────────────────
@@ -297,50 +377,167 @@ const PRODUCT_DETAILS: Record<string, {
   }
 };
 
+const PRODUCT_DETAILS_EN: Record<string, {
+  title: string;
+  tag: string;
+  desc: string;
+  bullets: string[];
+  metric: string;
+  metricLabel: string;
+  techStack: string[];
+  mockup: string;
+}> = {
+  'tiktok-api': {
+    title: 'TikTok API Ingestion Express',
+    tag: 'DIRECT INTEGRATION V2',
+    desc: 'Connect directly to the official TikTok Leads API without slow or expensive middleware like Zapier. Receive leads in real-time with latency under 120ms.',
+    bullets: [
+      'Automatic subscription to official TikTok Leads webhooks.',
+      'HMAC signature validation and SHA-256 encryption for absolute security.',
+      'Instant synchronization with CRM fields.',
+      'Immediate automated actions upon receiving the lead.'
+    ],
+    metric: '<120ms',
+    metricLabel: 'Ingestion Latency',
+    techStack: ['TikTok Graph API', 'HMAC Validation', 'SHA-256 Encryption'],
+    mockup: 'tiktok'
+  },
+  'meta-ads': {
+    title: 'Meta Leads API & Webhook',
+    tag: 'FB/IG CAMPAIGNS',
+    desc: 'Inject lead data from Facebook and Instagram forms instantly. Our system processes Meta Graph API requests asynchronously to guarantee zero record loss.',
+    bullets: [
+      'Native connection with Meta Leads Ads API.',
+      'Automatic lead deduplication based on phone/email.',
+      'Automatic triggers for follow-up sequences.',
+      'Automatic lead allocation based on channel or budget.'
+    ],
+    metric: '100%',
+    metricLabel: 'Capture Rate',
+    techStack: ['Meta Graph API v19.0', 'Webhook Handshake', 'Async Queueing'],
+    mockup: 'meta'
+  },
+  'whatsapp-gen': {
+    title: 'WhatsApp Lead Generator Widget',
+    tag: 'WEBSITE CAPTURE',
+    desc: 'A premium floating widget for your landing page that converts passive visitors into active WhatsApp conversations. Start the qualifying bot in 5 seconds.',
+    bullets: [
+      'Highly customizable widget with micro-animations.',
+      'Pre-capture key data (name, business) before redirecting.',
+      'Smart routing based on agent availability.',
+      'Chat history automatically linked to lead profile.'
+    ],
+    metric: '+35%',
+    metricLabel: 'Traffic Conversion',
+    techStack: ['React Widget', 'WhatsApp Click-to-Chat', 'Lead Router'],
+    mockup: 'whatsapp'
+  },
+  'ai-agent': {
+    title: 'Autopilot Conversational AI Agent',
+    tag: 'GPT-4 ARTIFICIAL INTELLIGENCE',
+    desc: 'Your virtual sales agent that works 24/7 on WhatsApp. Qualify prospects, handle common objections and schedule appointments directly on your calendar.',
+    bullets: [
+      'Hyper-contextual responses powered by GPT-4o.',
+      'Lead qualification based on budget and urgency.',
+      'Real-time appointment scheduling with Google Calendar and Outlook.',
+      'Seamless handoff to human agents when hot buying intent is detected.'
+    ],
+    metric: '38%',
+    metricLabel: 'Conversion Rate (vs 12% manual)',
+    techStack: ['GPT-4o API', 'Vector Embeddings', 'Calendar OAuth Sync'],
+    mockup: 'ai_agent'
+  },
+  'omnicanal': {
+    title: 'Omnichannel Inbox',
+    tag: 'TEAM COLLABORATION',
+    desc: 'A centralized and collaborative inbox for your entire team to handle WhatsApp, Instagram, Facebook, and Telegram chats without crossing accounts or losing context.',
+    bullets: [
+      'Multi-channel conversations in a single unified thread.',
+      'Internal notes invisible to the customer for team support.',
+      'Manual or rotative (Round-Robin) chat allocation.',
+      'Quick replies, official templates, and quote sending in one click.'
+    ],
+    metric: '0',
+    metricLabel: 'Unanswered Messages',
+    techStack: ['WebSockets', 'Shared Inbox Orchestrator', 'Rotative Allocator'],
+    mockup: 'inbox'
+  },
+  'lead-hunter': {
+    title: 'Lead Hunter (Google Maps Extractor)',
+    tag: 'B2B LEAD MINING',
+    desc: 'The ultimate tool for cold B2B prospecting. Automatically extract hundreds of local businesses with phone numbers, emails, and websites by simply entering a keyword and a city.',
+    bullets: [
+      'Direct extraction from Google Places API.',
+      'Phone number validation and international formatting.',
+      'Automatic email enrichment searching active domains.',
+      'One-click export or direct injection into marketing funnels.'
+    ],
+    metric: '500+',
+    metricLabel: 'Extracted Leads/minute',
+    techStack: ['Google Places SDK', 'Web Scraper Crawler', 'Deduplication Pipeline'],
+    mockup: 'hunter'
+  },
+  'cotizador': {
+    title: 'Dynamic Professional Quote Generator',
+    tag: 'FINANCES & PRO DOCUMENTS',
+    desc: 'Create business proposals and quotes with detailed items in less than 60 seconds. Generate spectacular PDFs tailored to your company brand automatically.',
+    bullets: [
+      'Exact calculation of taxes, discounts, and payment schemes.',
+      'Optional modules configurable by the end customer.',
+      'Proposal version control and commercial validity.',
+      'PDF generator with digital signature and corporate watermark.'
+    ],
+    metric: '<1 min',
+    metricLabel: 'Creation Time',
+    techStack: ['PDF Rendering Engine', 'Catalog Sync', 'Taxation Logic Salvador'],
+    mockup: 'cotizador'
+  },
+  'cobros': {
+    title: 'Payment & Billing Portal',
+    tag: 'ACCELERATED CASH FLOW',
+    desc: 'A public and secure portal for your client where they can review their commercial quote and pay you directly online via credit card or transfer.',
+    bullets: [
+      'Direct integration with local payment gateways.',
+      'Support for multiple currencies and gateways.',
+      'Automatic generation of tax receipts and invoices.',
+      'Automated payment reminders via WhatsApp.'
+    ],
+    metric: '2.5x',
+    metricLabel: 'Collection Speed',
+    techStack: ['Payment Gateway APIs', 'Receipt Auto-generator', 'Invoice Tracker'],
+    mockup: 'cobros'
+  },
+  'flyer': {
+    title: 'Flyer Studio AI',
+    tag: 'MULTIMEDIA MARKETING',
+    desc: 'Generate high-impact promotional content for campaigns using artificial intelligence. Design print-ready arts for Instagram and Facebook without knowing graphic design.',
+    bullets: [
+      'AI-powered image generator for products.',
+      'Automatic format adaptation for stories and posts.',
+      'Write high-converting promotional copies attached to the flyer.',
+      'Automatic publisher scheduling on official channels.'
+    ],
+    metric: '90%',
+    metricLabel: 'Design Cost Savings',
+    techStack: ['Creative AI Models', 'Layout Auto-composer', 'FB Publisher API'],
+    mockup: 'flyer'
+  }
+};
+
 // ─── MAIN EXPORT ─────────────────────────────────────────────────────────────
 export default function LandingPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { i18n } = useTranslation();
+  const isSpanish = i18n.language?.startsWith('es');
+  const en = !isSpanish;
+  const txt = (es: string, enVal: string) => en ? enVal : es;
+
   const [annual, setAnnual] = useState(true);
   const [showLogin, setShowLogin] = useState(false);
 
   // Dynamic Plans from database
-  const [plans, setPlans] = useState<any[]>([
-    { 
-      name: 'Starter',  
-      slug: 'starter',
-      annual: 24,  
-      monthly: 29,  
-      price_annual: 288,
-      users: 3,  
-      max_leads: 500,
-      desc: 'Esencial para agencias y equipos que inician su aceleración.',
-      features: ['Pipeline visual Kanban', 'Cotizador + PDF profesional', '1 AI Bot (Telegram/WhatsApp)', 'Email marketing campaigns', 'Reportes de ventas básicos'] 
-    },
-    { 
-      name: 'Pro',   
-      slug: 'pro',
-      annual: 60,  
-      monthly: 75, 
-      price_annual: 720,
-      users: 10,  
-      max_leads: 4000,
-      pop: true,
-      desc: 'La suite completa de automatización para escalar sin límites.',
-      features: ['Todo en Starter', 'Canales ilimitados de mensajería', 'Flyer Studio con IA', 'Lead Hunter (Google Places)', 'Captura nativa de TikTok + Meta Leads', 'Reportes analíticos avanzados'] 
-    },
-    { 
-      name: 'Enterprise',      
-      slug: 'enterprise',
-      annual: 149, 
-      monthly: 199, 
-      price_annual: 1788,
-      users: 100, 
-      max_leads: 999999,
-      desc: 'Arquitectura empresarial para grandes operaciones de volumen.',
-      features: ['Todo en Pro', 'Workflows visuales automatizados', 'API REST & Webhooks avanzados', 'Inbox omnicanal unificado', 'Multi-workspace corporativo', 'SLA garantizado 99.9%'] 
-    },
-  ]);
+  const [rawPlans, setRawPlans] = useState<any[]>([]);
   const [loadingPlans, setLoadingPlans] = useState(true);
 
   useEffect(() => {
@@ -354,20 +551,7 @@ export default function LandingPage() {
         
         if (error) throw error;
         if (data && data.length > 0) {
-          const formattedPlans = data.map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            slug: p.slug,
-            description: p.description || '',
-            annual: Math.round(Number(p.price_annual) / 12),
-            monthly: Math.round(Number(p.price_monthly)),
-            price_annual: Number(p.price_annual),
-            users: p.max_users || 0,
-            max_leads: p.max_leads || 0,
-            features: Array.isArray(p.features) ? p.features : [],
-            pop: p.slug === 'pro'
-          }));
-          setPlans(formattedPlans);
+          setRawPlans(data);
         }
       } catch (err) {
         console.error('Error fetching plans from supabase:', err);
@@ -377,6 +561,40 @@ export default function LandingPage() {
     }
     fetchPlans();
   }, []);
+
+  const plans = rawPlans.length > 0 ? rawPlans.map((p: any) => ({
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    annual: Math.round(Number(p.price_annual) / 12),
+    monthly: Math.round(Number(p.price_monthly)),
+    price_annual: Number(p.price_annual),
+    users: p.max_users || 0,
+    max_leads: p.max_leads || 0,
+    pop: p.slug === 'pro',
+    desc: p.slug === 'starter' 
+        ? txt('Esencial para agencias y equipos que inician su aceleración.', 'Essential for agencies and teams starting their acceleration.')
+        : p.slug === 'pro' || p.slug === 'growth'
+        ? txt('La suite completa de automatización para escalar sin límites.', 'The complete automation suite to scale without limits.')
+        : txt('Arquitectura empresarial para grandes operaciones de volumen.', 'Enterprise architecture for large-scale operations.'),
+    features: p.slug === 'starter'
+        ? (en 
+           ? ['Visual Kanban pipeline', 'Professional quote generator + PDF', '1 AI Bot (Telegram/WhatsApp)', 'Email marketing campaigns', 'Basic sales reports']
+           : ['Pipeline visual Kanban', 'Cotizador + PDF profesional', '1 AI Bot (Telegram/WhatsApp)', 'Email marketing campaigns', 'Reportes de ventas básicos'])
+        : p.slug === 'pro' || p.slug === 'growth'
+        ? (en
+           ? ['Everything in Starter', 'Unlimited messaging channels', 'Flyer Studio with AI', 'Lead Hunter (Google Places)', 'Native TikTok + Meta Leads capture', 'Advanced analytical reports']
+           : ['Todo en Starter', 'Canales ilimitados de mensajería', 'Flyer Studio con IA', 'Lead Hunter (Google Places)', 'Captura nativa de TikTok + Meta Leads', 'Reportes analíticos avanzados'])
+        : (en
+           ? ['Everything in Pro', 'Automated visual workflows', 'Advanced REST API & Webhooks', 'Unified omni-channel Inbox', 'Multi-workspace corporate', 'Guaranteed SLA 99.9%']
+           : ['Todo en Pro', 'Workflows visuales automatizados', 'API REST & Webhooks avanzados', 'Inbox omnicanal unificado', 'Multi-workspace corporativo', 'SLA garantizado 99.9%']),
+  })) : (en ? PLANS_EN : PLANS_ES);
+
+  const activeVsRows = en ? VS_ROWS_EN : VS_ROWS_ES;
+  const activeFeatures = en ? FEATURES_EN : FEATURES_ES;
+  const activeWhy = en ? WHY_EN : WHY_ES;
+  const activeFaqs = en ? FAQS_EN : FAQS_ES;
+  const activeProductDetails = en ? PRODUCT_DETAILS_EN : PRODUCT_DETAILS;
 
   // Live Interactive Testing Lead Capture Simulator
   const [simName, setSimName] = useState('');
@@ -453,32 +671,35 @@ export default function LandingPage() {
           <div className="lg:col-span-7 flex flex-col justify-center">
             <div className="inline-flex items-center gap-2 border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-1.5 rounded-full mb-8 self-start">
               <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-              <span className="text-[10px] font-bold text-indigo-300 tracking-[0.25em] uppercase">Módulo Social Captura V2.0</span>
+              <span className="text-[10px] font-bold text-indigo-300 tracking-[0.25em] uppercase">{txt('Módulo Social Captura V2.0', 'Social Capture Module V2.0')}</span>
             </div>
 
             <h1 className="text-5xl lg:text-7xl font-black leading-[0.95] tracking-tight mb-8">
-              La landing page<br />
+              {txt('La landing page', 'The landing page')}<br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-indigo-300 to-emerald-400">
-                que devora leads<br />e inyecta ventas.
+                {txt('que devora leads', 'that devours leads')}<br />{txt('e inyecta ventas.', 'and injects sales.')}
               </span>
             </h1>
 
             <p className="text-base lg:text-lg text-slate-400 max-w-xl mb-10 leading-relaxed">
-              Integra tus campañas de <span className="text-white font-semibold">TikTok, Instagram y Facebook</span>. AI Agents cualifican y nuestro cotizador profesional cierra el trato. Todo en piloto automático.
+              {txt(
+                'Integra tus campañas de TikTok, Instagram y Facebook. AI Agents cualifican y nuestro cotizador profesional cierra el trato. Todo en piloto automático.',
+                'Integrate your TikTok, Instagram and Facebook campaigns. AI Agents qualify and our professional quote generator closes the deal. All on autopilot.'
+              )}
             </p>
 
             <div className="flex items-center gap-4 flex-wrap">
               {user ? (
                 <button onClick={() => navigate('/dashboard')} className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-8 py-4 rounded-xl transition-all text-sm shadow-xl shadow-indigo-600/30">
-                  Entrar al Centro de Control <ArrowRight className="w-4 h-4" />
+                  {txt('Entrar al Centro de Control', 'Enter Control Center')} <ArrowRight className="w-4 h-4" />
                 </button>
               ) : (
                 <>
                   <button onClick={() => navigate('/register')} className="inline-flex items-center gap-2 bg-white text-slate-950 hover:bg-slate-100 font-bold px-8 py-4 rounded-xl transition-all text-sm shadow-lg">
-                    Empezar gratis 14 días <ArrowRight className="w-4 h-4" />
+                    {txt('Empezar gratis 14 días', 'Start free for 14 days')} <ArrowRight className="w-4 h-4" />
                   </button>
                   <button onClick={() => setShowLogin(true)} className="inline-flex items-center gap-2 border border-white/10 hover:border-white/20 text-slate-300 hover:text-white font-semibold px-8 py-4 rounded-xl transition-all text-sm">
-                    Ver demo guiada
+                    {txt('Ver demo guiada', 'Watch guided demo')}
                   </button>
                 </>
               )}
@@ -486,8 +707,8 @@ export default function LandingPage() {
 
             {/* Micro proof bar */}
             <div className="mt-14 pt-8 border-t border-white/[0.05] flex flex-wrap gap-8 text-slate-500 text-xs">
-              <div>🛡️ Encriptación Enterprise</div>
-              <div>⚡ Latencia de Ingestión &lt;200ms</div>
+              <div>{txt('🛡️ Encriptación Enterprise', '🛡️ Enterprise Encryption')}</div>
+              <div>{txt('⚡ Latencia de Ingestión <200ms', '⚡ Ingestion Latency <200ms')}</div>
               <div>💬 Meta & TikTok API Verified Partner</div>
             </div>
           </div>
@@ -504,14 +725,14 @@ export default function LandingPage() {
                 <span className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
                 <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
               </div>
-              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Visual Pipeline Simulator</span>
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{txt('Visual Pipeline Simulator', 'Visual Pipeline Simulator')}</span>
             </div>
 
             {simStatus === 'idle' && (
               <form onSubmit={handleSimulate} className="space-y-4">
-                <p className="text-xs text-slate-400 mb-2">Simula el registro de un prospecto y observa cómo entra en vivo a la cola del CRM:</p>
+                <p className="text-xs text-slate-400 mb-2">{txt('Simula el registro de un prospecto y observa cómo entra en vivo a la cola del CRM:', 'Simulate a prospect registration and watch it enter the CRM queue live:')}</p>
                 <div>
-                  <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1">Nombre Completo</label>
+                  <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1">{txt('Nombre Completo', 'Full Name')}</label>
                   <input 
                     type="text" 
                     placeholder="Carlos Mendoza"
@@ -522,7 +743,7 @@ export default function LandingPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1">Teléfono o WhatsApp</label>
+                  <label className="block text-[10px] text-slate-500 font-bold uppercase mb-1">{txt('Teléfono o WhatsApp', 'Phone or WhatsApp')}</label>
                   <input 
                     type="tel" 
                     placeholder="+503 7120 4488"
@@ -533,7 +754,7 @@ export default function LandingPage() {
                   />
                 </div>
                 <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/20">
-                  <Zap className="w-3.5 h-3.5 fill-current" /> Disparar Webhook de Captura
+                  <Zap className="w-3.5 h-3.5 fill-current" /> {txt('Disparar Webhook de Captura', 'Trigger Capture Webhook')}
                 </button>
               </form>
             )}
@@ -541,7 +762,7 @@ export default function LandingPage() {
             {simStatus === 'sending' && (
               <div className="py-12 flex flex-col items-center justify-center space-y-4">
                 <span className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
-                <p className="text-xs font-bold text-indigo-400">Procesando firma HMAC & Graph API...</p>
+                <p className="text-xs font-bold text-indigo-400">{txt('Procesando firma HMAC & Graph API...', 'Processing HMAC signature & Graph API...')}</p>
               </div>
             )}
 
@@ -550,24 +771,24 @@ export default function LandingPage() {
                 <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex gap-3">
                   <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-xs font-bold text-white">¡Lead Inyectado al CRM!</p>
-                    <p className="text-[11px] text-slate-400 mt-1">El webhook de Meta/TikTok validó el token e inyectó los datos exitosamente en el Tenant ID de pruebas.</p>
+                     <p className="text-xs font-bold text-white">{txt('¡Lead Inyectado al CRM!', 'Lead Injected to CRM!')}</p>
+                     <p className="text-[11px] text-slate-400 mt-1">{txt('El webhook de Meta/TikTok validó el token e inyectó los datos exitosamente en el Tenant ID de pruebas.', 'The Meta/TikTok webhook validated the token and successfully injected data into the test Tenant ID.')}</p>
                   </div>
                 </div>
 
                 <div className="bg-slate-900 border border-white/10 rounded-xl p-4 space-y-2">
-                  <p className="text-[10px] font-black text-slate-500 uppercase">Estado en Pipeline Realtime:</p>
+                  <p className="text-[10px] font-black text-slate-500 uppercase">{txt('Estado en Pipeline Realtime:', 'Realtime Pipeline Status:')}</p>
                   <div className="flex items-center justify-between text-xs border-b border-white/5 pb-2">
-                    <span className="text-slate-400">Prospecto:</span>
+                    <span className="text-slate-400">{txt('Prospecto:', 'Prospect:')}</span>
                     <span className="font-bold text-white">{simName}</span>
                   </div>
                   <div className="flex items-center justify-between text-xs border-b border-white/5 pb-2">
-                    <span className="text-slate-400">Módulo Asignado:</span>
+                    <span className="text-slate-400">{txt('Módulo Asignado:', 'Assigned Module:')}</span>
                     <span className="font-bold text-indigo-400">AI Follow-Up Active</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400">Acción Bot:</span>
-                    <span className="font-bold text-emerald-400">WhatsApp Enviado ✅</span>
+                    <span className="text-slate-400">{txt('Acción Bot:', 'Bot Action:')}</span>
+                    <span className="font-bold text-emerald-400">{txt('WhatsApp Enviado ✅', 'WhatsApp Sent ✅')}</span>
                   </div>
                 </div>
 
@@ -575,7 +796,7 @@ export default function LandingPage() {
                   onClick={() => { setSimStatus('idle'); setSimName(''); setSimPhone(''); }}
                   className="w-full bg-white/5 border border-white/10 hover:bg-white/10 text-white font-semibold py-2 rounded-xl text-xs transition-colors"
                 >
-                  Probar otra vez
+                  {txt('Probar otra vez', 'Try again')}
                 </button>
               </div>
             )}
@@ -586,7 +807,7 @@ export default function LandingPage() {
       {/* ─── DYNAMIC INTEGRATIONS SHOWCASE ────────────────────────────────────── */}
       <section className="py-16 bg-[#040408] border-b border-white/[0.05]">
         <div className="max-w-7xl mx-auto px-6 text-center">
-          <p className="text-slate-500 text-xs font-semibold tracking-[0.2em] uppercase mb-8">Captura omnicanal directa en 1 clic</p>
+          <p className="text-slate-500 text-xs font-semibold tracking-[0.2em] uppercase mb-8">{txt('Captura omnicanal directa en 1 clic', 'Direct omnichannel capture in 1 click')}</p>
           <div className="flex flex-wrap justify-center items-center gap-6">
             {CHANNELS.map(ch => (
               <div 
@@ -608,9 +829,9 @@ export default function LandingPage() {
       <section className="py-28 bg-[#07070d] border-b border-white/[0.05]">
         <div className="max-w-5xl mx-auto px-6">
           <div className="text-center mb-16">
-            <span className="text-xs font-black text-indigo-400 uppercase tracking-[0.25em]">Simulador de Negocio</span>
-            <h2 className="text-4xl font-black text-white mt-3">Calcula el ROI real de Arias CRM</h2>
-            <p className="text-slate-500 mt-2">Observa la enorme diferencia monetaria entre perder leads manuales vs automatizar con nosotros.</p>
+            <span className="text-xs font-black text-indigo-400 uppercase tracking-[0.25em]">{txt('Simulador de Negocio', 'Business Simulator')}</span>
+            <h2 className="text-4xl font-black text-white mt-3">{txt('Calcula el ROI real de Arias CRM', 'Calculate the real ROI of Arias CRM')}</h2>
+            <p className="text-slate-500 mt-2">{txt('Observa la enorme diferencia monetaria entre perder leads manuales vs automatizar con nosotros.', 'Observe the huge monetary difference between losing manual leads vs automating with us.')}</p>
           </div>
 
           <div className="grid md:grid-cols-12 gap-8 items-stretch">
@@ -618,8 +839,8 @@ export default function LandingPage() {
             <div className="md:col-span-5 bg-white/[0.02] border border-white/5 rounded-3xl p-8 flex flex-col justify-center space-y-6">
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <label className="text-xs font-bold text-slate-300 uppercase">Leads por Mes</label>
-                  <span className="text-sm font-black text-indigo-400">{leads} leads</span>
+                  <label className="text-xs font-bold text-slate-300 uppercase">{txt('Leads por Mes', 'Leads per Month')}</label>
+                  <span className="text-sm font-black text-indigo-400">{leads} {txt('leads', 'leads')}</span>
                 </div>
                 <input 
                   type="range" 
@@ -634,7 +855,7 @@ export default function LandingPage() {
 
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <label className="text-xs font-bold text-slate-300 uppercase">Valor de Venta Promedio</label>
+                  <label className="text-xs font-bold text-slate-300 uppercase">{txt('Valor de Venta Promedio', 'Average Sale Value')}</label>
                   <span className="text-sm font-black text-indigo-400">${leadVal} USD</span>
                 </div>
                 <input 
@@ -649,7 +870,10 @@ export default function LandingPage() {
               </div>
 
               <div className="p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 text-xs text-slate-400 leading-relaxed">
-                🚀 Asumimos una tasa del <strong>12% de cierre manual</strong> (competencia) vs un <strong>38% de cierre automatizado</strong> mediante respuestas del AI bot en 5 segundos y cotizaciones instantáneas.
+                {txt(
+                  '🚀 Asumimos una tasa del 12% de cierre manual (competencia) vs un 38% de cierre automatizado mediante respuestas del AI bot en 5 segundos y cotizaciones instantáneas.',
+                  '🚀 We assume a 12% manual close rate (competitors) vs a 38% automated close rate via AI bot replies in 5 seconds and instant quotes.'
+                )}
               </div>
             </div>
 
@@ -659,31 +883,31 @@ export default function LandingPage() {
 
               <div className="space-y-6">
                 <div>
-                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Diferencia de Cierre</p>
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">{txt('Diferencia de Cierre', 'Close Difference')}</p>
                   <div className="grid grid-cols-2 gap-4 mt-2">
                     <div className="bg-slate-950 p-4 rounded-xl border border-white/5">
-                      <p className="text-[10px] text-slate-500 font-bold uppercase">Cierres con HubSpot</p>
-                      <p className="text-2xl font-black text-slate-400 mt-1">{closedCompetitor} ventas</p>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase">{txt('Cierres con HubSpot', 'HubSpot Closures')}</p>
+                      <p className="text-2xl font-black text-slate-400 mt-1">{closedCompetitor} {txt('ventas', 'sales')}</p>
                     </div>
                     <div className="bg-slate-950 p-4 rounded-xl border border-indigo-500/20">
-                      <p className="text-[10px] text-indigo-400 font-bold uppercase">Cierres con Arias CRM</p>
-                      <p className="text-2xl font-black text-emerald-400 mt-1">{closedArias} ventas</p>
+                      <p className="text-[10px] text-indigo-400 font-bold uppercase">{txt('Cierres con Arias CRM', 'Arias CRM Closures')}</p>
+                      <p className="text-2xl font-black text-emerald-400 mt-1">{closedArias} {txt('ventas', 'sales')}</p>
                     </div>
                   </div>
                 </div>
 
                 <div className="border-t border-white/10 pt-6">
-                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Ingresos Mensuales Adicionales Estimados</p>
+                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest">{txt('Ingresos Mensuales Adicionales Estimados', 'Estimated Additional Monthly Revenue')}</p>
                   <p className="text-5xl lg:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-indigo-300 tracking-tight mt-2">
-                    +${extraRevenue.toLocaleString()} <span className="text-sm font-medium text-slate-500">USD/mes</span>
+                    +${extraRevenue.toLocaleString()} <span className="text-sm font-medium text-slate-500">{txt('USD/mes', 'USD/mo')}</span>
                   </p>
                 </div>
               </div>
 
               <div className="mt-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-6 border-t border-white/10">
-                <p className="text-xs text-slate-500">Ahorra hasta $800/mes en suscripciones redundantes.</p>
+                <p className="text-xs text-slate-500">{txt('Ahorra hasta $800/mes en suscripciones redundantes.', 'Save up to $800/mo in redundant subscriptions.')}</p>
                 <button onClick={() => navigate('/register')} className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-6 py-2.5 rounded-xl text-xs transition-colors shrink-0 shadow-lg shadow-emerald-500/20">
-                  Capturar este Retorno Ahora
+                  {txt('Capturar este Retorno Ahora', 'Capture This Return Now')}
                 </button>
               </div>
             </div>
@@ -698,9 +922,9 @@ export default function LandingPage() {
 
         <div className="max-w-5xl mx-auto px-6 relative z-10">
           <div className="text-center mb-16">
-            <span className="text-xs font-black text-blue-600 uppercase tracking-[0.25em]">Tecnología en Acción</span>
-            <h2 className="text-4xl lg:text-5xl font-black text-slate-900 mt-3 leading-tight">Diseño pensado para convertir</h2>
-            <p className="text-slate-600 mt-3 max-w-xl mx-auto text-sm">Nuestra plataforma cuenta con herramientas exclusivas que la competencia simplemente no ofrece.</p>
+            <span className="text-xs font-black text-blue-600 uppercase tracking-[0.25em]">{txt('Tecnología en Acción', 'Technology in Action')}</span>
+            <h2 className="text-4xl lg:text-5xl font-black text-slate-900 mt-3 leading-tight">{txt('Diseño pensado para convertir', 'Design Crafted to Convert')}</h2>
+            <p className="text-slate-600 mt-3 max-w-xl mx-auto text-sm">{txt('Nuestra plataforma cuenta con herramientas exclusivas que la competencia simplemente no ofrece.', 'Our platform features exclusive tools that competitors simply do not offer.')}</p>
           </div>
 
           {/* Interactive Feature Toggles - Light themed */}
@@ -709,7 +933,7 @@ export default function LandingPage() {
               onClick={() => setActiveTab('social')}
               className={`px-6 py-3.5 rounded-full text-xs font-black transition-all ${activeTab === 'social' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'bg-slate-200/60 text-slate-700 hover:text-slate-900 border border-slate-300/40'}`}
             >
-              ⚡ Captura Social Express
+              {txt('⚡ Captura Social Express', '⚡ Social Express Capture')}
             </button>
             <button
               onClick={() => setActiveTab('agent')}
@@ -721,7 +945,7 @@ export default function LandingPage() {
               onClick={() => setActiveTab('billing')}
               className={`px-6 py-3.5 rounded-full text-xs font-black transition-all ${activeTab === 'billing' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'bg-slate-200/60 text-slate-700 hover:text-slate-900 border border-slate-300/40'}`}
             >
-              💸 Cotizador & Cobros
+              {txt('💸 Cotizador & Cobros', '💸 Quotes & Payments')}
             </button>
           </div>
 
@@ -730,19 +954,22 @@ export default function LandingPage() {
             <div className="p-8 md:p-12 md:col-span-5 flex flex-col justify-center bg-slate-50/50">
               {activeTab === 'social' && (
                 <>
-                  <span className="text-[10px] font-black bg-blue-100 text-blue-700 border border-blue-200/60 px-3 py-1 rounded-full uppercase tracking-wider self-start mb-6">Omnicanal V2</span>
-                  <h3 className="text-2xl font-black text-slate-900 mb-4 leading-tight">Cero leads perdidos en campañas.</h3>
+                  <span className="text-[10px] font-black bg-blue-100 text-blue-700 border border-blue-200/60 px-3 py-1 rounded-full uppercase tracking-wider self-start mb-6">{txt('Omnicanal V2', 'Omnichannel V2')}</span>
+                  <h3 className="text-2xl font-black text-slate-900 mb-4 leading-tight">{txt('Cero leads perdidos en campañas.', 'Zero leads lost in campaigns.')}</h3>
                   <p className="text-sm text-slate-600 leading-relaxed mb-8">
-                    Tus formularios de anuncios en redes sociales inyectan datos de forma instantánea. Olvídate de dependencias de Zapier lentas o exportaciones de CSV manuales de fin de semana.
+                    {txt(
+                      'Tus formularios de anuncios en redes sociales inyectan datos de forma instantánea. Olvídate de dependencias de Zapier lentas o exportaciones de CSV manuales de fin de semana.',
+                      'Your social media ad forms inject data instantly. Forget about slow Zapier integrations or manual weekend CSV exports.'
+                    )}
                   </p>
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <BrandIcon name="WhatsApp" />
-                      <span className="text-xs font-bold text-slate-700">WhatsApp Webhook Integrado</span>
+                      <span className="text-xs font-bold text-slate-700">{txt('WhatsApp Webhook Integrado', 'Integrated WhatsApp Webhook')}</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <BrandIcon name="TikTok" />
-                      <span className="text-xs font-bold text-slate-700">TikTok Leads API Oficial</span>
+                      <span className="text-xs font-bold text-slate-700">{txt('TikTok Leads API Oficial', 'Official TikTok Leads API')}</span>
                     </div>
                   </div>
                 </>
@@ -750,19 +977,22 @@ export default function LandingPage() {
 
               {activeTab === 'agent' && (
                 <>
-                  <span className="text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200/60 px-3 py-1 rounded-full uppercase tracking-wider self-start mb-6">Autopilot</span>
-                  <h3 className="text-2xl font-black text-slate-900 mb-4 leading-tight">Contacta a tu prospecto en 5 segundos.</h3>
+                  <span className="text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200/60 px-3 py-1 rounded-full uppercase tracking-wider self-start mb-6">{txt('Autopilot', 'Autopilot')}</span>
+                  <h3 className="text-2xl font-black text-slate-900 mb-4 leading-tight">{txt('Contacta a tu prospecto en 5 segundos.', 'Reach your prospect in 5 seconds.')}</h3>
                   <p className="text-sm text-slate-600 leading-relaxed mb-8">
-                    El AI Agent inteligente interactúa con el cliente al instante, califica su interés, responde objeciones comunes y agenda una reunión en tu calendario.
+                    {txt(
+                      'El AI Agent inteligente interactúa con el cliente al instante, califica su interés, responde objeciones comunes y agenda una reunión en tu calendario.',
+                      'The smart AI Agent interacts with the customer instantly, qualifies interest, answers common objections, and schedules a meeting on your calendar.'
+                    )}
                   </p>
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <span className="text-base">🎯</span>
-                      <span className="text-xs font-bold text-slate-700">Calificación Automática de Prospectos</span>
+                      <span className="text-xs font-bold text-slate-700">{txt('Calificación Automática de Prospectos', 'Automatic Prospect Qualification')}</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-base">📅</span>
-                      <span className="text-xs font-bold text-slate-700">Agendamiento de Citas 24/7</span>
+                      <span className="text-xs font-bold text-slate-700">{txt('Agendamiento de Citas 24/7', '24/7 Appointment Scheduling')}</span>
                     </div>
                   </div>
                 </>
@@ -770,19 +1000,22 @@ export default function LandingPage() {
 
               {activeTab === 'billing' && (
                 <>
-                  <span className="text-[10px] font-black bg-indigo-100 text-indigo-700 border border-indigo-200/60 px-3 py-1 rounded-full uppercase tracking-wider self-start mb-6">Finanzas</span>
-                  <h3 className="text-2xl font-black text-slate-900 mb-4 leading-tight">Cierra tratos con PDFs impecables.</h3>
+                  <span className="text-[10px] font-black bg-indigo-100 text-indigo-700 border border-indigo-200/60 px-3 py-1 rounded-full uppercase tracking-wider self-start mb-6">{txt('Finanzas', 'Finance')}</span>
+                  <h3 className="text-2xl font-black text-slate-900 mb-4 leading-tight">{txt('Cierra tratos con PDFs impecables.', 'Close deals with flawless PDFs.')}</h3>
                   <p className="text-sm text-slate-600 leading-relaxed mb-8">
-                    Genera presupuestos, cotizaciones y facturas profesionales con tu branding de manera nativa. El cliente puede revisar, configurar módulos opcionales y pagar en línea de inmediato.
+                    {txt(
+                      'Genera presupuestos, cotizaciones y facturas profesionales con tu branding de manera nativa. El cliente puede revisar, configurar módulos opcionales y pagar en línea de inmediato.',
+                      'Generate professional quotes, budgets, and invoices with your branding natively. The customer can review, configure optional modules, and pay online immediately.'
+                    )}
                   </p>
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <span className="text-base">📄</span>
-                      <span className="text-xs font-bold text-slate-700">Cotizador Dinámico & Editor de PDF</span>
+                      <span className="text-xs font-bold text-slate-700">{txt('Cotizador Dinámico & Editor de PDF', 'Dynamic Quote & PDF Editor')}</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="text-base">💳</span>
-                      <span className="text-xs font-bold text-slate-700">Pasarelas de Pago Directas</span>
+                      <span className="text-xs font-bold text-slate-700">{txt('Pasarelas de Pago Directas', 'Direct Payment Gateways')}</span>
                     </div>
                   </div>
                 </>
@@ -797,17 +1030,17 @@ export default function LandingPage() {
                 <div className="w-full max-w-sm bg-slate-900 border border-white/10 rounded-2xl p-5 shadow-2xl space-y-4">
                   <div className="flex justify-between items-center border-b border-white/5 pb-3">
                     <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" /> Ingestado
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" /> {txt('Ingestado', 'Injected')}
                     </span>
                     <span className="text-[10px] text-slate-500">Meta Graph API V19.0</span>
                   </div>
                   <div className="space-y-2 text-xs">
-                    <p className="text-slate-400">Campaña de Origen:</p>
+                    <p className="text-slate-400">{txt('Campaña de Origen:', 'Campaign Source:')}</p>
                     <p className="font-bold text-white">📸 Meta Lead Ads — Black Friday Promo</p>
                     <div className="bg-slate-950 p-3 rounded-lg space-y-1.5 text-[11px] text-slate-300">
-                      <p><strong>Nombre:</strong> Carlos Mendoza</p>
+                      <p><strong>{txt('Nombre:', 'Name:')}</strong> Carlos Mendoza</p>
                       <p><strong>WhatsApp:</strong> +503 7120 4488</p>
-                      <p><strong>Campaña ID:</strong> camp_meta_4091</p>
+                      <p><strong>{txt('Campaña ID:', 'Campaign ID:')}</strong> camp_meta_4091</p>
                     </div>
                   </div>
                 </div>
@@ -817,17 +1050,26 @@ export default function LandingPage() {
                 <div className="w-full max-w-sm bg-slate-900 border border-white/10 rounded-2xl p-5 shadow-2xl space-y-3">
                   <div className="flex items-center gap-2 border-b border-white/5 pb-3">
                     <div className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
-                    <span className="text-xs font-black text-white">AI Agent Conversacional</span>
+                    <span className="text-xs font-black text-white">{txt('AI Agent Conversacional', 'Conversational AI Agent')}</span>
                   </div>
                   <div className="text-[11px] space-y-2 flex flex-col">
                     <div className="bg-slate-800 text-white rounded-lg p-2.5 max-w-[85%] self-start">
-                      ¡Hola Carlos! Veo tu interés en Arias CRM. ¿Cuántos asesores tiene tu negocio?
+                      {txt(
+                        '¡Hola Carlos! Veo tu interés en Arias CRM. ¿Cuántos asesores tiene tu negocio?',
+                        'Hi Carlos! I see your interest in Arias CRM. How many sales agents does your business have?'
+                      )}
                     </div>
                     <div className="bg-indigo-600 text-white rounded-lg p-2.5 max-w-[85%] self-end">
-                      Hola. Somos un equipo de 6 vendedores en nuestra distribuidora.
+                      {txt(
+                        'Hola. Somos un equipo de 6 vendedores en nuestra distribuidora.',
+                        'Hi. We are a team of 6 salespeople at our distributorship.'
+                      )}
                     </div>
                     <div className="bg-slate-800 text-white rounded-lg p-2.5 max-w-[85%] self-start">
-                      Excelente, el Plan Growth es ideal. ¿Deseas que te agende una demo de 15 minutos mañana?
+                      {txt(
+                        'Excelente, el Plan Growth es ideal. ¿Deseas que te agende una demo de 15 minutos mañana?',
+                        'Excellent, the Growth Plan is ideal. Would you like me to schedule a 15-minute demo tomorrow?'
+                      )}
                     </div>
                   </div>
                 </div>
@@ -836,26 +1078,26 @@ export default function LandingPage() {
               {activeTab === 'billing' && (
                 <div className="w-full max-w-sm bg-slate-900 border border-white/10 rounded-2xl p-5 shadow-2xl space-y-3">
                   <div className="flex justify-between items-center border-b border-white/5 pb-3">
-                    <span className="text-xs font-black text-white">Cotización #1092</span>
-                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-black">Generada</span>
+                    <span className="text-xs font-black text-white">{txt('Cotización #1092', 'Quote #1092')}</span>
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-black">{txt('Generada', 'Generated')}</span>
                   </div>
                   <div className="space-y-2 text-[11px] text-slate-300">
                     <div className="flex justify-between">
-                      <span>Base Plan (Growth Anual)</span>
+                      <span>{txt('Base Plan (Growth Anual)', 'Base Plan (Annual Growth)')}</span>
                       <span>$1,188.00/yr</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Módulo Lead Hunter</span>
-                      <span>Incluido</span>
+                      <span>{txt('Módulo Lead Hunter', 'Lead Hunter Module')}</span>
+                      <span>{txt('Incluido', 'Included')}</span>
                     </div>
                     <div className="flex justify-between border-t border-white/5 pt-2 font-black text-white text-xs">
-                      <span>Total</span>
+                      <span>{txt('Total', 'Total')}</span>
                       <span>$1,188.00</span>
                     </div>
                   </div>
                   <div className="pt-2 flex gap-2">
-                    <button className="flex-1 bg-indigo-600 text-white text-[10px] font-black py-2 rounded-lg">Pagar en línea</button>
-                    <button className="flex-1 bg-slate-800 text-slate-400 text-[10px] font-black py-2 rounded-lg">Bajar PDF</button>
+                    <button className="flex-1 bg-indigo-600 text-white text-[10px] font-black py-2 rounded-lg">{txt('Pagar en línea', 'Pay online')}</button>
+                    <button className="flex-1 bg-slate-800 text-slate-400 text-[10px] font-black py-2 rounded-lg">{txt('Bajar PDF', 'Download PDF')}</button>
                   </div>
                 </div>
               )}
@@ -868,11 +1110,11 @@ export default function LandingPage() {
       <section className="py-28 bg-[#07070d] border-b border-white/[0.05]">
         <div className="max-w-5xl mx-auto px-6">
           <div className="mb-16">
-            <span className="text-xs font-black text-amber-500 uppercase tracking-[0.25em] mb-4 block">Exclusivos</span>
-            <h2 className="text-4xl font-black text-white leading-tight">Features que HubSpot<br />no ofrece a ningún precio.</h2>
+            <span className="text-xs font-black text-amber-500 uppercase tracking-[0.25em] mb-4 block">{txt('Exclusivos', 'Exclusive')}</span>
+            <h2 className="text-4xl font-black text-white leading-tight">{txt('Features que HubSpot no ofrece a ningún precio.', 'Features that HubSpot does not offer at any price.')}</h2>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
-            {FEATURES.map(f => (
+            {activeFeatures.map(f => (
               <div key={f.title} className="p-8 rounded-3xl bg-white/[0.01] border border-white/5 hover:border-white/10 hover:shadow-xl transition-all group">
                 <span className="text-2xl text-slate-600 font-black block mb-6 group-hover:text-indigo-400 transition-colors">{f.icon}</span>
                 <h3 className="text-base font-black text-white mb-3">{f.title}</h3>
@@ -888,12 +1130,15 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto px-6">
           
           <div className="text-center mb-16">
-            <span className="text-xs font-black text-indigo-400 uppercase tracking-[0.25em]">El Stack Tecnológico Definitivo</span>
+            <span className="text-xs font-black text-indigo-400 uppercase tracking-[0.25em]">{txt('El Stack Tecnológico Definitivo', 'The Definitive Tech Stack')}</span>
             <h2 className="text-4xl lg:text-5xl font-black text-white mt-3 leading-tight">
-              ¿Por qué gastar fortunas en<br />HubSpot o respond.io?
+              {txt('¿Por qué gastar fortunas en', 'Why spend fortunes on')}<br />{txt('HubSpot o respond.io?', 'HubSpot or respond.io?')}
             </h2>
             <p className="text-slate-500 mt-3 max-w-xl mx-auto text-sm">
-              Activa o desactiva las herramientas que necesitas para ver el costo acumulado de armar el mismo stack en otras plataformas frente a la tarifa única de Arias CRM.
+              {txt(
+                'Activa o desactiva las herramientas que necesitas para ver el costo acumulado de armar el mismo stack en otras plataformas frente a la tarifa única de Arias CRM.',
+                'Turn on or off the tools you need to see the accumulated cost of building the same stack on other platforms compared to the single flat rate of Arias CRM.'
+              )}
             </p>
             <div className="flex justify-center mt-6">
               <div className="inline-flex items-center gap-1 bg-white/5 rounded-full p-1 border border-white/10">
@@ -904,7 +1149,7 @@ export default function LandingPage() {
                     annual ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  Anual (20% OFF)
+                  {txt('Anual (20% OFF)', 'Annual (20% OFF)')}
                 </button>
                 <button
                   type="button"
@@ -913,7 +1158,7 @@ export default function LandingPage() {
                     !annual ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  Mensual
+                  {txt('Mensual', 'Monthly')}
                 </button>
               </div>
             </div>
@@ -925,13 +1170,13 @@ export default function LandingPage() {
             <div className="lg:col-span-7 bg-[#080812]/50 border border-white/5 rounded-3xl p-8 space-y-6 relative overflow-hidden">
               <div className="absolute top-0 left-0 w-[200px] h-[200px] bg-indigo-500/5 blur-[80px] pointer-events-none" />
               
-              <p className="text-xs font-black text-slate-500 uppercase tracking-widest border-b border-white/5 pb-3">Herramientas & Integraciones</p>
+              <p className="text-xs font-black text-slate-500 uppercase tracking-widest border-b border-white/5 pb-3">{txt('Herramientas & Integraciones', 'Tools & Integrations')}</p>
               
               {/* Toggle 1 */}
               <div className="flex items-center justify-between gap-6 p-4 rounded-2xl bg-white/[0.01] border border-white/5 hover:border-white/10 transition-all">
                 <div className="space-y-1">
-                  <p className="text-sm font-bold text-white">Captura Automatizada de Ads (TikTok/FB/IG)</p>
-                  <p className="text-xs text-slate-400">Ingestión inmediata de leads sin Zapier ($120/mes de ahorro).</p>
+                  <p className="text-sm font-bold text-white">{txt('Captura Automatizada de Ads (TikTok/FB/IG)', 'Automated Ads Capture (TikTok/FB/IG)')}</p>
+                  <p className="text-xs text-slate-400">{txt('Ingestión inmediata de leads sin Zapier ($120/mes de ahorro).', 'Immediate lead ingestion without Zapier ($120/mo savings).')}</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer shrink-0">
                   <input 
@@ -948,9 +1193,9 @@ export default function LandingPage() {
               <div className="flex items-center justify-between gap-6 p-4 rounded-2xl bg-white/[0.01] border border-white/5 hover:border-white/10 transition-all">
                 <div className="space-y-1">
                   <p className="text-sm font-bold text-emerald-400 flex items-center gap-1.5">
-                    AI Agent Conversacional 24/7 (WhatsApp) <Sparkles className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
+                    {txt('AI Agent Conversacional 24/7 (WhatsApp)', '24/7 Conversational AI Agent (WhatsApp)')} <Sparkles className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
                   </p>
-                  <p className="text-xs text-slate-400">Bot autónomo que califica y agenda citas ($250/mes de ahorro).</p>
+                  <p className="text-xs text-slate-400">{txt('Bot autónomo que califica y agenda citas ($250/mes de ahorro).', 'Autonomous bot that qualifies and schedules appointments ($250/mo savings).')}</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer shrink-0">
                   <input 
@@ -966,8 +1211,8 @@ export default function LandingPage() {
               {/* Toggle 3 */}
               <div className="flex items-center justify-between gap-6 p-4 rounded-2xl bg-white/[0.01] border border-white/5 hover:border-white/10 transition-all">
                 <div className="space-y-1">
-                  <p className="text-sm font-bold text-white">Cotizador Integrado con PDF Pro</p>
-                  <p className="text-xs text-slate-400">Presupuestos interactivos editables en segundos ($150/mes de ahorro).</p>
+                  <p className="text-sm font-bold text-white">{txt('Cotizador Integrado con PDF Pro', 'Integrated Quote Generator with PDF Pro')}</p>
+                  <p className="text-xs text-slate-400">{txt('Presupuestos interactivos editables en segundos ($150/mes de ahorro).', 'Interactive quotes editable in seconds ($150/mo savings).')}</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer shrink-0">
                   <input 
@@ -983,8 +1228,8 @@ export default function LandingPage() {
               {/* Toggle 4 */}
               <div className="flex items-center justify-between gap-6 p-4 rounded-2xl bg-white/[0.01] border border-white/5 hover:border-white/10 transition-all">
                 <div className="space-y-1">
-                  <p className="text-sm font-bold text-white">Extractor Lead Hunter (Google Maps)</p>
-                  <p className="text-xs text-slate-400">Minería de prospectos B2B en frío ilimitada ($120/mes de ahorro).</p>
+                  <p className="text-sm font-bold text-white">{txt('Extractor Lead Hunter (Google Maps)', 'Lead Hunter Extractor (Google Maps)')}</p>
+                  <p className="text-xs text-slate-400">{txt('Minería de prospectos B2B en frío ilimitada ($120/mes de ahorro).', 'Unlimited cold B2B prospect mining ($120/mo savings).')}</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer shrink-0">
                   <input 
@@ -1000,8 +1245,8 @@ export default function LandingPage() {
               {/* Toggle 5 */}
               <div className="flex items-center justify-between gap-6 p-4 rounded-2xl bg-white/[0.01] border border-white/5 hover:border-white/10 transition-all">
                 <div className="space-y-1">
-                  <p className="text-sm font-bold text-white">Inbox Omnicanal WhatsApp / Telegram</p>
-                  <p className="text-xs text-slate-400">Bandeja compartida para múltiples agentes ($150/mes de ahorro).</p>
+                  <p className="text-sm font-bold text-white">{txt('Inbox Omnicanal WhatsApp / Telegram', 'Omnichannel WhatsApp / Telegram Inbox')}</p>
+                  <p className="text-xs text-slate-400">{txt('Bandeja compartida para múltiples agentes ($150/mes de ahorro).', 'Shared inbox for multiple agents ($150/mo savings).')}</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer shrink-0">
                   <input 
@@ -1021,29 +1266,29 @@ export default function LandingPage() {
               <div className="absolute top-0 right-0 w-[180px] h-[180px] bg-indigo-500/10 blur-[60px] pointer-events-none" />
               
               <div className="space-y-6">
-                <p className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-white/5 pb-3">Comparativa de Costo Mensual</p>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest border-b border-white/5 pb-3">{txt('Comparativa de Costo Mensual', 'Monthly Cost Comparison')}</p>
                 
                 {/* Competitor price card */}
                 <div className="bg-slate-950/80 border border-white/5 p-5 rounded-2xl">
-                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Stack HubSpot + respond.io</p>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">{txt('Stack HubSpot + respond.io', 'HubSpot + respond.io Stack')}</p>
                   <p className="text-4xl font-black text-slate-300 tracking-tight mt-1 animate-fadeIn">
-                    ${hsEquivalent} <span className="text-xs font-semibold text-slate-600">USD/mes</span>
+                    ${hsEquivalent} <span className="text-xs font-semibold text-slate-600">{txt('USD/mes', 'USD/mo')}</span>
                   </p>
-                  <p className="text-[10px] text-red-400 mt-2">⚠️ Requiere contratos anuales obligatorios.</p>
+                  <p className="text-[10px] text-red-400 mt-2">{txt('⚠️ Requiere contratos anuales obligatorios.', '⚠️ Requires mandatory annual contracts.')}</p>
                 </div>
 
                 {/* Arias CRM flat price card */}
                 <div className="bg-indigo-950/20 border border-indigo-500/30 p-5 rounded-2xl relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-8 h-8 bg-emerald-500/10 rounded-full blur-md" />
                   <p className="text-[10px] text-indigo-400 font-black uppercase tracking-wider flex items-center gap-1">
-                    Arias CRM <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded uppercase font-black tracking-normal">Tarifa Única</span>
+                    Arias CRM <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded uppercase font-black tracking-normal">{txt('Tarifa Única', 'Flat Rate')}</span>
                   </p>
                   <div className="flex items-baseline gap-2 mt-1">
                     {annual && (
                       <span className="text-sm text-slate-500 line-through font-semibold">${proMonthly}</span>
                     )}
                     <p className="text-4xl font-black text-emerald-400 tracking-tight">
-                      ${flatPrice} <span className="text-xs font-semibold text-emerald-600">USD/mes</span>
+                      ${flatPrice} <span className="text-xs font-semibold text-emerald-600">{txt('USD/mes', 'USD/mo')}</span>
                     </p>
                     {annual && (
                       <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.2 rounded font-black uppercase tracking-wider">
@@ -1053,24 +1298,24 @@ export default function LandingPage() {
                   </div>
                   <p className="text-[10px] text-emerald-400 mt-2 font-semibold">
                     {annual 
-                      ? `✅ Todo incluido (Facturado anual: $${flatPriceAnnual} USD/año)` 
-                      : '✅ Todo incluido. Cancela cuando quieras.'
+                      ? txt(`✅ Todo incluido (Facturado anual: $${flatPriceAnnual} USD/año)`, `✅ All-inclusive (Billed annually: $${flatPriceAnnual} USD/yr)`)
+                      : txt('✅ Todo incluido. Cancela cuando quieras.', '✅ All-inclusive. Cancel anytime.')
                     }
                   </p>
                 </div>
 
                 {/* Savings highlights */}
                 <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-center">
-                  <p className="text-[11px] text-slate-300 font-semibold">¡Ahorras hasta con esta configuración!</p>
+                  <p className="text-[11px] text-slate-300 font-semibold">{txt('¡Ahorras hasta con esta configuración!', 'You save up to this with this configuration!')}</p>
                   <p className="text-2xl font-black text-emerald-400 mt-1">
-                    -${(hsEquivalent - flatPrice)} USD/mes
+                    -${(hsEquivalent - flatPrice)} {txt('USD/mes', 'USD/mo')}
                   </p>
                 </div>
               </div>
 
               <div className="mt-8 pt-6 border-t border-white/5">
                 <button onClick={() => navigate('/register')} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 rounded-xl text-xs transition-all shadow-lg shadow-indigo-600/30">
-                  Obtener todo el stack por ${flatPrice}/mes
+                  {txt('Obtener todo el stack por', 'Get the entire stack for')} ${flatPrice}/{txt('mes', 'mo')}
                 </button>
               </div>
 
@@ -1240,7 +1485,7 @@ export default function LandingPage() {
                               : 'text-slate-300 border-r border-white/5'
                           }`}
                         >
-                          {plan.max_leads >= 999999 ? 'Ilimitados' : `${plan.max_leads.toLocaleString()} contactos`}
+                          {((plan.max_leads || 0) >= 999999) ? 'Ilimitados' : `${(plan.max_leads || 0).toLocaleString()} contactos`}
                         </td>
                       );
                     })}
@@ -1606,11 +1851,11 @@ export default function LandingPage() {
       <section className="py-28 border-b border-white/[0.05]">
         <div className="max-w-5xl mx-auto px-6">
           <div className="mb-16">
-            <span className="text-xs font-black text-indigo-600 uppercase tracking-[0.25em] mb-4 block">Beneficios</span>
-            <h2 className="text-4xl font-black text-white leading-tight max-w-sm">Resultados, no complejidad.</h2>
+            <span className="text-xs font-black text-indigo-600 uppercase tracking-[0.25em] mb-4 block">{txt('Beneficios', 'Benefits')}</span>
+            <h2 className="text-4xl font-black text-white leading-tight max-w-sm">{txt('Resultados, no complejidad.', 'Results, not complexity.')}</h2>
           </div>
           <div className="grid md:grid-cols-3 gap-8">
-            {WHY.map(w => (
+            {activeWhy.map(w => (
               <div key={w.t} className="group">
                 <h3 className="text-sm font-black text-white mb-2 group-hover:text-indigo-400 transition-colors">{w.t}</h3>
                 <p className="text-xs text-slate-400 leading-relaxed">{w.b}</p>
@@ -1624,12 +1869,12 @@ export default function LandingPage() {
       <section className="py-28 bg-[#f8fafc] border-y border-slate-200/60">
         <div className="max-w-3xl mx-auto px-6">
           <div className="text-center mb-16">
-            <span className="text-xs font-black text-blue-600 uppercase tracking-[0.25em]">Preguntas Frecuentes</span>
-            <h2 className="text-4xl font-black text-slate-900 mt-3">Todo lo que debes saber</h2>
+            <span className="text-xs font-black text-blue-600 uppercase tracking-[0.25em]">{txt('Preguntas Frecuentes', 'Frequently Asked Questions')}</span>
+            <h2 className="text-4xl font-black text-slate-900 mt-3">{txt('Todo lo que debes saber', 'Everything you need to know')}</h2>
           </div>
 
           <div className="space-y-4">
-            {FAQS.map((faq, idx) => (
+            {activeFaqs.map((faq, idx) => (
               <div 
                 key={idx} 
                 className="border border-slate-200 bg-white rounded-2xl overflow-hidden shadow-sm transition-all"
@@ -1684,7 +1929,7 @@ export default function LandingPage() {
       )}
       {/* ─── FUTURISTIC FEATURE DETAILS OVERLAY MODAL ────────────────────────── */}
       {activeProductDetail && (() => {
-        const prod = PRODUCT_DETAILS[activeProductDetail];
+        const prod = activeProductDetails[activeProductDetail];
         if (!prod) return null;
         return (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 md:p-6 bg-slate-950/80 backdrop-blur-xl animate-fadeIn">

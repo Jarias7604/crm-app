@@ -16,6 +16,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     const { t } = useTranslation();
 
     interface NavItem {
+        id?: string;
         name: string;
         href: string;
         icon: any;
@@ -30,10 +31,10 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
 
     // Only one accordion open at a time
     const getInitialAccordion = () => {
-        if (marketingPaths.some(path => location.pathname.startsWith(path) && !location.pathname.startsWith('/marketing/chat'))) return 'Marketing Hub';
-        if (location.pathname.startsWith('/support')) return 'Service Hub';
-        if (teamPaths.some(path => location.pathname.startsWith(path))) return 'Equipo';
-        if (location.pathname.startsWith('/leads')) return 'Leads';
+        if (marketingPaths.some(path => location.pathname.startsWith(path) && !location.pathname.startsWith('/marketing/chat'))) return 'marketing';
+        if (location.pathname.startsWith('/support')) return 'service_hub';
+        if (teamPaths.some(path => location.pathname.startsWith(path))) return 'team';
+        if (location.pathname.startsWith('/leads')) return 'leads';
         return null;
     };
     const [openAccordion, setOpenAccordion] = useState<string | null>(getInitialAccordion());
@@ -137,14 +138,15 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
 
     if (canAccess('leads')) {
         navigation.push({
+            id: 'leads',
             name: t('sidebar.leads'),
             href: '/leads',
             icon: Users,
             current: location.pathname.startsWith('/leads'),
             subItems: [
-                { name: 'Todos los Leads', href: '/leads', icon: Users },
+                { name: t('sidebar.allLeads'), href: '/leads', icon: Users },
                 {
-                    name: '🔥 Listos para Comprar',
+                    name: t('sidebar.readyToBuy'),
                     href: '/leads',
                     icon: Target,
                     badge: hotLeadCount,
@@ -155,23 +157,23 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     }
 
     if (canAccess('clientes.view') || profile?.role === 'super_admin' || profile?.role === 'company_admin') {
-        navigation.push({ name: 'Clientes', href: '/clientes', icon: UserCheck, current: location.pathname.startsWith('/clientes') });
+        navigation.push({ name: t('sidebar.clients'), href: '/clientes', icon: UserCheck, current: location.pathname.startsWith('/clientes') });
     }
 
     if (canAccess('proyectos') || profile?.role === 'super_admin' || profile?.role === 'company_admin') {
-        navigation.push({ name: 'Proyectos', href: '/proyectos', icon: Layers, current: location.pathname.startsWith('/proyectos') });
+        navigation.push({ name: t('sidebar.projects'), href: '/proyectos', icon: Layers, current: location.pathname.startsWith('/proyectos') });
     }
 
     if (canAccess('quotes')) {
-        navigation.push({ name: 'Cotizaciones', href: '/cotizaciones', icon: FileText, current: location.pathname === '/cotizaciones' });
+        navigation.push({ name: t('sidebar.quotes'), href: '/cotizaciones', icon: FileText, current: location.pathname === '/cotizaciones' });
     }
 
     if (profile?.role === 'super_admin') {
-        navigation.push({ name: 'Facturación', href: '/company/billing', icon: CreditCard, current: location.pathname.startsWith('/company/billing') });
+        navigation.push({ name: t('sidebar.billing'), href: '/company/billing', icon: CreditCard, current: location.pathname.startsWith('/company/billing') });
     }
 
     if (canAccess('quotes')) { // Assuming if they can access quotes, they can access finances. Or just company_admin. Let's make it for super_admin or company_admin.
-        navigation.push({ name: 'Finanzas', href: '/finanzas', icon: CreditCard, current: location.pathname.startsWith('/finanzas') });
+        navigation.push({ name: t('sidebar.finances'), href: '/finanzas', icon: CreditCard, current: location.pathname.startsWith('/finanzas') });
     }
 
     if (canAccess('calendar')) {
@@ -179,9 +181,10 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
             { name: t('sidebar.calendar'), href: '/calendar', icon: Calendar },
         ];
         if (profile?.role === 'super_admin' || profile?.role === 'company_admin') {
-            calendarSubItems.push({ name: 'Mi Agenda', href: '/calendar/booking', icon: BookOpen });
+            calendarSubItems.push({ name: t('sidebar.myAgenda'), href: '/calendar/booking', icon: BookOpen });
         }
         navigation.push({
+            id: 'calendar',
             name: t('sidebar.calendar'),
             href: '/calendar',
             icon: Calendar,
@@ -191,45 +194,47 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     }
 
     if (canAccess('reports') || profile?.role === 'super_admin' || profile?.role === 'company_admin') {
-        navigation.push({ name: 'Reportes BI', href: '/reports', icon: BarChart3, current: location.pathname.startsWith('/reports') });
+        navigation.push({ name: t('sidebar.reportsBi'), href: '/reports', icon: BarChart3, current: location.pathname.startsWith('/reports') });
     }
 
     // Support Platform
     navigation.push({
-        name: 'Service Hub',
+        id: 'service_hub',
+        name: t('sidebar.serviceHub'),
         href: '/support/tickets',
         icon: Headset,
         current: location.pathname.startsWith('/support'),
         subItems: [
-            { name: 'Tickets', href: '/support/tickets', icon: TicketIcon },
-            { name: 'Atrasados', href: '/support/atrasados', icon: AlertTriangle },
-            { name: 'Manual CRM', href: '/support/manual', icon: BookOpen },
+            { name: t('sidebar.tickets'), href: '/support/tickets', icon: TicketIcon },
+            { name: t('sidebar.overdue'), href: '/support/atrasados', icon: AlertTriangle },
+            { name: t('sidebar.manualCrm'), href: '/support/manual', icon: BookOpen },
         ]
     });
 
     if (canAccess('marketing')) {
         navigation.push({
-            name: 'Marketing Hub',
+            id: 'marketing',
+            name: t('sidebar.marketingHub'),
             href: '/marketing',
             icon: Megaphone,
             current: location.pathname.startsWith('/marketing') && !location.pathname.startsWith('/marketing/chat'),
             subItems: [
-                { name: 'Dashboard', href: '/marketing', icon: LayoutDashboard },
-                { name: 'Campañas', href: '/marketing/email', icon: Zap },
-                { name: 'Lead Hunter', href: '/marketing/lead-hunter', icon: Search },
-                { name: 'Agentes AI', href: '/marketing/ai-agents', icon: Bot },
-                { name: '🧠 Cockpit AI', href: '/marketing/cockpit', icon: Brain, badge: hotLeadCount },
-                { name: '🎯 Oracle AI', href: '/marketing/predictions', icon: Target },
-                { name: 'Motor de Ventas', href: '/marketing/engine-config', icon: Zap },
-                { name: '🎨 Flyer Studio', href: '/marketing/flyers', icon: Sparkles },
-                { name: 'Configuración', href: '/marketing/settings', icon: Settings },
+                { name: t('sidebar.dashboard'), href: '/marketing', icon: LayoutDashboard },
+                { name: t('sidebar.campaigns'), href: '/marketing/email', icon: Zap },
+                { name: t('sidebar.leadHunter'), href: '/marketing/lead-hunter', icon: Search },
+                { name: t('sidebar.aiAgents'), href: '/marketing/ai-agents', icon: Bot },
+                { name: t('sidebar.cockpitAi'), href: '/marketing/cockpit', icon: Brain, badge: hotLeadCount },
+                { name: t('sidebar.oracleAi'), href: '/marketing/predictions', icon: Target },
+                { name: t('sidebar.salesEngine'), href: '/marketing/engine-config', icon: Zap },
+                { name: t('sidebar.flyerStudio'), href: '/marketing/flyers', icon: Sparkles },
+                { name: t('sidebar.settings'), href: '/marketing/settings', icon: Settings },
             ]
         });
     }
 
     if (canAccess('chat')) {
         navigation.push({
-            name: 'Mensajes',
+            name: t('sidebar.messages'),
             href: '/marketing/chat',
             icon: MessageSquare,
             current: location.pathname.startsWith('/marketing/chat')
@@ -237,14 +242,14 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     }
 
     const configSubItemsRaw = [
-        { name: 'Marca de Empresa', href: '/company/branding', icon: Building, current: location.pathname === '/company/branding', permissionKey: 'branding' },
-        { name: 'Integraciones', href: '/company/integrations', icon: Network, current: location.pathname.startsWith('/company/integrations'), permissionKey: 'branding' },
-        { name: 'Pipeline Clientes', href: '/admin/pipeline', icon: UserCheck, current: location.pathname === '/admin/pipeline', permissionKey: 'pipeline.admin' },
-        { name: 'Catálogo de Productos', href: '/catalogo', icon: Package, current: location.pathname === '/catalogo', permissionKey: 'pricing' },
-        { name: 'Gestión Financiera', href: '/financial-rules', icon: CreditCard, current: location.pathname === '/financial-rules', permissionKey: 'financial_rules' },
-        { name: 'Motivos de Pérdida', href: '/loss-reasons', icon: XCircle, current: location.pathname === '/loss-reasons', permissionKey: 'loss_reasons' },
-        { name: 'Rubros / Industrias', href: '/industries', icon: Building2, current: location.pathname === '/industries', permissionKey: 'loss_reasons' },
-        { name: 'Call Bot AI', href: '/admin/call-bot', icon: PhoneCall, current: location.pathname === '/admin/call-bot', permissionKey: 'pipeline.admin' },
+        { name: t('sidebar.companyBrand'), href: '/company/branding', icon: Building, current: location.pathname === '/company/branding', permissionKey: 'branding' },
+        { name: t('sidebar.integrations'), href: '/company/integrations', icon: Network, current: location.pathname.startsWith('/company/integrations'), permissionKey: 'branding' },
+        { name: t('sidebar.clientPipeline'), href: '/admin/pipeline', icon: UserCheck, current: location.pathname === '/admin/pipeline', permissionKey: 'pipeline.admin' },
+        { name: t('sidebar.productCatalog'), href: '/catalogo', icon: Package, current: location.pathname === '/catalogo', permissionKey: 'pricing' },
+        { name: t('sidebar.financialManagement'), href: '/financial-rules', icon: CreditCard, current: location.pathname === '/financial-rules', permissionKey: 'financial_rules' },
+        { name: t('sidebar.lossReasons'), href: '/loss-reasons', icon: XCircle, current: location.pathname === '/loss-reasons', permissionKey: 'loss_reasons' },
+        { name: t('sidebar.industries'), href: '/industries', icon: Building2, current: location.pathname === '/industries', permissionKey: 'loss_reasons' },
+        { name: t('sidebar.callBotAi'), href: '/admin/call-bot', icon: PhoneCall, current: location.pathname === '/admin/call-bot', permissionKey: 'pipeline.admin' },
     ];
 
     const isSuperOrAdmin = profile?.role === 'super_admin' || profile?.role === 'company_admin';
@@ -256,33 +261,34 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
 
 
     if (profile?.role === 'super_admin') {
-        navigation.push({ name: 'Observatory', href: '/admin/observatory', icon: Sparkles, current: location.pathname.startsWith('/admin/observatory') });
+        navigation.push({ name: t('sidebar.observatory'), href: '/admin/observatory', icon: Sparkles, current: location.pathname.startsWith('/admin/observatory') });
         navigation.push({ name: t('sidebar.companies'), href: '/admin/companies', icon: Building, current: location.pathname.startsWith('/admin/companies') });
-        navigation.push({ name: 'SaaS Plans', href: '/admin/plans', icon: Package, current: location.pathname.startsWith('/admin/plans') });
-        navigation.push({ name: 'SaaS Billing', href: '/admin/billing', icon: CreditCard, current: location.pathname.startsWith('/admin/billing') });
-        navigation.push({ name: 'Auditoría', href: '/admin/audit-log', icon: ShieldCheck, current: location.pathname.startsWith('/admin/audit-log') });
+        navigation.push({ name: t('sidebar.saasPlans'), href: '/admin/plans', icon: Package, current: location.pathname.startsWith('/admin/plans') });
+        navigation.push({ name: t('sidebar.saasBilling'), href: '/admin/billing', icon: CreditCard, current: location.pathname.startsWith('/admin/billing') });
+        navigation.push({ name: t('sidebar.audit'), href: '/admin/audit-log', icon: ShieldCheck, current: location.pathname.startsWith('/admin/audit-log') });
     }
 
     if (profile?.role === 'super_admin' || profile?.role === 'company_admin') {
         navigation.push({
-            name: 'Equipo',
+            id: 'team',
+            name: t('sidebar.team'),
             href: '/company/team',
             icon: Users,
             current: location.pathname.startsWith('/company/team') || location.pathname.startsWith('/company/teams') || location.pathname.startsWith('/company/performance'),
             subItems: [
-                { name: 'Miembros', href: '/company/team', icon: UserCircle },
-                { name: 'Estructura', href: '/company/teams', icon: Network },
-                { name: 'Rendimiento', href: '/company/performance', icon: BarChart3 },
+                { name: t('sidebar.members'), href: '/company/team', icon: UserCircle },
+                { name: t('sidebar.structure'), href: '/company/teams', icon: Network },
+                { name: t('sidebar.performance'), href: '/company/performance', icon: BarChart3 },
             ]
         });
-        navigation.push({ name: 'Permisos', href: '/company/permissions', icon: ShieldCheck, current: location.pathname.startsWith('/company/permissions') });
+        navigation.push({ name: t('sidebar.permissions'), href: '/company/permissions', icon: ShieldCheck, current: location.pathname.startsWith('/company/permissions') });
     }
 
     const getRoleTitle = () => {
-        if (profile?.role === 'super_admin') return 'Super Admin';
-        if (profile?.role === 'company_admin') return 'Administrador';
-        if (profile?.role === 'collaborator') return 'Agente de Ventas';
-        return 'Usuario';
+        if (profile?.role === 'super_admin') return t('roles.superAdmin');
+        if (profile?.role === 'company_admin') return t('roles.companyAdmin');
+        if (profile?.role === 'collaborator') return t('roles.collaborator');
+        return t('roles.user');
     };
 
     return (
@@ -438,11 +444,11 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                             'group flex items-center justify-between rounded-xl transition-all duration-200 focus:outline-none mb-4 w-full bg-[#1e293b]/50 border border-gray-800 hover:bg-[#1e293b] hover:border-gray-700',
                             isCollapsed ? "p-3" : "px-4 py-2.5"
                         )}
-                        title="Omni-Buscador (Cmd+K)"
+                        title={`${t('sidebar.omniSearch')} (Cmd+K)`}
                     >
                         <div className="flex items-center text-gray-400 group-hover:text-white transition-colors">
                             <Search className={cn("h-5 w-5 shrink-0 transition-colors", !isCollapsed && "mr-3")} />
-                            {!isCollapsed && <span className="text-xs font-bold tracking-wide">Omni-Buscador</span>}
+                            {!isCollapsed && <span className="text-xs font-bold tracking-wide">{t('sidebar.omniSearch')}</span>}
                         </div>
                         {!isCollapsed && (
                             <div className="flex items-center gap-1">
@@ -457,7 +463,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                             {item.subItems && !isCollapsed ? (
                                 <>
                                     <button
-                                        onClick={() => setOpenAccordion(openAccordion === item.name ? null : item.name)}
+                                        onClick={() => setOpenAccordion(openAccordion === item.id ? null : item.id!)}
                                         className={cn(
                                             item.current ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40' : 'text-gray-400 hover:bg-[#1e293b] hover:text-white',
                                             'group flex items-center justify-between w-full rounded-xl transition-all duration-200 focus:outline-none p-3 px-4'
@@ -470,9 +476,9 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                                             )} aria-hidden="true" />
                                             <span className="text-sm font-semibold tracking-wide truncate">{item.name}</span>
                                         </div>
-                                        {openAccordion === item.name ? <ChevronDown className="h-4 w-4 opacity-50" /> : <ChevronRight className="h-4 w-4 opacity-50" />}
+                                        {openAccordion === item.id ? <ChevronDown className="h-4 w-4 opacity-50" /> : <ChevronRight className="h-4 w-4 opacity-50" />}
                                     </button>
-                                    {openAccordion === item.name && (
+                                    {openAccordion === item.id && (
                                     <div className="ml-4 pl-4 border-l border-gray-800/50 pt-1 space-y-1">
                                             {item.subItems.map((sub) => {
                                                 const isActive = location.pathname === sub.href && !(sub as any).onClick;
@@ -553,7 +559,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                                         "h-5 w-5 transition-colors shrink-0",
                                         !isCollapsed && "mr-3"
                                     )} />
-                                    {!isCollapsed && <span className="text-sm font-semibold">Configuración</span>}
+                                    {!isCollapsed && <span className="text-sm font-semibold">{t('sidebar.settings')}</span>}
                                 </div>
                                 {!isCollapsed && (configOpen ? <ChevronDown className="h-4 w-4 opacity-50" /> : <ChevronRight className="h-4 w-4 opacity-50" />)}
                             </button>
@@ -567,7 +573,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                                     <div className="bg-gradient-to-r from-blue-600/20 to-indigo-600/20 px-4 py-3 border-b border-white/5">
                                         <div className="flex items-center gap-2">
                                             <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                                            <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Configuración</span>
+                                            <span className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">{t('sidebar.settings')}</span>
                                         </div>
                                     </div>
                                     <div className="p-2 space-y-1">

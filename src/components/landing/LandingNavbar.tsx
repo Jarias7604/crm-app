@@ -37,7 +37,8 @@ export default function LandingNavbar({ onLoginClick, onProductClick }: { onLogi
   
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const en = i18n.language !== 'es';
+  const isSpanish = i18n.language?.startsWith('es');
+  const en = !isSpanish;
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
@@ -57,7 +58,7 @@ export default function LandingNavbar({ onLoginClick, onProductClick }: { onLogi
   }, []);
 
   const toggleLanguage = () => {
-    i18n.changeLanguage(i18n.language === 'es' ? 'en' : 'es');
+    i18n.changeLanguage(isSpanish ? 'en' : 'es');
   };
 
   return (
@@ -107,59 +108,59 @@ export default function LandingNavbar({ onLoginClick, onProductClick }: { onLogi
                     
                     {/* Col 1: Capture */}
                     <div className="col-span-3 space-y-5">
-                      <p className="text-[11px] font-black text-indigo-400 uppercase tracking-widest">Capturar Leads</p>
+                      <p className="text-[11px] font-black text-indigo-400 uppercase tracking-widest">{en ? 'Capture Leads' : 'Capturar Leads'}</p>
                       <div className="space-y-4">
                         <div onClick={() => { onProductClick?.('tiktok-api'); setProductsOpen(false); }} className="group cursor-pointer">
-                          <p className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">TikTok API Captura</p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">Ingestión directa sin retraso.</p>
+                          <p className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">{en ? 'TikTok API Capture' : 'TikTok API Captura'}</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">{en ? 'Direct ingestion without delay.' : 'Ingestión directa sin retraso.'}</p>
                         </div>
                         <div onClick={() => { onProductClick?.('meta-ads'); setProductsOpen(false); }} className="group cursor-pointer">
                           <p className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">Meta Lead Ads</p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">Campañas FB/IG webhook.</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">{en ? 'FB/IG webhook campaigns.' : 'Campañas FB/IG webhook.'}</p>
                         </div>
                         <div onClick={() => { onProductClick?.('whatsapp-gen'); setProductsOpen(false); }} className="group cursor-pointer">
                           <p className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">WhatsApp Lead Generator</p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">Chat widget de retención.</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">{en ? 'Chat widget for retention.' : 'Chat widget de retención.'}</p>
                         </div>
                       </div>
                     </div>
 
                     {/* Col 2: Convert */}
                     <div className="col-span-3 space-y-5">
-                      <p className="text-[11px] font-black text-indigo-400 uppercase tracking-widest">Cualificar & Convertir</p>
+                      <p className="text-[11px] font-black text-indigo-400 uppercase tracking-widest">{en ? 'Qualify & Convert' : 'Cualificar & Convertir'}</p>
                       <div className="space-y-4">
                         <div onClick={() => { onProductClick?.('ai-agent'); setProductsOpen(false); }} className="group cursor-pointer">
                           <p className="text-sm font-bold text-emerald-400 flex items-center gap-1 group-hover:text-emerald-300">
                             AI Agent 24/7 <Sparkles className="w-3.5 h-3.5 animate-pulse" />
                           </p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">Califica prospectos al instante.</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">{en ? 'Qualify prospects instantly.' : 'Califica prospectos al instante.'}</p>
                         </div>
                         <div onClick={() => { onProductClick?.('omnicanal'); setProductsOpen(false); }} className="group cursor-pointer">
-                          <p className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">Bandeja Omnicanal</p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">Inbox unificado colaborativo.</p>
+                          <p className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">{en ? 'Omnichannel Inbox' : 'Bandeja Omnicanal'}</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">{en ? 'Collaborative unified inbox.' : 'Inbox unificado colaborativo.'}</p>
                         </div>
                         <div onClick={() => { onProductClick?.('lead-hunter'); setProductsOpen(false); }} className="group cursor-pointer">
                           <p className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">Lead Hunter</p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">Extracción directa Google Maps.</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">{en ? 'Direct Google Maps scraping.' : 'Extracción directa Google Maps.'}</p>
                         </div>
                       </div>
                     </div>
 
                     {/* Col 3: Close */}
                     <div className="col-span-3 space-y-5">
-                      <p className="text-[11px] font-black text-indigo-400 uppercase tracking-widest">Cierre & Finanzas</p>
+                      <p className="text-[11px] font-black text-indigo-400 uppercase tracking-widest">{en ? 'Close & Finance' : 'Cierre & Finanzas'}</p>
                       <div className="space-y-4">
                         <div onClick={() => { onProductClick?.('cotizador'); setProductsOpen(false); }} className="group cursor-pointer">
-                          <p className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">Cotizador Profesional</p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">Partidas y PDF branding.</p>
+                          <p className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">{en ? 'Professional Quote Generator' : 'Cotizador Profesional'}</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">{en ? 'Itemized quotes & branded PDFs.' : 'Partidas y PDF branding.'}</p>
                         </div>
                         <div onClick={() => { onProductClick?.('cobros'); setProductsOpen(false); }} className="group cursor-pointer">
-                          <p className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">Portal de Cobros</p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">Pasarela de pago para clientes.</p>
+                          <p className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">{en ? 'Billing Portal' : 'Portal de Cobros'}</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">{en ? 'Payment gateway for clients.' : 'Pasarela de pago para clientes.'}</p>
                         </div>
                         <div onClick={() => { onProductClick?.('flyer'); setProductsOpen(false); }} className="group cursor-pointer">
                           <p className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">Flyer Studio IA</p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">Creador de arte promocional.</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">{en ? 'Promotional artwork creator.' : 'Creador de arte promocional.'}</p>
                         </div>
                       </div>
                     </div>
@@ -167,7 +168,7 @@ export default function LandingNavbar({ onLoginClick, onProductClick }: { onLogi
                     {/* Col 4: Integrations & pricing hook */}
                     <div className="col-span-3 bg-white/[0.03] border border-white/10 rounded-2xl p-6 flex flex-col justify-between">
                       <div>
-                        <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-4">Conectividad Directa</p>
+                        <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-4">{en ? 'Direct Connectivity' : 'Conectividad Directa'}</p>
                         <div className="flex gap-3 items-center flex-wrap">
                           <WhatsAppMin />
                           <TelegramMin />
@@ -177,8 +178,8 @@ export default function LandingNavbar({ onLoginClick, onProductClick }: { onLogi
                       </div>
                       
                       <div className="mt-6 pt-6 border-t border-white/10">
-                        <p className="text-xs font-black text-emerald-400 mb-1">💸 40% más accesible</p>
-                        <p className="text-[10px] text-slate-400 leading-normal">Compara con HubSpot y respond.io.</p>
+                        <p className="text-xs font-black text-emerald-400 mb-1">{en ? '💸 40% more affordable' : '💸 40% más accesible'}</p>
+                        <p className="text-[10px] text-slate-400 leading-normal">{en ? 'Compare with HubSpot and respond.io.' : 'Compara con HubSpot y respond.io.'}</p>
                       </div>
                     </div>
 
@@ -205,7 +206,7 @@ export default function LandingNavbar({ onLoginClick, onProductClick }: { onLogi
               className="flex items-center gap-1.5 text-sm font-bold text-slate-400 hover:text-white mr-2 transition-colors"
             >
               <Globe className="w-4 h-4 text-slate-400" />
-              {i18n.language === 'es' ? 'EN' : 'ES'}
+              {isSpanish ? 'EN' : 'ES'}
             </button>
             
             {/* FIXED TEXT COLOR: Styled as a premium glowing glass border button */}
