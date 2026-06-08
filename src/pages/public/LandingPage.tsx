@@ -1330,12 +1330,12 @@ export default function LandingPage() {
       <section id="pricing" className="py-28 bg-[#07070d] border-b border-white/[0.05] scroll-mt-20">
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-16">
-            <span className="text-xs font-black text-indigo-400 uppercase tracking-[0.25em] mb-4 block">Comparativa Premium</span>
+            <span className="text-xs font-black text-indigo-400 uppercase tracking-[0.25em] mb-4 block">{txt('Comparativa Premium', 'Premium Comparison')}</span>
             <h2 className="text-4xl lg:text-5xl font-black text-white leading-tight">
-              Encuentra el plan perfecto para tu equipo
+              {txt('Encuentra el plan perfecto para tu equipo', 'Find the perfect plan for your team')}
             </h2>
             <p className="text-slate-400 mt-4 max-w-xl mx-auto text-sm">
-              Compara detalladamente las características y descubre por qué Arias CRM es la mejor alternativa integrada del mercado.
+              {txt('Compara detalladamente las características y descubre por qué Arias CRM es la mejor alternativa integrada del mercado.', 'Compare features in detail and discover why Arias CRM is the best integrated alternative on the market.')}
             </p>
           </div>
 
@@ -1345,7 +1345,7 @@ export default function LandingPage() {
             {/* 1. Header Control Panel */}
             <div className="p-8 border-b border-white/10 bg-[#0c0c1b]/60 flex flex-col md:flex-row justify-between items-center gap-6">
               <div className="flex items-center gap-4">
-                <span className="text-sm font-black text-white uppercase tracking-wider">Comparar Planes</span>
+                <span className="text-sm font-black text-white uppercase tracking-wider">{txt('Comparar Planes', 'Compare Plans')}</span>
                 
                 {/* Yearly / Monthly Toggle Switch */}
                 <div className="inline-flex items-center gap-1 bg-white/5 rounded-full p-1 border border-white/10">
@@ -1355,7 +1355,7 @@ export default function LandingPage() {
                       annual ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    Anual (20% OFF)
+                    {txt('Anual (20% OFF)', 'Yearly (20% OFF)')}
                   </button>
                   <button
                     onClick={() => setAnnual(false)}
@@ -1363,13 +1363,13 @@ export default function LandingPage() {
                       !annual ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    Mensual
+                    {txt('Mensual', 'Monthly')}
                   </button>
                 </div>
               </div>
 
               <div className="text-xs text-slate-500 font-medium">
-                🚀 Prueba gratis por 14 días · Sin tarjetas · Configuración en 5 minutos
+                🚀 {txt('Prueba gratis por 14 días · Sin tarjetas · Configuración en 5 minutos', '14-day free trial · No cards required · Setup in 5 minutes')}
               </div>
             </div>
 
@@ -1381,7 +1381,7 @@ export default function LandingPage() {
                   <tr>
                     {/* Characteristics Header */}
                     <th className="lg:sticky lg:top-[96px] z-30 lg:bg-[#07070d]/95 lg:backdrop-blur-md p-6 text-sm font-black text-slate-500 uppercase tracking-widest w-[30%] border-b border-white/10">
-                      Características
+                      {txt('Características', 'Features')}
                     </th>
                     {plans.map((plan) => {
                       const isHighlighted = plan.slug === 'pro';
@@ -1396,7 +1396,7 @@ export default function LandingPage() {
                         >
                           {isHighlighted && (
                             <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-[8px] font-black bg-indigo-600 text-white px-2.5 py-1 rounded-full uppercase tracking-widest shadow-md">
-                              Recomendado
+                              {txt('Recomendado', 'Recommended')}
                             </span>
                           )}
                           <p className={`text-xs font-black uppercase tracking-wider mb-2 ${isHighlighted ? 'text-indigo-400 mt-1' : 'text-slate-500'}`}>{plan.name}</p>
@@ -1415,15 +1415,15 @@ export default function LandingPage() {
                               <span className={`text-3xl font-black ${isHighlighted ? 'text-emerald-400' : 'text-white'}`}>
                                 ${annual ? plan.annual : plan.monthly}
                               </span>
-                              <span className="text-[10px] text-slate-500 font-bold">/mes</span>
+                              <span className="text-[10px] text-slate-500 font-bold">/{txt('mes', 'mo')}</span>
                             </div>
                             {annual ? (
                               <span className="text-[8px] text-slate-400 font-black uppercase tracking-wider mt-0.5">
-                                Facturado anual: ${plan.price_annual || (plan.annual * 12)}/año
+                                {txt(`Facturado anual: $${plan.price_annual || (plan.annual * 12)}/año`, `Billed annually: $${plan.price_annual || (plan.annual * 12)}/yr`)}
                               </span>
                             ) : (
                               <span className="text-[8px] text-slate-500 font-black uppercase tracking-wider mt-0.5">
-                                Facturado mensual
+                                {txt('Facturado mensual', 'Billed monthly')}
                               </span>
                             )}
                           </div>
@@ -1435,7 +1435,7 @@ export default function LandingPage() {
                                 : 'bg-white/5 hover:bg-white/10 text-white border border-white/10'
                             }`}
                           >
-                            Iniciar Prueba
+                            {txt('Iniciar Prueba', 'Start Trial')}
                           </button>
                         </th>
                       );
@@ -1449,12 +1449,12 @@ export default function LandingPage() {
                   {/* CATEGORY 1: CAPACIDAD Y USO */}
                   <tr className="bg-white/[0.02] border-b border-white/5">
                     <td colSpan={plans.length + 1} className="p-5 pl-6 text-xs lg:text-sm font-black text-indigo-400 uppercase tracking-[0.2em]">
-                      Capacidad y Uso
+                      {txt('Capacidad y Uso', 'Capacity & Usage')}
                     </td>
                   </tr>
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
-                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Asesores Incluidos</td>
+                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">{txt('Asesores Incluidos', 'Included Agents')}</td>
                     {plans.map((plan) => {
                       const isHighlighted = plan.slug === 'pro';
                       return (
@@ -1466,14 +1466,14 @@ export default function LandingPage() {
                               : 'text-slate-300 border-r border-white/5'
                           }`}
                         >
-                          {plan.users >= 100 ? 'Ilimitados' : `${plan.users} asesores`}
+                          {plan.users >= 100 ? txt('Ilimitados', 'Unlimited') : txt(`${plan.users} asesores`, `${plan.users} agents`)}
                         </td>
                       );
                     })}
                   </tr>
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
-                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Contactos en CRM</td>
+                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">{txt('Contactos en CRM', 'CRM Contacts')}</td>
                     {plans.map((plan) => {
                       const isHighlighted = plan.slug === 'pro';
                       return (
@@ -1485,14 +1485,14 @@ export default function LandingPage() {
                               : 'text-slate-300 border-r border-white/5'
                           }`}
                         >
-                          {((plan.max_leads || 0) >= 999999) ? 'Ilimitados' : `${(plan.max_leads || 0).toLocaleString()} contactos`}
+                          {((plan.max_leads || 0) >= 999999) ? txt('Ilimitados', 'Unlimited') : txt(`${(plan.max_leads || 0).toLocaleString()} contactos`, `${(plan.max_leads || 0).toLocaleString()} contacts`)}
                         </td>
                       );
                     })}
                   </tr>
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
-                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Workspaces Multi-Empresa</td>
+                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">{txt('Workspaces Multi-Empresa', 'Multi-Company Workspaces')}</td>
                     {plans.map((plan) => {
                       const isHighlighted = plan.slug === 'pro';
                       return (
@@ -1504,7 +1504,7 @@ export default function LandingPage() {
                               : 'text-slate-300 border-r border-white/5'
                           }`}
                         >
-                          {plan.slug === 'starter' ? '1 workspace' : plan.slug === 'pro' ? '10 workspaces' : 'Ilimitados'}
+                          {plan.slug === 'starter' ? txt('1 workspace', '1 workspace') : plan.slug === 'pro' ? txt('10 workspaces', '10 workspaces') : txt('Ilimitados', 'Unlimited')}
                         </td>
                       );
                     })}
@@ -1513,13 +1513,13 @@ export default function LandingPage() {
                   {/* CATEGORY 2: CANALES INCLUIDOS */}
                   <tr className="bg-white/[0.02] border-b border-white/5">
                     <td colSpan={plans.length + 1} className="p-5 pl-6 text-xs lg:text-sm font-black text-indigo-400 uppercase tracking-[0.2em]">
-                      Canales Oficiales
+                      {txt('Canales Oficiales', 'Official Channels')}
                     </td>
                   </tr>
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
                     <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold flex items-center gap-2.5">
-                      <BrandIcon name="WhatsApp" /> WhatsApp API Oficial
+                      <BrandIcon name="WhatsApp" /> {txt('WhatsApp API Oficial', 'Official WhatsApp API')}
                     </td>
                     {plans.map((plan) => (
                       <td key={plan.id || plan.slug} className={`p-6 text-center ${plan.slug === 'pro' ? 'bg-indigo-500/[0.03] border-x border-indigo-500/20' : 'border-r border-white/5'}`}><Tick /></td>
@@ -1567,12 +1567,12 @@ export default function LandingPage() {
                   {/* CATEGORY 3: AI & AUTOMATIZACION */}
                   <tr className="bg-white/[0.02] border-b border-white/5">
                     <td colSpan={plans.length + 1} className="p-5 pl-6 text-[10px] font-black text-indigo-400 uppercase tracking-widest">
-                      AI & Automatización
+                      {txt('AI & Automatización', 'AI & Automation')}
                     </td>
                   </tr>
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
-                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">AI Sales Agent Bot</td>
+                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">{txt('AI Sales Agent Bot', 'AI Sales Agent Bot')}</td>
                     {plans.map((plan) => {
                       const isHighlighted = plan.slug === 'pro';
                       return (
@@ -1584,14 +1584,14 @@ export default function LandingPage() {
                               : 'text-slate-300 border-r border-white/5'
                           }`}
                         >
-                          {plan.slug === 'starter' ? '1 bot activo' : plan.slug === 'pro' ? 'Bots Ilimitados' : 'Bots Dedicados'}
+                          {plan.slug === 'starter' ? txt('1 bot activo', '1 active bot') : plan.slug === 'pro' ? txt('Bots Ilimitados', 'Unlimited Bots') : txt('Bots Dedicados', 'Dedicated Bots')}
                         </td>
                       );
                     })}
                   </tr>
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
-                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Cotizador PDF Profesional</td>
+                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">{txt('Cotizador PDF Profesional', 'Professional PDF Quote Generator')}</td>
                     {plans.map((plan) => (
                       <td key={plan.id || plan.slug} className={`p-6 text-center ${plan.slug === 'pro' ? 'bg-indigo-500/[0.03] border-x border-indigo-500/20' : 'border-r border-white/5'}`}><Tick /></td>
                     ))}
@@ -1607,7 +1607,7 @@ export default function LandingPage() {
                   </tr>
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
-                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Flyer Studio con IA</td>
+                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">{txt('Flyer Studio con IA', 'Flyer Studio with AI')}</td>
                     {plans.map((plan) => (
                       <td key={plan.id || plan.slug} className={`p-6 text-center ${plan.slug === 'pro' ? 'bg-indigo-500/[0.03] border-x border-indigo-500/20' : 'border-r border-white/5'}`}>
                         {plan.slug !== 'starter' ? <Tick /> : <Cross />}
@@ -1616,7 +1616,7 @@ export default function LandingPage() {
                   </tr>
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
-                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Workflows Automatizados</td>
+                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">{txt('Workflows Automatizados', 'Automated Workflows')}</td>
                     {plans.map((plan) => (
                       <td key={plan.id || plan.slug} className={`p-6 text-center ${plan.slug === 'pro' ? 'bg-indigo-500/[0.03] border-x border-indigo-500/20' : 'border-r border-white/5'}`}>
                         {plan.slug === 'enterprise' ? <Tick /> : <Cross />}
@@ -1627,12 +1627,12 @@ export default function LandingPage() {
                   {/* CATEGORY 4: SOPORTE Y GARANTIAS */}
                   <tr className="bg-white/[0.02] border-b border-white/5">
                     <td colSpan={plans.length + 1} className="p-5 pl-6 text-[10px] font-black text-indigo-400 uppercase tracking-widest">
-                      Soporte y Garantías
+                      {txt('Soporte y Garantías', 'Support & Warranties')}
                     </td>
                   </tr>
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
-                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Canal de Soporte</td>
+                    <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">{txt('Canal de Soporte', 'Support Channel')}</td>
                     {plans.map((plan) => {
                       const isHighlighted = plan.slug === 'pro';
                       return (
@@ -1644,7 +1644,7 @@ export default function LandingPage() {
                               : 'text-slate-300 border-r border-white/5'
                           }`}
                         >
-                          {plan.slug === 'starter' ? 'Email' : plan.slug === 'pro' ? 'WhatsApp + Email' : 'SLA Dedicado 24/7'}
+                          {plan.slug === 'starter' ? 'Email' : plan.slug === 'pro' ? 'WhatsApp + Email' : txt('SLA Dedicado 24/7', 'Dedicated SLA 24/7')}
                         </td>
                       );
                     })}
@@ -1652,10 +1652,10 @@ export default function LandingPage() {
 
                   <tr className="border-b border-white/5 hover:bg-white/[0.01] transition-colors">
                     <td className="p-6 pl-6 text-sm lg:text-base text-slate-200 font-bold">Onboarding</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">Documentación</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 bg-indigo-500/[0.03] border-x border-indigo-500/20">Guiado</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">1-a-1 Dedicado</td>
-                    <td className="p-6 text-center text-sm lg:text-base text-indigo-300 font-bold">1-a-1 Dedicado</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">{txt('Documentación', 'Documentation')}</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 bg-indigo-500/[0.03] border-x border-indigo-500/20">{txt('Guiado', 'Guided')}</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-slate-300 border-r border-white/5">{txt('1-a-1 Dedicado', 'Dedicated 1-on-1')}</td>
+                    <td className="p-6 text-center text-sm lg:text-base text-indigo-300 font-bold">{txt('1-a-1 Dedicado', 'Dedicated 1-on-1')}</td>
                   </tr>
 
                 </tbody>
@@ -1668,13 +1668,13 @@ export default function LandingPage() {
           <div className="mt-24 border-t border-white/10 pt-20">
             <div className="text-center mb-16">
               <span className="text-xs font-black text-emerald-400 uppercase tracking-[0.25em] mb-4 block">
-                ¿Por qué pagar miles de dólares de más?
+                {txt('¿Por qué pagar miles de dólares de más?', 'Why pay thousands of dollars more?')}
               </span>
               <h3 className="text-3xl lg:text-4xl font-black text-white leading-tight">
-                Comparativa Real de Valor y Capacidades
+                {txt('Comparativa Real de Valor y Capacidades', 'Real Comparison of Value & Capabilities')}
               </h3>
               <p className="text-slate-400 mt-4 max-w-2xl mx-auto text-sm">
-                Analiza de forma honesta el costo y las prestaciones de las tres alternativas líderes. Arias CRM te ofrece el stack de ventas completo de alta gama a una fracción de su costo ordinario.
+                {txt('Analiza de forma honesta el costo y las prestaciones de las tres alternativas líderes. Arias CRM te ofrece el stack de ventas completo de alta gama a una fracción de su costo ordinario.', 'Honestly analyze the cost and features of the three leading alternatives. Arias CRM offers you the complete high-end sales stack at a fraction of its ordinary cost.')}
               </p>
               <div className="flex justify-center mt-6">
                 <div className="inline-flex items-center gap-1 bg-white/5 rounded-full p-1 border border-white/10">
@@ -1685,7 +1685,7 @@ export default function LandingPage() {
                       annual ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    Anual (20% OFF)
+                    {txt('Anual (20% OFF)', 'Yearly (20% OFF)')}
                   </button>
                   <button
                     type="button"
@@ -1694,7 +1694,7 @@ export default function LandingPage() {
                       !annual ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    Mensual
+                    {txt('Mensual', 'Monthly')}
                   </button>
                 </div>
               </div>
@@ -1708,40 +1708,40 @@ export default function LandingPage() {
                   <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-6">
                     <span className="text-base font-black text-slate-500 uppercase tracking-widest">HubSpot CRM</span>
                     <span className="text-[9px] bg-red-500/10 text-red-400 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">
-                      Muy Costoso
+                      {txt('Muy Costoso', 'Very Expensive')}
                     </span>
                   </div>
                   
                   <p className="text-xs text-slate-400 leading-relaxed mb-6">
-                    El software tradicional corporativo. Excelente reputación, pero requiere pagar miles de dólares en módulos separados, cobra extra por cada asesor y te bloquea en contratos anuales.
+                    {txt('El software tradicional corporativo. Excelente reputación, pero requiere pagar miles de dólares en módulos separados, cobra extra por cada asesor y te bloquea en contratos anuales.', 'Traditional corporate software. Excellent reputation, but requires paying thousands of dollars in separate modules, charges extra per agent, and locks you into annual contracts.')}
                   </p>
 
                   <ul className="space-y-4 mb-8">
                     <li className="flex items-start gap-3 text-xs text-slate-400">
                       <Cross />
-                      <span><strong>$890/mes</strong> (Plan Professional base para equipo chico)</span>
+                      <span><strong>$890/{txt('mes', 'mo')}</strong> {txt('(Plan Professional base para equipo chico)', '(Base Professional plan for small teams)')}</span>
                     </li>
                     <li className="flex items-start gap-3 text-xs text-slate-400">
                       <Cross />
-                      <span><strong>Cobro extra por contacto</strong> (marketing vs comercial)</span>
+                      <span><strong>{txt('Cobro extra por contacto', 'Extra charge per contact')}</strong> {txt('(marketing vs comercial)', '(marketing vs sales)')}</span>
                     </li>
                     <li className="flex items-start gap-3 text-xs text-slate-400">
                       <Cross />
-                      <span><strong>Sin cotizador PDF profesional</strong> integrado por defecto</span>
+                      <span><strong>{txt('Sin cotizador PDF profesional', 'No professional PDF quote generator')}</strong> {txt('integrado por defecto', 'integrated by default')}</span>
                     </li>
                     <li className="flex items-start gap-3 text-xs text-slate-400">
                       <Cross />
-                      <span><strong>Sin extractor de Google Maps</strong> (requiere software externo)</span>
+                      <span><strong>{txt('Sin extractor de Google Maps', 'No Google Maps extractor')}</strong> {txt('(requiere software externo)', '(requires external software)')}</span>
                     </li>
                     <li className="flex items-start gap-3 text-xs text-slate-400">
                       <Cross />
-                      <span><strong>Contratos anuales forzosos</strong> y cargos de onboarding</span>
+                      <span><strong>{txt('Contratos anuales forzosos', 'Forced annual contracts')}</strong> {txt('y cargos de onboarding', 'and onboarding fees')}</span>
                     </li>
                   </ul>
                 </div>
 
                 <div className="border-t border-white/5 pt-6 text-center">
-                  <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Costo Anual Estimado:</p>
+                  <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">{txt('Costo Anual Estimado:', 'Estimated Annual Cost:')}</p>
                   <p className="text-3xl font-black text-slate-300 mt-1.5">$10,680+ USD</p>
                 </div>
               </div>
@@ -1749,50 +1749,50 @@ export default function LandingPage() {
               {/* The Champion: Arias CRM */}
               <div className="bg-[#0c0c24]/50 border-2 border-indigo-500 rounded-3xl p-8 flex flex-col justify-between relative shadow-[0_0_50px_rgba(99,102,241,0.15)] hover:scale-[1.03] transition-all group">
                 <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-[9px] font-black bg-indigo-600 text-white px-3 py-1 rounded-full uppercase tracking-widest shadow-md">
-                  La Mejor Inversión
+                  {txt('La Mejor Inversión', 'The Best Investment')}
                 </span>
                 
                 <div>
                   <div className="flex items-center justify-between border-b border-indigo-500/25 pb-4 mb-6">
                     <span className="text-base font-black text-indigo-400 uppercase tracking-widest">Arias CRM</span>
                     <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-2.5 py-1 rounded-full font-black uppercase tracking-wider">
-                      Todo Incluido
+                      {txt('Todo Incluido', 'All-Inclusive')}
                     </span>
                   </div>
 
                   <p className="text-xs text-slate-300 leading-relaxed mb-6 font-medium">
-                    Ofrecemos la suite completa sin parches externos. Inbox unificado omnicanal, cotizador profesional interactivo, extractor de leads de Google Maps ilimitado y Flyer Studio con IA.
+                    {txt('Ofrecemos la suite completa sin parches externos. Inbox unificado omnicanal, cotizador profesional interactivo, extractor de leads de Google Maps ilimitado y Flyer Studio con IA.', 'We offer the complete suite without external patches. Unified omni-channel inbox, interactive professional quote generator, unlimited Google Maps lead extractor, and Flyer Studio with AI.')}
                   </p>
 
                   <ul className="space-y-4 mb-8">
                     <li className="flex items-start gap-3 text-xs text-slate-200">
                       <Tick />
                       <span>
-                        <strong>${flatPrice}/mes</strong> {annual ? '(Facturación Anual - 20% OFF)' : '(Facturación Mensual)'}
+                        <strong>${flatPrice}/{txt('mes', 'mo')}</strong> {annual ? txt('(Facturación Anual - 20% OFF)', '(Annual Billing - 20% OFF)') : txt('(Facturación Mensual)', '(Monthly Billing)')}
                       </span>
                     </li>
                     <li className="flex items-start gap-3 text-xs text-slate-200">
                       <Tick />
-                      <span><strong>Contactos e Ingestión Ilimitada</strong> gratis</span>
+                      <span><strong>{txt('Contactos e Ingestión Ilimitada', 'Unlimited Contacts & Ingestion')}</strong> {txt('gratis', 'free')}</span>
                     </li>
                     <li className="flex items-start gap-3 text-xs text-slate-200">
                       <Tick />
-                      <span><strong>Lead Hunter de Google Maps</strong> gratis integrado</span>
+                      <span><strong>{txt('Lead Hunter de Google Maps', 'Google Maps Lead Hunter')}</strong> {txt('gratis integrado', 'integrated for free')}</span>
                     </li>
                     <li className="flex items-start gap-3 text-xs text-slate-200">
                       <Tick />
-                      <span><strong>Cotizador interactivo y PDF</strong> con tu propia marca</span>
+                      <span><strong>{txt('Cotizador interactivo y PDF', 'Interactive Quote & PDF')}</strong> {txt('con tu propia marca', 'with your own brand')}</span>
                     </li>
                     <li className="flex items-start gap-3 text-xs text-slate-200">
                       <Tick />
-                      <span><strong>Cancela cuando quieras</strong>, sin contratos obligatorios</span>
+                      <span><strong>{txt('Cancela cuando quieras', 'Cancel anytime')}</strong>, {txt('sin contratos obligatorios', 'no mandatory contracts')}</span>
                     </li>
                   </ul>
                 </div>
 
                 <div className="border-t border-indigo-500/20 pt-6 text-center">
                   <p className="text-xs text-indigo-300 font-semibold uppercase tracking-wider">
-                    {annual ? 'Costo Anual Fijo:' : 'Costo Anual Proyectado:'}
+                    {annual ? txt('Costo Anual Fijo:', 'Fixed Annual Cost:') : txt('Costo Anual Proyectado:', 'Projected Annual Cost:')}
                   </p>
                   <p className="text-4xl font-black text-emerald-400 mt-1.5">${flatPriceAnnual} USD</p>
                 </div>
@@ -1804,40 +1804,40 @@ export default function LandingPage() {
                   <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-6">
                     <span className="text-base font-black text-slate-500 uppercase tracking-widest">Respond.io</span>
                     <span className="text-[9px] bg-amber-500/10 text-amber-400 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">
-                      Inbox Limitado
+                      {txt('Inbox Limitado', 'Limited Inbox')}
                     </span>
                   </div>
 
                   <p className="text-xs text-slate-400 leading-relaxed mb-6">
-                    Excelente bandeja omnicanal para chats, pero carece por completo de base de datos CRM avanzada, procesos de cierre de ventas, cotizaciones o captación B2B en frío.
+                    {txt('Excelente bandeja omnicanal para chats, pero carece por completo de base de datos CRM avanzada, procesos de cierre de ventas, cotizaciones o captación B2B en frío.', 'Excellent omni-channel inbox for chats, but completely lacks advanced CRM database, sales closing processes, quotes, or cold B2B lead generation.')}
                   </p>
 
                   <ul className="space-y-4 mb-8">
                     <li className="flex items-start gap-3 text-xs text-slate-400">
                       <Cross />
-                      <span><strong>$99/mes</strong> (Plan básico con límite de solo 5 asesores)</span>
+                      <span><strong>$99/{txt('mes', 'mo')}</strong> {txt('(Plan básico con límite de solo 5 asesores)', '(Basic plan limited to only 5 agents)')}</span>
                     </li>
                     <li className="flex items-start gap-3 text-xs text-slate-400">
                       <Cross />
-                      <span><strong>Límite estricto de contactos</strong> mensuales activos</span>
+                      <span><strong>{txt('Límite estricto de contactos', 'Strict limit of monthly')}</strong> {txt('mensuales activos', 'active contacts')}</span>
                     </li>
                     <li className="flex items-start gap-3 text-xs text-slate-400">
                       <Cross />
-                      <span><strong>Sin cotizaciones ni facturación</strong> comercial integrada</span>
+                      <span><strong>{txt('Sin cotizaciones ni facturación', 'No quotes or billing')}</strong> {txt('comercial integrada', 'integrated commercially')}</span>
                     </li>
                     <li className="flex items-start gap-3 text-xs text-slate-400">
                       <Cross />
-                      <span><strong>Sin generadores ni extractores</strong> de leads fríos</span>
+                      <span><strong>{txt('Sin generadores ni extractores', 'No cold lead generators or extractors')}</strong></span>
                     </li>
                     <li className="flex items-start gap-3 text-xs text-slate-400">
                       <Cross />
-                      <span><strong>Costos adicionales</strong> por volumen de mensajes activos</span>
+                      <span><strong>{txt('Costos adicionales', 'Additional costs')}</strong> {txt('por volumen de mensajes activos', 'based on active messages volume')}</span>
                     </li>
                   </ul>
                 </div>
 
                 <div className="border-t border-white/5 pt-6 text-center">
-                  <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Costo Anual Base:</p>
+                  <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">{txt('Costo Anual Base:', 'Base Annual Cost:')}</p>
                   <p className="text-3xl font-black text-slate-300 mt-1.5">$1,188+ USD</p>
                 </div>
               </div>
@@ -1904,13 +1904,13 @@ export default function LandingPage() {
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080800a_1px,transparent_1px),linear-gradient(to_bottom,#8080800a_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
         <div className="max-w-2xl mx-auto px-6 text-center relative z-10">
           <h2 className="text-5xl font-black text-white leading-tight mb-6 tracking-tight">
-            Empieza a capturar<br />leads hoy mismo.
+            {txt('Empieza a capturar', 'Start capturing')}<br />{txt('leads hoy mismo.', 'leads today.')}
           </h2>
-          <p className="text-slate-400 mb-10 text-sm">14 días gratis · Sin tarjeta de crédito · Configuración en 5 minutos.</p>
+          <p className="text-slate-400 mb-10 text-sm">{txt('14 días gratis · Sin tarjeta de crédito · Configuración en 5 minutos.', '14 days free · No credit card · Setup in 5 minutes.')}</p>
           <button onClick={() => navigate('/register')} className="inline-flex items-center gap-2 bg-white text-slate-950 font-bold px-10 py-4 rounded-xl hover:bg-slate-100 transition-all text-sm shadow-2xl shadow-white/20">
-            Crear cuenta gratis <ArrowRight className="w-4 h-4" />
+            {txt('Crear cuenta gratis', 'Create free account')} <ArrowRight className="w-4 h-4" />
           </button>
-          <p className="text-slate-600 text-xs mt-6">40% más económico que HubSpot · Más versátil que respond.io</p>
+          <p className="text-slate-600 text-xs mt-6">{txt('40% más económico que HubSpot · Más versátil que respond.io', '40% more affordable than HubSpot · More versatile than respond.io')}</p>
         </div>
       </section>
 
