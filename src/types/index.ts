@@ -76,6 +76,7 @@ export interface Company {
     time_format?: string;
     timezone?: string;
     allowed_permissions?: string[];
+    parent_company_id?: string | null;
 }
 
 export interface PermissionDefinition {

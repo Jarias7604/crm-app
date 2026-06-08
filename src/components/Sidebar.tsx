@@ -8,6 +8,7 @@ import { LanguageSwitcher } from './LanguageSwitcher';
 import { brandingService } from '../services/branding';
 import { supabase } from '../services/supabase';
 import type { Company } from '../types';
+import toast from 'react-hot-toast';
 
 export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolean, onToggle: () => void }) {
     const { profile, signOut, setSimulatedCompanyId, setSimulatedRole, simulatedCompanyId, revertSimulation } = useAuth();
@@ -63,6 +64,49 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
             if (data) setCompaniesList(data as Company[]);
         } catch (err) {
             console.error('Error loading companies for sidebar selector:', err);
+        }
+    };
+
+    const [workspaces, setWorkspaces] = useState<Company[]>([]);
+
+    useEffect(() => {
+        if (profile?.company_id && (profile?.role === 'company_admin' || profile?.role === 'super_admin')) {
+            loadWorkspaces();
+        }
+    }, [profile?.company_id, profile?.role]);
+
+    // Listen for child company creations/deletions/updates to refresh workspace selector in real-time
+    useEffect(() => {
+        const handleRefreshWorkspaces = () => loadWorkspaces();
+        window.addEventListener('refresh-workspaces', handleRefreshWorkspaces);
+        return () => window.removeEventListener('refresh-workspaces', handleRefreshWorkspaces);
+    }, [profile?.company_id]);
+
+    const loadWorkspaces = async () => {
+        try {
+            let parentId = profile?.company_id;
+            if (!parentId) return;
+
+            const { data: currentComp } = await supabase
+                .from('companies')
+                .select('id, parent_company_id')
+                .eq('id', parentId)
+                .single();
+
+            if (currentComp?.parent_company_id) {
+                parentId = currentComp.parent_company_id;
+            }
+
+            const { data, error } = await supabase
+                .from('companies')
+                .select('id, name, logo_url, parent_company_id')
+                .or(`id.eq.${parentId},parent_company_id.eq.${parentId}`)
+                .order('name');
+
+            if (error) throw error;
+            if (data) setWorkspaces(data as unknown as Company[]);
+        } catch (err) {
+            console.error('Error loading workspaces:', err);
         }
     };
 
@@ -430,6 +474,37 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                     </div>
                 )}
             </div>
+
+            {/* Workspace Switcher */}
+            {!isCollapsed && workspaces.length > 1 && (
+                <div className="px-4 py-3 border-b border-[#1e293b] bg-black/10">
+                    <label className="block text-[8px] font-black text-gray-500 uppercase tracking-widest mb-1.5">
+                        Workspace Activo
+                    </label>
+                    <div className="relative">
+                        <select
+                            className="w-full bg-[#1e293b]/70 border border-gray-800 rounded-xl px-3 py-2 text-xs font-black text-white focus:ring-2 focus:ring-blue-500/50 outline-none transition-all cursor-pointer hover:bg-[#1e293b] appearance-none"
+                            value={profile?.company_id || ''}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === profile?.company_id) return;
+                                setSimulatedCompanyId(val || null);
+                                window.dispatchEvent(new CustomEvent('company-changed', { detail: val }));
+                                toast.success('Workspace cambiado correctamente');
+                            }}
+                        >
+                            {workspaces.map(w => (
+                                <option key={w.id} value={w.id} className="bg-[#0f172a] text-white font-bold py-2">
+                                    {w.parent_company_id ? `🏢 ${w.name}` : `👑 ${w.name} (Principal)`}
+                                </option>
+                            ))}
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
+                            <ChevronDown className="w-3.5 h-3.5" />
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Navigation */}
             <div className={cn(

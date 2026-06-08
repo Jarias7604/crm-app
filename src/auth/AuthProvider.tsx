@@ -260,19 +260,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             let finalProfile = { ...data, permissions: activePerms } as Profile;
 
             // SIMULATION PRIVILEGE CHECK (role-based, no hardcoded IDs)
-            // Only super_admin users can use the simulation/testing feature
-            const isSimulationEligible = data?.role === 'super_admin';
+            // Both super_admin and company_admin users can switch workspaces/simulate roles
+            const isSimulationEligible = data?.role === 'super_admin' || data?.role === 'company_admin';
 
             // APPLY SIMULATION IF ELIGIBLE AND SIMULATION IS ACTIVE
             if (isSimulationEligible) {
                 const simRole = localStorage.getItem('simulated_role');
-                const simCompanyId = localStorage.getItem('simulated_company_id');
+                let simCompanyId = localStorage.getItem('simulated_company_id');
 
                 if (simRole || simCompanyId) {
                     console.warn('⚡ SIMULATION ACTIVE:', { role: simRole, company: simCompanyId });
 
                     let simPermissions: any = {};
-                    const effectiveCompanyId = simCompanyId || data.company_id;
+                    let effectiveCompanyId = simCompanyId || data.company_id;
+
+                    // SECURITY: If company_admin is simulating, they can only switch to child companies of their own company
+                    if (data.role === 'company_admin' && simCompanyId && simCompanyId !== data.company_id) {
+                        try {
+                            const { data: targetCompany } = await supabase
+                                .from('companies')
+                                .select('id, parent_company_id')
+                                .eq('id', simCompanyId)
+                                .single();
+                            
+                            if (!targetCompany || targetCompany.parent_company_id !== data.company_id) {
+                                console.warn('🛡️ Access Denied: company_admin cannot switch to non-child company.');
+                                effectiveCompanyId = data.company_id;
+                                localStorage.removeItem('simulated_company_id');
+                                setSimulatedCompanyId(null);
+                            }
+                        } catch (err) {
+                            console.error('Error validating child company simulation:', err);
+                            effectiveCompanyId = data.company_id;
+                        }
+                    }
 
                     // Load permissions for the simulated role from the actual role_permissions table
                     if (effectiveCompanyId && simRole) {
@@ -351,16 +372,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             company_id: effectiveCompanyId || finalProfile.company_id,
                             permissions: simPermissions
                         };
+                    } else if (effectiveCompanyId) {
+                        // Just simulated company_id, retain role and permissions
+                        finalProfile = {
+                            ...finalProfile,
+                            company_id: effectiveCompanyId
+                        };
                     }
                 }
             }
 
-            // SECURITY: If the final profile is NOT super_admin, clear any residual
-            // simulation state from localStorage that might have been left by a previous
-            // super_admin session. This prevents company_admin from seeing the wrong company.
-            if (finalProfile.role !== 'super_admin') {
+            // SECURITY: If the final profile is NEITHER super_admin NOR company_admin, clear any residual
+            // simulation state from localStorage.
+            if (finalProfile.role !== 'super_admin' && finalProfile.role !== 'company_admin') {
                 if (localStorage.getItem('simulated_company_id') || localStorage.getItem('simulated_role')) {
-                    console.warn('🛡️ Clearing residual simulation state for non-super_admin user');
+                    console.warn('🛡️ Clearing residual simulation state for non-admin user');
                     localStorage.removeItem('simulated_company_id');
                     localStorage.removeItem('simulated_role');
                     setSimulatedCompanyId(null);

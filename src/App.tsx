@@ -77,6 +77,7 @@ const BillingManager    = lazy(() => import('./pages/admin/BillingManager'));
 const BookingSettings   = lazy(() => import('./pages/calendar/BookingSettings'));
 const PublicBookingPage = lazy(() => import('./pages/public/PublicBookingPage'));
 const PrivacyPolicy     = lazy(() => import('./pages/public/PrivacyPolicy'));
+const Workspaces        = lazy(() => import('./pages/company/Workspaces'));
 
 
 // ─── Skeleton Screen (técnica Netflix) ───────────────────────────────────────
@@ -215,6 +216,7 @@ function App() {
                     <Route path="/company/branding" element={<Branding />} />
                     <Route path="/company/teams" element={<Teams />} />
                     <Route path="/company/performance" element={<TeamPerformance />} />
+                    <Route path="/company/workspaces" element={<Workspaces />} />
                     <Route path="/catalogo" element={<CatalogoProductos />} />
                     <Route path="/pricing" element={<Navigate to="/catalogo" replace />} />
                     <Route path="/paquetes" element={<Navigate to="/catalogo" replace />} />
