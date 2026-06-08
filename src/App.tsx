@@ -147,20 +147,23 @@ function NewAdminOnboardingGuard() {
     if (profile?.role !== 'company_admin') return;
     // Skip if already in onboarding
     if (location.pathname === '/onboarding') return;
+    // Skip if simulating a company to prevent hijacking context
+    if (localStorage.getItem('simulated_company_id')) return;
+
     // Skip if user has been around for more than 6 hours (not brand new)
-    const createdAt = new Date(profile.created_at).getTime();
+    const createdAt = profile?.created_at ? new Date(profile.created_at).getTime() : 0;
     const sixHoursAgo = Date.now() - 6 * 60 * 60 * 1000;
     if (createdAt < sixHoursAgo) return;
 
     // Check if company name has been set (indicates onboarding was completed)
-    // Logo is optional — don't gate on it
     supabase
       .from('companies')
-      .select('name, logo_url, industry')
+      .select('name, logo_url, industry, parent_company_id')
       .eq('id', profile.company_id)
       .single()
       .then(({ data }) => {
-        // If company has no industry set, it hasn't been through onboarding yet
+        // Skip onboarding if it's a child workspace or already has an industry set
+        if (data?.parent_company_id) return;
         if (!data?.industry) {
           navigate('/onboarding', { replace: true });
         }
