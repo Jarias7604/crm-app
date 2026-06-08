@@ -121,12 +121,13 @@ export default function Workspaces() {
                 .eq('provider', 'whatsapp')
                 .maybeSingle();
 
+            const settings = mktData?.settings || {};
             setFormData({
                 name: workspace.name,
-                waba_id: mktData?.waba_id || '',
-                phone_number_id: mktData?.phone_number_id || '',
-                sender_phone_number: mktData?.phone_number || '',
-                whatsapp_token: mktData?.access_token || '',
+                waba_id: settings.wabaId || '',
+                phone_number_id: settings.phoneNumberId || '',
+                sender_phone_number: settings.phone || '',
+                whatsapp_token: settings.token || '',
                 allowed_permissions: workspace.allowed_permissions || []
             });
         } catch (err) {
@@ -197,14 +198,18 @@ export default function Workspaces() {
                     .eq('provider', 'whatsapp')
                     .maybeSingle();
 
+                const settingsPayload = {
+                    wabaId: formData.waba_id.trim() || null,
+                    phoneNumberId: formData.phone_number_id.trim() || null,
+                    phone: formData.sender_phone_number.trim() || null,
+                    token: formData.whatsapp_token.trim() || null
+                };
+
                 if (existingInt) {
                     await supabase
                         .from('marketing_integrations')
                         .update({
-                            waba_id: formData.waba_id.trim() || null,
-                            phone_number_id: formData.phone_number_id.trim() || null,
-                            phone: formData.sender_phone_number.trim() || null,
-                            access_token: formData.whatsapp_token.trim() || null,
+                            settings: settingsPayload,
                             is_active: true
                         })
                         .eq('id', existingInt.id);
@@ -214,10 +219,7 @@ export default function Workspaces() {
                         .insert({
                             company_id: targetCompanyId,
                             provider: 'whatsapp',
-                            waba_id: formData.waba_id.trim() || null,
-                            phone_number_id: formData.phone_number_id.trim() || null,
-                            phone: formData.sender_phone_number.trim() || null,
-                            access_token: formData.whatsapp_token.trim() || null,
+                            settings: settingsPayload,
                             is_active: true
                         });
                 }
