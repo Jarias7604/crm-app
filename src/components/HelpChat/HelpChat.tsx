@@ -1,15 +1,34 @@
 import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Bot, Sparkles } from 'lucide-react';
 import { sendMessage } from '../../lib/api';
+import { useTranslation } from 'react-i18next';
 
 export default function HelpChat() {
+  const { i18n } = useTranslation();
+  const isSpanish = i18n.language?.startsWith('es');
+  const en = !isSpanish;
+  const txt = (es: string, enVal: string) => en ? enVal : es;
+
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [messages, setMessages] = useState<{role: 'user' | 'bot', content: string, imageUrl?: string}[]>([
-    { role: 'bot', content: '¡Hola! Soy tu asistente de Arias CRM. ¿En qué puedo ayudarte hoy?' }
-  ]);
+  const [messages, setMessages] = useState<{role: 'user' | 'bot', content: string, imageUrl?: string}[]>([]);
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Set initial welcome message based on language
+  useEffect(() => {
+    if (messages.length === 0 || (messages.length === 1 && messages[0].role === 'bot')) {
+      setMessages([
+        { 
+          role: 'bot', 
+          content: txt(
+            '¡Hola! Soy tu asistente de Arias CRM. ¿En qué puedo ayudarte hoy?', 
+            'Hello! I am your Arias CRM assistant. How can I help you today?'
+          ) 
+        }
+      ]);
+    }
+  }, [i18n.language]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -33,7 +52,10 @@ export default function HelpChat() {
         imageUrl: res.imageUrl 
       }]);
     } catch (error) {
-      setMessages(prev => [...prev, { role: 'bot', content: 'Lo siento, tuve un problema al procesar tu solicitud.' }]);
+      setMessages(prev => [...prev, { 
+        role: 'bot', 
+        content: txt('Lo siento, tuve un problema al procesar tu solicitud.', 'Sorry, I had a problem processing your request.') 
+      }]);
     } finally {
       setLoading(false);
     }
@@ -51,10 +73,10 @@ export default function HelpChat() {
                 <Bot className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-bold text-sm tracking-tight">Asistente Arias</h3>
+                <h3 className="font-bold text-sm tracking-tight">{txt('Asistente Arias', 'Arias Assistant')}</h3>
                 <div className="flex items-center">
                   <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse mr-1.5" />
-                  <span className="text-[10px] opacity-80 uppercase tracking-widest font-bold">En línea</span>
+                  <span className="text-[10px] opacity-80 uppercase tracking-widest font-bold">{txt('En línea', 'Online')}</span>
                 </div>
               </div>
             </div>
@@ -99,7 +121,7 @@ export default function HelpChat() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                placeholder="Pregúntame algo..."
+                placeholder={txt('Pregúntame algo...', 'Ask me anything...')}
                 className="w-full pl-4 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
               />
               <button
@@ -112,7 +134,7 @@ export default function HelpChat() {
             </div>
             <p className="mt-2 text-[10px] text-center text-slate-400 flex items-center justify-center">
               <Sparkles className="w-3 h-3 mr-1 text-indigo-400" />
-              Potenciado por Arias IA
+              {txt('Potenciado por Arias IA', 'Powered by Arias AI')}
             </p>
           </div>
         </div>

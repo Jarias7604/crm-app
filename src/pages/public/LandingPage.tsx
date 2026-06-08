@@ -1111,7 +1111,7 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto px-6">
           <div className="mb-16">
             <span className="text-xs font-black text-amber-500 uppercase tracking-[0.25em] mb-4 block">{txt('Exclusivos', 'Exclusive')}</span>
-            <h2 className="text-4xl font-black text-white leading-tight">{txt('Features que HubSpot no ofrece a ningún precio.', 'Features that HubSpot does not offer at any price.')}</h2>
+            <h2 className="text-4xl font-black text-white leading-tight">{txt('Características que HubSpot no ofrece a ningún precio.', 'Features that HubSpot does not offer at any price.')}</h2>
           </div>
           <div className="grid md:grid-cols-3 gap-6">
             {activeFeatures.map(f => (
