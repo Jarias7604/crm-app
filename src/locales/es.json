@@ -63,7 +63,8 @@
         "structure": "Estructura",
         "performance": "Rendimiento",
         "permissions": "Permisos",
-        "omniSearch": "Omni-Buscador"
+        "omniSearch": "Omni-Buscador",
+        "workspaces": "Workspaces & Departamentos"
     },
     "roles": {
         "superAdmin": "Super Admin",

@@ -288,6 +288,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     const configSubItemsRaw = [
         { name: t('sidebar.companyBrand'), href: '/company/branding', icon: Building, current: location.pathname === '/company/branding', permissionKey: 'branding' },
         { name: t('sidebar.integrations'), href: '/company/integrations', icon: Network, current: location.pathname.startsWith('/company/integrations'), permissionKey: 'branding' },
+        { name: t('sidebar.workspaces'), href: '/company/workspaces', icon: Building2, current: location.pathname === '/company/workspaces', permissionKey: 'pipeline.admin' },
         { name: t('sidebar.clientPipeline'), href: '/admin/pipeline', icon: UserCheck, current: location.pathname === '/admin/pipeline', permissionKey: 'pipeline.admin' },
         { name: t('sidebar.productCatalog'), href: '/catalogo', icon: Package, current: location.pathname === '/catalogo', permissionKey: 'pricing' },
         { name: t('sidebar.financialManagement'), href: '/financial-rules', icon: CreditCard, current: location.pathname === '/financial-rules', permissionKey: 'financial_rules' },
