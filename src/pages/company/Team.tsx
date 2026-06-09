@@ -777,13 +777,17 @@ export default function Team() {
                                                     calendar: { label: 'Agenda', icon: Calendar },
                                                     chat: { label: 'Chat', icon: MessageSquare },
                                                     clientes: { label: 'Clientes', icon: Building },
+                                                    proyectos: { label: 'Proyectos', icon: Layers },
+                                                    finanzas: { label: 'Finanzas', icon: CreditCard },
                                                     marketing: { label: 'Marketing', icon: Megaphone },
                                                     pricing: { label: 'Precios', icon: Tag },
                                                     paquetes: { label: 'Paquetes', icon: Package },
                                                     items: { label: 'Catálogo', icon: Layers },
-                                                    financial_rules: { label: 'Finanzas', icon: CreditCard },
+                                                    financial_rules: { label: 'Reglas Finanzas', icon: CreditCard },
                                                     loss_reasons: { label: 'Mot. Pérdida', icon: XCircle },
                                                     dashboard_full: { label: 'Dashboard', icon: Shield },
+                                                    reports: { label: 'Reportes BI', icon: BarChart3 },
+                                                    view_financials: { label: 'Montos Financieros', icon: CreditCard },
                                                 };
 
                                                 if (!editingMember.custom_role_id) return (

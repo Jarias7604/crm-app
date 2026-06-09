@@ -7,7 +7,7 @@ import {
     Shield, Plus, Edit2, Trash2, Save, X, Loader2,
     Users, FileText, Calendar, MessageSquare, Megaphone,
     Tag, Package, Layers, CreditCard, XCircle, Building,
-    CheckCircle, AlertCircle, ChevronRight
+    CheckCircle, AlertCircle, ChevronRight, BarChart3
 } from 'lucide-react';
 
 // ─── Permission catalog ───────────────────────────────────────────────────────
@@ -18,6 +18,8 @@ const ALL_PERMISSIONS = [
     { key: 'calendar',       label: 'Agenda / Calendario',   icon: Calendar,     desc: 'Ver y crear eventos en la agenda global' },
     { key: 'chat',           label: 'Chat / Mensajes',       icon: MessageSquare,desc: 'Acceder al módulo de mensajería' },
     { key: 'clientes',       label: 'Clientes',              icon: Building,     desc: 'Ver el directorio de clientes activos' },
+    { key: 'proyectos',      label: 'Proyectos',             icon: Layers,       desc: 'Gestionar proyectos del equipo' },
+    { key: 'finanzas',       label: 'Finanzas',              icon: CreditCard,   desc: 'Acceso a la vista principal de finanzas' },
     { key: 'marketing',      label: 'Marketing Hub',         icon: Megaphone,    desc: 'Campañas, emails y automatizaciones' },
     { key: 'pricing',        label: 'Precios y Tarifas',     icon: Tag,          desc: 'Configurar precios de servicios' },
     { key: 'paquetes',       label: 'Paquetes',              icon: Package,      desc: 'Gestionar paquetes de venta' },
@@ -25,6 +27,7 @@ const ALL_PERMISSIONS = [
     { key: 'financial_rules',label: 'Reglas Financieras',    icon: CreditCard,   desc: 'Configurar reglas de pago y crédito' },
     { key: 'loss_reasons',   label: 'Motivos de Pérdida',    icon: XCircle,      desc: 'Administrar razones de cierre perdido' },
     { key: 'dashboard_full', label: 'Dashboard Completo',    icon: Shield,       desc: 'Ver métricas globales y reportes' },
+    { key: 'reports',        label: 'Reportes BI',           icon: BarChart3,    desc: 'Acceso al módulo de Inteligencia de Negocios' },
     { key: 'view_financials',label: 'Ver Montos Financieros',icon: CreditCard,   desc: 'Ver montos de cotizaciones, cierres y reportes financieros' },
 ];
 

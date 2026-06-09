@@ -200,7 +200,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         });
     }
 
-    if (canAccess('clientes.view') || profile?.role === 'super_admin' || profile?.role === 'company_admin') {
+    if (canAccess('clientes') || profile?.role === 'super_admin' || profile?.role === 'company_admin') {
         navigation.push({ name: t('sidebar.clients'), href: '/clientes', icon: UserCheck, current: location.pathname.startsWith('/clientes') });
     }
 
@@ -216,7 +216,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         navigation.push({ name: t('sidebar.billing'), href: '/company/billing', icon: CreditCard, current: location.pathname.startsWith('/company/billing') });
     }
 
-    if (canAccess('quotes')) { // Assuming if they can access quotes, they can access finances. Or just company_admin. Let's make it for super_admin or company_admin.
+    if (canAccess('finanzas') || profile?.role === 'super_admin' || profile?.role === 'company_admin') { 
         navigation.push({ name: t('sidebar.finances'), href: '/finanzas', icon: CreditCard, current: location.pathname.startsWith('/finanzas') });
     }
 
@@ -237,7 +237,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         });
     }
 
-    if (canAccess('reports') || profile?.role === 'super_admin' || profile?.role === 'company_admin') {
+    if (canAccess('dashboard_full') || canAccess('reports') || profile?.role === 'super_admin' || profile?.role === 'company_admin') {
         navigation.push({ name: t('sidebar.reportsBi'), href: '/reports', icon: BarChart3, current: location.pathname.startsWith('/reports') });
     }
 
