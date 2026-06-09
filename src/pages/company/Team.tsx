@@ -4,7 +4,7 @@ import { teamService, type Invitation } from '../../services/team';
 import type { Profile, CustomRole, Role } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, Users, Lock, FileText, Tag, Package, Layers, Building, CreditCard, XCircle, KeyRound, Copy, History, AlertCircle, Send } from 'lucide-react';
+import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, MessageSquare, Megaphone, User, Users, Lock, FileText, Tag, Package, Layers, Building, CreditCard, XCircle, KeyRound, Copy, History, AlertCircle, Send, BarChart3 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../auth/AuthProvider';
 import { storageService } from '../../services/storage';
@@ -777,13 +777,17 @@ export default function Team() {
                                                     calendar: { label: 'Agenda', icon: Calendar },
                                                     chat: { label: 'Chat', icon: MessageSquare },
                                                     clientes: { label: 'Clientes', icon: Building },
+                                                    proyectos: { label: 'Proyectos', icon: Layers },
+                                                    finanzas: { label: 'Finanzas', icon: CreditCard },
                                                     marketing: { label: 'Marketing', icon: Megaphone },
                                                     pricing: { label: 'Precios', icon: Tag },
                                                     paquetes: { label: 'Paquetes', icon: Package },
                                                     items: { label: 'Catálogo', icon: Layers },
-                                                    financial_rules: { label: 'Finanzas', icon: CreditCard },
+                                                    financial_rules: { label: 'Reglas Finanzas', icon: CreditCard },
                                                     loss_reasons: { label: 'Mot. Pérdida', icon: XCircle },
                                                     dashboard_full: { label: 'Dashboard', icon: Shield },
+                                                    reports: { label: 'Reportes BI', icon: BarChart3 },
+                                                    view_financials: { label: 'Montos Financieros', icon: CreditCard },
                                                 };
 
                                                 if (!editingMember.custom_role_id) return (

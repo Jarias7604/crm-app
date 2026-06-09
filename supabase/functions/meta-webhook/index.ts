@@ -14,8 +14,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
  *   META_PAGE_ACCESS_TOKEN  (for fetching Lead Ads field data from Graph API)
  */
 
-const SUPABASE_URL            = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const SUPABASE_URL            = Deno.env.get('CRM_SUPABASE_URL') || Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('CRM_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // ─── LEAD ADS PROCESSOR ──────────────────────────────────────────────────────

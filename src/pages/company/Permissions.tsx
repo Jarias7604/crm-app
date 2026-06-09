@@ -1,4 +1,4 @@
-import { Shield, Loader2, ChevronDown, Plus, Trash2, Settings2, Users, Info, Building, Target, MessageSquare, Megaphone, Calendar, LayoutDashboard, FileText } from 'lucide-react';
+import { Shield, Loader2, ChevronDown, Plus, Trash2, Settings2, Users, Info, Building, Target, MessageSquare, Megaphone, Calendar, LayoutDashboard, FileText, Layers, CreditCard, BarChart3, Headset } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../auth/AuthProvider';
 import { permissionsService, type PermissionDefinition, type RolePermission, type CustomRole } from '../../services/permissions';
@@ -186,7 +186,11 @@ export default function Permissions() {
             'Dashboard': LayoutDashboard,
             'Marketing': Megaphone,
             'Mensajes': MessageSquare,
-            'Cotizaciones': FileText
+            'Cotizaciones': FileText,
+            'Proyectos': Layers,
+            'Finanzas': CreditCard,
+            'Reportes BI': BarChart3,
+            'Soporte': Headset
         };
         return icons[category] || Building;
     };

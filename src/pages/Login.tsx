@@ -32,6 +32,8 @@ const translateAuthError = (rawMessage: string): string => {
         return 'El código ingresado no es válido o ha expirado. Solicita uno nuevo.';
     if (msg.includes('network') || msg.includes('fetch'))
         return 'Error de conexión. Verifica tu internet e intenta de nuevo.';
+    if (msg.includes('invalid api key'))
+        return 'Error de configuración: la API Key de Supabase es inválida. Revisa tu archivo .env.local.';
     // Fallback: don't expose raw English error
     return 'Ocurrió un error inesperado. Por favor intenta de nuevo.';
 };
