@@ -121,14 +121,14 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
             return (
                 <div className="fixed inset-0 z-[9999]">
                     <div className="absolute inset-0 bg-black/40 lead-sheet-backdrop" onClick={() => setIsDetailOpen(false)} />
-                    <div className="absolute inset-x-0 bottom-0 max-h-[93vh] rounded-t-[28px] sm:inset-y-0 sm:bottom-auto sm:left-auto sm:right-0 sm:max-h-full sm:w-[480px] sm:max-w-lg sm:rounded-none bg-white shadow-2xl flex flex-col overflow-hidden lead-sheet">
+                    <div className="absolute inset-x-0 bottom-0 max-h-[93vh] rounded-t-[28px] sm:inset-y-0 sm:bottom-auto sm:left-auto sm:right-0 sm:max-h-full sm:w-[640px] sm:max-w-2xl sm:rounded-none bg-white/95 backdrop-blur-xl border-l border-white/50 shadow-[0_8px_40px_rgba(0,0,0,0.12)] flex flex-col overflow-hidden lead-sheet transition-all duration-500 ease-out">
                         {/* Mobile drag handle pill */}
                         <div className="flex justify-center pt-3 pb-0 flex-shrink-0 sm:hidden">
                             <div className="w-10 h-1 bg-gray-200 rounded-full" />
                         </div>
                         {/* Header */}
-                        <div className="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-white to-gray-50 flex justify-between items-center relative z-30">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-16 -mt-16 opacity-50 blur-2xl"></div>
+                        <div className="px-6 py-5 border-b border-gray-100/50 bg-gradient-to-r from-white/80 to-gray-50/80 backdrop-blur-sm flex justify-between items-center relative z-30">
+                            <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-50/50 rounded-full -mr-20 -mt-20 opacity-50 blur-3xl pointer-events-none"></div>
                             <div className="relative z-10 flex-1">
                                 <div className="flex items-center gap-3 mb-1">
                                     <div className="w-10 h-10 bg-[#4449AA] rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
@@ -139,14 +139,14 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                             type="text"
                                             defaultValue={selectedLead.name}
                                             onBlur={(e) => handleUpdateLead({ name: e.target.value })}
-                                            className="block w-full text-xl font-black text-gray-900 border-none hover:bg-white/50 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded px-2 -ml-2 transition-all bg-transparent"
+                                            className="block w-full text-2xl font-black text-gray-900 tracking-tight border-none hover:bg-white/50 focus:bg-white focus:ring-2 focus:ring-indigo-500 rounded px-2 -ml-2 transition-all bg-transparent"
                                         />
                                         <input
                                             type="text"
                                             defaultValue={selectedLead.company_name || ''}
                                             placeholder="Empresa no especificada"
                                             onBlur={(e) => handleUpdateLead({ company_name: e.target.value })}
-                                            className="block w-full text-[13px] font-bold text-gray-400 border-none hover:bg-white/50 focus:bg-white focus:ring-2 focus:ring-blue-500 rounded px-2 -ml-2 transition-all bg-transparent"
+                                            className="block w-full text-[14px] font-bold text-gray-400/80 border-none hover:bg-white/50 focus:bg-white focus:ring-2 focus:ring-indigo-500 rounded px-2 -ml-2 transition-all bg-transparent"
                                         />
                                         <CustomDatePicker
                                             value={selectedLead.created_at || ''}
@@ -206,18 +206,18 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                         {/* Content */}
                         <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-4 sm:p-6 space-y-6">
                             {/* Quick Stats */}
-                            <div className="flex gap-2 sm:gap-4 min-w-0">
-                                <div className="flex-1 min-w-0 overflow-hidden bg-gradient-to-br from-green-50 to-emerald-50 p-3 sm:p-4 rounded-xl border border-green-100/50 shadow-sm text-center group transition-transform hover:scale-[1.02]">
-                                    <p className="text-xl sm:text-2xl font-black text-green-600 tracking-tighter truncate">${(selectedLead.value || 0).toLocaleString()}</p>
-                                    <p className="text-[9px] font-black text-green-800/40 uppercase tracking-widest mt-2">Inversión</p>
+                            <div className="flex gap-3 sm:gap-4 min-w-0">
+                                <div className="flex-1 min-w-0 overflow-hidden bg-gradient-to-br from-emerald-50/80 to-teal-50/50 p-4 sm:p-5 rounded-2xl border border-emerald-100/60 shadow-[0_2px_10px_rgba(0,0,0,0.02)] text-center group transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
+                                    <p className="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tighter truncate">${(selectedLead.value || 0).toLocaleString()}</p>
+                                    <p className="text-[10px] font-black text-emerald-800/40 uppercase tracking-widest mt-2">Inversión</p>
                                 </div>
-                                <div className="flex-1 min-w-0 overflow-hidden bg-gradient-to-br from-orange-50 to-red-50 p-3 sm:p-4 rounded-xl border border-orange-100/50 shadow-sm text-center group transition-transform hover:scale-[1.02]">
-                                    <div className="flex justify-center"><PriorityBadge priority={selectedLead.priority || 'medium'} /></div>
-                                    <p className="text-[9px] font-black text-orange-800/40 uppercase tracking-widest mt-2">Temperatura</p>
+                                <div className="flex-1 min-w-0 overflow-hidden bg-gradient-to-br from-orange-50/80 to-rose-50/50 p-4 sm:p-5 rounded-2xl border border-orange-100/60 shadow-[0_2px_10px_rgba(0,0,0,0.02)] text-center group transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
+                                    <div className="flex justify-center scale-110 mb-1"><PriorityBadge priority={selectedLead.priority || 'medium'} /></div>
+                                    <p className="text-[10px] font-black text-orange-800/40 uppercase tracking-widest mt-2">Temperatura</p>
                                 </div>
-                                <div className="flex-1 min-w-0 overflow-hidden bg-gradient-to-br from-indigo-50 to-blue-50 p-3 sm:p-4 rounded-xl border border-blue-100/50 shadow-sm text-center group transition-transform hover:scale-[1.02]">
-                                    <div className="flex justify-center"><StatusBadge status={selectedLead.status} /></div>
-                                    <p className="text-[9px] font-black text-blue-800/40 uppercase tracking-widest mt-2">Estado</p>
+                                <div className="flex-1 min-w-0 overflow-hidden bg-gradient-to-br from-indigo-50/80 to-blue-50/50 p-4 sm:p-5 rounded-2xl border border-indigo-100/60 shadow-[0_2px_10px_rgba(0,0,0,0.02)] text-center group transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
+                                    <div className="flex justify-center scale-110 mb-1"><StatusBadge status={selectedLead.status} /></div>
+                                    <p className="text-[10px] font-black text-indigo-800/40 uppercase tracking-widest mt-2">Estado</p>
                                 </div>
                             </div>
 
