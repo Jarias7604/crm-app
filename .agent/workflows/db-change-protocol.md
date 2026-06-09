@@ -1,6 +1,6 @@
-# 🛡️ Protocolo de Prevención de Caídas de RLS y Cambios en Base de Datos
+# 🛡️ Protocolo de Prevención de Caídas de RLS y Aislamiento de Entornos
 
-Este protocolo establece los pasos obligatorios para desarrolladores e inteligencias artificiales para asegurar que **nunca** se repita una caída de políticas RLS en producción.
+Este protocolo establece los pasos obligatorios para desarrolladores e inteligencias artificiales para asegurar que **nunca** se repita una caída de políticas RLS en producción y que el entorno local **jamás** apunte a producción de forma accidental.
 
 ---
 
@@ -16,7 +16,24 @@ Este protocolo establece los pasos obligatorios para desarrolladores e inteligen
 
 ---
 
-## 2. Proceso Obligatorio de Verificación (Local → Testing → Producción)
+## 2. Aislamiento Estricto de Entornos (Desarrollo Seguro)
+
+Para garantizar la confidencialidad de la información de los clientes reales y evitar mutaciones catastróficas accidentales en producción:
+
+> [!IMPORTANT]
+> **Prohibición de Credenciales de Producción en Local**:
+> Ningún desarrollador ni agente de IA debe configurar la URL de producción (`mtxqqamitglhehaktgxm`) ni sus llaves de API en archivos locales como `.env.local` o `.env.development.local`.
+
+*   **Entorno de Desarrollo Local**: Debe configurarse estrictamente para apuntar al proyecto de **Testing/Secundario** (`ubqscyfefgfbmndnypbp`) o a un emulador local de Supabase.
+*   **Configuración Estándar de `.env.local`**:
+    ```env
+    VITE_SUPABASE_URL="https://ubqscyfefgfbmndnypbp.supabase.co"
+    VITE_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    ```
+
+---
+
+## 3. Proceso Obligatorio de Verificación (Local → Testing → Producción)
 
 Antes de que cualquier cambio toque producción, debe seguir este flujo de validación:
 
@@ -37,7 +54,7 @@ graph TD
 
 ---
 
-## 3. Script de Auditoría de Políticas (Integrado en el Repositorio)
+## 4. Script de Auditoría de Políticas (Integrado en el Repositorio)
 
 Hemos creado una herramienta de auditoría en la carpeta `scripts/audit-rls.cjs` que verifica automáticamente si existen tablas con RLS activo pero sin políticas aplicadas (estado de "denegación por defecto").
 
