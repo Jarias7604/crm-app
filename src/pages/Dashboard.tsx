@@ -1153,7 +1153,7 @@ export default function Dashboard() {
                         bg: 'bg-emerald-50/50',
                         trend: `${stats.wonDealsTrend > 0 ? '+' : ''}${stats.wonDealsTrend}%`,
                         trendColor: stats.wonDealsTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
-                        onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'] } }),
+                        onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'], startDate: dateRange.startDate, endDate: dateRange.endDate } }),
                         tooltip: 'Número de prospectos que ya compraron o cerraron trato en el período. Cada uno representa dinero real que entró. ¡Más es mejor!'
                     },
                     {
@@ -1175,7 +1175,7 @@ export default function Dashboard() {
                         bg: 'bg-amber-50/50',
                         trend: `${stats.conversionRateTrend > 0 ? '+' : ''}${stats.conversionRateTrend}%`,
                         trendColor: stats.conversionRateTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
-                        onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'] } }),
+                        onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'], startDate: dateRange.startDate, endDate: dateRange.endDate } }),
                         tooltip: 'De cada 100 prospectos que entran, ¿cuántos terminan comprando? Si es 10%, necesitas 10 leads para vender 1. Mientras más alto, más eficiente es tu equipo.'
                     },
                     {
@@ -1197,7 +1197,7 @@ export default function Dashboard() {
                         bg: 'bg-rose-500/10',
                         trend: `${stats.erroneousLeadsTrend > 0 ? '+' : ''}${stats.erroneousLeadsTrend}%`,
                         trendColor: stats.erroneousLeadsTrend <= 0 ? 'text-emerald-500' : 'text-rose-500',
-                        onClick: () => navigate('/leads', { state: { status: 'Erróneo' } }),
+                        onClick: () => navigate('/leads', { state: { status: 'Erróneo', startDate: dateRange.startDate, endDate: dateRange.endDate } }),
                         tooltip: 'Prospectos marcados como datos inválidos: número equivocado, duplicado, o que pidieron no ser contactados. Mantener este número bajo asegura que tu base de datos sea limpia.'
                     },
                 ].map((item) => {
@@ -1479,7 +1479,7 @@ export default function Dashboard() {
                                     {focusItems.map((item, i) => (
                                         <div
                                             key={i}
-                                            onClick={() => item.action && navigate('/leads', { state: { status: item.action } })}
+                                            onClick={() => item.action && navigate('/leads', { state: { status: item.action, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
                                             className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-50/60 hover:bg-slate-100/80 cursor-pointer transition-all group/item border border-slate-100/80"
                                         >
                                             <div className={`w-8 h-8 rounded-xl ${item.bg} flex items-center justify-center shrink-0 mt-0.5`}>
