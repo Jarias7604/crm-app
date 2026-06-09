@@ -8,6 +8,7 @@ import { Plus, Search, Trash2, Edit2, Shield, Loader2, Camera, Calendar, X, Mess
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../auth/AuthProvider';
 import { storageService } from '../../services/storage';
+import { permissionsService, type RolePermission } from '../../services/permissions';
 import { supabase } from '../../services/supabase';
 import Switch from '../../components/ui/Switch';
 import { CustomDatePicker } from '../../components/ui/CustomDatePicker';
@@ -26,6 +27,7 @@ export default function Team() {
     const [maxUsers, setMaxUsers] = useState(5);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [rolePermissions, setRolePermissions] = useState<RolePermission[]>([]);
     const [allowedPermissions, setAllowedPermissions] = useState<string[]>([]);
 
     // Modal States
@@ -72,18 +74,20 @@ export default function Team() {
     const loadData = async () => {
         if (!myProfile?.company_id) return;
         try {
-            const [membersData, invitationsData, limit, roles, allowed] = await Promise.all([
+            const [membersData, invitationsData, limit, roles, allowed, rPerms] = await Promise.all([
                 teamService.getTeamMembers(myProfile.company_id),
                 teamService.getInvitations(myProfile.company_id),
                 teamService.getCompanyLimit(myProfile.company_id),
                 teamService.getRoles(myProfile.company_id),
-                teamService.getCompanyPermissions(myProfile.company_id)
+                teamService.getCompanyPermissions(myProfile.company_id),
+                permissionsService.getRolePermissions()
             ]);
             setMembers(membersData || []);
             setInvitations(invitationsData || []);
             setMaxUsers(limit);
             setCustomRoles(roles);
             setAllowedPermissions(allowed);
+            setRolePermissions(rPerms || []);
 
             if (!formData.customRoleId && roles.length > 0) {
                 const defaultRole = roles.find(r => r.base_role === 'collaborator') || roles[0];
@@ -176,12 +180,11 @@ export default function Team() {
 
         const selectedRole = customRoles.find(r => r.id === editingMember.custom_role_id);
 
-        // DIRECT PERMISSION SAVING: Save exactly what is shown in the UI
         const currentPerms = editingMember.permissions || {};
         const finalPersistedPerms: Record<string, boolean> = {};
 
-        // Iterate over ALL possible permissions and save their CURRENT UI state
-        for (const key of allowedPermissions) {
+        // To avoid data loss from the legacy UI sync, just preserve whatever they already had
+        for (const key of Object.keys(currentPerms)) {
             finalPersistedPerms[key] = !!currentPerms[key];
         }
 
@@ -769,7 +772,22 @@ export default function Team() {
                                             {/* Read-only preview of what this role allows */}
                                             {(() => {
                                                 const selectedRole = customRoles.find(r => r.id === editingMember.custom_role_id);
-                                                const perms = (selectedRole as any)?.permissions || {};
+                                                
+                                                // Resolve permissions from role_permissions table
+                                                const perms: Record<string, boolean> = {};
+                                                if (selectedRole?.base_role === 'super_admin' || selectedRole?.base_role === 'company_admin') {
+                                                    // Admins logically have all enabled if licensed, but let's just show all for preview
+                                                    allowedPermissions.forEach(k => perms[k] = true);
+                                                } else if (selectedRole) {
+                                                    rolePermissions
+                                                        .filter(rp => rp.role_id === selectedRole.id && rp.is_enabled)
+                                                        .forEach(rp => {
+                                                            const baseKey = rp.permission_key.split('.')[0];
+                                                            perms[rp.permission_key] = true;
+                                                            perms[baseKey] = true; // Auto-enable base category for preview
+                                                        });
+                                                }
+
                                                 const PERM_LABELS: Record<string, { label: string; icon: any }> = {
                                                     leads: { label: 'Leads', icon: Users },
                                                     quotes: { label: 'Cotizaciones', icon: FileText },
