@@ -51,6 +51,10 @@ const MODULES_CONFIG = [
     { key: 'financial_rules', label: 'Reglas Financ.', icon: CreditCard, color: 'text-emerald-600', bg: 'bg-emerald-50' },
     { key: 'loss_reasons', label: 'Motivos de Pérdida', icon: XCircle, color: 'text-slate-600', bg: 'bg-slate-50' },
     { key: 'proyectos', label: 'Gestión de Proyectos', icon: Layers, color: 'text-indigo-700', bg: 'bg-indigo-50' },
+    { key: 'finanzas', label: 'Finanzas', icon: CreditCard, color: 'text-emerald-700', bg: 'bg-emerald-100' },
+    { key: 'tickets', label: 'Service Hub', icon: Megaphone, color: 'text-orange-600', bg: 'bg-orange-50' },
+    { key: 'reports', label: 'Reportes BI', icon: FileText, color: 'text-fuchsia-600', bg: 'bg-fuchsia-50' },
+    { key: 'view_financials', label: 'Montos Financieros', icon: CreditCard, color: 'text-rose-700', bg: 'bg-rose-100' },
 ];
 
 // ─── Default module sets by license plan ──────────────────────────────────────
@@ -59,8 +63,8 @@ const MODULES_CONFIG = [
 // This prevents new tenants from seeing a completely empty CRM.
 const PLAN_DEFAULT_MODULES: Record<string, string[]> = {
     trial:       ['leads', 'quotes', 'calendar', 'loss_reasons'],
-    active:      ['leads', 'quotes', 'calendar', 'marketing', 'chat', 'loss_reasons', 'pricing', 'paquetes', 'items', 'proyectos'],
-    manual_hold: ['leads', 'quotes', 'calendar', 'loss_reasons', 'proyectos'],
+    active:      ['leads', 'quotes', 'calendar', 'marketing', 'chat', 'loss_reasons', 'pricing', 'paquetes', 'items', 'proyectos', 'finanzas', 'tickets', 'reports', 'view_financials'],
+    manual_hold: ['leads', 'quotes', 'calendar', 'loss_reasons', 'proyectos', 'tickets'],
     expired:     [],
     suspended:   [],
 };
