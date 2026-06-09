@@ -241,19 +241,21 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
         navigation.push({ name: t('sidebar.reportsBi'), href: '/reports', icon: BarChart3, current: location.pathname.startsWith('/reports') });
     }
 
-    // Support Platform
-    navigation.push({
-        id: 'service_hub',
-        name: t('sidebar.serviceHub'),
-        href: '/support/tickets',
-        icon: Headset,
-        current: location.pathname.startsWith('/support'),
-        subItems: [
-            { name: t('sidebar.tickets'), href: '/support/tickets', icon: TicketIcon },
-            { name: t('sidebar.overdue'), href: '/support/atrasados', icon: AlertTriangle },
-            { name: t('sidebar.manualCrm'), href: '/support/manual', icon: BookOpen },
-        ]
-    });
+    if (canAccess('tickets') || profile?.role === 'super_admin' || profile?.role === 'company_admin') {
+        // Support Platform
+        navigation.push({
+            id: 'service_hub',
+            name: t('sidebar.serviceHub'),
+            href: '/support/tickets',
+            icon: Headset,
+            current: location.pathname.startsWith('/support'),
+            subItems: [
+                { name: t('sidebar.tickets'), href: '/support/tickets', icon: TicketIcon },
+                { name: t('sidebar.overdue'), href: '/support/atrasados', icon: AlertTriangle },
+                { name: t('sidebar.manualCrm'), href: '/support/manual', icon: BookOpen },
+            ]
+        });
+    }
 
     if (canAccess('marketing')) {
         navigation.push({
