@@ -12,7 +12,7 @@ serve(async (req) => {
     }
 
     try {
-        const { prompt, companyId, performanceContext } = await req.json();
+        const { prompt, companyId, performanceContext, isPerformanceChat } = await req.json();
 
         if (!prompt || !companyId) {
             throw new Error("Missing prompt or companyId");
@@ -56,18 +56,20 @@ serve(async (req) => {
             .limit(50);
 
         // Auto-Search: Find leads that might be mentioned in the user's prompt
-        const words = prompt.replace(/[^\w\s]/gi, '').split(/\s+/).filter((w: string) => w.length > 3);
         let mentionedLeads: any[] = [];
-        if (words.length > 0) {
-            const searchConditions = words.map((w: string) => `name.ilike.%${w}%`).join(',');
-            const { data: searchResults } = await supabase
-                .from('leads')
-                .select('id, name, email, phone, status, value')
-                .eq('company_id', companyId)
-                .or(searchConditions)
-                .limit(5);
-            
-            if (searchResults) mentionedLeads = searchResults;
+        if (!isPerformanceChat) {
+            const words = prompt.replace(/[^\w\s]/gi, '').split(/\s+/).filter((w: string) => w.length > 3);
+            if (words.length > 0) {
+                const searchConditions = words.map((w: string) => `name.ilike.%${w}%`).join(',');
+                const { data: searchResults } = await supabase
+                    .from('leads')
+                    .select('id, name, email, phone, status, value')
+                    .eq('company_id', companyId)
+                    .or(searchConditions)
+                    .limit(5);
+                
+                if (searchResults) mentionedLeads = searchResults;
+            }
         }
 
         // Get Today's Activity (Calls)

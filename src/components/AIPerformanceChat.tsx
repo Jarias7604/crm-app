@@ -69,7 +69,8 @@ export function AIPerformanceChat({ companyId, isOpen, onClose, performanceConte
                 body: { 
                     prompt: text, 
                     companyId,
-                    performanceContext: trimmedContext
+                    performanceContext: trimmedContext,
+                    isPerformanceChat: true
                 }
             });
 
