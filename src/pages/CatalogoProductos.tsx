@@ -27,12 +27,20 @@ export default function CatalogoProductos() {
     const [categorySearch, setCategorySearch] = useState('');
     const [editingId, setEditingId] = useState<string | null>(null);
     const [showForm, setShowForm] = useState(false);
-    // Quick-create type modal
     const [showTypeModal, setShowTypeModal] = useState(false);
     const [newTypeName, setNewTypeName] = useState('');
     const [newTypeColor, setNewTypeColor] = useState(PRESET_COLORS[0]);
     const [savingType, setSavingType] = useState(false);
     const { types, getName, getColor, reload: reloadTypes } = useItemTypes();
+
+    const [uiState, setUiState] = useState({
+        frecuencia_cobro: 'unico' as 'unico' | 'recurrente',
+        intervalo: 'mensual' as 'mensual' | 'anual',
+        precio_base: 0,
+        tiene_setup: false,
+        setup_fee: 0,
+        unidad_medida: ''
+    });
     
     // Filters
     const [filterTipo, setFilterTipo] = useState<string>('all');
@@ -98,6 +106,20 @@ export default function CatalogoProductos() {
     const handleEdit = (item: PricingItem) => {
         setEditingId(item.id);
         setFormData(item);
+        
+        const isRecurring = item.precio_mensual > 0 || item.precio_anual > 0;
+        const isAnnual = item.precio_anual > 0 && item.precio_mensual === 0;
+        const hasSetup = isRecurring && item.costo_unico > 0;
+        
+        setUiState({
+            frecuencia_cobro: isRecurring ? 'recurrente' : 'unico',
+            intervalo: isAnnual ? 'anual' : 'mensual',
+            precio_base: isRecurring ? (isAnnual ? item.precio_anual : item.precio_mensual) : item.costo_unico,
+            tiene_setup: hasSetup,
+            setup_fee: hasSetup ? item.costo_unico : 0,
+            unidad_medida: item.metadata?.unidad_medida || '',
+        });
+        
         setShowForm(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -125,14 +147,38 @@ export default function CatalogoProductos() {
             if (!formData.nombre?.trim()) return toast.error('El nombre es obligatorio');
             if (!profile?.company_id) return toast.error('Empresa no identificada');
 
-            const { id, created_at, updated_at, ...updateData } = formData as any;
+            const { id, created_at, updated_at, ...baseData } = formData as any;
+            
+            // Transform UI State to DB structure
+            let finalUpdate = { ...baseData };
+            
+            if (uiState.frecuencia_cobro === 'unico') {
+                finalUpdate.costo_unico = uiState.precio_base;
+                finalUpdate.precio_mensual = 0;
+                finalUpdate.precio_anual = 0;
+            } else {
+                if (uiState.intervalo === 'mensual') {
+                    finalUpdate.precio_mensual = uiState.precio_base;
+                    finalUpdate.precio_anual = 0;
+                } else {
+                    finalUpdate.precio_anual = uiState.precio_base;
+                    finalUpdate.precio_mensual = 0;
+                }
+                finalUpdate.costo_unico = uiState.tiene_setup ? uiState.setup_fee : 0;
+            }
+            
+            // Guardar unidad de medida en metadata
+            finalUpdate.metadata = {
+                ...(finalUpdate.metadata || {}),
+                unidad_medida: uiState.unidad_medida
+            };
 
             if (editingId) {
-                await pricingService.updatePricingItem(editingId, updateData);
+                await pricingService.updatePricingItem(editingId, finalUpdate);
                 toast.success('✅ Producto actualizado exitosamente');
             } else {
                 await pricingService.createPricingItem({
-                    ...updateData,
+                    ...finalUpdate,
                     company_id: profile.company_id,
                 } as any);
                 toast.success('✅ Producto creado exitosamente');
@@ -160,6 +206,14 @@ export default function CatalogoProductos() {
     const resetForm = () => {
         setEditingId(null);
         setShowForm(false);
+        setUiState({
+            frecuencia_cobro: 'unico',
+            intervalo: 'mensual',
+            precio_base: 0,
+            tiene_setup: false,
+            setup_fee: 0,
+            unidad_medida: ''
+        });
         setFormData({
             tipo: types[0]?.slug ?? 'modulo',
             nombre: '',
@@ -438,8 +492,7 @@ export default function CatalogoProductos() {
                                     <textarea
                                         value={formData.descripcion}
                                         onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                                        className="w-full border border-gray-200 rounded-xl p-4 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none text-gray-700 bg-gray-50/50 hover:bg-gray-50 focus:bg-white font-medium shadow-inner shadow-gray-50/50"
-                                        rows={4}
+                                        className="w-full border border-gray-200 rounded-xl p-4 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-y min-h-[120px] text-gray-700 bg-gray-50/50 hover:bg-gray-50 focus:bg-white font-medium shadow-inner shadow-gray-50/50"
                                         placeholder="Descripción visible en las cotizaciones para el cliente final..."
                                     />
                                 </div>
@@ -465,73 +518,84 @@ export default function CatalogoProductos() {
 
                             {/* Columna Derecha: Pricing & Settings */}
                             <div className="lg:col-span-6 space-y-6">
-                                {/* MODELO DE PRECIO — selector visual */}
-                                <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
-                                    <h4 className="text-xs font-black text-gray-500 mb-3 uppercase tracking-wider flex items-center gap-2">
-                                        <DollarSign className="w-3.5 h-3.5 text-green-500" /> Modelo de Precio
-                                    </h4>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                        {([
-                                            { value: 'precio_fijo',        label: 'Precio Fijo',    icon: '💰', hint: 'Honorario, proyecto' },
-                                            { value: 'por_hora',           label: 'Por Hora',       icon: '⏱️', hint: 'Consultoría, legal' },
-                                            { value: 'por_unidad',         label: 'Por Unidad',     icon: '📦', hint: 'Docs, productos' },
-                                            { value: 'suscripcion_mensual',label: 'Mensual',        icon: '🔁', hint: 'SaaS, mantenimiento' },
-                                            { value: 'suscripcion_anual',  label: 'Anual',          icon: '📅', hint: 'Licencia anual' },
-                                            { value: 'implementacion',     label: 'Setup+Recur.',  icon: '🚀', hint: 'Inicio + mensual' },
-                                        ] as const).map(m => (
-                                            <button
-                                                key={m.value}
-                                                type="button"
-                                                onClick={() => setFormData(prev => ({ ...prev, modelo_precio: m.value } as any))}
-                                                title={m.hint}
-                                                className={`p-3 rounded-xl border-2 text-left transition-all ${
-                                                    (formData as any).modelo_precio === m.value
-                                                        ? 'border-indigo-500 bg-indigo-50 shadow-[0_4px_20px_-4px_rgba(99,102,241,0.3)] scale-[1.02] transform'
-                                                        : 'border-gray-200 hover:border-gray-300 bg-white hover:shadow-md hover:-translate-y-0.5'
-                                                }`}
-                                            >
-                                                <div className="flex justify-between items-start mb-1">
-                                                    <span className="text-xl">{m.icon}</span>
-                                                    {(formData as any).modelo_precio === m.value && <CheckCircle className="w-4 h-4 text-indigo-600" />}
-                                                </div>
-                                                <p className={`text-[12px] font-black mt-1 ${ (formData as any).modelo_precio === m.value ? 'text-indigo-700' : 'text-gray-700' }`}>{m.label}</p>
-                                                <p className="text-[10px] text-gray-400 leading-tight mt-0.5">{m.hint}</p>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100">
+                                {/* HubSpot Style Pricing Editor */}
+                                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 shadow-sm">
                                     <h4 className="text-sm font-black text-gray-900 mb-4 flex items-center gap-2 uppercase tracking-wider">
-                                        <DollarSign className="w-4 h-4 text-green-500" /> Precios
+                                        <DollarSign className="w-4 h-4 text-green-500" /> Facturación
                                     </h4>
-                                    <div className="space-y-4">
+                                    
+                                    <div className="space-y-6">
+                                        {/* Frecuencia de Cobro */}
                                         <div>
-                                            <label className="text-xs font-bold text-gray-500 mb-1.5 block">Precio Anual / Fijo ($)</label>
-                                            <div className="relative">
-                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
-                                                <Input type="number" value={formData.precio_anual} onChange={(e) => setFormData({ ...formData, precio_anual: Number(e.target.value) })} className="pl-8 text-lg font-black text-gray-900 bg-white shadow-sm" />
+                                            <label className="text-xs font-bold text-gray-500 mb-2 block">Frecuencia de Cobro</label>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setUiState({...uiState, frecuencia_cobro: 'unico'})}
+                                                    className={`p-3 rounded-xl border-2 text-left transition-all ${uiState.frecuencia_cobro === 'unico' ? 'border-indigo-500 bg-indigo-50 shadow-[0_4px_15px_-3px_rgba(99,102,241,0.2)]' : 'border-gray-200 bg-white hover:border-gray-300'}`}
+                                                >
+                                                    <div className="flex justify-between items-start">
+                                                        <p className={`text-sm font-black ${uiState.frecuencia_cobro === 'unico' ? 'text-indigo-700' : 'text-gray-700'}`}>Pago Único</p>
+                                                        {uiState.frecuencia_cobro === 'unico' && <CheckCircle className="w-4 h-4 text-indigo-600" />}
+                                                    </div>
+                                                    <p className="text-[10px] text-gray-500 mt-0.5">Se cobra una sola vez</p>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setUiState({...uiState, frecuencia_cobro: 'recurrente'})}
+                                                    className={`p-3 rounded-xl border-2 text-left transition-all ${uiState.frecuencia_cobro === 'recurrente' ? 'border-indigo-500 bg-indigo-50 shadow-[0_4px_15px_-3px_rgba(99,102,241,0.2)]' : 'border-gray-200 bg-white hover:border-gray-300'}`}
+                                                >
+                                                    <div className="flex justify-between items-start">
+                                                        <p className={`text-sm font-black ${uiState.frecuencia_cobro === 'recurrente' ? 'text-indigo-700' : 'text-gray-700'}`}>Suscripción</p>
+                                                        {uiState.frecuencia_cobro === 'recurrente' && <CheckCircle className="w-4 h-4 text-indigo-600" />}
+                                                    </div>
+                                                    <p className="text-[10px] text-gray-500 mt-0.5">Cobro recurrente</p>
+                                                </button>
                                             </div>
                                         </div>
-                                        <div>
-                                            <label className="text-xs font-bold text-gray-500 mb-1.5 block">Precio Mensual / Por Hora ($)</label>
-                                            <div className="relative">
-                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
-                                                <Input type="number" value={formData.precio_mensual} onChange={(e) => setFormData({ ...formData, precio_mensual: Number(e.target.value) })} className="pl-8 text-lg font-black text-gray-900 bg-white shadow-sm" />
+
+                                        {uiState.frecuencia_cobro === 'recurrente' && (
+                                            <div className="animate-in fade-in slide-in-from-top-2">
+                                                <label className="text-xs font-bold text-gray-500 mb-2 block">Intervalo de Facturación</label>
+                                                <div className="flex gap-2">
+                                                    <button type="button" onClick={() => setUiState({...uiState, intervalo: 'mensual'})} className={`px-4 py-2 rounded-lg text-sm font-bold border ${uiState.intervalo === 'mensual' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200'}`}>Mensual</button>
+                                                    <button type="button" onClick={() => setUiState({...uiState, intervalo: 'anual'})} className={`px-4 py-2 rounded-lg text-sm font-bold border ${uiState.intervalo === 'anual' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200'}`}>Anual</button>
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
+
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
-                                                <label className="text-xs font-bold text-gray-500 mb-1.5 block">Costo Único / Setup ($)</label>
+                                                <label className="text-xs font-bold text-gray-500 mb-1.5 block">Precio Unitario ($)</label>
                                                 <div className="relative">
                                                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
-                                                    <Input type="number" value={formData.costo_unico} onChange={(e) => setFormData({ ...formData, costo_unico: Number(e.target.value) })} className="pl-8 font-bold bg-white shadow-sm" />
+                                                    <Input type="number" value={uiState.precio_base} onChange={(e) => setUiState({ ...uiState, precio_base: Number(e.target.value) })} className="pl-8 text-lg font-black text-gray-900 bg-white shadow-sm" />
                                                 </div>
                                             </div>
                                             <div>
-                                                <label className="text-xs font-bold text-gray-500 mb-1.5 block">SKU / Código (Opcional)</label>
-                                                <Input value={formData.codigo} onChange={(e) => setFormData({ ...formData, codigo: e.target.value })} placeholder="Ej. SKU-123" className="uppercase font-mono text-sm bg-gray-50 shadow-inner" />
+                                                <label className="text-xs font-bold text-gray-500 mb-1.5 block">Se cobra por (Opcional)</label>
+                                                <Input type="text" value={uiState.unidad_medida} onChange={(e) => setUiState({ ...uiState, unidad_medida: e.target.value })} placeholder="Ej: Hora, Usuario, Paquete..." className="bg-white shadow-sm" />
                                             </div>
+                                        </div>
+
+                                        {uiState.frecuencia_cobro === 'recurrente' && (
+                                            <div className="pt-4 border-t border-gray-200">
+                                                <label className="flex items-center gap-2 cursor-pointer mb-3">
+                                                    <input type="checkbox" checked={uiState.tiene_setup} onChange={(e) => setUiState({...uiState, tiene_setup: e.target.checked})} className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 border-gray-300" />
+                                                    <span className="text-sm font-bold text-gray-700">Agregar costo inicial (Setup Fee)</span>
+                                                </label>
+                                                {uiState.tiene_setup && (
+                                                    <div className="relative w-full sm:w-1/2 animate-in fade-in slide-in-from-top-1">
+                                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                                                        <Input type="number" value={uiState.setup_fee} onChange={(e) => setUiState({ ...uiState, setup_fee: Number(e.target.value) })} className="pl-8 font-bold bg-white" placeholder="Costo único" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        <div className="pt-4 border-t border-gray-200">
+                                            <label className="text-xs font-bold text-gray-500 mb-1.5 block">SKU / Código (Opcional)</label>
+                                            <Input value={formData.codigo} onChange={(e) => setFormData({ ...formData, codigo: e.target.value })} placeholder="Ej. SKU-123" className="uppercase font-mono text-sm bg-white shadow-inner max-w-[50%]" />
                                         </div>
                                     </div>
                                 </div>
@@ -622,29 +686,20 @@ export default function CatalogoProductos() {
                                         </td>
                                         <td className="py-4 px-6">
                                             {(() => {
-                                                const m = (item as any).modelo_precio || 'precio_fijo';
-                                                const MAP: Record<string,{label:string,color:string}> = {
-                                                    precio_fijo:         { label: 'Fijo',      color: '#6366f1' },
-                                                    por_hora:            { label: 'Por Hora',  color: '#f59e0b' },
-                                                    por_unidad:          { label: 'Por Unidad',color: '#10b981' },
-                                                    suscripcion_mensual: { label: 'Mensual',   color: '#3b82f6' },
-                                                    suscripcion_anual:   { label: 'Anual',     color: '#8b5cf6' },
-                                                    implementacion:      { label: 'Setup+',   color: '#ef4444' },
-                                                    por_volumen:         { label: 'Volumen',   color: '#14b8a6' },
-                                                };
-                                                const meta = MAP[m] || MAP.precio_fijo;
-                                                return (
-                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black" style={{ backgroundColor: `${meta.color}15`, color: meta.color }}>
-                                                        {meta.label}
-                                                    </span>
+                                                const isRecurring = item.precio_mensual > 0 || item.precio_anual > 0;
+                                                return isRecurring ? (
+                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-50 text-indigo-600">Suscripción</span>
+                                                ) : (
+                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-600">Pago Único</span>
                                                 );
                                             })()}
                                         </td>
                                         <td className="py-4 px-6 text-right">
                                             <div className="text-right">
-                                                {item.precio_anual > 0 && <p className="text-sm font-black text-gray-900">${item.precio_anual.toLocaleString()}<span className="text-xs font-normal text-gray-400">/año</span></p>}
-                                                {item.precio_mensual > 0 && <p className="text-sm font-bold text-gray-500">${item.precio_mensual.toLocaleString()}<span className="text-xs font-normal text-gray-400">/mes</span></p>}
-                                                {item.costo_unico > 0 && <p className="text-sm font-bold text-amber-600">${item.costo_unico.toLocaleString()}<span className="text-xs font-normal text-gray-400"> único</span></p>}
+                                                {item.precio_anual > 0 && <p className="text-sm font-black text-gray-900">${item.precio_anual.toLocaleString()}<span className="text-xs font-normal text-gray-400"> {item.metadata?.unidad_medida ? `por ${item.metadata.unidad_medida}/año` : '/año'}</span></p>}
+                                                {item.precio_mensual > 0 && <p className="text-sm font-bold text-gray-500">${item.precio_mensual.toLocaleString()}<span className="text-xs font-normal text-gray-400"> {item.metadata?.unidad_medida ? `por ${item.metadata.unidad_medida}/mes` : '/mes'}</span></p>}
+                                                {item.costo_unico > 0 && item.precio_mensual === 0 && item.precio_anual === 0 && <p className="text-sm font-black text-gray-900">${item.costo_unico.toLocaleString()}<span className="text-xs font-normal text-gray-400"> {item.metadata?.unidad_medida ? `por ${item.metadata.unidad_medida}` : ''}</span></p>}
+                                                {item.costo_unico > 0 && (item.precio_mensual > 0 || item.precio_anual > 0) && <p className="text-sm font-bold text-amber-600">+ ${item.costo_unico.toLocaleString()}<span className="text-xs font-normal text-amber-600/70"> setup</span></p>}
                                             </div>
                                         </td>
                                         <td className="py-4 px-6 text-center">
