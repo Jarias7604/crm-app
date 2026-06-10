@@ -318,35 +318,42 @@ export default function CatalogoProductos() {
             {showForm && (
                 <div className="fixed inset-0 z-[100] flex justify-end">
                     {/* Backdrop */}
-                    <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm transition-opacity" onClick={resetForm} />
+                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] transition-opacity" onClick={resetForm} />
 
                     {/* Drawer Content */}
-                    <div className="relative w-full max-w-[850px] h-full bg-white shadow-2xl flex flex-col animate-in slide-in-from-right-8 fade-in duration-300 border-l border-gray-200">
+                    <div className="relative w-full sm:w-[560px] max-w-xl h-full bg-[#F8FAFC] shadow-[0_8px_40px_rgba(0,0,0,0.12)] flex flex-col animate-in slide-in-from-right-8 fade-in duration-300 border-l border-slate-200/60 overflow-hidden">
                         
-                        {/* Drawer Header */}
-                        <div className="bg-gradient-to-r from-[#f8fafc] to-white border-b border-gray-100 p-5 flex justify-between items-center shrink-0">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center">
-                                    {editingId ? <Edit className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-black text-gray-900 leading-tight">
-                                        {editingId ? 'Editar Producto' : 'Crear Nuevo Producto'}
-                                    </h3>
-                                    <p className="text-xs text-gray-500 font-medium">Configura los detalles comerciales y de facturación</p>
+                        {/* Header Premium (Dark Mode Style) */}
+                        <div className="px-6 py-7 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 flex justify-between items-center relative z-30 shadow-md shrink-0">
+                            {/* Decorative background glow */}
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none -mr-10 -mt-10"></div>
+                            <div className="relative z-10 flex-1">
+                                <div className="flex items-center gap-4 mb-2">
+                                    <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-xl flex items-center justify-center text-white shadow-lg ring-4 ring-indigo-500/30">
+                                        {editingId ? <Edit className="w-6 h-6" /> : <Plus className="w-6 h-6" />}
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="text-2xl font-black text-white tracking-tight">
+                                            {editingId ? 'Editar Producto' : 'Nuevo Producto'}
+                                        </h3>
+                                        <p className="text-[14px] font-bold text-indigo-200 mt-1">Configura detalles comerciales</p>
+                                    </div>
                                 </div>
                             </div>
-                            <button onClick={resetForm} className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors focus:outline-none">
-                                <X className="w-5 h-5" />
-                            </button>
+                            <div className="flex flex-col items-center gap-3 relative z-10 ml-4 self-start">
+                                <button
+                                    onClick={resetForm}
+                                    className="p-2 bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700 rounded-xl transition-all border border-slate-700 shadow-sm active:scale-95"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Drawer Body */}
-                        <div className="p-6 overflow-y-auto flex-1">
-                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                            {/* Columna Izquierda: Info General */}
-                            <div className="lg:col-span-6 space-y-6">
-                                <div className="space-y-6">
+                        <div className="p-6 overflow-y-auto flex-1 space-y-6 custom-scrollbar">
+                            {/* General Info */}
+                            <div className="bg-white rounded-2xl p-6 border border-slate-200/60 shadow-sm space-y-6">
                                     <div className="space-y-1.5">
                                         <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
                                             <Tag className="w-4 h-4 text-gray-400" /> Nombre del Producto <span className="text-red-500">*</span>
@@ -485,7 +492,6 @@ export default function CatalogoProductos() {
                                             )}
                                         </div>
                                     </div>
-                                </div>
 
                                 <div className="space-y-1.5">
                                     <label className="text-sm font-bold text-gray-700">Descripción Comercial</label>
@@ -498,7 +504,7 @@ export default function CatalogoProductos() {
                                 </div>
                                 
                                 {formData.tipo === 'plan' && (
-                                    <div className="bg-amber-50 rounded-xl border border-amber-100 p-5">
+                                    <div className="bg-amber-50 rounded-xl border border-amber-100 p-5 mt-6">
                                         <h4 className="text-sm font-bold text-amber-800 mb-4 flex items-center gap-2">
                                             <Zap className="w-4 h-4" /> Configuración de Volumen (Rango DTEs)
                                         </h4>
@@ -516,10 +522,8 @@ export default function CatalogoProductos() {
                                 )}
                             </div>
 
-                            {/* Columna Derecha: Pricing & Settings */}
-                            <div className="lg:col-span-6 space-y-6">
-                                {/* HubSpot Style Pricing Editor */}
-                                <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 shadow-sm">
+                            {/* Pricing & Settings */}
+                            <div className="bg-white rounded-2xl p-6 border border-slate-200/60 shadow-sm space-y-6">
                                     <h4 className="text-sm font-black text-gray-900 mb-4 flex items-center gap-2 uppercase tracking-wider">
                                         <DollarSign className="w-4 h-4 text-green-500" /> Facturación
                                     </h4>
@@ -595,33 +599,31 @@ export default function CatalogoProductos() {
 
                                         <div className="pt-4 border-t border-gray-200">
                                             <label className="text-xs font-bold text-gray-500 mb-1.5 block">SKU / Código (Opcional)</label>
-                                            <Input value={formData.codigo} onChange={(e) => setFormData({ ...formData, codigo: e.target.value })} placeholder="Ej. SKU-123" className="uppercase font-mono text-sm bg-white shadow-inner max-w-[50%]" />
+                                            <Input value={formData.codigo} onChange={(e) => setFormData({ ...formData, codigo: e.target.value })} placeholder="Ej. SKU-123" className="uppercase font-mono text-sm bg-gray-50 shadow-inner max-w-[50%]" />
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl">
+                                <div className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
                                     <div>
-                                        <p className="font-bold text-gray-900 text-sm">Estado del Producto</p>
-                                        <p className="text-xs text-gray-500">Disponible para cotizar</p>
+                                        <h4 className="text-sm font-bold text-gray-900">Estado del Producto</h4>
+                                        <p className="text-[11px] text-gray-500 mt-0.5">Disponible para cotizar</p>
                                     </div>
-                                    <label className="relative inline-flex items-center cursor-pointer">
-                                        <input type="checkbox" className="sr-only peer" checked={formData.activo} onChange={(e) => setFormData({ ...formData, activo: e.target.checked })} />
-                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
-                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData({ ...formData, activo: !formData.activo })}
+                                        className={`w-12 h-6 rounded-full transition-colors relative shadow-inner ${formData.activo ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                    >
+                                        <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-all shadow-sm ${formData.activo ? 'left-7' : 'left-1'}`} />
+                                    </button>
                                 </div>
                             </div>
-                        </div>
-                    </div>
                         
                         {/* Drawer Footer */}
-                        <div className="bg-gray-50 p-5 flex justify-end gap-3 border-t border-gray-100 shrink-0">
-                            <Button onClick={resetForm} variant="outline" className="px-6 rounded-xl font-bold bg-white">
-                                Cancelar
-                            </Button>
-                            <Button onClick={handleSave} className="bg-[#007BFF] hover:bg-blue-600 text-white px-8 rounded-xl shadow-lg shadow-blue-500/30">
-                                <Save className="w-4 h-4 mr-2" />
-                                <span className="font-bold">Guardar Producto</span>
+                        <div className="p-5 border-t border-gray-100 bg-white flex justify-end gap-3 shrink-0">
+                            <Button onClick={resetForm} variant="outline" className="text-sm font-bold h-11 px-6 rounded-xl hover:bg-gray-50">Cancelar</Button>
+                            <Button onClick={handleSave} className="text-sm font-bold bg-indigo-600 hover:bg-indigo-700 h-11 px-8 rounded-xl shadow-md">
+                                <Save className="w-4 h-4 mr-2" /> Guardar Producto
                             </Button>
                         </div>
                     </div>
