@@ -351,278 +351,288 @@ export default function CatalogoProductos() {
                         </div>
 
                         {/* Drawer Body */}
-                        <div className="p-6 overflow-y-auto flex-1 space-y-6 custom-scrollbar">
-                            {/* General Info */}
-                            <div className="bg-white rounded-2xl p-6 border border-slate-200/60 shadow-sm space-y-6">
-                                    <div className="space-y-1.5">
-                                        <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                                            <Tag className="w-4 h-4 text-gray-400" /> Nombre del Producto <span className="text-red-500">*</span>
-                                        </label>
-                                        <Input
-                                            value={formData.nombre}
-                                            onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                                            placeholder="Ej. Sistema ERP Pro, Licencia Mensual..."
-                                            className="h-12 text-lg font-medium"
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-sm font-bold text-gray-700 flex items-center justify-between">
-                                            <span className="flex items-center gap-2"><Layers className="w-4 h-4 text-gray-400" /> Tipo / Categoría</span>
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowTypeModal(v => !v)}
-                                                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-bold hover:underline"
-                                            >
-                                                <Plus className="w-3.5 h-3.5" /> Nueva categoría
-                                            </button>
-                                        </label>
-                                        <div className="relative">
-                                            <button
-                                                type="button"
-                                                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                                className={`w-full h-12 border ${isDropdownOpen ? 'border-blue-500 ring-2 ring-blue-500/20 bg-white' : 'border-gray-200 bg-gray-50/50 hover:bg-white'} rounded-xl px-4 transition-all font-semibold text-gray-700 flex items-center justify-between shadow-sm`}
-                                            >
-                                                {(() => {
-                                                    const selectedType = types.find(t => t.slug === formData.tipo);
-                                                    return selectedType ? (
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: selectedType.color }}></span>
-                                                            <span>{selectedType.name}</span>
+                        <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                                {/* Left Column: General Info */}
+                                <div className="lg:col-span-6 space-y-6">
+                                    <div className="bg-white rounded-2xl p-6 border border-slate-200/60 shadow-sm space-y-6">
+                                        <div className="space-y-1.5">
+                                            <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
+                                                <Tag className="w-4 h-4 text-gray-400" /> Nombre del Producto <span className="text-red-500">*</span>
+                                            </label>
+                                            <Input
+                                                value={formData.nombre}
+                                                onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                                                placeholder="Ej. Sistema ERP Pro, Licencia Mensual..."
+                                                className="h-12 text-lg font-medium"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-sm font-bold text-gray-700 flex items-center justify-between">
+                                                <span className="flex items-center gap-2"><Layers className="w-4 h-4 text-gray-400" /> Tipo / Categoría</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowTypeModal(v => !v)}
+                                                    className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-bold hover:underline"
+                                                >
+                                                    <Plus className="w-3.5 h-3.5" /> Nueva categoría
+                                                </button>
+                                            </label>
+                                            <div className="relative">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                                                    className={`w-full h-12 border ${isDropdownOpen ? 'border-blue-500 ring-2 ring-blue-500/20 bg-white' : 'border-gray-200 bg-gray-50/50 hover:bg-white'} rounded-xl px-4 transition-all font-semibold text-gray-700 flex items-center justify-between shadow-sm`}
+                                                >
+                                                    {(() => {
+                                                        const selectedType = types.find(t => t.slug === formData.tipo);
+                                                        return selectedType ? (
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: selectedType.color }}></span>
+                                                                {selectedType.name}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-gray-400">Selecciona el tipo...</span>
+                                                        );
+                                                    })()}
+                                                    <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                                                </button>
+
+                                                {isDropdownOpen && (
+                                                    <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-white border border-gray-100 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                                                        <div className="relative mb-2 px-2 pt-2">
+                                                            <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Buscar categoría..."
+                                                                value={searchTerm}
+                                                                onChange={(e) => setSearchTerm(e.target.value)}
+                                                                className="w-full bg-gray-50 border-0 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+                                                                autoFocus
+                                                            />
                                                         </div>
-                                                    ) : (
-                                                        <span className="text-gray-400 font-normal">Seleccionar categoría...</span>
-                                                    );
-                                                })()}
-                                                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                                            </button>
-
-                                            {isDropdownOpen && (
-                                                <div className="absolute top-[calc(100%+8px)] left-0 right-0 z-40 bg-white rounded-2xl border border-gray-100 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] p-2 animate-in fade-in slide-in-from-top-2 duration-200">
-                                                    <div className="relative mb-2 px-2 pt-2">
-                                                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Buscar categoría..."
-                                                            value={categorySearch}
-                                                            onChange={e => setCategorySearch(e.target.value)}
-                                                            className="w-full h-9 pl-9 pr-4 text-sm font-medium bg-gray-50 border-none rounded-lg focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none"
-                                                            onClick={e => e.stopPropagation()}
-                                                        />
-                                                    </div>
-                                                    <div className="max-h-56 overflow-y-auto p-1 space-y-1 scrollbar-thin">
-                                                        {types.filter(t => t.name.toLowerCase().includes(categorySearch.toLowerCase())).map(t => (
-                                                            <button
-                                                                key={t.slug}
-                                                                type="button"
-                                                                onClick={() => { setFormData({ ...formData, tipo: t.slug as any }); setIsDropdownOpen(false); setCategorySearch(''); }}
-                                                                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${formData.tipo === t.slug ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-50 text-gray-700'}`}
-                                                            >
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: t.color }}></span>
-                                                                    {t.name}
-                                                                </div>
-                                                                {formData.tipo === t.slug && <CheckCircle className="w-4 h-4 text-blue-600" />}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                    <div className="p-2 border-t border-gray-100 mt-1">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => { setIsDropdownOpen(false); setShowTypeModal(true); }}
-                                                            className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition-all"
-                                                        >
-                                                            <Plus className="w-4 h-4" /> Crear nueva categoría
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Mini-modal crear categoría */}
-                                            {showTypeModal && (
-                                                <div className="absolute top-[calc(100%+8px)] left-0 right-0 z-50 bg-white rounded-2xl border border-indigo-100 shadow-2xl shadow-indigo-900/15 p-5 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                                                    <div className="flex items-center justify-between">
-                                                        <p className="text-sm font-black text-gray-900">Nueva Categoría</p>
-                                                        <button onClick={() => setShowTypeModal(false)} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100">
-                                                            <X className="w-4 h-4" />
-                                                        </button>
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-xs font-bold text-gray-600 mb-1.5">Nombre *</label>
-                                                        <Input
-                                                            value={newTypeName}
-                                                            onChange={e => setNewTypeName(e.target.value)}
-                                                            placeholder="Ej. Consultoría, Licencia, Activo..."
-                                                            onKeyDown={e => e.key === 'Enter' && handleQuickCreateType()}
-                                                            autoFocus
-                                                            className="text-sm"
-                                                        />
-                                                    </div>
-                                                    <div>
-                                                        <label className="block text-xs font-bold text-gray-600 mb-2">Color del badge</label>
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {PRESET_COLORS.map(c => (
+                                                        <div className="max-h-56 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+                                                            {types.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase())).map(type => (
                                                                 <button
-                                                                    key={c}
+                                                                    key={type.slug}
                                                                     type="button"
-                                                                    onClick={() => setNewTypeColor(c)}
-                                                                    className="w-6 h-6 rounded-full transition-transform hover:scale-110 border-2"
-                                                                    style={{
-                                                                        backgroundColor: c,
-                                                                        borderColor: newTypeColor === c ? '#1e293b' : 'transparent',
-                                                                        boxShadow: newTypeColor === c ? '0 0 0 2px white, 0 0 0 3px #1e293b' : 'none',
+                                                                    onClick={() => {
+                                                                        setFormData({ ...formData, tipo: type.slug });
+                                                                        setIsDropdownOpen(false);
                                                                     }}
-                                                                />
+                                                                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${formData.tipo === type.slug ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-700 hover:bg-gray-50 font-medium'}`}
+                                                                >
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: type.color }}></span>
+                                                                        {type.name}
+                                                                    </div>
+                                                                    {formData.tipo === type.slug && <CheckCircle className="w-4 h-4 text-blue-600" />}
+                                                                </button>
                                                             ))}
                                                         </div>
-                                                        <div className="mt-2 flex items-center gap-2">
-                                                            <span className="text-xs text-gray-400">Vista previa:</span>
-                                                            <span className="px-2.5 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: `${newTypeColor}20`, color: newTypeColor }}>
-                                                                {newTypeName || 'Mi Tipo'}
-                                                            </span>
+                                                        <div className="p-2 border-t border-gray-100 bg-gray-50/50">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setIsDropdownOpen(false);
+                                                                    setShowTypeModal(true);
+                                                                }}
+                                                                className="w-full flex items-center gap-2 justify-center py-2 text-sm font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                                                            >
+                                                                <Plus className="w-4 h-4" /> Crear nueva categoría
+                                                            </button>
                                                         </div>
                                                     </div>
-                                                    <Button
-                                                        onClick={handleQuickCreateType}
-                                                        disabled={savingType}
-                                                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl h-10"
-                                                    >
-                                                        {savingType ? 'Creando...' : '+ Crear y Seleccionar'}
-                                                    </Button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
+                                                )}
 
-                                <div className="space-y-1.5">
-                                    <label className="text-sm font-bold text-gray-700">Descripción Comercial</label>
-                                    <textarea
-                                        value={formData.descripcion}
-                                        onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                                        className="w-full border border-gray-200 rounded-xl p-4 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-y min-h-[120px] text-gray-700 bg-gray-50/50 hover:bg-gray-50 focus:bg-white font-medium shadow-inner shadow-gray-50/50"
-                                        placeholder="Descripción visible en las cotizaciones para el cliente final..."
-                                    />
-                                </div>
-                                
-                                {formData.tipo === 'plan' && (
-                                    <div className="bg-amber-50 rounded-xl border border-amber-100 p-5 mt-6">
-                                        <h4 className="text-sm font-bold text-amber-800 mb-4 flex items-center gap-2">
-                                            <Zap className="w-4 h-4" /> Configuración de Volumen (Rango DTEs)
-                                        </h4>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="text-xs font-bold text-amber-700 mb-1 block">Volumen Mínimo</label>
-                                                <Input type="number" value={formData.min_dtes} onChange={e => setFormData({...formData, min_dtes: Number(e.target.value)})} className="bg-white border-amber-200" />
-                                            </div>
-                                            <div>
-                                                <label className="text-xs font-bold text-amber-700 mb-1 block">Volumen Máximo</label>
-                                                <Input type="number" value={formData.max_dtes} onChange={e => setFormData({...formData, max_dtes: Number(e.target.value)})} className="bg-white border-amber-200" />
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Pricing & Settings */}
-                            <div className="bg-white rounded-2xl p-6 border border-slate-200/60 shadow-sm space-y-6">
-                                    <h4 className="text-sm font-black text-gray-900 mb-4 flex items-center gap-2 uppercase tracking-wider">
-                                        <DollarSign className="w-4 h-4 text-green-500" /> Facturación
-                                    </h4>
-                                    
-                                    <div className="space-y-6">
-                                        {/* Frecuencia de Cobro */}
-                                        <div>
-                                            <label className="text-xs font-bold text-gray-500 mb-2 block">Frecuencia de Cobro</label>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setUiState({...uiState, frecuencia_cobro: 'unico'})}
-                                                    className={`p-3 rounded-xl border-2 text-left transition-all ${uiState.frecuencia_cobro === 'unico' ? 'border-indigo-500 bg-indigo-50 shadow-[0_4px_15px_-3px_rgba(99,102,241,0.2)]' : 'border-gray-200 bg-white hover:border-gray-300'}`}
-                                                >
-                                                    <div className="flex justify-between items-start">
-                                                        <p className={`text-sm font-black ${uiState.frecuencia_cobro === 'unico' ? 'text-indigo-700' : 'text-gray-700'}`}>Pago Único</p>
-                                                        {uiState.frecuencia_cobro === 'unico' && <CheckCircle className="w-4 h-4 text-indigo-600" />}
-                                                    </div>
-                                                    <p className="text-[10px] text-gray-500 mt-0.5">Se cobra una sola vez</p>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setUiState({...uiState, frecuencia_cobro: 'recurrente'})}
-                                                    className={`p-3 rounded-xl border-2 text-left transition-all ${uiState.frecuencia_cobro === 'recurrente' ? 'border-indigo-500 bg-indigo-50 shadow-[0_4px_15px_-3px_rgba(99,102,241,0.2)]' : 'border-gray-200 bg-white hover:border-gray-300'}`}
-                                                >
-                                                    <div className="flex justify-between items-start">
-                                                        <p className={`text-sm font-black ${uiState.frecuencia_cobro === 'recurrente' ? 'text-indigo-700' : 'text-gray-700'}`}>Suscripción</p>
-                                                        {uiState.frecuencia_cobro === 'recurrente' && <CheckCircle className="w-4 h-4 text-indigo-600" />}
-                                                    </div>
-                                                    <p className="text-[10px] text-gray-500 mt-0.5">Cobro recurrente</p>
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        {uiState.frecuencia_cobro === 'recurrente' && (
-                                            <div className="animate-in fade-in slide-in-from-top-2">
-                                                <label className="text-xs font-bold text-gray-500 mb-2 block">Intervalo de Facturación</label>
-                                                <div className="flex gap-2">
-                                                    <button type="button" onClick={() => setUiState({...uiState, intervalo: 'mensual'})} className={`px-4 py-2 rounded-lg text-sm font-bold border ${uiState.intervalo === 'mensual' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200'}`}>Mensual</button>
-                                                    <button type="button" onClick={() => setUiState({...uiState, intervalo: 'anual'})} className={`px-4 py-2 rounded-lg text-sm font-bold border ${uiState.intervalo === 'anual' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200'}`}>Anual</button>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="text-xs font-bold text-gray-500 mb-1.5 block">Precio Unitario ($)</label>
-                                                <div className="relative">
-                                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
-                                                    <Input type="number" value={uiState.precio_base} onChange={(e) => setUiState({ ...uiState, precio_base: Number(e.target.value) })} className="pl-8 text-lg font-black text-gray-900 bg-white shadow-sm" />
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <label className="text-xs font-bold text-gray-500 mb-1.5 block">Se cobra por (Opcional)</label>
-                                                <Input type="text" value={uiState.unidad_medida} onChange={(e) => setUiState({ ...uiState, unidad_medida: e.target.value })} placeholder="Ej: Hora, Usuario, Paquete..." className="bg-white shadow-sm" />
-                                            </div>
-                                        </div>
-
-                                        {uiState.frecuencia_cobro === 'recurrente' && (
-                                            <div className="pt-4 border-t border-gray-200">
-                                                <label className="flex items-center gap-2 cursor-pointer mb-3">
-                                                    <input type="checkbox" checked={uiState.tiene_setup} onChange={(e) => setUiState({...uiState, tiene_setup: e.target.checked})} className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 border-gray-300" />
-                                                    <span className="text-sm font-bold text-gray-700">Agregar costo inicial (Setup Fee)</span>
-                                                </label>
-                                                {uiState.tiene_setup && (
-                                                    <div className="relative w-full sm:w-1/2 animate-in fade-in slide-in-from-top-1">
-                                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
-                                                        <Input type="number" value={uiState.setup_fee} onChange={(e) => setUiState({ ...uiState, setup_fee: Number(e.target.value) })} className="pl-8 font-bold bg-white" placeholder="Costo único" />
+                                                {/* Mini-modal crear categoría */}
+                                                {showTypeModal && (
+                                                    <div className="absolute top-[calc(100%+8px)] left-0 w-full bg-white border border-gray-200 rounded-xl shadow-xl z-50 p-4 animate-in fade-in zoom-in-95">
+                                                        <div className="flex items-center justify-between mb-4">
+                                                            <p className="font-bold text-gray-900 text-sm">Nueva Categoría</p>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setShowTypeModal(false)}
+                                                                className="text-gray-400 hover:text-gray-600 p-1"
+                                                            >
+                                                                <X className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                        <div className="space-y-4">
+                                                            <div>
+                                                                <label className="text-xs font-bold text-gray-500 mb-1 block">Nombre *</label>
+                                                                <Input
+                                                                    value={newTypeName}
+                                                                    onChange={(e) => setNewTypeName(e.target.value)}
+                                                                    placeholder="Ej. Hosting, Desarrollo..."
+                                                                    className="h-9 text-sm"
+                                                                    autoFocus
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="text-xs font-bold text-gray-500 mb-1.5 block">Color Visual</label>
+                                                                <div className="flex gap-2 flex-wrap">
+                                                                    {PRESET_COLORS.map(color => (
+                                                                        <button
+                                                                            key={color}
+                                                                            type="button"
+                                                                            onClick={() => setNewTypeColor(color)}
+                                                                            className={`w-6 h-6 rounded-full transition-transform ${newTypeColor === color ? 'scale-125 ring-2 ring-offset-2 ring-gray-400 shadow-md' : 'hover:scale-110'}`}
+                                                                            style={{ backgroundColor: color }}
+                                                                        />
+                                                                    ))}
+                                                                </div>
+                                                                <div className="mt-3 flex items-center gap-2">
+                                                                    <span className="text-xs text-gray-500">Preview:</span>
+                                                                    <span className="px-2 py-0.5 rounded-full text-xs font-bold" style={{ backgroundColor: `${newTypeColor}20`, color: newTypeColor }}>
+                                                                        {newTypeName || 'Mi Tipo'}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            <Button
+                                                                onClick={handleQuickCreateType}
+                                                                disabled={savingType}
+                                                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl h-10"
+                                                            >
+                                                                {savingType ? 'Creando...' : '+ Crear y Seleccionar'}
+                                                            </Button>
+                                                        </div>
                                                     </div>
                                                 )}
                                             </div>
-                                        )}
-
-                                        <div className="pt-4 border-t border-gray-200">
-                                            <label className="text-xs font-bold text-gray-500 mb-1.5 block">SKU / Código (Opcional)</label>
-                                            <Input value={formData.codigo} onChange={(e) => setFormData({ ...formData, codigo: e.target.value })} placeholder="Ej. SKU-123" className="uppercase font-mono text-sm bg-gray-50 shadow-inner max-w-[50%]" />
                                         </div>
                                     </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="text-sm font-bold text-gray-700">Descripción Comercial</label>
+                                        <textarea
+                                            value={formData.descripcion}
+                                            onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                                            className="w-full border border-gray-200 rounded-xl p-4 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-y min-h-[120px] text-gray-700 bg-gray-50/50 hover:bg-gray-50 focus:bg-white font-medium shadow-inner shadow-gray-50/50"
+                                            placeholder="Descripción visible en las cotizaciones para el cliente final..."
+                                        />
+                                    </div>
+                                    
+                                    {formData.tipo === 'plan' && (
+                                        <div className="bg-amber-50 rounded-xl border border-amber-100 p-5 mt-6">
+                                            <h4 className="text-sm font-bold text-amber-800 mb-4 flex items-center gap-2">
+                                                <Zap className="w-4 h-4" /> Configuración de Volumen (Rango DTEs)
+                                            </h4>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="text-xs font-bold text-amber-700 mb-1 block">Volumen Mínimo</label>
+                                                    <Input type="number" value={formData.min_dtes} onChange={e => setFormData({...formData, min_dtes: Number(e.target.value)})} className="bg-white border-amber-200" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-bold text-amber-700 mb-1 block">Volumen Máximo</label>
+                                                    <Input type="number" value={formData.max_dtes} onChange={e => setFormData({...formData, max_dtes: Number(e.target.value)})} className="bg-white border-amber-200" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
-                                <div className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
-                                    <div>
-                                        <h4 className="text-sm font-bold text-gray-900">Estado del Producto</h4>
-                                        <p className="text-[11px] text-gray-500 mt-0.5">Disponible para cotizar</p>
+                                {/* Right Column: Pricing & Settings */}
+                                <div className="lg:col-span-6 space-y-6">
+                                    <div className="bg-white rounded-2xl p-6 border border-slate-200/60 shadow-sm space-y-6">
+                                        <h4 className="text-sm font-black text-gray-900 mb-4 flex items-center gap-2 uppercase tracking-wider">
+                                            <DollarSign className="w-4 h-4 text-green-500" /> Facturación
+                                        </h4>
+                                        
+                                        <div className="space-y-6">
+                                            {/* Frecuencia de Cobro */}
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-500 mb-2 block">Frecuencia de Cobro</label>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setUiState({...uiState, frecuencia_cobro: 'unico'})}
+                                                        className={`p-3 rounded-xl border-2 text-left transition-all ${uiState.frecuencia_cobro === 'unico' ? 'border-indigo-500 bg-indigo-50 shadow-[0_4px_15px_-3px_rgba(99,102,241,0.2)]' : 'border-gray-200 bg-white hover:border-gray-300'}`}
+                                                    >
+                                                        <p className={`text-sm font-black ${uiState.frecuencia_cobro === 'unico' ? 'text-indigo-700' : 'text-gray-700'}`}>Pago Único</p>
+                                                        <p className="text-[10px] text-gray-500 mt-0.5">Se cobra una sola vez</p>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setUiState({...uiState, frecuencia_cobro: 'recurrente'})}
+                                                        className={`p-3 rounded-xl border-2 text-left transition-all ${uiState.frecuencia_cobro === 'recurrente' ? 'border-indigo-500 bg-indigo-50 shadow-[0_4px_15px_-3px_rgba(99,102,241,0.2)]' : 'border-gray-200 bg-white hover:border-gray-300'}`}
+                                                    >
+                                                        <div className="flex justify-between items-start">
+                                                            <p className={`text-sm font-black ${uiState.frecuencia_cobro === 'recurrente' ? 'text-indigo-700' : 'text-gray-700'}`}>Suscripción</p>
+                                                            {uiState.frecuencia_cobro === 'recurrente' && <CheckCircle className="w-4 h-4 text-indigo-600" />}
+                                                        </div>
+                                                        <p className="text-[10px] text-gray-500 mt-0.5">Cobro recurrente</p>
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {uiState.frecuencia_cobro === 'recurrente' && (
+                                                <div className="animate-in fade-in slide-in-from-top-2">
+                                                    <label className="text-xs font-bold text-gray-500 mb-2 block">Intervalo de Facturación</label>
+                                                    <div className="flex gap-2">
+                                                        <button type="button" onClick={() => setUiState({...uiState, intervalo: 'mensual'})} className={`px-4 py-2 rounded-lg text-sm font-bold border ${uiState.intervalo === 'mensual' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200'}`}>Mensual</button>
+                                                        <button type="button" onClick={() => setUiState({...uiState, intervalo: 'anual'})} className={`px-4 py-2 rounded-lg text-sm font-bold border ${uiState.intervalo === 'anual' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200'}`}>Anual</button>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="text-xs font-bold text-gray-500 mb-1.5 block">Precio Unitario ($)</label>
+                                                    <div className="relative">
+                                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                                                        <Input type="number" value={uiState.precio_base} onChange={(e) => setUiState({ ...uiState, precio_base: Number(e.target.value) })} className="pl-8 text-lg font-black text-gray-900 bg-white shadow-sm" />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-bold text-gray-500 mb-1.5 block">Se cobra por (Opcional)</label>
+                                                    <Input type="text" value={uiState.unidad_medida} onChange={(e) => setUiState({ ...uiState, unidad_medida: e.target.value })} placeholder="Ej: Hora, Usuario, Paquete..." className="bg-white shadow-sm" />
+                                                </div>
+                                            </div>
+
+                                            {uiState.frecuencia_cobro === 'recurrente' && (
+                                                <div className="pt-4 border-t border-gray-200">
+                                                    <label className="flex items-center gap-2 cursor-pointer mb-3">
+                                                        <input type="checkbox" checked={uiState.tiene_setup} onChange={(e) => setUiState({...uiState, tiene_setup: e.target.checked})} className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 border-gray-300" />
+                                                        <span className="text-sm font-bold text-gray-700">Agregar costo inicial (Setup Fee)</span>
+                                                    </label>
+                                                    {uiState.tiene_setup && (
+                                                        <div className="relative w-full sm:w-1/2 animate-in fade-in slide-in-from-top-1">
+                                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                                                            <Input type="number" value={uiState.setup_fee} onChange={(e) => setUiState({ ...uiState, setup_fee: Number(e.target.value) })} className="pl-8 font-bold bg-white" placeholder="Costo único" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            <div className="pt-4 border-t border-gray-200">
+                                                <label className="text-xs font-bold text-gray-500 mb-1.5 block">SKU / Código (Opcional)</label>
+                                                <Input value={formData.codigo} onChange={(e) => setFormData({ ...formData, codigo: e.target.value })} placeholder="Ej. SKU-123" className="uppercase font-mono text-sm bg-gray-50 shadow-inner max-w-[50%]" />
+                                            </div>
+                                        </div>
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setFormData({ ...formData, activo: !formData.activo })}
-                                        className={`w-12 h-6 rounded-full transition-colors relative shadow-inner ${formData.activo ? 'bg-emerald-500' : 'bg-gray-300'}`}
-                                    >
-                                        <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-all shadow-sm ${formData.activo ? 'left-7' : 'left-1'}`} />
-                                    </button>
+
+                                    <div className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
+                                        <div>
+                                            <h4 className="text-sm font-bold text-gray-900">Estado del Producto</h4>
+                                            <p className="text-[11px] text-gray-500 mt-0.5">Disponible para cotizar</p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData({ ...formData, activo: !formData.activo })}
+                                            className={`w-12 h-6 rounded-full transition-colors relative shadow-inner ${formData.activo ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                        >
+                                            <div className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-all shadow-sm ${formData.activo ? 'left-7' : 'left-1'}`} />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        
+                        </div>
+
                         {/* Drawer Footer */}
                         <div className="p-5 border-t border-gray-100 bg-white flex justify-end gap-3 shrink-0">
-                            <Button onClick={resetForm} variant="outline" className="text-sm font-bold h-11 px-6 rounded-xl hover:bg-gray-50">Cancelar</Button>
-                            <Button onClick={handleSave} className="text-sm font-bold bg-indigo-600 hover:bg-indigo-700 h-11 px-8 rounded-xl shadow-md">
+                            <Button onClick={resetForm} variant="outline" className="text-sm font-bold h-11 px-6 rounded-xl hover:bg-gray-50 text-gray-700">Cancelar</Button>
+                            <Button onClick={handleSave} className="text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 h-11 px-8 rounded-xl shadow-md">
                                 <Save className="w-4 h-4 mr-2" /> Guardar Producto
                             </Button>
                         </div>
