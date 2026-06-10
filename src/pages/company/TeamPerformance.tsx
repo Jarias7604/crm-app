@@ -4,9 +4,10 @@ import {
     Trophy, Users, TrendingUp, DollarSign, Target, Crown,
     Loader2, ChevronDown, BarChart3, Award, Zap, ArrowUpRight,
     ArrowDownRight, Minus, CalendarDays, CheckCircle, Settings, X, Save,
-    Phone, PhoneCall,
+    Phone, PhoneCall, Sparkles,
 } from 'lucide-react';
 import { ActivityDashboard } from '../../components/ActivityDashboard';
+import { AIPerformanceChat } from '../../components/AIPerformanceChat';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../auth/AuthProvider';
 import {
@@ -106,6 +107,7 @@ export default function TeamPerformancePage() {
     // Dropdown states
     const [isTeamDropdownOpen, setIsTeamDropdownOpen] = useState(false);
     const [isPeriodDropdownOpen, setIsPeriodDropdownOpen] = useState(false);
+    const [isAiChatOpen, setIsAiChatOpen] = useState(false);
     const teamDropdownRef = useRef<HTMLDivElement>(null);
     const periodDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -370,25 +372,35 @@ export default function TeamPerformancePage() {
                 </div>
             )}
 
-            {/* Tabs */}
-            <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 w-fit">
-                {([
-                    { key: 'users' as const, icon: Users, label: 'Por Persona' },
-                    { key: 'teams' as const, icon: BarChart3, label: 'Por Equipo' },
-                    { key: 'calls' as const, icon: PhoneCall, label: '📊 Actividad' },
-                    { key: 'charts' as const, icon: TrendingUp, label: 'Gráficas' },
-                    { key: 'forecast' as const, icon: Target, label: '📊 Forecast' },
-                ] as const).map((tab) => (
-                    <button
-                        key={tab.key}
-                        onClick={() => setActiveTab(tab.key)}
-                        className={`px-5 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.key ? 'bg-white text-[#4449AA] shadow-sm' : 'text-gray-400 hover:text-gray-600'
-                            }`}
-                    >
-                        <tab.icon className="w-3.5 h-3.5 inline mr-1.5" />
-                        {tab.label}
-                    </button>
-                ))}
+            {/* Tabs & AI */}
+            <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+                    {([
+                        { key: 'users' as const, icon: Users, label: 'Por Persona' },
+                        { key: 'teams' as const, icon: BarChart3, label: 'Por Equipo' },
+                        { key: 'calls' as const, icon: PhoneCall, label: '📊 Actividad' },
+                        { key: 'charts' as const, icon: TrendingUp, label: 'Gráficas' },
+                        { key: 'forecast' as const, icon: Target, label: '📊 Forecast' },
+                    ] as const).map((tab) => (
+                        <button
+                            key={tab.key}
+                            onClick={() => setActiveTab(tab.key)}
+                            className={`px-5 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.key ? 'bg-white text-[#4449AA] shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                                }`}
+                        >
+                            <tab.icon className="w-3.5 h-3.5 inline mr-1.5" />
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+
+                <button
+                    onClick={() => setIsAiChatOpen(true)}
+                    className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-5 py-2.5 rounded-xl shadow-[0_4px_14px_rgba(147,51,234,0.39)] transition-all transform hover:scale-105"
+                >
+                    <Sparkles className="w-4 h-4 animate-pulse" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Sofía AI Analyst</span>
+                </button>
             </div>
 
             {/* Content */}
@@ -434,6 +446,14 @@ export default function TeamPerformancePage() {
                     }}
                 />
             )}
+
+            {/* AI Performance Chat */}
+            <AIPerformanceChat
+                companyId={profile?.company_id || ''}
+                isOpen={isAiChatOpen}
+                onClose={() => setIsAiChatOpen(false)}
+                performanceContext={{ userPerformance, callSummary }}
+            />
         </div>
     );
 }

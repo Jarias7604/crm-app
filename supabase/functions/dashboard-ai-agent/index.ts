@@ -12,7 +12,7 @@ serve(async (req) => {
     }
 
     try {
-        const { prompt, companyId } = await req.json();
+        const { prompt, companyId, performanceContext } = await req.json();
 
         if (!prompt || !companyId) {
             throw new Error("Missing prompt or companyId");
@@ -93,6 +93,7 @@ serve(async (req) => {
             pending_followups_count: pendingLeads.length,
             pending_leads: pendingLeads,
             specifically_mentioned_leads: mentionedLeads,
+            performance_data: performanceContext || null,
         };
 
         // 3. Build System Prompt with Function Calling / Structured Output rules
