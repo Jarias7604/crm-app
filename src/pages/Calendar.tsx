@@ -757,7 +757,7 @@ export default function Calendar() {
         const weekDays = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
         return (
-            <div className="hidden md:flex flex-1 flex-col bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="hidden md:flex flex-1 flex-col bg-white rounded-2xl border border-gray-100 shadow-sm">
                 {/* Week day headers */}
                 <div className="grid grid-cols-7 border-b border-gray-100">
                     {weekDays.map(d => (
@@ -780,6 +780,11 @@ export default function Calendar() {
                             <div
                                 key={day.toISOString()}
                                 onClick={() => setSelectedDate(day)}
+                                onDoubleClick={() => {
+                                    if (dayEvents.length > 0) {
+                                        navigate('/leads', { state: { leadIds: dayEvents.map(e => e.lead?.id).filter(Boolean), fromCalendar: true } });
+                                    }
+                                }}
                                 className={`min-h-[130px] p-2 flex flex-col transition-colors cursor-pointer
                                     ${!inMonth ? 'bg-gray-50/60' : 'bg-white'}
                                     ${isDayToday && !isDaySelected ? 'bg-indigo-50/30' : ''}
@@ -876,12 +881,40 @@ export default function Calendar() {
                                         );
                                     })}
                                     {dayEvents.length > MAX_VISIBLE && (
-                                        <button
-                                            onClick={() => navigate('/leads', { state: { leadIds: dayEvents.map(e => e.lead?.id).filter(Boolean), fromCalendar: true } })}
-                                            className="text-[9px] text-indigo-500 font-bold hover:text-indigo-700 text-left pl-1 mt-0.5 transition-colors"
-                                        >
-                                            + {dayEvents.length - MAX_VISIBLE} más
-                                        </button>
+                                        <div className="relative group/more">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); navigate('/leads', { state: { leadIds: dayEvents.map(e => e.lead?.id).filter(Boolean), fromCalendar: true } }) }}
+                                                className="text-[9px] text-indigo-500 font-bold hover:text-indigo-700 text-left pl-1 mt-0.5 transition-colors w-full"
+                                            >
+                                                + {dayEvents.length - MAX_VISIBLE} más
+                                            </button>
+                                            {/* Premium Hover Card */}
+                                            <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover/more:flex flex-col w-64 bg-white/95 backdrop-blur-xl border border-slate-200/60 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.15)] z-[100] p-3 animate-in fade-in slide-in-from-bottom-2 pointer-events-none group-hover/more:pointer-events-auto cursor-default" onClick={(e) => e.stopPropagation()}>
+                                                <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
+                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{format(day, "d 'de' MMMM", { locale: es })}</span>
+                                                    <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{dayEvents.length} seg.</span>
+                                                </div>
+                                                <div className="max-h-[200px] overflow-y-auto space-y-1.5 custom-scrollbar pr-1">
+                                                    {dayEvents.map(ev => {
+                                                        const cfg = getActionCfg(ev.action_type);
+                                                        const timeStr = formatTimeInZone(ev.date, companyTimezone);
+                                                        return (
+                                                            <div key={ev.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer" onClick={(e) => { e.stopPropagation(); ev.lead && navigate('/leads', { state: { leadId: ev.lead.id } }); }}>
+                                                                <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${cfg.badge}`}>
+                                                                    <cfg.Icon className={`w-3 h-3 ${cfg.badgeText}`} />
+                                                                </div>
+                                                                <div className="flex flex-col flex-1 min-w-0">
+                                                                    <span className={`text-[11px] font-bold truncate ${ev.completed ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{ev.lead?.name || 'Lead'}</span>
+                                                                    <span className="text-[9px] text-slate-400">{timeStr}</span>
+                                                                </div>
+                                                                {ev.completed && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 rotate-45 bg-white border-b border-r border-slate-200/60 pointer-events-none"></div>
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
                             </div>
