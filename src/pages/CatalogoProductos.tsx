@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Save, X, Search, Box, Layers, Zap, ArrowUpDown, Tag, DollarSign, Copy, Clock, Hash, RefreshCw, Repeat } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, Search, Box, Layers, Zap, ArrowUpDown, Tag, DollarSign, Copy, Clock, Hash, RefreshCw, Repeat, ChevronDown, CheckCircle } from 'lucide-react';
 import { pricingService } from '../services/pricing';
 import type { PricingItem } from '../types/pricing';
 import { useAuth } from '../auth/AuthProvider';
@@ -23,6 +23,8 @@ export default function CatalogoProductos() {
 
     const [items, setItems] = useState<PricingItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [categorySearch, setCategorySearch] = useState('');
     const [editingId, setEditingId] = useState<string | null>(null);
     const [showForm, setShowForm] = useState(false);
     // Quick-create type modal
@@ -241,8 +243,8 @@ export default function CatalogoProductos() {
                     <div className="p-8">
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                             {/* Columna Izquierda: Info General */}
-                            <div className="lg:col-span-8 space-y-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="lg:col-span-6 space-y-6">
+                                <div className="space-y-6">
                                     <div className="space-y-1.5">
                                         <label className="text-sm font-bold text-gray-700 flex items-center gap-2">
                                             <Tag className="w-4 h-4 text-gray-400" /> Nombre del Producto <span className="text-red-500">*</span>
@@ -266,15 +268,65 @@ export default function CatalogoProductos() {
                                             </button>
                                         </label>
                                         <div className="relative">
-                                            <select
-                                                value={formData.tipo}
-                                                onChange={(e) => setFormData({ ...formData, tipo: e.target.value as any })}
-                                                className="w-full h-12 border border-gray-200 rounded-xl px-4 bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all font-semibold text-gray-700"
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                                                className={`w-full h-12 border ${isDropdownOpen ? 'border-blue-500 ring-2 ring-blue-500/20 bg-white' : 'border-gray-200 bg-gray-50/50 hover:bg-white'} rounded-xl px-4 transition-all font-semibold text-gray-700 flex items-center justify-between shadow-sm`}
                                             >
-                                                {types.map(t => (
-                                                    <option key={t.slug} value={t.slug}>{t.name}</option>
-                                                ))}
-                                            </select>
+                                                {(() => {
+                                                    const selectedType = types.find(t => t.slug === formData.tipo);
+                                                    return selectedType ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: selectedType.color }}></span>
+                                                            <span>{selectedType.name}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-gray-400 font-normal">Seleccionar categoría...</span>
+                                                    );
+                                                })()}
+                                                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                                            </button>
+
+                                            {isDropdownOpen && (
+                                                <div className="absolute top-[calc(100%+8px)] left-0 right-0 z-40 bg-white rounded-2xl border border-gray-100 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] p-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                                                    <div className="relative mb-2 px-2 pt-2">
+                                                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Buscar categoría..."
+                                                            value={categorySearch}
+                                                            onChange={e => setCategorySearch(e.target.value)}
+                                                            className="w-full h-9 pl-9 pr-4 text-sm font-medium bg-gray-50 border-none rounded-lg focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none"
+                                                            onClick={e => e.stopPropagation()}
+                                                        />
+                                                    </div>
+                                                    <div className="max-h-56 overflow-y-auto p-1 space-y-1 scrollbar-thin">
+                                                        {types.filter(t => t.name.toLowerCase().includes(categorySearch.toLowerCase())).map(t => (
+                                                            <button
+                                                                key={t.slug}
+                                                                type="button"
+                                                                onClick={() => { setFormData({ ...formData, tipo: t.slug as any }); setIsDropdownOpen(false); setCategorySearch(''); }}
+                                                                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${formData.tipo === t.slug ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-50 text-gray-700'}`}
+                                                            >
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="w-2.5 h-2.5 rounded-full shadow-sm" style={{ backgroundColor: t.color }}></span>
+                                                                    {t.name}
+                                                                </div>
+                                                                {formData.tipo === t.slug && <CheckCircle className="w-4 h-4 text-blue-600" />}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                    <div className="p-2 border-t border-gray-100 mt-1">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => { setIsDropdownOpen(false); setShowTypeModal(true); }}
+                                                            className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-xl transition-all"
+                                                        >
+                                                            <Plus className="w-4 h-4" /> Crear nueva categoría
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
 
                                             {/* Mini-modal crear categoría */}
                                             {showTypeModal && (
@@ -338,8 +390,8 @@ export default function CatalogoProductos() {
                                     <textarea
                                         value={formData.descripcion}
                                         onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                                        className="w-full border border-gray-200 rounded-xl p-4 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none text-gray-600 bg-gray-50/50 focus:bg-white"
-                                        rows={3}
+                                        className="w-full border border-gray-200 rounded-xl p-4 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-none text-gray-700 bg-gray-50/50 hover:bg-gray-50 focus:bg-white font-medium shadow-inner shadow-gray-50/50"
+                                        rows={4}
                                         placeholder="Descripción visible en las cotizaciones para el cliente final..."
                                     />
                                 </div>
@@ -364,13 +416,13 @@ export default function CatalogoProductos() {
                             </div>
 
                             {/* Columna Derecha: Pricing & Settings */}
-                            <div className="lg:col-span-4 space-y-6">
+                            <div className="lg:col-span-6 space-y-6">
                                 {/* MODELO DE PRECIO — selector visual */}
                                 <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
                                     <h4 className="text-xs font-black text-gray-500 mb-3 uppercase tracking-wider flex items-center gap-2">
                                         <DollarSign className="w-3.5 h-3.5 text-green-500" /> Modelo de Precio
                                     </h4>
-                                    <div className="grid grid-cols-2 gap-2">
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                         {([
                                             { value: 'precio_fijo',        label: 'Precio Fijo',    icon: '💰', hint: 'Honorario, proyecto' },
                                             { value: 'por_hora',           label: 'Por Hora',       icon: '⏱️', hint: 'Consultoría, legal' },
@@ -384,15 +436,18 @@ export default function CatalogoProductos() {
                                                 type="button"
                                                 onClick={() => setFormData(prev => ({ ...prev, modelo_precio: m.value } as any))}
                                                 title={m.hint}
-                                                className={`p-2.5 rounded-xl border-2 text-left transition-all ${
+                                                className={`p-3 rounded-xl border-2 text-left transition-all ${
                                                     (formData as any).modelo_precio === m.value
-                                                        ? 'border-[#4449AA] bg-[#4449AA]/5 shadow-sm'
-                                                        : 'border-gray-200 hover:border-gray-300 bg-white'
+                                                        ? 'border-indigo-500 bg-indigo-50 shadow-[0_4px_20px_-4px_rgba(99,102,241,0.3)] scale-[1.02] transform'
+                                                        : 'border-gray-200 hover:border-gray-300 bg-white hover:shadow-md hover:-translate-y-0.5'
                                                 }`}
                                             >
-                                                <span className="text-base">{m.icon}</span>
-                                                <p className={`text-[11px] font-black mt-0.5 ${ (formData as any).modelo_precio === m.value ? 'text-[#4449AA]' : 'text-gray-700' }`}>{m.label}</p>
-                                                <p className="text-[10px] text-gray-400 leading-tight">{m.hint}</p>
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <span className="text-xl">{m.icon}</span>
+                                                    {(formData as any).modelo_precio === m.value && <CheckCircle className="w-4 h-4 text-indigo-600" />}
+                                                </div>
+                                                <p className={`text-[12px] font-black mt-1 ${ (formData as any).modelo_precio === m.value ? 'text-indigo-700' : 'text-gray-700' }`}>{m.label}</p>
+                                                <p className="text-[10px] text-gray-400 leading-tight mt-0.5">{m.hint}</p>
                                             </button>
                                         ))}
                                     </div>
@@ -407,26 +462,28 @@ export default function CatalogoProductos() {
                                             <label className="text-xs font-bold text-gray-500 mb-1.5 block">Precio Anual / Fijo ($)</label>
                                             <div className="relative">
                                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
-                                                <Input type="number" value={formData.precio_anual} onChange={(e) => setFormData({ ...formData, precio_anual: Number(e.target.value) })} className="pl-8 text-lg font-black text-gray-900 bg-white" />
+                                                <Input type="number" value={formData.precio_anual} onChange={(e) => setFormData({ ...formData, precio_anual: Number(e.target.value) })} className="pl-8 text-lg font-black text-gray-900 bg-white shadow-sm" />
                                             </div>
                                         </div>
                                         <div>
                                             <label className="text-xs font-bold text-gray-500 mb-1.5 block">Precio Mensual / Por Hora ($)</label>
                                             <div className="relative">
                                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
-                                                <Input type="number" value={formData.precio_mensual} onChange={(e) => setFormData({ ...formData, precio_mensual: Number(e.target.value) })} className="pl-8 text-lg font-black text-gray-900 bg-white" />
+                                                <Input type="number" value={formData.precio_mensual} onChange={(e) => setFormData({ ...formData, precio_mensual: Number(e.target.value) })} className="pl-8 text-lg font-black text-gray-900 bg-white shadow-sm" />
                                             </div>
                                         </div>
-                                        <div>
-                                            <label className="text-xs font-bold text-gray-500 mb-1.5 block">Costo Único / Setup ($)</label>
-                                            <div className="relative">
-                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
-                                                <Input type="number" value={formData.costo_unico} onChange={(e) => setFormData({ ...formData, costo_unico: Number(e.target.value) })} className="pl-8 font-bold bg-white" />
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-500 mb-1.5 block">Costo Único / Setup ($)</label>
+                                                <div className="relative">
+                                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                                                    <Input type="number" value={formData.costo_unico} onChange={(e) => setFormData({ ...formData, costo_unico: Number(e.target.value) })} className="pl-8 font-bold bg-white shadow-sm" />
+                                                </div>
                                             </div>
-                                        </div>
-                                        <div>
-                                            <label className="text-xs font-bold text-gray-500 mb-1.5 block">SKU / Código (Opcional)</label>
-                                            <Input value={formData.codigo} onChange={(e) => setFormData({ ...formData, codigo: e.target.value })} placeholder="Ej. SKU-123" className="uppercase font-mono text-sm bg-white" />
+                                            <div>
+                                                <label className="text-xs font-bold text-gray-500 mb-1.5 block">SKU / Código (Opcional)</label>
+                                                <Input value={formData.codigo} onChange={(e) => setFormData({ ...formData, codigo: e.target.value })} placeholder="Ej. SKU-123" className="uppercase font-mono text-sm bg-gray-50 shadow-inner" />
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
