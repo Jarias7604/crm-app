@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Phone, Mail, Calendar, CheckCircle, Plus, FileText, Send, Clock, Trash2, Shield, X, MapPin, Building, Globe, Copy, RefreshCw, MessageCircle, TrendingUp, DollarSign, Download, UploadCloud, Loader2, Target, MessageSquare, Smartphone } from 'lucide-react';
+import { User, Phone, Mail, Calendar, CheckCircle, Plus, FileText, Send, Clock, Trash2, Shield, X, MapPin, Building, Globe, Copy, RefreshCw, MessageCircle, TrendingUp, DollarSign, Download, UploadCloud, Loader2, Target, MessageSquare, Smartphone, Activity } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { supabase } from '../../services/supabase';
@@ -14,6 +14,7 @@ import toast from 'react-hot-toast';
 
 import { Input } from '../ui/Input';
 import { CustomDatePicker } from '../ui/CustomDatePicker';
+import { CustomSelect } from '../ui/CustomSelect';
 
 interface LeadDetailPanelProps {
     isOpen: boolean;
@@ -121,110 +122,123 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
             return (
                 <div className="fixed inset-0 z-[9999]">
                     <div className="absolute inset-0 bg-black/40 lead-sheet-backdrop" onClick={() => setIsDetailOpen(false)} />
-                    <div className="absolute inset-x-0 bottom-0 max-h-[93vh] rounded-t-[28px] sm:inset-y-0 sm:bottom-auto sm:left-auto sm:right-0 sm:max-h-full sm:w-[640px] sm:max-w-2xl sm:rounded-none bg-white/95 backdrop-blur-xl border-l border-white/50 shadow-[0_8px_40px_rgba(0,0,0,0.12)] flex flex-col overflow-hidden lead-sheet transition-all duration-500 ease-out">
+                    <div className="absolute inset-x-0 bottom-0 max-h-[93vh] rounded-t-[28px] sm:inset-y-0 sm:bottom-auto sm:left-auto sm:right-0 sm:max-h-full sm:w-[560px] sm:max-w-xl sm:rounded-none bg-[#F8FAFC] shadow-[0_8px_40px_rgba(0,0,0,0.12)] flex flex-col overflow-hidden lead-sheet transition-all duration-300 ease-out border-l border-slate-200/60">
                         {/* Mobile drag handle pill */}
                         <div className="flex justify-center pt-3 pb-0 flex-shrink-0 sm:hidden">
                             <div className="w-10 h-1 bg-gray-200 rounded-full" />
                         </div>
-                        {/* Header */}
-                        <div className="px-6 py-5 border-b border-gray-100/50 bg-gradient-to-r from-white/80 to-gray-50/80 backdrop-blur-sm flex justify-between items-center relative z-30">
-                            <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-50/50 rounded-full -mr-20 -mt-20 opacity-50 blur-3xl pointer-events-none"></div>
+                        {/* Header Premium (Dark Mode Style) */}
+                        <div className="px-6 py-7 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 flex justify-between items-center relative z-30 shadow-md">
+                            {/* Decorative background glow */}
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none -mr-10 -mt-10"></div>
                             <div className="relative z-10 flex-1">
-                                <div className="flex items-center gap-3 mb-1">
-                                    <div className="w-10 h-10 bg-[#4449AA] rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
-                                        <User className="w-5 h-5" />
+                                <div className="flex items-center gap-4 mb-2">
+                                    <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-xl flex items-center justify-center text-white shadow-lg ring-4 ring-indigo-500/30">
+                                        <User className="w-6 h-6" />
                                     </div>
                                     <div className="flex-1">
                                         <input
                                             type="text"
                                             defaultValue={selectedLead.name}
                                             onBlur={(e) => handleUpdateLead({ name: e.target.value })}
-                                            className="block w-full text-2xl font-black text-gray-900 tracking-tight border-none hover:bg-white/50 focus:bg-white focus:ring-2 focus:ring-indigo-500 rounded px-2 -ml-2 transition-all bg-transparent"
+                                            className="block w-full text-2xl font-black text-white tracking-tight border-none hover:bg-white/5 focus:bg-white/10 focus:ring-2 focus:ring-indigo-400 rounded-lg px-2 py-0.5 -ml-2 transition-all bg-transparent placeholder-slate-400"
+                                            placeholder="Nombre del Lead"
                                         />
                                         <input
                                             type="text"
                                             defaultValue={selectedLead.company_name || ''}
                                             placeholder="Empresa no especificada"
                                             onBlur={(e) => handleUpdateLead({ company_name: e.target.value })}
-                                            className="block w-full text-[14px] font-bold text-gray-400/80 border-none hover:bg-white/50 focus:bg-white focus:ring-2 focus:ring-indigo-500 rounded px-2 -ml-2 transition-all bg-transparent"
+                                            className="block w-full text-[14px] font-bold text-indigo-200 border-none hover:bg-white/5 focus:bg-white/10 focus:ring-2 focus:ring-indigo-400 rounded-lg px-2 -ml-2 transition-all bg-transparent placeholder-indigo-300/50"
                                         />
-                                        <CustomDatePicker
-                                            value={selectedLead.created_at || ''}
-                                            onChange={(date) => {
-                                                if (date) {
-                                                    const newDate = new Date(`${date}T12:00:00Z`);
-                                                    handleUpdateLead({ created_at: newDate.toISOString() });
-                                                }
-                                            }}
-                                            variant="light"
-                                            className="w-40"
-                                        />
+                                        <div className="ml-1 mt-2">
+                                            <CustomDatePicker
+                                                value={selectedLead.created_at || ''}
+                                                onChange={(date) => {
+                                                    if (date) {
+                                                        const newDate = new Date(`${date}T12:00:00Z`);
+                                                        handleUpdateLead({ created_at: newDate.toISOString() });
+                                                    }
+                                                }}
+                                                variant="light"
+                                                className="w-44 text-sm font-bold bg-white/10 text-white border-white/20 hover:bg-white/20 hover:border-white/30 backdrop-blur-sm transition-all shadow-sm"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3">
-                                    <div className="flex items-center gap-2 group bg-white px-3 py-1.5 rounded-lg border border-gray-100 shadow-sm transition-all hover:border-blue-200">
-                                        <Phone className="w-3.5 h-3.5 text-blue-500" />
+                                <div className="flex flex-wrap gap-x-3 gap-y-2 mt-4">
+                                    <div className="flex items-center gap-2 group bg-slate-800/60 px-3 py-1.5 rounded-lg border border-slate-700/50 shadow-sm transition-all hover:bg-slate-700/80 hover:border-slate-600">
+                                        <Phone className="w-3.5 h-3.5 text-indigo-400" />
                                         <input
                                             type="text"
                                             defaultValue={selectedLead.phone || ''}
                                             placeholder="Añadir teléfono"
                                             onBlur={(e) => handleUpdateLead({ phone: e.target.value })}
-                                            className="text-xs text-gray-700 font-bold border-none bg-transparent p-0 focus:ring-0 w-28"
+                                            className="text-[13px] text-slate-200 font-bold border-none bg-transparent p-0 focus:ring-0 w-28 placeholder-slate-500"
                                         />
                                     </div>
-                                    <div className="flex items-center gap-2 group bg-white px-3 py-1.5 rounded-lg border border-gray-100 shadow-sm transition-all hover:border-blue-200">
-                                        <Mail className="w-3.5 h-3.5 text-blue-500" />
+                                    <div className="flex items-center gap-2 group bg-slate-800/60 px-3 py-1.5 rounded-lg border border-slate-700/50 shadow-sm transition-all hover:bg-slate-700/80 hover:border-slate-600">
+                                        <Mail className="w-3.5 h-3.5 text-indigo-400" />
                                         <input
                                             type="text"
                                             defaultValue={selectedLead.email || ''}
                                             placeholder="Añadir email"
                                             onBlur={(e) => handleUpdateLead({ email: e.target.value })}
-                                            className="text-xs text-gray-700 font-bold border-none bg-transparent p-0 focus:ring-0 w-40"
+                                            className="text-[13px] text-slate-200 font-bold border-none bg-transparent p-0 focus:ring-0 w-44 placeholder-slate-500"
                                         />
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2 relative z-10 ml-4">
+                            <div className="flex flex-col items-center gap-3 relative z-10 ml-4 self-start">
+                                <button
+                                    onClick={() => setIsDetailOpen(false)}
+                                    className="p-2 bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700 rounded-xl transition-all border border-slate-700 shadow-sm active:scale-95"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
                                 {isAdmin && (
                                     <button
                                         onClick={() => handleDeleteLead(selectedLead.id, selectedLead.name)}
-                                        className="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100 shadow-sm hover:shadow-md"
+                                        className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all active:scale-95"
                                         title="Eliminar Lead"
                                     >
                                         <Trash2 className="w-5 h-5" />
                                     </button>
                                 )}
-                                <button
-                                    onClick={() => setIsDetailOpen(false)}
-                                    className="p-2.5 bg-gray-100 text-gray-500 hover:bg-gray-200 rounded-xl transition-all border border-gray-200 shadow-sm active:scale-95"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
                             </div>
                         </div>
 
                         {/* Content */}
                         <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-4 sm:p-6 space-y-6">
-                            {/* Quick Stats */}
-                            <div className="flex gap-3 sm:gap-4 min-w-0">
-                                <div className="flex-1 min-w-0 overflow-hidden bg-gradient-to-br from-emerald-50/80 to-teal-50/50 p-4 sm:p-5 rounded-2xl border border-emerald-100/60 shadow-[0_2px_10px_rgba(0,0,0,0.02)] text-center group transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
-                                    <p className="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tighter truncate">${(selectedLead.value || 0).toLocaleString()}</p>
-                                    <p className="text-[10px] font-black text-emerald-800/40 uppercase tracking-widest mt-2">Inversión</p>
+                            {/* Quick Stats Premium Card */}
+                            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/60 shadow-sm flex items-center gap-4 divide-x divide-slate-100">
+                                <div className="flex-1 flex flex-col items-center">
+                                    <div className="w-8 h-8 rounded-full bg-emerald-50 flex items-center justify-center mb-2">
+                                        <DollarSign className="w-4 h-4 text-emerald-600" />
+                                    </div>
+                                    <p className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight truncate">${(selectedLead.value || 0).toLocaleString()}</p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Inversión</p>
                                 </div>
-                                <div className="flex-1 min-w-0 overflow-hidden bg-gradient-to-br from-orange-50/80 to-rose-50/50 p-4 sm:p-5 rounded-2xl border border-orange-100/60 shadow-[0_2px_10px_rgba(0,0,0,0.02)] text-center group transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
+                                <div className="flex-1 flex flex-col items-center">
+                                    <div className="w-8 h-8 rounded-full bg-orange-50 flex items-center justify-center mb-2">
+                                        <Target className="w-4 h-4 text-orange-500" />
+                                    </div>
                                     <div className="flex justify-center scale-110 mb-1"><PriorityBadge priority={selectedLead.priority || 'medium'} /></div>
-                                    <p className="text-[10px] font-black text-orange-800/40 uppercase tracking-widest mt-2">Temperatura</p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Temperatura</p>
                                 </div>
-                                <div className="flex-1 min-w-0 overflow-hidden bg-gradient-to-br from-indigo-50/80 to-blue-50/50 p-4 sm:p-5 rounded-2xl border border-indigo-100/60 shadow-[0_2px_10px_rgba(0,0,0,0.02)] text-center group transition-all duration-300 hover:shadow-md hover:-translate-y-0.5">
+                                <div className="flex-1 flex flex-col items-center">
+                                    <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center mb-2">
+                                        <Activity className="w-4 h-4 text-indigo-500" />
+                                    </div>
                                     <div className="flex justify-center scale-110 mb-1"><StatusBadge status={selectedLead.status} /></div>
-                                    <p className="text-[10px] font-black text-indigo-800/40 uppercase tracking-widest mt-2">Estado</p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Estado</p>
                                 </div>
                             </div>
 
                             {/* Canales de Chat Unificados */}
-                            <div className="bg-white rounded-xl p-4 border border-blue-100 shadow-sm space-y-3">
-                                <h4 className="text-xs font-black text-blue-800 uppercase tracking-widest flex items-center gap-2">
-                                    <MessageSquare className="w-4 h-4" /> Centro de Mensajería
+                            <div className="bg-white rounded-2xl p-5 border border-slate-200/60 shadow-sm space-y-4">
+                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-3">
+                                    <MessageSquare className="w-3.5 h-3.5 text-indigo-400" /> Centro de Mensajería
                                 </h4>
                                 <div className="grid grid-cols-2 gap-3">
                                     <button
@@ -232,36 +246,33 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                             e.stopPropagation();
                                             navigate('/marketing/chat', { state: { lead: selectedLead, channel: 'telegram' } });
                                         }}
-                                        className="flex items-center justify-center gap-2 py-3 bg-sky-50 text-sky-600 rounded-xl font-bold text-xs hover:bg-sky-100 transition-all border border-sky-100"
+                                        className="flex items-center justify-center gap-2 py-3 bg-slate-50 text-slate-700 rounded-xl font-bold text-[11px] hover:bg-sky-500 hover:text-white hover:border-sky-500 transition-all border border-slate-200 shadow-sm group"
                                     >
-                                        <Send className="w-4 h-4" /> Telegram Bot
+                                        <Send className="w-4 h-4 text-sky-500 group-hover:text-white" /> Telegram Bot
                                     </button>
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             navigate('/marketing/chat', { state: { lead: selectedLead, channel: 'whatsapp' } });
                                         }}
-                                        className="flex items-center justify-center gap-2 py-3 bg-green-50 text-green-600 rounded-xl font-bold text-xs hover:bg-green-100 transition-all border border-green-100"
+                                        className="flex items-center justify-center gap-2 py-3 bg-slate-50 text-slate-700 rounded-xl font-bold text-[11px] hover:bg-[#25D366] hover:text-white hover:border-[#25D366] transition-all border border-slate-200 shadow-sm group"
                                     >
-                                        <Smartphone className="w-4 h-4" /> WhatsApp
+                                        <Smartphone className="w-4 h-4 text-[#25D366] group-hover:text-white" /> WhatsApp
                                     </button>
                                 </div>
-                                <p className="text-[10px] text-gray-400 font-medium text-center italic">
-                                    Activa la comunicación omnicanal con este lead.
-                                </p>
                             </div>
 
-                            {/* Quick Action Logger */}
+                            {/* Primary Action Button */}
                             <div>
                                 {!isCallLoggerOpen ? (
                                     <button
                                         onClick={() => setIsCallLoggerOpen(true)}
-                                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-dashed border-emerald-200 text-emerald-700 hover:border-emerald-400 hover:from-emerald-100 hover:to-teal-100 font-black px-4 py-4 rounded-2xl text-[10px] uppercase tracking-widest transition-all active:scale-[0.98] group"
+                                        className="w-full flex items-center justify-center gap-3 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md hover:shadow-lg font-black px-4 py-4 rounded-2xl text-[12px] uppercase tracking-widest transition-all active:scale-[0.98] group border border-indigo-500"
                                     >
-                                        <div className="w-7 h-7 bg-emerald-600 rounded-xl flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
-                                            <Phone className="w-3.5 h-3.5 text-white" />
+                                        <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center group-hover:scale-110 transition-all">
+                                            <Phone className="w-4 h-4 text-white" />
                                         </div>
-                                        Registrar Acción
+                                        Registrar Nueva Acción
                                     </button>
                                 ) : (
                                     <QuickActionLogger
@@ -283,149 +294,139 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
                                 )}
                             </div>
 
-                            {/* Edit Status & Priority */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Cambiar Estado</label>
-                                    <div className="relative">
-                                        <select
-                                            value={selectedLead.status}
-                                            onChange={(e) => handleUpdateLead({ status: e.target.value as LeadStatus })}
-                                            className="block w-full rounded-xl border-gray-200 shadow-sm text-sm font-bold text-gray-700 bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all pl-3 py-2.5"
-                                        >
-                                            {Object.entries(STATUS_CONFIG).map(([key, config]) => (
-                                                <option key={key} value={key}>
-                                                    {config.icon} {config.label}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    {(selectedLead.contact_count || 0) > 0 && (
-                                        <div className={`flex items-center gap-1.5 mt-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black ${(selectedLead.contact_count || 0) >= 6 ? 'bg-red-50 text-red-600' :
-                                            (selectedLead.contact_count || 0) >= 4 ? 'bg-amber-50 text-amber-600' :
-                                                'bg-emerald-50 text-emerald-600'
-                                            }`}>
-                                            📞 {selectedLead.contact_count} intentos
+                            {/* Detalles Principales Card */}
+                            <div className="bg-white rounded-2xl p-5 border border-slate-200/60 shadow-sm space-y-5">
+                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
+                                    <Target className="w-3.5 h-3.5" /> Detalles del Lead
+                                </h4>
+                                <div className="grid grid-cols-2 gap-5">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Cambiar Estado</label>
+                                        <div className="relative">
+                                            <CustomSelect
+                                                value={selectedLead.status}
+                                                onChange={(val) => handleUpdateLead({ status: val as LeadStatus })}
+                                                options={Object.entries(STATUS_CONFIG).map(([key, config]) => ({ value: key, label: config.label, icon: config.icon }))}
+                                            />
                                         </div>
-                                    )}
-                                    {(selectedLead.engagement_score || 0) > 0 && (
-                                        <div className={`flex items-center gap-1.5 mt-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black ${(selectedLead.engagement_score || 0) >= 10 ? 'bg-rose-50 text-rose-600' :
-                                            (selectedLead.engagement_score || 0) >= 5 ? 'bg-orange-50 text-orange-600' :
-                                                'bg-sky-50 text-sky-600'
-                                            }`}>
-                                            🔥 Engagement: {selectedLead.engagement_score} pts
+                                        {(selectedLead.contact_count || 0) > 0 && (
+                                            <div className={`flex items-center gap-1.5 mt-2 px-2.5 py-1.5 rounded-lg text-[10px] font-black ${(selectedLead.contact_count || 0) >= 6 ? 'bg-red-50 text-red-600 border border-red-100' :
+                                                (selectedLead.contact_count || 0) >= 4 ? 'bg-amber-50 text-amber-600 border border-amber-100' :
+                                                    'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                                                }`}>
+                                                📞 {selectedLead.contact_count} intentos de contacto
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Temperatura</label>
+                                        <div className="relative">
+                                            <CustomSelect
+                                                value={selectedLead.priority || 'medium'}
+                                                onChange={(val) => handleUpdateLead({ priority: val as LeadPriority })}
+                                                options={[
+                                                    { value: 'very_high', label: 'Altísima (Hot)', icon: '🔥' },
+                                                    { value: 'high', label: 'Alta (Warm)', icon: '⚡' },
+                                                    { value: 'medium', label: 'Media', icon: '🕑' },
+                                                    { value: 'low', label: 'Baja (Cold)', icon: '💤' },
+                                                ]}
+                                            />
                                         </div>
-                                    )}
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Temperatura</label>
-                                    <div className="relative">
-                                        <select
-                                            value={selectedLead.priority || 'medium'}
-                                            onChange={(e) => handleUpdateLead({ priority: e.target.value as LeadPriority })}
-                                            className="block w-full rounded-xl border-gray-200 shadow-sm text-sm font-bold text-gray-700 bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all pl-3 py-2.5"
-                                        >
-                                            <option value="very_high">🔥 Altísima (Hot)</option>
-                                            <option value="high">⚡ Alta (Warm)</option>
-                                            <option value="medium">🕑 Media</option>
-                                            <option value="low">💤 Baja (Cold)</option>
-                                        </select>
+                                        {(selectedLead.engagement_score || 0) > 0 && (
+                                            <div className={`flex items-center gap-1.5 mt-2 px-2.5 py-1.5 rounded-lg text-[10px] font-black ${(selectedLead.engagement_score || 0) >= 10 ? 'bg-rose-50 text-rose-600 border border-rose-100' :
+                                                (selectedLead.engagement_score || 0) >= 5 ? 'bg-orange-50 text-orange-600 border border-orange-100' :
+                                                    'bg-sky-50 text-sky-600 border border-sky-100'
+                                                }`}>
+                                                🔥 Nivel Engagement: {selectedLead.engagement_score} pts
+                                            </div>
+                                        )}
                                     </div>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Fuente del Lead</label>
-                                    <div className="relative">
-                                        <select
-                                            value={selectedLead.source || ''}
-                                            onChange={(e) => handleUpdateLead({ source: e.target.value || null })}
-                                            className="block w-full rounded-xl border-gray-200 shadow-sm text-sm font-bold text-gray-700 bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all pl-3 py-2.5"
-                                        >
-                                            <option value="">Sin especificar</option>
-                                            {SOURCE_OPTIONS.map(opt => (
-                                                <option key={opt.value} value={opt.value}>
-                                                    {opt.icon} {opt.label}
-                                                </option>
-                                            ))}
-                                        </select>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Fuente de Origen</label>
+                                        <div className="relative">
+                                            <CustomSelect
+                                                value={selectedLead.source || ''}
+                                                onChange={(val) => handleUpdateLead({ source: val || null })}
+                                                options={[
+                                                    { value: '', label: 'Sin especificar' },
+                                                    ...SOURCE_OPTIONS.map(opt => ({ value: opt.value, label: opt.label, icon: opt.icon }))
+                                                ]}
+                                                placeholder="Sin especificar"
+                                            />
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Rubro / Industria</label>
-                                    <div className="relative">
-                                        <select
-                                            value={selectedLead.industry || ''}
-                                            onChange={(e) => handleUpdateLead({ industry: e.target.value || null })}
-                                            className="block w-full rounded-xl border-gray-200 shadow-sm text-sm font-bold text-gray-700 bg-gray-50/50 focus:bg-white focus:ring-2 focus:ring-indigo-500 transition-all pl-3 py-2.5"
-                                        >
-                                            <option value="">Sin especificar</option>
-                                            {industries.map(ind => (
-                                                <option key={ind.id} value={ind.name}>
-                                                    {ind.name}
-                                                </option>
-                                            ))}
-                                        </select>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest ml-1">Rubro / Industria</label>
+                                        <div className="relative">
+                                            <CustomSelect
+                                                value={selectedLead.industry || ''}
+                                                onChange={(val) => handleUpdateLead({ industry: val || null })}
+                                                options={[
+                                                    { value: '', label: 'Sin especificar' },
+                                                    ...industries.map(ind => ({ value: ind.name, label: ind.name }))
+                                                ]}
+                                                placeholder="Sin especificar"
+                                            />
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="col-span-2 bg-blue-50 p-3 rounded-lg border border-blue-100 flex items-center gap-3">
-                                    <div className="flex-shrink-0">
-                                        {(() => {
-                                            const assignee = teamMembers.find(m => m.id === selectedLead.assigned_to);
-                                            return assignee?.avatar_url ? (
-                                                <img src={assignee.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm" />
-                                            ) : (
-                                                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center border-2 border-white shadow-sm">
-                                                    <User className="w-5 h-5 text-blue-400" />
-                                                </div>
-                                            );
-                                        })()}
-                                    </div>
-                                    <div className="flex-1">
-                                        <label className="block text-xs font-bold text-blue-700 mb-1 flex items-center gap-1">
-                                            <Shield className="w-3 h-3" /> Dueño / Responsable Principal
-                                        </label>
-                                        <select
-                                            value={selectedLead.assigned_to || ''}
-                                            onChange={(e) => handleUpdateLead({ assigned_to: e.target.value || null })}
-                                            className="block w-full rounded-md border-blue-200 shadow-sm text-sm bg-white focus:ring-blue-500 focus:border-blue-500 font-bold"
-                                        >
-                                            <option value="">Sin asignar</option>
-                                            {teamMembers.map(m => (
-                                                <option key={m.id} value={m.id}>
-                                                    {m.full_name ? `${m.full_name} (${m.email.split('@')[0]})` : m.email}
-                                                </option>
-                                            ))}
-                                        </select>
+                                    <div className="col-span-2 bg-slate-50 p-4 rounded-xl border border-slate-200 flex items-center gap-4 mt-2">
+                                        <div className="flex-shrink-0">
+                                            {(() => {
+                                                const assignee = teamMembers.find(m => m.id === selectedLead.assigned_to);
+                                                return assignee?.avatar_url ? (
+                                                    <img src={assignee.avatar_url} alt="" className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm ring-2 ring-slate-200" />
+                                                ) : (
+                                                    <div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center border-2 border-white shadow-sm ring-2 ring-slate-100">
+                                                        <User className="w-6 h-6 text-slate-500" />
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+                                        <div className="flex-1 space-y-1.5">
+                                            <label className="block text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                                                <Shield className="w-3.5 h-3.5 text-indigo-500" /> Propietario del Lead
+                                            </label>
+                                            <CustomSelect
+                                                value={selectedLead.assigned_to || ''}
+                                                onChange={(val) => handleUpdateLead({ assigned_to: val || null })}
+                                                options={[
+                                                    { value: '', label: 'Sin asignar' },
+                                                    ...teamMembers.map(m => ({ value: m.id, label: m.full_name ? `${m.full_name} (${m.email.split('@')[0]})` : m.email }))
+                                                ]}
+                                                placeholder="Sin asignar"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Editable Values Section */}
-                            <div className="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-5 border border-gray-100 shadow-sm space-y-4">
-                                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                                    <DollarSign className="w-4 h-4 text-green-600" /> Proyecciones Económicas
+                            <div className="bg-white rounded-2xl p-5 border border-slate-200/60 shadow-sm space-y-4">
+                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-3">
+                                    <DollarSign className="w-3.5 h-3.5 text-emerald-500" /> Proyecciones Económicas
                                 </h4>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-1.5">
-                                        <label className="block text-[10px] font-bold text-gray-500 uppercase ml-1 tracking-tight">Potencial ($)</label>
+                                <div className="grid grid-cols-2 gap-5">
+                                    <div className="space-y-2">
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase ml-1 tracking-widest">Potencial Estimado ($)</label>
                                         <div className="relative">
-                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</div>
+                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</div>
                                             <Input
                                                 type="number"
                                                 defaultValue={selectedLead.value || 0}
                                                 onBlur={(e) => handleUpdateLead({ value: Number(e.target.value) })}
-                                                className="pl-7 rounded-xl border-gray-100 bg-white font-black text-gray-900 focus:ring-green-500"
+                                                className="pl-7 rounded-xl border-slate-200 bg-slate-50 font-black text-slate-800 focus:bg-white focus:ring-indigo-500 shadow-sm"
                                             />
                                         </div>
                                     </div>
-                                    <div className="space-y-1.5">
-                                        <label className="block text-[10px] font-bold text-gray-500 uppercase ml-1 tracking-tight">Cierre Real ($)</label>
+                                    <div className="space-y-2">
+                                        <label className="block text-[10px] font-bold text-slate-500 uppercase ml-1 tracking-widest">Cierre Real ($)</label>
                                         <div className="relative">
-                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</div>
+                                            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">$</div>
                                             <Input
                                                 type="number"
                                                 defaultValue={selectedLead.closing_amount || 0}
                                                 onBlur={(e) => handleUpdateLead({ closing_amount: Number(e.target.value) })}
-                                                className="pl-7 rounded-xl border-gray-100 bg-white font-black text-green-600 focus:ring-green-500"
+                                                className="pl-7 rounded-xl border-slate-200 bg-emerald-50/50 font-black text-emerald-700 focus:bg-white focus:ring-emerald-500 shadow-sm"
                                             />
                                         </div>
                                     </div>
@@ -434,10 +435,9 @@ export const LeadDetailPanel: React.FC<LeadDetailPanelProps> = ({
 
 
                             {/* Documents Section */}
-                            <div className="bg-white rounded-lg p-4 border border-gray-200">
-                                <h4 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
-                                    <FileText className="w-4 h-4 text-blue-600" />
-                                    Documentos Adjuntos (PDF)
+                            <div className="bg-white rounded-2xl p-5 border border-slate-200/60 shadow-sm space-y-4">
+                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-3">
+                                    <FileText className="w-4 h-4 text-rose-500" /> Documentos Adjuntos
                                 </h4>
 
                                 {selectedLead.document_path ? (

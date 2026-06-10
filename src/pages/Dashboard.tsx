@@ -1142,7 +1142,7 @@ export default function Dashboard() {
             </div>
 
             {/* KPI Cards - Global Standard */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5 group/cards">
                 {[
                     {
                         name: t('dashboard.crm.wonDeals'),
@@ -1205,15 +1205,16 @@ export default function Dashboard() {
                         <div
                             key={item.name}
                             onClick={item.onClick}
-                            className={`group relative rounded-2xl p-4 shadow-[0_2px_15px_rgb(0,0,0,0.03)] border transition-all duration-500 hover:-translate-y-1 cursor-pointer ${activeCardFilter === item.name ? 'z-[101]' : 'z-10'} bg-white border-slate-200/60`}
+                            className={`group relative rounded-[20px] p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border transition-all duration-500 ease-[cubic-bezier(0.25,0.8,0.25,1)] group-hover/cards:scale-[0.97] group-hover/cards:opacity-60 hover:!scale-[1.03] hover:!opacity-100 hover:!-translate-y-2 hover:shadow-[0_20px_50px_rgb(0,0,0,0.12)] hover:z-50 cursor-pointer ${activeCardFilter === item.name ? 'z-[101]' : 'z-10'} bg-white border-slate-200/70 overflow-hidden`}
                         >
-                            <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none">
-                                <div className={`absolute top-0 right-0 -mr-4 -mt-4 w-24 h-24 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 bg-slate-50`}></div>
+                            <div className="absolute inset-0 pointer-events-none">
+                                <div className={`absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 rounded-full blur-3xl opacity-0 group-hover:opacity-60 transition-opacity duration-700 ${item.color.replace('text-', 'bg-')}`}></div>
+                                <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-slate-50/50 to-transparent"></div>
                             </div>
                             <div className="flex flex-col h-full relative z-10">
-                                <div className="flex justify-between items-start mb-3">
-                                    <div className={`p-2 rounded-xl ${item.bg} transition-transform group-hover:scale-110 shadow-sm shadow-black/5`}>
-                                        <item.icon className={`h-4 w-4 ${item.color}`} />
+                                <div className="flex justify-between items-start mb-4">
+                                    <div className={`p-2.5 rounded-xl ${item.bg.replace('500/10', '50/80').replace('500/20', '50/80')} border border-white/50 transition-transform group-hover:scale-110 shadow-sm shadow-slate-200/50`}>
+                                        <item.icon className={`h-5 w-5 ${item.color.replace('400', '600')}`} />
                                     </div>
                                     <div className="relative" ref={activeCardFilter === item.name ? cardFilterRef : null}>
                                         <button
@@ -1221,12 +1222,12 @@ export default function Dashboard() {
                                                 e.stopPropagation();
                                                 setActiveCardFilter(activeCardFilter === item.name ? null : item.name);
                                             }}
-                                            className={`p-1.5 rounded-lg transition-all ${activeCardFilter === item.name ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                                            className={`p-1.5 rounded-lg transition-all ${activeCardFilter === item.name ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
                                         >
                                             <Settings className="w-3.5 h-3.5" />
                                         </button>
                                         {activeCardFilter === item.name && (
-                                            <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-2xl border border-indigo-50 z-50 py-2 animate-in fade-in slide-in-from-top-2">
+                                            <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-xl shadow-2xl border border-slate-100 z-50 py-2 animate-in fade-in slide-in-from-top-2">
                                                 {(Object.entries(DATE_RANGE_OPTIONS) as [DateRange, { label: string }][]).map(([key, option]) => (
                                                     <button
                                                         key={key}
@@ -1235,11 +1236,11 @@ export default function Dashboard() {
                                                             setSelectedDateRange(key);
                                                             setActiveCardFilter(null);
                                                         }}
-                                                        className={`w-full text-left px-4 py-2 text-[11px] transition-colors flex items-center justify-between ${selectedDateRange === key ? 'bg-indigo-50 text-indigo-600 font-black' : 'text-slate-600 font-bold hover:bg-gray-50'}`}
+                                                        className={`w-full text-left px-4 py-2 text-[11px] transition-colors flex items-center justify-between ${selectedDateRange === key ? 'bg-indigo-50 text-indigo-600 font-black' : 'text-slate-600 font-bold hover:bg-slate-50'}`}
                                                     >
                                                         <span className="flex items-center gap-2">
                                                             {option.label}
-                                                            <span className="text-[9px] opacity-30 font-medium">{getDateRangeLabelDisplay(key)}</span>
+                                                            <span className="text-[9px] opacity-50 font-medium">{getDateRangeLabelDisplay(key)}</span>
                                                         </span>
                                                         {selectedDateRange === key && <CheckCircle className="w-4 h-4 text-indigo-600" />}
                                                     </button>
@@ -1250,7 +1251,7 @@ export default function Dashboard() {
                                 </div>
 
                                 <div className="flex-grow">
-                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] mb-1 text-slate-400 flex items-center gap-1">
+                                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] mb-1.5 text-slate-500 flex items-center gap-1">
                                         {item.name}
                                         {'tooltip' in item && item.tooltip && (
                                             <InfoTip text={item.tooltip as string} position="bottom" />
@@ -1259,29 +1260,29 @@ export default function Dashboard() {
                                     {item.name === t('dashboard.crm.totalLeads') ? (
                                         <div className="space-y-2 mt-1">
                                             <div className="flex items-baseline gap-2">
-                                                <span className="text-3xl font-black tracking-tighter text-slate-900">{item.value}</span>
+                                                <span className="text-4xl font-black tracking-[-0.04em] text-slate-900">{item.value}</span>
                                             </div>
                                             <div 
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     navigate('/leads', { state: { assignedFilter: 'unassigned' } });
                                                 }}
-                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-600 font-bold transition-all border border-orange-100/30 group/badge"
+                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-600 font-bold transition-all border border-orange-200/50 group/badge"
                                             >
                                                 <UserMinus className="w-3.5 h-3.5 group-hover/badge:-translate-x-0.5 transition-transform" />
                                                 <span className="text-[9px] uppercase tracking-wider">Sin Asignar:</span>
-                                                <span className="text-[10px] font-black bg-orange-200/50 text-orange-700 px-1.5 py-0.2 rounded-md">{unassignedLeads.length}</span>
+                                                <span className="text-[10px] font-black bg-white/60 text-orange-700 px-1.5 py-0.2 rounded-md shadow-sm">{unassignedLeads.length}</span>
                                             </div>
                                         </div>
                                     ) : item.name === t('dashboard.crm.wonDeals') ? (
-                                        <div className="space-y-1.5 mt-1">
+                                        <div className="space-y-2 mt-1">
                                             <div className="flex items-baseline gap-2">
-                                                <span className="text-3xl font-black tracking-tighter text-slate-900">{item.value}</span>
-                                                <span className="text-[9px] bg-emerald-100/70 text-emerald-800 font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider">Tratos</span>
+                                                <span className="text-4xl font-black tracking-[-0.04em] text-slate-900">{item.value}</span>
+                                                <span className="text-[9px] bg-emerald-100 border border-emerald-200 text-emerald-700 font-extrabold px-1.5 py-0.5 rounded-md uppercase tracking-wider">Tratos</span>
                                             </div>
-                                            <div className="space-y-1 text-[11px] font-bold font-inter text-slate-600 bg-slate-50/70 p-2 rounded-xl border border-slate-100/50">
+                                            <div className="space-y-1.5 text-[11px] font-bold font-inter text-slate-600 bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/60">
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-slate-400">🎯 Cierre Real:</span>
+                                                    <span className="text-slate-500">🎯 Cierre Real:</span>
                                                     {canViewFinancials ? (
                                                         <span className="text-emerald-600 font-black">${(stats.totalWonAmount || 0).toLocaleString()}</span>
                                                     ) : (
@@ -1289,7 +1290,7 @@ export default function Dashboard() {
                                                     )}
                                                 </div>
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-slate-400">📊 Potencial:</span>
+                                                    <span className="text-slate-500">📊 Potencial:</span>
                                                     {canViewFinancials ? (
                                                         <span className="text-indigo-600 font-black">${(stats.totalWonPotential || 0).toLocaleString()}</span>
                                                     ) : (
@@ -1297,22 +1298,22 @@ export default function Dashboard() {
                                                     )}
                                                 </div>
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-slate-400">🎟️ Ticket Prom:</span>
+                                                    <span className="text-slate-500">🎟️ Ticket Prom:</span>
                                                     {canViewFinancials ? (
-                                                        <span className="text-slate-700 font-black">${averageTicket.toLocaleString()}</span>
+                                                        <span className="text-slate-900 font-black">${averageTicket.toLocaleString()}</span>
                                                     ) : (
                                                         <span className="text-slate-400 font-black">$•••</span>
                                                     )}
                                                 </div>
                                                 {canViewFinancials && stats.totalWonPotential > 0 && (
-                                                    <div className="mt-1.5 pt-1.5 border-t border-slate-200/50 flex justify-between items-center text-[9px]">
+                                                    <div className="mt-2 pt-2 border-t border-slate-200 flex justify-between items-center text-[9px]">
                                                         <span className="text-slate-400 uppercase tracking-wider text-[8px] font-black">Efectividad:</span>
                                                         {stats.totalWonAmount >= stats.totalWonPotential ? (
-                                                            <span className="text-emerald-600 bg-emerald-50 px-1 py-0.2 rounded font-black">
+                                                            <span className="text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded font-black border border-emerald-200/50">
                                                                 🚀 +{Math.round(((stats.totalWonAmount - stats.totalWonPotential) / stats.totalWonPotential) * 100)}%
                                                             </span>
                                                         ) : (
-                                                            <span className="text-amber-600 bg-amber-50 px-1 py-0.2 rounded font-black">
+                                                            <span className="text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded font-black border border-amber-200/50">
                                                                 📉 {Math.round((stats.totalWonAmount / stats.totalWonPotential) * 100)}%
                                                             </span>
                                                         )}
@@ -1322,20 +1323,20 @@ export default function Dashboard() {
                                         </div>
                                     ) : (
                                         <div className="flex items-baseline gap-2">
-                                            <span className="text-3xl font-black tracking-tighter text-slate-900">{item.value}</span>
+                                            <span className="text-4xl font-black tracking-[-0.04em] text-slate-900">{item.value}</span>
                                             {item.secondaryValue && <span className="text-[11px] font-bold text-slate-400">{item.secondaryValue}</span>}
                                         </div>
                                     )}
                                 </div>
 
-                                <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+                                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
                                     <div className="flex items-center gap-1.5">
                                         <div className={`w-1.5 h-1.5 rounded-full ${item.trendColor.replace('text', 'bg')}`} />
-                                        <span className={`text-[9px] font-black tracking-widest uppercase ${item.trendColor}`}>
+                                        <span className={`text-[10px] font-black tracking-widest uppercase ${item.trendColor}`}>
                                             {item.trend}
                                         </span>
                                     </div>
-                                    <span className="text-[8px] font-bold text-slate-300">
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
                                         {getDateRangeLabelDisplay(selectedDateRange) || 'Todo el tiempo'}
                                     </span>
                                 </div>
@@ -1350,7 +1351,7 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch relative z-0">
 
                 {/* Row 1: Funnel + Strategic Priority + Sources */}
-                <div className={`bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 lg:col-span-5 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'funnel' ? 'z-[50]' : 'z-0'}`}>
+                <div className={`bg-white p-5 rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200/70 lg:col-span-5 flex flex-col group hover:shadow-[0_20px_50px_rgba(0,0,0,0.08)] transition-all duration-500 relative ${activeCardFilter === 'funnel' ? 'z-[50]' : 'z-0'}`}>
                     <div className="flex justify-between items-center mb-2">
                         <div className="flex flex-col">
                             <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-1">
@@ -1455,7 +1456,7 @@ export default function Dashboard() {
                     ].filter(Boolean) as { icon: any; color: string; bg: string; label: string; value: string; sub: string; action: string; tooltip: string }[];
 
                     return (
-                        <div className="bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 lg:col-span-4 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500">
+                        <div className="bg-white p-5 rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200/70 lg:col-span-4 flex flex-col group hover:shadow-[0_20px_50px_rgba(0,0,0,0.08)] transition-all duration-500">
                             {/* Header */}
                             <div className="flex items-center justify-between mb-3">
                                 <div>
@@ -1539,7 +1540,7 @@ export default function Dashboard() {
                     );
                 })()}
 
-                <div className={`bg-white p-3 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 lg:col-span-3 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative ${activeCardFilter === 'sources' ? 'z-[50]' : 'z-0'}`}>
+                <div className={`bg-white p-5 rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200/70 lg:col-span-3 flex flex-col group hover:shadow-[0_20px_50px_rgba(0,0,0,0.08)] transition-all duration-500 relative ${activeCardFilter === 'sources' ? 'z-[50]' : 'z-0'}`}>
                     <div className="flex justify-between items-start mb-4">
                         <div className="flex flex-col">
                             <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">{t('dashboard.crm.sourcesTitle')}</h3>
@@ -1637,7 +1638,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* Row 1.5: Sales Trend + Lead Alert KPIs */}
-                <div className="lg:col-span-8 bg-white p-4 rounded-2xl shadow-[0_2px_15px_rgb(0,0,0,0.03)] border border-slate-200/60 flex flex-col group hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 relative z-0">
+                <div className="lg:col-span-8 bg-white p-5 rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200/70 flex flex-col group hover:shadow-[0_20px_50px_rgba(0,0,0,0.08)] transition-all duration-500 relative z-0">
                     <div className="flex justify-between items-center mb-4">
                         <div className="flex flex-col">
                             <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-1">
@@ -1710,7 +1711,7 @@ export default function Dashboard() {
 
                 {/* ── Lead Health Pulse: 3 KPIs en una sola fila compacta ── */}
                 <div className="lg:col-span-4 flex flex-col h-full">
-                    <div className="bg-white rounded-2xl border border-slate-200/60 shadow-[0_2px_15px_rgb(0,0,0,0.03)] overflow-hidden flex flex-col h-full">
+                    <div className="bg-white rounded-[24px] border border-slate-200/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgb(0,0,0,0.08)] transition-all duration-500 overflow-hidden flex flex-col h-full">
                         {/* Header */}
                         <div className="px-4 pt-3 pb-2 border-b border-slate-100/80 flex items-center gap-2">
                             <Zap className="w-3 h-3 text-indigo-500" />

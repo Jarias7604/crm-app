@@ -75,7 +75,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                                         type="checkbox"
                                                                         checked={selectedLeadIds.length === sortedLeads.length && sortedLeads.length > 0}
                                                                         onChange={toggleSelectAll}
-                                                                        className="w-4 h-4 rounded border-gray-300 text-[#4449AA] focus:ring-[#4449AA] cursor-pointer"
+                                                                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 cursor-pointer transition-all"
                                                                     />
                                                                 </div>
                                                             </th>
@@ -83,178 +83,175 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                             {columnOrder.map((colId, index) => (
                                                                 <Draggable key={colId} draggableId={colId} index={index}>
                                                                     {(provided, snapshot) => (
-                                                                        <th
-                                                                            ref={provided.innerRef}
-                                                                            {...provided.draggableProps}
-                                                                            scope="col"
-                                                                            style={{
-                                                                                ...provided.draggableProps.style,
-                                                                                width: columnWidths[colId] ?? DEFAULT_COL_WIDTHS[colId] ?? 140,
-                                                                                minWidth: 80,
-                                                                                // NOTE: do NOT override position here — the CSS sticky from
-                                                                                // .arias-table thead th already acts as positioning ancestor
-                                                                                // for our absolute resize handle.
-                                                                            }}
-                                                                            className={`px-4 py-4 text-left text-xs font-black uppercase tracking-widest transition-colors relative select-none ${
-                                                                                snapshot.isDragging
-                                                                                    ? 'bg-[#4449AA] text-white shadow-2xl shadow-indigo-400/40 rounded-lg opacity-95 z-50'
-                                                                                    : 'bg-[#FAFAFB] text-gray-400'
-                                                                            }`}
-                                                                        >
-                                                                            <div className="flex items-center gap-2">
-                                                                                <div
-                                                                                    {...provided.dragHandleProps}
-                                                                                    title="Arrastra para reordenar"
-                                                                                    style={{ cursor: 'move' }}
-                                                                                    className={`transition-all flex items-center rounded p-0.5 ${
-                                                                                        snapshot.isDragging
-                                                                                            ? 'text-white/90 bg-white/10'
-                                                                                            : 'text-gray-300 hover:text-[#4449AA] hover:bg-indigo-50'
-                                                                                    }`}
-                                                                                >
-                                                                                    <GripVertical className="w-4 h-4" />
-                                                                                </div>
+                                                                            <th
+                                                                                ref={provided.innerRef}
+                                                                                {...provided.draggableProps}
+                                                                                scope="col"
+                                                                                style={{
+                                                                                    ...provided.draggableProps.style,
+                                                                                    width: columnWidths[colId] ?? DEFAULT_COL_WIDTHS[colId] ?? 140,
+                                                                                    minWidth: 80,
+                                                                                }}
+                                                                                className={`px-4 py-4 text-left text-[11px] font-black uppercase tracking-[0.15em] transition-all relative select-none border-b border-slate-200/80 ${
+                                                                                    snapshot.isDragging
+                                                                                        ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-500/30 rounded-lg opacity-95 z-50'
+                                                                                        : 'bg-slate-50 text-slate-500'
+                                                                                }`}
+                                                                            >
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <div
+                                                                                        {...provided.dragHandleProps}
+                                                                                        title="Arrastra para reordenar"
+                                                                                        style={{ cursor: 'move' }}
+                                                                                        className={`transition-all flex items-center rounded p-0.5 ${
+                                                                                            snapshot.isDragging
+                                                                                                ? 'text-white/90 bg-white/20'
+                                                                                                : 'text-slate-300 hover:text-indigo-600 hover:bg-indigo-50'
+                                                                                        }`}
+                                                                                    >
+                                                                                        <GripVertical className="w-4 h-4" />
+                                                                                    </div>
 
                                                                                 {colId === 'name' && (
                                                                                     <div
-                                                                                        className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                        className="cursor-pointer hover:text-indigo-600 transition-colors group flex items-center gap-1"
                                                                                         onClick={() => setSortConfig({
                                                                                             key: 'name',
                                                                                             direction: sortConfig?.key === 'name' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
                                                                                         })}
                                                                                     >
                                                                                         Nombre / Empresa
-                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'name' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'name' ? 'text-indigo-600' : 'text-slate-300 group-hover:text-indigo-500'} transition-all`} />
                                                                                     </div>
                                                                                 )}
 
                                                                                 {colId === 'email' && (
                                                                                     <div
-                                                                                        className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                        className="cursor-pointer hover:text-indigo-600 transition-colors group flex items-center gap-1"
                                                                                         onClick={() => setSortConfig({
                                                                                             key: 'email',
                                                                                             direction: sortConfig?.key === 'email' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
                                                                                         })}
                                                                                     >
                                                                                         Email
-                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'email' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'email' ? 'text-indigo-600' : 'text-slate-300 group-hover:text-indigo-500'} transition-all`} />
                                                                                     </div>
                                                                                 )}
 
                                                                                 {colId === 'phone' && (
                                                                                     <div
-                                                                                        className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                        className="cursor-pointer hover:text-indigo-600 transition-colors group flex items-center gap-1"
                                                                                         onClick={() => setSortConfig({
                                                                                             key: 'phone',
                                                                                             direction: sortConfig?.key === 'phone' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
                                                                                         })}
                                                                                     >
                                                                                         Teléfono
-                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'phone' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'phone' ? 'text-indigo-600' : 'text-slate-300 group-hover:text-indigo-500'} transition-all`} />
                                                                                     </div>
                                                                                 )}
 
                                                                                 {colId === 'status' && (
                                                                                     <div
-                                                                                        className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                        className="cursor-pointer hover:text-indigo-600 transition-colors group flex items-center gap-1"
                                                                                         onClick={() => setSortConfig({
                                                                                             key: 'status',
                                                                                             direction: sortConfig?.key === 'status' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
                                                                                         })}
                                                                                     >
                                                                                         Estado
-                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'status' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'status' ? 'text-indigo-600' : 'text-slate-300 group-hover:text-indigo-500'} transition-all`} />
                                                                                     </div>
                                                                                 )}
 
                                                                                 {colId === 'priority' && (
                                                                                     <div
-                                                                                        className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                        className="cursor-pointer hover:text-indigo-600 transition-colors group flex items-center gap-1"
                                                                                         onClick={() => setSortConfig({
                                                                                             key: 'priority',
                                                                                             direction: sortConfig?.key === 'priority' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
                                                                                         })}
                                                                                     >
                                                                                         Prioridad
-                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'priority' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'priority' ? 'text-indigo-600' : 'text-slate-300 group-hover:text-indigo-500'} transition-all`} />
                                                                                     </div>
                                                                                 )}
 
                                                                                 {colId === 'source' && (
                                                                                     <div
-                                                                                        className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                        className="cursor-pointer hover:text-indigo-600 transition-colors group flex items-center gap-1"
                                                                                         onClick={() => setSortConfig({
                                                                                             key: 'source',
                                                                                             direction: sortConfig?.key === 'source' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
                                                                                         })}
                                                                                     >
                                                                                         Fuente
-                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'source' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'source' ? 'text-indigo-600' : 'text-slate-300 group-hover:text-indigo-500'} transition-all`} />
                                                                                     </div>
                                                                                 )}
 
                                                                                 {colId === 'created_at' && (
                                                                                     <div
-                                                                                        className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                        className="cursor-pointer hover:text-indigo-600 transition-colors group flex items-center gap-1"
                                                                                         onClick={() => setSortConfig({
                                                                                             key: 'created_at',
                                                                                             direction: sortConfig?.key === 'created_at' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
                                                                                         })}
                                                                                     >
                                                                                         Creado el
-                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'created_at' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'created_at' ? 'text-indigo-600' : 'text-slate-300 group-hover:text-indigo-500'} transition-all`} />
                                                                                     </div>
                                                                                 )}
 
                                                                                 {colId === 'internal_won_date' && (
                                                                                     <div
-                                                                                        className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                        className="cursor-pointer hover:text-indigo-600 transition-colors group flex items-center gap-1"
                                                                                         onClick={() => setSortConfig({
                                                                                             key: 'internal_won_date' as keyof Lead,
                                                                                             direction: sortConfig?.key === 'internal_won_date' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
                                                                                         })}
                                                                                     >
                                                                                         Fecha Cierre
-                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'internal_won_date' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'internal_won_date' ? 'text-indigo-600' : 'text-slate-300 group-hover:text-indigo-500'} transition-all`} />
                                                                                     </div>
                                                                                 )}
 
                                                                                 {colId === 'value' && (
                                                                                     <div
-                                                                                        className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                        className="cursor-pointer hover:text-indigo-600 transition-colors group flex items-center gap-1"
                                                                                         onClick={() => setSortConfig({
                                                                                             key: 'value',
                                                                                             direction: sortConfig?.key === 'value' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
                                                                                         })}
                                                                                     >
                                                                                         Valor
-                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'value' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'value' ? 'text-indigo-600' : 'text-slate-300 group-hover:text-indigo-500'} transition-all`} />
                                                                                     </div>
                                                                                 )}
 
                                                                                 {colId === 'last_follow_up_at' && (
                                                                                     <div
-                                                                                        className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                        className="cursor-pointer hover:text-indigo-600 transition-colors group flex items-center gap-1"
                                                                                         onClick={() => setSortConfig({
                                                                                             key: 'last_follow_up_at' as keyof Lead,
                                                                                             direction: sortConfig?.key === 'last_follow_up_at' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
                                                                                         })}
                                                                                     >
                                                                                         Último Seguimiento
-                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'last_follow_up_at' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'last_follow_up_at' ? 'text-indigo-600' : 'text-slate-300 group-hover:text-indigo-500'} transition-all`} />
                                                                                     </div>
                                                                                 )}
 
                                                                                 {colId === 'assigned_to' && (
                                                                                     <div
-                                                                                        className="cursor-pointer hover:text-[#4449AA] transition-colors group flex items-center gap-1"
+                                                                                        className="cursor-pointer hover:text-indigo-600 transition-colors group flex items-center gap-1"
                                                                                         onClick={() => setSortConfig({
                                                                                             key: 'assigned_to',
                                                                                             direction: sortConfig?.key === 'assigned_to' && sortConfig.direction === 'asc' ? 'desc' : 'asc'
                                                                                         })}
                                                                                     >
                                                                                         Asignado
-                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'assigned_to' ? 'text-[#4449AA]' : 'text-gray-300 group-hover:text-[#4449AA]'} transition-all`} />
+                                                                                        <ArrowUpDown className={`w-3 h-3 ${sortConfig?.key === 'assigned_to' ? 'text-indigo-600' : 'text-slate-300 group-hover:text-indigo-500'} transition-all`} />
                                                                                     </div>
                                                                                 )}
                                                                             </div>
@@ -296,20 +293,20 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                 )}
                                             </Droppable>
                                         </DragDropContext>
-                                        <tbody className="bg-white divide-y divide-gray-50/50">
+                                        <tbody className="bg-white divide-y divide-slate-100/60">
                                             {paginatedLeads.map((lead) => {
                                                 const isSelected = selectedLeadIds.includes(lead.id);
                                                 return (
                                                     <tr
                                                         key={lead.id}
-                                                        className={`group transition-all duration-200 ${isSelected ? 'bg-indigo-50/30' : 'hover:bg-[#FDFDFE]'}`}
+                                                        className={`group transition-all duration-300 ease-out hover:shadow-lg hover:shadow-indigo-500/10 hover:-translate-y-[2px] relative z-0 hover:z-10 bg-white rounded-xl ${isSelected ? 'bg-indigo-50/50' : 'hover:bg-indigo-50/20'}`}
                                                     >
-                                                        <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                                        <td className="px-6 py-4 whitespace-nowrap bg-inherit" onClick={(e) => e.stopPropagation()}>
                                                             <input
                                                                 type="checkbox"
                                                                 checked={isSelected}
                                                                 onChange={() => toggleLeadSelection(lead.id)}
-                                                                className="w-4 h-4 rounded border-gray-300 text-[#4449AA] focus:ring-[#4449AA] cursor-pointer"
+                                                                className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600 cursor-pointer transition-all"
                                                             />
                                                         </td>
                                                         {columnOrder.map((colId) => (
@@ -465,8 +462,8 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                             </td>
                                                         ))}
 
-                                                        <td className="px-4 py-4 bg-white" style={{ position: 'sticky', right: 0, zIndex: 2, boxShadow: '-2px 0 6px rgba(0,0,0,0.04)' }}>
-                                                            <div className="flex justify-center items-center gap-1.5 transition-all">
+                                                        <td className="px-4 py-4 bg-inherit" style={{ position: 'sticky', right: 0, zIndex: 2, boxShadow: '-4px 0 12px rgba(0,0,0,0.02)' }}>
+                                                            <div className="flex justify-center items-center gap-1.5 transition-all opacity-70 group-hover:opacity-100">
                                                                 {((lead.cotizaciones?.length ?? 0) > 0 || lead.document_path) && (
                                                                     <>
                                                                         <button
@@ -508,7 +505,7 @@ export const LeadTable: React.FC<LeadTableProps> = ({
                                                                 )}
                                                                 <button
                                                                     onClick={(e) => { e.stopPropagation(); openLeadDetail(lead); }}
-                                                                    className="p-1.5 text-indigo-400 hover:text-white hover:bg-[#4449AA] rounded-lg transition-all shadow-sm bg-indigo-50/50"
+                                                                    className="p-1.5 text-indigo-500 hover:text-white hover:bg-indigo-600 rounded-lg transition-all shadow-sm bg-indigo-50/80"
                                                                 >
                                                                     <ChevronRight className="w-4 h-4" />
                                                                 </button>

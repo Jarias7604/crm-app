@@ -131,21 +131,29 @@ export default function Clientes() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {/* Stats - Compact Premium Spotlight */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 group/cards">
         {[
-          { label: 'En Pipeline', value: inPipeline.length, icon: Clock, color: 'text-blue-600 bg-blue-50' },
-          { label: 'Go-Live Esta Semana', value: goLiveThisWeek.length, icon: TrendingUp, color: 'text-amber-600 bg-amber-50' },
-          { label: 'Clientes Activos', value: activos.length, icon: CheckCircle2, color: 'text-emerald-600 bg-emerald-50' },
-          { label: 'Total', value: clients.length, icon: Users, color: 'text-purple-600 bg-purple-50' },
+          { label: 'En Pipeline', value: inPipeline.length, icon: Clock, iconColor: 'text-blue-600', iconBg: 'bg-blue-50/80', borderColor: 'hover:border-blue-200', glowColor: 'bg-blue-100', shadowHover: 'hover:shadow-[0_8px_30px_rgba(37,99,235,0.12)]' },
+          { label: 'Go-Live Semana', value: goLiveThisWeek.length, icon: TrendingUp, iconColor: 'text-amber-600', iconBg: 'bg-amber-50/80', borderColor: 'hover:border-amber-200', glowColor: 'bg-amber-100', shadowHover: 'hover:shadow-[0_8px_30px_rgba(245,158,11,0.12)]' },
+          { label: 'Activos', value: activos.length, icon: CheckCircle2, iconColor: 'text-emerald-600', iconBg: 'bg-emerald-50/80', borderColor: 'hover:border-emerald-200', glowColor: 'bg-emerald-100', shadowHover: 'hover:shadow-[0_8px_30px_rgba(16,185,129,0.12)]' },
+          { label: 'Total', value: clients.length, icon: Users, iconColor: 'text-purple-600', iconBg: 'bg-purple-50/80', borderColor: 'hover:border-purple-200', glowColor: 'bg-purple-100', shadowHover: 'hover:shadow-[0_8px_30px_rgba(147,51,234,0.12)]' },
         ].map(s => (
-          <div key={s.label} className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-3">
-            <div className={`w-9 h-9 rounded-xl ${s.color} flex items-center justify-center flex-shrink-0`}>
-              <s.icon className="w-4 h-4" />
+          <div 
+            key={s.label} 
+            className={`group relative rounded-[16px] p-3 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border transition-all duration-300 ease-out hover:-translate-y-0.5 hover:z-50 cursor-default overflow-hidden flex items-center gap-3 bg-white border-slate-200/70 z-10 ${s.borderColor} ${s.shadowHover}`}
+          >
+            <div className="absolute inset-0 pointer-events-none">
+              <div className={`absolute right-0 top-0 w-24 h-24 rounded-full blur-2xl opacity-0 group-hover:opacity-40 transition-opacity duration-500 -mr-8 -mt-8 ${s.glowColor}`}></div>
             </div>
-            <div>
-              <p className="text-2xl font-black text-gray-900">{s.value}</p>
-              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">{s.label}</p>
+            <div className={`p-2 rounded-xl ${s.iconBg} border border-white/50 shadow-sm shadow-slate-200/50 transition-transform group-hover:scale-105 shrink-0 z-10`}>
+              <s.icon className={`w-4 h-4 ${s.iconColor}`} />
+            </div>
+            <div className="flex flex-col min-w-0 z-10">
+              <span className="text-[9px] font-black uppercase tracking-[0.15em] text-slate-400 truncate">{s.label}</span>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-xl font-black tracking-tight text-slate-900 leading-none">{s.value}</span>
+              </div>
             </div>
           </div>
         ))}
@@ -228,7 +236,7 @@ export default function Clientes() {
       )}
 
       {/* List */}
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200/70 overflow-hidden transition-all duration-300">
         {loading ? (
           <div className="divide-y divide-gray-50">
             {Array(5).fill(0).map((_, i) => (

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, FileText, CheckCircle, XCircle, Clock, Edit, Trash2, Eye, ArrowUpDown, GripVertical, Search } from 'lucide-react';
+import { Plus, FileText, CheckCircle, XCircle, Clock, Edit, Trash2, Eye, ArrowUpDown, GripVertical, Search, BadgeDollarSign, TrendingUp } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { useAuth } from '../auth/AuthProvider';
 import { cotizacionesService } from '../services/cotizaciones';
@@ -310,27 +310,23 @@ export default function Cotizaciones() {
                         </div>
                     </div>
 
-                    {/* Stats Cards */}
-                    {/* Stats Cards - Senior Architect Premium Redesign */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {/* Stats Cards - Compact Premium Redesign */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 group/cards">
                         {/* Total Quotes Card */}
                         <div
                             onClick={() => setStatusFilter(null)}
-                            className={`group relative bg-white rounded-2xl p-6 border transition-all duration-500 overflow-hidden cursor-pointer ${!statusFilter ? 'border-[#4449AA] ring-2 ring-[#4449AA]/5 shadow-[0_12px_40px_rgba(68,73,170,0.08)]' : 'border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)]'}`}
+                            className={`group relative rounded-[16px] p-3 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:z-50 cursor-pointer overflow-hidden flex items-center gap-3 ${!statusFilter ? 'bg-white border-blue-400/50 ring-1 ring-blue-500/20 z-[101]' : 'bg-white border-slate-200/70 z-10'}`}
                         >
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50/30 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-blue-100/40 transition-colors duration-500"></div>
-                            <div className="relative flex items-center justify-between">
-                                <div className="space-y-1">
-                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Total</p>
-                                    <div className="flex items-baseline gap-2">
-                                        <p className="text-3xl font-black text-slate-900 tracking-tight">{stats.total}</p>
-                                        <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded-md">General</span>
-                                    </div>
-                                </div>
-                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-500">
-                                    <div className="w-8 h-8 rounded-xl bg-white/60 backdrop-blur-sm shadow-sm flex items-center justify-center">
-                                        <FileText className="w-4 h-4 text-[#4449AA]" />
-                                    </div>
+                            <div className="absolute inset-0 pointer-events-none">
+                                <div className="absolute right-0 top-0 w-24 h-24 rounded-full blur-2xl opacity-0 group-hover:opacity-40 transition-opacity duration-500 bg-blue-100 -mr-8 -mt-8"></div>
+                            </div>
+                            <div className="p-2 rounded-xl bg-blue-50/80 border border-white/50 shadow-sm shadow-slate-200/50 transition-transform group-hover:scale-105 shrink-0 z-10">
+                                <FileText className="h-4 w-4 text-blue-600" />
+                            </div>
+                            <div className="flex flex-col min-w-0 z-10">
+                                <span className="text-[9px] font-black uppercase tracking-[0.15em] text-slate-400 truncate">Total Cotiz.</span>
+                                <div className="flex items-baseline gap-1.5">
+                                    <span className="text-xl font-black tracking-tight text-slate-900 leading-none">{stats.total}</span>
                                 </div>
                             </div>
                         </div>
@@ -338,41 +334,37 @@ export default function Cotizaciones() {
                         {/* Accepted Quotes Card */}
                         <div
                             onClick={() => setStatusFilter(statusFilter === 'aceptada' ? null : 'aceptada')}
-                            className={`group relative bg-white rounded-2xl p-6 border transition-all duration-500 overflow-hidden cursor-pointer ${statusFilter === 'aceptada' ? 'border-emerald-500 ring-2 ring-emerald-500/5 shadow-[0_12px_40px_rgba(16,185,129,0.08)]' : 'border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)]'}`}
+                            className={`group relative rounded-[16px] p-3 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:z-50 cursor-pointer overflow-hidden flex items-center gap-3 ${statusFilter === 'aceptada' ? 'bg-white border-emerald-400/50 ring-1 ring-emerald-500/20 z-[101]' : 'bg-white border-slate-200/70 z-10'}`}
                         >
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50/30 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-emerald-100/40 transition-colors duration-500"></div>
-                            <div className="relative flex items-center justify-between">
-                                <div className="space-y-1">
-                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Aceptadas</p>
-                                    <div className="flex items-baseline gap-2">
-                                        <p className="text-3xl font-black text-slate-900 tracking-tight">{stats.aceptadas}</p>
-                                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-md">
-                                            {stats.total > 0 ? `${Math.round((stats.aceptadas / stats.total) * 100)}%` : '0%'}
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-500">
-                                    <div className="w-8 h-8 rounded-xl bg-white/60 backdrop-blur-sm shadow-sm flex items-center justify-center">
-                                        <CheckCircle className="w-4 h-4 text-emerald-500" />
-                                    </div>
+                            <div className="absolute inset-0 pointer-events-none">
+                                <div className="absolute right-0 top-0 w-24 h-24 rounded-full blur-2xl opacity-0 group-hover:opacity-40 transition-opacity duration-500 bg-emerald-100 -mr-8 -mt-8"></div>
+                            </div>
+                            <div className="p-2 rounded-xl bg-emerald-50/80 border border-white/50 shadow-sm shadow-slate-200/50 transition-transform group-hover:scale-105 shrink-0 z-10">
+                                <CheckCircle className="h-4 w-4 text-emerald-600" />
+                            </div>
+                            <div className="flex flex-col min-w-0 z-10">
+                                <span className="text-[9px] font-black uppercase tracking-[0.15em] text-slate-400 truncate">Aceptadas</span>
+                                <div className="flex items-baseline gap-1.5">
+                                    <span className="text-xl font-black tracking-tight text-slate-900 leading-none">{stats.aceptadas}</span>
+                                    <span className="text-[9px] font-extrabold text-emerald-600 bg-emerald-50 px-1 rounded-sm">
+                                        {stats.total > 0 ? `${Math.round((stats.aceptadas / stats.total) * 100)}%` : '0%'}
+                                    </span>
                                 </div>
                             </div>
                         </div>
 
                         {/* Total Value Card */}
-                        <div className="group relative bg-white rounded-2xl p-6 border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] transition-all duration-500 overflow-hidden">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50/30 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-indigo-100/40 transition-colors duration-500"></div>
-                            <div className="relative flex items-center justify-between">
-                                <div className="space-y-1">
-                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Valor Total</p>
-                                    <div className="flex items-baseline gap-1">
-                                        <p className="text-2xl font-black text-slate-900 tracking-tight leading-none">${stats.valor_total.toLocaleString()}</p>
-                                    </div>
-                                </div>
-                                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-500">
-                                    <div className="w-8 h-8 rounded-xl bg-white/60 backdrop-blur-sm shadow-sm flex items-center justify-center">
-                                        <span className="text-xs font-black text-indigo-600">$</span>
-                                    </div>
+                        <div className="group relative rounded-[16px] p-3 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgb(243,214,210,0.8)] hover:border-[#e3b5af] hover:z-50 cursor-default overflow-hidden flex items-center gap-3 bg-white border-slate-200/70 z-10">
+                            <div className="absolute inset-0 pointer-events-none">
+                                <div className="absolute right-0 top-0 w-24 h-24 rounded-full blur-2xl opacity-0 group-hover:opacity-60 transition-opacity duration-500 bg-[#f3d6d2] -mr-8 -mt-8"></div>
+                            </div>
+                            <div className="p-2 rounded-xl bg-[#f3d6d2]/60 border border-[#f3d6d2] shadow-sm shadow-[#f3d6d2]/50 transition-transform group-hover:scale-105 shrink-0 z-10">
+                                <BadgeDollarSign className="h-4 w-4 text-[#c25e5e]" />
+                            </div>
+                            <div className="flex flex-col min-w-0 z-10">
+                                <span className="text-[9px] font-black uppercase tracking-[0.15em] text-slate-400 truncate">Valor Pipeline</span>
+                                <div className="flex items-baseline gap-1.5">
+                                    <span className="text-xl font-black tracking-tight text-slate-900 leading-none">${(stats.valor_total / 1000).toFixed(1)}k</span>
                                 </div>
                             </div>
                         </div>
@@ -380,20 +372,18 @@ export default function Cotizaciones() {
                         {/* Closed Value Card */}
                         <div
                             onClick={() => setStatusFilter(statusFilter === 'aceptada' ? null : 'aceptada')}
-                            className={`group relative rounded-2xl p-6 transition-all duration-500 overflow-hidden border-none text-white cursor-pointer ${statusFilter === 'aceptada' ? 'bg-[#383d8f] shadow-[0_20px_60px_rgba(68,73,170,0.3)] ring-2 ring-white/10' : 'bg-[#4449AA] shadow-[0_20px_40px_rgba(68,73,170,0.15)] hover:shadow-[0_30px_60px_rgba(68,73,170,0.25)]'}`}
+                            className={`group relative rounded-[16px] p-3 shadow-[0_4px_20px_rgb(0,0,0,0.03)] border transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgb(233,247,207,0.8)] hover:z-50 cursor-pointer overflow-hidden flex items-center gap-3 ${statusFilter === 'aceptada' ? 'bg-white border-[#c6db9c] ring-1 ring-[#e9f7cf] z-[101]' : 'bg-white border-slate-200/70 hover:border-[#c6db9c] z-10'}`}
                         >
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl group-hover:bg-white/20 transition-colors duration-500"></div>
-                            <div className="relative flex items-center justify-between">
-                                <div className="space-y-1">
-                                    <p className="text-[10px] font-black text-indigo-100/70 uppercase tracking-[0.2em]">Valor Cerrado</p>
-                                    <div className="flex items-baseline gap-1">
-                                        <p className="text-2xl font-black text-white tracking-tight leading-none">${stats.valor_aceptadas.toLocaleString()}</p>
-                                    </div>
-                                </div>
-                                <div className="w-12 h-12 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500">
-                                    <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
-                                        <CheckCircle className="w-4 h-4 text-white" />
-                                    </div>
+                            <div className="absolute inset-0 pointer-events-none">
+                                <div className="absolute right-0 top-0 w-24 h-24 rounded-full blur-2xl opacity-0 group-hover:opacity-60 transition-opacity duration-500 bg-[#e9f7cf] -mr-8 -mt-8"></div>
+                            </div>
+                            <div className="p-2 rounded-xl bg-[#e9f7cf]/80 border border-[#e9f7cf] shadow-sm shadow-[#e9f7cf]/50 transition-transform group-hover:scale-105 shrink-0 z-10">
+                                <TrendingUp className="h-4 w-4 text-[#709c34]" />
+                            </div>
+                            <div className="flex flex-col min-w-0 z-10">
+                                <span className="text-[9px] font-black uppercase tracking-[0.15em] text-slate-400 truncate">Valor Cerrado</span>
+                                <div className="flex items-baseline gap-1.5">
+                                    <span className="text-xl font-black tracking-tight text-slate-900 leading-none">${(stats.valor_aceptadas / 1000).toFixed(1)}k</span>
                                 </div>
                             </div>
                         </div>
@@ -404,7 +394,7 @@ export default function Cotizaciones() {
                         <DragDropContext onDragEnd={handleOnDragEnd}>
                             <Droppable droppableId="quote-columns" direction="horizontal">
                                 {(provided) => (
-                                    <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/80 overflow-hidden transition-all duration-300">
+                                    <div className="bg-white rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200/70 overflow-hidden transition-all duration-300">
                                         <div ref={quotesWrapperRef} className="arias-table-wrapper">
                                             <div ref={quotesTableRef} className="arias-table">
                                                 <table

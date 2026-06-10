@@ -1473,7 +1473,7 @@ export default function Leads() {
                             </div>
 
                             {/* Table card */}
-                            <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100/80 overflow-hidden">
+                            <div className="bg-white rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.02)] border border-slate-200/60 overflow-hidden">
                                 <div ref={leadsWrapperRef} className="arias-table-wrapper">
                                     <div ref={leadsTableRef} className="arias-table">
                                         <LeadTable 
