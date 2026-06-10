@@ -12,7 +12,11 @@ serve(async (req) => {
     }
 
     try {
-        const { prompt, companyId, performanceContext, isPerformanceChat } = await req.json();
+        const body = await req.json();
+        const prompt = body.prompt;
+        const companyId = body.companyId;
+        const performanceContext = body.performanceContext;
+        const isPerformanceChat = body.isPerformanceChat || !!performanceContext;
 
         if (!prompt || !companyId) {
             throw new Error("Missing prompt or companyId");
@@ -88,6 +92,32 @@ serve(async (req) => {
             status: (f.leads as any).status,
             value: (f.leads as any).value
         })) || [];
+
+        // Format performance data safely
+        if (isPerformanceChat && performanceContext) {
+            const { data: profiles } = await supabase
+                .from('profiles')
+                .select('id, full_name')
+                .eq('company_id', companyId);
+            
+            const profileMap = new Map();
+            if (profiles) {
+                profiles.forEach(p => profileMap.set(p.id, p.full_name));
+            }
+
+            if (performanceContext.userPerformance) {
+                performanceContext.userPerformance = performanceContext.userPerformance.map((u: any) => ({
+                    ...u,
+                    user_name: u.user_name || profileMap.get(u.user_id) || 'Usuario Desconocido'
+                }));
+            }
+            if (performanceContext.callSummary) {
+                performanceContext.callSummary = performanceContext.callSummary.map((c: any) => ({
+                    ...c,
+                    user_name: c.user_name || profileMap.get(c.user_id) || 'Usuario Desconocido'
+                }));
+            }
+        }
 
         const contextData = {
             today: new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
