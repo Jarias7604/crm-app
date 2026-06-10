@@ -1190,15 +1190,15 @@ export default function Dashboard() {
                         tooltip: 'Total de prospectos registrados en el período seleccionado. Incluye todos los estados: nuevos, en proceso, cerrados y perdidos.'
                     },
                     {
-                        name: t('dashboard.crm.erroneousLeads'),
-                        value: stats.erroneousLeads || 0,
+                        name: 'Descartes & Errores',
+                        value: 0,
                         icon: AlertTriangle,
-                        color: 'text-rose-400',
-                        bg: 'bg-rose-500/10',
-                        trend: `${stats.erroneousLeadsTrend > 0 ? '+' : ''}${stats.erroneousLeadsTrend}%`,
-                        trendColor: stats.erroneousLeadsTrend <= 0 ? 'text-emerald-500' : 'text-rose-500',
-                        onClick: () => navigate('/leads', { state: { status: 'Erróneo', startDate: dateRange.startDate, endDate: dateRange.endDate } }),
-                        tooltip: 'Prospectos marcados como datos inválidos: número equivocado, duplicado, o que pidieron no ser contactados. Mantener este número bajo asegura que tu base de datos sea limpia.'
+                        color: 'text-slate-500',
+                        bg: 'bg-slate-500/10',
+                        trend: '',
+                        trendColor: '',
+                        onClick: undefined,
+                        tooltip: 'Leads descartados (Perdidos) o con datos inválidos (Erróneos). Es normal tener descartes, pero debes vigilar este volumen y revisar la calidad o la estrategia de cierre.'
                     },
                 ].map((item) => {
                     return (
@@ -1321,6 +1321,42 @@ export default function Dashboard() {
                                                 )}
                                             </div>
                                         </div>
+                                    ) : item.name === 'Descartes & Errores' ? (
+                                        <div className="flex flex-col mt-2 gap-2.5 flex-grow justify-center">
+                                            <div 
+                                                className="flex justify-between items-center group/err cursor-pointer p-1.5 rounded-xl hover:bg-rose-50 border border-transparent hover:border-rose-100 transition-all"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    navigate('/leads', { state: { status: 'Erróneo', startDate: dateRange.startDate, endDate: dateRange.endDate } });
+                                                }}
+                                            >
+                                                <div className="flex flex-col">
+                                                    <span className="text-2xl font-black tracking-[-0.04em] text-slate-900 group-hover/err:text-rose-600 transition-colors leading-none">{stats.erroneousLeads || 0}</span>
+                                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1">Erróneos</span>
+                                                </div>
+                                                <div className="bg-rose-100 text-rose-700 text-[9px] font-black px-2 py-1 rounded-lg">
+                                                    {Math.round(((stats.erroneousLeads || 0) / Math.max(stats.totalLeads, 1)) * 100)}%
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="h-px w-full bg-slate-100"></div>
+                                            
+                                            <div 
+                                                className="flex justify-between items-center group/lost cursor-pointer p-1.5 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    navigate('/leads', { state: { status: 'Perdido', startDate: dateRange.startDate, endDate: dateRange.endDate } });
+                                                }}
+                                            >
+                                                <div className="flex flex-col">
+                                                    <span className="text-2xl font-black tracking-[-0.04em] text-slate-900 group-hover/lost:text-slate-600 transition-colors leading-none">{funnelData.find(d => d.key === 'Perdido')?.value || 0}</span>
+                                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-1">Perdidos</span>
+                                                </div>
+                                                <div className="bg-slate-100 text-slate-600 text-[9px] font-black px-2 py-1 rounded-lg">
+                                                    {Math.round(((funnelData.find(d => d.key === 'Perdido')?.value || 0) / Math.max(stats.totalLeads, 1)) * 100)}%
+                                                </div>
+                                            </div>
+                                        </div>
                                     ) : (
                                         <div className="flex items-baseline gap-2">
                                             <span className="text-4xl font-black tracking-[-0.04em] text-slate-900">{item.value}</span>
@@ -1329,17 +1365,19 @@ export default function Dashboard() {
                                     )}
                                 </div>
 
-                                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                                    <div className="flex items-center gap-1.5">
-                                        <div className={`w-1.5 h-1.5 rounded-full ${item.trendColor.replace('text', 'bg')}`} />
-                                        <span className={`text-[10px] font-black tracking-widest uppercase ${item.trendColor}`}>
-                                            {item.trend}
+                                {item.name !== 'Descartes & Errores' && (
+                                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                                        <div className="flex items-center gap-1.5">
+                                            <div className={`w-1.5 h-1.5 rounded-full ${item.trendColor.replace('text', 'bg')}`} />
+                                            <span className={`text-[10px] font-black tracking-widest uppercase ${item.trendColor}`}>
+                                                {item.trend}
+                                            </span>
+                                        </div>
+                                        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                            {getDateRangeLabelDisplay(selectedDateRange) || 'Todo el tiempo'}
                                         </span>
                                     </div>
-                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                                        {getDateRangeLabelDisplay(selectedDateRange) || 'Todo el tiempo'}
-                                    </span>
-                                </div>
+                                )}
                             </div>
                         </div>
                     );
