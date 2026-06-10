@@ -2105,22 +2105,37 @@ function CallActivitySection({
 
                                     {/* Total Calls */}
                                     <div className="col-span-1 text-center">
-                                        <span className="text-[13px] font-black text-gray-700">{user.calls_total}</span>
+                                        {user.calls_total > 0 ? (
+                                            <button onClick={(e) => { e.stopPropagation(); navigate('/leads', { state: { assignedFilter: user.user_id } }); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-gray-100 transition-all cursor-pointer border border-transparent hover:border-gray-200">
+                                                <span className="text-[13px] font-black text-gray-700 group-hover:text-[#4449AA] transition-colors">{user.calls_total}</span>
+                                                <ArrowUpRight className="w-3.5 h-3.5 text-[#4449AA] opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
+                                            </button>
+                                        ) : <span className="text-[13px] font-black text-gray-300">{user.calls_total}</span>}
                                     </div>
 
                                     {/* Connected */}
                                     <div className="col-span-1 text-center">
-                                        <span className="text-[13px] font-black text-emerald-600">{user.calls_connected}</span>
+                                        {user.calls_connected > 0 ? (
+                                            <button onClick={(e) => { e.stopPropagation(); navigate('/leads', { state: { assignedFilter: user.user_id } }); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-emerald-50 transition-all cursor-pointer border border-transparent hover:border-emerald-100">
+                                                <span className="text-[13px] font-black text-emerald-600 group-hover:text-emerald-700 transition-colors">{user.calls_connected}</span>
+                                                <ArrowUpRight className="w-3.5 h-3.5 text-emerald-600 opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
+                                            </button>
+                                        ) : <span className="text-[13px] font-black text-gray-300">{user.calls_connected}</span>}
                                     </div>
 
                                     {/* No Answer */}
                                     <div className="col-span-1 text-center">
-                                        <span className="text-[13px] font-black text-red-400">{user.calls_no_answer}</span>
+                                        {user.calls_no_answer > 0 ? (
+                                            <button onClick={(e) => { e.stopPropagation(); navigate('/leads', { state: { assignedFilter: user.user_id } }); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-red-50 transition-all cursor-pointer border border-transparent hover:border-red-100">
+                                                <span className="text-[13px] font-black text-red-400 group-hover:text-red-600 transition-colors">{user.calls_no_answer}</span>
+                                                <ArrowUpRight className="w-3.5 h-3.5 text-red-500 opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
+                                            </button>
+                                        ) : <span className="text-[13px] font-black text-gray-300">{user.calls_no_answer}</span>}
                                     </div>
 
                                     {/* Connect Rate */}
                                     <div className="col-span-1 text-center">
-                                        <span className={`text-[11px] font-black px-2 py-1 rounded-lg ${connectRate >= 50 ? 'bg-emerald-50 text-emerald-700' :
+                                        <span className={`inline-flex items-center justify-center text-[11px] font-black px-2.5 py-1 rounded-lg ${connectRate >= 50 ? 'bg-emerald-50 text-emerald-700' :
                                             connectRate >= 30 ? 'bg-amber-50 text-amber-700' :
                                                 'bg-red-50 text-red-600'
                                             }`}>
@@ -2130,12 +2145,22 @@ function CallActivitySection({
 
                                     {/* Unique Leads */}
                                     <div className="col-span-2 text-center">
-                                        <span className="text-[13px] font-black text-gray-600">{user.unique_leads_called}</span>
+                                        {user.unique_leads_called > 0 ? (
+                                            <button onClick={(e) => { e.stopPropagation(); navigate('/leads', { state: { assignedFilter: user.user_id } }); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-gray-100 transition-all cursor-pointer border border-transparent hover:border-gray-200">
+                                                <span className="text-[13px] font-black text-gray-600 group-hover:text-[#4449AA] transition-colors">{user.unique_leads_called}</span>
+                                                <ArrowUpRight className="w-3.5 h-3.5 text-[#4449AA] opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
+                                            </button>
+                                        ) : <span className="text-[13px] font-black text-gray-300">{user.unique_leads_called}</span>}
                                     </div>
 
                                     {/* Status Changes */}
                                     <div className="col-span-2 text-center">
-                                        <span className="text-[13px] font-black text-[#4449AA]">{user.leads_with_status_change}</span>
+                                        {user.leads_with_status_change > 0 ? (
+                                            <button onClick={(e) => { e.stopPropagation(); navigate('/leads', { state: { assignedFilter: user.user_id } }); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-violet-50 transition-all cursor-pointer border border-transparent hover:border-violet-100">
+                                                <span className="text-[13px] font-black text-[#4449AA] group-hover:text-violet-700 transition-colors">{user.leads_with_status_change}</span>
+                                                <ArrowUpRight className="w-3.5 h-3.5 text-violet-600 opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
+                                            </button>
+                                        ) : <span className="text-[13px] font-black text-gray-300">{user.leads_with_status_change}</span>}
                                     </div>
                                 </div>
                             );
