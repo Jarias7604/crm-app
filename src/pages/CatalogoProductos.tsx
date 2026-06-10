@@ -321,7 +321,7 @@ export default function CatalogoProductos() {
                     <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-[2px] transition-opacity" onClick={resetForm} />
 
                     {/* Drawer Content */}
-                    <div className="relative w-full sm:w-[560px] max-w-xl h-full bg-[#F8FAFC] shadow-[0_8px_40px_rgba(0,0,0,0.12)] flex flex-col animate-in slide-in-from-right-8 fade-in duration-300 border-l border-slate-200/60 overflow-hidden">
+                    <div className="relative w-full sm:w-[900px] max-w-[95vw] h-full bg-[#F8FAFC] shadow-[0_8px_40px_rgba(0,0,0,0.12)] flex flex-col animate-in slide-in-from-right-8 fade-in duration-300 border-l border-slate-200/60 overflow-hidden">
                         
                         {/* Header Premium (Dark Mode Style) */}
                         <div className="px-6 py-7 bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 flex justify-between items-center relative z-30 shadow-md shrink-0">
