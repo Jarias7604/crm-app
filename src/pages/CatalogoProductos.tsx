@@ -548,6 +548,7 @@ export default function CatalogoProductos() {
                                 </div>
                             </div>
                         </div>
+                    </div>
                         
                         {/* Drawer Footer */}
                         <div className="bg-gray-50 p-5 flex justify-end gap-3 border-t border-gray-100 shrink-0">
