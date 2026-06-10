@@ -452,7 +452,7 @@ export default function TeamPerformancePage() {
                 companyId={profile?.company_id || ''}
                 isOpen={isAiChatOpen}
                 onClose={() => setIsAiChatOpen(false)}
-                performanceContext={{ userPerformance, callSummary }}
+                performanceContext={{ userPerformance, callSummary, profileNames }}
             />
         </div>
     );

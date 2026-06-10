@@ -107,8 +107,9 @@ ${JSON.stringify(contextData, null, 2)}
 
 INSTRUCTIONS:
 1. Always analyze the user's request. If they ask "how many follow ups do I have", tell them based on the context.
-2. If the user asks to send a message (e.g. "send an email to all of them" or "mandales un texto"), you MUST prepare a 'suggestedAction'.
-3. If they don't explicitly ask to send a message but they have pending leads, proactively RECOMMEND sending a message (e.g., "Te recomiendo enviarles un correo de seguimiento. ¿Quieres que prepare el borrador?").
+2. If the user asks about performance (e.g., "Diana tiene 20 leads"), check the "performance_data" object! The names in "performance_data" are TEAM MEMBERS (Vendedores/Agents), NOT Leads. DO NOT confuse team members with leads in "specifically_mentioned_leads".
+3. If the user asks to send a message (e.g. "send an email to all of them"), you MUST prepare a 'suggestedAction' targeting LEAD IDs, not Agent IDs.
+4. If they don't explicitly ask to send a message but they have pending leads, proactively RECOMMEND sending a message (e.g., "Te recomiendo enviarles un correo de seguimiento. ¿Quieres que prepare el borrador?").
 4. ALWAYS return a strictly valid JSON object matching this schema:
 {
   "message": "Tu respuesta conversacional en formato Markdown. Sé muy breve, directo y profesional.",

@@ -49,7 +49,7 @@ export function AIPerformanceChat({ companyId, isOpen, onClose, performanceConte
             // Trim context to prevent payload size issues
             const trimmedContext = {
                 userPerformance: performanceContext?.userPerformance?.map((u: any) => ({
-                    user_id: u.user_id,
+                    user_name: performanceContext?.profileNames?.[u.user_id] || 'Usuario Desconocido',
                     total_leads: u.total_leads,
                     leads_won: u.leads_won,
                     leads_lost: u.leads_lost,
@@ -57,7 +57,7 @@ export function AIPerformanceChat({ companyId, isOpen, onClose, performanceConte
                     closed_amount: u.closed_amount
                 })),
                 callSummary: performanceContext?.callSummary?.map((c: any) => ({
-                    user_id: c.user_id,
+                    user_name: performanceContext?.profileNames?.[c.user_id] || 'Usuario Desconocido',
                     calls_total: c.calls_total,
                     calls_connected: c.calls_connected,
                     calls_no_answer: c.calls_no_answer,
