@@ -194,54 +194,102 @@ export default function CatalogoProductos() {
     // Premium UI Render
     return (
         <div className="max-w-[1400px] mx-auto space-y-6">
-            {/* Header premium */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-8 rounded-[24px] border border-gray-100 shadow-sm relative overflow-hidden">
-                {/* Decorative background */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-500/5 to-purple-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
-                
-                <div className="relative z-10">
-                    <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
-                            <Box className="w-6 h-6" />
-                        </div>
-                        <h1 className="text-3xl font-black text-[#0f172a] tracking-tight">Catálogo de Servicios y Productos</h1>
+            {/* Super Header Compacto + Buscador */}
+            <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex flex-col lg:flex-row items-center gap-4 sticky top-0 z-10">
+                <div className="flex items-center gap-3 min-w-max">
+                    <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                        <Box className="w-5 h-5" />
                     </div>
-                    <p className="text-gray-500 font-medium ml-14">Servicios, productos, suscripciones y módulos para cualquier industria.</p>
+                    <div>
+                        <h1 className="text-xl font-black text-gray-900 leading-tight">Catálogo</h1>
+                        <p className="text-[11px] text-gray-500 font-bold uppercase tracking-wider">Productos y Servicios</p>
+                    </div>
                 </div>
-                
-                {canEdit && !showForm && (
+
+                <div className="flex-1 flex w-full items-center gap-2">
+                    <div className="flex-1 flex items-center bg-gray-50 rounded-xl px-3 py-2 border border-gray-200/60 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all">
+                        <Search className="w-4 h-4 text-gray-400 mr-2 shrink-0" />
+                        <input
+                            type="text"
+                            placeholder="Buscar por nombre, código o descripción..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full bg-transparent border-none outline-none text-sm font-medium text-gray-700 placeholder:text-gray-400"
+                        />
+                    </div>
+                    
+                    <div className="hidden md:flex flex-wrap gap-1 p-1 bg-gray-50 rounded-xl border border-gray-200/60">
+                        <button
+                            onClick={() => setFilterTipo('all')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${filterTipo === 'all' ? 'bg-white shadow-sm text-gray-900 border border-gray-200' : 'text-gray-500 hover:text-gray-700'}`}
+                        >
+                            Todos ({items.length})
+                        </button>
+                        {types.map(t => {
+                            const count = items.filter(i => i.tipo === t.slug).length;
+                            return (
+                                <button
+                                    key={t.slug}
+                                    onClick={() => setFilterTipo(t.slug)}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5`}
+                                    style={filterTipo === t.slug ? {
+                                        backgroundColor: t.color,
+                                        color: 'white',
+                                        boxShadow: `0 2px 8px ${t.color}40`,
+                                    } : {
+                                        color: t.color,
+                                        opacity: 0.8
+                                    }}
+                                >
+                                    <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                                    {t.name} ({count})
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {canEdit && (
                     <Button
                         onClick={() => { resetForm(); setShowForm(true); }}
-                        className="mt-6 md:mt-0 bg-[#0f172a] hover:bg-gray-800 text-white shadow-xl shadow-gray-900/20 rounded-xl px-6 py-2.5 relative z-10 transition-all hover:scale-105 active:scale-95"
+                        className="w-full lg:w-auto bg-[#0f172a] hover:bg-gray-800 text-white shadow-md rounded-xl px-5 py-2.5 transition-all"
                     >
-                        <Plus className="w-5 h-5 mr-2" />
-                        <span className="font-bold">Nuevo Producto</span>
+                        <Plus className="w-4 h-4 mr-2" />
+                        <span className="font-bold text-sm">Nuevo Producto</span>
                     </Button>
                 )}
             </div>
 
-            {/* Formulario Inline (Estilo Slide-down Premium) */}
+            {/* Formulario Estilo Drawer (Panel Lateral) */}
             {showForm && (
-                <div className="bg-white rounded-[24px] border border-gray-100 shadow-xl shadow-blue-900/5 overflow-hidden animate-in slide-in-from-top-4 fade-in duration-300">
-                    <div className="bg-gradient-to-r from-[#f8fafc] to-white border-b border-gray-100 p-6 flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center">
-                                {editingId ? <Edit className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-black text-gray-900">
-                                    {editingId ? 'Editar Producto' : 'Crear Nuevo Producto'}
-                                </h3>
-                                <p className="text-xs text-gray-500 font-medium">Configura los detalles comerciales y de facturación</p>
-                            </div>
-                        </div>
-                        <button onClick={resetForm} className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors">
-                            <X className="w-5 h-5" />
-                        </button>
-                    </div>
+                <div className="fixed inset-0 z-[100] flex justify-end">
+                    {/* Backdrop */}
+                    <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm transition-opacity" onClick={resetForm} />
 
-                    <div className="p-8">
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    {/* Drawer Content */}
+                    <div className="relative w-full max-w-[850px] h-full bg-white shadow-2xl flex flex-col animate-in slide-in-from-right-8 fade-in duration-300 border-l border-gray-200">
+                        
+                        {/* Drawer Header */}
+                        <div className="bg-gradient-to-r from-[#f8fafc] to-white border-b border-gray-100 p-5 flex justify-between items-center shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center">
+                                    {editingId ? <Edit className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-gray-900 leading-tight">
+                                        {editingId ? 'Editar Producto' : 'Crear Nuevo Producto'}
+                                    </h3>
+                                    <p className="text-xs text-gray-500 font-medium">Configura los detalles comerciales y de facturación</p>
+                                </div>
+                            </div>
+                            <button onClick={resetForm} className="p-2 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors focus:outline-none">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Drawer Body */}
+                        <div className="p-6 overflow-y-auto flex-1">
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                             {/* Columna Izquierda: Info General */}
                             <div className="lg:col-span-6 space-y-6">
                                 <div className="space-y-6">
@@ -500,63 +548,22 @@ export default function CatalogoProductos() {
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    <div className="bg-gray-50 p-6 flex justify-end gap-3 border-t border-gray-100">
-                        <Button onClick={resetForm} variant="outline" className="px-6 rounded-xl font-bold bg-white">
-                            Cancelar
-                        </Button>
-                        <Button onClick={handleSave} className="bg-[#007BFF] hover:bg-blue-600 text-white px-8 rounded-xl shadow-lg shadow-blue-500/30">
-                            <Save className="w-4 h-4 mr-2" />
-                            <span className="font-bold">Guardar Producto</span>
-                        </Button>
+                        
+                        {/* Drawer Footer */}
+                        <div className="bg-gray-50 p-5 flex justify-end gap-3 border-t border-gray-100 shrink-0">
+                            <Button onClick={resetForm} variant="outline" className="px-6 rounded-xl font-bold bg-white">
+                                Cancelar
+                            </Button>
+                            <Button onClick={handleSave} className="bg-[#007BFF] hover:bg-blue-600 text-white px-8 rounded-xl shadow-lg shadow-blue-500/30">
+                                <Save className="w-4 h-4 mr-2" />
+                                <span className="font-bold">Guardar Producto</span>
+                            </Button>
+                        </div>
                     </div>
                 </div>
             )}
 
-            {/* Filtros y Buscador Premium */}
-            <div className="bg-white rounded-[20px] p-2 border border-gray-100 shadow-sm flex flex-col md:flex-row gap-2">
-                <div className="flex-1 flex items-center bg-gray-50 rounded-[16px] px-4 py-2 border border-gray-200/60 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all">
-                    <Search className="w-5 h-5 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder="Buscar por nombre, código o descripción..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full bg-transparent border-none outline-none px-3 text-sm font-medium text-gray-700 placeholder:text-gray-400"
-                    />
-                </div>
-                
-                <div className="flex flex-wrap gap-1 md:w-auto p-1 bg-gray-50 rounded-[16px] border border-gray-200/60 overflow-hidden">
-                    <button
-                        onClick={() => setFilterTipo('all')}
-                        className={`px-4 py-2 rounded-[12px] text-xs font-bold transition-all ${filterTipo === 'all' ? 'bg-white shadow-sm text-gray-900 border border-gray-200' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        Todos ({items.length})
-                    </button>
-                    {types.map(t => {
-                        const count = items.filter(i => i.tipo === t.slug).length;
-                        return (
-                            <button
-                                key={t.slug}
-                                onClick={() => setFilterTipo(t.slug)}
-                                className={`px-4 py-2 rounded-[12px] text-xs font-bold transition-all flex items-center gap-1.5`}
-                                style={filterTipo === t.slug ? {
-                                    backgroundColor: t.color,
-                                    color: 'white',
-                                    boxShadow: `0 4px 12px ${t.color}40`,
-                                } : {
-                                    color: t.color,
-                                    opacity: 0.8
-                                }}
-                            >
-                                <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                                {t.name} ({count})
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
+
 
             {/* Tabla Principal */}
             <div className="bg-white rounded-[24px] shadow-sm border border-gray-100 overflow-hidden">
