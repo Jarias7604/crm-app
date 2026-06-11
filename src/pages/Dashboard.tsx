@@ -820,7 +820,7 @@ export default function Dashboard() {
                 <MobileQuickActions
                     isHome
                     hideFAB
-                    onCreateLead={() => navigate('/leads', { state: { openCreateModal: true } })}
+                    onCreateLead={() => navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  openCreateModal: true } })}
                 />
             </div>
         );
@@ -960,7 +960,7 @@ export default function Dashboard() {
                             {hotLeads.slice(0, 3).map(lead => (
                                 <button
                                     key={lead.id}
-                                    onClick={() => navigate('/leads', { state: { leadId: lead.id } })}
+                                    onClick={() => navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  leadId: lead.id } })}
                                     className="flex items-center gap-2 bg-white/15 hover:bg-white/25 border border-white/20 rounded-xl px-3 py-1.5 transition-all"
                                 >
                                     <div className="w-6 h-6 rounded-full bg-white/30 flex items-center justify-center text-[10px] font-black text-white shrink-0">
@@ -1016,7 +1016,7 @@ export default function Dashboard() {
                                                 <div
                                                     key={lead.id}
                                                     className="px-4 py-2.5 flex items-center justify-between hover:bg-red-50/40 transition-colors cursor-pointer group/row"
-                                                    onClick={() => { setShowEscalation(true); navigate('/leads', { state: { leadId: lead.id } }); }}
+                                                    onClick={() => { setShowEscalation(true); navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  leadId: lead.id } }); }}
                                                 >
                                                     <div className="min-w-0 flex-1">
                                                         <p className="text-xs font-bold text-gray-900 truncate group-hover/row:text-red-600 transition-colors">{lead.name}</p>
@@ -1047,7 +1047,7 @@ export default function Dashboard() {
                                     </div>
                                     <div className="px-4 py-2.5 border-t border-gray-100 bg-gray-50/50">
                                         <button
-                                            onClick={() => { setShowEscalation(true); navigate('/leads', { state: { status: 'Llamada fría', minContactCount: 6 } }); }}
+                                            onClick={() => { setShowEscalation(true); navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  status: 'Llamada fría', minContactCount: 6 } }); }}
                                             className="w-full flex items-center justify-center gap-1.5 bg-red-500 hover:bg-red-600 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl transition-all"
                                         >
                                             Ver todos en Leads
@@ -1153,7 +1153,7 @@ export default function Dashboard() {
                         bg: 'bg-emerald-50/50',
                         trend: `${stats.wonDealsTrend > 0 ? '+' : ''}${stats.wonDealsTrend}%`,
                         trendColor: stats.wonDealsTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
-                        onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'], startDate: dateRange.startDate, endDate: dateRange.endDate } }),
+                        onClick: () => navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  status: ['Cerrado', 'Cliente'], startDate: dateRange.startDate, endDate: dateRange.endDate } }),
                         tooltip: 'Número de prospectos que ya compraron o cerraron trato en el período. Cada uno representa dinero real que entró. ¡Más es mejor!'
                     },
                     {
@@ -1175,7 +1175,7 @@ export default function Dashboard() {
                         bg: 'bg-amber-50/50',
                         trend: `${stats.conversionRateTrend > 0 ? '+' : ''}${stats.conversionRateTrend}%`,
                         trendColor: stats.conversionRateTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
-                        onClick: () => navigate('/leads', { state: { status: ['Cerrado', 'Cliente'], startDate: dateRange.startDate, endDate: dateRange.endDate } }),
+                        onClick: () => navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  status: ['Cerrado', 'Cliente'], startDate: dateRange.startDate, endDate: dateRange.endDate } }),
                         tooltip: 'De cada 100 prospectos que entran, ¿cuántos terminan comprando? Si es 10%, necesitas 10 leads para vender 1. Mientras más alto, más eficiente es tu equipo.'
                     },
                     {
@@ -1186,7 +1186,7 @@ export default function Dashboard() {
                         bg: 'bg-blue-50/50',
                         trend: `${stats.totalLeadsTrend > 0 ? '+' : ''}${stats.totalLeadsTrend}%`,
                         trendColor: stats.totalLeadsTrend >= 0 ? 'text-emerald-500' : 'text-rose-500',
-                        onClick: () => navigate('/leads', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } }),
+                        onClick: () => navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  startDate: dateRange.startDate, endDate: dateRange.endDate } }),
                         tooltip: 'Total de prospectos registrados en el período seleccionado. Incluye todos los estados: nuevos, en proceso, cerrados y perdidos.'
                     },
                     {
@@ -1265,7 +1265,7 @@ export default function Dashboard() {
                                             <div 
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    navigate('/leads', { state: { assignedFilter: 'unassigned' } });
+                                                    navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  assignedFilter: 'unassigned' } });
                                                 }}
                                                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-600 font-bold transition-all border border-orange-200/50 group/badge"
                                             >
@@ -1327,7 +1327,7 @@ export default function Dashboard() {
                                                 className="flex justify-between items-center group/err cursor-pointer p-1.5 rounded-xl hover:bg-rose-50 border border-transparent hover:border-rose-100 transition-all"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    navigate('/leads', { state: { status: 'Erróneo', startDate: dateRange.startDate, endDate: dateRange.endDate } });
+                                                    navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  status: 'Erróneo', startDate: dateRange.startDate, endDate: dateRange.endDate } });
                                                 }}
                                             >
                                                 <div className="flex flex-col">
@@ -1345,7 +1345,7 @@ export default function Dashboard() {
                                                 className="flex justify-between items-center group/lost cursor-pointer p-1.5 rounded-xl hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    navigate('/leads', { state: { status: 'Perdido', startDate: dateRange.startDate, endDate: dateRange.endDate } });
+                                                    navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  status: 'Perdido', startDate: dateRange.startDate, endDate: dateRange.endDate } });
                                                 }}
                                             >
                                                 <div className="flex flex-col">
@@ -1435,7 +1435,7 @@ export default function Dashboard() {
                     <div className="flex-grow flex items-center justify-center">
                         <FunnelInfographic
                             data={funnelData}
-                            onStageClick={(status) => navigate('/leads', { state: { status, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
+                            onStageClick={(status) => navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  status, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
                             hideClientAmount={!isAdmin}
                             hideAmounts={!canViewActiveFinancials}
                         />
@@ -1518,7 +1518,7 @@ export default function Dashboard() {
                                     {focusItems.map((item, i) => (
                                         <div
                                             key={i}
-                                            onClick={() => item.action && navigate('/leads', { state: { status: item.action, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
+                                            onClick={() => item.action && navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  status: item.action, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
                                             className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-50/60 hover:bg-slate-100/80 cursor-pointer transition-all group/item border border-slate-100/80"
                                         >
                                             <div className={`w-8 h-8 rounded-xl ${item.bg} flex items-center justify-center shrink-0 mt-0.5`}>
@@ -1558,7 +1558,7 @@ export default function Dashboard() {
                                         </div>
                                     </div>
                                     <div
-                                        onClick={() => navigate('/leads', { state: { leadId: topOpportunities[0].id } })}
+                                        onClick={() => navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  leadId: topOpportunities[0].id } })}
                                         className="flex items-center gap-2 p-2 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100/60 cursor-pointer hover:border-indigo-200 transition-all"
                                     >
                                         <div className="w-7 h-7 rounded-lg bg-indigo-500 flex items-center justify-center text-white text-[11px] font-black shrink-0">
@@ -1636,7 +1636,7 @@ export default function Dashboard() {
                                             stroke="none"
                                             onClick={(data) => {
                                                 if (data && data.key) {
-                                                    navigate('/leads', { state: { source: data.key, startDate: dateRange.startDate, endDate: dateRange.endDate } });
+                                                    navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  source: data.key, startDate: dateRange.startDate, endDate: dateRange.endDate } });
                                                 }
                                             }}
                                             className="cursor-pointer"
@@ -1658,7 +1658,7 @@ export default function Dashboard() {
                             {sourceData.slice(0, 4).map((entry, index) => (
                                 <div
                                     key={index}
-                                    onClick={() => navigate('/leads', { state: { source: entry.key, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
+                                    onClick={() => navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  source: entry.key, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
                                     className="flex items-start gap-2.5 group/item cursor-pointer hover:bg-slate-50 p-1 rounded-lg transition-all"
                                 >
                                     <div
@@ -1771,7 +1771,7 @@ export default function Dashboard() {
                                 const badge = urgentCount > 5 ? '🔴 Urgente' : urgentCount > 0 ? '⚠️ Revisar' : '✅ Al día';
                                 return (
                                     <button
-                                        onClick={() => navigate('/leads', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } })}
+                                        onClick={() => navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  startDate: dateRange.startDate, endDate: dateRange.endDate } })}
                                         className="flex flex-col items-center gap-1 py-4 px-2 hover:bg-slate-50/70 transition-colors group/kpi"
                                     >
                                         <Clock className={`w-4 h-4 ${color} mb-0.5`} />
@@ -1791,7 +1791,7 @@ export default function Dashboard() {
                                 const noFollowup = escalationLeads.length;
                                 return (
                                     <button
-                                        onClick={() => navigate('/leads')}
+                                        onClick={() => navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all' } })}
                                         className="flex flex-col items-center gap-1 py-4 px-2 hover:bg-slate-50/70 transition-colors group/kpi"
                                     >
                                         <Target className="w-4 h-4 text-indigo-500 mb-0.5" />
@@ -1932,7 +1932,7 @@ export default function Dashboard() {
                             <p className="text-[10px] text-gray-400 font-medium mt-0.5">Mayores contratos</p>
                         </div>
                         <div className="flex items-center gap-2">
-                            <button onClick={() => navigate('/leads', { state: { startDate: dateRange.startDate, endDate: dateRange.endDate } })} className="text-[9px] font-black text-slate-400 hover:text-indigo-600 uppercase tracking-[0.2em] transition-all">Ver</button>
+                            <button onClick={() => navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  startDate: dateRange.startDate, endDate: dateRange.endDate } })} className="text-[9px] font-black text-slate-400 hover:text-indigo-600 uppercase tracking-[0.2em] transition-all">Ver</button>
                             <div className="relative" ref={activeCardFilter === 'topOpp' ? cardFilterRef : null}>
                                 <button
                                     onClick={(e) => {
@@ -1971,7 +1971,7 @@ export default function Dashboard() {
                         {topOpportunities.length > 0 ? topOpportunities.map((lead) => (
                             <div
                                 key={lead.id}
-                                onClick={() => navigate('/leads', { state: { leadId: lead.id } })}
+                                onClick={() => navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  leadId: lead.id } })}
                                 className="p-2.5 bg-gray-50/50 rounded-xl border border-transparent hover:border-indigo-100 hover:bg-white transition-all cursor-pointer group/item flex justify-between items-center"
                             >
                                 <div className="flex flex-col gap-0.5 max-w-[60%]">
@@ -2017,7 +2017,7 @@ export default function Dashboard() {
                             </p>
                         </div>
                         <div className="flex items-center gap-2">
-                            <button onClick={() => navigate('/leads')} className="text-[9px] font-black text-blue-600 hover:text-blue-800 uppercase tracking-[0.2em] transition-all">Ver</button>
+                            <button onClick={() => navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all' } })} className="text-[9px] font-black text-blue-600 hover:text-blue-800 uppercase tracking-[0.2em] transition-all">Ver</button>
                             <div className="relative" ref={activeCardFilter === 'followups' ? cardFilterRef : null}>
                                 <button
                                     onClick={(e) => {
@@ -2115,7 +2115,7 @@ export default function Dashboard() {
                                     items.map((item) => (
                                         <div
                                             key={`${item.id}-${item.type}`}
-                                            onClick={() => navigate('/leads', { state: { leadId: item.id } })}
+                                            onClick={() => navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  leadId: item.id } })}
                                             className={`p-2.5 rounded-xl border border-transparent transition-all cursor-pointer group/item flex justify-between items-center bg-gray-50/50 ${
                                                 item.type === 'hot' ? 'hover:border-amber-100 hover:bg-amber-50/20' :
                                                 item.type === 'overdue' ? 'hover:border-rose-100 hover:bg-rose-50/20' :
@@ -2336,7 +2336,7 @@ export default function Dashboard() {
                                             <div
                                                 key={index}
                                                 className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-all cursor-pointer group/item"
-                                                onClick={() => navigate('/leads', { state: { status: 'Perdido', lostAtStage: item.stage, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
+                                                onClick={() => navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  status: 'Perdido', lostAtStage: item.stage, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
                                             >
                                                 <div className={`w-3 h-3 rounded-full ${item.color} shadow-sm group-hover/item:scale-125 transition-transform`} />
                                                 <div className="flex-1">
@@ -2352,7 +2352,7 @@ export default function Dashboard() {
                                     {stageLossData.length > 5 && (
                                         <div className="pt-2 border-t border-slate-100 mt-auto">
                                             <button
-                                                onClick={() => navigate('/leads', { state: { status: 'Perdido', startDate: dateRange.startDate, endDate: dateRange.endDate } })}
+                                                onClick={() => navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  status: 'Perdido', startDate: dateRange.startDate, endDate: dateRange.endDate } })}
                                                 className="w-full text-center py-2 text-[9px] font-black text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50/50 rounded-xl transition-all border border-indigo-100/50 uppercase tracking-widest"
                                             >
                                                 Ver todos los leads perdidos →
@@ -2436,7 +2436,7 @@ export default function Dashboard() {
                                         {displayedReasons.map((item, index) => (
                                             <div
                                                 key={index}
-                                                onClick={() => navigate('/leads', { state: { status: 'Perdido', lossReasonId: item.id, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
+                                                onClick={() => navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  status: 'Perdido', lossReasonId: item.id, startDate: dateRange.startDate, endDate: dateRange.endDate } })}
                                                 className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition-all cursor-pointer group/item"
                                             >
                                                 <div className="flex-1">
@@ -2458,7 +2458,7 @@ export default function Dashboard() {
                                     {filteredReasons.length > 5 && (
                                         <div className="pt-2 border-t border-slate-100 mt-auto">
                                             <button
-                                                onClick={() => navigate('/leads', { state: { status: 'Perdido', startDate: dateRange.startDate, endDate: dateRange.endDate } })}
+                                                onClick={() => navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  status: 'Perdido', startDate: dateRange.startDate, endDate: dateRange.endDate } })}
                                                 className="w-full text-center py-2 text-[9px] font-black text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50/50 rounded-xl transition-all border border-indigo-100/50 uppercase tracking-widest"
                                             >
                                                 Ver todos los motivos de pérdida →
@@ -2606,7 +2606,7 @@ export default function Dashboard() {
                         {/* Footer button */}
                         <div className="flex justify-end pt-2 border-t border-slate-100">
                             <Button
-                                onClick={() => navigate('/leads', { state: { leadId: selectedAiLead.id } })}
+                                onClick={() => navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  leadId: selectedAiLead.id } })}
                                 className="text-[10px] font-black uppercase tracking-wider bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl"
                             >
                                 Ver Detalles del Lead
@@ -2717,7 +2717,7 @@ export default function Dashboard() {
                         {/* Footer button */}
                         <div className="flex justify-end pt-2 border-t border-slate-100">
                             <Button
-                                onClick={() => navigate('/leads')}
+                                onClick={() => navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all' } })}
                                 className="text-[10px] font-black uppercase tracking-wider bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl"
                             >
                                 Ver Todos los Leads
