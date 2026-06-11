@@ -1265,7 +1265,7 @@ export default function Dashboard() {
                                             <div 
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    navigate('/leads', { state: { assignedFilter: dashboardAssignedTo || 'all',  assignedFilter: 'unassigned' } });
+                                                    navigate('/leads', { state: { assignedFilter: 'unassigned' } });
                                                 }}
                                                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-orange-50 hover:bg-orange-100 text-orange-600 font-bold transition-all border border-orange-200/50 group/badge"
                                             >
