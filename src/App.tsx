@@ -64,6 +64,7 @@ const PWAInstallPrompt  = lazy(() => import('./components/PWAInstallPrompt').the
 const FlyerStudio       = lazy(() => import('./pages/marketing/FlyerStudio'));
 const SocialHub         = lazy(() => import('./pages/marketing/SocialHub'));
 const SocialAccounts    = lazy(() => import('./pages/company/SocialAccounts'));
+const MetaCallback      = lazy(() => import('./pages/company/MetaCallback'));
 const Finanzas          = lazy(() => import('./pages/Finanzas'));
 const GlobalSearch      = lazy(() => import('./components/GlobalSearch').then(m => ({ default: m.GlobalSearch })));
 const OnboardingWizard  = lazy(() => import('./pages/OnboardingWizard'));
@@ -223,6 +224,7 @@ function App() {
                     <Route path="/company/performance" element={<TeamPerformance />} />
                     <Route path="/company/workspaces" element={<Workspaces />} />
                     <Route path="/company/social-accounts" element={<SocialAccounts />} />
+                    <Route path="/integrations/meta/callback" element={<MetaCallback />} />
                     <Route path="/catalogo" element={<CatalogoProductos />} />
                     <Route path="/pricing" element={<Navigate to="/catalogo" replace />} />
                     <Route path="/paquetes" element={<Navigate to="/catalogo" replace />} />

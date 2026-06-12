@@ -91,13 +91,14 @@ export const socialPublishService = {
 
     // ── Publishing ────────────────────────────────────────────────────
 
-    async publish(postId: string, platforms: string[]): Promise<Record<string, any>> {
+    async publish(postId: string, selectedCuentas: { platform: string; account_id: string }[]): Promise<Record<string, any>> {
         const results: Record<string, any> = {};
 
         // Mark as publishing
         await supabase.from('social_posts').update({ status: 'publishing' }).eq('id', postId);
 
-        for (const platform of platforms) {
+        for (const item of selectedCuentas) {
+            const { platform, account_id } = item;
             try {
                 let fnName = '';
                 if (platform === 'facebook') fnName = 'publish-facebook';
@@ -108,13 +109,13 @@ export const socialPublishService = {
                 }
 
                 const { data, error } = await supabase.functions.invoke(fnName, {
-                    body: { post_id: postId }
+                    body: { post_id: postId, account_id }
                 });
 
                 if (error) throw error;
-                results[platform] = data;
+                results[`${platform}_${account_id}`] = data;
             } catch (err: any) {
-                results[platform] = { error: err.message };
+                results[`${platform}_${account_id}`] = { error: err.message };
             }
         }
 

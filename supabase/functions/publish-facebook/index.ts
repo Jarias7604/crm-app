@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
     try {
-        const { post_id, company_id } = await req.json();
+        const { post_id, company_id, account_id } = await req.json();
 
         const SUPABASE_URL = Deno.env.get('CRM_SUPABASE_URL') || Deno.env.get('SUPABASE_URL')!;
         const SUPABASE_KEY = Deno.env.get('CRM_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -38,13 +38,21 @@ Deno.serve(async (req) => {
         }
 
         // 2. Get Facebook account credentials
-        const { data: account } = await supabase
+        let accountQuery = supabase
             .from('social_accounts')
             .select('*')
             .eq('company_id', company_id || post.company_id)
             .eq('platform', 'facebook')
-            .eq('is_active', true)
-            .maybeSingle();
+            .eq('is_active', true);
+
+        if (account_id) {
+            accountQuery = accountQuery.eq('account_id', account_id);
+        } else {
+            accountQuery = accountQuery.order('is_default', { ascending: false }).order('created_at');
+        }
+
+        const { data: accounts } = await accountQuery;
+        const account = accounts?.[0];
 
         if (!account?.access_token || !account?.account_id) {
             await supabase.from('social_posts').update({
