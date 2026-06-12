@@ -6,13 +6,17 @@ export interface SocialAccount {
     company_id: string;
     platform: 'facebook' | 'instagram' | 'tiktok' | 'youtube';
     account_name: string | null;
+    display_name: string | null;
     account_id: string | null;
     avatar_url: string | null;
     access_token: string | null;
     token_expires_at: string | null;
     is_active: boolean;
+    is_default: boolean;
+    follower_count: number;
     metadata: Record<string, any>;
     created_at: string;
+    updated_at?: string | null;
 }
 
 export interface SocialPost {
