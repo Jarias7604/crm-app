@@ -11,7 +11,7 @@ import { supabase } from '../../services/supabase';
 
 export const FacebookIcon = ({ size = 20, color = "#1877F2", className = "" }) => (
   <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill={color}>
-    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
   </svg>
 );
 
@@ -34,21 +34,21 @@ export const InstagramIcon = ({ size = 20, className = "" }) => (
 
 export const TikTokIcon = ({ size = 20, className = "" }) => (
   <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="#010101">
-    <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.02 1.59 4.23.85.99 2.0 1.69 3.25 2.02v3.8c-1.57-.16-3.07-.84-4.22-1.91-.12-.11-.22-.24-.33-.36v7.89c.04 2.44-1.2 4.77-3.26 6.07-2.07 1.3-4.75 1.44-6.95.36-2.2-1.08-3.69-3.28-3.92-5.73-.3-3.2 1.87-6.27 4.96-7.05 1.27-.32 2.6-.2 3.79.34v4.06c-.79-.5-1.74-.69-2.67-.51-1.39.26-2.42 1.48-2.52 2.9-.1 1.76 1.24 3.29 3.0 3.4 1.76.11 3.32-1.15 3.51-2.91.03-.27.04-.54.04-.81V.02z"/>
+    <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.02 1.59 4.23.85.99 2.0 1.69 3.25 2.02v3.8c-1.57-.16-3.07-.84-4.22-1.91-.12-.11-.22-.24-.33-.36v7.89c.04 2.44-1.2 4.77-3.26 6.07-2.07 1.3-4.75 1.44-6.95.36-2.2-1.08-3.69-3.28-3.92-5.73-.3-3.2 1.87-6.27 4.96-7.05 1.27-.32 2.6-.2 3.79.34v4.06c-.79-.5-1.74-.69-2.67-.51-1.39.26-2.42 1.48-2.52 2.9-.1 1.76 1.24 3.29 3.0 3.4 1.76.11 3.32-1.15 3.51-2.91.03-.27.04-.54.04-.81V.02z" />
   </svg>
 );
 
 export const YouTubeIcon = ({ size = 20, className = "" }) => (
   <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="#FF0000">
-    <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.108C19.518 3.535 12 3.535 12 3.535s-7.518 0-9.388.52a3.005 3.005 0 0 0-2.11 2.108C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.108c1.87.52 9.388.52 9.388.52s7.518 0 9.388-.52a3.003 3.003 0 0 0 2.11-2.108C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+    <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.108C19.518 3.535 12 3.535 12 3.535s-7.518 0-9.388.52a3.005 3.005 0 0 0-2.11 2.108C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.108c1.87.52 9.388.52 9.388.52s7.518 0 9.388-.52a3.003 3.003 0 0 0 2.11-2.108C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
   </svg>
 );
 
 const PLATFORM_META: Record<string, { icon: React.ComponentType<any>; color: string; bgLight: string; label: string }> = {
-  facebook:  { icon: FacebookIcon, color: '#1877F2', bgLight: '#e8f0fe', label: 'Facebook'  },
+  facebook: { icon: FacebookIcon, color: '#1877F2', bgLight: '#e8f0fe', label: 'Facebook' },
   instagram: { icon: InstagramIcon, color: '#E1306C', bgLight: '#fdf0f5', label: 'Instagram' },
-  tiktok:    { icon: TikTokIcon, color: '#010101', bgLight: '#f1f1f1', label: 'TikTok'    },
-  youtube:   { icon: YouTubeIcon, color: '#FF0000', bgLight: '#ffebee', label: 'YouTube'   },
+  tiktok: { icon: TikTokIcon, color: '#010101', bgLight: '#f1f1f1', label: 'TikTok' },
+  youtube: { icon: YouTubeIcon, color: '#FF0000', bgLight: '#ffebee', label: 'YouTube' },
 };
 
 const TONES = ['Profesional', 'Urgente', 'Premium', 'Amigable', 'Informal'];
@@ -81,8 +81,8 @@ function AccountPicker({ platform, accounts, selected, onChange }: {
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
-      <button 
-        onClick={() => setOpen(o => !o)} 
+      <button
+        onClick={() => setOpen(o => !o)}
         style={{
           width: '100%', display: 'flex', alignItems: 'center', gap: 12,
           background: selected ? `${meta.color}08` : '#fff',
@@ -108,8 +108,8 @@ function AccountPicker({ platform, accounts, selected, onChange }: {
           boxShadow: '0 8px 30px rgba(0,0,0,0.06)', overflow: 'hidden',
         }}>
           {/* None option */}
-          <button 
-            onClick={() => { onChange(null); setOpen(false); }} 
+          <button
+            onClick={() => { onChange(null); setOpen(false); }}
             style={{
               width: '100%', padding: '10px 14px', textAlign: 'left', border: 'none',
               background: !selected ? '#f1f5f9' : 'transparent',
@@ -119,9 +119,9 @@ function AccountPicker({ platform, accounts, selected, onChange }: {
             — No publicar en {meta.label}
           </button>
           {accounts.map(a => (
-            <button 
-              key={a.id} 
-              onClick={() => { onChange(a); setOpen(false); }} 
+            <button
+              key={a.id}
+              onClick={() => { onChange(a); setOpen(false); }}
               style={{
                 width: '100%', padding: '10px 14px', textAlign: 'left', border: 'none',
                 background: selected?.id === a.id ? `${meta.color}10` : 'transparent',
@@ -329,24 +329,24 @@ export default function SocialHub() {
     <div style={{ height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column', background: '#f4f6f9', overflow: 'hidden', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
 
       {/* Header - Salesforce Lightning Design Aesthetic */}
-      <header style={{ 
-        padding: '12px 24px', 
-        borderBottom: '1px solid #d8dde6', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'space-between', 
-        flexShrink: 0, 
+      <header style={{
+        padding: '12px 24px',
+        borderBottom: '1px solid #d8dde6',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexShrink: 0,
         background: '#ffffff',
         boxShadow: '0 2px 4px rgba(0,0,0,0.03)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button 
-            onClick={() => navigate('/marketing')} 
-            style={{ 
-              background: '#fff', 
-              border: '1px solid #d8dde6', 
-              borderRadius: 8, 
-              padding: 8, 
+          <button
+            onClick={() => navigate('/marketing')}
+            style={{
+              background: '#fff',
+              border: '1px solid #d8dde6',
+              borderRadius: 8,
+              padding: 8,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -364,16 +364,16 @@ export default function SocialHub() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button 
-            onClick={() => navigate('/company/social-accounts')} 
-            style={{ 
-              background: '#ffffff', 
-              border: '1px solid #d8dde6', 
-              borderRadius: 8, 
-              padding: '8px 16px', 
-              fontSize: 12, 
-              fontWeight: 700, 
-              color: '#0070d2', 
+          <button
+            onClick={() => navigate('/company/social-accounts')}
+            style={{
+              background: '#ffffff',
+              border: '1px solid #d8dde6',
+              borderRadius: 8,
+              padding: '8px 16px',
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#0070d2',
               cursor: 'pointer',
               transition: 'background 0.15s',
             }}
@@ -389,21 +389,21 @@ export default function SocialHub() {
       <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '320px 1fr 400px', overflow: 'hidden' }}>
 
         {/* ── COL 1: Media & Tone (320px) ── */}
-        <div style={{ 
-          borderRight: '1px solid #d8dde6', 
-          padding: '20px', 
-          overflowY: 'auto', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: 20, 
+        <div style={{
+          borderRight: '1px solid #d8dde6',
+          padding: '20px',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 20,
           background: '#f4f6f9'
         }}>
           {/* Uploader Card */}
           <div style={{ background: '#ffffff', borderRadius: 8, border: '1px solid #d8dde6', padding: 16 }}>
             <div style={{ fontSize: 11, fontWeight: 800, color: '#54698d', letterSpacing: '0.08em', marginBottom: 12 }}>MULTIMEDIA</div>
-            
-            <div 
-              onClick={() => fileInputRef.current?.click()} 
+
+            <div
+              onClick={() => fileInputRef.current?.click()}
               style={{
                 border: `2px dashed ${contentUrl ? '#10b981' : '#d8dde6'}`,
                 borderRadius: 8, padding: '24px 12px', textAlign: 'center', cursor: 'pointer',
@@ -437,21 +437,21 @@ export default function SocialHub() {
             </div>
             <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleUpload} style={{ display: 'none' }} />
 
-            <button 
-              onClick={() => navigate('/marketing/flyers')} 
-              style={{ 
+            <button
+              onClick={() => navigate('/marketing/flyers')}
+              style={{
                 width: '100%',
-                background: '#ffffff', 
-                border: '1px solid #d8dde6', 
-                borderRadius: 8, 
-                padding: '9px 12px', 
-                color: '#0070d2', 
-                fontSize: 12, 
-                fontWeight: 700, 
-                cursor: 'pointer', 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 6, 
+                background: '#ffffff',
+                border: '1px solid #d8dde6',
+                borderRadius: 8,
+                padding: '9px 12px',
+                color: '#0070d2',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
                 justifyContent: 'center',
                 marginTop: 12
               }}
@@ -465,17 +465,17 @@ export default function SocialHub() {
             <div style={{ fontSize: 11, fontWeight: 800, color: '#54698d', letterSpacing: '0.08em', marginBottom: 12 }}>TONO DE MARCA</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {TONES.map(t => (
-                <button 
-                  key={t} 
-                  onClick={() => setSelectedTone(t)} 
-                  style={{ 
-                    padding: '6px 12px', 
-                    borderRadius: 20, 
-                    border: `1px solid ${selectedTone === t ? '#0070d2' : '#d8dde6'}`, 
-                    background: selectedTone === t ? '#0070d2' : '#ffffff', 
-                    color: selectedTone === t ? '#ffffff' : '#54698d', 
-                    fontSize: 11, 
-                    fontWeight: 700, 
+                <button
+                  key={t}
+                  onClick={() => setSelectedTone(t)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: 20,
+                    border: `1px solid ${selectedTone === t ? '#0070d2' : '#d8dde6'}`,
+                    background: selectedTone === t ? '#0070d2' : '#ffffff',
+                    color: selectedTone === t ? '#ffffff' : '#54698d',
+                    fontSize: 11,
+                    fontWeight: 700,
                     cursor: 'pointer',
                     transition: 'all 0.1s'
                   }}
@@ -506,12 +506,12 @@ export default function SocialHub() {
         </div>
 
         {/* ── COL 2: Message Composer (Center - 1fr) ── */}
-        <div style={{ 
-          background: '#ffffff', 
-          padding: '24px', 
-          overflowY: 'auto', 
-          display: 'flex', 
-          flexDirection: 'column', 
+        <div style={{
+          background: '#ffffff',
+          padding: '24px',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
           gap: 20
         }}>
           <div>
@@ -526,23 +526,23 @@ export default function SocialHub() {
               const BrandIcon = m.icon;
               const isActive = previewPlatform === p;
               return (
-                <button 
-                  key={p} 
-                  onClick={() => setPreviewPlatform(p)} 
-                  style={{ 
-                    padding: '10px 20px', 
+                <button
+                  key={p}
+                  onClick={() => setPreviewPlatform(p)}
+                  style={{
+                    padding: '10px 20px',
                     border: 'none',
                     borderBottom: isActive ? '3px solid #0070d2' : '3px solid transparent',
-                    background: 'transparent', 
-                    cursor: 'pointer', 
-                    fontSize: 13, 
-                    fontWeight: isActive ? 800 : 600, 
-                    color: isActive ? '#081c3b' : '#54698d', 
+                    background: 'transparent',
+                    cursor: 'pointer',
+                    fontSize: 13,
+                    fontWeight: isActive ? 800 : 600,
+                    color: isActive ? '#081c3b' : '#54698d',
                     display: 'flex',
                     alignItems: 'center',
                     gap: 8,
                     marginBottom: -1,
-                    transition: 'all 0.15s' 
+                    transition: 'all 0.15s'
                   }}
                 >
                   <BrandIcon size={14} color={isActive ? m.color : '#54698d'} />
@@ -574,22 +574,22 @@ export default function SocialHub() {
             <div style={{ border: '1px solid #d8dde6', borderRadius: 8, overflow: 'hidden' }}>
               <div style={{ padding: '8px 14px', background: '#fafbfc', borderBottom: '1px solid #d8dde6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 11, fontWeight: 800, color: '#54698d' }}>CAPTION DE PUBLICACIÓN</span>
-                
+
                 {/* AI Assistant Button */}
-                <button 
-                  onClick={() => handleAICaption(previewPlatform)} 
-                  disabled={generatingCaption === previewPlatform} 
-                  style={{ 
-                    background: '#ffffff', 
-                    border: '1px solid #d8dde6', 
-                    borderRadius: 6, 
-                    padding: '4px 10px', 
-                    fontSize: 11, 
-                    fontWeight: 700, 
-                    color: '#0070d2', 
-                    cursor: 'pointer', 
-                    display: 'flex', 
-                    alignItems: 'center', 
+                <button
+                  onClick={() => handleAICaption(previewPlatform)}
+                  disabled={generatingCaption === previewPlatform}
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid #d8dde6',
+                    borderRadius: 6,
+                    padding: '4px 10px',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: '#0070d2',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
                     gap: 4,
                     boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                   }}
@@ -602,47 +602,47 @@ export default function SocialHub() {
                   Optimizar con IA
                 </button>
               </div>
-              <textarea 
-                value={captions[previewPlatform] || ''} 
-                onChange={e => setCaptions(prev => ({ ...prev, [previewPlatform]: e.target.value }))} 
-                placeholder={`Escribe la publicación para ${PLATFORM_META[previewPlatform]?.label} aquí...`} 
-                rows={8} 
-                style={{ 
-                  width: '100%', 
-                  background: 'transparent', 
-                  border: 'none', 
-                  outline: 'none', 
-                  padding: '14px', 
-                  fontSize: 14, 
-                  color: '#081c3b', 
-                  resize: 'vertical', 
-                  fontFamily: 'inherit', 
+              <textarea
+                value={captions[previewPlatform] || ''}
+                onChange={e => setCaptions(prev => ({ ...prev, [previewPlatform]: e.target.value }))}
+                placeholder={`Escribe la publicación para ${PLATFORM_META[previewPlatform]?.label} aquí...`}
+                rows={8}
+                style={{
+                  width: '100%',
+                  background: 'transparent',
+                  border: 'none',
+                  outline: 'none',
+                  padding: '14px',
+                  fontSize: 14,
+                  color: '#081c3b',
+                  resize: 'vertical',
+                  fontFamily: 'inherit',
                   boxSizing: 'border-box',
                   lineHeight: 1.6
-                }} 
+                }}
               />
             </div>
           </div>
         </div>
 
         {/* ── COL 3: Live Preview & Publish Pane (Right - 400px) ── */}
-        <div style={{ 
-          borderLeft: '1px solid #d8dde6', 
-          padding: '24px 20px', 
-          overflowY: 'auto', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          gap: 20, 
+        <div style={{
+          borderLeft: '1px solid #d8dde6',
+          padding: '24px 20px',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 20,
           background: '#f4f6f9'
         }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: '#54698d', letterSpacing: '0.08em' }}>VISTA PREVIA EN VIVO</div>
 
           {/* Social Mockup Container: Stretches beautifully to fill Col 3 */}
-          <div style={{ 
-            background: '#ffffff', 
-            borderRadius: 8, 
-            border: '1px solid #d8dde6', 
-            overflow: 'hidden', 
+          <div style={{
+            background: '#ffffff',
+            borderRadius: 8,
+            border: '1px solid #d8dde6',
+            overflow: 'hidden',
             boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
           }}>
             {/* Platform-aware mock header */}
@@ -706,7 +706,7 @@ export default function SocialHub() {
             {previewPlatform === 'instagram' && (
               <div style={{ padding: '10px 14px', background: '#fff', borderTop: '1px solid #f0f0f0' }}>
                 <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                  {['❤️','💬','📤'].map(ic => <span key={ic} style={{ fontSize: 18 }}>{ic}</span>)}
+                  {['❤️', '💬', '📤'].map(ic => <span key={ic} style={{ fontSize: 18 }}>{ic}</span>)}
                 </div>
                 {generatingCaption ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#94a3b8', fontSize: 12 }}><Loader2 size={12} className="animate-spin" /> Generando copy con IA...</div>
@@ -728,16 +728,16 @@ export default function SocialHub() {
                 const m = PLATFORM_META[p];
                 const BrandIcon = m.icon;
                 return (
-                  <div 
-                    key={p} 
-                    style={{ 
-                      flex: 1, 
-                      background: '#f4f6f9', 
-                      borderRadius: 8, 
-                      padding: '10px', 
-                      border: '1px dashed #d8dde6', 
+                  <div
+                    key={p}
+                    style={{
+                      flex: 1,
+                      background: '#f4f6f9',
+                      borderRadius: 8,
+                      padding: '10px',
+                      border: '1px dashed #d8dde6',
                       textAlign: 'center',
-                      opacity: 0.65 
+                      opacity: 0.65
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}><BrandIcon size={16} /></div>
@@ -750,14 +750,14 @@ export default function SocialHub() {
           </div>
 
           {/* Schedule Picker placeholder */}
-          <div style={{ 
-            background: '#ffffff', 
-            borderRadius: 8, 
-            padding: '12px 14px', 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 12, 
-            border: '1px solid #d8dde6', 
+          <div style={{
+            background: '#ffffff',
+            borderRadius: 8,
+            padding: '12px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            border: '1px solid #d8dde6',
             opacity: 0.75
           }}>
             <Clock size={15} color="#54698d" />
@@ -769,24 +769,24 @@ export default function SocialHub() {
 
           {/* Action Publish Button */}
           <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <button 
-              onClick={handlePublish} 
-              disabled={publishing || !contentUrl || selectedCount === 0} 
+            <button
+              onClick={handlePublish}
+              disabled={publishing || !contentUrl || selectedCount === 0}
               style={{
                 width: '100%',
-                background: !contentUrl || selectedCount === 0 
-                  ? '#cbd5e1' 
+                background: !contentUrl || selectedCount === 0
+                  ? '#cbd5e1'
                   : 'linear-gradient(180deg, #0070d2 0%, #005fb2 100%)',
                 color: '#ffffff',
-                border: 'none', 
-                borderRadius: 8, 
+                border: 'none',
+                borderRadius: 8,
                 padding: '14px 20px',
-                fontSize: 13.5, 
+                fontSize: 13.5,
                 fontWeight: 800,
                 cursor: publishing || !contentUrl || selectedCount === 0 ? 'not-allowed' : 'pointer',
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 gap: 8,
                 boxShadow: contentUrl && selectedCount > 0 ? '0 2px 6px rgba(0,112,210,0.3)' : 'none',
                 transition: 'all 0.15s ease',
