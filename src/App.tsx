@@ -63,6 +63,7 @@ const ManualPage        = lazy(() => import('./pages/support/ManualPage'));
 const PWAInstallPrompt  = lazy(() => import('./components/PWAInstallPrompt').then(m => ({ default: m.PWAInstallPrompt })));
 const FlyerStudio       = lazy(() => import('./pages/marketing/FlyerStudio'));
 const SocialHub         = lazy(() => import('./pages/marketing/SocialHub'));
+const AiCreditsAdmin    = lazy(() => import('./pages/marketing/AiCreditsAdmin'));
 const SocialAccounts    = lazy(() => import('./pages/company/SocialAccounts'));
 const MetaCallback      = lazy(() => import('./pages/company/MetaCallback'));
 const Finanzas          = lazy(() => import('./pages/Finanzas'));
@@ -273,6 +274,7 @@ function App() {
                     <Route path="/marketing/settings" element={<MarketingSettings />} />
                     <Route path="/marketing/flyers" element={<FlyerStudio />} />
                     <Route path="/marketing/social" element={<SocialHub />} />
+                    <Route path="/marketing/ai-credits" element={<AiCreditsAdmin />} />
                     <Route path="/marketing/predictions" element={<PredictiveBoard />} />
                     <Route path="/marketing/data-hygiene" element={<DataHygiene />} />
                     <Route path="/marketing/agent-network" element={<AgentNetworkMap />} />
