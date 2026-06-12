@@ -5,27 +5,28 @@ import {
   ArrowLeft, Sparkles, Download, Send, RefreshCw,
   Zap, Image, Check, ChevronRight, Upload, X, Eye,
   BarChart3, Wand2, Layers, Palette, Type, Layout,
-  ExternalLink, Star, Cpu
+  ExternalLink, Star, Cpu, Crown, Smile, Building2,
+  Instagram, Facebook, Linkedin, Smartphone, Video
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../services/supabase';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 const FORMATS = [
-  { id: 'ig-post',     label: 'Instagram Post',   tag: '1:1',     icon: '📷' },
-  { id: 'ig-portrait', label: 'IG Retrato',        tag: '4:5',     icon: '📷' },
-  { id: 'fb-post',     label: 'Facebook Post',     tag: '6:5',     icon: '👥' },
-  { id: 'story',       label: 'Story / Reels',     tag: '9:16',    icon: '🎬' },
-  { id: 'fb-cover',    label: 'Portada Facebook',  tag: 'Banner',  icon: '🖼️' },
-  { id: 'li-post',     label: 'LinkedIn',          tag: '1.91:1',  icon: '💼' },
+  { id: 'ig-post',     label: 'Instagram Post',   tag: '1:1',     icon: Instagram },
+  { id: 'ig-portrait', label: 'IG Retrato',        tag: '4:5',     icon: Smartphone },
+  { id: 'fb-post',     label: 'Facebook Post',     tag: '6:5',     icon: Facebook },
+  { id: 'story',       label: 'Story / Reels',     tag: '9:16',    icon: Video },
+  { id: 'fb-cover',    label: 'Portada Facebook',  tag: 'Banner',  icon: Layout },
+  { id: 'li-post',     label: 'LinkedIn',          tag: '1.91:1',  icon: Linkedin },
 ];
 
 const TONES = [
-  { key: 'premium',     label: 'Premium',     emoji: '👑' },
-  { key: 'urgente',     label: 'Urgente',     emoji: '⚡' },
-  { key: 'moderno',     label: 'Moderno',     emoji: '✦' },
-  { key: 'amigable',    label: 'Amigable',    emoji: '😊' },
-  { key: 'corporativo', label: 'Corporativo', emoji: '🏢' },
+  { key: 'premium',     label: 'Premium',     icon: Crown,      color: '#D4AF37' },
+  { key: 'urgente',     label: 'Urgente',     icon: Zap,        color: '#ef4444' },
+  { key: 'moderno',     label: 'Moderno',     icon: Sparkles,   color: '#7c3aed' },
+  { key: 'amigable',    label: 'Amigable',    icon: Smile,      color: '#10b981' },
+  { key: 'corporativo', label: 'Corporativo', icon: Building2,  color: '#0070d2' },
 ];
 
 const BRAND_COLORS = [
@@ -44,7 +45,7 @@ const css = {
   colBody: { flex:1, overflowY:'auto' as const, padding:'16px 18px' },
   label:   { fontSize:10, fontWeight:800, color:'#54698d', letterSpacing:'0.1em', textTransform:'uppercase' as const, marginBottom:6, display:'block' },
   input:   { width:'100%', border:'1px solid #d8dde6', borderRadius:7, padding:'9px 12px', fontSize:13, color:'#0f172a', outline:'none', fontFamily:'inherit', boxSizing:'border-box' as const, background:'#fff' },
-  textarea:{ width:'100%', border:'1px solid #d8dde6', borderRadius:7, padding:'10px 12px', fontSize:13, color:'#0f172a', outline:'none', resize:'vertical' as const, minHeight:100, fontFamily:'inherit', boxSizing:'border-box' as const },
+  textarea:{ width:'100%', border:'1px solid #d8dde6', borderRadius:7, padding:'10px 12px', fontSize:13, color:'#0f172a', outline:'none', resize:'vertical' as const, minHeight:80, fontFamily:'inherit', boxSizing:'border-box' as const },
   section: { marginBottom:20 },
   pill:    (active:boolean, accent='#0070d2') => ({ border:`1.5px solid ${active ? accent : '#e2e8f0'}`, borderRadius:7, padding:'7px 10px', cursor:'pointer', background: active ? `${accent}10` : '#f8fafc', transition:'all 0.12s', display:'flex', alignItems:'center', gap:5 }),
   btn:     { background:'linear-gradient(135deg,#0070d2,#005fb2)', border:'none', borderRadius:7, padding:'11px 20px', fontSize:12, fontWeight:800, color:'#fff', cursor:'pointer', display:'flex', alignItems:'center', gap:7, width:'100%', justifyContent:'center' as const },
@@ -73,7 +74,6 @@ export default function FlyerStudio() {
   const [selected, setSelected]         = useState(0);
   const [credits, setCredits]           = useState<number|null>(null);
   const [companyName, setCompanyName]   = useState('');
-  const [previewOpen, setPreviewOpen]   = useState(false);
 
   useEffect(() => {
     if (!profile?.company_id) return;
@@ -147,7 +147,6 @@ export default function FlyerStudio() {
             <ArrowLeft size={14} color="#54698d"/>
           </button>
           <div style={{display:'flex',alignItems:'center',gap:8}}>
-            {/* Vector icon */}
             <div style={{width:34,height:34,borderRadius:8,background:'linear-gradient(135deg,#0070d2,#7c3aed)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
               <Wand2 size={16} color="#fff" strokeWidth={2.5}/>
             </div>
@@ -171,18 +170,18 @@ export default function FlyerStudio() {
         </div>
       </header>
 
-      {/* ── 3 COLUMNS ──────────────────────────────────────────────────────── */}
+      {/* ── 2 COLUMNS ──────────────────────────────────────────────────────── */}
       <div style={css.cols}>
 
-        {/* ══ COL 1 — CREATIVE BRIEF (320px) ════════════════════════════════ */}
-        <div style={css.col('320px')}>
+        {/* ══ COL 1 — CONFIGURATION (385px) ══════════════════════════════════ */}
+        <div style={css.col('385px')}>
           <div style={css.colHead}>
             <div style={{width:26,height:26,borderRadius:6,background:'#eff6ff',display:'flex',alignItems:'center',justifyContent:'center'}}>
-              <Type size={13} color="#0070d2"/>
+              <Wand2 size={13} color="#0070d2"/>
             </div>
             <div>
-              <div style={{fontSize:12,fontWeight:800,color:'#0f172a'}}>Brief Creativo</div>
-              <div style={{fontSize:10,color:'#94a3b8'}}>Describe tu publicidad</div>
+              <div style={{fontSize:12,fontWeight:800,color:'#0f172a'}}>Configuración de Flyer</div>
+              <div style={{fontSize:10,color:'#94a3b8'}}>Elige estilo, formato y contenido</div>
             </div>
           </div>
 
@@ -224,64 +223,40 @@ export default function FlyerStudio() {
               <input ref={logoRef} type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(!f)return;setLogoFile(f);const r=new FileReader();r.onload=ev=>setLogoPreview(ev.target?.result as string);r.readAsDataURL(f);}} style={{display:'none'}}/>
             </div>
 
-            {/* Variants */}
-            <div style={css.section}>
-              <label style={css.label}>¿Cuántas variantes? (1 crédito c/u)</label>
-              <div style={{display:'flex',gap:8}}>
-                {([1,2,3] as const).map(n=>(
-                  <button key={n} onClick={()=>setVariantCount(n)}
-                    style={{flex:1,height:44,border:`1.5px solid ${variantCount===n?'#0070d2':'#e2e8f0'}`,borderRadius:7,background:variantCount===n?'#eff6ff':'#f8fafc',cursor:'pointer',fontSize:18,fontWeight:900,color:variantCount===n?'#0070d2':'#94a3b8'}}>
-                    {n}
-                  </button>
-                ))}
-              </div>
-              <div style={{fontSize:10,color:'#94a3b8',marginTop:5}}>
-                Costo: <strong style={{color:'#0f172a'}}>{variantCount} crédito{variantCount>1?'s':''}</strong>
-                {credits!==null?` · Quedan ${credits}`:''}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* ══ COL 2 — STYLE SETTINGS (320px) ════════════════════════════════ */}
-        <div style={css.col('320px')}>
-          <div style={css.colHead}>
-            <div style={{width:26,height:26,borderRadius:6,background:'#f5f3ff',display:'flex',alignItems:'center',justifyContent:'center'}}>
-              <Palette size={13} color="#7c3aed"/>
-            </div>
-            <div>
-              <div style={{fontSize:12,fontWeight:800,color:'#0f172a'}}>Estilo & Formato</div>
-              <div style={{fontSize:10,color:'#94a3b8'}}>Define el look del flyer</div>
-            </div>
-          </div>
-
-          <div style={css.colBody}>
             {/* Format */}
             <div style={css.section}>
               <label style={css.label}>Formato</label>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
-                {FORMATS.map(f=>(
-                  <button key={f.id} onClick={()=>setFormat(f.id)}
-                    style={{...css.pill(format===f.id), flexDirection:'column' as const, alignItems:'flex-start', padding:'8px 10px'}}>
-                    <span style={{fontSize:13}}>{f.icon}</span>
-                    <span style={{fontSize:11,fontWeight:700,color:format===f.id?'#0070d2':'#0f172a',marginTop:2}}>{f.label}</span>
-                    <span style={{fontSize:9,color:'#94a3b8'}}>{f.tag}</span>
-                  </button>
-                ))}
+                {FORMATS.map(f=>{
+                  const IconComponent = f.icon;
+                  return (
+                    <button key={f.id} onClick={()=>setFormat(f.id)}
+                      style={{...css.pill(format===f.id), flexDirection:'row' as const, alignItems:'center', padding:'8px 10px'}}>
+                      <IconComponent size={14} color={format===f.id?'#0070d2':'#54698d'}/>
+                      <div style={{display:'flex',flexDirection:'column',alignItems:'flex-start'}}>
+                        <span style={{fontSize:11,fontWeight:700,color:format===f.id?'#0070d2':'#0f172a'}}>{f.label}</span>
+                        <span style={{fontSize:9,color:'#94a3b8'}}>{f.tag}</span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             {/* Tone */}
             <div style={css.section}>
               <label style={css.label}>Tono de diseño</label>
-              <div style={{display:'flex',flexDirection:'column',gap:5}}>
-                {TONES.map(t=>(
-                  <button key={t.key} onClick={()=>setTone(t.key)}
-                    style={{...css.pill(tone===t.key), justifyContent:'flex-start'}}>
-                    <span style={{fontSize:14}}>{t.emoji}</span>
-                    <span style={{fontSize:12,fontWeight:700,color:tone===t.key?'#0070d2':'#0f172a'}}>{t.label}</span>
-                    {tone===t.key && <Check size={11} color="#0070d2" style={{marginLeft:'auto'}}/>}
-                  </button>
-                ))}
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                {TONES.map(t=>{
+                  const ToneIcon = t.icon;
+                  return (
+                    <button key={t.key} onClick={()=>setTone(t.key)}
+                      style={{...css.pill(tone===t.key), justifyContent:'flex-start', gap:6}}>
+                      <ToneIcon size={13} color={tone===t.key?'#0070d2':t.color}/>
+                      <span style={{fontSize:11,fontWeight:700,color:tone===t.key?'#0070d2':'#0f172a'}}>{t.label}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -291,27 +266,41 @@ export default function FlyerStudio() {
               <div style={{display:'flex',gap:7,flexWrap:'wrap' as const}}>
                 {BRAND_COLORS.map(hex=>(
                   <button key={hex} onClick={()=>toggleColor(hex)}
-                    style={{width:28,height:28,borderRadius:'50%',background:hex,border:'none',cursor:'pointer',outline:colors.includes(hex)?`3px solid ${hex}`:'3px solid transparent',outlineOffset:2,boxShadow:'0 1px 3px rgba(0,0,0,0.18)',transition:'outline 0.1s'}}/>
+                    style={{width:24,height:24,borderRadius:'50%',background:hex,border:'none',cursor:'pointer',outline:colors.includes(hex)?`2px solid ${hex}`:'2px solid transparent',outlineOffset:2,boxShadow:'0 1px 3px rgba(0,0,0,0.18)',transition:'outline 0.1s'}}/>
                 ))}
                 {colors.length>0 && <button onClick={()=>setColors([])} style={{fontSize:10,color:'#94a3b8',background:'none',border:'none',cursor:'pointer',textDecoration:'underline'}}>Limpiar</button>}
               </div>
             </div>
 
-            {/* Generate button */}
-            <div style={{paddingTop:8}}>
+            {/* Variants & Generate */}
+            <div style={css.section}>
+              <label style={css.label}>Variantes (1 crédito c/u)</label>
+              <div style={{display:'flex',gap:6,marginBottom:12}}>
+                {([1,2,3] as const).map(n=>(
+                  <button key={n} onClick={()=>setVariantCount(n)}
+                    style={{flex:1,height:38,border:`1.5px solid ${variantCount===n?'#0070d2':'#e2e8f0'}`,borderRadius:7,background:variantCount===n?'#eff6ff':'#f8fafc',cursor:'pointer',fontSize:14,fontWeight:900,color:variantCount===n?'#0070d2':'#94a3b8'}}>
+                    {n} {n===1?'variante':'variantes'}
+                  </button>
+                ))}
+              </div>
+              
               <button onClick={generate} disabled={generating||!prompt.trim()}
-                style={{...css.btn, opacity:generating||!prompt.trim()?0.5:1, cursor:generating||!prompt.trim()?'not-allowed':'pointer', padding:'13px 20px'}}>
+                style={{...css.btn, opacity:generating||!prompt.trim()?0.5:1, cursor:generating||!prompt.trim()?'not-allowed':'pointer', padding:'12px 20px'}}>
                 {generating
                   ? <><Cpu size={14} style={{animation:'spin 1s linear infinite'}}/> Generando con IA...</>
                   : <><Sparkles size={14} color="#D4AF37" fill="#D4AF37"/> Generar Flyer con IA <ChevronRight size={13}/></>
                 }
               </button>
+              <div style={{fontSize:10,color:'#94a3b8',textAlign:'center',marginTop:6}}>
+                Costo: <strong style={{color:'#0f172a'}}>{variantCount} crédito{variantCount>1?'s':''}</strong>
+                {credits!==null?` · Disponibles: ${credits}`:''}
+              </div>
               <style>{`@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
             </div>
           </div>
         </div>
 
-        {/* ══ COL 3 — PREVIEW & RESULTS (flex:1) ════════════════════════════ */}
+        {/* ══ COL 2 — PREVIEW & RESULTS (flex:1) ════════════════════════════ */}
         <div style={{...css.col('1fr','#f0f2f5',false), flex:1}}>
           <div style={{...css.colHead, background:'#fff', borderBottom:'1px solid #dde1e7'}}>
             <div style={{width:26,height:26,borderRadius:6,background:'#f0fdf4',display:'flex',alignItems:'center',justifyContent:'center'}}>
@@ -330,11 +319,11 @@ export default function FlyerStudio() {
             )}
           </div>
 
-          <div style={{flex:1,overflowY:'auto',padding:20,display:'flex',flexDirection:'column',gap:16}}>
+          <div style={{flex:1,overflowY:'auto',padding:20,display:'flex',flexDirection:'column',gap:16,alignItems:'center',justifyContent:'center'}}>
 
             {/* Empty / loading state */}
             {!generating && variants.length===0 && (
-              <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16,paddingTop:40}}>
+              <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16,paddingTop:20}}>
                 <div style={{width:72,height:72,borderRadius:16,background:'linear-gradient(135deg,#0070d220,#7c3aed20)',border:'2px dashed #d8dde6',display:'flex',alignItems:'center',justifyContent:'center'}}>
                   <Layers size={28} color="#94a3b8"/>
                 </div>
@@ -342,7 +331,6 @@ export default function FlyerStudio() {
                   <div style={{fontSize:14,fontWeight:700,color:'#64748b',marginBottom:4}}>Completa el brief y genera</div>
                   <div style={{fontSize:12,color:'#94a3b8',maxWidth:240}}>La IA creará un flyer profesional listo para publicar en tus redes sociales.</div>
                 </div>
-                {/* Tips */}
                 {[
                   {icon:Star, text:'Usa un tono acorde a tu audiencia'},
                   {icon:Palette, text:'Agrega tus colores de marca'},
@@ -358,7 +346,7 @@ export default function FlyerStudio() {
 
             {/* Generating animation */}
             {generating && (
-              <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16}}>
+              <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16}}>
                 <div style={{width:64,height:64,borderRadius:'50%',background:'linear-gradient(135deg,#0070d2,#7c3aed)',display:'flex',alignItems:'center',justifyContent:'center',animation:'pulse 1.5s ease-in-out infinite'}}>
                   <Sparkles size={26} color="#fff"/>
                 </div>
@@ -375,7 +363,7 @@ export default function FlyerStudio() {
 
             {/* Results */}
             {variants.length>0 && (
-              <>
+              <div style={{width:'100%',maxWidth:440,display:'flex',flexDirection:'column',gap:16}}>
                 {/* Variant selector tabs */}
                 {variants.length>1 && (
                   <div style={{display:'flex',gap:8,background:'#fff',padding:8,borderRadius:8,border:'1px solid #e2e8f0'}}>
@@ -393,7 +381,7 @@ export default function FlyerStudio() {
                   <img
                     src={variants[selected]}
                     alt={`Variante ${selected+1}`}
-                    style={{width:'100%',display:'block',maxHeight:'380px',objectFit:'contain',background:'#f8fafc'}}
+                    style={{width:'100%',display:'block',maxHeight:'400px',objectFit:'contain',background:'#f8fafc'}}
                   />
                 </div>
 
@@ -401,19 +389,18 @@ export default function FlyerStudio() {
                 <div style={{background:'#fff',borderRadius:10,border:'1px solid #e2e8f0',padding:'14px 16px',display:'flex',flexDirection:'column',gap:8}}>
                   <div style={{fontSize:11,fontWeight:700,color:'#0f172a',marginBottom:2}}>Acciones rápidas</div>
 
-                  {/* Preview full */}
-                  <button onClick={()=>window.open(variants[selected],'_blank')}
-                    style={{...css.ghost,justifyContent:'center',width:'100%'}}>
-                    <ExternalLink size={13}/> Ver en pantalla completa
-                  </button>
+                  <div style={{display:'flex',gap:8}}>
+                    <button onClick={()=>window.open(variants[selected],'_blank')}
+                      style={{...css.ghost,flex:1,justifyContent:'center'}}>
+                      <ExternalLink size={13}/> Pantalla Completa
+                    </button>
 
-                  {/* Download */}
-                  <button onClick={handleDownload}
-                    style={{...css.ghost,justifyContent:'center',width:'100%',background:'#f0fdf4',border:'1px solid #bbf7d0',color:'#166534'}}>
-                    <Download size={13}/> Descargar PNG
-                  </button>
+                    <button onClick={handleDownload}
+                      style={{...css.ghost,flex:1,justifyContent:'center',background:'#f0fdf4',border:'1px solid #bbf7d0',color:'#166534'}}>
+                      <Download size={13}/> Descargar PNG
+                    </button>
+                  </div>
 
-                  {/* Send to Social Hub */}
                   <button onClick={sendToSocialHub}
                     style={{...css.btn,background:'linear-gradient(135deg,#0070d2,#005fb2)'}}>
                     <Send size={13}/>
@@ -435,7 +422,7 @@ export default function FlyerStudio() {
                     </span>
                   </div>
                 )}
-              </>
+              </div>
             )}
           </div>
         </div>
