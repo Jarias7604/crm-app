@@ -206,7 +206,7 @@ export default function SocialHub() {
   }
 
   async function handleAICaption(platform: string) {
-    if (!contentUrl && !captions.default) { toast.error('Sube contenido primero'); return; }
+    if (!contentUrl && !captions[platform]) { toast.error('Sube contenido o escribe una idea primero'); return; }
     setGeneratingCaption(platform);
     try {
       const text = await socialPublishService.generateCaption(platform, captions[platform] || 'Contenido premium', selectedTone, profile?.company_id || '');
