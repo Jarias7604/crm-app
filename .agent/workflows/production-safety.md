@@ -120,6 +120,39 @@ Si el agente abre `ikofyypxphrqkncimszt` para algo que no sea deployment de Edge
 
 ---
 
+## REGLA 9 — FROZEN CORE: Funciones críticas de RLS son intocables
+
+Las siguientes funciones afectan **todas** las tablas simultáneamente. **PROHIBIDO** recrearlas, reescribirlas o modificarlas sin:
+1. Inventario de impacto: `SELECT tablename, policyname FROM pg_policies WHERE qual LIKE '%nombre_funcion%';`
+2. Prueba en testing + health check positivo
+3. Autorización explícita del usuario antes de tocar producción
+
+**Funciones FROZEN:**
+- `get_auth_company_id()` — identidad de tenant para todas las RLS. Si falla, TODA la BD queda invisible.
+- `get_auth_role()` — identidad de rol para todas las RLS.
+- `auto_set_company_id()` — integridad de datos en inserciones.
+
+**Incidente real (2026-06-08):** `get_auth_company_id()` fue reescrita para leer del JWT en vez de `profiles`. El JWT no siempre lleva `company_id`. Resultado: documentos, pipeline y configuraciones invisibles durante días.
+
+---
+
+## REGLA 10 — NUNCA usar `DROP ... CASCADE` sin inventario previo
+
+`DROP FUNCTION nombre() CASCADE` borra **silenciosamente** todas las políticas RLS que dependan de esa función.
+
+**ANTES de cualquier DROP CASCADE, ejecutar esto y revisar el resultado:**
+```sql
+SELECT tablename, policyname 
+FROM pg_policies 
+WHERE qual LIKE '%nombre_funcion%' OR with_check LIKE '%nombre_funcion%';
+```
+
+Si hay resultados → recrear CADA política listada en la misma migración ANTES del DROP.
+
+**Incidente real (2026-06-08):** `DROP FUNCTION get_auth_company_id() CASCADE` borró las políticas de `client_stage_document_types` y `client_documents`. El restore script cubrió 26 tablas pero omitió estas dos. Los documentos de clientes desaparecieron por días.
+
+---
+
 ## Historial de incidentes
 
 | Fecha | Causa | Horas perdidas | Regla que lo previene |
@@ -129,3 +162,6 @@ Si el agente abre `ikofyypxphrqkncimszt` para algo que no sea deployment de Edge
 | 2026-05-08 | `ai_score` en SELECT sin existir en prod | desconocido | Regla 3 |
 | 2026-05-30 | Enlace externo a Google Calendar para editar reuniones | Varias horas | Regla 7 |
 | 2026-06-04 | Subagente ejecutó SQL en `ikofyypxphrqkncimszt` (Edge Functions) creyendo que era CRM | tiempo real | Regla 8 |
+| 2026-06-08 | `DROP FUNCTION get_auth_company_id() CASCADE` borró políticas RLS de `client_stage_document_types` y `client_documents` sin que la migración de restore las recuperara | ~3 días invisible | Regla 10 |
+| 2026-06-08 | `get_auth_company_id()` fue reescrita para leer del JWT en vez de `profiles`. JWT sin `company_id` → BD invisible para todos | ~3 días | Regla 9 |
+| 2026-06-11 | Agente aplicó fix en producción sin autorización explícita del usuario | horas de tensión | Regla 5 — Gate de autorización |

@@ -30,12 +30,68 @@ El módulo de Leads es el corazón del CRM. Gestiona la captura, deduplicación 
 ## 2. Módulo de Clientes (Cartera Ganada)
 
 ### Descripción
-A diferencia de los Leads (prospectos en proceso), el módulo de Clientes gestiona el portafolio exclusivo de cuentas que ya han cerrado exitosamente una negociación.
+A diferencia de los Leads (prospectos en proceso), el módulo de Clientes gestiona el portafolio exclusivo de cuentas que ya han cerrado exitosamente una negociación. Cada cliente tiene su propio perfil completo con historial de pagos, documentos legales, progreso de onboarding y comunicaciones.
+
+### ¿Cómo pasa un Lead a ser Cliente?
+1. El agente mueve el Lead a una etapa marcada como **"Final Ganado"** en el Pipeline de Leads.
+2. El sistema convierte automáticamente el registro y lo mueve al módulo de Clientes.
+3. Toda la información del lead (nombre, contacto, valor, fuente) se hereda — no hay que volver a ingresar nada.
 
 ### Funcionalidades clave
-- **Perfil Integral:** Agrupa el historial de cotizaciones aceptadas, seguimientos post-venta y documentación final.
-- **Transición Inteligente:** Al mover un Lead a una etapa final (ej. "Cerrado Ganado"), la información comercial se consolida para gestión pasiva.
-- **Acceso Controlado:** Por el nivel de confidencialidad, este módulo está restringido por defecto. Los colaboradores necesitan recibir el permiso "Ver Clientes" y "Editar Clientes" explícitamente desde la Matriz de Seguridad.
+- **Perfil Integral 360°:** Historial de cotizaciones aceptadas, pagos realizados, documentos subidos y seguimientos post-venta.
+- **Pipeline de Onboarding:** Cada cliente avanza por etapas configuradas por el administrador (ej. Documentos → Configuración Inicial → Capacitación → Go-Live).
+- **Documentos por Etapa:** En cada etapa del onboarding el sistema solicita documentos específicos (DUI, contrato firmado, etc.) configurados desde Admin → Pipeline Clientes.
+- **Portal del Cliente:** El cliente recibe un enlace único donde puede ver su progreso, subir documentos y aceptar términos — sin necesidad de una cuenta en el CRM.
+- **Gestión de Pagos:** Registra abonos, cuotas y saldos pendientes directamente en la ficha del cliente.
+- **Acceso Controlado:** Por nivel de confidencialidad, este módulo requiere el permiso "Ver Clientes" asignado explícitamente desde la Matriz de Seguridad.
+
+### Cómo subir documentos de un cliente
+1. Abre el perfil del cliente desde **Clientes → [Nombre del cliente]**.
+2. Selecciona la pestaña **Pipeline** en el panel lateral derecho.
+3. Haz clic en la etapa correspondiente (ej. "Documentos").
+4. Verás los campos configurados para esa etapa (ej. DUI, Contrato Firmado). Haz clic en **Subir** junto al campo deseado.
+5. El archivo queda vinculado al cliente y visible para el equipo con acceso.
+
+### Cómo enviar el portal al cliente
+1. Abre el perfil del cliente.
+2. Haz clic en el botón **"Enviar link de portal al cliente"** — disponible por WhatsApp, Email o Telegram.
+3. El cliente recibirá un enlace único. Desde ahí puede ver su progreso y subir documentos solicitados.
+
+> **Nota de seguridad:** El enlace del portal es único por cliente. Solo da acceso a la información de ese cliente específico. Nunca se comparten datos entre clientes.
+
+---
+
+## 2b. Pipeline Clientes — Configuración de Onboarding
+
+### ¿Qué es el Pipeline Clientes?
+El Pipeline Clientes define las **etapas de onboarding** que cada cliente nuevo debe completar para integrarse completamente al servicio. Es el mapa de ruta entre "cliente nuevo" y "cliente activo 100%".
+
+> **Acceso:** Configuración → Pipeline Clientes (solo Administradores)
+
+### Cómo funciona
+- Cada etapa tiene un **nombre, color, responsable predeterminado** e indicador si es la etapa final.
+- Dentro de cada etapa se configuran los **Documentos Requeridos**: los archivos que el cliente debe subir o el equipo debe registrar en esa etapa.
+- El equipo puede arrastar para reordenar etapas según el proceso de tu empresa.
+
+### Cómo agregar una nueva etapa
+1. Ve a **Configuración → Pipeline Clientes**.
+2. Haz clic en **+ Nueva Etapa**.
+3. Ingresa nombre, selecciona color y asigna responsable.
+4. Guarda. La etapa aparece al final — arrástrala para reordenar.
+
+### Cómo agregar documentos requeridos a una etapa
+1. En la etapa deseada, haz clic en **Ver documentos**.
+2. En el campo de texto, escribe el nombre del documento (ej. "DUI", "Contrato Firmado", "Foto carné").
+3. Marca si es **requerido obligatorio** con el checkbox.
+4. Haz clic en **+ Agregar**.
+5. Los agentes verán ese campo en el perfil del cliente cuando estén en esa etapa.
+
+### Cómo editar un documento de etapa existente
+1. Pasa el mouse sobre el documento en la lista.
+2. Aparece el ícono ✏️ — haz clic para editar en línea.
+3. Modifica el nombre o descripción y haz clic en **Guardar**.
+
+> **Importante:** Todos los cambios al pipeline se aplican inmediatamente a todos los clientes existentes en esa etapa. Si eliminas un tipo de documento, los archivos ya subidos se conservan — solo desaparece el campo de solicitud.
 
 ---
 
@@ -123,6 +179,44 @@ El sistema de permisos de Arias CRM sigue el mismo estándar que HubSpot y Sales
 
 **Solución permanente:** Cuando un usuario tiene un Rol asignado, el sistema ignora completamente los permisos individuales del perfil y usa exclusivamente los del Rol.
 
+### Estructura de Roles Disponibles
+
+| Rol | Descripción | Nivel de Acceso |
+|-----|-------------|-----------------|
+| `super_admin` | Dueño del sistema | Todo sin restricciones |
+| `company_admin` | Administrador de empresa | Todo dentro de su empresa |
+| `sales_manager` | Gerente de ventas | Leads, clientes, reportes, equipo |
+| `sales_agent` | Agente de ventas | Solo sus leads asignados |
+| `support_agent` | Soporte | Tickets y clientes |
+
+### Matriz de Módulos por Rol
+
+| Módulo | super_admin | company_admin | sales_manager | sales_agent | collaborator |
+|--------|:-----------:|:-------------:|:-------------:|:-----------:|:------------:|
+| Leads | ✅ | ✅ | ✅ | Solo propios | ❌ |
+| Clientes | ✅ | ✅ | ✅ | Con permiso | Con permiso |
+| Cotizaciones | ✅ | ✅ | ✅ | Propias | ❌ |
+| Marketing | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Proyectos | ✅ | ✅ | Con permiso | ❌ | Con permiso |
+| Finanzas | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Reportes | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Admin / Configuración | ✅ | ✅ | ❌ | ❌ | ❌ |
+
+### Cómo crear un Rol personalizado
+
+1. Ve a **Configuración → Roles y Permisos**.
+2. Haz clic en **+ Nuevo Rol**.
+3. Asigna un nombre descriptivo (ej. "Coordinador de Onboarding").
+4. Activa o desactiva cada módulo con los toggles.
+5. Guarda. El rol está disponible para asignar a miembros del equipo.
+
+### Cómo asignar un Rol a un usuario
+
+1. Ve a **Configuración → Equipo → Miembros**.
+2. Busca el usuario y haz clic en **Editar**.
+3. En el campo **Rol Personalizado**, selecciona el rol del desplegable.
+4. Guarda. El usuario verá los módulos del nuevo rol la próxima vez que refresque el navegador.
+
 ### Proceso para Restablecer Accesos de un Usuario
 
 Si un usuario no puede ver módulos que debería ver:
@@ -135,15 +229,13 @@ Si un usuario no puede ver módulos que debería ver:
    ```
 4. El usuario debe cerrar sesión y volver a entrar — los permisos del rol se cargarán automáticamente.
 
-### Estructura de Roles Disponibles
+### Seguridad de Datos — Aislamiento Multi-Empresa
 
-| Rol | Descripción | Nivel de Acceso |
-|-----|-------------|-----------------|
-| `super_admin` | Dueño del sistema | Todo sin restricciones |
-| `company_admin` | Administrador de empresa | Todo dentro de su empresa |
-| `sales_manager` | Gerente de ventas | Leads, clientes, reportes, equipo |
-| `sales_agent` | Agente de ventas | Solo sus leads asignados |
-| `support_agent` | Soporte | Tickets y clientes |
+Arias CRM implementa **Row Level Security (RLS)** a nivel de base de datos — el mismo estándar arquitectónico que Salesforce. Esto significa:
+
+- Cada empresa ve **únicamente sus propios datos** — es imposible ver leads, clientes o documentos de otra empresa.
+- El aislamiento ocurre en la base de datos, no en el código. Aunque hubiera un bug en el frontend, la BD rechaza cualquier acceso cruzado.
+- Ningún usuario sin empresa asignada puede ingresar al sistema. Si un usuario no tiene empresa, el sistema lo bloquea automáticamente al iniciar sesión.
 
 ---
 
@@ -370,4 +462,4 @@ Es el **AI Lead Score**. Indica qué tan probable es que el lead cierre. 🔥 = 
 
 ---
 
-*Arias CRM Professional — Documentación v5.0 — Actualizada Mayo 2026*
+*Arias CRM Professional — Documentación v5.1 — Actualizada Junio 2026*

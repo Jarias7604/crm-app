@@ -513,6 +513,24 @@ export default function FlyerStudio() {
                 Guardar
               </button>
               <button
+                onClick={async () => {
+                  // Save first, then open Social Hub with the flyer URL
+                  if (!flyerRef.current) return;
+                  try {
+                    const html2canvas = (await import('html2canvas')).default;
+                    const canvas = await html2canvas(flyerRef.current, { scale: 2, useCORS: true, backgroundColor: null });
+                    const blob = await new Promise<Blob>((res) => canvas.toBlob(b => res(b!), 'image/png'));
+                    const url = await flyerService.uploadFlyer(blob, profile?.company_id || 'shared');
+                    navigate(`/marketing/social?flyerUrl=${encodeURIComponent(url)}`);
+                  } catch {
+                    navigate('/marketing/social');
+                  }
+                }}
+                style={{ background: 'linear-gradient(135deg, #7c3aed, #a855f7)', color: '#fff', border: 'none', borderRadius: 10, padding: '8px 16px', fontSize: 12, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                🌐 Publicar en Redes
+              </button>
+              <button
                 onClick={handleExport}
                 disabled={isExporting}
                 style={{ background: '#0f172a', color: '#fff', border: 'none', borderRadius: 10, padding: '8px 16px', fontSize: 12, fontWeight: 800, cursor: isExporting ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}

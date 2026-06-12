@@ -62,6 +62,8 @@ const CallBot           = lazy(() => import('./pages/admin/CallBot'));
 const ManualPage        = lazy(() => import('./pages/support/ManualPage'));
 const PWAInstallPrompt  = lazy(() => import('./components/PWAInstallPrompt').then(m => ({ default: m.PWAInstallPrompt })));
 const FlyerStudio       = lazy(() => import('./pages/marketing/FlyerStudio'));
+const SocialHub         = lazy(() => import('./pages/marketing/SocialHub'));
+const SocialAccounts    = lazy(() => import('./pages/company/SocialAccounts'));
 const Finanzas          = lazy(() => import('./pages/Finanzas'));
 const GlobalSearch      = lazy(() => import('./components/GlobalSearch').then(m => ({ default: m.GlobalSearch })));
 const OnboardingWizard  = lazy(() => import('./pages/OnboardingWizard'));
@@ -220,6 +222,7 @@ function App() {
                     <Route path="/company/teams" element={<Teams />} />
                     <Route path="/company/performance" element={<TeamPerformance />} />
                     <Route path="/company/workspaces" element={<Workspaces />} />
+                    <Route path="/company/social-accounts" element={<SocialAccounts />} />
                     <Route path="/catalogo" element={<CatalogoProductos />} />
                     <Route path="/pricing" element={<Navigate to="/catalogo" replace />} />
                     <Route path="/paquetes" element={<Navigate to="/catalogo" replace />} />
@@ -267,6 +270,7 @@ function App() {
                     <Route path="/marketing/engine-config" element={<SalesEngineConfig />} />
                     <Route path="/marketing/settings" element={<MarketingSettings />} />
                     <Route path="/marketing/flyers" element={<FlyerStudio />} />
+                    <Route path="/marketing/social" element={<SocialHub />} />
                     <Route path="/marketing/predictions" element={<PredictiveBoard />} />
                     <Route path="/marketing/data-hygiene" element={<DataHygiene />} />
                     <Route path="/marketing/agent-network" element={<AgentNetworkMap />} />
