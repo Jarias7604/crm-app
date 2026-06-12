@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     CRITICAL RULE: DO NOT write any text, letters, words, typos, characters, brand logos, or watermarks. Absolutely NO text in the image. Pure conceptual clean background.`;
     }
 
-    const res = await fetch('https://api.openai.com/v1/images/generations', {
+    let res = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openaiKey}`,
@@ -57,20 +57,40 @@ Deno.serve(async (req) => {
         prompt: imagePrompt,
         n: 1,
         size: '1024x1024',
-        quality: 'standard',
-        response_format: 'url'
+        quality: 'standard'
       })
     });
 
+    let data;
     if (!res.ok) {
       const errText = await res.text();
-      console.error('DALL-E Error:', errText);
-      return new Response(JSON.stringify({ fondo_url: getUnsplashFallback(industria) }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      console.warn('DALL-E 3 failed, trying DALL-E 2. Error:', errText);
+      
+      // Fallback to DALL-E 2
+      res = await fetch('https://api.openai.com/v1/images/generations', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'dall-e-2',
+          prompt: imagePrompt.substring(0, 950), // DALL-E 2 has a shorter prompt limit (1000 chars)
+          n: 1,
+          size: '1024x1024'
+        })
       });
+
+      if (!res.ok) {
+        const errText2 = await res.text();
+        console.error('DALL-E 2 failed as well. Error:', errText2);
+        return new Response(JSON.stringify({ fondo_url: getUnsplashFallback(industria) }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
-    const data = await res.json();
+    data = await res.json();
     const fondo_url = data.data?.[0]?.url;
 
     if (!fondo_url) {
@@ -102,8 +122,8 @@ function getUnsplashFallback(industria = '') {
   if (norm.includes('comida') || norm.includes('restaurante') || norm.includes('café') || norm.includes('pastelería') || norm.includes('panadería')) {
     return 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?q=80&w=1080&auto=format&fit=crop';
   }
-  if (norm.includes('médico') || norm.includes('salud') || norm.includes('dental') || norm.includes('clínica') || norm.includes('odontología')) {
-    return 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?q=80&w=1080&auto=format&fit=crop';
+  if (norm.includes('médico') || norm.includes('salud') || norm.includes('dental') || norm.includes('clínica') || norm.includes('odontología') || norm.includes('farmacia') || norm.includes('medicina') || norm.includes('doctor') || norm.includes('hospital') || norm.includes('bienestar') || norm.includes('remedio') || norm.includes('medicamento') || norm.includes('pastillas') || norm.includes('wellness')) {
+    return 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?q=80&w=1080&auto=format&fit=crop';
   }
   if (norm.includes('gimnasio') || norm.includes('fit') || norm.includes('deporte') || norm.includes('entrenamiento')) {
     return 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=1080&auto=format&fit=crop';
