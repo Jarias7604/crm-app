@@ -243,6 +243,8 @@ export default function SocialHub() {
   const [showMetaTips, setShowMetaTips] = useState(false);
   const [generatingHashtags, setGeneratingHashtags] = useState(false);
   const [suggestedHashtags, setSuggestedHashtags] = useState<string[]>([]);
+  const [showIntelligence, setShowIntelligence] = useState(false);
+  const [openIntelSection, setOpenIntelSection] = useState<string | null>('score');
 
   // Per-platform selected account
   const [selectedAccounts, setSelectedAccounts] = useState<Record<string, SocialAccount | null>>({
@@ -862,107 +864,6 @@ export default function SocialHub() {
             )}
           </div>
 
-          {/* ── INTELLIGENCE PANEL (Sprint 2) ─────────────────────────────────── */}
-          <div style={{ background: '#ffffff', borderRadius: 10, border: '1px solid #d8dde6', overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-
-            {/* — Section: Virality Score — */}
-            <div style={{ padding: '14px 16px', borderBottom: '1px solid #f1f5f9' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                  <div style={{ width: 28, height: 28, borderRadius: 7, background: `${viralityResult.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Zap size={14} color={viralityResult.color} fill={viralityResult.color} />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>Score de Viralidad</div>
-                    <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>Basado en algoritmo Meta 2024</div>
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 26, fontWeight: 900, color: viralityResult.color, lineHeight: 1 }}>{viralityResult.score}</div>
-                  <div style={{ fontSize: 9, color: '#94a3b8', fontWeight: 600 }}>/ 100</div>
-                </div>
-              </div>
-
-              {/* Score bar */}
-              <div style={{ height: 6, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden', marginBottom: 8 }}>
-                <div style={{
-                  height: '100%', width: `${viralityResult.score}%`, borderRadius: 99,
-                  background: viralityResult.score >= 75 ? 'linear-gradient(90deg,#10b981,#059669)' : viralityResult.score >= 50 ? 'linear-gradient(90deg,#f59e0b,#d97706)' : 'linear-gradient(90deg,#ef4444,#dc2626)',
-                  transition: 'width 0.6s cubic-bezier(0.4,0,0.2,1)',
-                }} />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: viralityResult.color }}>{viralityResult.label}</span>
-                <button onClick={() => setShowMetaTips(p => !p)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 10, color: '#0070d2', fontWeight: 700, padding: 0, display: 'flex', alignItems: 'center', gap: 3 }}>
-                  <ChevronDown size={11} style={{ transform: showMetaTips ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-                  {showMetaTips ? 'Ocultar análisis' : 'Ver análisis completo'}
-                </button>
-              </div>
-            </div>
-
-            {/* — Accordion: Meta Checklist — */}
-            {showMetaTips && (
-              <div style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9', background: '#fafbfc' }}>
-                <div style={{ fontSize: 10, fontWeight: 800, color: '#54698d', letterSpacing: '0.07em', marginBottom: 10 }}>
-                  CHECKLIST META · {previewPlatform === 'instagram' ? 'Instagram' : 'Facebook'}
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                  {viralityResult.tips.map((tip, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, padding: '7px 10px', borderRadius: 7, background: tip.ok ? '#f0fdf4' : '#fffbeb', border: `1px solid ${tip.ok ? '#d1fae5' : '#fde68a'}` }}>
-                      {tip.ok
-                        ? <CheckCircle2 size={13} color="#10b981" style={{ flexShrink: 0, marginTop: 1 }} />
-                        : <AlertTriangle size={13} color="#d97706" style={{ flexShrink: 0, marginTop: 1 }} />}
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: tip.ok ? '#166534' : '#92400e' }}>{tip.text}</div>
-                        {!tip.ok && <div style={{ fontSize: 10, color: '#78716c', marginTop: 2, lineHeight: 1.5 }}>{tip.detail}</div>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {/* Meta insight footer */}
-                <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 7, background: '#eff6ff', border: '1px solid #bfdbfe', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                  <TrendingUp size={12} color="#1d4ed8" style={{ flexShrink: 0, marginTop: 1 }} />
-                  <div style={{ fontSize: 10, color: '#1e40af', lineHeight: 1.6 }}>
-                    <strong>Meta 2024:</strong> Posts con imagen + CTA + 3–5 hashtags generan <strong>3.1× más alcance orgánico</strong>. Reels: 22% más distribución que fotos estáticas.
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* — Section: Hashtag Engine — */}
-            <div style={{ padding: '14px 16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: suggestedHashtags.length > 0 ? 12 : 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                  <div style={{ width: 28, height: 28, borderRadius: 7, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Hash size={14} color="#0070d2" />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a', lineHeight: 1 }}>Hashtag Engine IA</div>
-                    <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>
-                      {previewPlatform === 'instagram' ? '5 hashtags · óptimo según Meta' : '1–2 hashtags · FB penaliza el exceso'}
-                    </div>
-                  </div>
-                </div>
-                <button onClick={handleGenerateHashtags} disabled={generatingHashtags} style={{ background: generatingHashtags ? '#f1f5f9' : 'linear-gradient(135deg,#0070d2,#005fb2)', border: 'none', borderRadius: 7, padding: '6px 14px', fontSize: 11, fontWeight: 700, color: generatingHashtags ? '#94a3b8' : '#fff', cursor: generatingHashtags ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 5, boxShadow: generatingHashtags ? 'none' : '0 1px 4px rgba(0,112,210,0.3)', transition: 'all 0.15s' }}>
-                  {generatingHashtags ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} color="#D4AF37" fill="#D4AF37" />}
-                  {generatingHashtags ? 'Generando...' : 'Generar'}
-                </button>
-              </div>
-              {suggestedHashtags.length > 0 && (
-                <div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-                    {suggestedHashtags.map((tag, i) => (
-                      <span key={i} style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 99, padding: '4px 11px', fontSize: 11, fontWeight: 700, color: '#1d4ed8' }}>{tag}</span>
-                    ))}
-                  </div>
-                  <button onClick={applyHashtags} style={{ width: '100%', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 7, padding: '8px', fontSize: 11, fontWeight: 700, color: '#166534', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-                    <Check size={12} /> Agregar al caption
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
           {/* Future Networks */}
           <div style={{ background: '#ffffff', borderRadius: 8, border: '1px solid #d8dde6', padding: 14 }}>
 
@@ -1049,6 +950,140 @@ export default function SocialHub() {
         </div>
 
       </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          INTELLIGENCE PANEL — Mini-módulo acordeón (Sprint 1 + Sprint 2)
+          Separado del workspace para no interferir con la Vista Previa.
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <div style={{ flexShrink: 0, borderTop: '1px solid #d8dde6', background: '#ffffff' }}>
+
+        {/* Accordion Toggle Bar */}
+        <button
+          onClick={() => setShowIntelligence(p => !p)}
+          style={{
+            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '10px 24px', background: 'none', border: 'none', cursor: 'pointer',
+            borderBottom: showIntelligence ? '1px solid #d8dde6' : 'none',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Zap size={13} color={viralityResult.score >= 75 ? '#10b981' : viralityResult.score >= 50 ? '#f59e0b' : '#ef4444'} fill={viralityResult.score >= 75 ? '#10b981' : viralityResult.score >= 50 ? '#f59e0b' : '#ef4444'} />
+              <span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>Intelligence & Analytics</span>
+            </div>
+            <span style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>Score de Viralidad · Recomendaciones Meta · Hashtag Engine · KPIs</span>
+            {/* Live score badge */}
+            <span style={{ fontSize: 10, fontWeight: 800, color: viralityResult.color, background: `${viralityResult.color}15`, border: `1px solid ${viralityResult.color}30`, borderRadius: 99, padding: '2px 8px' }}>
+              {viralityResult.score}/100 {viralityResult.label.split(' ').slice(-1)}
+            </span>
+          </div>
+          <ChevronDown size={14} color="#64748b" style={{ transform: showIntelligence ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+        </button>
+
+        {/* Accordion Content */}
+        {showIntelligence && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 0, borderTop: 'none' }}>
+
+            {/* ─── Column A: Score de Viralidad ─────────────────────────── */}
+            <div style={{ borderRight: '1px solid #f1f5f9', padding: '20px 24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                <div style={{ width: 30, height: 30, borderRadius: 8, background: `${viralityResult.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Zap size={15} color={viralityResult.color} fill={viralityResult.color} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>Score de Viralidad</div>
+                  <div style={{ fontSize: 10, color: '#64748b' }}>Algoritmo Meta · {previewPlatform === 'instagram' ? 'Instagram' : 'Facebook'}</div>
+                </div>
+                <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
+                  <div style={{ fontSize: 30, fontWeight: 900, color: viralityResult.color, lineHeight: 1 }}>{viralityResult.score}</div>
+                  <div style={{ fontSize: 9, color: '#94a3b8' }}>/ 100</div>
+                </div>
+              </div>
+              <div style={{ height: 8, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden', marginBottom: 10 }}>
+                <div style={{ height: '100%', width: `${viralityResult.score}%`, borderRadius: 99, background: viralityResult.score >= 75 ? 'linear-gradient(90deg,#10b981,#059669)' : viralityResult.score >= 50 ? 'linear-gradient(90deg,#f59e0b,#d97706)' : 'linear-gradient(90deg,#ef4444,#dc2626)', transition: 'width 0.6s cubic-bezier(0.4,0,0.2,1)' }} />
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: viralityResult.color, marginBottom: 14 }}>{viralityResult.label}</div>
+              {/* Quick tips summary */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {viralityResult.tips.map((tip, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
+                    {tip.ok
+                      ? <CheckCircle2 size={12} color="#10b981" style={{ flexShrink: 0, marginTop: 1 }} />
+                      : <AlertTriangle size={12} color="#d97706" style={{ flexShrink: 0, marginTop: 1 }} />}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 11, fontWeight: tip.ok ? 600 : 700, color: tip.ok ? '#475569' : '#92400e' }}>{tip.text}</div>
+                      {!tip.ok && <div style={{ fontSize: 10, color: '#78716c', lineHeight: 1.4, marginTop: 1 }}>{tip.detail}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ─── Column B: Hashtag Engine ─────────────────────────────── */}
+            <div style={{ borderRight: '1px solid #f1f5f9', padding: '20px 24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                <div style={{ width: 30, height: 30, borderRadius: 8, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Hash size={15} color="#0070d2" />
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>Hashtag Engine IA</div>
+                  <div style={{ fontSize: 10, color: '#64748b' }}>{previewPlatform === 'instagram' ? '5 tags · rango óptimo Meta' : '1–2 tags · FB penaliza el exceso'}</div>
+                </div>
+                <button onClick={handleGenerateHashtags} disabled={generatingHashtags} style={{ marginLeft: 'auto', background: generatingHashtags ? '#f1f5f9' : 'linear-gradient(135deg,#0070d2,#005fb2)', border: 'none', borderRadius: 7, padding: '6px 14px', fontSize: 11, fontWeight: 700, color: generatingHashtags ? '#94a3b8' : '#fff', cursor: generatingHashtags ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+                  {generatingHashtags ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} color="#D4AF37" fill="#D4AF37" />}
+                  {generatingHashtags ? 'Generando...' : 'Generar'}
+                </button>
+              </div>
+              {suggestedHashtags.length > 0 ? (
+                <div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                    {suggestedHashtags.map((tag, i) => (
+                      <span key={i} style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 99, padding: '4px 12px', fontSize: 12, fontWeight: 700, color: '#1d4ed8' }}>{tag}</span>
+                    ))}
+                  </div>
+                  <button onClick={applyHashtags} style={{ width: '100%', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 7, padding: '9px', fontSize: 12, fontWeight: 700, color: '#166534', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    <Check size={13} /> Agregar al caption
+                  </button>
+                </div>
+              ) : (
+                <div style={{ padding: '20px 0', textAlign: 'center' }}>
+                  <Hash size={28} color="#cbd5e1" style={{ margin: '0 auto 10px' }} />
+                  <div style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.6 }}>Escribe un caption y presiona <strong style={{ color: '#0070d2' }}>Generar</strong> para obtener hashtags optimizados con IA.</div>
+                  <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 7, background: '#eff6ff', border: '1px solid #bfdbfe', textAlign: 'left', display: 'flex', gap: 7, alignItems: 'flex-start' }}>
+                    <TrendingUp size={12} color="#1d4ed8" style={{ flexShrink: 0, marginTop: 1 }} />
+                    <span style={{ fontSize: 10, color: '#1e40af', lineHeight: 1.5 }}><strong>Meta 2024:</strong> Posts con 3–5 hashtags relevantes reciben 3.1× más alcance orgánico que posts sin hashtags.</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ─── Column C: Performance KPIs (Sprint 1 placeholder) ─────── */}
+            <div style={{ padding: '20px 24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                <div style={{ width: 30, height: 30, borderRadius: 8, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <TrendingUp size={15} color="#10b981" />
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>Performance & KPIs</div>
+                  <div style={{ fontSize: 10, color: '#64748b' }}>Top posts · Alcance · Engagement</div>
+                </div>
+              </div>
+              <div style={{ padding: '24px 16px', borderRadius: 8, border: '1px dashed #d8dde6', background: '#fafbfc', textAlign: 'center' }}>
+                <TrendingUp size={28} color="#cbd5e1" style={{ margin: '0 auto 10px' }} />
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>Analytics · Sprint 1</div>
+                <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.6 }}>Conecta Facebook & Instagram para ver métricas reales: alcance, engagement, top posts, y recomendaciones de publicación.</div>
+                <div style={{ marginTop: 12, display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+                  {['Alcance total', 'Engagement %', 'Top 3 posts', 'Mejor hora'].map(kpi => (
+                    <span key={kpi} style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 99, padding: '3px 10px' }}>{kpi}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }
