@@ -158,6 +158,7 @@ export default function SocialHub() {
   const [contentUrl, setContentUrl] = useState(flyerUrl);
   const [contentType, setContentType] = useState<'image' | 'video'>('image');
   const [uploading, setUploading] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   const [captions, setCaptions] = useState<Record<string, string>>({ facebook: '', instagram: '' });
   const [generatingCaption, setGeneratingCaption] = useState<string | null>(null);
@@ -238,11 +239,26 @@ export default function SocialHub() {
     const file = e.target.files?.[0];
     if (!file || !profile?.company_id) return;
     setUploading(true);
+    setImgError(false);
     try {
       const url = await socialPublishService.uploadContent(file, profile.company_id);
       setContentUrl(url);
       setContentType(file.type.startsWith('video') ? 'video' : 'image');
       toast.success('Contenido listo');
+      // Auto-generate captions for newly uploaded content
+      if (profile.company_id) {
+        setGeneratingCaption('facebook');
+        try {
+          const context = file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
+          const [fbText, igText] = await Promise.all([
+            socialPublishService.generateCaption('facebook', context, selectedTone, profile.company_id),
+            socialPublishService.generateCaption('instagram', context, selectedTone, profile.company_id)
+          ]);
+          setCaptions({ facebook: fbText, instagram: igText });
+          toast.success('¡Copy generado con IA!');
+        } catch { /* caption errors are non-blocking */ }
+        finally { setGeneratingCaption(null); }
+      }
     } catch { toast.error('Error al subir'); }
     finally { setUploading(false); if (e.target) e.target.value = ''; }
   }
@@ -612,67 +628,77 @@ export default function SocialHub() {
             overflow: 'hidden', 
             boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
           }}>
-            {/* Header of Mock */}
-            <div style={{ padding: '12px 14px', borderBottom: '1px solid #f4f6f9', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ 
-                width: 34, height: 34, borderRadius: '50%', 
-                background: 'linear-gradient(135deg, #0070d2, #00396b)', 
-                display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                fontSize: 13, fontWeight: 800, color: '#ffffff'
-              }}>
+            {/* Platform-aware mock header */}
+            <div style={{ padding: '10px 14px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', gap: 10, background: previewPlatform === 'instagram' ? 'linear-gradient(90deg,#fdf497 0%,#fd5949 45%,#d6249f 60%,#285AEB 100%)' : '#1877F2' }}>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: previewPlatform === 'instagram' ? '#E1306C' : '#1877F2', flexShrink: 0 }}>
                 {(selectedAccounts[previewPlatform]?.account_name || 'A')[0].toUpperCase()}
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: '#081c3b' }}>
-                  {selectedAccounts[previewPlatform]?.account_name || 'ARIAS Defense Components'}
-                </div>
-                <div style={{ fontSize: 10, color: '#54698d', display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
-                  <span>Ahora</span> · <Globe size={10} color="#54698d" />
-                </div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{selectedAccounts[previewPlatform]?.account_name || 'ARIAS Defense Components'}</div>
+                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginTop: 1 }}>Ahora · {previewPlatform === 'facebook' ? '🌐 Público' : '📷 Instagram'}</div>
               </div>
+              {previewPlatform === 'facebook' ? <FacebookIcon size={16} color="#fff" /> : <InstagramIcon size={16} />}
             </div>
 
-            {/* If Facebook, render Caption ABOVE Media */}
+            {/* Facebook: caption ABOVE image */}
             {previewPlatform === 'facebook' && (
-              <div style={{ padding: '12px 14px', borderBottom: '1px solid #f4f6f9' }}>
-                <p style={{ margin: 0, fontSize: 12.5, color: '#334155', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-                  {captions.facebook ? (
-                    captions.facebook
-                  ) : (
-                    <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Escribe u optimiza con IA un caption...</span>
-                  )}
-                </p>
+              <div style={{ padding: '10px 14px', borderBottom: captions.facebook ? '1px solid #f0f0f0' : 'none', background: '#fff' }}>
+                {generatingCaption ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#94a3b8', fontSize: 12 }}><Loader2 size={12} className="animate-spin" /> Generando copy con IA...</div>
+                ) : (
+                  <p style={{ margin: 0, fontSize: 13, color: '#1c1e21', lineHeight: 1.55, whiteSpace: 'pre-wrap', fontFamily: 'system-ui, sans-serif' }}>
+                    {captions.facebook || <span style={{ color: '#bfc4cc', fontStyle: 'italic', fontSize: 12 }}>El copy aparecerá aquí automáticamente...</span>}
+                  </p>
+                )}
               </div>
             )}
 
-            {/* Media Area */}
+            {/* Media */}
             {contentUrl ? (
               contentType === 'image' ? (
-                <div style={{ background: '#f4f6f9', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                  <img src={contentUrl} alt="Mock Preview" style={{ width: '100%', maxHeight: 220, objectFit: 'contain' }} />
+                <div style={{ background: '#f0f0f0', lineHeight: 0, position: 'relative', minHeight: 160 }}>
+                  {!imgError ? (
+                    <img
+                      src={contentUrl}
+                      alt="Vista previa"
+                      onError={() => setImgError(true)}
+                      style={{ width: '100%', maxHeight: 240, objectFit: 'cover', display: 'block' }}
+                    />
+                  ) : (
+                    <div style={{ height: 180, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'linear-gradient(135deg,#0f172a,#1e293b)' }}>
+                      <Image size={32} color="#475569" />
+                      <span style={{ color: '#64748b', fontSize: 11, fontWeight: 600 }}>Vista previa no disponible</span>
+                      <span style={{ color: '#475569', fontSize: 10 }}>La imagen se publicará correctamente</span>
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div style={{ height: 160, background: '#090d16', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Video size={36} color="#10b981" />
+                <div style={{ height: 160, background: 'linear-gradient(135deg,#090d16,#1a2540)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                  <Video size={32} color="#10b981" />
+                  <span style={{ color: '#10b981', fontSize: 11, fontWeight: 700 }}>Video listo para publicar</span>
                 </div>
               )
             ) : (
-              <div style={{ height: 160, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#54698d', fontSize: 12, background: '#fafbfc', gap: 6 }}>
-                <Upload size={20} color="#cbd5e1" />
-                <span>Sube una imagen/video para ver la preview</span>
+              <div style={{ height: 160, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#fafbfc' }}>
+                <Upload size={22} color="#cbd5e1" />
+                <span style={{ color: '#94a3b8', fontSize: 11 }}>Sube una imagen para la preview</span>
               </div>
             )}
 
-            {/* If Instagram, render Caption BELOW Media */}
+            {/* Instagram: caption BELOW image */}
             {previewPlatform === 'instagram' && (
-              <div style={{ padding: '12px 14px', borderTop: '1px solid #f4f6f9' }}>
-                <p style={{ margin: 0, fontSize: 12.5, color: '#334155', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-                  {captions.instagram ? (
-                    captions.instagram
-                  ) : (
-                    <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Escribe u optimiza con IA un caption...</span>
-                  )}
-                </p>
+              <div style={{ padding: '10px 14px', background: '#fff', borderTop: '1px solid #f0f0f0' }}>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                  {['❤️','💬','📤'].map(ic => <span key={ic} style={{ fontSize: 18 }}>{ic}</span>)}
+                </div>
+                {generatingCaption ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#94a3b8', fontSize: 12 }}><Loader2 size={12} className="animate-spin" /> Generando copy con IA...</div>
+                ) : (
+                  <p style={{ margin: 0, fontSize: 12.5, color: '#262626', lineHeight: 1.55, whiteSpace: 'pre-wrap', fontFamily: 'system-ui, sans-serif' }}>
+                    <strong style={{ fontSize: 12 }}>{selectedAccounts['instagram']?.account_name || 'ariasdefense'} </strong>
+                    {captions.instagram || <span style={{ color: '#bfc4cc', fontStyle: 'italic' }}>El copy aparecerá aquí...</span>}
+                  </p>
+                )}
               </div>
             )}
           </div>
