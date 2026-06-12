@@ -26,12 +26,14 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
     }
     const isCallBotEnabled = import.meta.env.VITE_SHOW_CALL_BOT === 'true';
     const configPaths = ['/company/billing', '/company/branding', '/company/integrations', '/catalogo', '/financial-rules', '/loss-reasons', '/industries', '/admin/call-bot'];
-    const marketingPaths = ['/marketing', '/marketing/email', '/marketing/lead-hunter', '/marketing/ai-agents', '/marketing/settings', '/marketing/flyers', '/marketing/cockpit', '/marketing/engine-config', '/marketing/predictions'];
+    const marketingPaths = ['/marketing', '/marketing/email', '/marketing/lead-hunter', '/marketing/ai-agents', '/marketing/settings', '/marketing/cockpit', '/marketing/engine-config', '/marketing/predictions'];
+    const socialPaths = ['/marketing/social', '/marketing/flyers', '/company/social-accounts'];
     const teamPaths = ['/company/team', '/company/teams', '/company/performance'];
     const [configOpen, setConfigOpen] = useState(configPaths.some(path => location.pathname === path));
 
     // Only one accordion open at a time
     const getInitialAccordion = () => {
+        if (socialPaths.some(path => location.pathname.startsWith(path) || location.pathname === path)) return 'social';
         if (marketingPaths.some(path => location.pathname.startsWith(path) && !location.pathname.startsWith('/marketing/chat'))) return 'marketing';
         if (location.pathname.startsWith('/support')) return 'service_hub';
         if (teamPaths.some(path => location.pathname.startsWith(path))) return 'team';
@@ -263,7 +265,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
             name: t('sidebar.marketingHub'),
             href: '/marketing',
             icon: Megaphone,
-            current: location.pathname.startsWith('/marketing') && !location.pathname.startsWith('/marketing/chat'),
+            current: location.pathname.startsWith('/marketing') && !location.pathname.startsWith('/marketing/chat') && !socialPaths.some(p => location.pathname.startsWith(p)),
             subItems: [
                 { name: t('sidebar.dashboard'), href: '/marketing', icon: LayoutDashboard },
                 { name: t('sidebar.campaigns'), href: '/marketing/email', icon: Zap },
@@ -272,9 +274,20 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                 { name: t('sidebar.cockpitAi'), href: '/marketing/cockpit', icon: Brain, badge: hotLeadCount },
                 { name: t('sidebar.oracleAi'), href: '/marketing/predictions', icon: Target },
                 { name: t('sidebar.salesEngine'), href: '/marketing/engine-config', icon: Zap },
-                { name: t('sidebar.flyerStudio'), href: '/marketing/flyers', icon: Sparkles },
-                { name: '🌐 Social Media Hub', href: '/marketing/social', icon: Globe },
                 { name: t('sidebar.settings'), href: '/marketing/settings', icon: Settings },
+            ]
+        });
+
+        navigation.push({
+            id: 'social',
+            name: t('sidebar.socialMediaHub') || 'Social Media Hub',
+            href: '/marketing/social',
+            icon: Globe,
+            current: socialPaths.some(path => location.pathname.startsWith(path) || location.pathname === path),
+            subItems: [
+                { name: t('sidebar.socialDashboard') || 'Panel de Publicación', href: '/marketing/social', icon: LayoutDashboard },
+                { name: t('sidebar.flyerStudio'), href: '/marketing/flyers', icon: Sparkles },
+                { name: t('sidebar.connectedAccounts') || 'Cuentas Conectadas', href: '/company/social-accounts', icon: Network },
             ]
         });
     }
