@@ -168,9 +168,9 @@ export const socialPublishService = {
     async uploadContent(file: File, companyId: string): Promise<string> {
         const ext = file.name.split('.').pop() || 'jpg';
         const path = `social/${companyId}/${Date.now()}.${ext}`;
-        const { error } = await supabase.storage.from('marketing').upload(path, file, { upsert: true });
+        const { error } = await supabase.storage.from('marketing_assets').upload(path, file, { upsert: true });
         if (error) throw error;
-        const { data } = supabase.storage.from('marketing').getPublicUrl(path);
+        const { data } = supabase.storage.from('marketing_assets').getPublicUrl(path);
         return data.publicUrl;
     },
 };
