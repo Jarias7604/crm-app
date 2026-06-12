@@ -5,11 +5,48 @@ import { ArrowLeft, Upload, Send, Loader2, Image, Video, Sparkles, Clock, Star, 
 import { useAuth } from '../../auth/AuthProvider';
 import { socialPublishService, type SocialAccount, type SocialPost } from '../../services/social/socialPublishService';
 
-const PLATFORM_META: Record<string, { emoji: string; color: string; label: string }> = {
-  facebook:  { emoji: '👥', color: '#1877F2', label: 'Facebook'  },
-  instagram: { emoji: '📷', color: '#E1306C', label: 'Instagram' },
-  tiktok:    { emoji: '🎵', color: '#010101', label: 'TikTok'    },
-  youtube:   { emoji: '▶️', color: '#FF0000', label: 'YouTube'   },
+// ── BRAND SVG ICONS ─────────────────────────────────────────────────────────
+
+export const FacebookIcon = ({ size = 20, color = "#1877F2", className = "" }) => (
+  <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill={color}>
+    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+  </svg>
+);
+
+export const InstagramIcon = ({ size = 20, className = "" }) => (
+  <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="url(#ig-gradient-sh)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <defs>
+      <linearGradient id="ig-gradient-sh" x1="0%" y1="100%" x2="100%" y2="0%">
+        <stop offset="0%" stopColor="#fdf497" />
+        <stop offset="5%" stopColor="#fdf497" />
+        <stop offset="45%" stopColor="#fd5949" />
+        <stop offset="60%" stopColor="#d6249f" />
+        <stop offset="90%" stopColor="#285AEB" />
+      </linearGradient>
+    </defs>
+    <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+  </svg>
+);
+
+export const TikTokIcon = ({ size = 20, className = "" }) => (
+  <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="#010101">
+    <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.02 1.59 4.23.85.99 2.0 1.69 3.25 2.02v3.8c-1.57-.16-3.07-.84-4.22-1.91-.12-.11-.22-.24-.33-.36v7.89c.04 2.44-1.2 4.77-3.26 6.07-2.07 1.3-4.75 1.44-6.95.36-2.2-1.08-3.69-3.28-3.92-5.73-.3-3.2 1.87-6.27 4.96-7.05 1.27-.32 2.6-.2 3.79.34v4.06c-.79-.5-1.74-.69-2.67-.51-1.39.26-2.42 1.48-2.52 2.9-.1 1.76 1.24 3.29 3.0 3.4 1.76.11 3.32-1.15 3.51-2.91.03-.27.04-.54.04-.81V.02z"/>
+  </svg>
+);
+
+export const YouTubeIcon = ({ size = 20, className = "" }) => (
+  <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="#FF0000">
+    <path d="M23.498 6.163a3.003 3.003 0 0 0-2.11-2.108C19.518 3.535 12 3.535 12 3.535s-7.518 0-9.388.52a3.005 3.005 0 0 0-2.11 2.108C0 8.033 0 12 0 12s0 3.967.502 5.837a3.003 3.003 0 0 0 2.11 2.108c1.87.52 9.388.52 9.388.52s7.518 0 9.388-.52a3.003 3.003 0 0 0 2.11-2.108C24 15.967 24 12 24 12s0-3.967-.502-5.837zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+  </svg>
+);
+
+const PLATFORM_META: Record<string, { icon: React.ComponentType<any>; color: string; bgLight: string; label: string }> = {
+  facebook:  { icon: FacebookIcon, color: '#1877F2', bgLight: '#e8f0fe', label: 'Facebook'  },
+  instagram: { icon: InstagramIcon, color: '#E1306C', bgLight: '#fdf0f5', label: 'Instagram' },
+  tiktok:    { icon: TikTokIcon, color: '#010101', bgLight: '#f1f1f1', label: 'TikTok'    },
+  youtube:   { icon: YouTubeIcon, color: '#FF0000', bgLight: '#ffebee', label: 'YouTube'   },
 };
 
 const TONES = ['Profesional', 'Urgente', 'Premium', 'Amigable', 'Informal'];
@@ -31,7 +68,9 @@ function AccountPicker({ platform, accounts, selected, onChange }: {
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const meta = PLATFORM_META[platform] || { emoji: '🌐', color: '#888', label: platform };
+  const meta = PLATFORM_META[platform];
+  const BrandIcon = meta.icon;
+
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
     document.addEventListener('mousedown', h);
@@ -40,48 +79,59 @@ function AccountPicker({ platform, accounts, selected, onChange }: {
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
-      <button onClick={() => setOpen(o => !o)} style={{
-        width: '100%', display: 'flex', alignItems: 'center', gap: 10,
-        background: selected ? `${meta.color}12` : '#fff',
-        border: `1px solid ${selected ? meta.color + '40' : '#cbd5e1'}`,
-        borderRadius: 12, padding: '10px 14px', cursor: 'pointer', transition: 'all 0.2s',
-      }}>
-        <span style={{ fontSize: 18 }}>{meta.emoji}</span>
+      <button 
+        onClick={() => setOpen(o => !o)} 
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+          background: selected ? `${meta.color}08` : '#fff',
+          border: `1.5px solid ${selected ? meta.color : '#cbd5e1'}`,
+          borderRadius: 14, padding: '12px 16px', cursor: 'pointer', transition: 'all 0.2s ease',
+          boxShadow: selected ? `0 4px 12px ${meta.color}15` : 'none',
+        }}
+      >
+        <BrandIcon size={20} />
         <div style={{ flex: 1, textAlign: 'left' }}>
-          <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{meta.label}</div>
-          <div style={{ fontSize: 11, color: selected ? '#10b981' : '#ca8a04' }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>{meta.label}</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: selected ? '#10b981' : '#f59e0b', marginTop: 1 }}>
             {selected ? `✓ ${selected.account_name}` : 'Seleccionar cuenta...'}
           </div>
         </div>
         {selected?.is_default && <Star size={11} color="#D4AF37" fill="#D4AF37" />}
-        <ChevronDown size={14} color="#64748b" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
+        <ChevronDown size={14} color="#64748b" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
       </button>
 
       {open && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 50,
-          background: '#fff', border: '1px solid #cbd5e1', borderRadius: 12,
-          boxShadow: '0 16px 40px rgba(0,0,0,0.08)', overflow: 'hidden',
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 50,
+          background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14,
+          boxShadow: '0 16px 40px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.02)', overflow: 'hidden',
         }}>
           {/* None option */}
-          <button onClick={() => { onChange(null); setOpen(false); }} style={{
-            width: '100%', padding: '10px 14px', textAlign: 'left', border: 'none',
-            background: !selected ? '#f1f5f9' : 'transparent',
-            color: '#64748b', fontSize: 12, cursor: 'pointer',
-          }}>
+          <button 
+            onClick={() => { onChange(null); setOpen(false); }} 
+            style={{
+              width: '100%', padding: '11px 16px', textAlign: 'left', border: 'none',
+              background: !selected ? '#f1f5f9' : 'transparent',
+              color: '#64748b', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
             — No publicar en {meta.label}
           </button>
           {accounts.map(a => (
-            <button key={a.id} onClick={() => { onChange(a); setOpen(false); }} style={{
-              width: '100%', padding: '10px 14px', textAlign: 'left', border: 'none',
-              background: selected?.id === a.id ? `${meta.color}20` : 'transparent',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
-              borderTop: '1px solid #f1f5f9',
-            }}>
-              <span style={{ fontSize: 16 }}>{meta.emoji}</span>
+            <button 
+              key={a.id} 
+              onClick={() => { onChange(a); setOpen(false); }} 
+              style={{
+                width: '100%', padding: '11px 16px', textAlign: 'left', border: 'none',
+                background: selected?.id === a.id ? `${meta.color}10` : 'transparent',
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
+                borderTop: '1px solid #f1f5f9', transition: 'background 0.15s',
+              }}
+            >
+              <BrandIcon size={16} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{a.account_name}</div>
-                <div style={{ fontSize: 11, color: '#64748b' }}>ID: {a.account_id}</div>
+                <div style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>ID: {a.account_id}</div>
               </div>
               {a.is_default && <Star size={11} color="#D4AF37" fill="#D4AF37" />}
               {selected?.id === a.id && <Check size={14} color={meta.color} />}
@@ -202,67 +252,174 @@ export default function SocialHub() {
   const getStatusDot = (status: string) => ({ published: '#10b981', failed: '#ef4444', publishing: '#f59e0b', draft: '#64748b' }[status] || '#64748b');
 
   return (
-    <div style={{ height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column', background: '#f8fafc', overflow: 'hidden' }}>
+    <div style={{ height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column', background: 'linear-gradient(145deg, #f8fafc 0%, #edf2f7 100%)', overflow: 'hidden', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
 
-      {/* Header */}
-      <header style={{ padding: '14px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, background: '#fff' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => navigate('/marketing')} style={{ background: '#f1f5f9', border: 'none', borderRadius: 10, padding: 8, cursor: 'pointer' }}>
-            <ArrowLeft size={18} color="#64748b" />
+      {/* Header - Premium Glassmorphism */}
+      <header style={{ 
+        padding: '16px 28px', 
+        borderBottom: '1px solid rgba(226, 232, 240, 0.8)', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'space-between', 
+        flexShrink: 0, 
+        background: 'rgba(255, 255, 255, 0.85)',
+        backdropFilter: 'blur(12px)',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.02)'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <button 
+            onClick={() => navigate('/marketing')} 
+            style={{ 
+              background: '#fff', 
+              border: '1px solid #e2e8f0', 
+              borderRadius: 12, 
+              padding: 9, 
+              cursor: 'pointer',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.03)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'transform 0.15s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateX(-2px)'}
+            onMouseLeave={(e) => e.currentTarget.style.transform = 'none'}
+          >
+            <ArrowLeft size={16} color="#475569" strokeWidth={2.5} />
           </button>
           <div>
-            <div style={{ fontSize: 10, fontWeight: 800, color: '#D4AF37', letterSpacing: '0.12em' }}>ARIAS CRM · PREMIUM</div>
-            <div style={{ fontSize: 18, fontWeight: 900, color: '#0f172a' }}>🌐 Social Media Hub</div>
+            <div style={{ fontSize: 10, fontWeight: 900, color: '#D4AF37', letterSpacing: '0.15em' }}>ARIAS CRM · PREMIUM</div>
+            <div style={{ fontSize: 19, fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6, marginTop: 1 }}>
+              🌐 Social Media Hub
+            </div>
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => navigate('/company/social-accounts')} style={{ background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.25)', borderRadius: 10, padding: '7px 14px', fontSize: 12, fontWeight: 700, color: '#D4AF37', cursor: 'pointer' }}>
+          <button 
+            onClick={() => navigate('/company/social-accounts')} 
+            style={{ 
+              background: 'linear-gradient(135deg, rgba(212,175,55,0.1) 0%, rgba(212,175,55,0.05) 100%)', 
+              border: '1.5px solid rgba(212,175,55,0.3)', 
+              borderRadius: 12, 
+              padding: '9px 18px', 
+              fontSize: 12, 
+              fontWeight: 800, 
+              color: '#92400e', 
+              cursor: 'pointer',
+              boxShadow: '0 4px 10px rgba(212,175,55,0.05)',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.border = '1.5px solid rgba(212,175,55,0.5)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.border = '1.5px solid rgba(212,175,55,0.3)'; }}
+          >
             Gestionar Cuentas
           </button>
         </div>
       </header>
 
-      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '280px 1fr 320px', overflow: 'hidden' }}>
+      {/* Main Grid View */}
+      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '290px 1fr 330px', overflow: 'hidden' }}>
 
-        {/* ── COL 1: Content ── */}
-        <div style={{ borderRight: '1px solid #e2e8f0', padding: 18, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14, background: '#fff' }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: '#D4AF37', letterSpacing: '0.12em' }}>CONTENIDO</div>
+        {/* ── COL 1: Content Pane ── */}
+        <div style={{ 
+          borderRight: '1px solid #e2e8f0', 
+          padding: '24px 20px', 
+          overflowY: 'auto', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: 20, 
+          background: '#fff',
+          boxShadow: '4px 0 20px rgba(0,0,0,0.01)'
+        }}>
+          <div style={{ fontSize: 10, fontWeight: 900, color: '#D4AF37', letterSpacing: '0.15em' }}>CONTENIDO</div>
 
-          <div onClick={() => fileInputRef.current?.click()} style={{
-            border: `2px dashed ${contentUrl ? '#10b981' : '#cbd5e1'}`,
-            borderRadius: 14, padding: 20, textAlign: 'center', cursor: 'pointer',
-            background: contentUrl ? '#f0fdf4' : '#f8fafc',
-            minHeight: 140, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8,
-          }}>
+          {/* Media Uploader */}
+          <div 
+            onClick={() => fileInputRef.current?.click()} 
+            style={{
+              border: `2px dashed ${contentUrl ? '#10b981' : '#cbd5e1'}`,
+              borderRadius: 16, padding: '24px 16px', textAlign: 'center', cursor: 'pointer',
+              background: contentUrl ? '#f0fdf4' : '#fafafa',
+              minHeight: 150, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
+              transition: 'all 0.2s ease',
+              boxShadow: contentUrl ? '0 4px 12px rgba(16,185,129,0.05)' : 'none',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#D4AF37'; e.currentTarget.style.background = contentUrl ? '#f0fdf4' : '#fcfcfc'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = contentUrl ? '#10b981' : '#cbd5e1'; e.currentTarget.style.background = contentUrl ? '#f0fdf4' : '#fafafa'; }}
+          >
             {uploading ? (
-              <><Loader2 size={26} color="#D4AF37" className="animate-spin" /><span style={{ color: '#64748b', fontSize: 12 }}>Subiendo...</span></>
+              <>
+                <Loader2 size={28} color="#D4AF37" className="animate-spin" />
+                <span style={{ color: '#64748b', fontSize: 12, fontWeight: 700 }}>Subiendo...</span>
+              </>
             ) : contentUrl ? (
               <>
                 {contentType === 'image'
-                  ? <img src={contentUrl} alt="" style={{ maxWidth: '100%', maxHeight: 120, borderRadius: 8, objectFit: 'cover' }} />
-                  : <><Video size={28} color="#10b981" /><span style={{ fontSize: 12, color: '#10b981', fontWeight: 700 }}>Video listo</span></>
+                  ? <img src={contentUrl} alt="" style={{ maxWidth: '100%', maxHeight: 110, borderRadius: 10, objectFit: 'cover', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }} />
+                  : <><Video size={30} color="#10b981" /><span style={{ fontSize: 12, color: '#10b981', fontWeight: 800 }}>Video listo</span></>
                 }
-                <span style={{ fontSize: 10, color: '#64748b' }}>Click para cambiar</span>
+                <span style={{ fontSize: 10, color: '#64748b', fontWeight: 700, background: '#fff', border: '1px solid #e2e8f0', padding: '3px 8px', borderRadius: 6, marginTop: 4 }}>Cambiar archivo</span>
               </>
             ) : (
               <>
-                <Upload size={22} color="#D4AF37" />
-                <span style={{ color: '#64748b', fontSize: 12, fontWeight: 600 }}>Subir imagen o video</span>
+                <div style={{ background: 'rgba(212,175,55,0.08)', borderRadius: 50, padding: 12 }}>
+                  <Upload size={24} color="#D4AF37" />
+                </div>
+                <div>
+                  <span style={{ color: '#0f172a', fontSize: 13, fontWeight: 800, display: 'block' }}>Subir imagen o video</span>
+                  <span style={{ color: '#64748b', fontSize: 10, marginTop: 2, display: 'block' }}>Formatos soportados: PNG, JPG, MP4</span>
+                </div>
               </>
             )}
           </div>
           <input ref={fileInputRef} type="file" accept="image/*,video/*" onChange={handleUpload} style={{ display: 'none' }} />
 
-          <button onClick={() => navigate('/marketing/flyers')} style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: 10, padding: '9px 12px', color: '#475569', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, justifyContent: 'center' }}>
-            <Image size={14} /> Desde Flyer Studio
+          {/* Flyer Studio Integration Button */}
+          <button 
+            onClick={() => navigate('/marketing/flyers')} 
+            style={{ 
+              background: '#f8fafc', 
+              border: '1.5px solid #cbd5e1', 
+              borderRadius: 14, 
+              padding: '11px 14px', 
+              color: '#334155', 
+              fontSize: 12, 
+              fontWeight: 800, 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 8, 
+              justifyContent: 'center',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#94a3b8'; e.currentTarget.style.background = '#f1f5f9'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.background = '#f8fafc'; }}
+          >
+            <Sparkles size={14} color="#D4AF37" fill="#D4AF37" /> Desde Flyer Studio
           </button>
 
-          {/* Tone */}
+          {/* Tone Selector */}
           <div>
-            <div style={{ fontSize: 10, fontWeight: 800, color: '#64748b', letterSpacing: '0.08em', marginBottom: 7 }}>TONO DE MARCA</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+            <div style={{ fontSize: 10, fontWeight: 900, color: '#64748b', letterSpacing: '0.1em', marginBottom: 8 }}>TONO DE MARCA</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {TONES.map(t => (
-                <button key={t} onClick={() => setSelectedTone(t)} style={{ padding: '4px 10px', borderRadius: 7, border: `1px solid ${selectedTone === t ? '#D4AF37' : '#e2e8f0'}`, background: selectedTone === t ? 'rgba(212,175,55,0.12)' : '#f1f5f9', color: selectedTone === t ? '#D4AF37' : '#475569', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                <button 
+                  key={t} 
+                  onClick={() => setSelectedTone(t)} 
+                  style={{ 
+                    padding: '6px 11px', 
+                    borderRadius: 9, 
+                    border: `1.5px solid ${selectedTone === t ? '#D4AF37' : '#e2e8f0'}`, 
+                    background: selectedTone === t ? 'rgba(212,175,55,0.08)' : '#f8fafc', 
+                    color: selectedTone === t ? '#92400e' : '#475569', 
+                    fontSize: 11, 
+                    fontWeight: 800, 
+                    cursor: 'pointer',
+                    transition: 'all 0.15s'
+                  }}
+                  onMouseEnter={(e) => { if (selectedTone !== t) e.currentTarget.style.borderColor = '#cbd5e1'; }}
+                  onMouseLeave={(e) => { if (selectedTone !== t) e.currentTarget.style.borderColor = '#e2e8f0'; }}
+                >
                   {t}
                 </button>
               ))}
@@ -271,142 +428,327 @@ export default function SocialHub() {
 
           {/* History */}
           {recentPosts.length > 0 && (
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 800, color: '#64748b', letterSpacing: '0.08em', marginBottom: 7 }}>HISTORIAL RECIENTE</div>
-              {recentPosts.slice(0, 4).map(p => (
-                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: '1px solid #f1f5f9' }}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: getStatusDot(p.status), display: 'inline-block', flexShrink: 0 }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 11, color: '#0f172a', fontWeight: 600 }}>{p.platforms.join(' · ')}</div>
-                    <div style={{ fontSize: 10, color: '#64748b', textTransform: 'capitalize' }}>{p.status}</div>
+            <div style={{ marginTop: 'auto', paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+              <div style={{ fontSize: 10, fontWeight: 900, color: '#64748b', letterSpacing: '0.1em', marginBottom: 10 }}>HISTORIAL RECIENTE</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {recentPosts.slice(0, 3).map(p => (
+                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', border: '1px solid #f1f5f9', borderRadius: 10, background: '#fafafa' }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: getStatusDot(p.status), display: 'inline-block', flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 11, color: '#0f172a', fontWeight: 800 }}>{p.platforms.join(' · ')}</div>
+                      <div style={{ fontSize: 10, color: '#64748b', textTransform: 'capitalize', marginTop: 1 }}>{p.status}</div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
         </div>
 
-        {/* ── COL 2: Preview + Captions ── */}
-        <div style={{ padding: 22, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 18 }}>
+        {/* ── COL 2: Preview & AI Pane ── */}
+        <div style={{ padding: '26px 28px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 24 }}>
 
-          {/* Platform preview tabs */}
-          <div style={{ display: 'flex', gap: 6 }}>
+          {/* Platform Preview Switcher */}
+          <div style={{ display: 'flex', gap: 8, background: '#e2e8f0', padding: 5, borderRadius: 16, width: 'fit-content' }}>
             {activePlatforms.map(p => {
               const m = PLATFORM_META[p];
+              const BrandIcon = m.icon;
+              const isActive = previewPlatform === p;
               return (
-                <button key={p} onClick={() => setPreviewPlatform(p)} style={{ padding: '7px 14px', borderRadius: 9, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, background: previewPlatform === p ? m.color : '#cbd5e1', color: previewPlatform === p ? '#fff' : '#475569', transition: 'all 0.15s' }}>
-                  {m.emoji} {m.label}
+                <button 
+                  key={p} 
+                  onClick={() => setPreviewPlatform(p)} 
+                  style={{ 
+                    padding: '8px 16px', 
+                    borderRadius: 12, 
+                    border: 'none', 
+                    cursor: 'pointer', 
+                    fontSize: 12, 
+                    fontWeight: 800, 
+                    background: isActive ? '#fff' : 'transparent', 
+                    color: isActive ? '#0f172a' : '#475569', 
+                    boxShadow: isActive ? '0 4px 10px rgba(0,0,0,0.05)' : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    transition: 'all 0.15s' 
+                  }}
+                >
+                  <BrandIcon size={14} color={isActive ? m.color : '#64748b'} />
+                  {m.label}
                 </button>
               );
             })}
           </div>
 
-          {/* Post preview */}
-          <div style={{ background: '#fff', borderRadius: 18, border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 4px 14px rgba(0,0,0,0.03)' }}>
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg, #D4AF37, #f59e0b)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 900, color: '#fff' }}>
+          {/* Live Mobile Post Mockup */}
+          <div style={{ 
+            background: '#fff', 
+            borderRadius: 20, 
+            border: '1.5px solid #e2e8f0', 
+            overflow: 'hidden', 
+            boxShadow: '0 12px 36px rgba(15,23,42,0.04), 0 2px 8px rgba(0,0,0,0.01)',
+            maxWidth: 550
+          }}>
+            {/* Header of the mock post */}
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ 
+                width: 36, height: 36, borderRadius: '50%', 
+                background: 'linear-gradient(135deg, #D4AF37, #92400e)', 
+                display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                fontSize: 14, fontWeight: 900, color: '#fff',
+                boxShadow: '0 2px 6px rgba(212,175,55,0.3)'
+              }}>
                 {(selectedAccounts[previewPlatform]?.account_name || 'A')[0].toUpperCase()}
               </div>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{selectedAccounts[previewPlatform]?.account_name || 'ARIAS Defense Components'}</div>
-                <div style={{ fontSize: 11, color: '#64748b' }}>Ahora · 🌐</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>
+                  {selectedAccounts[previewPlatform]?.account_name || 'ARIAS Defense Components'}
+                </div>
+                <div style={{ fontSize: 10, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
+                  <span>Ahora</span> · <Globe size={10} color="#64748b" />
+                </div>
               </div>
             </div>
-            {contentUrl && contentType === 'image' && <img src={contentUrl} alt="" style={{ width: '100%', maxHeight: 300, objectFit: 'cover' }} />}
-            {contentUrl && contentType === 'video' && <div style={{ height: 180, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Video size={36} color="#64748b" /></div>}
-            {!contentUrl && <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: 13, background: '#fff' }}>Sube contenido para ver preview</div>}
-            <div style={{ padding: '12px 16px' }}>
-              <p style={{ margin: 0, fontSize: 13, color: '#334155', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-                {captions[previewPlatform] || <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Caption para {PLATFORM_META[previewPlatform]?.label}...</span>}
+
+            {/* Media Box */}
+            {contentUrl ? (
+              contentType === 'image' ? (
+                <div style={{ background: '#f8fafc', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                  <img src={contentUrl} alt="Preview" style={{ width: '100%', maxHeight: 340, objectFit: 'contain', background: '#fafafa' }} />
+                </div>
+              ) : (
+                <div style={{ height: 260, background: '#090d16', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Video size={42} color="#10b981" />
+                </div>
+              )
+            ) : (
+              <div style={{ height: 200, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 13, background: '#f8fafc', gap: 8 }}>
+                <Upload size={24} color="#cbd5e1" />
+                <span>Sube una imagen o video para previsualizar</span>
+              </div>
+            )}
+
+            {/* Caption in Mockup */}
+            <div style={{ padding: '16px 18px', borderTop: '1px solid #f1f5f9' }}>
+              <p style={{ margin: 0, fontSize: 13.5, color: '#334155', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                {captions[previewPlatform] ? (
+                  captions[previewPlatform]
+                ) : (
+                  <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Escribe un caption abajo o utiliza la IA para generar uno optimizado...</span>
+                )}
               </p>
             </div>
           </div>
 
-          {/* Captions per platform */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* Caption Inputs / AI Generator Boxes */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 550 }}>
             {activePlatforms.map(p => {
               const m = PLATFORM_META[p];
+              const BrandIcon = m.icon;
               return (
-                <div key={p} style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-                  <div style={{ padding: '9px 14px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc' }}>
-                    <span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{m.emoji} {m.label}</span>
-                    <button onClick={() => handleAICaption(p)} disabled={generatingCaption === p} style={{ background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.2)', borderRadius: 7, padding: '3px 9px', fontSize: 11, fontWeight: 700, color: '#D4AF37', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-                      {generatingCaption === p ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />} IA
+                <div 
+                  key={p} 
+                  style={{ 
+                    background: '#fff', 
+                    borderRadius: 16, 
+                    border: '1.5px solid #e2e8f0', 
+                    overflow: 'hidden', 
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.02)' 
+                  }}
+                >
+                  <div style={{ 
+                    padding: '10px 16px', 
+                    borderBottom: '1.5px solid #f1f5f9', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between', 
+                    background: '#fafbfc' 
+                  }}>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <BrandIcon size={16} />
+                      {m.label} Caption
+                    </span>
+                    <button 
+                      onClick={() => handleAICaption(p)} 
+                      disabled={generatingCaption === p} 
+                      style={{ 
+                        background: 'linear-gradient(135deg, rgba(212,175,55,0.1) 0%, rgba(212,175,55,0.04) 100%)', 
+                        border: '1px solid rgba(212,175,55,0.3)', 
+                        borderRadius: 8, 
+                        padding: '4px 11px', 
+                        fontSize: 11, 
+                        fontWeight: 800, 
+                        color: '#92400e', 
+                        cursor: 'pointer', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 5,
+                        transition: 'all 0.15s'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.02)'; e.currentTarget.style.borderColor = 'rgba(212,175,55,0.5)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.borderColor = 'rgba(212,175,55,0.3)'; }}
+                    >
+                      {generatingCaption === p ? (
+                        <Loader2 size={11} className="animate-spin" />
+                      ) : (
+                        <Sparkles size={11} color="#D4AF37" fill="#D4AF37" />
+                      )}
+                      Generar con IA
                     </button>
                   </div>
-                  <textarea value={captions[p] || ''} onChange={e => setCaptions(prev => ({ ...prev, [p]: e.target.value }))} placeholder={`Caption optimizado para ${m.label}...`} rows={3} style={{ width: '100%', background: 'transparent', border: 'none', outline: 'none', padding: '10px 14px', fontSize: 13, color: '#0f172a', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }} />
+                  <textarea 
+                    value={captions[p] || ''} 
+                    onChange={e => setCaptions(prev => ({ ...prev, [p]: e.target.value }))} 
+                    placeholder={`Escribe un caption optimizado para tu audiencia en ${m.label}...`} 
+                    rows={3} 
+                    style={{ 
+                      width: '100%', 
+                      background: 'transparent', 
+                      border: 'none', 
+                      outline: 'none', 
+                      padding: '12px 16px', 
+                      fontSize: 13.5, 
+                      color: '#0f172a', 
+                      resize: 'vertical', 
+                      fontFamily: 'inherit', 
+                      boxSizing: 'border-box',
+                      lineHeight: 1.5
+                    }} 
+                  />
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* ── COL 3: Publish Panel ── */}
-        <div style={{ borderLeft: '1px solid #e2e8f0', padding: 18, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14, background: '#fff' }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: '#D4AF37', letterSpacing: '0.12em' }}>PUBLICAR EN</div>
+        {/* ── COL 3: Destination Panel ── */}
+        <div style={{ 
+          borderLeft: '1px solid #e2e8f0', 
+          padding: '24px 20px', 
+          overflowY: 'auto', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          gap: 16, 
+          background: '#fff',
+          boxShadow: '-4px 0 20px rgba(0,0,0,0.01)'
+        }}>
+          <div style={{ fontSize: 10, fontWeight: 900, color: '#D4AF37', letterSpacing: '0.15em' }}>PUBLICAR EN</div>
 
           {loading ? (
             <div style={{ textAlign: 'center', padding: 32 }}><Loader2 size={24} color="#D4AF37" className="animate-spin" /></div>
           ) : (
             <>
-              {/* Per-platform account selectors */}
-              {Object.keys(PLATFORM_META).filter(p => p !== 'tiktok' && p !== 'youtube').map(platform => {
-                const list = grouped[platform] || [];
-                return (
-                  <div key={platform}>
-                    <AccountPicker
-                      platform={platform}
-                      accounts={list}
-                      selected={selectedAccounts[platform] || null}
-                      onChange={a => setSelectedAccounts(prev => ({ ...prev, [platform]: a }))}
-                    />
-                    {list.length === 0 && (
-                      <div style={{ fontSize: 11, color: '#ef4444', padding: '4px 4px', marginTop: 4 }}>
-                        No hay cuentas. <button onClick={() => navigate('/company/social-accounts')} style={{ color: '#D4AF37', background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, padding: 0, fontWeight: 'bold' }}>Conectar</button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-
-              {/* Phase 2 platforms */}
-              <div style={{ opacity: 0.55, display: 'flex', gap: 8 }}>
-                {['tiktok', 'youtube'].map(p => {
-                  const m = PLATFORM_META[p];
+              {/* Account Selectors list */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {Object.keys(PLATFORM_META).filter(p => p !== 'tiktok' && p !== 'youtube').map(platform => {
+                  const list = grouped[platform] || [];
                   return (
-                    <div key={p} style={{ flex: 1, background: '#f8fafc', borderRadius: 10, padding: '10px 12px', border: '1px dashed #cbd5e1', textAlign: 'center' }}>
-                      <div style={{ fontSize: 18 }}>{m.emoji}</div>
-                      <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>{m.label}</div>
-                      <div style={{ fontSize: 10, color: '#94a3b8' }}>Próximo</div>
+                    <div key={platform}>
+                      <AccountPicker
+                        platform={platform}
+                        accounts={list}
+                        selected={selectedAccounts[platform] || null}
+                        onChange={a => setSelectedAccounts(prev => ({ ...prev, [platform]: a }))}
+                      />
+                      {list.length === 0 && (
+                        <div style={{ fontSize: 11, color: '#ef4444', padding: '6px 8px', marginTop: 6, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span>Sin cuentas conectadas.</span>
+                          <button 
+                            onClick={() => navigate('/company/social-accounts')} 
+                            style={{ color: '#D4AF37', background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, padding: 0, fontWeight: 900 }}
+                          >
+                            Conectar
+                          </button>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
 
-              {/* Schedule placeholder */}
-              <div style={{ background: '#f8fafc', borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, border: '1px solid #e2e8f0', opacity: 0.7 }}>
-                <Clock size={15} color="#64748b" />
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>Programar publicación</div>
-                  <div style={{ fontSize: 10, color: '#94a3b8' }}>Próximamente · Fase 2</div>
+              {/* Coming Soon Platforms */}
+              <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 16 }}>
+                <div style={{ fontSize: 10, fontWeight: 900, color: '#64748b', letterSpacing: '0.08em', marginBottom: 10 }}>FUTURAS REDES</div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  {['tiktok', 'youtube'].map(p => {
+                    const m = PLATFORM_META[p];
+                    const BrandIcon = m.icon;
+                    return (
+                      <div 
+                        key={p} 
+                        style={{ 
+                          flex: 1, 
+                          background: '#f8fafc', 
+                          borderRadius: 14, 
+                          padding: '12px 14px', 
+                          border: '1px dashed #cbd5e1', 
+                          textAlign: 'center',
+                          opacity: 0.65 
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 4 }}><BrandIcon size={18} /></div>
+                        <div style={{ fontSize: 11, color: '#475569', fontWeight: 800 }}>{m.label}</div>
+                        <div style={{ fontSize: 9, color: '#94a3b8', fontWeight: 700, marginTop: 2 }}>Próximamente</div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Publish button */}
-              <button onClick={handlePublish} disabled={publishing || !contentUrl || selectedCount === 0} style={{
-                background: !contentUrl || selectedCount === 0 ? '#cbd5e1' : 'linear-gradient(135deg, #D4AF37, #f59e0b)',
-                color: !contentUrl || selectedCount === 0 ? '#94a3b8' : '#fff',
-                border: 'none', borderRadius: 14, padding: '14px 20px',
-                fontSize: 14, fontWeight: 900,
-                cursor: publishing || !contentUrl || selectedCount === 0 ? 'not-allowed' : 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                boxShadow: contentUrl && selectedCount > 0 ? '0 8px 24px rgba(212,175,55,0.2)' : 'none',
-                transition: 'all 0.2s', marginTop: 'auto',
+              {/* Scheduling Box */}
+              <div style={{ 
+                background: '#f8fafc', 
+                borderRadius: 14, 
+                padding: '12px 16px', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 12, 
+                border: '1.5px solid #e2e8f0', 
+                opacity: 0.75,
+                marginTop: 8
               }}>
-                {publishing ? <><Loader2 size={16} className="animate-spin" /> Publicando...</> : <><Send size={16} /> Publicar Ahora</>}
+                <Clock size={16} color="#64748b" />
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: '#475569' }}>Programar publicación</div>
+                  <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 600, marginTop: 1 }}>Fase 2 · Configurar hora</div>
+                </div>
+              </div>
+
+              {/* Main Publish Button - Glowing Emerald Green Gradient */}
+              <button 
+                onClick={handlePublish} 
+                disabled={publishing || !contentUrl || selectedCount === 0} 
+                style={{
+                  background: !contentUrl || selectedCount === 0 
+                    ? '#cbd5e1' 
+                    : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  color: !contentUrl || selectedCount === 0 ? '#94a3b8' : '#fff',
+                  border: 'none', 
+                  borderRadius: 16, 
+                  padding: '15px 20px',
+                  fontSize: 14, 
+                  fontWeight: 900,
+                  cursor: publishing || !contentUrl || selectedCount === 0 ? 'not-allowed' : 'pointer',
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: 8,
+                  boxShadow: contentUrl && selectedCount > 0 ? '0 10px 25px rgba(16,185,129,0.3)' : 'none',
+                  transition: 'all 0.2s ease', 
+                  marginTop: 'auto',
+                }}
+                onMouseEnter={(e) => { if (contentUrl && selectedCount > 0 && !publishing) e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                onMouseLeave={(e) => { if (contentUrl && selectedCount > 0 && !publishing) e.currentTarget.style.transform = 'none'; }}
+              >
+                {publishing ? (
+                  <><Loader2 size={16} className="animate-spin" /> Publicando...</>
+                ) : (
+                  <><Send size={16} /> Publicar Ahora</>
+                )}
               </button>
 
-              <p style={{ fontSize: 11, color: '#64748b', textAlign: 'center', margin: 0 }}>
+              <p style={{ fontSize: 11, color: '#64748b', textAlign: 'center', margin: 0, fontWeight: 700 }}>
                 {selectedCount > 0 ? `Publicará en ${selectedCount} cuenta(s)` : 'Selecciona al menos una cuenta'}
               </p>
             </>
