@@ -45,6 +45,7 @@ export interface RecommendIdeasParams {
   tono: string;
   companyId: string;
   idioma?: string;
+  images?: string[];
 }
 
 export const flyerService = {

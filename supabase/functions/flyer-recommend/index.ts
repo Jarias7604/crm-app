@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { industria, oferta, tono, idioma = 'es' } = await req.json();
+    const { industria, oferta, tono, idioma = 'es', images } = await req.json();
 
     if (!oferta) {
       return new Response(JSON.stringify({ error: 'Falta la descripción de la oferta' }), {
@@ -50,6 +50,22 @@ Deno.serve(async (req) => {
 
     Devuelve la respuesta estrictamente como un objeto JSON con la clave "ideas" que contenga un arreglo de 3 objetos con las propiedades indicadas. No agregues explicaciones externas ni markdown de código.`;
 
+    const userContent: any[] = [{ type: 'text', text: prompt }];
+
+    if (images && Array.isArray(images)) {
+      for (const img of images) {
+        userContent.push({
+          type: 'image_url',
+          image_url: { url: img }
+        });
+      }
+    }
+
+    if (images && images.length > 0) {
+      const visualPrompt = ` Además, analiza las imágenes adjuntas. Los anuncios y conceptos de flyers generados deben alinearse visualmente y conceptualmente con lo que se muestra en estas fotos (ej: si son computadoras, oficinas, o productos específicos). El título y gancho deben complementar de manera lógica y atractiva lo que se observa en las imágenes.`;
+      userContent[0].text += visualPrompt;
+    }
+
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -60,7 +76,7 @@ Deno.serve(async (req) => {
         model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: 'Eres un redactor creativo senior y experto en marketing y diseño gráfico publicitario para redes sociales en América Latina.' },
-          { role: 'user', content: prompt }
+          { role: 'user', content: userContent }
         ],
         response_format: { type: 'json_object' },
         temperature: 0.8

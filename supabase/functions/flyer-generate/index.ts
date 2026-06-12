@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { idea, industria, oferta, tono } = await req.json();
+    const { idea, industria, oferta, tono, customPrompt } = await req.json();
 
     if (!industria) {
       return new Response(JSON.stringify({ error: 'Falta la industria o rubro' }), {
@@ -35,11 +35,16 @@ Deno.serve(async (req) => {
 
     // Prompt sumamente optimizado para DALL-E 3
     // Regla crucial: "no text", "no words", "space for copy", "studio photography"
-    const imagePrompt = `Professional, high-end commercial studio photography representing the sector of: ${industria}.
+    let imagePrompt = '';
+    if (customPrompt) {
+      imagePrompt = `${customPrompt}. Professional, high-end commercial studio photography. Modern, clean, atmospheric lighting, soft shadows, extremely high detail. Composition: Perfect background for advertising, plenty of negative space for overlay text. CRITICAL RULE: DO NOT write any text, letters, words, typos, characters, brand logos, or watermarks. Absolutely NO text in the image.`;
+    } else {
+      imagePrompt = `Professional, high-end commercial studio photography representing the sector of: ${industria}.
     Theme/Concept: ${idea?.titulo || 'Business'} - ${idea?.gancho || oferta}.
     Visual Style: Modern, clean, atmospheric lighting, soft shadows, extremely high detail. Elegant and minimal.
     Composition: Perfect background for advertising. It must have plenty of negative space and clean areas for placing overlay text. The main elements should be artistically positioned on one side or bottom.
     CRITICAL RULE: DO NOT write any text, letters, words, typos, characters, brand logos, or watermarks. Absolutely NO text in the image. Pure conceptual clean background.`;
+    }
 
     const res = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',

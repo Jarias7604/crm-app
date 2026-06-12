@@ -69,6 +69,12 @@ export default function FlyerStudio() {
   // Step 2 — ideas
   const [ideas, setIdeas] = useState<FlyerIdea[]>([]);
 
+  // New States for AI Ad generator customizations
+  const [creationMode, setCreationMode]   = useState<'text' | 'photo'>('text');
+  const [step1Photos, setStep1Photos]     = useState<string[]>([]);
+  const [customImagePrompt, setCustomImagePrompt] = useState('');
+  const photoInputRef1 = useRef<HTMLInputElement>(null);
+
   // Industry dropdown state
   const [isIndustryOpen, setIsIndustryOpen] = useState(false);
   const [industrySearch, setIndustrySearch]  = useState('');
@@ -244,6 +250,49 @@ export default function FlyerStudio() {
     })();
   }, [profile?.company_id]);
 
+  // ─── UTILS: Compress image for vision API ──────────────────────────────────
+  const compressImage = (dataUrl: string, maxW = 512, maxH = 512): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let w = img.width;
+        let h = img.height;
+        if (w > maxW || h > maxH) {
+          if (w > h) {
+            h = Math.round((h * maxW) / w);
+            w = maxW;
+          } else {
+            w = Math.round((w * maxH) / h);
+            h = maxH;
+          }
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+      img.src = dataUrl;
+    });
+  };
+
+  const handleStep1PhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []).slice(0, 3 - step1Photos.length);
+    if (!files.length) return;
+    const readers = files.map(file => new Promise<string>(resolve => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result as string);
+      r.readAsDataURL(file);
+    }));
+    Promise.all(readers).then(urls => {
+      const merged = [...step1Photos, ...urls].slice(0, 3);
+      setStep1Photos(merged);
+      toast.success(`${urls.length} foto${urls.length > 1 ? 's' : ''} cargada${urls.length > 1 ? 's' : ''}`);
+      if (e.target) e.target.value = '';
+    });
+  };
+
   // ─── STEP 1 → 2: Generate ideas ────────────────────────────────────────────
   const handleGenerateIdeas = async () => {
     if (!selectedIndustries.length || !oferta.trim()) {
@@ -253,16 +302,23 @@ export default function FlyerStudio() {
     const industriaStr = selectedIndustries.join(', ');
     setIsLoadingIdeas(true);
     try {
+      let compressedImages: string[] | undefined = undefined;
+      if (creationMode === 'photo' && step1Photos.length > 0) {
+        compressedImages = await Promise.all(step1Photos.map(p => compressImage(p)));
+      }
+
       const result = await flyerService.recommendIdeas({
         industria: industriaStr,
         oferta,
         tono,
         companyId: profile?.company_id || '',
         idioma: 'es',
+        images: compressedImages,
       });
       setIdeas(result);
       setStep(2);
-    } catch {
+    } catch (err: any) {
+      console.error('recommendIdeas error:', err);
       // Premium AI fallback
       setIdeas([
         {
@@ -299,6 +355,17 @@ export default function FlyerStudio() {
   // ─── STEP 2 → 3: Select idea & generate image ──────────────────────────────
   const handleSelectIdea = async (idea: FlyerIdea) => {
     const accent = idea.paleta?.[0] || '#1a56db';
+    
+    let bgUrl: string | null = null;
+    let bgUrl2: string | null = null;
+    if (creationMode === 'photo' && step1Photos.length > 0) {
+      bgUrl = step1Photos[0];
+      bgUrl2 = step1Photos[1] || null;
+      setUserPhotos(step1Photos);
+      setPhotoMode('upload');
+      setPhotoLayout('single');
+    }
+
     setFlyerData(prev => ({
       ...prev,
       title: idea.titulo || '',
@@ -306,18 +373,24 @@ export default function FlyerStudio() {
       cta: idea.cta || 'CONTÁCTANOS',
       beneficios: idea.beneficios || [],
       accent,
-      bgImageUrl: null,
+      bgImageUrl: bgUrl,
+      bgImage2Url: bgUrl2,
       industria: selectedIndustries[0] || selectedIndustries.join(', '),
     }));
+    
     setStep(3);
-    await generateImage(idea);
+    
+    if (creationMode === 'text' || step1Photos.length === 0) {
+      setPhotoMode('ai');
+      await generateImage(idea);
+    }
   };
 
-  const generateImage = async (idea: FlyerIdea) => {
+  const generateImage = async (idea: FlyerIdea, customPrompt?: string) => {
     setIsLoadingImg(true);
     try {
       const { data, error } = await supabase.functions.invoke('flyer-generate', {
-        body: { idea, industria: selectedIndustries.join(', '), oferta, tono, seed: Date.now() }
+        body: { idea, industria: selectedIndustries.join(', '), oferta, tono, seed: Date.now(), customPrompt }
       });
       if (error) throw error;
       if (data?.fondo_url) {
@@ -551,24 +624,104 @@ export default function FlyerStudio() {
           <div style={{ maxWidth: 860, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, height: '100%' }}>
 
             {/* Left: Offer */}
-            <div style={{ background: '#fff', borderRadius: 20, padding: 28, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{ background: '#fff', borderRadius: 20, padding: 28, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 800, color: '#D4AF37', letterSpacing: '0.08em', marginBottom: 6 }}>PASO 1 DE 3</div>
                 <h2 style={{ fontSize: 22, fontWeight: 900, color: '#0f172a', margin: 0 }}>¿Qué quieres promocionar?</h2>
-                <p style={{ fontSize: 13, color: '#64748b', marginTop: 6, marginBottom: 0 }}>Describe tu oferta con el mayor detalle posible — la IA la usará para crear contenido relevante.</p>
+                <p style={{ fontSize: 13, color: '#64748b', marginTop: 6, marginBottom: 0 }}>Describe tu oferta y sube fotos si deseas que la IA las analice para el contenido.</p>
               </div>
 
+              {/* Mode Toggle */}
+              <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: 10, padding: 3, gap: 4 }}>
+                <button
+                  onClick={() => setCreationMode('text')}
+                  style={{
+                    flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: 'pointer', border: 'none',
+                    background: creationMode === 'text' ? '#fff' : 'transparent',
+                    color: creationMode === 'text' ? '#0f172a' : '#64748b',
+                    boxShadow: creationMode === 'text' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.15s'
+                  }}
+                >
+                  ✍️ Generar desde Texto
+                </button>
+                <button
+                  onClick={() => setCreationMode('photo')}
+                  style={{
+                    flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: 'pointer', border: 'none',
+                    background: creationMode === 'photo' ? '#fff' : 'transparent',
+                    color: creationMode === 'photo' ? '#0f172a' : '#64748b',
+                    boxShadow: creationMode === 'photo' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.15s'
+                  }}
+                >
+                  📸 Analizar mis Fotos + Texto
+                </button>
+              </div>
+
+              {/* Photo Upload Area in Step 1 */}
+              {creationMode === 'photo' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <label style={{ fontSize: 10, fontWeight: 800, color: '#475569', letterSpacing: '0.06em' }}>📸 SUBIR FOTOS DE REFERENCIA (1-3 FOTOS)</label>
+                  <input ref={photoInputRef1} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handleStep1PhotoUpload} />
+                  
+                  {step1Photos.length === 0 ? (
+                    <button
+                      onClick={() => photoInputRef1.current?.click()}
+                      style={{
+                        width: '100%', padding: '20px 16px', borderRadius: 12, border: '2px dashed #D4AF37', background: '#fffbeb',
+                        cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, transition: 'all 0.15s'
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#fff8e6'}
+                      onMouseLeave={e => e.currentTarget.style.background = '#fffbeb'}
+                    >
+                      <Upload size={24} color="#D4AF37" />
+                      <span style={{ fontSize: 12, fontWeight: 800, color: '#92400e' }}>Seleccionar fotos del producto o servicio</span>
+                      <span style={{ fontSize: 10, color: '#b45309', textAlign: 'center' }}>La IA (Vision) las analizará para redactar beneficios, hook y título.</span>
+                    </button>
+                  ) : (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      {step1Photos.map((url, i) => (
+                        <div key={i} style={{ position: 'relative', width: 64, height: 64 }}>
+                          <img src={url} alt={`referencia ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8, border: '2px solid #D4AF37' }} />
+                          <button
+                            onClick={() => setStep1Photos(prev => prev.filter((_, j) => j !== i))}
+                            style={{
+                              position: 'absolute', top: -5, right: -5, width: 18, height: 18, borderRadius: '50%',
+                              background: '#ef4444', color: '#fff', border: '2px solid #fff', fontSize: 10,
+                              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900
+                            }}
+                          >×</button>
+                        </div>
+                      ))}
+                      {step1Photos.length < 3 && (
+                        <button
+                          onClick={() => photoInputRef1.current?.click()}
+                          style={{
+                            width: 64, height: 64, borderRadius: 8, border: '2px dashed #D4AF37', background: '#fffbeb',
+                            cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2
+                          }}
+                        >
+                          <Upload size={14} color="#D4AF37" />
+                          <span style={{ fontSize: 8, fontWeight: 800, color: '#b45309' }}>+ Foto</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
-                <label style={{ fontSize: 11, fontWeight: 800, color: '#475569', letterSpacing: '0.06em' }}>TU OFERTA / SERVICIO / PRODUCTO</label>
+                <label style={{ fontSize: 10, fontWeight: 800, color: '#475569', letterSpacing: '0.06em' }}>DESCRIPCIÓN DE TU OFERTA / CONTEXTO</label>
                 <textarea
                   value={oferta}
                   onChange={e => setOferta(e.target.value)}
-                  placeholder="Ej: Vendo terrenos en Costa del Sol con vista al mar, cerca del aeropuerto, desde $25,000. Plazos disponibles, escritura incluida..."
-                  rows={7}
+                  placeholder={creationMode === 'photo' ? "Explica qué quieres lograr con estas fotos (ej: crear anuncio para facturación electrónica rápida y sin complicaciones)..." : "Ej: Vendo terrenos en Costa del Sol con vista al mar, cerca del aeropuerto, desde $25,000. Plazos disponibles, escritura incluida..."}
+                  rows={6}
                   style={{
-                    flex: 1, padding: '14px 16px', borderRadius: 12,
-                    border: '1.5px solid #e2e8f0', fontSize: 14, fontWeight: 400,
-                    color: '#0f172a', resize: 'none', outline: 'none', lineHeight: 1.6,
+                    flex: 1, padding: '12px 14px', borderRadius: 12,
+                    border: '1.5px solid #e2e8f0', fontSize: 13, fontWeight: 400,
+                    color: '#0f172a', resize: 'none', outline: 'none', lineHeight: 1.5,
                     fontFamily: 'inherit', transition: 'border-color 0.2s',
                   }}
                   onFocus={e => e.target.style.borderColor = '#D4AF37'}
@@ -582,10 +735,10 @@ export default function FlyerStudio() {
                 style={{
                   background: !selectedIndustries.length || !oferta.trim() ? '#e2e8f0' : 'linear-gradient(135deg, #D4AF37, #f59e0b)',
                   color: !selectedIndustries.length || !oferta.trim() ? '#94a3b8' : '#000',
-                  border: 'none', borderRadius: 14, padding: '16px 24px',
-                  fontSize: 14, fontWeight: 900, cursor: !selectedIndustries.length || !oferta.trim() ? 'not-allowed' : 'pointer',
+                  border: 'none', borderRadius: 14, padding: '14px 20px',
+                  fontSize: 13, fontWeight: 900, cursor: !selectedIndustries.length || !oferta.trim() ? 'not-allowed' : 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  boxShadow: !selectedIndustries.length || !oferta.trim() ? 'none' : '0 8px 24px rgba(212,175,55,0.35)',
+                  boxShadow: !selectedIndustries.length || !oferta.trim() ? 'none' : '0 6px 18px rgba(212,175,55,0.3)',
                   transition: 'all 0.2s',
                 }}
               >
@@ -873,13 +1026,50 @@ export default function FlyerStudio() {
                   {/* Content */}
                   <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {photoMode === 'ai' && (
-                      <button
-                        onClick={() => generateImage({ titulo: flyerData.title, gancho: flyerData.subtitle, beneficios: flyerData.beneficios, cta: flyerData.cta, paleta: [flyerData.accent], tono })}
-                        disabled={isLoadingImg}
-                        style={{ width: '100%', background: isLoadingImg ? '#f8fafc' : '#fff', color: '#374151', border: '1.5px solid #e2e8f0', borderRadius: 10, padding: '11px 16px', fontSize: 12, fontWeight: 700, cursor: isLoadingImg ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all 0.15s' }}>
-                        <RefreshCw size={14} className={isLoadingImg ? 'animate-spin' : ''} />
-                        {isLoadingImg ? 'Generando con IA...' : 'Regenerar imagen IA'}
-                      </button>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <textarea
+                          value={customImagePrompt}
+                          onChange={e => setCustomImagePrompt(e.target.value)}
+                          placeholder="Describe detalladamente qué imagen quieres generar (ej: Computadora portátil moderna mostrando facturación electrónica en pantalla, sobre escritorio de madera elegante, estilo minimalista)"
+                          rows={3}
+                          style={{
+                            width: '100%',
+                            padding: '8px 10px',
+                            borderRadius: 8,
+                            border: '1.5px solid #e2e8f0',
+                            fontSize: 11,
+                            resize: 'none',
+                            outline: 'none',
+                            boxSizing: 'border-box',
+                            fontFamily: 'inherit',
+                            lineHeight: 1.4
+                          }}
+                        />
+                        <button
+                          onClick={() => generateImage({ titulo: flyerData.title, gancho: flyerData.subtitle, beneficios: flyerData.beneficios, cta: flyerData.cta, paleta: [flyerData.accent], tono }, customImagePrompt)}
+                          disabled={isLoadingImg}
+                          style={{
+                            width: '100%',
+                            background: isLoadingImg ? '#f8fafc' : 'linear-gradient(135deg, #1a56db, #7c3aed)',
+                            color: isLoadingImg ? '#64748b' : '#fff',
+                            border: 'none',
+                            borderRadius: 10,
+                            padding: '11px 16px',
+                            fontSize: 12,
+                            fontWeight: 800,
+                            cursor: isLoadingImg ? 'wait' : 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6,
+                            transition: 'all 0.15s',
+                            boxShadow: isLoadingImg ? 'none' : '0 2px 6px rgba(26,86,219,0.2)'
+                          }}
+                        >
+                          <RefreshCw size={14} className={isLoadingImg ? 'animate-spin' : ''} />
+                          {isLoadingImg ? 'Generando con IA...' : 'Generar Imagen Personalizada'}
+                        </button>
+                      </div>
                     )}
                     {/* ── UPLOAD MODE ── */}
                     {photoMode === 'upload' && (

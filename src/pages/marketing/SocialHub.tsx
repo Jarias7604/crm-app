@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Upload, Send, Loader2, Image, Video, Sparkles, Clock, Star, ChevronDown, Check, Globe } from 'lucide-react';
+import { ArrowLeft, Upload, Send, Loader2, Image, Video, Sparkles, Clock, Star, ChevronDown, Check, Globe, HelpCircle } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { socialPublishService, type SocialAccount, type SocialPost } from '../../services/social/socialPublishService';
+import { flyerService, type FlyerAsset } from '../../services/flyerService';
+import { supabase } from '../../services/supabase';
 
 // ── BRAND SVG ICONS ─────────────────────────────────────────────────────────
 
