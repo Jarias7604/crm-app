@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Upload, Send, Loader2, Image, Video, Sparkles, Clock, Star, ChevronDown, Check, Globe, HelpCircle } from 'lucide-react';
+import { ArrowLeft, Upload, Send, Loader2, Image, Video, Sparkles, Clock, Star, ChevronDown, Check, Globe, HelpCircle, Zap, Hash, TrendingUp, AlertTriangle, CheckCircle2, Info } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { socialPublishService, type SocialAccount, type SocialPost } from '../../services/social/socialPublishService';
 import { flyerService, type FlyerAsset } from '../../services/flyerService';
@@ -53,7 +53,82 @@ const PLATFORM_META: Record<string, { icon: React.ComponentType<any>; color: str
 
 const TONES = ['Profesional', 'Urgente', 'Premium', 'Amigable', 'Informal'];
 
-// Groups accounts by platform
+// ── VIRALITY SCORE ENGINE ───────────────────────────────────────────────────
+
+interface ViralityResult {
+  score: number;
+  label: string;
+  color: string;
+  tips: Array<{ ok: boolean; text: string; detail: string }>;
+}
+
+function getViralityScore(caption: string, platform: string, hasMedia: boolean): ViralityResult {
+  let score = 0;
+  const tips: Array<{ ok: boolean; text: string; detail: string }> = [];
+
+  // 1. Media uploaded (most important — +25 pts)
+  const mediaOk = hasMedia;
+  tips.push({ ok: mediaOk, text: 'Imagen o video adjunto', detail: 'Posts con visual obtienen 2.3x más alcance orgánico.' });
+  if (mediaOk) score += 25;
+
+  // 2. Caption not empty
+  const hasCaption = caption.trim().length > 10;
+  tips.push({ ok: hasCaption, text: 'Caption escrito', detail: 'Un caption bien escrito aumenta el tiempo de visualización.' });
+  if (hasCaption) score += 10;
+
+  // 3. Optimal caption length
+  const len = caption.trim().length;
+  const optimalLen = platform === 'facebook' ? (len >= 40 && len <= 300) : (len >= 100 && len <= 220);
+  const lenLabel = platform === 'facebook' ? '40–300 caracteres (FB)' : '100–220 caracteres (IG)';
+  tips.push({ ok: optimalLen, text: `Longitud óptima: ${lenLabel}`, detail: 'Meta recomienda esta longitud para máximo engagement.' });
+  if (optimalLen) score += 15;
+
+  // 4. Has emoji
+  const hasEmoji = /\p{Emoji}/u.test(caption);
+  tips.push({ ok: hasEmoji, text: 'Incluye emojis', detail: 'Los emojis aumentan el CTR hasta un 25% según estudios de Meta.' });
+  if (hasEmoji) score += 10;
+
+  // 5. Has CTA
+  const ctaWords = ['escríbenos', 'llama', 'contáctanos', 'visita', 'descubre', 'agenda', 'reserva', 'compra', 'obtén', 'haz clic', 'click', 'link', 'bio', 'dm', 'mensaje', 'conoce', 'descarga', 'regístrate'];
+  const hasCTA = ctaWords.some(w => caption.toLowerCase().includes(w));
+  tips.push({ ok: hasCTA, text: 'Tiene CTA (llamada a acción)', detail: 'Posts con CTA generan 89% más interacciones.' });
+  if (hasCTA) score += 15;
+
+  // 6. Hashtag count
+  const hashtagCount = (caption.match(/#\w+/g) || []).length;
+  const optimalHashtags = platform === 'instagram' ? (hashtagCount >= 3 && hashtagCount <= 5) : (hashtagCount >= 1 && hashtagCount <= 2);
+  const hashtagLabel = platform === 'instagram' ? '3–5 hashtags (IG óptimo)' : '1–2 hashtags (FB óptimo)';
+  tips.push({ ok: optimalHashtags, text: hashtagLabel, detail: 'Meta penaliza el exceso de hashtags. 3-5 en IG es el punto dulce.' });
+  if (optimalHashtags) score += 10;
+
+  // 7. No link in IG caption
+  if (platform === 'instagram') {
+    const hasLink = /https?:\/\//i.test(caption);
+    const noLink = !hasLink;
+    tips.push({ ok: noLink, text: 'Sin links en caption (IG)', detail: 'Instagram suprime el alcance de posts con URLs en el caption.' });
+    if (noLink) score += 10;
+  }
+
+  // 8. Hook in first line (starts with power word or question)
+  const firstLine = caption.trim().split('\n')[0].toLowerCase();
+  const hookWords = ['¿', 'cómo', 'por qué', 'el secreto', 'la verdad', 'descubre', 'alerta', 'nuevo', 'gratis', 'exclusivo', 'ya', 'ahora', '🚨', '🔥', '⚡', '💡'];
+  const hasHook = hookWords.some(w => firstLine.includes(w));
+  tips.push({ ok: hasHook, text: 'Gancho fuerte en la primera línea', detail: 'La primera frase decide si el usuario sigue leyendo o hace scroll.' });
+  if (hasHook) score += 5;
+
+  // Clamp score 0-100
+  score = Math.min(100, Math.max(0, score));
+
+  let label = '🔴 Bajo alcance';
+  let color = '#ef4444';
+  if (score >= 75) { label = '🔥 Viral potencial'; color = '#10b981'; }
+  else if (score >= 50) { label = '✅ Buen alcance'; color = '#f59e0b'; }
+  else if (score >= 25) { label = '⚠️ Alcance limitado'; color = '#f59e0b'; }
+
+  return { score, label, color, tips };
+}
+
+
 function groupByPlatform(accounts: SocialAccount[]) {
   const map: Record<string, SocialAccount[]> = {};
   for (const a of accounts) {
@@ -165,6 +240,9 @@ export default function SocialHub() {
   const [selectedTone, setSelectedTone] = useState('Profesional');
   const [previewPlatform, setPreviewPlatform] = useState('facebook');
   const [publishing, setPublishing] = useState(false);
+  const [showMetaTips, setShowMetaTips] = useState(false);
+  const [generatingHashtags, setGeneratingHashtags] = useState(false);
+  const [suggestedHashtags, setSuggestedHashtags] = useState<string[]>([]);
 
   // Per-platform selected account
   const [selectedAccounts, setSelectedAccounts] = useState<Record<string, SocialAccount | null>>({
@@ -234,6 +312,49 @@ export default function SocialHub() {
   }
 
   const grouped = groupByPlatform(accounts);
+
+  // ── Virality Score (reactive, no API call) ──────────────────────────────────
+  const viralityResult = useMemo(() =>
+    getViralityScore(captions[previewPlatform] || '', previewPlatform, !!contentUrl),
+    [captions, previewPlatform, contentUrl]
+  );
+
+  // ── Hashtag Generator ────────────────────────────────────────────────────────
+  async function handleGenerateHashtags() {
+    const caption = captions[previewPlatform];
+    if (!caption?.trim()) { toast.error('Escribe un caption primero'); return; }
+    setGeneratingHashtags(true);
+    setSuggestedHashtags([]);
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-chat', {
+        body: {
+          messages: [
+            { role: 'system', content: 'Eres un experto en marketing digital de El Salvador. Responde SOLO con una lista de hashtags separados por espacios, sin explicaciones. Incluye hashtags en español, inglés y algunos locales de El Salvador.' },
+            { role: 'user', content: `Genera exactamente ${previewPlatform === 'instagram' ? 5 : 2} hashtags de alto impacto para este caption de ${previewPlatform === 'instagram' ? 'Instagram' : 'Facebook'}: "${caption.substring(0, 200)}"` }
+          ],
+          companyId: profile?.company_id,
+        }
+      });
+      if (error) throw error;
+      const raw: string = data?.content || data?.response || '';
+      const tags = raw.match(/#\w+/g) || raw.split(/\s+/).filter((w: string) => w.startsWith('#'));
+      if (tags.length === 0) throw new Error('No hashtags returned');
+      setSuggestedHashtags(tags.slice(0, previewPlatform === 'instagram' ? 5 : 2));
+    } catch (e) {
+      toast.error('Error generando hashtags');
+    } finally {
+      setGeneratingHashtags(false);
+    }
+  }
+
+  function applyHashtags() {
+    if (!suggestedHashtags.length) return;
+    const current = captions[previewPlatform] || '';
+    const withTags = current.trim() + '\n\n' + suggestedHashtags.join(' ');
+    setCaptions(prev => ({ ...prev, [previewPlatform]: withTags }));
+    setSuggestedHashtags([]);
+    toast.success('Hashtags agregados al caption');
+  }
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -741,8 +862,107 @@ export default function SocialHub() {
             )}
           </div>
 
+          {/* ── AI VIRALITY SCORE ─────────────────────────────────────────────── */}
+          <div style={{ background: '#ffffff', borderRadius: 10, border: `1.5px solid ${viralityResult.color}30`, padding: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Zap size={13} color={viralityResult.color} fill={viralityResult.color} />
+                <span style={{ fontSize: 11, fontWeight: 800, color: '#54698d', letterSpacing: '0.06em' }}>SCORE DE VIRALIDAD</span>
+              </div>
+              <button
+                onClick={() => setShowMetaTips(p => !p)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#0070d2', fontWeight: 700, padding: 0 }}
+              >
+                <Info size={11} />{showMetaTips ? 'Ocultar tips' : 'Ver tips Meta'}
+              </button>
+            </div>
+
+            {/* Score bar */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <div style={{ flex: 1, height: 8, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${viralityResult.score}%`,
+                  background: viralityResult.score >= 75
+                    ? 'linear-gradient(90deg, #10b981, #059669)'
+                    : viralityResult.score >= 50
+                    ? 'linear-gradient(90deg, #f59e0b, #d97706)'
+                    : 'linear-gradient(90deg, #ef4444, #dc2626)',
+                  borderRadius: 99,
+                  transition: 'width 0.5s ease',
+                }} />
+              </div>
+              <span style={{ fontSize: 18, fontWeight: 900, color: viralityResult.color, minWidth: 36, textAlign: 'right', lineHeight: 1 }}>{viralityResult.score}</span>
+            </div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: viralityResult.color }}>{viralityResult.label}</div>
+
+            {/* Meta Tips Checklist */}
+            {showMetaTips && (
+              <div style={{ marginTop: 12, borderTop: '1px solid #f1f5f9', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: '#54698d', letterSpacing: '0.06em', marginBottom: 2 }}>RECOMENDACIONES META</div>
+                {viralityResult.tips.map((tip, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                    {tip.ok
+                      ? <CheckCircle2 size={13} color="#10b981" style={{ flexShrink: 0, marginTop: 1 }} />
+                      : <AlertTriangle size={13} color="#f59e0b" style={{ flexShrink: 0, marginTop: 1 }} />}
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: tip.ok ? '#0f172a' : '#92400e' }}>{tip.text}</div>
+                      {!tip.ok && <div style={{ fontSize: 9.5, color: '#78716c', marginTop: 1, lineHeight: 1.4 }}>{tip.detail}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ── HASHTAG ENGINE ─────────────────────────────────────────────────── */}
+          <div style={{ background: '#ffffff', borderRadius: 10, border: '1px solid #d8dde6', padding: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Hash size={13} color="#0070d2" />
+                <span style={{ fontSize: 11, fontWeight: 800, color: '#54698d', letterSpacing: '0.06em' }}>HASHTAG ENGINE IA</span>
+              </div>
+              <button
+                onClick={handleGenerateHashtags}
+                disabled={generatingHashtags}
+                style={{
+                  background: 'linear-gradient(135deg, #0070d2, #005fb2)',
+                  border: 'none', borderRadius: 6, padding: '5px 12px',
+                  fontSize: 11, fontWeight: 700, color: '#ffffff',
+                  cursor: generatingHashtags ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  opacity: generatingHashtags ? 0.7 : 1, transition: 'all 0.15s',
+                }}
+              >
+                {generatingHashtags ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} color="#D4AF37" fill="#D4AF37" />}
+                Generar
+              </button>
+            </div>
+
+            {suggestedHashtags.length > 0 ? (
+              <div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                  {suggestedHashtags.map((tag, i) => (
+                    <span key={i} style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 20, padding: '3px 10px', fontSize: 11, fontWeight: 700, color: '#1d4ed8' }}>{tag}</span>
+                  ))}
+                </div>
+                <button
+                  onClick={applyHashtags}
+                  style={{ width: '100%', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: '7px', fontSize: 11, fontWeight: 700, color: '#166534', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+                >
+                  <Check size={12} /> Agregar al caption
+                </button>
+              </div>
+            ) : (
+              <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.5 }}>
+                Genera {previewPlatform === 'instagram' ? '5 hashtags optimizados' : '2 hashtags de alto impacto'} para tu publicación con un solo clic.
+              </div>
+            )}
+          </div>
+
           {/* Future Networks */}
           <div style={{ background: '#ffffff', borderRadius: 8, border: '1px solid #d8dde6', padding: 14 }}>
+
             <div style={{ fontSize: 10, fontWeight: 800, color: '#54698d', letterSpacing: '0.08em', marginBottom: 10 }}>FUTURAS REDES</div>
             <div style={{ display: 'flex', gap: 8 }}>
               {['tiktok', 'youtube'].map(p => {
