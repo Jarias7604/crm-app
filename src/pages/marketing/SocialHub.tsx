@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Upload, Send, Loader2, Image, Video, Sparkles, Clock, Star, ChevronDown, Check, Globe, HelpCircle, Zap, Hash, TrendingUp, AlertTriangle, CheckCircle2, Info } from 'lucide-react';
+import { ArrowLeft, Upload, Send, Loader2, Image, Video, Sparkles, Clock, Star, ChevronDown, Check, Globe, HelpCircle, Zap, Hash, TrendingUp, AlertTriangle, CheckCircle2, Info, Eye } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { socialPublishService, type SocialAccount, type SocialPost } from '../../services/social/socialPublishService';
 import { flyerService, type FlyerAsset } from '../../services/flyerService';
@@ -245,6 +245,7 @@ export default function SocialHub() {
   const [suggestedHashtags, setSuggestedHashtags] = useState<string[]>([]);
   const [showIntelligence, setShowIntelligence] = useState(false);
   const [openIntelSection, setOpenIntelSection] = useState<string | null>('score');
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
   // Per-platform selected account
   const [selectedAccounts, setSelectedAccounts] = useState<Record<string, SocialAccount | null>>({
@@ -775,94 +776,140 @@ export default function SocialHub() {
           gap: 20,
           background: '#f4f6f9'
         }}>
-          <div style={{ fontSize: 11, fontWeight: 800, color: '#54698d', letterSpacing: '0.08em' }}>VISTA PREVIA EN VIVO</div>
+          {/* Vista Previa Button Card */}
+          <div style={{ background: '#ffffff', borderRadius: 8, border: '1px solid #d8dde6', padding: 16, display: 'flex', flexDirection: 'column', gap: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 11, fontWeight: 800, color: '#54698d', letterSpacing: '0.08em' }}>VISTA PREVIA EN VIVO</span>
+              <span style={{ fontSize: 10, background: '#eff6ff', color: '#1d4ed8', padding: '2px 8px', borderRadius: 20, fontWeight: 700, textTransform: 'uppercase' }}>
+                {previewPlatform}
+              </span>
+            </div>
+            <button
+              onClick={() => setIsPreviewModalOpen(true)}
+              style={{
+                width: '100%',
+                background: 'linear-gradient(135deg, #0070d2, #005fb2)',
+                border: 'none',
+                borderRadius: 8,
+                padding: '12px',
+                fontSize: 12,
+                fontWeight: 700,
+                color: '#ffffff',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                boxShadow: '0 2px 4px rgba(0,112,210,0.2)',
+                transition: 'all 0.15s'
+              }}
+            >
+              <Eye size={14} /> Ver Publicación Completa (Modal)
+            </button>
+            <p style={{ fontSize: 10.5, color: '#64748b', margin: 0, textAlign: 'center', lineHeight: 1.4 }}>
+              Visualiza el flyer, caption y cuenta destino tal como se verá en el feed de {previewPlatform === 'facebook' ? 'Facebook' : 'Instagram'}.
+            </p>
+          </div>
 
-          {/* Social Mockup Container — scrollable preview */}
-          <div style={{
-            background: '#ffffff',
-            borderRadius: 8,
-            border: '1px solid #d8dde6',
-            overflowX: 'hidden',
-            overflowY: 'auto',
-            maxHeight: 500,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-            scrollbarWidth: 'thin',
-            scrollbarColor: '#d1d5db transparent',
-          }}>
-            {/* Platform-aware mock header */}
-            <div style={{ padding: '10px 14px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', gap: 10, background: previewPlatform === 'instagram' ? 'linear-gradient(90deg,#fdf497 0%,#fd5949 45%,#d6249f 60%,#285AEB 100%)' : '#1877F2' }}>
-              <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: previewPlatform === 'instagram' ? '#E1306C' : '#1877F2', flexShrink: 0 }}>
-                {(selectedAccounts[previewPlatform]?.account_name || 'A')[0].toUpperCase()}
+          {/* ── AI VIRALITY SCORE ─────────────────────────────────────────────── */}
+          <div style={{ background: '#ffffff', borderRadius: 8, border: `1.5px solid ${viralityResult.color}30`, padding: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Zap size={13} color={viralityResult.color} fill={viralityResult.color} />
+                <span style={{ fontSize: 11, fontWeight: 800, color: '#54698d', letterSpacing: '0.06em' }}>SCORE DE VIRALIDAD</span>
               </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{selectedAccounts[previewPlatform]?.account_name || 'ARIAS Defense Components'}</div>
-                <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.8)', marginTop: 1 }}>Ahora · {previewPlatform === 'facebook' ? '🌐 Público' : '📷 Instagram'}</div>
-              </div>
-              {previewPlatform === 'facebook' ? <FacebookIcon size={16} color="#fff" /> : <InstagramIcon size={16} />}
+              <button
+                onClick={() => setShowMetaTips(p => !p)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, color: '#0070d2', fontWeight: 700, padding: 0 }}
+              >
+                <ChevronDown size={11} style={{ transform: showMetaTips ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                {showMetaTips ? 'Ocultar tips' : 'Ver tips Meta'}
+              </button>
             </div>
 
-            {/* Facebook: caption ABOVE image */}
-            {previewPlatform === 'facebook' && (
-              <div style={{ padding: '10px 14px', borderBottom: captions.facebook ? '1px solid #f0f0f0' : 'none', background: '#fff' }}>
-                {generatingCaption ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#94a3b8', fontSize: 12 }}><Loader2 size={12} className="animate-spin" /> Generando copy con IA...</div>
-                ) : (
-                  <p style={{ margin: 0, fontSize: 13, color: '#1c1e21', lineHeight: 1.55, whiteSpace: 'pre-wrap', fontFamily: 'system-ui, sans-serif' }}>
-                    {captions.facebook || <span style={{ color: '#bfc4cc', fontStyle: 'italic', fontSize: 12 }}>El copy aparecerá aquí automáticamente...</span>}
-                  </p>
-                )}
+            {/* Score bar */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <div style={{ flex: 1, height: 8, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${viralityResult.score}%`,
+                  background: viralityResult.score >= 75
+                    ? 'linear-gradient(90deg, #10b981, #059669)'
+                    : viralityResult.score >= 50
+                    ? 'linear-gradient(90deg, #f59e0b, #d97706)'
+                    : 'linear-gradient(90deg, #ef4444, #dc2626)',
+                  borderRadius: 99,
+                  transition: 'width 0.5s ease',
+                }} />
               </div>
-            )}
+              <span style={{ fontSize: 18, fontWeight: 900, color: viralityResult.color, minWidth: 36, textAlign: 'right', lineHeight: 1 }}>{viralityResult.score}</span>
+            </div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: viralityResult.color }}>{viralityResult.label}</div>
 
-            {/* Media */}
-            {contentUrl ? (
-              contentType === 'image' ? (
-                <div style={{ background: '#f0f0f0', lineHeight: 0, position: 'relative', minHeight: 160 }}>
-                  {!imgError ? (
-                    <img
-                      src={contentUrl}
-                      alt="Vista previa"
-                      onError={() => setImgError(true)}
-                      style={{ width: '100%', maxHeight: 240, objectFit: 'cover', display: 'block' }}
-                    />
-                  ) : (
-                    <div style={{ height: 180, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'linear-gradient(135deg,#0f172a,#1e293b)' }}>
-                      <Image size={32} color="#475569" />
-                      <span style={{ color: '#64748b', fontSize: 11, fontWeight: 600 }}>Vista previa no disponible</span>
-                      <span style={{ color: '#475569', fontSize: 10 }}>La imagen se publicará correctamente</span>
+            {/* Meta Tips Checklist */}
+            {showMetaTips && (
+              <div style={{ marginTop: 12, borderTop: '1px solid #f1f5f9', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: '#54698d', letterSpacing: '0.06em', marginBottom: 2 }}>RECOMENDACIONES META</div>
+                {viralityResult.tips.map((tip, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                    {tip.ok
+                      ? <CheckCircle2 size={13} color="#10b981" style={{ flexShrink: 0, marginTop: 1 }} />
+                      : <AlertTriangle size={13} color="#f59e0b" style={{ flexShrink: 0, marginTop: 1 }} />}
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: tip.ok ? '#0f172a' : '#92400e' }}>{tip.text}</div>
+                      {!tip.ok && <div style={{ fontSize: 9.5, color: '#78716c', marginTop: 1, lineHeight: 1.4 }}>{tip.detail}</div>}
                     </div>
-                  )}
-                </div>
-              ) : (
-                <div style={{ height: 160, background: 'linear-gradient(135deg,#090d16,#1a2540)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                  <Video size={32} color="#10b981" />
-                  <span style={{ color: '#10b981', fontSize: 11, fontWeight: 700 }}>Video listo para publicar</span>
-                </div>
-              )
-            ) : (
-              <div style={{ height: 160, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#fafbfc' }}>
-                <Upload size={22} color="#cbd5e1" />
-                <span style={{ color: '#94a3b8', fontSize: 11 }}>Sube una imagen para la preview</span>
-              </div>
-            )}
-
-            {/* Instagram: caption BELOW image */}
-            {previewPlatform === 'instagram' && (
-              <div style={{ padding: '10px 14px', background: '#fff', borderTop: '1px solid #f0f0f0' }}>
-                <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                  {['❤️', '💬', '📤'].map(ic => <span key={ic} style={{ fontSize: 18 }}>{ic}</span>)}
-                </div>
-                {generatingCaption ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#94a3b8', fontSize: 12 }}><Loader2 size={12} className="animate-spin" /> Generando copy con IA...</div>
-                ) : (
-                  <p style={{ margin: 0, fontSize: 12.5, color: '#262626', lineHeight: 1.55, whiteSpace: 'pre-wrap', fontFamily: 'system-ui, sans-serif' }}>
-                    <strong style={{ fontSize: 12 }}>{selectedAccounts['instagram']?.account_name || 'ariasdefense'} </strong>
-                    {captions.instagram || <span style={{ color: '#bfc4cc', fontStyle: 'italic' }}>El copy aparecerá aquí...</span>}
-                  </p>
-                )}
+                  </div>
+                ))}
               </div>
             )}
           </div>
+
+          {/* ── HASHTAG ENGINE ─────────────────────────────────────────────────── */}
+          <div style={{ background: '#ffffff', borderRadius: 8, border: '1px solid #d8dde6', padding: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Hash size={13} color="#0070d2" />
+                <span style={{ fontSize: 11, fontWeight: 800, color: '#54698d', letterSpacing: '0.06em' }}>HASHTAG ENGINE IA</span>
+              </div>
+              <button
+                onClick={handleGenerateHashtags}
+                disabled={generatingHashtags}
+                style={{
+                  background: 'linear-gradient(135deg, #0070d2, #005fb2)',
+                  border: 'none', borderRadius: 6, padding: '5px 12px',
+                  fontSize: 11, fontWeight: 700, color: '#ffffff',
+                  cursor: generatingHashtags ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  opacity: generatingHashtags ? 0.7 : 1, transition: 'all 0.15s',
+                }}
+              >
+                {generatingHashtags ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} color="#D4AF37" fill="#D4AF37" />}
+                Generar
+              </button>
+            </div>
+
+            {suggestedHashtags.length > 0 ? (
+              <div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                  {suggestedHashtags.map((tag, i) => (
+                    <span key={i} style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 20, padding: '3px 10px', fontSize: 11, fontWeight: 700, color: '#1d4ed8' }}>{tag}</span>
+                  ))}
+                </div>
+                <button
+                  onClick={applyHashtags}
+                  style={{ width: '100%', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 6, padding: '7px', fontSize: 11, fontWeight: 700, color: '#166534', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}
+                >
+                  <Check size={12} /> Agregar al caption
+                </button>
+              </div>
+            ) : (
+              <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.5 }}>
+                Genera {previewPlatform === 'instagram' ? '5 hashtags optimizados' : '2 hashtags de alto impacto'} para tu publicación con un solo clic.
+              </div>
+            )}
+          </div>
+
 
           {/* Future Networks */}
           <div style={{ background: '#ffffff', borderRadius: 8, border: '1px solid #d8dde6', padding: 14 }}>
@@ -951,139 +998,192 @@ export default function SocialHub() {
 
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════════════════
-          INTELLIGENCE PANEL — Mini-módulo acordeón (Sprint 1 + Sprint 2)
-          Separado del workspace para no interferir con la Vista Previa.
-      ═══════════════════════════════════════════════════════════════════════ */}
-      <div style={{ flexShrink: 0, borderTop: '1px solid #d8dde6', background: '#ffffff' }}>
-
-        {/* Accordion Toggle Bar */}
-        <button
-          onClick={() => setShowIntelligence(p => !p)}
-          style={{
-            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '10px 24px', background: 'none', border: 'none', cursor: 'pointer',
-            borderBottom: showIntelligence ? '1px solid #d8dde6' : 'none',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Zap size={13} color={viralityResult.score >= 75 ? '#10b981' : viralityResult.score >= 50 ? '#f59e0b' : '#ef4444'} fill={viralityResult.score >= 75 ? '#10b981' : viralityResult.score >= 50 ? '#f59e0b' : '#ef4444'} />
-              <span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>Intelligence & Analytics</span>
+      {/* ─── LIVE PREVIEW MODAL ─── */}
+      {isPreviewModalOpen && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
+          padding: 20, boxSizing: 'border-box'
+        }}>
+          <div style={{
+            background: '#ffffff', borderRadius: 12, width: '100%', maxWidth: 580,
+            maxHeight: '90vh', display: 'flex', flexDirection: 'column',
+            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.15), 0 10px 10px -5px rgba(0,0,0,0.04)',
+            overflow: 'hidden', border: '1px solid #e2e8f0'
+          }}>
+            {/* Modal Header */}
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f8fafc' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>Vista Previa en Vivo</span>
+                <span style={{ fontSize: 10, background: '#eff6ff', color: '#1d4ed8', padding: '2px 8px', borderRadius: 20, fontWeight: 700, textTransform: 'uppercase' }}>
+                  {previewPlatform} Feed Simulator
+                </span>
+              </div>
+              <button
+                onClick={() => setIsPreviewModalOpen(false)}
+                style={{
+                  background: 'none', border: 'none', color: '#64748b', cursor: 'pointer',
+                  fontSize: 18, fontWeight: 700, padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}
+              >
+                ✕
+              </button>
             </div>
-            <span style={{ fontSize: 11, color: '#64748b', fontWeight: 500 }}>Score de Viralidad · Recomendaciones Meta · Hashtag Engine · KPIs</span>
-            {/* Live score badge */}
-            <span style={{ fontSize: 10, fontWeight: 800, color: viralityResult.color, background: `${viralityResult.color}15`, border: `1px solid ${viralityResult.color}30`, borderRadius: 99, padding: '2px 8px' }}>
-              {viralityResult.score}/100 {viralityResult.label.split(' ').slice(-1)}
-            </span>
-          </div>
-          <ChevronDown size={14} color="#64748b" style={{ transform: showIntelligence ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-        </button>
 
-        {/* Accordion Content */}
-        {showIntelligence && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 0, borderTop: 'none' }}>
-
-            {/* ─── Column A: Score de Viralidad ─────────────────────────── */}
-            <div style={{ borderRight: '1px solid #f1f5f9', padding: '20px 24px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                <div style={{ width: 30, height: 30, borderRadius: 8, background: `${viralityResult.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Zap size={15} color={viralityResult.color} fill={viralityResult.color} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>Score de Viralidad</div>
-                  <div style={{ fontSize: 10, color: '#64748b' }}>Algoritmo Meta · {previewPlatform === 'instagram' ? 'Instagram' : 'Facebook'}</div>
-                </div>
-                <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-                  <div style={{ fontSize: 30, fontWeight: 900, color: viralityResult.color, lineHeight: 1 }}>{viralityResult.score}</div>
-                  <div style={{ fontSize: 9, color: '#94a3b8' }}>/ 100</div>
-                </div>
-              </div>
-              <div style={{ height: 8, background: '#f1f5f9', borderRadius: 99, overflow: 'hidden', marginBottom: 10 }}>
-                <div style={{ height: '100%', width: `${viralityResult.score}%`, borderRadius: 99, background: viralityResult.score >= 75 ? 'linear-gradient(90deg,#10b981,#059669)' : viralityResult.score >= 50 ? 'linear-gradient(90deg,#f59e0b,#d97706)' : 'linear-gradient(90deg,#ef4444,#dc2626)', transition: 'width 0.6s cubic-bezier(0.4,0,0.2,1)' }} />
-              </div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: viralityResult.color, marginBottom: 14 }}>{viralityResult.label}</div>
-              {/* Quick tips summary */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {viralityResult.tips.map((tip, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
-                    {tip.ok
-                      ? <CheckCircle2 size={12} color="#10b981" style={{ flexShrink: 0, marginTop: 1 }} />
-                      : <AlertTriangle size={12} color="#d97706" style={{ flexShrink: 0, marginTop: 1 }} />}
+            {/* Modal Scrollable Body */}
+            <div style={{ padding: '20px', overflowY: 'auto', flex: 1, background: '#f0f2f5', display: 'flex', justifyContent: 'center' }}>
+              
+              {/* Facebook Card Mockup */}
+              {previewPlatform === 'facebook' ? (
+                <div style={{ background: '#ffffff', borderRadius: 8, width: '100%', maxWidth: 500, boxShadow: '0 1px 2px rgba(0,0,0,0.2)', overflow: 'hidden', border: '1px solid #ced0d4' }}>
+                  {/* FB Author Header */}
+                  <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#1877F2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: '#fff', flexShrink: 0 }}>
+                      {(selectedAccounts['facebook']?.account_name || 'A')[0].toUpperCase()}
+                    </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 11, fontWeight: tip.ok ? 600 : 700, color: tip.ok ? '#475569' : '#92400e' }}>{tip.text}</div>
-                      {!tip.ok && <div style={{ fontSize: 10, color: '#78716c', lineHeight: 1.4, marginTop: 1 }}>{tip.detail}</div>}
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#050505', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {selectedAccounts['facebook']?.account_name || 'ARIAS Defense Components'}
+                        <span style={{ color: '#1877F2', fontSize: 12 }}>✓</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: '#65676b', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                        <span>Ahora</span>
+                        <span>·</span>
+                        <Globe size={12} color="#65676b" />
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            {/* ─── Column B: Hashtag Engine ─────────────────────────────── */}
-            <div style={{ borderRight: '1px solid #f1f5f9', padding: '20px 24px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                <div style={{ width: 30, height: 30, borderRadius: 8, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Hash size={15} color="#0070d2" />
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>Hashtag Engine IA</div>
-                  <div style={{ fontSize: 10, color: '#64748b' }}>{previewPlatform === 'instagram' ? '5 tags · rango óptimo Meta' : '1–2 tags · FB penaliza el exceso'}</div>
-                </div>
-                <button onClick={handleGenerateHashtags} disabled={generatingHashtags} style={{ marginLeft: 'auto', background: generatingHashtags ? '#f1f5f9' : 'linear-gradient(135deg,#0070d2,#005fb2)', border: 'none', borderRadius: 7, padding: '6px 14px', fontSize: 11, fontWeight: 700, color: generatingHashtags ? '#94a3b8' : '#fff', cursor: generatingHashtags ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
-                  {generatingHashtags ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} color="#D4AF37" fill="#D4AF37" />}
-                  {generatingHashtags ? 'Generando...' : 'Generar'}
-                </button>
-              </div>
-              {suggestedHashtags.length > 0 ? (
-                <div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-                    {suggestedHashtags.map((tag, i) => (
-                      <span key={i} style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 99, padding: '4px 12px', fontSize: 12, fontWeight: 700, color: '#1d4ed8' }}>{tag}</span>
-                    ))}
+                  {/* FB Caption */}
+                  <div style={{ padding: '4px 16px 12px', fontSize: 14, color: '#050505', lineHeight: 1.5, whiteSpace: 'pre-wrap', fontFamily: 'Segoe UI, Helvetica, Arial, sans-serif' }}>
+                    {captions.facebook || <span style={{ color: '#8c96a3', fontStyle: 'italic' }}>Escribe un copy para ver la vista previa aquí...</span>}
                   </div>
-                  <button onClick={applyHashtags} style={{ width: '100%', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 7, padding: '9px', fontSize: 12, fontWeight: 700, color: '#166534', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                    <Check size={13} /> Agregar al caption
-                  </button>
+
+                  {/* FB Media Slot */}
+                  {contentUrl ? (
+                    contentType === 'image' ? (
+                      <div style={{ background: '#f0f2f5', borderTop: '1px solid #e5e7eb', borderBottom: '1px solid #e5e7eb', maxHeight: 360, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <img src={contentUrl} alt="Flyer" style={{ width: '100%', objectFit: 'contain', maxHeight: 360 }} />
+                      </div>
+                    ) : (
+                      <div style={{ height: 280, background: '#000', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                        <Video size={40} color="#10b981" />
+                        <span style={{ color: '#10b981', fontSize: 12, fontWeight: 700 }}>Video listo para reproducir en Facebook</span>
+                      </div>
+                    )
+                  ) : (
+                    <div style={{ height: 240, background: '#f7f8fa', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, borderTop: '1px solid #ced0d4', borderBottom: '1px solid #ced0d4' }}>
+                      <Upload size={28} color="#bcc0c4" />
+                      <span style={{ color: '#65676b', fontSize: 12 }}>Sube una imagen o video para visualizar el post</span>
+                    </div>
+                  )}
+
+                  {/* FB Reactions bar */}
+                  <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #e5e7eb', fontSize: 12, color: '#65676b' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ background: '#1877F2', borderRadius: '50%', width: 16, height: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: '#fff' }}>👍</span>
+                      <span style={{ background: '#F02849', borderRadius: '50%', width: 16, height: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: '#fff' }}>❤️</span>
+                      <span style={{ fontWeight: 600 }}>Tú y 42 personas más</span>
+                    </div>
+                    <div>
+                      <span>12 comentarios</span>
+                      <span style={{ margin: '0 6px' }}>·</span>
+                      <span>5 veces compartido</span>
+                    </div>
+                  </div>
+
+                  {/* FB Action Buttons */}
+                  <div style={{ padding: '4px', display: 'flex', justifyContent: 'space-around', color: '#65676b', fontSize: 13, fontWeight: 600 }}>
+                    <div style={{ padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'center', borderRadius: 4 }} onMouseEnter={(e) => e.currentTarget.style.background = '#f2f2f2'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                      <span>👍</span> Me gusta
+                    </div>
+                    <div style={{ padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'center', borderRadius: 4 }} onMouseEnter={(e) => e.currentTarget.style.background = '#f2f2f2'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                      <span>💬</span> Comentar
+                    </div>
+                    <div style={{ padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'center', borderRadius: 4 }} onMouseEnter={(e) => e.currentTarget.style.background = '#f2f2f2'} onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
+                      <span>📤</span> Compartir
+                    </div>
+                  </div>
                 </div>
               ) : (
-                <div style={{ padding: '20px 0', textAlign: 'center' }}>
-                  <Hash size={28} color="#cbd5e1" style={{ margin: '0 auto 10px' }} />
-                  <div style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.6 }}>Escribe un caption y presiona <strong style={{ color: '#0070d2' }}>Generar</strong> para obtener hashtags optimizados con IA.</div>
-                  <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 7, background: '#eff6ff', border: '1px solid #bfdbfe', textAlign: 'left', display: 'flex', gap: 7, alignItems: 'flex-start' }}>
-                    <TrendingUp size={12} color="#1d4ed8" style={{ flexShrink: 0, marginTop: 1 }} />
-                    <span style={{ fontSize: 10, color: '#1e40af', lineHeight: 1.5 }}><strong>Meta 2024:</strong> Posts con 3–5 hashtags relevantes reciben 3.1× más alcance orgánico que posts sin hashtags.</span>
+                /* Instagram Mockup Card */
+                <div style={{ background: '#ffffff', borderRadius: 8, width: '100%', maxWidth: 450, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden', border: '1px solid #dbdbdb' }}>
+                  {/* IG Profile Row */}
+                  <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10, borderBottom: '1px solid #efefef' }}>
+                    <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%)', padding: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', flexShrink: 0 }}>
+                      <div style={{ width: '100%', height: '100%', borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: '#262626' }}>
+                        {(selectedAccounts['instagram']?.account_name || 'A')[0].toUpperCase()}
+                      </div>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#262626', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {selectedAccounts['instagram']?.account_name || 'ariasdefense'}
+                        <span style={{ color: '#3897f0', fontSize: 11 }}>✓</span>
+                      </div>
+                      <div style={{ fontSize: 11, color: '#8e8e8e', marginTop: 1 }}>San Salvador, El Salvador</div>
+                    </div>
+                  </div>
+
+                  {/* IG Media */}
+                  {contentUrl ? (
+                    contentType === 'image' ? (
+                      <div style={{ background: '#fafafa', display: 'flex', alignItems: 'center', justifyContent: 'center', maxHeight: 400, overflow: 'hidden' }}>
+                        <img src={contentUrl} alt="Instagram post" style={{ width: '100%', objectFit: 'cover', display: 'block' }} />
+                      </div>
+                    ) : (
+                      <div style={{ height: 320, background: '#000', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                        <Video size={40} color="#E1306C" />
+                        <span style={{ color: '#ffffff', fontSize: 12, fontWeight: 700 }}>Instagram Reel listo</span>
+                      </div>
+                    )
+                  ) : (
+                    <div style={{ height: 300, background: '#fafafa', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, borderBottom: '1px solid #dbdbdb' }}>
+                      <Upload size={26} color="#8e8e8e" />
+                      <span style={{ color: '#8e8e8e', fontSize: 12 }}>Sube una imagen para ver la preview de Instagram</span>
+                    </div>
+                  )}
+
+                  {/* IG Action Icons Row */}
+                  <div style={{ padding: '12px 14px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                      <span style={{ fontSize: 20, cursor: 'pointer' }}>❤️</span>
+                      <span style={{ fontSize: 20, cursor: 'pointer' }}>💬</span>
+                      <span style={{ fontSize: 20, cursor: 'pointer' }}>📤</span>
+                    </div>
+                    <span style={{ fontSize: 20, cursor: 'pointer' }}>🔖</span>
+                  </div>
+
+                  {/* IG Likes Count */}
+                  <div style={{ padding: '0 14px 4px', fontSize: 13, fontWeight: 700, color: '#262626' }}>
+                    423 Me gusta
+                  </div>
+
+                  {/* IG Caption */}
+                  <div style={{ padding: '0 14px 14px', fontSize: 13, color: '#262626', lineHeight: 1.5, whiteSpace: 'pre-wrap', fontFamily: '-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif' }}>
+                    <strong style={{ marginRight: 6 }}>{selectedAccounts['instagram']?.account_name || 'ariasdefense'}</strong>
+                    {captions.instagram || <span style={{ color: '#8e8e8e', fontStyle: 'italic' }}>El copy aparecerá aquí...</span>}
                   </div>
                 </div>
               )}
+
             </div>
 
-            {/* ─── Column C: Performance KPIs (Sprint 1 placeholder) ─────── */}
-            <div style={{ padding: '20px 24px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                <div style={{ width: 30, height: 30, borderRadius: 8, background: '#f0fdf4', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <TrendingUp size={15} color="#10b981" />
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>Performance & KPIs</div>
-                  <div style={{ fontSize: 10, color: '#64748b' }}>Top posts · Alcance · Engagement</div>
-                </div>
-              </div>
-              <div style={{ padding: '24px 16px', borderRadius: 8, border: '1px dashed #d8dde6', background: '#fafbfc', textAlign: 'center' }}>
-                <TrendingUp size={28} color="#cbd5e1" style={{ margin: '0 auto 10px' }} />
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>Analytics · Sprint 1</div>
-                <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.6 }}>Conecta Facebook & Instagram para ver métricas reales: alcance, engagement, top posts, y recomendaciones de publicación.</div>
-                <div style={{ marginTop: 12, display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
-                  {['Alcance total', 'Engagement %', 'Top 3 posts', 'Mejor hora'].map(kpi => (
-                    <span key={kpi} style={{ fontSize: 10, fontWeight: 700, color: '#94a3b8', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 99, padding: '3px 10px' }}>{kpi}</span>
-                  ))}
-                </div>
-              </div>
+            {/* Modal Footer */}
+            <div style={{ padding: '12px 20px', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'flex-end', gap: 8, background: '#f8fafc' }}>
+              <button
+                onClick={() => setIsPreviewModalOpen(false)}
+                style={{
+                  background: '#ffffff', border: '1px solid #d8dde6', borderRadius: 6,
+                  padding: '8px 16px', fontSize: 12, fontWeight: 700, color: '#0070d2', cursor: 'pointer'
+                }}
+              >
+                Cerrar
+              </button>
             </div>
-
           </div>
-        )}
-      </div>
-
+        </div>
+      )}
     </div>
   );
 }
