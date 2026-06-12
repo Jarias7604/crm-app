@@ -172,6 +172,46 @@ export default function SocialHub() {
 
   useEffect(() => { loadData(); }, [profile?.company_id]);
 
+  // Load flyer data and auto-generate captions
+  useEffect(() => {
+    if (profile?.company_id && flyerUrl) {
+      autoGenerateCaptions();
+    }
+  }, [profile?.company_id, flyerUrl]);
+
+  async function autoGenerateCaptions() {
+    if (!profile?.company_id) return;
+    setGeneratingCaption('facebook');
+    try {
+      // 1. Get flyer details from db
+      const { data: flyerData } = await supabase
+        .from('flyer_assets')
+        .select('titulo, prompt_used')
+        .eq('image_url', flyerUrl)
+        .maybeSingle();
+
+      const context = flyerData
+        ? `Flyer titulado "${flyerData.titulo || ''}" con diseño: ${flyerData.prompt_used || ''}`
+        : 'Facturación instantánea y declaraciones para PYMEs';
+
+      // 2. Generate for facebook and instagram
+      const [fbText, igText] = await Promise.all([
+        socialPublishService.generateCaption('facebook', context, selectedTone, profile.company_id),
+        socialPublishService.generateCaption('instagram', context, selectedTone, profile.company_id)
+      ]);
+
+      setCaptions({
+        facebook: fbText,
+        instagram: igText
+      });
+      toast.success('¡Copy publicitario creado con IA!');
+    } catch (err) {
+      console.error('Error generating initial captions:', err);
+    } finally {
+      setGeneratingCaption(null);
+    }
+  }
+
   async function loadData() {
     setLoading(true);
     try {
@@ -592,6 +632,19 @@ export default function SocialHub() {
               </div>
             </div>
 
+            {/* If Facebook, render Caption ABOVE Media */}
+            {previewPlatform === 'facebook' && (
+              <div style={{ padding: '12px 14px', borderBottom: '1px solid #f4f6f9' }}>
+                <p style={{ margin: 0, fontSize: 12.5, color: '#334155', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                  {captions.facebook ? (
+                    captions.facebook
+                  ) : (
+                    <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Escribe u optimiza con IA un caption...</span>
+                  )}
+                </p>
+              </div>
+            )}
+
             {/* Media Area */}
             {contentUrl ? (
               contentType === 'image' ? (
@@ -610,16 +663,18 @@ export default function SocialHub() {
               </div>
             )}
 
-            {/* Caption in Mock */}
-            <div style={{ padding: '12px 14px', borderTop: '1px solid #f4f6f9' }}>
-              <p style={{ margin: 0, fontSize: 12.5, color: '#334155', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-                {captions[previewPlatform] ? (
-                  captions[previewPlatform]
-                ) : (
-                  <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>El caption se mostrará aquí...</span>
-                )}
-              </p>
-            </div>
+            {/* If Instagram, render Caption BELOW Media */}
+            {previewPlatform === 'instagram' && (
+              <div style={{ padding: '12px 14px', borderTop: '1px solid #f4f6f9' }}>
+                <p style={{ margin: 0, fontSize: 12.5, color: '#334155', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                  {captions.instagram ? (
+                    captions.instagram
+                  ) : (
+                    <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Escribe u optimiza con IA un caption...</span>
+                  )}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Future Networks */}
