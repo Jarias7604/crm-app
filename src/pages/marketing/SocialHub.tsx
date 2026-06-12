@@ -637,13 +637,17 @@ export default function SocialHub() {
         }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: '#54698d', letterSpacing: '0.08em' }}>VISTA PREVIA EN VIVO</div>
 
-          {/* Social Mockup Container: Stretches beautifully to fill Col 3 */}
+          {/* Social Mockup Container — scrollable preview */}
           <div style={{
             background: '#ffffff',
             borderRadius: 8,
             border: '1px solid #d8dde6',
-            overflow: 'hidden',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+            overflowX: 'hidden',
+            overflowY: 'auto',
+            maxHeight: 500,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+            scrollbarWidth: 'thin',
+            scrollbarColor: '#d1d5db transparent',
           }}>
             {/* Platform-aware mock header */}
             <div style={{ padding: '10px 14px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', gap: 10, background: previewPlatform === 'instagram' ? 'linear-gradient(90deg,#fdf497 0%,#fd5949 45%,#d6249f 60%,#285AEB 100%)' : '#1877F2' }}>
