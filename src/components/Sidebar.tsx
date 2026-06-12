@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../auth/AuthProvider';
-import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft, Zap, Search, Bot, XCircle, Network, BarChart3, UserCircle, Headset, TicketIcon, AlertTriangle, UserCheck, BookOpen, PhoneCall, Sparkles, Brain, Target } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Building, LogOut, ShieldCheck, FileText, Settings, ChevronDown, ChevronRight, Package, Layers, Building2, Megaphone, MessageSquare, CreditCard, ChevronLeft, Zap, Search, Bot, XCircle, Network, BarChart3, UserCircle, Headset, TicketIcon, AlertTriangle, UserCheck, BookOpen, PhoneCall, Sparkles, Brain, Target, Globe } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { brandingService } from '../services/branding';
@@ -273,6 +273,7 @@ export default function Sidebar({ isCollapsed, onToggle }: { isCollapsed: boolea
                 { name: t('sidebar.oracleAi'), href: '/marketing/predictions', icon: Target },
                 { name: t('sidebar.salesEngine'), href: '/marketing/engine-config', icon: Zap },
                 { name: t('sidebar.flyerStudio'), href: '/marketing/flyers', icon: Sparkles },
+                { name: '🌐 Social Media Hub', href: '/marketing/social', icon: Globe },
                 { name: t('sidebar.settings'), href: '/marketing/settings', icon: Settings },
             ]
         });
