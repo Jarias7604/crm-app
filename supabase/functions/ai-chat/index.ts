@@ -66,19 +66,32 @@ serve(async (req) => {
             ];
         }
 
-        // 4. Call OpenAI
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                model: 'gpt-4o', // Premium model
-                messages: messagesPayload,
-                temperature: 0.7,
-            }),
-        });
+        // 4. Call OpenAI with automatic fallback if company key is invalid
+        const systemApiKey = Deno.env.get('OPENAI_API_KEY');
+
+        async function callOpenAI(key: string) {
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${key}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4o',
+                    messages: messagesPayload,
+                    temperature: 0.7,
+                }),
+            });
+            return response;
+        }
+
+        let response = await callOpenAI(apiKey);
+
+        // If company key is invalid (401/403), fallback to system key
+        if ((response.status === 401 || response.status === 403) && systemApiKey && systemApiKey !== apiKey) {
+            console.warn('[ai-chat] Company API key invalid, falling back to system key');
+            response = await callOpenAI(systemApiKey);
+        }
 
         if (!response.ok) {
             const errText = await response.text();
