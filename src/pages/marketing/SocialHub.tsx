@@ -491,15 +491,32 @@ export default function SocialHub() {
             <div style={{ background: '#ffffff', borderRadius: 8, border: '1px solid #d8dde6', padding: 16 }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: '#54698d', letterSpacing: '0.08em', marginBottom: 12 }}>HISTORIAL RECIENTE</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {recentPosts.slice(0, 3).map(p => (
-                  <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, paddingBottom: 8, borderBottom: '1px solid #f4f6f9' }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: getStatusDot(p.status), display: 'inline-block' }} />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 11, color: '#081c3b', fontWeight: 700 }}>{p.platforms.join(' · ')}</div>
-                      <div style={{ fontSize: 9, color: '#54698d', textTransform: 'capitalize' }}>{p.status}</div>
+                {recentPosts.slice(0, 5).map(p => {
+                  const postDate = new Date(p.created_at);
+                  const now = new Date();
+                  const diffDays = Math.floor((now.getTime() - postDate.getTime()) / (1000 * 60 * 60 * 24));
+                  const dateLabel = diffDays === 0
+                    ? `Hoy ${postDate.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })}`
+                    : diffDays === 1
+                    ? 'Ayer'
+                    : postDate.toLocaleDateString('es-SV', { day: '2-digit', month: '2-digit', year: '2-digit' });
+
+                  return (
+                    <div key={p.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, paddingBottom: 10, borderBottom: '1px solid #f4f6f9' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: getStatusDot(p.status), display: 'inline-block', marginTop: 4, flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 11, color: '#081c3b', fontWeight: 700 }}>{p.platforms.join(' · ')}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                          <span style={{ fontSize: 9, color: p.status === 'published' ? '#10b981' : p.status === 'failed' ? '#ef4444' : '#64748b', fontWeight: 700, textTransform: 'capitalize' }}>
+                            {p.status === 'published' ? '✓ Publicado' : p.status === 'failed' ? '✗ Falló' : p.status}
+                          </span>
+                          <span style={{ fontSize: 9, color: '#94a3b8' }}>·</span>
+                          <span style={{ fontSize: 9, color: '#94a3b8' }}>{dateLabel}</span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
