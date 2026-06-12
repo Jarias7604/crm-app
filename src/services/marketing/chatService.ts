@@ -41,25 +41,36 @@ export const chatService = {
         if (error) throw error;
     },
 
-    async createConversation(leadId: string, channel: string, companyId?: string | null, externalId: string = 'internal') {
+    async createConversation(leadId: string, channel: string, companyId?: string | null, externalId?: string) {
         let finalCompanyId = companyId;
+        let finalExternalId = externalId;
+
+        // Try to get company_id and phone from the lead
+        const { data: lead } = await supabase.from('leads').select('company_id, phone').eq('id', leadId).maybeSingle();
+        
+        if (lead) {
+            if (!finalCompanyId && lead.company_id) {
+                finalCompanyId = lead.company_id;
+            }
+            if (!finalExternalId || finalExternalId === 'internal') {
+                if (channel === 'whatsapp' && lead.phone) {
+                    finalExternalId = lead.phone.replace(/\D/g, '');
+                } else if (channel === 'telegram') {
+                    finalExternalId = `notif_${leadId}`;
+                }
+            }
+        }
 
         if (!finalCompanyId) {
-            // Try to get company_id from the lead itself
-            const { data: lead } = await supabase.from('leads').select('company_id').eq('id', leadId).single();
-            if (lead?.company_id) {
-                finalCompanyId = lead.company_id;
-            } else {
-                // Fallback to current user's profile or simulated company ID
-                const { data: { user } } = await supabase.auth.getUser();
-                if (user) {
-                    const simId = localStorage.getItem('simulated_company_id');
-                    if (simId) {
-                        finalCompanyId = simId;
-                    } else {
-                        const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single();
-                        finalCompanyId = profile?.company_id;
-                    }
+            // Fallback to current user's profile or simulated company ID
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const simId = localStorage.getItem('simulated_company_id');
+                if (simId) {
+                    finalCompanyId = simId;
+                } else {
+                    const { data: profile } = await supabase.from('profiles').select('company_id').eq('id', user.id).single();
+                    finalCompanyId = profile?.company_id;
                 }
             }
         }
@@ -69,13 +80,17 @@ export const chatService = {
             throw new Error(`No se pudo encontrar la empresa asociada al prospecto ${leadId}. Por favor verifique la configuración.`);
         }
 
+        if (!finalExternalId) {
+            finalExternalId = 'internal';
+        }
+
         const { data, error } = await supabase
             .from('marketing_conversations')
             .insert({
                 company_id: finalCompanyId,
                 lead_id: leadId,
                 channel,
-                external_id: externalId,
+                external_id: finalExternalId,
                 last_message: 'Nueva conversación...',
                 unread_count: 0
             })

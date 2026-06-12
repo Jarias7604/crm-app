@@ -347,10 +347,16 @@ export default function ChatHub() {
 
             if (convId === 'new') {
                 if (!selectedConv.lead?.id) return;
+                const cleanPhone = (selectedConv.lead.phone || '').replace(/\D/g, '');
+                const extId = selectedConv.channel === 'whatsapp'
+                    ? cleanPhone
+                    : (selectedConv.channel === 'telegram' ? `notif_${selectedConv.lead.id}` : 'internal');
+
                 const newConv = await chatService.createConversation(
                     selectedConv.lead.id,
                     selectedConv.channel,
-                    selectedConv.lead.company_id
+                    selectedConv.lead.company_id,
+                    extId
                 );
                 setSelectedConv(newConv);
                 convId = newConv.id;
@@ -492,10 +498,16 @@ export default function ChatHub() {
             let convId = selectedConv.id;
             if (convId === 'new') {
                 if (!selectedConv.lead?.id) throw new Error("Lead ID missing");
+                const cleanPhone = (selectedConv.lead.phone || '').replace(/\D/g, '');
+                const extId = selectedConv.channel === 'whatsapp'
+                    ? cleanPhone
+                    : (selectedConv.channel === 'telegram' ? `notif_${selectedConv.lead.id}` : 'internal');
+
                 const newConv = await chatService.createConversation(
                     selectedConv.lead.id,
                     selectedConv.channel,
-                    selectedConv.lead.company_id
+                    selectedConv.lead.company_id,
+                    extId
                 );
                 convId = newConv.id;
                 setSelectedConv(newConv);
