@@ -264,13 +264,30 @@ export default function SocialHub() {
   }
 
   async function handleAICaption(platform: string) {
-    if (!contentUrl && !captions[platform]) { toast.error('Sube contenido o escribe una idea primero'); return; }
+    const originalText = captions[platform] || '';
+    // Need either a flyer loaded OR some text to work with
+    if (!contentUrl && !originalText.trim()) {
+      toast.error('Escribe una idea o sube contenido primero');
+      return;
+    }
     setGeneratingCaption(platform);
     try {
-      const text = await socialPublishService.generateCaption(platform, captions[platform] || 'Contenido premium', selectedTone, profile?.company_id || '');
+      const seedContent = originalText.trim() || 'Contenido de marketing profesional para mi empresa';
+      const text = await socialPublishService.generateCaption(
+        platform,
+        seedContent,
+        selectedTone,
+        profile?.company_id || ''
+      );
       setCaptions(prev => ({ ...prev, [platform]: text }));
-    } catch { toast.error('Error generando caption'); }
-    finally { setGeneratingCaption(null); }
+      toast.success(`✨ Copy de ${platform} optimizado con IA`);
+    } catch (err: any) {
+      // Restore the original text — NEVER leave the user with an empty field
+      setCaptions(prev => ({ ...prev, [platform]: originalText }));
+      toast.error(err.message || 'Error generando caption. Tu texto original fue restaurado.');
+    } finally {
+      setGeneratingCaption(null);
+    }
   }
 
   async function handlePublish() {

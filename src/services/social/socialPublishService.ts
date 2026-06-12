@@ -139,28 +139,54 @@ export const socialPublishService = {
     // ── Caption AI ────────────────────────────────────────────────────
 
     async generateCaption(platform: string, content: string, tone: string, companyId: string): Promise<string> {
-        const platformTones: Record<string, string> = {
-            facebook: 'profesional pero cercano, con emojis moderados',
-            instagram: 'visual, aspiracional, con hashtags relevantes al final',
-            tiktok: 'energético, casual, con trending phrases y hashtags populares',
-            youtube: 'descriptivo, con palabras clave SEO, formal pero amigable',
+        const platformGuide: Record<string, string> = {
+            facebook: 'copy persuasivo para Facebook, 2-3 párrafos, emojis moderados al inicio de cada párrafo, termina con llamada a la acción clara y un link placeholder',
+            instagram: 'copy visual e inspirador para Instagram, máximo 150 palabras, 8-12 hashtags relevantes al final separados por espacios, emojis estratégicos',
+            tiktok: 'copy energético y viral para TikTok, máximo 80 palabras, trending hashtags, tono juvenil',
+            youtube: 'descripción SEO-optimizada para YouTube, 3-4 párrafos, palabras clave naturales, timestamps placeholder, links en descripción',
         };
 
-        const { data } = await supabase.functions.invoke('ai-chat', {
+        const toneGuide: Record<string, string> = {
+            'Profesional': 'tono corporativo, formal pero accesible, enfocado en valor de negocio y ROI',
+            'Urgente': 'tono de urgencia y escasez, crea FOMO, usa palabras como HOY, AHORA, ÚLTIMAS PLAZAS',
+            'Premium': 'tono exclusivo y aspiracional, palabras como elite, exclusivo, premium, select',
+            'Amigable': 'tono cálido y cercano como hablarle a un amigo, primera persona, empatía',
+            'Informal': 'tono casual y divertido, jerga moderna, emojis abundantes',
+        };
+
+        const { data, error } = await supabase.functions.invoke('ai-chat', {
             body: {
-                messages: [{
-                    role: 'user',
-                    content: `Crea un caption para ${platform} sobre este contenido: "${content}". 
-                    Tono: ${platformTones[platform] || 'profesional'}. 
-                    Tono de marca deseado: ${tone}.
-                    Máximo 3 párrafos. Incluye call to action al final.
-                    Responde SOLO con el caption, sin explicaciones.`
-                }],
-                companyId
+                messages: [
+                    {
+                        role: 'system',
+                        content: `Eres un experto en marketing digital y copywriting para redes sociales en El Salvador y Latinoamérica. Especializas en contenido para empresas B2B y servicios profesionales. Tu trabajo es crear copy que convierte y genera engagement real. IMPORTANTE: Responde ÚNICAMENTE con el caption listo para publicar, sin comillas alrededor, sin explicaciones, sin prefijos como "Aquí tienes" o "Caption:".`
+                    },
+                    {
+                        role: 'user',
+                        content: `Crea un caption de alta conversión para ${platform.toUpperCase()} para el siguiente contenido o idea: "${content}".
+
+Pauta de plataforma: ${platformGuide[platform] || 'copy profesional y conciso'}.
+Tono de marca requerido: ${tone} — ${toneGuide[tone] || 'profesional'}.
+
+El caption debe:
+- Capturar atención en la primera línea (hook fuerte)
+- Comunicar el beneficio clave claramente
+- Terminar con una llamada a la acción (CTA) específica
+- Ser 100% en español latinoamericano
+
+Escribe SOLO el caption, nada más.`
+                    }
+                ],
+                companyId: companyId || undefined,
             }
         });
 
-        return data?.content || '';
+        if (error) throw new Error(error.message || 'Error generating caption');
+
+        // ai-chat returns {content} when messages+companyId, {response} otherwise
+        const text = data?.content || data?.response || '';
+        if (!text) throw new Error('La IA no generó texto. Intenta de nuevo.');
+        return text.trim();
     },
 
     // ── Storage: Upload content for publishing ─────────────────────────
