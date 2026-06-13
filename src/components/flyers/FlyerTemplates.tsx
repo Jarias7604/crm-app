@@ -513,234 +513,441 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
     const parsed = parsePrompt(data.prompt);
     const primary = data.primaryColor || '#9b1c1c';
     const secondary = data.secondaryColor || '#1a1a2e';
-    const price = data.price || parsed.price || derivePrice(data.prompt);
-    const features = (data.features || parsed.features || deriveFeatures(data.prompt)).slice(0, 3);
+    const price = data.price || parsed.price || derivePrice(data.prompt) || '$12.95';
+    const rawFeatures = data.features || parsed.features || deriveFeatures(data.prompt);
+    
+    // Enforce exactly 4 features for the 4 side layout quadrants (2 left, 2 right)
+    const defaultFeatures = [
+      'Facturación Electrónica',
+      'Control de Ventas',
+      'Gestión de Inventario',
+      'Módulo de Compras'
+    ];
+    const features: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      features.push(rawFeatures[i] || defaultFeatures[i]);
+    }
+
     const { h1, h2 } = deriveHeadline(data.prompt, data.company_name);
-    const headline = data.headline || parsed.title || h1;
-    const subheadline = data.subheadline || parsed.subtitle || h2;
+    const headline = data.headline || parsed.title || h1 || '¿Sin control de tu NEGOCIO?';
+    const subheadline = data.subheadline || parsed.subtitle || h2 || `${data.company_name} todo en un solo sistema`;
     const phone = data.phone || parsed.phone || derivePhone(data.prompt);
     const website = data.website || parsed.website || deriveWebsite(data.prompt);
-    const cta = data.cta || parsed.cta || deriveCta(data.prompt, 'Activa HOY MISMO');
+    const cta = data.cta || parsed.cta || deriveCta(data.prompt, `Todo con ${data.company_name}`);
+
+    // Parse the headline parts to color the word "NEGOCIO" in primaryColor if present
+    const renderHeadline = () => {
+      const parts = headline.split(/(NEGOCIO)/g);
+      return parts.map((part, i) => {
+        if (part === 'NEGOCIO') {
+          return <span key={i} style={{ color: primary }}>NEGOCIO</span>;
+        }
+        return part;
+      });
+    };
 
     return (
       <div ref={ref} style={{
         width: 1080, height: 1080,
-        background: data.bgImageUrl ? `url(${data.bgImageUrl}) center/cover no-repeat` : `radial-gradient(circle at 100% 0%, ${primary}18 0%, rgba(11,15,25,0) 60%), radial-gradient(circle at 0% 100%, ${secondary}18 0%, rgba(11,15,25,0) 60%), #0b111e`,
+        background: data.bgImageUrl ? `url(${data.bgImageUrl}) center/cover no-repeat` : '#f8fafc',
         fontFamily: "'Outfit', 'Inter', 'Segoe UI', Arial, sans-serif",
         position: 'relative',
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
       }}>
-        {/* Futuristic tech grid */}
+        {/* Subtle grid backdrop */}
         {!data.bgImageUrl && (
           <div style={{
             position: 'absolute', inset: 0,
-            backgroundImage: 'linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px)',
-            backgroundSize: '40px 40px',
+            backgroundImage: 'radial-gradient(#e2e8f0 1.5px, transparent 1.5px)',
+            backgroundSize: '24px 24px',
+            opacity: 0.5,
             pointerEvents: 'none'
           }} />
         )}
 
-        {/* TOP BADGE */}
-        <div style={{ background: `linear-gradient(90deg, ${primary}, ${primary}cc)`, padding: '12px 0', textAlign: 'center', borderBottom: '1px solid rgba(255,255,255,0.08)', zIndex: 10 }}>
-          <span style={{ color: '#fff', fontSize: 13, fontWeight: 800, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
-            Solución Integral Para Tu Negocio
-          </span>
+        {/* HEADER SECTION */}
+        <div style={{ paddingTop: 45, display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 10, paddingLeft: 60, paddingRight: 60 }}>
+          <h1 style={{
+            fontSize: headline.length > 30 ? 44 : 52,
+            fontWeight: 900,
+            color: '#0f172a',
+            textAlign: 'center',
+            margin: 0,
+            lineHeight: 1.1,
+            letterSpacing: '-0.02em',
+            textShadow: data.bgImageUrl ? '0 4px 12px rgba(255,255,255,0.95)' : 'none'
+          }}>
+            {renderHeadline()}
+          </h1>
+          <p style={{
+            fontSize: 22,
+            fontWeight: 700,
+            color: '#334155',
+            textAlign: 'center',
+            margin: '8px 0 0 0',
+            textShadow: data.bgImageUrl ? '0 2px 6px rgba(255,255,255,0.9)' : 'none'
+          }}>
+            {subheadline}
+          </p>
         </div>
 
-        {/* HEADER */}
-        <div style={{ padding: '45px 80px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 10 }}>
-          <div style={{ flex: 1, marginRight: 40 }}>
-            <div style={{
-              fontSize: headline.length > 30 ? 36 : 44,
-              fontWeight: 900,
-              color: '#ffffff',
-              textShadow: data.bgImageUrl ? '0 4px 10px rgba(0,0,0,0.95), 0 2px 4px rgba(0,0,0,0.8)' : 'none',
-              lineHeight: 1.05,
-              letterSpacing: 'normal',
-              marginBottom: 10
-            }}>
-              {headline}
-            </div>
-            <div style={{
-              fontSize: 23,
-              fontWeight: 800,
-              color: data.bgImageUrl ? '#ffffff' : primary,
-              textShadow: data.bgImageUrl ? '0 2px 6px rgba(0,0,0,0.85), 0 0 10px rgba(255,255,255,0.2)' : 'none',
-              marginBottom: 18
-            }}>{subheadline}</div>
-            
-            {/* Badges */}
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              {features.slice(0, 3).map((f, i) => (
-                <span key={i} style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: '#ffffff',
-                  background: 'rgba(255,255,255,0.08)',
-                  border: '1px solid rgba(255,255,255,0.15)',
-                  textShadow: '0 1px 2px rgba(0,0,0,0.5)',
-                  borderRadius: 8,
-                  padding: '6px 14px'
-                }}>{getFeatureIcon(f)} {f.length > 16 ? f.substring(0,16)+'…' : f}</span>
-              ))}
-            </div>
-          </div>
+        {/* CENTER ELEMENT: LAPTOP + SIDE FEATURES + CONNECTIONS */}
+        <div style={{ position: 'relative', flex: 1, zIndex: 5 }}>
           
-          {/* Logo or Company Name */}
-          <div style={{ flexShrink: 0, textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-            {data.logoUrl ? (
-              <img src={data.logoUrl} crossOrigin="anonymous" style={{ maxHeight: 90, maxWidth: 240, objectFit: 'contain', filter: data.bgImageUrl ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' : 'none' }} alt="Brand Logo" />
-            ) : (
-              <div style={{ fontSize: 26, fontWeight: 900, color: '#ffffff', textShadow: data.bgImageUrl ? '0 2px 4px rgba(0,0,0,0.5)' : 'none', letterSpacing: 'normal', lineHeight: 1.1 }}>
-                {data.company_name.length > 20 ? (
-                  <>
-                    <div style={{ color: data.bgImageUrl ? '#ffffff' : primary }}>{data.company_name.split(' ').slice(0, 2).join(' ')}</div>
-                    <div style={{ fontSize: 16, color: 'rgba(255,255,255,0.6)' }}>{data.company_name.split(' ').slice(2).join(' ')}</div>
-                  </>
-                ) : (
-                  data.company_name
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* MIDDLE */}
-        <div style={{ flex: 1, display: 'flex', padding: '0 80px', gap: 50, zIndex: 10, alignItems: 'center' }}>
-          {/* LEFT: Features list */}
-          <div style={{ flex: '0 0 400px', display: 'flex', flexDirection: 'column', gap: 20, justifyContent: 'center' }}>
-            {features.map((f, i) => (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'flex-start', gap: 16,
-                background: data.bgImageUrl ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.02)',
-                border: data.bgImageUrl ? '1px solid rgba(226, 232, 240, 0.8)' : '1px solid rgba(255,255,255,0.06)',
-                borderRadius: 16, padding: '16px 20px',
-                boxShadow: data.bgImageUrl ? '0 8px 24px rgba(0,0,0,0.1)' : '0 8px 32px rgba(0,0,0,0.15)',
-              }}>
-                <div style={{
-                  width: 48, height: 48, borderRadius: 12,
-                  background: primary, flexShrink: 0,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22,
-                  boxShadow: `0 0 15px ${primary}40`
-                }}>
-                  {getFeatureIcon(f)}
-                </div>
-                <div>
-                  <div style={{ fontSize: 17, fontWeight: 800, color: data.bgImageUrl ? '#0f172a' : '#ffffff', marginBottom: 3 }}>{f}</div>
-                  <div style={{ fontSize: 13, color: data.bgImageUrl ? '#475569' : 'rgba(255,255,255,0.45)', lineHeight: 1.4 }}>
-                    Gestiona de forma eficiente y segura.
-                  </div>
-                </div>
-              </div>
-            ))}
+          {/* 1. Incline Price Tag */}
+          <div style={{
+            position: 'absolute',
+            top: 60,
+            left: 360,
+            transform: 'rotate(-8deg)',
+            background: primary,
+            color: '#fff',
+            padding: '10px 24px',
+            borderRadius: 12,
+            fontWeight: 900,
+            fontSize: 24,
+            zIndex: 15,
+            boxShadow: '0 8px 20px rgba(0,0,0,0.15)',
+            display: 'flex',
+            alignItems: 'baseline',
+            gap: 4
+          }}>
+            <span style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', opacity: 0.9 }}>Desde</span>
+            <span>{price}</span>
+            <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.95 }}>+ IVA</span>
           </div>
 
-          {/* RIGHT: Laptop + Phone mockup */}
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-            {/* Laptop mockup */}
-            <div style={{ position: 'relative', width: 360, zIndex: 2, filter: `drop-shadow(0 20px 40px ${primary}12)` }}>
-              <div style={{ background: '#1e2530', borderRadius: '12px 12px 0 0', padding: '12px 12px 0', border: '1px solid rgba(255,255,255,0.08)', borderBottom: 'none' }}>
-                <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                  <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#ff5f57' }} />
-                  <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#febc2e' }} />
-                  <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#28c840' }} />
-                </div>
-                {/* Screen contents */}
-                <div style={{ background: '#0e121d', borderRadius: 8, padding: 12, height: 210, border: '1px solid rgba(255,255,255,0.05)' }}>
-                  <div style={{ background: secondary, borderRadius: 5, padding: '6px 10px', marginBottom: 8, display: 'flex', justifyContent: 'space-between', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <span style={{ color: '#fff', fontSize: 9, fontWeight: 700 }}>{data.company_name.substring(0,18)}</span>
-                    <span style={{ color: primary, fontSize: 9, fontWeight: 800 }}>DASHBOARD</span>
-                  </div>
-                  {/* Cards inside screen */}
-                  <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                    {['$24,560', '$8,340', '1,250'].map((v, idx) => (
-                      <div key={idx} style={{ flex: 1, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 4, padding: 6, textAlign: 'center' }}>
-                        <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>{['Ventas', 'Compras', 'Clientes'][idx]}</div>
-                        <div style={{ fontSize: 10, fontWeight: 800, color: '#fff' }}>{v}</div>
-                      </div>
+          {/* 2. Side Features */}
+          {/* FEATURE 0: Top Left */}
+          <div style={{
+            position: 'absolute',
+            top: 80,
+            left: 60,
+            width: 220,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            textAlign: 'center',
+            zIndex: 10
+          }}>
+            <div style={{
+              width: 76, height: 76, borderRadius: '50%',
+              background: '#fff', border: `3px solid ${primary}`,
+              color: primary, fontSize: 34,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 6px 16px rgba(0,0,0,0.08)'
+            }}>
+              {getFeatureIcon(features[0])}
+            </div>
+            <span style={{ fontSize: 18, fontWeight: 800, color: '#1e293b', marginTop: 12, lineHeight: 1.2 }}>
+              {features[0]}
+            </span>
+          </div>
+
+          {/* FEATURE 1: Bottom Left */}
+          <div style={{
+            position: 'absolute',
+            top: 290,
+            left: 60,
+            width: 220,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            textAlign: 'center',
+            zIndex: 10
+          }}>
+            <div style={{
+              width: 76, height: 76, borderRadius: '50%',
+              background: '#fff', border: `3px solid ${primary}`,
+              color: primary, fontSize: 34,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 6px 16px rgba(0,0,0,0.08)'
+            }}>
+              {getFeatureIcon(features[1])}
+            </div>
+            <span style={{ fontSize: 18, fontWeight: 800, color: '#1e293b', marginTop: 12, lineHeight: 1.2 }}>
+              {features[1]}
+            </span>
+          </div>
+
+          {/* FEATURE 2: Top Right */}
+          <div style={{
+            position: 'absolute',
+            top: 80,
+            right: 60,
+            width: 220,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            textAlign: 'center',
+            zIndex: 10
+          }}>
+            <div style={{
+              width: 76, height: 76, borderRadius: '50%',
+              background: '#fff', border: `3px solid ${primary}`,
+              color: primary, fontSize: 34,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 6px 16px rgba(0,0,0,0.08)'
+            }}>
+              {getFeatureIcon(features[2])}
+            </div>
+            <span style={{ fontSize: 18, fontWeight: 800, color: '#1e293b', marginTop: 12, lineHeight: 1.2 }}>
+              {features[2]}
+            </span>
+          </div>
+
+          {/* FEATURE 3: Bottom Right */}
+          <div style={{
+            position: 'absolute',
+            top: 290,
+            right: 60,
+            width: 220,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            textAlign: 'center',
+            zIndex: 10
+          }}>
+            <div style={{
+              width: 76, height: 76, borderRadius: '50%',
+              background: '#fff', border: `3px solid ${primary}`,
+              color: primary, fontSize: 34,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 6px 16px rgba(0,0,0,0.08)'
+            }}>
+              {getFeatureIcon(features[3])}
+            </div>
+            <span style={{ fontSize: 18, fontWeight: 800, color: '#1e293b', marginTop: 12, lineHeight: 1.2 }}>
+              {features[3]}
+            </span>
+          </div>
+
+          {/* 3. Dotted Connection Lines */}
+          <div style={{ position: 'absolute', top: 118, left: 210, width: 150, borderBottom: '3px dashed #cbd5e1', zIndex: 1 }} />
+          <div style={{ position: 'absolute', top: 328, left: 210, width: 150, borderBottom: '3px dashed #cbd5e1', zIndex: 1 }} />
+          <div style={{ position: 'absolute', top: 118, right: 210, width: 150, borderBottom: '3px dashed #cbd5e1', zIndex: 1 }} />
+          <div style={{ position: 'absolute', top: 328, right: 210, width: 150, borderBottom: '3px dashed #cbd5e1', zIndex: 1 }} />
+
+          {/* 4. Large Centered Laptop */}
+          <div style={{
+            position: 'absolute',
+            top: 250,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: 520,
+            zIndex: 5,
+            filter: 'drop-shadow(0 20px 35px rgba(0,0,0,0.12))'
+          }}>
+            {/* Screen */}
+            <div style={{
+              background: '#1e293b', borderRadius: '16px 16px 0 0',
+              padding: '10px 10px 0', border: '1px solid rgba(255,255,255,0.12)', borderBottom: 'none'
+            }}>
+              {/* Browser Dots */}
+              <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#ff5f57' }} />
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#febc2e' }} />
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#28c840' }} />
+              </div>
+              
+              {/* Dashboard Content */}
+              <div style={{ background: '#f8fafc', borderRadius: 8, padding: 12, height: 230, border: '1px solid rgba(0,0,0,0.04)', overflow: 'hidden' }}>
+                {/* Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '6px 10px', marginBottom: 8, borderRadius: 5 }}>
+                  <span style={{ fontSize: 9, fontWeight: 800, color: '#334155' }}>Resumen del Negocio</span>
+                  <div style={{ display: 'flex', gap: 2 }}>
+                    {['Hoy', 'Semana', 'Este mes', 'Este año', 'Todo'].map((t, idx) => (
+                      <span key={idx} style={{ fontSize: 6, background: idx === 2 ? '#f1f5f9' : 'transparent', color: '#64748b', padding: '2px 4px', borderRadius: 3, fontWeight: idx === 2 ? 800 : 500 }}>{t}</span>
                     ))}
                   </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <div style={{ flex: 1, background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 4, padding: 6 }}>
-                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 50 }}>
-                        {[30, 50, 40, 75, 55, 90, 70].map((h, idx) => (
-                          <div key={idx} style={{ flex: 1, background: idx === 5 ? primary : `${primary}50`, borderRadius: 1, height: `${h}%` }} />
-                        ))}
+                </div>
+
+                {/* KPIs Grid */}
+                <div style={{ display: 'flex', gap: 5, marginBottom: 8 }}>
+                  {[
+                    { label: 'Ventas del Mes', val: '$5,234.75', change: '+18.4% vs mes anterior' },
+                    { label: 'Cuentas por Cobrar', val: '$1,414.55', change: 'Vencidas: 15. Por vencer: 8' },
+                    { label: 'Gastos del Mes', val: '$1,774.55', change: '-6.7% vs mes anterior' },
+                    { label: 'Utilidad del Mes', val: '$2,160.20', change: '+12.3% vs mes anterior' },
+                  ].map((kpi, idx) => (
+                    <div key={idx} style={{ flex: 1, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 5, padding: '5px 6px' }}>
+                      <div style={{ fontSize: 6, color: '#64748b', fontWeight: 700, marginBottom: 2, whiteSpace: 'nowrap' }}>{kpi.label}</div>
+                      <div style={{ fontSize: 9, fontWeight: 900, color: '#0f172a' }}>{kpi.val}</div>
+                      <div style={{ fontSize: 5, color: kpi.change.startsWith('+') ? '#10b981' : kpi.change.startsWith('-') ? '#ef4444' : '#64748b', fontWeight: 800, marginTop: 1, whiteSpace: 'nowrap' }}>
+                        {kpi.change}
                       </div>
                     </div>
-                    <div style={{ flex: 1, background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 4, padding: 6 }}>
-                      {['Actualizado', 'Verificado', 'Soporte 24/7'].map((txt, idx) => (
-                        <div key={idx} style={{ fontSize: 7, color: idx === 2 ? primary : 'rgba(255,255,255,0.6)', fontWeight: idx === 2 ? 800 : 400, borderBottom: '1px solid rgba(255,255,255,0.04)', padding: '3px 0' }}>
-                          {txt}
+                  ))}
+                </div>
+
+                {/* Charts Area */}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {/* Left Column chart */}
+                  <div style={{ flex: 1.5, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 5, padding: 6 }}>
+                    <div style={{ fontSize: 6, color: '#64748b', fontWeight: 800, marginBottom: 4 }}>Ventas por Mes</div>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 60 }}>
+                      {[25, 45, 35, 65, 50, 80, 60].map((val, idx) => (
+                        <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <div style={{ width: '100%', background: idx === 5 ? primary : `${primary}40`, height: val, borderRadius: '2px 2px 0 0' }} />
+                          <span style={{ fontSize: 4, color: '#94a3b8', marginTop: 2, fontWeight: 700 }}>{['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul'][idx]}</span>
                         </div>
                       ))}
                     </div>
                   </div>
-                </div>
-              </div>
-              <div style={{ background: '#2d3543', height: 10, borderRadius: '0 0 3px 3px', borderTop: '1px solid rgba(255,255,255,0.08)' }} />
-              <div style={{ background: '#212732', height: 6, borderRadius: '0 0 8px 8px', width: '110%', marginLeft: '-5%' }} />
-            </div>
 
-            {/* Overlapping Phone mockup */}
-            <div style={{ position: 'absolute', right: 20, bottom: -10, zIndex: 3, width: 115, background: '#1e2530', border: '2px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '8px 6px', boxShadow: '0 15px 35px rgba(0,0,0,0.4)' }}>
-              <div style={{ background: '#0e121d', borderRadius: 14, padding: 8, height: 180, border: '1px solid rgba(255,255,255,0.04)' }}>
-                <div style={{ background: primary, borderRadius: 5, padding: '4px 6px', marginBottom: 6 }}>
-                  <span style={{ color: '#fff', fontSize: 7, fontWeight: 800, letterSpacing: '0.05em' }}>COTIZACION</span>
-                </div>
-                {[`Ref: #${Math.floor(Math.random()*900)+100}`, data.company_name.substring(0,14), `Total: ${price || '$---'}`, 'Estado: Activo'].map((v, i) => (
-                  <div key={i} style={{ fontSize: 7, color: i === 2 ? '#fff' : 'rgba(255,255,255,0.5)', fontWeight: i === 2 ? 800 : 400, borderBottom: '1px solid rgba(255,255,255,0.04)', padding: '4px 0' }}>
-                    {v}
+                  {/* Middle list */}
+                  <div style={{ flex: 1, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 5, padding: 5 }}>
+                    <div style={{ fontSize: 6, color: '#64748b', fontWeight: 800, marginBottom: 3 }}>Top Clientes</div>
+                    {[
+                      { n: 'Jenny A. Brown', v: '$614.95' },
+                      { n: 'Maria Alexander', v: '$412.60' },
+                      { n: 'Maria Escobar', v: '$336.60' },
+                      { n: 'Garcia total', v: '$316.40' },
+                    ].map((item, idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', padding: '2px 0' }}>
+                        <span style={{ fontSize: 5, color: '#334155', fontWeight: 600 }}>{item.n}</span>
+                        <span style={{ fontSize: 5, color: primary, fontWeight: 800 }}>{item.v}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-                <div style={{ background: primary, borderRadius: 6, padding: '6px 0', textAlign: 'center', marginTop: 14, cursor: 'pointer' }}>
-                  <span style={{ color: '#fff', fontSize: 8, fontWeight: 800 }}>Ver Detalle</span>
+
+                  {/* Right Impuestos card */}
+                  <div style={{ flex: 1.2, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 5, padding: 6 }}>
+                    <div style={{ fontSize: 6, color: '#ef4444', fontWeight: 800, marginBottom: 2 }}>IMPUESTOS A PAGAR</div>
+                    <div style={{ fontSize: 5, color: '#64748b' }}>Total a Pagar</div>
+                    <div style={{ fontSize: 11, fontWeight: 900, color: '#0f172a', margin: '2px 0' }}>$1,245.60</div>
+                    <div style={{ fontSize: 4, color: '#94a3b8', marginBottom: 4 }}>Actualizado en tiempo real</div>
+                    <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: 2 }}>
+                      <div style={{ fontSize: 4, color: '#334155', fontWeight: 700 }}>Próximas Declaraciones</div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 4, color: '#64748b', marginTop: 1 }}>
+                        <span>IVA Mensual</span>
+                        <span style={{ fontWeight: 700 }}>15 Jul 2026</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
+
               </div>
             </div>
+            {/* Laptop Base */}
+            <div style={{ background: '#cbd5e1', height: 12, borderRadius: '0 0 4px 4px', border: '1px solid #94a3b8' }} />
+            <div style={{ background: '#94a3b8', height: 6, borderRadius: '0 0 10px 10px', width: '112%', marginLeft: '-6%', border: '1px solid #475569', borderTop: 'none' }} />
           </div>
         </div>
 
-        {/* PRICE + CTA BAR */}
-        <div style={{ background: '#080d16', borderTop: '1px solid rgba(255,255,255,0.04)', padding: '28px 80px', display: 'flex', alignItems: 'center', gap: 48, zIndex: 10 }}>
-          {price && (
-            <div>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Desde</div>
-              <div style={{ fontSize: 54, fontWeight: 900, color: '#fff', lineHeight: 1 }}>{price}</div>
-              <div style={{ background: primary, borderRadius: 6, padding: '4px 12px', marginTop: 6, display: 'inline-block' }}>
-                <span style={{ color: '#fff', fontSize: 10, fontWeight: 800 }}>OFERTA POR TIEMPO LIMITADO</span>
+        {/* PROMPTED / HIGHLIGHT TEXT UNDER LAPTOP */}
+        <div style={{
+          position: 'absolute',
+          top: 730,
+          left: 0,
+          right: 0,
+          textAlign: 'center',
+          padding: '0 100px',
+          zIndex: 10
+        }}>
+          <h2 style={{
+            fontSize: 24,
+            fontWeight: 800,
+            color: '#0f172a',
+            margin: 0,
+            lineHeight: 1.3
+          }}>
+            ¿Quieres saber cuánto tienes que pagar de <span style={{ color: primary }}>impuesto</span>?
+          </h2>
+          <p style={{
+            fontSize: 18,
+            color: '#334155',
+            fontWeight: 600,
+            margin: '4px 0 0 0'
+          }}>
+            Acá mismo, lo vas a tener en este tablero, <span style={{ color: primary }}>en tiempo real</span>.
+          </p>
+        </div>
+
+        {/* BOTTOM BENEFITS (3 CARDS ALIGNED) */}
+        <div style={{
+          position: 'absolute',
+          top: 840,
+          left: 60,
+          right: 60,
+          display: 'flex',
+          gap: 20,
+          zIndex: 10
+        }}>
+          {[
+            { title: 'Declaraciones a Tiempo', desc: 'Preparándote todas tus declaraciones a tiempo.', icon: '📄' },
+            { title: 'Tranquilidad Absoluta', desc: 'La tranquilidad no se compra.', icon: '⏱️' },
+            { title: 'Crecimiento de Negocio', desc: 'Ahora sí puede generar más.', icon: '📈' }
+          ].map((item, idx) => (
+            <div key={idx} style={{
+              flex: 1,
+              background: '#fff',
+              border: '1px solid #e2e8f0',
+              borderRadius: 16,
+              padding: '16px 20px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              boxShadow: '0 4px 12px rgba(15,23,42,0.04)'
+            }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: 12,
+                background: `${primary}15`, color: primary,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 22, flexShrink: 0
+              }}>
+                {item.icon}
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: primary, marginBottom: 2 }}>{item.title}</div>
+                <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, lineHeight: 1.3 }}>{item.desc}</div>
               </div>
             </div>
-          )}
-          <div style={{ flex: 1, textAlign: 'center' }}>
-            <div style={{ background: `linear-gradient(135deg, ${primary}, ${primary}dd)`, borderRadius: 14, padding: '18px 36px', display: 'inline-flex', alignItems: 'center', gap: 10, border: '1px solid rgba(255,255,255,0.1)', boxShadow: `0 8px 25px ${primary}35` }}>
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>Contáctanos</div>
-                <div style={{ fontSize: 22, color: '#fff', fontWeight: 900 }}>{cta}</div>
-              </div>
-            </div>
+          ))}
+        </div>
+
+        {/* FOOTER BAR (RED WITH BLACK ROUND BUTTON) */}
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: 68,
+          background: primary,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 60px',
+          zIndex: 10
+        }}>
+          <div style={{ color: '#fff', fontSize: 16, fontWeight: 700, letterSpacing: '0.02em' }}>
+            Más control. Más orden. Más crecimiento.
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>
-              El poder de tu negocio,<br />al alcance de tu mano.
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+            {phone && <span style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>📱 {phone}</span>}
+            {website && <span style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>🌐 {website}</span>}
+            
+            <div style={{
+              background: '#090d16',
+              color: '#fff',
+              padding: '10px 24px',
+              borderRadius: 24,
+              fontWeight: 800,
+              fontSize: 13,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+              border: '1px solid rgba(255,255,255,0.1)'
+            }}>
+              {cta}
             </div>
           </div>
         </div>
-
-        {/* FOOTER */}
-        <div style={{ background: '#030508', borderTop: '1px solid rgba(255,255,255,0.03)', padding: '16px 80px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {data.logoUrl ? (
-              <img src={data.logoUrl} crossOrigin="anonymous" style={{ height: 36, width: 36, objectFit: 'contain' }} alt="logo" />
-            ) : (
-              <div style={{ width: 36, height: 36, background: primary, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 900, fontSize: 16 }}>
-                {data.company_name.substring(0, 1)}
-              </div>
-            )}
-            <div>
-              <div style={{ color: '#fff', fontSize: 13, fontWeight: 800 }}>{data.company_name}</div>
+      </div>
+    );
+  }
+);13, fontWeight: 800 }}>{data.company_name}</div>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 40 }}>
