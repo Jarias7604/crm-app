@@ -453,7 +453,7 @@ export default function FlyerStudio() {
             </div>
           </div>
 
-          <div style={css.colBody}>
+          <div className="flyer-studio-col" style={css.colBody}>
             {/* Prompt */}
             <div style={css.section}>
               <label style={css.label}>¿Qué quieres promocionar? *</label>
@@ -632,7 +632,7 @@ export default function FlyerStudio() {
             </div>
           </div>
 
-          <div style={css.colBody}>
+          <div className="flyer-studio-col" style={css.colBody}>
             {/* Format (2 Columns) */}
             <div style={css.section}>
               <label style={css.label}>Formato</label>
@@ -760,7 +760,19 @@ export default function FlyerStudio() {
                 style={{ ...css.btn, opacity: generating || !prompt.trim() ? 0.4 : 0.8, cursor: generating || !prompt.trim() ? 'not-allowed' : 'pointer', padding: '9px 20px', fontSize: 11 }}>
                 <Sparkles size={12} color="#D4AF37" fill="#D4AF37" /> Fondo IA (alternativo)
               </button>
-              <style>{`@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
+              <style>{`
+                @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+                @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+                @keyframes scaleIn{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}
+                /* Auto-hide scrollbars — only show on hover */
+                .flyer-studio-col::-webkit-scrollbar { width: 5px; }
+                .flyer-studio-col::-webkit-scrollbar-track { background: transparent; }
+                .flyer-studio-col::-webkit-scrollbar-thumb { background: transparent; border-radius: 10px; }
+                .flyer-studio-col:hover::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); }
+                .flyer-studio-col::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.25); }
+                .flyer-studio-col { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+                .flyer-studio-col:hover { scrollbar-color: rgba(0,0,0,0.15) transparent; }
+              `}</style>
             </div>
           </div>
         </div>
@@ -791,7 +803,7 @@ export default function FlyerStudio() {
             )}
           </div>
 
-          <div style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 16, alignItems: showSuggestions ? 'stretch' : 'center', justifyContent: showSuggestions ? 'flex-start' : 'center' }}>
+          <div className="flyer-studio-col" style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 16, alignItems: showSuggestions ? 'stretch' : 'center', justifyContent: showSuggestions ? 'flex-start' : 'center' }}>
 
             {/* Suggestions View */}
             {showSuggestions && suggestions.length > 0 && (
@@ -1056,7 +1068,7 @@ export default function FlyerStudio() {
             background: '#ffffff', borderRadius: 20,
             overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
             display: 'flex', flexDirection: 'column',
-            maxWidth: '90vw', maxHeight: '85vh',
+            maxWidth: '90vw', maxHeight: '94vh',
             animation: 'scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
           }}>
             {/* Header */}
@@ -1112,11 +1124,18 @@ export default function FlyerStudio() {
                     />
                   )}
                 </div>
-              ) : (
+              ) : (() => {
+                // Scale template to fit within available modal space (no scroll)
+                const maxH = Math.min(window.innerHeight * 0.72, 650);
+                const ratio = getFlyerDimensions(format).width / getFlyerDimensions(format).height;
+                const fitW = Math.min(maxH * ratio, 700);
+                const fitH = fitW / ratio;
+                const sc = fitW / 1080;
+                return (
                 // Scaled Template inside Modal
                 <div style={{
-                  width: getFlyerDimensions(format).width,
-                  height: getFlyerDimensions(format).height,
+                  width: fitW,
+                  height: fitH,
                   overflow: 'hidden',
                   position: 'relative',
                   borderRadius: 14,
@@ -1124,7 +1143,7 @@ export default function FlyerStudio() {
                   background: '#fff'
                 }}>
                   <div style={{
-                    transform: `scale(${getFlyerDimensions(format).width / 1080})`,
+                    transform: `scale(${sc})`,
                     transformOrigin: 'top left',
                     width: 1080,
                     height: 1080,
@@ -1151,7 +1170,8 @@ export default function FlyerStudio() {
                     )}
                   </div>
                 </div>
-              )}
+                );
+              })()}
             </div>
 
             {/* Footer Actions */}
