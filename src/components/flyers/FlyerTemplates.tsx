@@ -395,62 +395,60 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
             ))}
           </div>
 
-          {/* RIGHT: Laptop Mockup (hidden if AI background is active) */}
-          {!data.bgImageUrl && (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-              <div style={{ position: 'relative', width: 400, filter: 'drop-shadow(0 25px 50px rgba(0,0,0,0.12))' }}>
-                {/* Laptop Screen */}
-                <div style={{
-                  background: '#1e293b', borderRadius: '16px 16px 0 0',
-                  padding: '12px 12px 0', position: 'relative',
-                  border: '1px solid rgba(255,255,255,0.12)', borderBottom: 'none'
-                }}>
-                  {/* Browser Dots */}
-                  <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                    <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#ff5f57' }} />
-                    <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#febc2e' }} />
-                    <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#28c840' }} />
+          {/* RIGHT: Laptop Mockup */}
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+            <div style={{ position: 'relative', width: 400, filter: 'drop-shadow(0 25px 50px rgba(0,0,0,0.12))' }}>
+              {/* Laptop Screen */}
+              <div style={{
+                background: '#1e293b', borderRadius: '16px 16px 0 0',
+                padding: '12px 12px 0', position: 'relative',
+                border: '1px solid rgba(255,255,255,0.12)', borderBottom: 'none'
+              }}>
+                {/* Browser Dots */}
+                <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                  <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#ff5f57' }} />
+                  <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#febc2e' }} />
+                  <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#28c840' }} />
+                </div>
+                {/* Dashboard Screen */}
+                <div style={{ background: '#f8fafc', borderRadius: 8, padding: 12, height: 230, border: '1px solid rgba(0,0,0,0.04)' }}>
+                  <div style={{ background: secondary, borderRadius: 6, padding: '8px 12px', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#fff', fontSize: 10, fontWeight: 800, letterSpacing: '0.02em' }}>Dashboard Activo</span>
+                    <span style={{ color: primary, fontSize: 14, fontWeight: 900 }}>●</span>
                   </div>
-                  {/* Dashboard Screen */}
-                  <div style={{ background: '#f8fafc', borderRadius: 8, padding: 12, height: 230, border: '1px solid rgba(0,0,0,0.04)' }}>
-                    <div style={{ background: secondary, borderRadius: 6, padding: '8px 12px', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ color: '#fff', fontSize: 10, fontWeight: 800, letterSpacing: '0.02em' }}>Dashboard Activo</span>
-                      <span style={{ color: primary, fontSize: 14, fontWeight: 900 }}>●</span>
-                    </div>
-                    {/* Stats */}
-                    <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-                      {['$24,560', '$8,340', '1,250', '320'].map((v, idx) => (
-                        <div key={idx} style={{ flex: 1, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: 6, textAlign: 'center' }}>
-                          <div style={{ fontSize: 8, color: '#64748b', marginBottom: 2, fontWeight: 700 }}>{['Ventas', 'Compras', 'Clientes', 'DTEs'][idx]}</div>
-                          <div style={{ fontSize: 10, fontWeight: 800, color: '#0f172a' }}>{v}</div>
-                          <div style={{ fontSize: 7, color: '#10b981', fontWeight: 800 }}>+{[12, 6, 8, 15][idx]}%</div>
-                        </div>
-                      ))}
-                    </div>
-                    {/* Chart */}
-                    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: 6, marginBottom: 8, display: 'flex', alignItems: 'flex-end', gap: 4, height: 62 }}>
-                      {[35, 55, 45, 75, 50, 85, 65, 95].map((h, idx) => (
-                        <div key={idx} style={{
-                          flex: 1, background: idx === 7 ? primary : `${primary}45`,
-                          borderRadius: '2px 2px 0 0', height: `${h}%`,
-                        }} />
-                      ))}
-                    </div>
-                    {/* Table */}
-                    {['Arias Defense', 'Cliente Premium', 'Corporación Alfa'].map((c, idx) => (
-                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid #f1f5f9' }}>
-                        <span style={{ fontSize: 8, color: '#334155', fontWeight: 600 }}>{c}</span>
-                        <span style={{ fontSize: 8, color: primary, fontWeight: 800 }}>${(1650 - idx * 400).toLocaleString()}</span>
+                  {/* Stats */}
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                    {['$24,560', '$8,340', '1,250', '320'].map((v, idx) => (
+                      <div key={idx} style={{ flex: 1, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: 6, textAlign: 'center' }}>
+                        <div style={{ fontSize: 8, color: '#64748b', marginBottom: 2, fontWeight: 700 }}>{['Ventas', 'Compras', 'Clientes', 'DTEs'][idx]}</div>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: '#0f172a' }}>{v}</div>
+                        <div style={{ fontSize: 7, color: '#10b981', fontWeight: 800 }}>+{[12, 6, 8, 15][idx]}%</div>
                       </div>
                     ))}
                   </div>
+                  {/* Chart */}
+                  <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: 6, marginBottom: 8, display: 'flex', alignItems: 'flex-end', gap: 4, height: 62 }}>
+                    {[35, 55, 45, 75, 50, 85, 65, 95].map((h, idx) => (
+                      <div key={idx} style={{
+                        flex: 1, background: idx === 7 ? primary : `${primary}45`,
+                        borderRadius: '2px 2px 0 0', height: `${h}%`,
+                      }} />
+                    ))}
+                  </div>
+                  {/* Table */}
+                  {['Arias Defense', 'Cliente Premium', 'Corporación Alfa'].map((c, idx) => (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', borderBottom: '1px solid #f1f5f9' }}>
+                      <span style={{ fontSize: 8, color: '#334155', fontWeight: 600 }}>{c}</span>
+                      <span style={{ fontSize: 8, color: primary, fontWeight: 800 }}>${(1650 - idx * 400).toLocaleString()}</span>
+                    </div>
+                  ))}
                 </div>
-                {/* Laptop Base */}
-                <div style={{ background: '#e2e8f0', height: 12, borderRadius: '0 0 4px 4px', border: '1px solid #cbd5e1' }} />
-                <div style={{ background: '#cbd5e1', height: 6, borderRadius: '0 0 10px 10px', width: '110%', marginLeft: '-5%' }} />
               </div>
+              {/* Laptop Base */}
+              <div style={{ background: '#e2e8f0', height: 12, borderRadius: '0 0 4px 4px', border: '1px solid #cbd5e1' }} />
+              <div style={{ background: '#cbd5e1', height: 6, borderRadius: '0 0 10px 10px', width: '110%', marginLeft: '-5%' }} />
             </div>
-          )}
+          </div>
         </div>
 
         {/* BOTTOM BENEFITS */}
@@ -578,7 +576,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
             {features.map((f, i) => (
               <div key={i} style={{
                 display: 'flex', alignItems: 'flex-start', gap: 16,
-                background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.06)',
+                background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255,255,255,0.06)',
                 borderRadius: 16, padding: '16px 20px',
                 boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
               }}>
@@ -600,72 +598,70 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
             ))}
           </div>
 
-          {/* RIGHT: Laptop + Phone mockup (hidden if AI background is active) */}
-          {!data.bgImageUrl && (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-              {/* Laptop mockup */}
-              <div style={{ position: 'relative', width: 360, zIndex: 2, filter: `drop-shadow(0 20px 40px ${primary}12)` }}>
-                <div style={{ background: '#1e2530', borderRadius: '12px 12px 0 0', padding: '12px 12px 0', border: '1px solid rgba(255,255,255,0.08)', borderBottom: 'none' }}>
-                  <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                    <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#ff5f57' }} />
-                    <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#febc2e' }} />
-                    <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#28c840' }} />
+          {/* RIGHT: Laptop + Phone mockup */}
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+            {/* Laptop mockup */}
+            <div style={{ position: 'relative', width: 360, zIndex: 2, filter: `drop-shadow(0 20px 40px ${primary}12)` }}>
+              <div style={{ background: '#1e2530', borderRadius: '12px 12px 0 0', padding: '12px 12px 0', border: '1px solid rgba(255,255,255,0.08)', borderBottom: 'none' }}>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                  <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#ff5f57' }} />
+                  <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#febc2e' }} />
+                  <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#28c840' }} />
+                </div>
+                {/* Screen contents */}
+                <div style={{ background: '#0e121d', borderRadius: 8, padding: 12, height: 210, border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ background: secondary, borderRadius: 5, padding: '6px 10px', marginBottom: 8, display: 'flex', justifyContent: 'space-between', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ color: '#fff', fontSize: 9, fontWeight: 700 }}>{data.company_name.substring(0,18)}</span>
+                    <span style={{ color: primary, fontSize: 9, fontWeight: 800 }}>DASHBOARD</span>
                   </div>
-                  {/* Screen contents */}
-                  <div style={{ background: '#0e121d', borderRadius: 8, padding: 12, height: 210, border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <div style={{ background: secondary, borderRadius: 5, padding: '6px 10px', marginBottom: 8, display: 'flex', justifyContent: 'space-between', border: '1px solid rgba(255,255,255,0.06)' }}>
-                      <span style={{ color: '#fff', fontSize: 9, fontWeight: 700 }}>{data.company_name.substring(0,18)}</span>
-                      <span style={{ color: primary, fontSize: 9, fontWeight: 800 }}>DASHBOARD</span>
-                    </div>
-                    {/* Cards inside screen */}
-                    <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                      {['$24,560', '$8,340', '1,250'].map((v, idx) => (
-                        <div key={idx} style={{ flex: 1, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 4, padding: 6, textAlign: 'center' }}>
-                          <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>{['Ventas', 'Compras', 'Clientes'][idx]}</div>
-                          <div style={{ fontSize: 10, fontWeight: 800, color: '#fff' }}>{v}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <div style={{ flex: 1, background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 4, padding: 6 }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 50 }}>
-                          {[30, 50, 40, 75, 55, 90, 70].map((h, idx) => (
-                            <div key={idx} style={{ flex: 1, background: idx === 5 ? primary : `${primary}50`, borderRadius: 1, height: `${h}%` }} />
-                          ))}
-                        </div>
+                  {/* Cards inside screen */}
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                    {['$24,560', '$8,340', '1,250'].map((v, idx) => (
+                      <div key={idx} style={{ flex: 1, background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 4, padding: 6, textAlign: 'center' }}>
+                        <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.35)', marginBottom: 2 }}>{['Ventas', 'Compras', 'Clientes'][idx]}</div>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: '#fff' }}>{v}</div>
                       </div>
-                      <div style={{ flex: 1, background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 4, padding: 6 }}>
-                        {['Actualizado', 'Verificado', 'Soporte 24/7'].map((txt, idx) => (
-                          <div key={idx} style={{ fontSize: 7, color: idx === 2 ? primary : 'rgba(255,255,255,0.6)', fontWeight: idx === 2 ? 800 : 400, borderBottom: '1px solid rgba(255,255,255,0.04)', padding: '3px 0' }}>
-                            {txt}
-                          </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <div style={{ flex: 1, background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 4, padding: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 50 }}>
+                        {[30, 50, 40, 75, 55, 90, 70].map((h, idx) => (
+                          <div key={idx} style={{ flex: 1, background: idx === 5 ? primary : `${primary}50`, borderRadius: 1, height: `${h}%` }} />
                         ))}
                       </div>
                     </div>
+                    <div style={{ flex: 1, background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 4, padding: 6 }}>
+                      {['Actualizado', 'Verificado', 'Soporte 24/7'].map((txt, idx) => (
+                        <div key={idx} style={{ fontSize: 7, color: idx === 2 ? primary : 'rgba(255,255,255,0.6)', fontWeight: idx === 2 ? 800 : 400, borderBottom: '1px solid rgba(255,255,255,0.04)', padding: '3px 0' }}>
+                          {txt}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-                <div style={{ background: '#2d3543', height: 10, borderRadius: '0 0 3px 3px', borderTop: '1px solid rgba(255,255,255,0.08)' }} />
-                <div style={{ background: '#212732', height: 6, borderRadius: '0 0 8px 8px', width: '110%', marginLeft: '-5%' }} />
               </div>
+              <div style={{ background: '#2d3543', height: 10, borderRadius: '0 0 3px 3px', borderTop: '1px solid rgba(255,255,255,0.08)' }} />
+              <div style={{ background: '#212732', height: 6, borderRadius: '0 0 8px 8px', width: '110%', marginLeft: '-5%' }} />
+            </div>
 
-              {/* Overlapping Phone mockup */}
-              <div style={{ position: 'absolute', right: 20, bottom: -10, zIndex: 3, width: 115, background: '#1e2530', border: '2px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '8px 6px', boxShadow: '0 15px 35px rgba(0,0,0,0.4)' }}>
-                <div style={{ background: '#0e121d', borderRadius: 14, padding: 8, height: 180, border: '1px solid rgba(255,255,255,0.04)' }}>
-                  <div style={{ background: primary, borderRadius: 5, padding: '4px 6px', marginBottom: 6 }}>
-                    <span style={{ color: '#fff', fontSize: 7, fontWeight: 800, letterSpacing: '0.05em' }}>COTIZACION</span>
+            {/* Overlapping Phone mockup */}
+            <div style={{ position: 'absolute', right: 20, bottom: -10, zIndex: 3, width: 115, background: '#1e2530', border: '2px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '8px 6px', boxShadow: '0 15px 35px rgba(0,0,0,0.4)' }}>
+              <div style={{ background: '#0e121d', borderRadius: 14, padding: 8, height: 180, border: '1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ background: primary, borderRadius: 5, padding: '4px 6px', marginBottom: 6 }}>
+                  <span style={{ color: '#fff', fontSize: 7, fontWeight: 800, letterSpacing: '0.05em' }}>COTIZACION</span>
+                </div>
+                {[`Ref: #${Math.floor(Math.random()*900)+100}`, data.company_name.substring(0,14), `Total: ${price || '$---'}`, 'Estado: Activo'].map((v, i) => (
+                  <div key={i} style={{ fontSize: 7, color: i === 2 ? '#fff' : 'rgba(255,255,255,0.5)', fontWeight: i === 2 ? 800 : 400, borderBottom: '1px solid rgba(255,255,255,0.04)', padding: '4px 0' }}>
+                    {v}
                   </div>
-                  {[`Ref: #${Math.floor(Math.random()*900)+100}`, data.company_name.substring(0,14), `Total: ${price || '$---'}`, 'Estado: Activo'].map((v, i) => (
-                    <div key={i} style={{ fontSize: 7, color: i === 2 ? '#fff' : 'rgba(255,255,255,0.5)', fontWeight: i === 2 ? 800 : 400, borderBottom: '1px solid rgba(255,255,255,0.04)', padding: '4px 0' }}>
-                      {v}
-                    </div>
-                  ))}
-                  <div style={{ background: primary, borderRadius: 6, padding: '6px 0', textAlign: 'center', marginTop: 14, cursor: 'pointer' }}>
-                    <span style={{ color: '#fff', fontSize: 8, fontWeight: 800 }}>Ver Detalle</span>
-                  </div>
+                ))}
+                <div style={{ background: primary, borderRadius: 6, padding: '6px 0', textAlign: 'center', marginTop: 14, cursor: 'pointer' }}>
+                  <span style={{ color: '#fff', fontSize: 8, fontWeight: 800 }}>Ver Detalle</span>
                 </div>
               </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* PRICE + CTA BAR */}
