@@ -200,10 +200,10 @@ export default function FlyerStudio() {
 
   // ── Auto-optimize brief with IA as user types ─────────────────────────────
   useEffect(() => {
-    if (autoOptRef.current) clearTimeout(autoOptRef.current);
-    // Skip: same as last auto-optimized, too short, or no company
+    // Skip: same as last auto-optimized, too short, no company, or already structured/edited
     if (!prompt.trim() || prompt.trim().length < 40) return;
     if (prompt === lastAutoOptPrompt.current) return;
+    if (/t[íi]tulo:|incluye:|cta:/i.test(prompt)) return; // Don't overwrite manually customized/structured text
     if (showSuggestions) return;
 
     autoOptRef.current = setTimeout(async () => {
@@ -247,10 +247,16 @@ export default function FlyerStudio() {
     if (!prompt.trim()) { toast.error('Describe qué quieres promocionar'); return; }
     setGenerating(true);
     setVariants([]);
+    // Extract visual keywords to generate a high quality background related to the theme without writing text
+    const visualTheme = prompt
+      .replace(/t[íi]tulo:|subt[íi]tulo:|incluye:|cta:|whatsapp:|tel[eé]fono:|contacto:|celular:|sitio:|web:|p[aá]gina|link|url/gi, '')
+      .replace(/\b\d{8,18}\b/g, '') // remove phone numbers
+      .trim();
+
     try {
       const { data, error } = await supabase.functions.invoke('flyer-ai-generator', {
         body: {
-          prompt,
+          prompt: `Professional commercial business backdrop graphic for: "${visualTheme}". Clean modern marketing layout design, photorealistic, modern advertising aesthetic, strictly NO TEXT, NO WRITING, NO ALPHABET, NO LETTERS, empty space for overlaying HTML text.`,
           company_name: companyName || 'Mi Empresa',
           cta: cta || undefined,
           colors,
@@ -327,19 +333,7 @@ export default function FlyerStudio() {
     setGenerating(true);
     try {
       let dataUrl = '';
-      if (previewMode === 'ai' && variants.length > 0) {
-        if (logoPreview && flyerRef.current) {
-          const canvas = await html2canvas(flyerRef.current, {
-            useCORS: true,
-            allowTaint: true,
-            scale: 2,
-            backgroundColor: null
-          });
-          dataUrl = canvas.toDataURL('image/png');
-        } else {
-          dataUrl = await urlToBase64(variants[selected]);
-        }
-      } else if (bgUploadPreview) {
+      if (bgUploadPreview) {
         if (!flyerRef.current) { toast.error('Flyer no está listo'); return; }
         const canvas = await html2canvas(flyerRef.current, {
           useCORS: true,
@@ -351,7 +345,13 @@ export default function FlyerStudio() {
       } else {
         const ref = selectedTemplate === 'A' ? templateRefA : templateRefB;
         if (!ref.current) throw new Error('Template not ready');
-        dataUrl = await toPng(ref.current, { pixelRatio: 2, cacheBust: true });
+        const canvas = await html2canvas(ref.current, {
+          useCORS: true,
+          allowTaint: true,
+          scale: 2,
+          backgroundColor: null
+        });
+        dataUrl = canvas.toDataURL('image/png');
       }
       const a = document.createElement('a');
       a.href = dataUrl;
@@ -370,16 +370,7 @@ export default function FlyerStudio() {
     setGenerating(true);
     try {
       let dataUrl = '';
-      if (previewMode === 'ai' && variants.length > 0) {
-        if (logoPreview && flyerRef.current) {
-          const canvas = await html2canvas(flyerRef.current, {
-            useCORS: true, allowTaint: true, scale: 2, backgroundColor: null
-          });
-          dataUrl = canvas.toDataURL('image/png');
-        } else {
-          dataUrl = await urlToBase64(variants[selected]);
-        }
-      } else if (bgUploadPreview) {
+      if (bgUploadPreview) {
         if (!flyerRef.current) { toast.error('Flyer no está listo'); return; }
         const canvas = await html2canvas(flyerRef.current, {
           useCORS: true, allowTaint: true, scale: 2, backgroundColor: null
@@ -388,7 +379,10 @@ export default function FlyerStudio() {
       } else {
         const ref = selectedTemplate === 'A' ? templateRefA : templateRefB;
         if (!ref.current) throw new Error('Template not ready');
-        dataUrl = await toPng(ref.current, { pixelRatio: 2, cacheBust: true });
+        const canvas = await html2canvas(ref.current, {
+          useCORS: true, allowTaint: true, scale: 2, backgroundColor: null
+        });
+        dataUrl = canvas.toDataURL('image/png');
       }
       sessionStorage.setItem('socialhub_prefill_image', dataUrl);
       
@@ -908,14 +902,7 @@ export default function FlyerStudio() {
                           alt="Flyer personalizado"
                           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#fff' }}
                         />
-                      ) : (previewMode === 'ai' && variants.length > 0) ? (
-                        <img
-                          src={variants[selected]}
-                          alt="Flyer generado"
-                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#fff' }}
-                        />
                       ) : (
-                        // Live Template scaled down to fit viewport
                         <div style={{
                           position: 'absolute',
                           top: 0,
@@ -934,6 +921,7 @@ export default function FlyerStudio() {
                               secondaryColor: colors[1] || '#1a1a2e',
                               phone, website,
                               logoUrl: logoPreview || undefined,
+                              bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
                             }} />
                           ) : (
                             <FlyerTemplateB data={{
@@ -943,6 +931,7 @@ export default function FlyerStudio() {
                               secondaryColor: colors[1] || '#1a1a2e',
                               phone, website,
                               logoUrl: logoPreview || undefined,
+                              bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
                             }} />
                           )}
                         </div>
@@ -1106,7 +1095,7 @@ export default function FlyerStudio() {
               display: 'flex', alignItems: 'center', justifyContent: 'center', 
               overflow: 'auto', flex: 1 
             }}>
-              {bgUploadPreview || (previewMode === 'ai' && variants.length > 0) ? (
+              {bgUploadPreview ? (
                 <div style={{
                   position: 'relative',
                   width: getFlyerDimensions(format).width,
@@ -1128,19 +1117,6 @@ export default function FlyerStudio() {
                       display: 'block'
                     }}
                   />
-                  {logoPreview && (
-                    <FreeLogo
-                      d={{
-                        title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null,
-                        logoUrl: logoPreview, industria: '', phone: '', website: '', templateId: 'direct-mockup',
-                        containerW: getFlyerDimensions(format).width,
-                        containerH: getFlyerDimensions(format).height,
-                        logoSize, logoX, logoY
-                      }}
-                      onMove={(x, y) => { setLogoX(x); setLogoY(y); }}
-                      onResize={(s) => setLogoSize(s)}
-                    />
-                  )}
                 </div>
               ) : (() => {
                 // Scale template to fit within available modal space (no scroll)
