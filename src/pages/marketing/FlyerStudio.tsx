@@ -998,7 +998,7 @@ export default function FlyerStudio() {
                 </div>
                 <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>Tu flyer generado por IA aparecerá aquí</div>
                 <div style={{ fontSize: 12, color: '#64748b', maxWidth: 260, lineHeight: 1.6 }}>
-                  Escribe tu brief en la columna izquierda y presiona <strong>"Generar Flyer Profesional con IA"</strong>. DALL·E 3 creará una imagen completa y única.
+                  Escribe tu brief en la columna izquierda y presiona <strong>"Generar Flyer Profesional con IA"</strong>. <strong>gpt-image-1</strong> creará una imagen completa y única.
                 </div>
                 <div style={{ background: '#f1f5f9', borderRadius: 10, padding: '10px 16px', fontSize: 11, color: '#475569', lineHeight: 1.6, maxWidth: 280 }}>
                   💡 <strong>Tip:</strong> Cuanto más detallado sea tu brief (tipo de negocio, oferta, colores, tono), mejor será el resultado.
@@ -1063,7 +1063,7 @@ export default function FlyerStudio() {
                 </div>
                 {/* Badge */}
                 <div style={{ textAlign: 'center', fontSize: 10, color: '#10b981', fontWeight: 700 }}>
-                  ✅ Flyer generado por DALL·E 3 — 100% original y único
+                  ✅ Flyer generado con IA — 100% original y único
                 </div>
 
                 {/* Logo drag tip */}
