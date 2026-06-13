@@ -329,7 +329,7 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
         <div style={{ padding: '52px 64px 24px', flex: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 10 }}>
           {/* Left: Headline & Price */}
           <div style={{ flex: 1, marginRight: 32 }}>
-            <div style={{ fontSize: headline.length > 30 ? 46 : 58, fontWeight: 900, color: '#0f172a', lineHeight: 1.1, letterSpacing: 'normal', marginBottom: 10 }}>
+            <div style={{ fontSize: headline.length > 30 ? 36 : 44, fontWeight: 900, color: '#0f172a', lineHeight: 1.1, letterSpacing: 'normal', marginBottom: 10 }}>
               {headline.split('NEGOCIO').map((part, i, arr) => (
                 <React.Fragment key={i}>
                   {part}{i < arr.length - 1 && <span style={{ color: primary }}>NEGOCIO</span>}
@@ -451,9 +451,9 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
         {/* BOTTOM BENEFITS */}
         <div style={{ background: '#f8fafc', borderTop: '1px solid #e2e8f0', padding: '28px 64px', display: 'flex', gap: 24, zIndex: 10 }}>
           {[
-            { label: 'Declaraciones a tiempo', desc: 'Preparando tus reportes de Hacienda sin errores.', icon: '📋' },
-            { label: 'Tranquilidad total', desc: 'Seguridad robusta y copias automáticas en la nube.', icon: '🕐' },
-            { label: 'Mayor rentabilidad', desc: 'Optimiza tus flujos y haz crecer tu negocio hoy.', icon: '📈' }
+            { label: 'Resultados inmediatos', desc: 'Ahorra tiempo y enfócate en hacer crecer tu negocio.', icon: '⚡' },
+            { label: 'Seguridad total', desc: 'Tus datos protegidos con respaldo automático en la nube.', icon: '🔒' },
+            { label: 'Mayor rentabilidad', desc: 'Optimiza tus procesos y maximiza tus ganancias hoy.', icon: '📈' }
           ].map((item, idx) => (
             <div key={idx} style={{
               flex: 1, display: 'flex', alignItems: 'center', gap: 14,
@@ -532,15 +532,15 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
         {/* HEADER */}
         <div style={{ padding: '45px 80px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 10 }}>
           <div style={{ flex: 1, marginRight: 40 }}>
-            <div style={{ fontSize: headline.length > 30 ? 46 : 56, fontWeight: 900, color: '#ffffff', lineHeight: 1.05, letterSpacing: 'normal', marginBottom: 10 }}>
+            <div style={{ fontSize: headline.length > 30 ? 36 : 44, fontWeight: 900, color: '#ffffff', lineHeight: 1.05, letterSpacing: 'normal', marginBottom: 10 }}>
               {headline}
             </div>
             <div style={{ fontSize: 23, fontWeight: 800, color: primary, marginBottom: 18 }}>{subheadline}</div>
             
             {/* Badges */}
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-              {['✅ Fácil', '⚡ Rápido', '🔒 100% Hacienda'].map((b, i) => (
-                <span key={i} style={{ fontSize: 13, fontWeight: 700, color: '#ffffff', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 14px' }}>{b}</span>
+              {features.slice(0, 3).map((f, i) => (
+                <span key={i} style={{ fontSize: 12, fontWeight: 700, color: '#ffffff', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 14px' }}>{getFeatureIcon(f)} {f.length > 16 ? f.substring(0,16)+'…' : f}</span>
               ))}
             </div>
           </div>
@@ -606,7 +606,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
                 {/* Screen contents */}
                 <div style={{ background: '#0e121d', borderRadius: 8, padding: 12, height: 210, border: '1px solid rgba(255,255,255,0.05)' }}>
                   <div style={{ background: secondary, borderRadius: 5, padding: '6px 10px', marginBottom: 8, display: 'flex', justifyContent: 'space-between', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <span style={{ color: '#fff', fontSize: 9, fontWeight: 700 }}>Arias ERP Professional</span>
+                    <span style={{ color: '#fff', fontSize: 9, fontWeight: 700 }}>{data.company_name.substring(0,18)}</span>
                     <span style={{ color: primary, fontSize: 9, fontWeight: 800 }}>DASHBOARD</span>
                   </div>
                   
@@ -630,7 +630,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
                       </div>
                     </div>
                     <div style={{ flex: 1, background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 4, padding: 6 }}>
-                      {['Factura #103', 'Cliente Alfa', 'Total: $1,250'].map((txt, idx) => (
+                      {['Actualizado', 'Verificado', 'Soporte 24/7'].map((txt, idx) => (
                         <div key={idx} style={{ fontSize: 7, color: idx === 2 ? primary : 'rgba(255,255,255,0.6)', fontWeight: idx === 2 ? 800 : 400, borderBottom: '1px solid rgba(255,255,255,0.04)', padding: '3px 0' }}>
                           {txt}
                         </div>
@@ -647,9 +647,9 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
             <div style={{ position: 'absolute', right: 20, bottom: -10, zIndex: 3, width: 115, background: '#1e2530', border: '2px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '8px 6px', boxShadow: '0 15px 35px rgba(0,0,0,0.4)' }}>
               <div style={{ background: '#0e121d', borderRadius: 14, padding: 8, height: 180, border: '1px solid rgba(255,255,255,0.04)' }}>
                 <div style={{ background: primary, borderRadius: 5, padding: '4px 6px', marginBottom: 6 }}>
-                  <span style={{ color: '#fff', fontSize: 7, fontWeight: 800, letterSpacing: '0.05em' }}>FACTURA DIGITAL</span>
+                  <span style={{ color: '#fff', fontSize: 7, fontWeight: 800, letterSpacing: '0.05em' }}>COTIZACION</span>
                 </div>
-                {['Factura: 001-023', 'Arias Defense', 'Total: $1,250.00', 'Estado: Pagada'].map((v, i) => (
+                {[`Ref: #${Math.floor(Math.random()*900)+100}`, data.company_name.substring(0,14), `Total: ${price || '$---'}`, 'Estado: Activo'].map((v, i) => (
                   <div key={i} style={{ fontSize: 7, color: i === 2 ? '#fff' : 'rgba(255,255,255,0.5)', fontWeight: i === 2 ? 800 : 400, borderBottom: '1px solid rgba(255,255,255,0.04)', padding: '4px 0' }}>
                     {v}
                   </div>
@@ -674,10 +674,9 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
             </div>
           )}
           <div style={{ flex: 1, textAlign: 'center' }}>
-            <div style={{ background: `linear-gradient(135deg, ${primary}, ${primary}dd)`, borderRadius: 14, padding: '16px 32px', display: 'inline-flex', alignItems: 'center', gap: 14, border: '1px solid rgba(255,255,255,0.1)', boxShadow: `0 8px 25px ${primary}35` }}>
-              <span style={{ fontSize: 24 }}>💬</span>
+            <div style={{ background: `linear-gradient(135deg, ${primary}, ${primary}dd)`, borderRadius: 14, padding: '18px 36px', display: 'inline-flex', alignItems: 'center', gap: 10, border: '1px solid rgba(255,255,255,0.1)', boxShadow: `0 8px 25px ${primary}35` }}>
               <div style={{ textAlign: 'left' }}>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 700, letterSpacing: '0.05em' }}>ACTIVA TU SISTEMA</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>Contáctanos</div>
                 <div style={{ fontSize: 22, color: '#fff', fontWeight: 900 }}>{cta}</div>
               </div>
             </div>

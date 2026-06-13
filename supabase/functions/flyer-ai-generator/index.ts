@@ -140,18 +140,22 @@ SECONDARY COLOR: ${secondaryColor}
 ${layout}
 
 MANDATORY DESIGN RULES:
-1. ALL text must be in Spanish and spelled perfectly
+1. CRITICAL — ALL text must be in PERFECT Spanish spelling. Zero tolerance for typos. 
+   CORRECT: "Reportes" (NEVER "Ruportes"), "Tiempo" (NEVER "Tiempò"), "Facturación" (NEVER "Facturacion"), 
+   "Inventario", "Clientes", "Ventas", "Seguridad", "Solución", "Gestión", "Automatización"
+   If unsure of a word, use a simpler synonym. NEVER render garbled or misspelled text.
 2. Typography: Use clean sans-serif fonts (like Inter, Montserrat or similar). Headlines BOLD, body text regular weight
 3. The flyer must look EXACTLY like a professional designer made it — not AI-generated
 4. Include realistic UI/dashboard mockup on a laptop screen (showing charts, numbers, graphs — it represents the software being promoted)
-5. Price must be visible and prominent
+5. Price must be visible and prominent if mentioned in the prompt
 6. Feature icons must be clean, professional vector-style icons (not clip art)
 7. Color usage: primary color ${primaryColor} for accents, badges, CTA buttons. White for main background. Dark color for text.
-8. High resolution, sharp edges, no blur, no distortion
+8. High resolution, sharp edges, no blur, no distortion, no warped letters
 9. The final result should be indistinguishable from a Canva Pro or Adobe Express professional template
 10. Include the company name "${company_name}" prominently
+11. NEVER mix fonts mid-word. NEVER render emoji as unicode boxes. NEVER distort text.
 
-This flyer will be published on Instagram/Facebook. It must immediately communicate value and drive action.`;
+This flyer will be published on Instagram/Facebook. It must immediately communicate value and drive action.\`;
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
