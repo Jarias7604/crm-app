@@ -947,27 +947,6 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
       </div>
     );
   }
-);13, fontWeight: 800 }}>{data.company_name}</div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 40 }}>
-            {phone && (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 9, textTransform: 'uppercase', fontWeight: 700 }}>WhatsApp</div>
-                <div style={{ color: '#fff', fontSize: 14, fontWeight: 800 }}>{phone}</div>
-              </div>
-            )}
-            {website && (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 9, textTransform: 'uppercase', fontWeight: 700 }}>Sitio web</div>
-                <div style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>{website}</div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
 );
 
 FlyerTemplateA.displayName = 'FlyerTemplateA';
