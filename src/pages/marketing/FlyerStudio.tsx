@@ -108,6 +108,7 @@ export default function FlyerStudio() {
   const [selected, setSelected] = useState(0);
   const [credits, setCredits] = useState<number | null>(null);
   const [companyName, setCompanyName] = useState('');
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
   // AI suggestions (Sprint 4)
   const [optimizing, setOptimizing] = useState(false);
@@ -680,6 +681,7 @@ export default function FlyerStudio() {
                   <div style={{ display: 'flex', justifyContent: 'center', width: '100%', userSelect: 'none' }}>
                     <div
                       ref={flyerRef}
+                      onClick={() => setIsPreviewModalOpen(true)}
                       style={{
                         position: 'relative',
                         borderRadius: '14px',
@@ -690,7 +692,12 @@ export default function FlyerStudio() {
                         maxHeight: '62vh',
                         aspectRatio: `${getFlyerDimensions(format).width} / ${getFlyerDimensions(format).height}`,
                         flexShrink: 1,
+                        cursor: 'zoom-in',
+                        transition: 'transform 0.2s ease',
                       }}
+                      title="Ver vista previa en pantalla completa"
+                      onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.015)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
                     >
                       {/* The actual AI-generated or uploaded flyer image — full bleed, no HTML overlays */}
                       <img
@@ -699,6 +706,19 @@ export default function FlyerStudio() {
                         crossOrigin="anonymous"
                         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#fff' }}
                       />
+                      {/* Hover overlay hint */}
+                      <div style={{
+                        position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.15)',
+                        opacity: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: 'opacity 0.2s',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.opacity = 0; }}
+                      >
+                        <div style={{ background: 'rgba(255,255,255,0.9)', padding: '8px 16px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: '#0f172a', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+                          <span>🔍 Vista Previa Completa</span>
+                        </div>
+                      </div>
                       {/* Logo overlay — only if user uploaded a logo AND it's a manual flyer upload (not template) */}
                       {logoPreview && bgUploadPreview && !variants.length && (
                         <FreeLogo
@@ -746,9 +766,13 @@ export default function FlyerStudio() {
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>Acciones de Exportación</div>
 
                   <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => setIsPreviewModalOpen(true)}
+                      style={{ ...css.ghost, flex: 1, justifyContent: 'center', background: '#f8fafc', border: '1px solid #cbd5e1' }}>
+                      🔍 Vista Previa Completa
+                    </button>
                     <button onClick={handleDownload}
                       style={{ ...css.ghost, flex: 1, justifyContent: 'center', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', fontWeight: 700 }}>
-                      <Download size={13} /> Descargar Flyer PNG
+                      <Download size={13} /> Descargar PNG
                     </button>
                   </div>
 
@@ -797,6 +821,95 @@ export default function FlyerStudio() {
           logoUrl: logoPreview || undefined,
         }} />
       </div>
+
+      {/* ── HIGH FIDELITY MODAL PREVIEW ────────────────────────────────────────── */}
+      {isPreviewModalOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(15, 23, 42, 0.82)',
+          backdropFilter: 'blur(16px)',
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          animation: 'fadeIn 0.2s ease-out',
+          padding: 20
+        }}>
+          {/* Close button at top right */}
+          <button 
+            onClick={() => setIsPreviewModalOpen(false)}
+            style={{
+              position: 'absolute', top: 20, right: 20,
+              background: 'rgba(255,255,255,0.1)', border: 'none',
+              borderRadius: '50%', width: 40, height: 40,
+              cursor: 'pointer', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', transition: 'background 0.2s',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.2)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
+          >
+            <X size={20} color="#fff" />
+          </button>
+
+          {/* Modal Content Card */}
+          <div style={{
+            background: '#ffffff', borderRadius: 20,
+            overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            display: 'flex', flexDirection: 'column',
+            maxWidth: '90vw', maxHeight: '85vh',
+            animation: 'scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+          }}>
+            {/* Header */}
+            <div style={{ padding: '16px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a' }}>Vista Previa en Alta Resolución</span>
+                <div style={{ fontSize: 11, color: '#64748b' }}>Revisa la alineación y los textos antes de publicar</div>
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#0070d2', background: '#eff6ff', padding: '4px 10px', borderRadius: 20 }}>
+                Formato: {format.toUpperCase()}
+              </span>
+            </div>
+
+            {/* Body (The Image) */}
+            <div style={{ 
+              background: '#f8fafc', padding: 24, 
+              display: 'flex', alignItems: 'center', justifyContent: 'center', 
+              overflow: 'auto', flex: 1 
+            }}>
+              <img
+                src={bgUploadPreview || variants[selected]}
+                alt="Flyer en Alta Resolución"
+                style={{
+                  maxHeight: '60vh', maxWidth: '100%',
+                  objectFit: 'contain', borderRadius: 10,
+                  boxShadow: '0 10px 30px rgba(0,0,0,0.12)',
+                  display: 'block'
+                }}
+              />
+            </div>
+
+            {/* Footer Actions */}
+            <div style={{ padding: '16px 24px', borderTop: '1px solid #f1f5f9', background: '#f8fafc', display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button 
+                onClick={() => setIsPreviewModalOpen(false)}
+                style={{ ...css.ghost, background: '#fff', border: '1px solid #d8dde6', padding: '10px 20px' }}
+              >
+                Cerrar
+              </button>
+              <button 
+                onClick={() => { handleDownload(); setIsPreviewModalOpen(false); }}
+                style={{ ...css.ghost, background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', fontWeight: 700, padding: '10px 20px' }}
+              >
+                <Download size={13} style={{ marginRight: 6 }} /> Descargar PNG
+              </button>
+              <button 
+                onClick={() => { sendToSocialHub(); setIsPreviewModalOpen(false); }}
+                style={{ ...css.btn, padding: '10px 24px', width: 'auto' }}
+              >
+                <Send size={13} style={{ marginRight: 6 }} /> Confirmar y Enviar a Redes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
