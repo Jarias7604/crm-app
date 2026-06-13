@@ -302,8 +302,8 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
     const { h1, h2 } = deriveHeadline(data.prompt, data.company_name);
     const headline = data.headline || parsed.title || h1;
     const subheadline = data.subheadline || parsed.subtitle || h2;
-    const phone = parsed.phone || derivePhone(data.prompt, data.phone);
-    const website = parsed.website || deriveWebsite(data.prompt, data.website);
+    const phone = data.phone || parsed.phone || derivePhone(data.prompt);
+    const website = data.website || parsed.website || deriveWebsite(data.prompt);
     const cta = data.cta || parsed.cta || deriveCta(data.prompt, 'Contáctanos HOY');
 
     return (
@@ -500,8 +500,8 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
     const { h1, h2 } = deriveHeadline(data.prompt, data.company_name);
     const headline = data.headline || parsed.title || h1;
     const subheadline = data.subheadline || parsed.subtitle || h2;
-    const phone = parsed.phone || derivePhone(data.prompt, data.phone);
-    const website = parsed.website || deriveWebsite(data.prompt, data.website);
+    const phone = data.phone || parsed.phone || derivePhone(data.prompt);
+    const website = data.website || parsed.website || deriveWebsite(data.prompt);
     const cta = data.cta || parsed.cta || deriveCta(data.prompt, 'Activa HOY MISMO');
 
     return (
@@ -655,7 +655,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
                   </div>
                 ))}
                 <div style={{ background: primary, borderRadius: 6, padding: '6px 0', textAlign: 'center', marginTop: 14, cursor: 'pointer' }}>
-                  <span style={{ color: '#fff', fontSize: 8, fontWeight: 800 }}>Emitir DTE</span>
+                  <span style={{ color: '#fff', fontSize: 8, fontWeight: 800 }}>Ver Detalle</span>
                 </div>
               </div>
             </div>
@@ -669,7 +669,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
               <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Desde</div>
               <div style={{ fontSize: 54, fontWeight: 900, color: '#fff', lineHeight: 1 }}>{price}</div>
               <div style={{ background: primary, borderRadius: 6, padding: '4px 12px', marginTop: 6, display: 'inline-block' }}>
-                <span style={{ color: '#fff', fontSize: 10, fontWeight: 800 }}>SIN CONTRATOS LARGOS</span>
+                <span style={{ color: '#fff', fontSize: 10, fontWeight: 800 }}>OFERTA POR TIEMPO LIMITADO</span>
               </div>
             </div>
           )}
