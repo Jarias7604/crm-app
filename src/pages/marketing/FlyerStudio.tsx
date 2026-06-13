@@ -174,6 +174,7 @@ export default function FlyerStudio() {
   const [autoOptimizing, setAutoOptimizing] = useState(false);
   const autoOptRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastAutoOptPrompt = useRef('');
+  const userSelectedColors = useRef(false);
 
   useEffect(() => {
     if (!profile?.company_id) return;
@@ -224,7 +225,7 @@ export default function FlyerStudio() {
           lastAutoOptPrompt.current = enriched;
           setPrompt(enriched);
         }
-        if (best.paleta?.length > 0) setColors(best.paleta.slice(0, 3));
+        if (best.paleta?.length > 0 && !userSelectedColors.current) setColors(best.paleta.slice(0, 3));
         if (best.cta && !cta.trim()) setCta(best.cta);
         if (best.tono) setTone(best.tono);
         // CRITICAL: clear stale AI variants — they don't match the new brief
@@ -240,7 +241,16 @@ export default function FlyerStudio() {
   }, [prompt]);
 
   function toggleColor(hex: string) {
-    setColors(p => p.includes(hex) ? p.filter(c => c !== hex) : p.length < 3 ? [...p, hex] : p);
+    userSelectedColors.current = true;
+    setColors(p => {
+      const lower = hex.toLowerCase();
+      const exists = p.some(c => c.toLowerCase() === lower);
+      if (exists) {
+        return p.filter(c => c.toLowerCase() !== lower);
+      } else {
+        return p.length < 3 ? [...p, hex] : p;
+      }
+    });
   }
 
   async function generate() {
@@ -254,16 +264,20 @@ export default function FlyerStudio() {
       .trim();
 
     try {
-      const { data, error } = await supabase.functions.invoke('flyer-generate', {
+      const { data, error } = await supabase.functions.invoke('flyer-ai-generator', {
         body: {
-          industria: companyName || 'Negocio',
-          tono: tone,
-          idea: { titulo: visualTheme },
-          customPrompt: `Professional clean commercial business background graphic for: "${visualTheme}". Clean modern marketing layout design, photorealistic, modern advertising aesthetic, strictly NO TEXT, NO WRITING, NO ALPHABET, NO LETTERS, empty space for overlaying HTML text.`
+          prompt,
+          company_name: companyName || 'Mi Empresa',
+          cta: cta || undefined,
+          colors,
+          format,
+          tone,
+          variant_count: variantCount,
+          company_id: profile?.company_id
         }
       });
-      if (error || !data?.fondo_url) throw new Error(error?.message || data?.error || 'Error generando fondo');
-      setVariants([data.fondo_url]);
+      if (error || !data?.variants?.length) throw new Error(error?.message || data?.error || 'Error generando');
+      setVariants(data.variants);
       setSelected(0);
       setPreviewMode('ai');
       if (data.credits_remaining != null) setCredits(data.credits_remaining);
@@ -329,7 +343,7 @@ export default function FlyerStudio() {
     setGenerating(true);
     try {
       let dataUrl = '';
-      if (bgUploadPreview) {
+      if (bgUploadPreview || (previewMode === 'ai' && variants.length > 0)) {
         if (!flyerRef.current) { toast.error('Flyer no está listo'); return; }
         const canvas = await html2canvas(flyerRef.current, {
           useCORS: true,
@@ -366,7 +380,7 @@ export default function FlyerStudio() {
     setGenerating(true);
     try {
       let dataUrl = '';
-      if (bgUploadPreview) {
+      if (bgUploadPreview || (previewMode === 'ai' && variants.length > 0)) {
         if (!flyerRef.current) { toast.error('Flyer no está listo'); return; }
         const canvas = await html2canvas(flyerRef.current, {
           useCORS: true, allowTaint: true, scale: 2, backgroundColor: null
@@ -891,10 +905,10 @@ export default function FlyerStudio() {
                       onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.01)'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
                     >
-                      {bgUploadPreview ? (
+                      {(bgUploadPreview || (previewMode === 'ai' && variants.length > 0)) ? (
                         <img
-                          src={bgUploadPreview}
-                          alt="Flyer personalizado"
+                          src={bgUploadPreview || variants[selected]}
+                          alt="Flyer"
                           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#fff' }}
                         />
                       ) : (
@@ -916,7 +930,6 @@ export default function FlyerStudio() {
                               secondaryColor: colors[1] || '#1a1a2e',
                               phone, website,
                               logoUrl: logoPreview || undefined,
-                              bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
                             }} />
                           ) : (
                             <FlyerTemplateB data={{
@@ -926,7 +939,6 @@ export default function FlyerStudio() {
                               secondaryColor: colors[1] || '#1a1a2e',
                               phone, website,
                               logoUrl: logoPreview || undefined,
-                              bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
                             }} />
                           )}
                         </div>
@@ -1027,7 +1039,6 @@ export default function FlyerStudio() {
           secondaryColor: colors[1] || '#1a1a2e',
           phone, website,
           logoUrl: logoPreview || undefined,
-          bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
         }} />
         <FlyerTemplateB ref={templateRefB} data={{
           company_name: companyName || 'Mi Empresa',
@@ -1036,7 +1047,6 @@ export default function FlyerStudio() {
           secondaryColor: colors[1] || '#1a1a2e',
           phone, website,
           logoUrl: logoPreview || undefined,
-          bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
         }} />
       </div>
 
@@ -1133,35 +1143,41 @@ export default function FlyerStudio() {
                   boxShadow: '0 20px 50px rgba(0,0,0,0.15)',
                   background: '#fff'
                 }}>
-                  <div style={{
-                    transform: `scale(${sc})`,
-                    transformOrigin: 'top left',
-                    width: 1080,
-                    height: 1080,
-                    pointerEvents: 'none'
-                  }}>
-                    {selectedTemplate === 'A' ? (
-                      <FlyerTemplateA data={{
-                        company_name: companyName || 'Mi Empresa',
-                        prompt, cta: cta || 'Contáctanos HOY',
-                        primaryColor: colors[0] || '#e91e8c',
-                        secondaryColor: colors[1] || '#1a1a2e',
-                        phone, website,
-                        logoUrl: logoPreview || undefined,
-                        bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
-                      }} />
-                    ) : (
-                      <FlyerTemplateB data={{
-                        company_name: companyName || 'Mi Empresa',
-                        prompt, cta: cta || 'Activa HOY MISMO',
-                        primaryColor: colors[0] || '#9b1c1c',
-                        secondaryColor: colors[1] || '#1a1a2e',
-                        phone, website,
-                        logoUrl: logoPreview || undefined,
-                        bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
-                      }} />
-                    )}
-                  </div>
+                  {(bgUploadPreview || (previewMode === 'ai' && variants.length > 0)) ? (
+                    <img
+                      src={bgUploadPreview || variants[selected]}
+                      alt="Flyer Vista Previa"
+                      style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+                    />
+                  ) : (
+                    <div style={{
+                      transform: `scale(${sc})`,
+                      transformOrigin: 'top left',
+                      width: 1080,
+                      height: 1080,
+                      pointerEvents: 'none'
+                    }}>
+                      {selectedTemplate === 'A' ? (
+                        <FlyerTemplateA data={{
+                          company_name: companyName || 'Mi Empresa',
+                          prompt, cta: cta || 'Contáctanos HOY',
+                          primaryColor: colors[0] || '#e91e8c',
+                          secondaryColor: colors[1] || '#1a1a2e',
+                          phone, website,
+                          logoUrl: logoPreview || undefined,
+                        }} />
+                      ) : (
+                        <FlyerTemplateB data={{
+                          company_name: companyName || 'Mi Empresa',
+                          prompt, cta: cta || 'Activa HOY MISMO',
+                          primaryColor: colors[0] || '#9b1c1c',
+                          secondaryColor: colors[1] || '#1a1a2e',
+                          phone, website,
+                          logoUrl: logoPreview || undefined,
+                        }} />
+                      )}
+                    </div>
+                  )}
                 </div>
                 );
               })()}
