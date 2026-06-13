@@ -261,8 +261,12 @@ CRITICAL: Use PERFECT Spanish spelling. Zero spelling mistakes, zero typos, clea
       console.error('Chat completions copywriting failed:', chatErr);
     }
 
-    // ── Generate variants sequentially (gpt-image-1 rate-limit safe) ─────────
+    // ── Generate variants sequentially with dall-e-3 fallback ────────────────
     const imageSize = FORMAT_SIZES[format] || '1024x1024';
+    // dall-e-3 only supports 1024x1024, 1024x1792, 1792x1024
+    const dalleSize = (imageSize === '1024x1536' || imageSize === '1536x1024')
+      ? (imageSize === '1024x1536' ? '1024x1792' : '1792x1024')
+      : '1024x1024';
     const variantSeeds = ['A', 'B', 'C'].slice(0, count);
     const errors: string[] = [];
     const variants: string[] = [];
@@ -273,30 +277,50 @@ CRITICAL: Use PERFECT Spanish spelling. Zero spelling mistakes, zero typos, clea
           prompt, company_name, tagline, cta, colors, format, tone, variantSeed: seed, mode
         });
 
-        const res = await fetch('https://api.openai.com/v1/images/generations', {
+        // ── Try gpt-image-1 first ────────────────────────────────────────────
+        let b64: string | null = null;
+
+        const res1 = await fetch('https://api.openai.com/v1/images/generations', {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openaiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-image-1',
-            prompt: imagePrompt,
-            n: 1,
-            size: imageSize,
-            quality: 'high',
-          }),
+          headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: 'gpt-image-1', prompt: imagePrompt, n: 1, size: imageSize, quality: 'high' }),
         });
 
-        if (!res.ok) {
-          const errText = await res.text();
-          console.error(`Variant ${seed} failed:`, errText);
-          errors.push(`Variant ${seed}: ${errText}`);
+        if (res1.ok) {
+          const data1 = await res1.json();
+          b64 = data1.data?.[0]?.b64_json || null;
+          console.log(`Variant ${seed} generated with gpt-image-1`);
         } else {
-          const data = await res.json();
-          const b64 = data.data?.[0]?.b64_json;
-          if (b64) variants.push(`data:image/png;base64,${b64}`);
+          const errText1 = await res1.text();
+          console.warn(`gpt-image-1 failed for variant ${seed}, falling back to dall-e-3. Error: ${errText1}`);
+
+          // ── Fallback: dall-e-3 ───────────────────────────────────────────
+          const res2 = await fetch('https://api.openai.com/v1/images/generations', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: 'dall-e-3',
+              prompt: imagePrompt,
+              n: 1,
+              size: dalleSize,
+              quality: 'hd',
+              response_format: 'b64_json',
+            }),
+          });
+
+          if (res2.ok) {
+            const data2 = await res2.json();
+            b64 = data2.data?.[0]?.b64_json || null;
+            console.log(`Variant ${seed} generated with dall-e-3 fallback`);
+          } else {
+            const errText2 = await res2.text();
+            console.error(`dall-e-3 also failed for variant ${seed}: ${errText2}`);
+            errors.push(`Variant ${seed}: ${errText2}`);
+          }
         }
+
+        if (b64) variants.push(`data:image/png;base64,${b64}`);
+
       } catch (e: any) {
         errors.push(`Variant ${seed} exception: ${e.message}`);
       }
