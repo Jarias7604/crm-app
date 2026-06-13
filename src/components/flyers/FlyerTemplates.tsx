@@ -20,6 +20,13 @@ export interface FlyerData {
   logoUrl?: string;
   tone?: string;
   bgImageUrl?: string;
+  highlight_title?: string;
+  highlight_desc?: string;
+  benefits?: { title: string; desc: string; icon: string }[];
+  mockup_info?: {
+    title: string;
+    kpis: { label: string; val: string; change?: string }[];
+  };
 }
 
 // ── Utility: clean phrases from bullet points or numbers ──────────────────────
@@ -93,6 +100,116 @@ export function parsePrompt(prompt: string): ParsedPrompt {
   }
 
   return result;
+}
+
+export interface IndustryContent {
+  highlight_title: string;
+  highlight_desc: string;
+  benefits: { title: string; desc: string; icon: string }[];
+  mockup_title: string;
+  kpis: { label: string; val: string; change?: string }[];
+}
+
+export function deriveIndustryContent(prompt: string, data: Partial<FlyerData>): IndustryContent {
+  const lower = (prompt || '').toLowerCase();
+  
+  // 1. K9 / Dog Training / Pets
+  if (lower.includes('perro') || lower.includes('canin') || lower.includes('mascota') || lower.includes('adiestra') || lower.includes('k9')) {
+    return {
+      highlight_title: data.highlight_title || '¿Quieres el mejor adiestramiento canino?',
+      highlight_desc: data.highlight_desc || 'Programas personalizados para obediencia, socialización y defensa.',
+      benefits: data.benefits && data.benefits.length >= 3 ? data.benefits : [
+        { title: 'Conducta Canina', desc: 'Soluciona problemas de comportamiento y agresión.', icon: '🐕' },
+        { title: 'Entrenadores Pro', desc: 'Instructores certificados con amplia experiencia.', icon: '🎓' },
+        { title: 'Resultados Reales', desc: 'Adiestramiento garantizado para todas las razas.', icon: '✅' }
+      ],
+      mockup_title: data.mockup_info?.title || 'Registro K9',
+      kpis: data.mockup_info?.kpis && data.mockup_info.kpis.length >= 4 ? data.mockup_info.kpis : [
+        { label: 'Perros', val: '180+' },
+        { label: 'Clases', val: '1,240' },
+        { label: 'Eficacia', val: '99.4%' },
+        { label: 'Calificación', val: '5.0 ★' }
+      ]
+    };
+  }
+  
+  // 2. Food / Restaurants / Pizza
+  if (lower.includes('pizz') || lower.includes('hamburgue') || lower.includes('taco') || lower.includes('comida') || lower.includes('restauran') || lower.includes('sabor') || lower.includes('chef') || lower.includes('cocin')) {
+    return {
+      highlight_title: data.highlight_title || '¿Listo para probar el mejor sabor?',
+      highlight_desc: data.highlight_desc || 'Ingredientes seleccionados, recetas originales y el mejor ambiente para ti.',
+      benefits: data.benefits && data.benefits.length >= 3 ? data.benefits : [
+        { title: 'Sabor Único', desc: 'Recetas artesanales preparadas con pasión.', icon: '🍕' },
+        { title: 'Servicio Rápido', desc: 'Directo a tu mesa o entrega a domicilio.', icon: '⚡' },
+        { title: 'Ingredientes Frescos', desc: 'La mejor calidad en cada bocado.', icon: '🍅' }
+      ],
+      mockup_title: data.mockup_info?.title || 'Menú Digital',
+      kpis: data.mockup_info?.kpis && data.mockup_info.kpis.length >= 4 ? data.mockup_info.kpis : [
+        { label: 'Pedidos', val: '2,450' },
+        { label: 'Valoraciones', val: '4.8 ★' },
+        { label: 'Entregas', val: '99.2%' },
+        { label: 'Especiales', val: '12' }
+      ]
+    };
+  }
+
+  // 3. Security / Guard / Defense
+  if (lower.includes('segurid') || lower.includes('guardia') || lower.includes('vigilan') || lower.includes('patrulla') || lower.includes('defens')) {
+    return {
+      highlight_title: data.highlight_title || '¿Buscas la máxima seguridad?',
+      highlight_desc: data.highlight_desc || 'Sistemas de protección, guardias entrenados y monitoreo permanente.',
+      benefits: data.benefits && data.benefits.length >= 3 ? data.benefits : [
+        { title: 'Vigilancia 24/7', desc: 'Monitoreo constante y respuesta inmediata.', icon: '🚨' },
+        { title: 'Guardias Expertos', desc: 'Personal altamente calificado y evaluado.', icon: '👮' },
+        { title: 'Control Total', desc: 'Sistemas avanzados para proteger lo tuyo.', icon: '🔒' }
+      ],
+      mockup_title: data.mockup_info?.title || 'Centro de Mando',
+      kpis: data.mockup_info?.kpis && data.mockup_info.kpis.length >= 4 ? data.mockup_info.kpis : [
+        { label: 'Cámaras', val: '32' },
+        { label: 'Guardias', val: '18' },
+        { label: 'Alarmas', val: 'Activa' },
+        { label: 'Respuesta', val: '< 3 min' }
+      ]
+    };
+  }
+
+  // 4. Dental / Odontology / Clinics
+  if (lower.includes('dent') || lower.includes('odont') || lower.includes('dient') || lower.includes('sonris') || lower.includes('ortodon')) {
+    return {
+      highlight_title: data.highlight_title || '¿Quieres la sonrisa de tus sueños?',
+      highlight_desc: data.highlight_desc || 'Tratamientos dentales avanzados para toda tu familia con especialistas.',
+      benefits: data.benefits && data.benefits.length >= 3 ? data.benefits : [
+        { title: 'Odontólogos Pro', desc: 'Profesionales con amplia experiencia.', icon: '🦷' },
+        { title: 'Tecnología 3D', desc: 'Diagnósticos precisos y sin dolor.', icon: '🔬' },
+        { title: 'Planes Flexibles', desc: 'Financiamiento a tu medida para todo tratamiento.', icon: '💳' }
+      ],
+      mockup_title: data.mockup_info?.title || 'Historial Clínico',
+      kpis: data.mockup_info?.kpis && data.mockup_info.kpis.length >= 4 ? data.mockup_info.kpis : [
+        { label: 'Pacientes', val: '1,520' },
+        { label: 'Clínicas', val: '2' },
+        { label: 'Citas Mes', val: '340' },
+        { label: 'Opiniones', val: '4.9 ★' }
+      ]
+    };
+  }
+
+  // 5. Default / B2B ERP
+  return {
+    highlight_title: data.highlight_title || '¿Quieres saber cuánto tienes que pagar de impuesto?',
+    highlight_desc: data.highlight_desc || 'Lleva tu contabilidad al día, facturación electrónica y reportes en tiempo real.',
+    benefits: data.benefits && data.benefits.length >= 3 ? data.benefits : [
+      { title: 'Declaraciones', desc: 'Preparándote tus declaraciones a tiempo.', icon: '📄' },
+      { title: 'Tranquilidad', desc: 'La tranquilidad y seguridad no se compran.', icon: '⏱️' },
+      { title: 'Crecimiento', desc: 'Lleva el control total de tus ingresos y gastos.', icon: '📈' }
+    ],
+    mockup_title: data.mockup_info?.title || 'Dashboard Activo',
+    kpis: data.mockup_info?.kpis && data.mockup_info.kpis.length >= 4 ? data.mockup_info.kpis : [
+      { label: 'Ventas', val: '$5,234.75' },
+      { label: 'Cobrar', val: '$1,414.55' },
+      { label: 'Gastos', val: '$1,774.55' },
+      { label: 'Utilidad', val: '$2,160.20' }
+    ]
+  };
 }
 
 export function getFeatureIcon(f: string): string {
@@ -306,6 +423,9 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
     const phone = data.phone || parsed.phone || derivePhone(data.prompt);
     const website = data.website || parsed.website || deriveWebsite(data.prompt);
     const cta = data.cta || parsed.cta || deriveCta(data.prompt, 'Contáctanos HOY');
+    
+    // Niche-adapted industry content for mockup KPIs
+    const industry = deriveIndustryContent(data.prompt, data);
 
     return (
       <div ref={ref} style={{
@@ -428,16 +548,16 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
                 {/* Dashboard Screen */}
                 <div style={{ background: '#f8fafc', borderRadius: 8, padding: 12, height: 230, border: '1px solid rgba(0,0,0,0.04)' }}>
                   <div style={{ background: secondary, borderRadius: 6, padding: '8px 12px', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#fff', fontSize: 10, fontWeight: 800, letterSpacing: '0.02em' }}>Dashboard Activo</span>
+                    <span style={{ color: '#fff', fontSize: 10, fontWeight: 800, letterSpacing: '0.02em' }}>{industry.mockup_title}</span>
                     <span style={{ color: primary, fontSize: 14, fontWeight: 900 }}>●</span>
                   </div>
                   {/* Stats */}
                   <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-                    {['$24,560', '$8,340', '1,250', '320'].map((v, idx) => (
+                    {industry.kpis.map((kpi, idx) => (
                       <div key={idx} style={{ flex: 1, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: 6, textAlign: 'center' }}>
-                        <div style={{ fontSize: 8, color: '#64748b', marginBottom: 2, fontWeight: 700 }}>{['Ventas', 'Compras', 'Clientes', 'DTEs'][idx]}</div>
-                        <div style={{ fontSize: 10, fontWeight: 800, color: '#0f172a' }}>{v}</div>
-                        <div style={{ fontSize: 7, color: '#10b981', fontWeight: 800 }}>+{[12, 6, 8, 15][idx]}%</div>
+                        <div style={{ fontSize: 8, color: '#64748b', marginBottom: 2, fontWeight: 700 }}>{kpi.label}</div>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: '#0f172a' }}>{kpi.val}</div>
+                        <div style={{ fontSize: 7, color: '#10b981', fontWeight: 800 }}>{kpi.change || '+12%'}</div>
                       </div>
                     ))}
                   </div>
@@ -519,23 +639,25 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
     const primary = data.primaryColor || '#9b1c1c';
     const secondary = data.secondaryColor || '#1a1a2e';
     const price = data.price || parsed.price || derivePrice(data.prompt) || '';
+    
+    // Niche-adapted industry content
+    const industry = deriveIndustryContent(data.prompt, data);
+    
     const rawFeatures = data.features || parsed.features || deriveFeatures(data.prompt);
     
     // Enforce exactly 4 features for the 4 side layout quadrants (2 left, 2 right)
-    const defaultFeatures = [
-      'Facturación Electrónica',
-      'Control de Ventas',
-      'Gestión de Inventario',
-      'Módulo de Compras'
-    ];
+    const defaultFeatures = industry.benefits.map(b => b.title).concat([
+      'Soporte 24/7',
+      'Garantía Total'
+    ]);
     const features: string[] = [];
     for (let i = 0; i < 4; i++) {
-      features.push(rawFeatures[i] || defaultFeatures[i]);
+      features.push(rawFeatures[i] || defaultFeatures[i] || 'Servicio Premium');
     }
 
     const { h1, h2 } = deriveHeadline(data.prompt, data.company_name);
-    const headline = data.headline || parsed.title || h1 || '¿Sin control de tu NEGOCIO?';
-    const subheadline = data.subheadline || parsed.subtitle || h2 || `${data.company_name} todo en un solo sistema`;
+    const headline = data.headline || parsed.title || h1 || '¿Listo para lo mejor?';
+    const subheadline = data.subheadline || parsed.subtitle || h2 || `${data.company_name} — Siempre a tu servicio`;
     const phone = data.phone || parsed.phone || derivePhone(data.prompt);
     const website = data.website || parsed.website || deriveWebsite(data.prompt);
     const cta = data.cta || parsed.cta || deriveCta(data.prompt, `Todo con ${data.company_name}`);
@@ -763,7 +885,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
               <div style={{ background: '#f8fafc', borderRadius: 8, padding: 12, height: 230, border: '1px solid rgba(0,0,0,0.04)', overflow: 'hidden' }}>
                 {/* Header */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '6px 10px', marginBottom: 8, borderRadius: 5 }}>
-                  <span style={{ fontSize: 9, fontWeight: 800, color: '#334155' }}>Resumen del Negocio</span>
+                  <span style={{ fontSize: 9, fontWeight: 800, color: '#334155' }}>{industry.mockup_title}</span>
                   <div style={{ display: 'flex', gap: 2 }}>
                     {['Hoy', 'Semana', 'Este mes', 'Este año', 'Todo'].map((t, idx) => (
                       <span key={idx} style={{ fontSize: 6, background: idx === 2 ? '#f1f5f9' : 'transparent', color: '#64748b', padding: '2px 4px', borderRadius: 3, fontWeight: idx === 2 ? 800 : 500 }}>{t}</span>
@@ -773,17 +895,12 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
 
                 {/* KPIs Grid */}
                 <div style={{ display: 'flex', gap: 5, marginBottom: 8 }}>
-                  {[
-                    { label: 'Ventas del Mes', val: '$5,234.75', change: '+18.4% vs mes anterior' },
-                    { label: 'Cuentas por Cobrar', val: '$1,414.55', change: 'Vencidas: 15. Por vencer: 8' },
-                    { label: 'Gastos del Mes', val: '$1,774.55', change: '-6.7% vs mes anterior' },
-                    { label: 'Utilidad del Mes', val: '$2,160.20', change: '+12.3% vs mes anterior' },
-                  ].map((kpi, idx) => (
+                  {industry.kpis.map((kpi, idx) => (
                     <div key={idx} style={{ flex: 1, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 5, padding: '5px 6px' }}>
                       <div style={{ fontSize: 6, color: '#64748b', fontWeight: 700, marginBottom: 2, whiteSpace: 'nowrap' }}>{kpi.label}</div>
                       <div style={{ fontSize: 9, fontWeight: 900, color: '#0f172a' }}>{kpi.val}</div>
-                      <div style={{ fontSize: 5, color: kpi.change.startsWith('+') ? '#10b981' : kpi.change.startsWith('-') ? '#ef4444' : '#64748b', fontWeight: 800, marginTop: 1, whiteSpace: 'nowrap' }}>
-                        {kpi.change}
+                      <div style={{ fontSize: 5, color: '#10b981', fontWeight: 800, marginTop: 1, whiteSpace: 'nowrap' }}>
+                        {kpi.change || 'Activo'}
                       </div>
                     </div>
                   ))}
@@ -793,7 +910,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
                 <div style={{ display: 'flex', gap: 6 }}>
                   {/* Left Column chart */}
                   <div style={{ flex: 1.5, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 5, padding: 6 }}>
-                    <div style={{ fontSize: 6, color: '#64748b', fontWeight: 800, marginBottom: 4 }}>Ventas por Mes</div>
+                    <div style={{ fontSize: 6, color: '#64748b', fontWeight: 800, marginBottom: 4 }}>Rendimiento</div>
                     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 60 }}>
                       {[25, 45, 35, 65, 50, 80, 60].map((val, idx) => (
                         <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -806,12 +923,12 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
 
                   {/* Middle list */}
                   <div style={{ flex: 1, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 5, padding: 5 }}>
-                    <div style={{ fontSize: 6, color: '#64748b', fontWeight: 800, marginBottom: 3 }}>Top Clientes</div>
+                    <div style={{ fontSize: 6, color: '#64748b', fontWeight: 800, marginBottom: 3 }}>Actividades</div>
                     {[
-                      { n: 'Jenny A. Brown', v: '$614.95' },
-                      { n: 'Maria Alexander', v: '$412.60' },
-                      { n: 'Maria Escobar', v: '$336.60' },
-                      { n: 'Garcia total', v: '$316.40' },
+                      { n: 'Servicios Completos', v: '100%' },
+                      { n: 'Nuevos Clientes', v: '+24' },
+                      { n: 'Valoraciones', v: '5.0 ★' },
+                      { n: 'Tasa de éxito', v: '99%' },
                     ].map((item, idx) => (
                       <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', padding: '2px 0' }}>
                         <span style={{ fontSize: 5, color: '#334155', fontWeight: 600 }}>{item.n}</span>
@@ -820,17 +937,17 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
                     ))}
                   </div>
 
-                  {/* Right Impuestos card */}
+                  {/* Right Status card */}
                   <div style={{ flex: 1.2, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 5, padding: 6 }}>
-                    <div style={{ fontSize: 6, color: '#ef4444', fontWeight: 800, marginBottom: 2 }}>IMPUESTOS A PAGAR</div>
-                    <div style={{ fontSize: 5, color: '#64748b' }}>Total a Pagar</div>
-                    <div style={{ fontSize: 11, fontWeight: 900, color: '#0f172a', margin: '2px 0' }}>$1,245.60</div>
-                    <div style={{ fontSize: 4, color: '#94a3b8', marginBottom: 4 }}>Actualizado en tiempo real</div>
+                    <div style={{ fontSize: 6, color: primary, fontWeight: 800, marginBottom: 2 }}>ESTADO GENERAL</div>
+                    <div style={{ fontSize: 5, color: '#64748b' }}>Rendimiento</div>
+                    <div style={{ fontSize: 11, fontWeight: 900, color: '#0f172a', margin: '2px 0' }}>Excelente</div>
+                    <div style={{ fontSize: 4, color: '#94a3b8', marginBottom: 4 }}>Actualizado hoy</div>
                     <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: 2 }}>
-                      <div style={{ fontSize: 4, color: '#334155', fontWeight: 700 }}>Próximas Declaraciones</div>
+                      <div style={{ fontSize: 4, color: '#334155', fontWeight: 700 }}>{data.company_name}</div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 4, color: '#64748b', marginTop: 1 }}>
-                        <span>IVA Mensual</span>
-                        <span style={{ fontWeight: 700 }}>15 Jul 2026</span>
+                        <span>Servicio Premium</span>
+                        <span style={{ fontWeight: 700 }}>100% OK</span>
                       </div>
                     </div>
                   </div>
@@ -861,7 +978,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
             margin: 0,
             lineHeight: 1.3
           }}>
-            ¿Quieres saber cuánto tienes que pagar de <span style={{ color: primary }}>impuesto</span>?
+            {industry.highlight_title}
           </h2>
           <p style={{
             fontSize: 18,
@@ -869,7 +986,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
             fontWeight: 600,
             margin: '4px 0 0 0'
           }}>
-            Acá mismo, lo vas a tener en este tablero, <span style={{ color: primary }}>en tiempo real</span>.
+            {industry.highlight_desc}
           </p>
         </div>
 
@@ -883,11 +1000,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
           gap: 20,
           zIndex: 10
         }}>
-          {[
-            { title: 'Declaraciones a Tiempo', desc: 'Preparándote todas tus declaraciones a tiempo.', icon: '📄' },
-            { title: 'Tranquilidad Absoluta', desc: 'La tranquilidad no se compra.', icon: '⏱️' },
-            { title: 'Crecimiento de Negocio', desc: 'Ahora sí puede generar más.', icon: '📈' }
-          ].map((item, idx) => (
+          {industry.benefits.map((item, idx) => (
             <div key={idx} style={{
               flex: 1,
               background: '#fff',
