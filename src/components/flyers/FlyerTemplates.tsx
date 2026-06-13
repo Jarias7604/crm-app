@@ -110,7 +110,7 @@ export function getFeatureIcon(f: string): string {
 }
 
 // ── Utility: derive headline from prompt ──────────────────────────────────────
-function deriveHeadline(prompt: string, company: string): { h1: string; h2: string } {
+export function deriveHeadline(prompt: string, company: string): { h1: string; h2: string } {
   if (!prompt || !prompt.trim()) {
     return { h1: 'Diseño Profesional', h2: company };
   }
@@ -174,7 +174,7 @@ function deriveHeadline(prompt: string, company: string): { h1: string; h2: stri
 }
 
 // ── Utility: derive features from prompt ──────────────────────────────────────
-function deriveFeatures(prompt: string): string[] {
+export function deriveFeatures(prompt: string): string[] {
   if (!prompt || !prompt.trim()) return [];
 
   const features: string[] = [];
@@ -239,7 +239,7 @@ function deriveFeatures(prompt: string): string[] {
 }
 
 // ── Utility: derive price from prompt ─────────────────────────────────────────
-function derivePrice(prompt: string): string {
+export function derivePrice(prompt: string): string {
   const match = prompt.match(/\$[\d,.]+/);
   if (match) return match[0];
   const match2 = prompt.match(/([\d,.]+)\s*(d[oó]lar|d[oó]lares|dollar|usd)/i);

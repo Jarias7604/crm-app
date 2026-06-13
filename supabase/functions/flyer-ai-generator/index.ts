@@ -57,7 +57,7 @@ const TONE_DIRECTIVES: Record<string, string> = {
   'corporativo': 'Professional, trustworthy, authoritative. Navy blues, clean grid layout, business photography, structured hierarchy. Enterprise and B2B feel.',
 };
 
-// ── Build the master prompt for gpt-image-1 ───────────────────────────────────
+// ── Build the master prompt for DALL-E 3 ───────────────────────────────────────
 function buildImagePrompt(params: {
   prompt: string;
   company_name: string;
@@ -67,8 +67,9 @@ function buildImagePrompt(params: {
   format: string;
   tone?: string;
   variantSeed?: string;
+  mode?: 'full' | 'background';
 }): string {
-  const { prompt, colors, tone, variantSeed } = params;
+  const { prompt, company_name, colors, tone, variantSeed, mode = 'background' } = params;
 
   const primaryColor = (colors && colors.length > 0) ? colors[0] : '#e91e8c';
   const secondaryColor = (colors && colors.length > 1) ? colors[1] : '#1a1a2e';
@@ -81,6 +82,15 @@ function buildImagePrompt(params: {
   };
 
   const selectedStyle = styles[variantSeed || 'A'];
+
+  if (mode === 'full') {
+    return `Create a STUNNING, HIGH-FIDELITY commercial advertising flyer for: "${prompt}". 
+Company Name: "${company_name}".
+Visual style theme: ${selectedStyle}.
+Visual tone direction: ${TONE_DIRECTIVES[tone || 'moderno'] || 'modern, clean and professional advertising layout'}.
+Brand colors to integrate: ${primaryColor} and ${secondaryColor}.
+Instructions: Generate a complete, ready-to-publish marketing flyer. The image itself MUST include beautifully integrated typography, catchy headings, promotional callouts, and an eye-catching layout that clearly communicates the promotion. Make it look like a premium agency-designed social media flyer. Ultra-high details, photorealistic, pixel-perfect.`;
+  }
 
   return `Design a STUNNING, HIGH-FIDELITY commercial advertising background. 
 Style theme: ${selectedStyle}.
@@ -125,6 +135,7 @@ Deno.serve(async (req) => {
       tone = 'moderno',
       variant_count = 1,
       company_id,
+      mode = 'background',
     } = body;
 
     if (!prompt) {
@@ -215,7 +226,7 @@ CRITICAL: Use PERFECT Spanish spelling. Zero spelling mistakes, zero typos, clea
 
     const generationPromises = variantSeeds.map(async (seed) => {
       const imagePrompt = buildImagePrompt({
-        prompt, company_name, tagline, cta, colors, format, tone, variantSeed: seed
+        prompt, company_name, tagline, cta, colors, format, tone, variantSeed: seed, mode
       });
 
       const res = await fetch('https://api.openai.com/v1/images/generations', {
@@ -225,11 +236,11 @@ CRITICAL: Use PERFECT Spanish spelling. Zero spelling mistakes, zero typos, clea
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-image-1',
+          model: 'dall-e-3',
           prompt: imagePrompt,
           n: 1,
           size: imageSize,
-          quality: 'medium',
+          response_format: 'b64_json',
         }),
       });
 
