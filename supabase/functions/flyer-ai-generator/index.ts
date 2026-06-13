@@ -180,59 +180,9 @@ Deno.serve(async (req) => {
     const errors: string[] = [];
 
     const generationPromises = variantSeeds.map(async (seed) => {
-      let imagePrompt = '';
-      try {
-        const chatRes = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openaiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o',
-            messages: [
-              {
-                role: 'system',
-                content: `You are an expert graphic designer specialized in writing highly detailed prompts for DALL-E 3.
-Your job is to write a detailed English prompt for DALL-E 3 that will generate a professional, clean, B2B marketing advertisement flyer.
-The flyer must look like it was designed in Canva/Photoshop.
-Ensure all main texts are written in perfect Spanish with correct spelling.
-Include the company name, visual graphics, value proposition, and any contact details clearly.`
-              },
-              {
-                role: 'user',
-                content: `Create a detailed DALL-E 3 prompt (in English) for a marketing flyer.
-Business Details:
-- Company Name: "${company_name}"
-- What to promote: "${prompt}"
-- Visual Tone: "${tone}" (e.g. premium B2B, modern, clean, warm)
-- Recommended Brand Colors: ${colors.join(', ')}
-- Layout Variant Seed: "${seed}" (propose a unique visual layout, e.g. Split screen mockup, high-end diagonal background, or clean centered layout)
-
-Output ONLY the prompt text. No explanations, no markdown formatting.`
-              }
-            ],
-            temperature: 0.85,
-            max_tokens: 350,
-          }),
-        });
-
-        if (chatRes.ok) {
-          const chatData = await chatRes.json();
-          imagePrompt = chatData.choices?.[0]?.message?.content?.trim() || '';
-          console.log(`GPT-4o optimized prompt for Variant ${seed}:`, imagePrompt);
-        } else {
-          console.warn(`GPT-4o optimization failed with status ${chatRes.status}, falling back to static prompt generator.`);
-        }
-      } catch (err) {
-        console.error('Error querying GPT-4o for prompt optimization:', err);
-      }
-
-      if (!imagePrompt) {
-        imagePrompt = buildImagePrompt({
-          prompt, company_name, tagline, cta, colors, format, tone, variantSeed: seed
-        });
-      }
+      const imagePrompt = buildImagePrompt({
+        prompt, company_name, tagline, cta, colors, format, tone, variantSeed: seed
+      });
 
       const res = await fetch('https://api.openai.com/v1/images/generations', {
         method: 'POST',

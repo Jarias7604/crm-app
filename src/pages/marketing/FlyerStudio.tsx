@@ -11,7 +11,7 @@ import {
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../services/supabase';
 import html2canvas from 'html2canvas';
-import { RenderFlyer, TEMPLATE_LIST } from './FlyerTemplates';
+import { RenderFlyer, FreeLogo, TEMPLATE_LIST } from './FlyerTemplates';
 import type { FlyerData } from './FlyerTemplates';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
@@ -75,32 +75,24 @@ export default function FlyerStudio() {
 
   // Form & Content States
   const [prompt, setPrompt] = useState('');
-  const [title, setTitle] = useState('Controla tu negocio');
-  const [subtitle, setSubtitle] = useState('Facturación electrónica + ERP en la nube');
-  const [cta, setCta] = useState('QUIERO SABER MÁS');
-  const [benefits, setBenefits] = useState<string[]>(['Fácil y rápido', '100% Cumple con Hacienda', 'Reportes en tiempo real']);
   const [phone, setPhone] = useState('+503 7971-8911');
   const [website, setWebsite] = useState('www.ariasdefense.com');
-  const [templateId, setTemplateId] = useState('direct-mockup');
   const [format, setFormat] = useState('ig-post');
   const [tone, setTone] = useState('moderno');
   const [variantCount, setVariantCount] = useState<1 | 2 | 3>(1);
   const [colors, setColors] = useState<string[]>([]);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState('');
-  
+
   // Custom background upload states
   const [bgFile, setBgFile] = useState<File | null>(null);
   const [bgUploadPreview, setBgUploadPreview] = useState('');
   const bgUploadRef = useRef<HTMLInputElement>(null);
 
-  // Alignment & Scaling Adjustments
+  // Logo positioning
   const [logoX, setLogoX] = useState(5);
   const [logoY, setLogoY] = useState(5);
   const [logoSize, setLogoSize] = useState(1.0);
-  const [textScale, setTextScale] = useState(1.0);
-  const [subtitleScale, setSubtitleScale] = useState(1.0);
-  const [benefitsScale, setBenefitsScale] = useState(1.0);
 
   const logoRef = useRef<HTMLInputElement>(null);
 
@@ -135,13 +127,9 @@ export default function FlyerStudio() {
     setGenerating(true);
     setVariants([]);
     try {
-      let enrichedPrompt = prompt.trim();
-      if (phone.trim()) enrichedPrompt += `\nTeléfono de contacto: ${phone.trim()}`;
-      if (website.trim()) enrichedPrompt += `\nSitio Web: ${website.trim()}`;
-
       const { data, error } = await supabase.functions.invoke('flyer-ai-generator', {
         body: {
-          prompt: enrichedPrompt,
+          prompt,
           company_name: companyName || 'Mi Empresa',
           cta: cta || undefined,
           colors,
@@ -187,12 +175,13 @@ export default function FlyerStudio() {
   }
 
   function applySuggestion(idea: any) {
-    if (idea.titulo) setTitle(idea.titulo);
-    if (idea.gancho) setSubtitle(idea.gancho);
-    if (idea.beneficios && Array.isArray(idea.beneficios)) {
-      setBenefits(idea.beneficios.slice(0, 4));
-    }
-    if (idea.cta) setCta(idea.cta);
+    // Build enriched prompt from AI suggestion
+    const parts: string[] = [];
+    if (idea.titulo) parts.push(idea.titulo);
+    if (idea.gancho) parts.push(idea.gancho);
+    if (idea.beneficios?.length) parts.push('Beneficios: ' + idea.beneficios.join(', '));
+    if (idea.cta) parts.push('CTA: ' + idea.cta);
+    if (parts.length) setPrompt(parts.join(' — '));
     if (idea.paleta && idea.paleta.length > 0) {
       setColors(idea.paleta.slice(0, 3));
     }
@@ -301,10 +290,10 @@ export default function FlyerStudio() {
           <div style={css.colBody}>
             {/* Prompt */}
             <div style={css.section}>
-              <label style={css.label}>1. Describe tu flyer (La IA dibujará el texto dentro) *</label>
+              <label style={css.label}>1. ¿Cuál es tu oferta o idea? *</label>
               <textarea
-                style={{ ...css.textarea, height: 100 }}
-                placeholder='Ej: Un flyer profesional para "Arias ERP" que diga: "Controla tu negocio desde un solo lugar - Facturación electrónica + ERP en la nube". Agrega los beneficios: Fácil, Rápido, 100% Cumple con Hacienda. Precio: Desde $12.95/mes. Estilo limpio con colores corporativos.'
+                style={css.textarea}
+                placeholder="Ej: Descuento de verano en facturación electrónica. 100% en la nube y rápido..."
                 value={prompt}
                 onChange={e => setPrompt(e.target.value)}
               />
@@ -333,7 +322,7 @@ export default function FlyerStudio() {
                   {optimizing ? (
                     <><Cpu size={12} style={{ animation: 'spin 1s linear infinite' }} /> Analizando con Meta AI...</>
                   ) : (
-                    <><Sparkles size={12} color="#D4AF37" fill="#D4AF37" /> Optimizar prompt con Meta AI</>
+                    <><Sparkles size={12} color="#D4AF37" fill="#D4AF37" /> Autocompletar con Meta AI</>
                   )}
                 </button>
               )}
@@ -392,8 +381,7 @@ export default function FlyerStudio() {
                 const r = new FileReader();
                 r.onload = ev => {
                   setBgUploadPreview(ev.target?.result as string);
-                  setTemplateId('direct-mockup');
-                  toast.success('¡Flyer subido! Se activó la plantilla "Mockup Directo"');
+                  toast.success('¡Flyer subido! Se mostrará al 100% sin superposiciones');
                 };
                 r.readAsDataURL(f);
               }} style={{ display: 'none' }} />
@@ -592,49 +580,53 @@ export default function FlyerStudio() {
                   </div>
                 )}
 
-                {/* Render the professional Flyer template wrapper */}
-                <div style={{ display: 'flex', justifyContent: 'center', width: '100%', userSelect: 'none' }}>
-                  <div
-                    ref={flyerRef}
-                    style={{
-                      borderRadius: '12px',
-                      overflow: 'hidden',
-                      boxShadow: '0 10px 30px rgba(0,0,0,0.18)',
-                      background: '#0f172a',
-                    }}
-                  >
-                    <RenderFlyer
-                      d={{
-                        title,
-                        subtitle,
-                        cta,
-                        beneficios: benefits.filter(Boolean),
-                        accent: colors[0] || '#0070d2',
-                        bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : "https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=1000&auto=format&fit=crop"),
-                        logoUrl: logoPreview || null,
-                        industria: companyName || 'Mi Empresa',
-                        phone,
-                        website,
-                        templateId,
-                        containerW: getFlyerDimensions(format).width,
-                        containerH: getFlyerDimensions(format).height,
-                        textScale,
-                        logoSize,
-                        logoX,
-                        logoY,
-                        subtitleScale,
-                        benefitsScale,
+                {/* ── FLYER CANVAS: Pure image from DALL-E 3 or uploaded flyer ── */}
+                {(bgUploadPreview || variants.length > 0) ? (
+                  <div style={{ display: 'flex', justifyContent: 'center', width: '100%', userSelect: 'none' }}>
+                    <div
+                      ref={flyerRef}
+                      style={{
+                        position: 'relative',
+                        borderRadius: '12px',
+                        overflow: 'hidden',
+                        boxShadow: '0 10px 30px rgba(0,0,0,0.22)',
+                        width: getFlyerDimensions(format).width,
+                        height: getFlyerDimensions(format).height,
+                        flexShrink: 0,
                       }}
-                      onLogoMove={(x, y) => {
-                        setLogoX(x);
-                        setLogoY(y);
-                      }}
-                      onLogoResize={(s) => {
-                        setLogoSize(s);
-                      }}
-                    />
+                    >
+                      {/* The actual AI-generated or uploaded flyer image — full bleed, no HTML overlays */}
+                      <img
+                        src={bgUploadPreview || variants[selected]}
+                        alt="Flyer generado"
+                        crossOrigin="anonymous"
+                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      />
+                      {/* Logo overlay — only if user uploaded a logo (draggable) */}
+                      {logoPreview && (
+                        <FreeLogo
+                          d={{ title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null, logoUrl: logoPreview, industria: '', phone: '', website: '', templateId: 'direct-mockup', containerW: getFlyerDimensions(format).width, containerH: getFlyerDimensions(format).height, logoSize, logoX, logoY }}
+                          onMove={(x, y) => { setLogoX(x); setLogoY(y); }}
+                          onResize={(s) => setLogoSize(s)}
+                        />
+                      )}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  /* Empty state — nothing generated yet */
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 40, background: '#fff', borderRadius: 12, border: '2px dashed #e2e8f0', width: '100%', maxWidth: 400 }}>
+                    <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'linear-gradient(135deg,#0070d2,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Wand2 size={24} color="#fff" />
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>Listo para crear tu flyer</div>
+                      <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>Describe tu flyer en el panel izquierdo<br />y presiona <strong>"Generar Imagen con IA"</strong></div>
+                    </div>
+                    <div style={{ fontSize: 10, color: '#94a3b8', textAlign: 'center', background: '#f8fafc', padding: '8px 16px', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                      💡 La IA usará el motor de DALL-E 3 (mismo que ChatGPT) para crear un flyer 100% profesional
+                    </div>
+                  </div>
+                )}
 
                 {/* Drag hint */}
                 {logoPreview && (
