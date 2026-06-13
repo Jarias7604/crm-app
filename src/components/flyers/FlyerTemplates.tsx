@@ -466,40 +466,45 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
           </div>
         </div>
 
-        {/* BOTTOM BENEFITS */}
-        <div style={{ background: '#f8fafc', borderTop: '1px solid #e2e8f0', padding: '28px 64px', display: 'flex', gap: 24, zIndex: 10 }}>
-          {[
-            { label: 'Resultados inmediatos', desc: 'Ahorra tiempo y enfócate en hacer crecer tu negocio.', icon: '⚡' },
-            { label: 'Seguridad total', desc: 'Tus datos protegidos con respaldo automático en la nube.', icon: '🔒' },
-            { label: 'Mayor rentabilidad', desc: 'Optimiza tus procesos y maximiza tus ganancias hoy.', icon: '📈' }
-          ].map((item, idx) => (
+        {/* BOTTOM BENEFITS — Dynamic from brief features */}
+        <div style={{ background: data.bgImageUrl ? 'rgba(15,23,42,0.7)' : '#f8fafc', borderTop: data.bgImageUrl ? 'none' : '1px solid #e2e8f0', padding: '22px 48px', display: 'flex', gap: 18, zIndex: 10, backdropFilter: data.bgImageUrl ? 'blur(10px)' : 'none' }}>
+          {features.slice(0, 3).map((feat, idx) => (
             <div key={idx} style={{
-              flex: 1, display: 'flex', alignItems: 'center', gap: 14,
-              background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16,
-              padding: '16px 20px', boxShadow: '0 4px 12px rgba(15,23,42,0.03)'
+              flex: 1, display: 'flex', alignItems: 'center', gap: 12,
+              background: data.bgImageUrl ? 'rgba(255,255,255,0.12)' : '#fff',
+              border: data.bgImageUrl ? '1px solid rgba(255,255,255,0.15)' : '1px solid #e2e8f0',
+              borderRadius: 14, padding: '14px 18px',
+              boxShadow: data.bgImageUrl ? 'none' : '0 4px 12px rgba(15,23,42,0.03)'
             }}>
-              <span style={{ fontSize: 26 }}>{item.icon}</span>
+              <span style={{ fontSize: 24, flexShrink: 0 }}>{getFeatureIcon(feat)}</span>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: primary, marginBottom: 2 }}>{item.label}</div>
-                <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500, lineHeight: 1.3 }}>{item.desc}</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: data.bgImageUrl ? '#fff' : primary, marginBottom: 2, lineHeight: 1.2 }}>{feat}</div>
+                <div style={{ fontSize: 11, color: data.bgImageUrl ? 'rgba(255,255,255,0.75)' : '#64748b', fontWeight: 500, lineHeight: 1.3 }}>Rápido, fácil y profesional.</div>
               </div>
             </div>
           ))}
         </div>
 
         {/* FOOTER */}
-        <div style={{ background: secondary, padding: '24px 64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 10 }}>
-          <div style={{ color: '#fff', fontSize: 20, fontWeight: 900, letterSpacing: 'normal' }}>{data.company_name}</div>
-          <div style={{ display: 'flex', gap: 32 }}>
-            {phone && <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: 600 }}>📱 {phone}</span>}
-            {website && <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: 600 }}>🌐 {website}</span>}
+        <div style={{ background: secondary, padding: '18px 48px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 10, flexWrap: 'nowrap', gap: 16 }}>
+          {/* Left: Company + contact */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+            <div style={{ color: '#fff', fontSize: 18, fontWeight: 900, lineHeight: 1.1 }}>{data.company_name}</div>
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+              {phone && <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>📱 {phone}</span>}
+              {website && <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>🌐 {website}</span>}
+            </div>
           </div>
+          {/* Right: CTA button */}
           <div style={{
-            background: `linear-gradient(135deg, ${primary}, ${primary}dd)`, borderRadius: 10, padding: '12px 28px',
-            color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer',
-            boxShadow: `0 6px 15px ${primary}35`, border: '1px solid rgba(255,255,255,0.1)'
+            background: `linear-gradient(135deg, ${primary}, ${primary}cc)`,
+            borderRadius: 10, padding: '12px 24px',
+            color: '#fff', fontWeight: 800, fontSize: 13,
+            boxShadow: `0 6px 15px ${primary}40`,
+            whiteSpace: 'nowrap', flexShrink: 0,
+            maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis'
           }}>
-            {cta}
+            {(cta || 'Contáctanos HOY').substring(0, 36)}{(cta || '').length > 36 ? '...' : ''}
           </div>
         </div>
       </div>
@@ -513,7 +518,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
     const parsed = parsePrompt(data.prompt);
     const primary = data.primaryColor || '#9b1c1c';
     const secondary = data.secondaryColor || '#1a1a2e';
-    const price = data.price || parsed.price || derivePrice(data.prompt) || '$12.95';
+    const price = data.price || parsed.price || derivePrice(data.prompt) || '';
     const rawFeatures = data.features || parsed.features || deriveFeatures(data.prompt);
     
     // Enforce exactly 4 features for the 4 side layout quadrants (2 left, 2 right)
@@ -596,7 +601,8 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
         {/* CENTER ELEMENT: LAPTOP + SIDE FEATURES + CONNECTIONS */}
         <div style={{ position: 'relative', flex: 1, zIndex: 5 }}>
           
-          {/* 1. Incline Price Tag */}
+          {/* 1. Incline Price Tag — only show if price is specified in the brief */}
+          {price && (
           <div style={{
             position: 'absolute',
             top: 60,
@@ -618,6 +624,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
             <span>{price}</span>
             <span style={{ fontSize: 11, fontWeight: 700, opacity: 0.95 }}>+ IVA</span>
           </div>
+          )}
 
           {/* 2. Side Features */}
           {/* FEATURE 0: Top Left */}
@@ -908,40 +915,45 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
           ))}
         </div>
 
-        {/* FOOTER BAR (RED WITH BLACK ROUND BUTTON) */}
+        {/* FOOTER BAR */}
         <div style={{
           position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: 68,
+          bottom: 0, left: 0, right: 0,
+          height: 72,
           background: primary,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 60px',
-          zIndex: 10
+          padding: '0 48px',
+          zIndex: 10,
+          gap: 16
         }}>
-          <div style={{ color: '#fff', fontSize: 16, fontWeight: 700, letterSpacing: '0.02em' }}>
-            Más control. Más orden. Más crecimiento.
+          {/* Left: Tagline */}
+          <div style={{ color: '#fff', fontSize: 15, fontWeight: 700, letterSpacing: '0.01em', flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+            {data.company_name}
           </div>
-          
-          <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-            {phone && <span style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>📱 {phone}</span>}
-            {website && <span style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>🌐 {website}</span>}
-            
-            <div style={{
-              background: '#090d16',
-              color: '#fff',
-              padding: '10px 24px',
-              borderRadius: 24,
-              fontWeight: 800,
-              fontSize: 13,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
-              border: '1px solid rgba(255,255,255,0.1)'
-            }}>
-              {cta}
-            </div>
+
+          {/* Center: Contact */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexShrink: 0 }}>
+            {phone && <span style={{ color: 'rgba(255,255,255,0.95)', fontSize: 14, fontWeight: 800, whiteSpace: 'nowrap' }}>📱 {phone}</span>}
+            {website && <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap' }}>🌐 {website}</span>}
+          </div>
+
+          {/* Right: CTA button */}
+          <div style={{
+            background: '#090d16',
+            color: '#fff',
+            padding: '10px 22px',
+            borderRadius: 24,
+            fontWeight: 800,
+            fontSize: 13,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+            maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis'
+          }}>
+            {(cta || 'Contáctanos HOY').substring(0, 30)}{(cta || '').length > 30 ? '...' : ''}
           </div>
         </div>
       </div>

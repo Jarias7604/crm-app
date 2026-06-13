@@ -84,12 +84,33 @@ function buildImagePrompt(params: {
   const selectedStyle = styles[variantSeed || 'A'];
 
   if (mode === 'full') {
-    return `Create a STUNNING, HIGH-FIDELITY commercial advertising flyer for: "${prompt}". 
-Company Name: "${company_name}".
-Visual style theme: ${selectedStyle}.
-Visual tone direction: ${TONE_DIRECTIVES[tone || 'moderno'] || 'modern, clean and professional advertising layout'}.
-Brand colors to integrate: ${primaryColor} and ${secondaryColor}.
-Instructions: Generate a complete, ready-to-publish marketing flyer. The image itself MUST include beautifully integrated typography, catchy headings, promotional callouts, and an eye-catching layout that clearly communicates the promotion. Make it look like a premium agency-designed social media flyer. Ultra-high details, photorealistic, pixel-perfect.`;
+    const layoutVariants: Record<string, string> = {
+      'A': `LAYOUT: Bold split design. LEFT 45%: Large headline text stacked vertically with primary color accent on 1-2 key words. Below headline: 3 benefit bullets with colored icon squares. Bottom-left corner: prominent price badge in primary color. RIGHT 55%: Laptop or smartphone mockup showing a clean dashboard/app interface relevant to the business. Background: white or very light gray with subtle dot grid pattern.`,
+      'B': `LAYOUT: Centered hero design. TOP CENTER: Ultra-bold headline in 2 lines, primary color gradient behind it as a banner strip. MIDDLE: Clean card with 3-4 features listed with emoji icons. Below features: A promotional badge or sticker with the price (if mentioned). BOTTOM: Dark footer bar with company name on left, CTA button on right. Background: clean white with soft geometric shapes in brand colors.`,
+      'C': `LAYOUT: Magazine-style full bleed. BACKGROUND: Relevant high-quality photo or gradient (${primaryColor} to ${secondaryColor}) as full background with 70% opacity dark overlay on left side. LEFT SIDE TEXT on dark overlay: Company badge top-left. HUGE headline text (3-4 words max) below. Subheadline. Feature pills. Price badge. CTA button. RIGHT SIDE: Semi-transparent glass card showing product/service mockup.`,
+    };
+
+    const layout = layoutVariants[variantSeed || 'A'];
+
+    return `You are a world-class graphic designer. Create a PROFESSIONAL, PIXEL-PERFECT, PRINT-READY social media advertising flyer.
+
+BUSINESS BRIEF:
+- What to promote: "${prompt}"
+- Company: "${company_name}"
+- Brand colors: Primary ${primaryColor}, Secondary ${secondaryColor}
+- Visual tone: ${TONE_DIRECTIVES[tone || 'moderno'] || 'Modern, clean, and professional'}
+
+${layout}
+
+MANDATORY DESIGN RULES (follow strictly):
+1. TYPOGRAPHY: All text must be BOLD, large, and easy to read. Headline must be the BIGGEST element (minimum 20% of canvas height). Use clean sans-serif fonts (Inter, Montserrat, or Outfit style).
+2. TEXT CONTENT: Extract key marketing message from the brief. The headline must be a SHORT, PUNCHY phrase in Spanish (4-7 words max) that grabs attention. Include 2-3 benefit bullets.
+3. COLORS: Use the brand colors ${primaryColor} and ${secondaryColor} prominently for buttons, accents, badges, and highlights. White background areas for readability.
+4. CTA BUTTON: Include a visible call-to-action button with contrasting color. Button text from brief if available.
+5. PRICE (if mentioned in brief): Show prominently in a colored badge/pill with "DESDE" label above.
+6. PROFESSIONAL QUALITY: This must look like it was designed by a $500/hour agency designer. No amateur layouts. Clean grid, proper margins, visual hierarchy.
+7. The final result must be ready to post on social media with zero additional editing needed.
+8. DO NOT leave blank areas. Fill the canvas with intentional, professional design elements.`;
   }
 
   return `Design a STUNNING, HIGH-FIDELITY commercial advertising background. 
@@ -219,46 +240,46 @@ CRITICAL: Use PERFECT Spanish spelling. Zero spelling mistakes, zero typos, clea
       console.error('Chat completions copywriting failed:', chatErr);
     }
 
-    // ── Generate variants in parallel ────────────────────────────────────────
+    // ── Generate variants sequentially (gpt-image-1 rate-limit safe) ─────────
     const imageSize = FORMAT_SIZES[format] || '1024x1024';
     const variantSeeds = ['A', 'B', 'C'].slice(0, count);
     const errors: string[] = [];
+    const variants: string[] = [];
 
-    const generationPromises = variantSeeds.map(async (seed) => {
-      const imagePrompt = buildImagePrompt({
-        prompt, company_name, tagline, cta, colors, format, tone, variantSeed: seed, mode
-      });
+    for (const seed of variantSeeds) {
+      try {
+        const imagePrompt = buildImagePrompt({
+          prompt, company_name, tagline, cta, colors, format, tone, variantSeed: seed, mode
+        });
 
-      const res = await fetch('https://api.openai.com/v1/images/generations', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openaiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'dall-e-3',
-          prompt: imagePrompt,
-          n: 1,
-          size: imageSize,
-          response_format: 'b64_json',
-        }),
-      });
+        const res = await fetch('https://api.openai.com/v1/images/generations', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-image-1',
+            prompt: imagePrompt,
+            n: 1,
+            size: imageSize,
+            quality: 'high',
+          }),
+        });
 
-      if (!res.ok) {
-        const errText = await res.text();
-        console.error(`Variant ${seed} failed:`, errText);
-        errors.push(`Variant ${seed}: ${errText}`);
-        return null;
+        if (!res.ok) {
+          const errText = await res.text();
+          console.error(`Variant ${seed} failed:`, errText);
+          errors.push(`Variant ${seed}: ${errText}`);
+        } else {
+          const data = await res.json();
+          const b64 = data.data?.[0]?.b64_json;
+          if (b64) variants.push(`data:image/png;base64,${b64}`);
+        }
+      } catch (e: any) {
+        errors.push(`Variant ${seed} exception: ${e.message}`);
       }
-
-      const data = await res.json();
-      const b64 = data.data?.[0]?.b64_json;
-      if (!b64) return null;
-      return `data:image/png;base64,${b64}`;
-    });
-
-    const rawVariants = await Promise.all(generationPromises);
-    const variants = rawVariants.filter(Boolean) as string[];
+    }
 
     if (variants.length === 0) {
       const errorDetails = errors.join(' | ');
