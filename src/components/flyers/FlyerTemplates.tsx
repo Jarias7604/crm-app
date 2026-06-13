@@ -332,14 +332,28 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
         <div style={{ padding: '52px 64px 24px', flex: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 10 }}>
           {/* Left: Headline & Price */}
           <div style={{ flex: 1, marginRight: 32 }}>
-            <div style={{ fontSize: headline.length > 30 ? 36 : 44, fontWeight: 900, color: '#0f172a', lineHeight: 1.1, letterSpacing: 'normal', marginBottom: 10 }}>
+            <div style={{
+              fontSize: headline.length > 30 ? 36 : 44,
+              fontWeight: 900,
+              color: data.bgImageUrl ? '#ffffff' : '#0f172a',
+              textShadow: data.bgImageUrl ? '0 4px 10px rgba(0,0,0,0.9), 0 2px 4px rgba(0,0,0,0.7)' : 'none',
+              lineHeight: 1.1,
+              letterSpacing: 'normal',
+              marginBottom: 10
+            }}>
               {headline.split('NEGOCIO').map((part, i, arr) => (
                 <React.Fragment key={i}>
                   {part}{i < arr.length - 1 && <span style={{ color: primary }}>NEGOCIO</span>}
                 </React.Fragment>
               ))}
             </div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#475569', marginBottom: 24 }}>{subheadline}</div>
+            <div style={{
+              fontSize: 22,
+              fontWeight: 700,
+              color: data.bgImageUrl ? '#f1f5f9' : '#475569',
+              textShadow: data.bgImageUrl ? '0 2px 6px rgba(0,0,0,0.8)' : 'none',
+              marginBottom: 24
+            }}>{subheadline}</div>
 
             {price && (
               <div style={{
@@ -357,9 +371,9 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
           {/* Right: Brand Logo */}
           <div style={{ flexShrink: 0, textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
             {data.logoUrl ? (
-              <img src={data.logoUrl} crossOrigin="anonymous" style={{ maxHeight: 90, maxWidth: 220, objectFit: 'contain' }} alt="Brand Logo" />
+              <img src={data.logoUrl} crossOrigin="anonymous" style={{ maxHeight: 90, maxWidth: 220, objectFit: 'contain', filter: data.bgImageUrl ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' : 'none' }} alt="Brand Logo" />
             ) : (
-              <div style={{ padding: '14px 24px', background: `${primary}08`, borderRadius: 16, border: `2px dashed ${primary}60` }}>
+              <div style={{ padding: '14px 24px', background: data.bgImageUrl ? 'rgba(255,255,255,0.95)' : `${primary}08`, borderRadius: 16, border: `2px dashed ${primary}60`, boxShadow: data.bgImageUrl ? '0 4px 12px rgba(0,0,0,0.1)' : 'none' }}>
                 <span style={{ fontSize: 20, fontWeight: 900, color: primary, letterSpacing: '0.02em' }}>{data.company_name}</span>
               </div>
             )}
@@ -373,9 +387,10 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
             {features.map((f, i) => (
               <div key={i} style={{
                 display: 'flex', alignItems: 'flex-start', gap: 18,
-                background: 'rgba(255, 255, 255, 0.6)', backdropFilter: 'blur(10px)',
+                background: data.bgImageUrl ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.6)',
+                backdropFilter: 'blur(10px)',
                 border: '1px solid rgba(226, 232, 240, 0.8)', borderRadius: 20,
-                padding: '20px 24px', boxShadow: '0 8px 24px rgba(15,23,42,0.02)'
+                padding: '20px 24px', boxShadow: '0 8px 24px rgba(15,23,42,0.06)'
               }}>
                 <div style={{
                   width: 52, height: 52, borderRadius: 14,
@@ -537,15 +552,38 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
         {/* HEADER */}
         <div style={{ padding: '45px 80px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 10 }}>
           <div style={{ flex: 1, marginRight: 40 }}>
-            <div style={{ fontSize: headline.length > 30 ? 36 : 44, fontWeight: 900, color: '#ffffff', lineHeight: 1.05, letterSpacing: 'normal', marginBottom: 10 }}>
+            <div style={{
+              fontSize: headline.length > 30 ? 36 : 44,
+              fontWeight: 900,
+              color: '#ffffff',
+              textShadow: data.bgImageUrl ? '0 4px 10px rgba(0,0,0,0.95), 0 2px 4px rgba(0,0,0,0.8)' : 'none',
+              lineHeight: 1.05,
+              letterSpacing: 'normal',
+              marginBottom: 10
+            }}>
               {headline}
             </div>
-            <div style={{ fontSize: 23, fontWeight: 800, color: primary, marginBottom: 18 }}>{subheadline}</div>
+            <div style={{
+              fontSize: 23,
+              fontWeight: 800,
+              color: data.bgImageUrl ? '#ffffff' : primary,
+              textShadow: data.bgImageUrl ? '0 2px 6px rgba(0,0,0,0.85), 0 0 10px rgba(255,255,255,0.2)' : 'none',
+              marginBottom: 18
+            }}>{subheadline}</div>
             
             {/* Badges */}
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               {features.slice(0, 3).map((f, i) => (
-                <span key={i} style={{ fontSize: 12, fontWeight: 700, color: '#ffffff', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '6px 14px' }}>{getFeatureIcon(f)} {f.length > 16 ? f.substring(0,16)+'…' : f}</span>
+                <span key={i} style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: '#ffffff',
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  textShadow: '0 1px 2px rgba(0,0,0,0.5)',
+                  borderRadius: 8,
+                  padding: '6px 14px'
+                }}>{getFeatureIcon(f)} {f.length > 16 ? f.substring(0,16)+'…' : f}</span>
               ))}
             </div>
           </div>
@@ -553,12 +591,12 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
           {/* Logo or Company Name */}
           <div style={{ flexShrink: 0, textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
             {data.logoUrl ? (
-              <img src={data.logoUrl} crossOrigin="anonymous" style={{ maxHeight: 90, maxWidth: 240, objectFit: 'contain' }} alt="Brand Logo" />
+              <img src={data.logoUrl} crossOrigin="anonymous" style={{ maxHeight: 90, maxWidth: 240, objectFit: 'contain', filter: data.bgImageUrl ? 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' : 'none' }} alt="Brand Logo" />
             ) : (
-              <div style={{ fontSize: 26, fontWeight: 900, color: '#ffffff', letterSpacing: 'normal', lineHeight: 1.1 }}>
+              <div style={{ fontSize: 26, fontWeight: 900, color: '#ffffff', textShadow: data.bgImageUrl ? '0 2px 4px rgba(0,0,0,0.5)' : 'none', letterSpacing: 'normal', lineHeight: 1.1 }}>
                 {data.company_name.length > 20 ? (
                   <>
-                    <div style={{ color: primary }}>{data.company_name.split(' ').slice(0, 2).join(' ')}</div>
+                    <div style={{ color: data.bgImageUrl ? '#ffffff' : primary }}>{data.company_name.split(' ').slice(0, 2).join(' ')}</div>
                     <div style={{ fontSize: 16, color: 'rgba(255,255,255,0.6)' }}>{data.company_name.split(' ').slice(2).join(' ')}</div>
                   </>
                 ) : (
@@ -576,9 +614,10 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
             {features.map((f, i) => (
               <div key={i} style={{
                 display: 'flex', alignItems: 'flex-start', gap: 16,
-                background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255,255,255,0.06)',
+                background: data.bgImageUrl ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.02)',
+                border: data.bgImageUrl ? '1px solid rgba(226, 232, 240, 0.8)' : '1px solid rgba(255,255,255,0.06)',
                 borderRadius: 16, padding: '16px 20px',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+                boxShadow: data.bgImageUrl ? '0 8px 24px rgba(0,0,0,0.1)' : '0 8px 32px rgba(0,0,0,0.15)',
               }}>
                 <div style={{
                   width: 48, height: 48, borderRadius: 12,
@@ -589,8 +628,8 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
                   {getFeatureIcon(f)}
                 </div>
                 <div>
-                  <div style={{ fontSize: 17, fontWeight: 800, color: '#ffffff', marginBottom: 3 }}>{f}</div>
-                  <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 17, fontWeight: 800, color: data.bgImageUrl ? '#0f172a' : '#ffffff', marginBottom: 3 }}>{f}</div>
+                  <div style={{ fontSize: 13, color: data.bgImageUrl ? '#475569' : 'rgba(255,255,255,0.45)', lineHeight: 1.4 }}>
                     Gestiona de forma eficiente y segura.
                   </div>
                 </div>

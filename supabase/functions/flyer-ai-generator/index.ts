@@ -150,6 +150,64 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── Generate optimized ad copy using GPT-4o-mini ─────────────────────────
+    let structuredText = {
+      headline: '',
+      subheadline: '',
+      features: [] as string[],
+      cta: cta || 'Contáctanos hoy',
+      price: '',
+    };
+
+    try {
+      const chatRes = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: `You are an expert copywriter. Your task is to extract and optimize advertising copy in Spanish from a raw prompt description. 
+You MUST return a JSON object with this exact structure:
+{
+  "headline": "A short, ultra-catchy 2-5 word main title in Spanish",
+  "subheadline": "A supporting slogan or dynamic offer of 4-8 words in Spanish",
+  "features": ["Feature 1 (max 4 words)", "Feature 2 (max 4 words)", "Feature 3 (max 4 words)"],
+  "cta": "WhatsApp / Call to action button text (max 3 words)",
+  "price": "Clean price text if mentioned (e.g. '$18.95/mes' or 'Desde $12.95'), otherwise empty"
+}
+CRITICAL: Use PERFECT Spanish spelling. Zero spelling mistakes, zero typos, clean accents. Do not include markdown formatting, just raw JSON.`,
+            },
+            {
+              role: 'user',
+              content: `Optimize this brief for a B2B flyer: "${prompt}". Company name: "${company_name}". Default CTA: "${cta || ''}"`,
+            }
+          ],
+          response_format: { type: 'json_object' }
+        }),
+      });
+
+      if (chatRes.ok) {
+        const chatData = await chatRes.json();
+        const content = JSON.parse(chatData.choices?.[0]?.message?.content || '{}');
+        if (content.headline) {
+          structuredText = {
+            headline: content.headline,
+            subheadline: content.subheadline || '',
+            features: Array.isArray(content.features) ? content.features.slice(0, 3) : [],
+            cta: content.cta || cta || 'Contáctanos hoy',
+            price: content.price || '',
+          };
+        }
+      }
+    } catch (chatErr) {
+      console.error('Chat completions copywriting failed:', chatErr);
+    }
+
     // ── Generate variants in parallel ────────────────────────────────────────
     const imageSize = FORMAT_SIZES[format] || '1024x1024';
     const variantSeeds = ['A', 'B', 'C'].slice(0, count);
@@ -231,6 +289,7 @@ Deno.serve(async (req) => {
       variants,
       count: variants.length,
       credits_remaining: creditsRemaining,
+      structured_text: structuredText,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
