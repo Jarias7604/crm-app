@@ -98,29 +98,42 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
         flexDirection: 'column',
       }}>
         {/* TOP SECTION */}
-        <div style={{ padding: '52px 64px 32px', flex: 'none' }}>
-          {/* Headline */}
-          <div style={{ fontSize: 62, fontWeight: 900, color: '#111', lineHeight: 1.1, marginBottom: 8 }}>
-            {headline.split('NEGOCIO').map((part, i, arr) => (
-              <React.Fragment key={i}>
-                {part}{i < arr.length - 1 && <span style={{ color: primary }}>NEGOCIO?</span>}
-              </React.Fragment>
-            ))}
-          </div>
-          <div style={{ fontSize: 30, fontWeight: 700, color: '#333', marginBottom: 32 }}>{subheadline}</div>
-
-          {/* Price Badge — only shown if price detected in prompt */}
-          {price && (
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 12,
-              background: primary, borderRadius: 16, padding: '14px 32px',
-              marginBottom: 40,
-            }}>
-              <span style={{ fontSize: 18, color: '#fff', fontWeight: 700 }}>Desde</span>
-              <span style={{ fontSize: 52, color: '#fff', fontWeight: 900, lineHeight: 1 }}>{price}</span>
-              <span style={{ fontSize: 16, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>+ IVA</span>
+        <div style={{ padding: '52px 64px 32px', flex: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          {/* Left: Headline & Price */}
+          <div style={{ flex: 1, marginRight: 32 }}>
+            {/* Headline */}
+            <div style={{ fontSize: headline.length > 30 ? 46 : 58, fontWeight: 900, color: '#111', lineHeight: 1.1, marginBottom: 8 }}>
+              {headline.split('NEGOCIO').map((part, i, arr) => (
+                <React.Fragment key={i}>
+                  {part}{i < arr.length - 1 && <span style={{ color: primary }}>NEGOCIO?</span>}
+                </React.Fragment>
+              ))}
             </div>
-          )}
+            <div style={{ fontSize: 22, fontWeight: 700, color: '#555', marginBottom: 24 }}>{subheadline}</div>
+
+            {/* Price Badge — only shown if price detected in prompt */}
+            {price && (
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 12,
+                background: primary, borderRadius: 16, padding: '12px 28px',
+              }}>
+                <span style={{ fontSize: 16, color: '#fff', fontWeight: 700 }}>Desde</span>
+                <span style={{ fontSize: 44, color: '#fff', fontWeight: 900, lineHeight: 1 }}>{price}</span>
+                <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>+ IVA</span>
+              </div>
+            )}
+          </div>
+
+          {/* Right: Brand Logo / Company name */}
+          <div style={{ flexShrink: 0, textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+            {data.logoUrl ? (
+              <img src={data.logoUrl} style={{ maxHeight: 90, maxWidth: 220, objectFit: 'contain' }} alt="Brand Logo" />
+            ) : (
+              <div style={{ padding: '12px 20px', background: `${primary}12`, borderRadius: 12, border: `1px dashed ${primary}` }}>
+                <span style={{ fontSize: 20, fontWeight: 900, color: primary }}>{data.company_name}</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* MIDDLE — Features grid + Laptop mockup */}
@@ -262,20 +275,35 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
 
         {/* HEADER */}
         <div style={{ padding: '40px 64px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 58, fontWeight: 900, color: '#111', lineHeight: 1.05, marginBottom: 8 }}>
+          <div style={{ flex: 1, marginRight: 32 }}>
+            <div style={{ fontSize: headline.length > 30 ? 44 : 54, fontWeight: 900, color: '#111', lineHeight: 1.05, marginBottom: 8 }}>
               {headline}
             </div>
-            <div style={{ fontSize: 28, fontWeight: 800, color: primary, marginBottom: 16 }}>{subheadline}</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: primary, marginBottom: 16 }}>{subheadline}</div>
             {/* Badges */}
-            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               {['✅ Fácil', '⚡ Rápido', '🔒 100% Cumple con Hacienda'].map((b, i) => (
-                <span key={i} style={{ fontSize: 14, fontWeight: 700, color: '#333', background: '#f5f5f5', borderRadius: 6, padding: '6px 14px' }}>{b}</span>
+                <span key={i} style={{ fontSize: 13, fontWeight: 700, color: '#333', background: '#f5f5f5', borderRadius: 6, padding: '5px 12px' }}>{b}</span>
               ))}
             </div>
           </div>
-          <div style={{ fontSize: 48, fontWeight: 900, color: primary, textAlign: 'right', lineHeight: 1 }}>
-            {data.company_name.split(' ').map((w, i) => <div key={i}>{w}</div>)}
+          
+          {/* Right side Logo or Company name */}
+          <div style={{ flexShrink: 0, textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+            {data.logoUrl ? (
+              <img src={data.logoUrl} style={{ maxHeight: 90, maxWidth: 220, objectFit: 'contain' }} alt="Brand Logo" />
+            ) : (
+              <div style={{ fontSize: 24, fontWeight: 900, color: primary, letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+                {data.company_name.length > 20 ? (
+                  <>
+                    <div>{data.company_name.split(' ').slice(0, 2).join(' ')}</div>
+                    <div style={{ fontSize: 16, color: '#666' }}>{data.company_name.split(' ').slice(2).join(' ')}</div>
+                  </>
+                ) : (
+                  data.company_name
+                )}
+              </div>
+            )}
           </div>
         </div>
 
