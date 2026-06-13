@@ -58,6 +58,39 @@ const css = {
   ghost: { background: '#f4f6f9', border: '1px solid #d8dde6', borderRadius: 7, padding: '9px 14px', fontSize: 12, fontWeight: 700, color: '#0f172a', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 },
 };
 
+// ─── Virality Score (local, no API) ──────────────────────────────────────────
+function calcViralScore(prompt: string, cta: string, phone: string, website: string) {
+  if (!prompt.trim() || prompt.trim().length < 10) return { score: 0, level: 'none', tips: [] as string[] };
+  let score = 0;
+  const tips: string[] = [];
+  const p = prompt.toLowerCase();
+  // Price or discount
+  if (/\$[\d,.]+|precio|costo|gratis|%\s*off|descuento|oferta|promo/i.test(prompt)) score += 18;
+  else tips.push('💰 Agrega precio o descuento concreto (ej: $12.95/mes, 30% OFF)');
+  // Urgency
+  if (/hoy|ahora|urgente|l[ií]mite|temporada|exclusiv|solo hasta|quedan/i.test(prompt)) score += 20;
+  else tips.push('⚡ Añade urgencia: HOY, OFERTA LIMITADA, SOLO ESTA SEMANA');
+  // Benefits / features
+  if (/incluye|ofrece|benefici|caracter|servicios|lleva|contiene/i.test(prompt)) score += 15;
+  else tips.push('✅ Lista 3 beneficios clave (ej: incluye: Facturación, Inventario, Reportes)');
+  // CTA
+  if (cta.trim().length > 2) score += 10;
+  else tips.push('🎯 Define tu CTA (ej: "Llama HOY", "Prueba gratis")');
+  // Contact info
+  if (phone.trim() || website.trim()) score += 8;
+  // Prompt length sweet spot
+  const len = prompt.trim().length;
+  if (len >= 80 && len <= 400) score += 15; else if (len > 40) score += 7;
+  else tips.push('📝 Describe más tu oferta (al menos 80 caracteres)');
+  // Numbers / specifics
+  if (/\d+/.test(prompt)) score += 9;
+  // Structured tags
+  if (/t[íi]tulo:|subt[íi]tulo:|incluye:/i.test(prompt)) score += 5;
+  const s = Math.min(score, 100);
+  const level = s >= 75 ? 'viral' : s >= 50 ? 'bueno' : s >= 30 ? 'mejorable' : 'bajo';
+  return { score: s, level, tips: tips.slice(0, 3) };
+}
+
 const getFlyerDimensions = (formatId: string) => {
   switch (formatId) {
     case 'ig-post':     return { width: 520, height: 520 };
@@ -416,6 +449,32 @@ export default function FlyerStudio() {
               )}
             </div>
 
+            {/* ── VIRALITY SCORE — shown BEFORE generating ── */}
+            {(() => {
+              const vs = calcViralScore(prompt, cta, phone, website);
+              if (vs.score === 0) return null;
+              const color = vs.level === 'viral' ? '#10b981' : vs.level === 'bueno' ? '#3b82f6' : vs.level === 'mejorable' ? '#f59e0b' : '#ef4444';
+              const label = vs.level === 'viral' ? '🔥 Alto impacto' : vs.level === 'bueno' ? '👍 Buen potencial' : vs.level === 'mejorable' ? '⚠️ Mejorable' : '📉 Bajo impacto';
+              return (
+                <div style={{ marginBottom: 20, background: `${color}08`, border: `1.5px solid ${color}30`, borderRadius: 10, padding: '12px 14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ fontSize: 10, fontWeight: 900, color: '#0f172a', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Score de Viralidad</span>
+                    <span style={{ fontSize: 11, fontWeight: 900, color }}>{vs.score}/100 · {label}</span>
+                  </div>
+                  <div style={{ height: 6, background: '#e2e8f0', borderRadius: 10, overflow: 'hidden', marginBottom: vs.tips.length > 0 ? 10 : 0 }}>
+                    <div style={{ height: '100%', width: `${vs.score}%`, background: `linear-gradient(90deg, ${color}, ${color}cc)`, borderRadius: 10, transition: 'width 0.4s ease' }} />
+                  </div>
+                  {vs.tips.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {vs.tips.map((tip, i) => (
+                        <div key={i} style={{ fontSize: 10, color: '#475569', fontWeight: 600, lineHeight: 1.4 }}>{tip}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             {/* CTA */}
             <div style={css.section}>
               <label style={css.label}>Llamada a la Acción (CTA)</label>
@@ -746,9 +805,8 @@ export default function FlyerStudio() {
                         boxShadow: '0 16px 48px rgba(0,0,0,0.18)',
                         width: '100%',
                         maxWidth: `min(${getFlyerDimensions(format).width}px, 100%)`,
-                        maxHeight: '62vh',
                         aspectRatio: `${getFlyerDimensions(format).width} / ${getFlyerDimensions(format).height}`,
-                        flexShrink: 1,
+                        flexShrink: 0,
                         cursor: 'zoom-in',
                         transition: 'transform 0.2s ease',
                         border: '1px solid #dde1e7',
@@ -773,6 +831,9 @@ export default function FlyerStudio() {
                       ) : (
                         // Live Template scaled down to fit viewport
                         <div style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
                           transform: `scale(${getFlyerDimensions(format).width / 1080})`,
                           transformOrigin: 'top left',
                           width: 1080,
