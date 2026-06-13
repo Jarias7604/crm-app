@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
     2. gancho: Un subtítulo o frase de enganche súper persuasiva que conecte con la necesidad del cliente (máximo 1 oración).
     3. beneficios: Una lista de exactamente 3 beneficios o características clave del producto/servicio. Cortas y contundentes.
     4. tono: El tono utilizado (debe encajar con el tono provisto).
-    5. cta: Un texto de llamado a la acción persuasivo (ej: 'QUIERO MI DESCUENTO', 'REGISTRARME HOY', 'COMPRAR AHORA').
+    5. cta: Un texto de llamado a la acción persuasivo (ej: 'QUIERO MI DESCUENTO', 'REGISTRARME HOY', 'COMPRAR AHORA'). ATENCIÓN: NUNCA inventes precios, ni porcentajes de descuento (como 30% OFF o $12.95/mes) si el usuario NO los ha incluido explícitamente en la 'Oferta Comercial'.
     6. paleta: Una lista de exactamente 2 o 3 colores complementarios en formato hexadecimal (ej: ["#7c3aed", "#10b981"]) que representen visualmente el tono de la marca. Evita colores invisibles como el blanco puro si no es de contraste.
 
     Devuelve la respuesta estrictamente como un objeto JSON con la clave "ideas" que contenga un arreglo de 3 objetos con las propiedades indicadas. No agregues explicaciones externas ni markdown de código.`;

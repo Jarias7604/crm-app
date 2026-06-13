@@ -299,21 +299,19 @@ export default function FlyerStudio() {
       const lower = prompt.toLowerCase();
       let fallbackImg = 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1080&q=80'; // tech / general B2B
       
-      if (lower.includes('pizza') || lower.includes('comida') || lower.includes('restaurante') || lower.includes('food')) {
-        fallbackImg = 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1080&q=80'; // pizza
-      } else if (lower.includes('hamburguesa') || lower.includes('burger')) {
-        fallbackImg = 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1080&q=80'; // burger
-      } else if (lower.includes('dentista') || lower.includes('dental') || lower.includes('diente') || lower.includes('clínica')) {
+      if (/\b(pizza|comida|restaurante|food|pupusa|pupusas|taco|tacos|burger|hamburguesa|sushi)\b/i.test(lower)) {
+        fallbackImg = 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1080&q=80'; // pizza / food
+      } else if (/\b(dentista|dental|diente|dientes|cl[íi]nica|odontolog[íi]a)\b/i.test(lower)) {
         fallbackImg = 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=1080&q=80'; // dental
-      } else if (lower.includes('defensa') || lower.includes('seguridad') || lower.includes('karate') || lower.includes('marciales')) {
+      } else if (/\b(defensa|seguridad|karate|marciales|taekwondo)\b/i.test(lower)) {
         fallbackImg = 'https://images.unsplash.com/photo-1555597673-b21d5c935865?auto=format&fit=crop&w=1080&q=80'; // martial arts
-      } else if (lower.includes('taller') || lower.includes('auto') || lower.includes('carro') || lower.includes('mecánico')) {
+      } else if (/\b(taller|auto|carro|veh[íi]culo|mec[aá]nico|motor)\b/i.test(lower)) {
         fallbackImg = 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=1080&q=80'; // auto workshop
-      } else if (lower.includes('belleza') || lower.includes('salon') || lower.includes('uñas') || lower.includes('spa') || lower.includes('maquillaje')) {
+      } else if (/\b(belleza|salon|sal[oó]n|u[ñn]as|spa|maquillaje|cabello|peluquer[íi]a)\b/i.test(lower)) {
         fallbackImg = 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1080&q=80'; // beauty salon
-      } else if (lower.includes('gym') || lower.includes('gimnasio') || lower.includes('fit') || lower.includes('ejercicio') || lower.includes('entrenamiento')) {
+      } else if (/\b(gym|gimnasio|fit|fitness|ejercicio|entrenamiento)\b/i.test(lower)) {
         fallbackImg = 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=1080&q=80'; // gym
-      } else if (lower.includes('abogado') || lower.includes('legal') || lower.includes('firma') || lower.includes('consultoría')) {
+      } else if (/\b(abogado|legal|firma|consultor[íi]a|leyes|derecho)\b/i.test(lower)) {
         fallbackImg = 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=1080&q=80'; // law/legal
       }
 
