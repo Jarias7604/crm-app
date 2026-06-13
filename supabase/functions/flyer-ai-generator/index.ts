@@ -84,33 +84,54 @@ function buildImagePrompt(params: {
   const selectedStyle = styles[variantSeed || 'A'];
 
   if (mode === 'full') {
-    const layoutVariants: Record<string, string> = {
-      'A': `LAYOUT: Bold split design. LEFT 45%: Large headline text stacked vertically with primary color accent on 1-2 key words. Below headline: 3 benefit bullets with colored icon squares. Bottom-left corner: prominent price badge in primary color. RIGHT 55%: Laptop or smartphone mockup showing a clean dashboard/app interface relevant to the business. Background: white or very light gray with subtle dot grid pattern.`,
-      'B': `LAYOUT: Centered hero design. TOP CENTER: Ultra-bold headline in 2 lines, primary color gradient behind it as a banner strip. MIDDLE: Clean card with 3-4 features listed with emoji icons. Below features: A promotional badge or sticker with the price (if mentioned). BOTTOM: Dark footer bar with company name on left, CTA button on right. Background: clean white with soft geometric shapes in brand colors.`,
-      'C': `LAYOUT: Magazine-style full bleed. BACKGROUND: Relevant high-quality photo or gradient (${primaryColor} to ${secondaryColor}) as full background with 70% opacity dark overlay on left side. LEFT SIDE TEXT on dark overlay: Company badge top-left. HUGE headline text (3-4 words max) below. Subheadline. Feature pills. Price badge. CTA button. RIGHT SIDE: Semi-transparent glass card showing product/service mockup.`,
-    };
 
-    const layout = layoutVariants[variantSeed || 'A'];
+    const layoutA = `LAYOUT: Clean left-text + right-mockup on WHITE background.
+TOP SECTION (company badge): "${company_name}" in small, clean horizontal text badge at top-left, with a thin ${primaryColor} colored bar below it. Sits 80px from top edge.
+HEADLINE (huge, dark): 3-5 word ultra-bold headline in ${secondaryColor || '#0f172a'}, stacked on 2-3 lines. 1-2 key words highlighted in ${primaryColor}. Positioned left half, 80px from left edge.
+SUBTEXT: 1 short line of supporting text below headline, normal weight, gray color.
+FEATURES: 2-3 bullet points with small filled square icons in ${primaryColor}. Short 4-6 word phrases. Left half.
+PRICE BADGE (if price mentioned): Bold pill badge in ${primaryColor}, white text "DESDE [price]". Left side, 80px from bottom.
+CTA BUTTON: Wide rounded button in ${primaryColor}, white bold text. Centered or left-aligned, 80px from bottom.
+MOCKUP: Laptop or tablet showing relevant dashboard/app UI. RIGHT half, vertically centered. 80px from right edge. 80px from bottom edge. Fully visible, NO part cut off.
+BACKGROUND: Pure white with very subtle light gray dot grid. Small ${primaryColor} geometric accent in top-right corner.`;
 
-    return `You are a world-class graphic designer. Create a PROFESSIONAL, PIXEL-PERFECT, PRINT-READY social media advertising flyer.
+    const layoutB = `LAYOUT: Centered design on white with top color bar.
+TOP BANNER: Full-width ${primaryColor} color strip, height ~12% of canvas. Company name "${company_name}" in white, centered, clean sans-serif.
+HEADLINE: Very large bold dark text, center-aligned, 2 lines. Contrasting key words in ${primaryColor}.
+MOCKUP: Laptop or phone centered in middle of canvas, slightly below headline. Fully contained — all 4 edges of device visible, min 80px from canvas edges.
+FEATURES ROW: 3 feature pills centered horizontally below mockup. Each: small icon + 3-4 word text.
+PRICE BADGE: Centered, ${primaryColor} background, white text "DESDE [price]" if mentioned.
+CTA: Wide pill button in ${primaryColor}, white text, centered, 80px from bottom.
+BACKGROUND: Pure white body area with subtle geometric light pattern.`;
+
+    const layoutC = `LAYOUT: Pink/brand gradient left + white right.
+LEFT HALF: Diagonal gradient from ${primaryColor} to a darker shade. Company name "${company_name}" at top in white, bold, small size. 80px from left/top edges. HUGE white headline ALL-CAPS 2-3 lines. 2 feature bullets in white. Price badge: white pill with ${primaryColor} text. CTA white button with ${primaryColor} text.
+RIGHT HALF: White background. Laptop or phone mockup fully contained — 80px from top, bottom and right canvas edges. No device edges cut off. Subtle drop shadow.
+DIVIDER: Soft curved diagonal line separating left gradient from white.
+BACKGROUND: Bright gradient on left, clean white on right.`;
+
+    const layouts: Record<string, string> = { A: layoutA, B: layoutB, C: layoutC };
+    const layout = layouts[variantSeed || 'A'];
+
+    return `You are a senior art director at a top Latin American advertising agency. Create a PROFESSIONAL, PRINT-READY social media flyer image.
 
 BUSINESS BRIEF:
-- What to promote: "${prompt}"
+- What to advertise: "${prompt}"
 - Company: "${company_name}"
-- Brand colors: Primary ${primaryColor}, Secondary ${secondaryColor}
-- Visual tone: ${TONE_DIRECTIVES[tone || 'moderno'] || 'Modern, clean, and professional'}
+- Primary color: ${primaryColor}
+- Secondary/dark color: ${secondaryColor || '#1a1a2e'}
+- Tone: ${TONE_DIRECTIVES[tone || 'moderno'] || 'Modern, clean, professional'}
 
 ${layout}
 
-MANDATORY DESIGN RULES (follow strictly):
-1. TYPOGRAPHY: All text must be BOLD, large, and easy to read. Headline must be the BIGGEST element (minimum 20% of canvas height). Use clean sans-serif fonts (Inter, Montserrat, or Outfit style).
-2. TEXT CONTENT: Extract key marketing message from the brief. The headline must be a SHORT, PUNCHY phrase in Spanish (4-7 words max) that grabs attention. Include 2-3 benefit bullets.
-3. COLORS: Use the brand colors ${primaryColor} and ${secondaryColor} prominently for buttons, accents, badges, and highlights. White background areas for readability.
-4. CTA BUTTON: Include a visible call-to-action button with contrasting color. Button text from brief if available.
-5. PRICE (if mentioned in brief): Show prominently in a colored badge/pill with "DESDE" label above.
-6. PROFESSIONAL QUALITY: This must look like it was designed by a $500/hour agency designer. No amateur layouts. Clean grid, proper margins, visual hierarchy.
-7. The final result must be ready to post on social media with zero additional editing needed.
-8. DO NOT leave blank areas. Fill the canvas with intentional, professional design elements.`;
+ABSOLUTE NON-NEGOTIABLE RULES:
+1. SAFE ZONE: Every single text, button, icon, logo and device mockup must be at least 80 pixels (8%) from ALL 4 edges of the canvas. If something is close to an edge, move it inward.
+2. NO CLIPPING: Device mockups (laptop, phone, tablet) must be 100% visible. Not a single pixel of the device may be cut off by the canvas border.
+3. COMPANY NAME: Must appear in the TOP portion of the flyer as a clean horizontal brand badge, NOT at the very bottom edge.
+4. FONT STYLE: Use modern geometric sans-serif fonts only. Bold, clean, no decorative scripts.
+5. SPANISH COPY: All text in perfect Spanish with correct accents and spelling. Extract content from the brief.
+6. BACKGROUND: Keep background WHITE or very light — never dark full-bleed unless it is the Layout C gradient style.
+7. QUALITY: Final result must look like a $1000 professional agency design. Pixel-perfect alignment. Clean visual hierarchy.`;
   }
 
   return `Design a STUNNING, HIGH-FIDELITY commercial advertising background. 

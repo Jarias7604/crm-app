@@ -1271,56 +1271,38 @@ export default function FlyerStudio() {
 
             {/* Body (The Image or Live template) */}
             <div style={{ 
-              background: '#f8fafc', padding: '16px 24px', 
+              background: '#f1f5f9', padding: '12px 20px', 
               display: 'flex', alignItems: 'center', justifyContent: 'center', 
-              overflow: 'hidden'
+              overflow: 'hidden',
+              flex: 1,
+              minHeight: 0
             }}>
               {bgUploadPreview || (showFullAiResult && variants.length > 0) ? (
-                (() => {
-                  // Calcula dimensiones que caben dentro del modal disponible
-                  // Modal disponible: 94vh - header(65px) - footer(70px) - padding(48px)
-                  const availH = Math.min(window.innerHeight * 0.94 - 183, window.innerHeight - 200);
-                  const availW = Math.min(window.innerWidth * 0.88, 760);
-                  const { width: fw, height: fh } = getFlyerDimensions(format);
-                  const ratio = fw / fh;
-                  // Fit by height first, then width
-                  let displayH = availH;
-                  let displayW = displayH * ratio;
-                  if (displayW > availW) {
-                    displayW = availW;
-                    displayH = displayW / ratio;
-                  }
-                  return (
-                    <div style={{
-                      position: 'relative',
-                      width: displayW,
-                      height: displayH,
-                      borderRadius: 14,
-                      boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
-                      background: '#fff',
-                      overflow: 'hidden',
-                      flexShrink: 0
-                    }}>
-                      <img
-                        src={bgUploadPreview || variants[selected]}
-                        alt="Flyer en Alta Resolución"
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'contain',
-                          display: 'block'
-                        }}
-                      />
-                      {logoPreview && (
-                        <FreeLogo
-                          d={{ title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null, logoUrl: logoPreview, industria: '', phone: '', website: '', templateId: 'direct-mockup', containerW: displayW, containerH: displayH, logoSize, logoX, logoY }}
-                          onMove={(x, y) => { setLogoX(x); setLogoY(y); }}
-                          onResize={(s) => setLogoSize(s)}
-                        />
-                      )}
-                    </div>
-                  );
-                })()
+                <div style={{
+                  position: 'relative',
+                  maxWidth: 'min(82vw, 680px)',
+                  maxHeight: 'calc(94vh - 155px)',
+                  width: '100%',
+                  borderRadius: 14,
+                  boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
+                  background: '#fff',
+                  overflow: 'hidden',
+                  aspectRatio: `${getFlyerDimensions(format).width} / ${getFlyerDimensions(format).height}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                  <img
+                    src={bgUploadPreview || variants[selected]}
+                    alt="Flyer en Alta Resolución"
+                    style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+                  />
+                  {logoPreview && (
+                    <FreeLogo
+                      d={{ title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null, logoUrl: logoPreview, industria: '', phone: '', website: '', templateId: 'direct-mockup', containerW: 600, containerH: 600, logoSize, logoX, logoY }}
+                      onMove={(x, y) => { setLogoX(x); setLogoY(y); }}
+                      onResize={(s) => setLogoSize(s)}
+                    />
+                  )}
+                </div>
               ) : (() => {
                 // Scale template to fit within available modal space (no scroll)
                 const maxH = Math.min(window.innerHeight * 0.72, 650);
@@ -1329,58 +1311,32 @@ export default function FlyerStudio() {
                 const fitH = fitW / ratio;
                 const sc = fitW / 1080;
                 return (
-                // Scaled Template inside Modal
                 <div style={{
-                  width: fitW,
-                  height: fitH,
-                  overflow: 'hidden',
-                  position: 'relative',
-                  borderRadius: 14,
-                  boxShadow: '0 20px 50px rgba(0,0,0,0.15)',
-                  background: '#fff'
+                  width: fitW, height: fitH, overflow: 'hidden', position: 'relative',
+                  borderRadius: 14, boxShadow: '0 20px 50px rgba(0,0,0,0.15)', background: '#fff'
                 }}>
                   {bgUploadPreview ? (
-                    <img
-                      src={bgUploadPreview}
-                      alt="Flyer Vista Previa"
-                      style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
-                    />
+                    <img src={bgUploadPreview} alt="Flyer Vista Previa" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
                   ) : (
-                    <div style={{
-                      transform: `scale(${sc})`,
-                      transformOrigin: 'top left',
-                      width: 1080,
-                      height: 1080,
-                      pointerEvents: 'none'
-                    }}>
+                    <div style={{ transform: `scale(${sc})`, transformOrigin: 'top left', width: 1080, height: 1080, pointerEvents: 'none' }}>
                       {selectedTemplate === 'A' ? (
                         <FlyerTemplateA data={{
-                          company_name: companyName || 'Mi Empresa',
-                          prompt,
+                          company_name: companyName || 'Mi Empresa', prompt,
                           cta: aiOptimizedText?.cta || cta || 'Contáctanos HOY',
-                          headline: aiOptimizedText?.headline,
-                          subheadline: aiOptimizedText?.subheadline,
-                          features: aiOptimizedText?.features,
-                          price: aiOptimizedText?.price,
-                          primaryColor: colors[0] || '#e91e8c',
-                          secondaryColor: colors[1] || '#1a1a2e',
-                          phone, website,
-                          logoUrl: logoPreview || undefined,
+                          headline: aiOptimizedText?.headline, subheadline: aiOptimizedText?.subheadline,
+                          features: aiOptimizedText?.features, price: aiOptimizedText?.price,
+                          primaryColor: colors[0] || '#e91e8c', secondaryColor: colors[1] || '#1a1a2e',
+                          phone, website, logoUrl: logoPreview || undefined,
                           bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
                         }} />
                       ) : (
                         <FlyerTemplateB data={{
-                          company_name: companyName || 'Mi Empresa',
-                          prompt,
+                          company_name: companyName || 'Mi Empresa', prompt,
                           cta: aiOptimizedText?.cta || cta || 'Activa HOY MISMO',
-                          headline: aiOptimizedText?.headline,
-                          subheadline: aiOptimizedText?.subheadline,
-                          features: aiOptimizedText?.features,
-                          price: aiOptimizedText?.price,
-                          primaryColor: colors[0] || '#9b1c1c',
-                          secondaryColor: colors[1] || '#1a1a2e',
-                          phone, website,
-                          logoUrl: logoPreview || undefined,
+                          headline: aiOptimizedText?.headline, subheadline: aiOptimizedText?.subheadline,
+                          features: aiOptimizedText?.features, price: aiOptimizedText?.price,
+                          primaryColor: colors[0] || '#9b1c1c', secondaryColor: colors[1] || '#1a1a2e',
+                          phone, website, logoUrl: logoPreview || undefined,
                           bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
                         }} />
                       )}
