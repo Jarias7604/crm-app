@@ -888,8 +888,8 @@ export default function FlyerStudio() {
                 )}
 
                 {/* ── FLYER CANVAS ── */}
-                {/* Show: uploaded flyer | AI generated | live template (only if brief has content) | empty state */}
-                {(bgUploadPreview || variants.length > 0) ? (
+                {/* Always show the live interactive preview so the user can test texts, alignment and design for free without consuming credits */}
+                {true ? (
                   <div style={{ display: 'flex', justifyContent: 'center', width: '100%', userSelect: 'none' }}>
                     <div
                       ref={flyerRef}
@@ -931,34 +931,34 @@ export default function FlyerStudio() {
                         }}>
                           {selectedTemplate === 'A' ? (
                             <FlyerTemplateA data={{
-                              company_name: companyName || 'Mi Empresa',
-                              prompt,
-                              cta: aiOptimizedText?.cta || cta || 'Contáctanos HOY',
-                              headline: aiOptimizedText?.headline,
-                              subheadline: aiOptimizedText?.subheadline,
-                              features: aiOptimizedText?.features,
-                              price: aiOptimizedText?.price,
-                              primaryColor: colors[0] || '#e91e8c',
-                              secondaryColor: colors[1] || '#1a1a2e',
-                              phone, website,
-                              logoUrl: logoPreview || undefined,
-                              bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
-                            }} />
+                                company_name: companyName || 'Mi Empresa',
+                                prompt,
+                                cta: aiOptimizedText?.cta || cta || 'Contáctanos HOY',
+                                headline: aiOptimizedText?.headline,
+                                subheadline: aiOptimizedText?.subheadline,
+                                features: aiOptimizedText?.features,
+                                price: aiOptimizedText?.price,
+                                primaryColor: colors[0] || '#e91e8c',
+                                secondaryColor: colors[1] || '#1a1a2e',
+                                phone, website,
+                                logoUrl: logoPreview || undefined,
+                                bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
+                              }} />
                           ) : (
                             <FlyerTemplateB data={{
-                              company_name: companyName || 'Mi Empresa',
-                              prompt,
-                              cta: aiOptimizedText?.cta || cta || 'Activa HOY MISMO',
-                              headline: aiOptimizedText?.headline,
-                              subheadline: aiOptimizedText?.subheadline,
-                              features: aiOptimizedText?.features,
-                              price: aiOptimizedText?.price,
-                              primaryColor: colors[0] || '#9b1c1c',
-                              secondaryColor: colors[1] || '#1a1a2e',
-                              phone, website,
-                              logoUrl: logoPreview || undefined,
-                              bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
-                            }} />
+                                company_name: companyName || 'Mi Empresa',
+                                prompt,
+                                cta: aiOptimizedText?.cta || cta || 'Activa HOY MISMO',
+                                headline: aiOptimizedText?.headline,
+                                subheadline: aiOptimizedText?.subheadline,
+                                features: aiOptimizedText?.features,
+                                price: aiOptimizedText?.price,
+                                primaryColor: colors[0] || '#9b1c1c',
+                                secondaryColor: colors[1] || '#1a1a2e',
+                                phone, website,
+                                logoUrl: logoPreview || undefined,
+                                bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
+                              }} />
                           )}
                         </div>
                       )}
@@ -986,17 +986,6 @@ export default function FlyerStudio() {
                           onResize={(s) => setLogoSize(s)}
                         />
                       )}
-                    </div>
-                  </div>
-                ) : (
-                  /* Empty state */
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, padding: '48px 32px', background: '#fff', borderRadius: 16, width: '100%', maxWidth: 420, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-                    <div style={{ width: 64, height: 64, borderRadius: 18, background: 'linear-gradient(135deg,#e0e7ff,#dbeafe)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Layers size={28} color="#6366f1" />
-                    </div>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>Completa el brief y genera</div>
-                      <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.6 }}>La IA creará un flyer profesional listo<br />para publicar en tus redes sociales.</div>
                     </div>
                   </div>
                 )}
