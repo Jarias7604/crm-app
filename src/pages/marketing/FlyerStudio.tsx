@@ -227,6 +227,10 @@ export default function FlyerStudio() {
         if (best.paleta?.length > 0) setColors(best.paleta.slice(0, 3));
         if (best.cta && !cta.trim()) setCta(best.cta);
         if (best.tono) setTone(best.tono);
+        // CRITICAL: clear stale AI variants — they don't match the new brief
+        setVariants([]);
+        setSelected(0);
+        setPreviewMode('template');
         toast.success('✨ IA mejoró tu brief automáticamente', { duration: 2000 });
       } catch (_) { /* silent fail */ }
       finally { setAutoOptimizing(false); }
@@ -311,6 +315,10 @@ export default function FlyerStudio() {
     if (idea.paleta && idea.paleta.length > 0) setColors(idea.paleta.slice(0, 3));
     if (idea.cta && !cta.trim()) setCta(idea.cta);
     if (idea.tono) setTone(idea.tono);
+    // CRITICAL: clear stale AI variants — they don't match the new brief
+    setVariants([]);
+    setSelected(0);
+    setPreviewMode('template');
     setShowSuggestions(false);
     toast.success('✨ Propuesta aplicada al brief');
   }
@@ -461,7 +469,15 @@ export default function FlyerStudio() {
                 style={{ ...css.textarea, minHeight: 120, fontSize: 13, lineHeight: 1.6, border: autoOptimizing ? '1.5px solid #7c3aed' : '1px solid #d8dde6', transition: 'border 0.3s' }}
                 placeholder={'Ej: 30% OFF en servicios de defensa personal este verano — escribe tu idea y la IA la mejorará automáticamente...'}
                 value={prompt}
-                onChange={e => setPrompt(e.target.value)}
+                onChange={e => {
+                  setPrompt(e.target.value);
+                  // CRITICAL: clear stale AI variants when brief changes
+                  if (variants.length > 0) {
+                    setVariants([]);
+                    setSelected(0);
+                    setPreviewMode('template');
+                  }
+                }}
               />
               {/* Auto-optimize status */}
               {autoOptimizing && (
@@ -510,6 +526,8 @@ export default function FlyerStudio() {
                             onClick={() => {
                               const addition = snippet.replace(/\(ej:.*/i, '').trim();
                               setPrompt(prev => prev ? `${prev.trim()}. ${addition}` : addition);
+                              // Clear stale AI variants
+                              if (variants.length > 0) { setVariants([]); setSelected(0); setPreviewMode('template'); }
                             }}
                             style={{
                               fontSize: 10, color: '#475569', fontWeight: 600, lineHeight: 1.4,
