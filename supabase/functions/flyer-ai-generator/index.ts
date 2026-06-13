@@ -68,8 +68,9 @@ function buildImagePrompt(params: {
   tone?: string;
   variantSeed?: string;
   mode?: 'full' | 'background';
+  structuredText?: { headline?: string; subheadline?: string; features?: string[]; cta?: string; price?: string };
 }): string {
-  const { prompt, company_name, colors, tone, variantSeed, mode = 'background' } = params;
+  const { prompt, company_name, colors, tone, variantSeed, mode = 'background', structuredText } = params;
 
   const primaryColor = (colors && colors.length > 0) ? colors[0] : '#e91e8c';
   const secondaryColor = (colors && colors.length > 1) ? colors[1] : '#1a1a2e';
@@ -81,14 +82,29 @@ function buildImagePrompt(params: {
     'C': `sophisticated corporate glassmorphism style, atmospheric soft shadows, sleek gradient waves, premium branding background`,
   };
 
-  const selectedStyle = styles[variantSeed || 'A'];
+  let selectedStyle = styles[variantSeed || 'A'];
+  if (mode === 'full') {
+    selectedStyle = selectedStyle.replace(/\bbackground\b/gi, 'marketing composition').replace(/\bbackdrop\b/gi, 'layout');
+  }
 
   if (mode === 'full') {
+    const textInstructions = structuredText?.headline
+      ? `The flyer MUST prominently feature the following text written clearly with NO typos, in perfect Spanish:
+- Main Title/Headline: "${structuredText.headline}"
+- Slogan/Subheadline: "${structuredText.subheadline || ''}"
+${structuredText.price ? `- Pricing/Offer: "${structuredText.price}"` : ''}
+- Button/CTA: "${structuredText.cta || 'Contáctanos hoy'}"
+- Company/Brand: "${company_name}"`
+      : `The flyer MUST prominently feature the Company Name "${company_name}" and a clear, catchy headline representing: "${prompt}".`;
+
     return `Create a STUNNING, HIGH-FIDELITY commercial advertising flyer for: "${prompt}". 
 Company Name: "${company_name}".
 Visual style theme: ${selectedStyle}.
 Visual tone direction: ${TONE_DIRECTIVES[tone || 'moderno'] || 'modern, clean and professional advertising layout'}.
 Brand colors to integrate: ${primaryColor} and ${secondaryColor}.
+
+${textInstructions}
+
 Instructions: Generate a complete, ready-to-publish marketing flyer. The image itself MUST include beautifully integrated typography, catchy headings, promotional callouts, and an eye-catching layout that clearly communicates the promotion. Make it look like a premium agency-designed social media flyer. Ultra-high details, photorealistic, pixel-perfect.`;
   }
 
@@ -232,7 +248,8 @@ CRITICAL: Use PERFECT Spanish spelling. Zero spelling mistakes, zero typos, clea
     for (const seed of variantSeeds) {
       try {
         const imagePrompt = buildImagePrompt({
-          prompt, company_name, tagline, cta, colors, format, tone, variantSeed: seed, mode
+          prompt, company_name, tagline, cta, colors, format, tone, variantSeed: seed, mode,
+          structuredText: mode === 'full' ? structuredText : undefined
         });
 
         // ── Try gpt-image-1 first ────────────────────────────────────────────
