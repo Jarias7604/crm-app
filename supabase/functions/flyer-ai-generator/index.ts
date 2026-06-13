@@ -20,6 +20,9 @@
 //
 // Returns: { variants: string[], credits_remaining: number }
 
+// Supabase Edge Function config — extend timeout to 150s for AI image generation
+export const config = { runtime: 'edge', maxDuration: 150 };
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -191,12 +194,11 @@ Deno.serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'dall-e-3',
+          model: 'gpt-image-1',
           prompt: imagePrompt,
           n: 1,
           size: imageSize,
-          quality: 'hd',
-          response_format: 'url',
+          quality: 'medium',
         }),
       });
 
@@ -208,86 +210,19 @@ Deno.serve(async (req) => {
       }
 
       const data = await res.json();
-      return data.data?.[0]?.url || null;
+      const b64 = data.data?.[0]?.b64_json;
+      if (!b64) return null;
+      return `data:image/png;base64,${b64}`;
     });
 
     const rawVariants = await Promise.all(generationPromises);
     const variants = rawVariants.filter(Boolean) as string[];
 
     if (variants.length === 0) {
-      console.warn("OpenAI generation failed. Activating High-Fidelity Fallback System...");
-      // Curated list of ultra-premium marketing flyer mockups/backgrounds based on format
-      const formatFallbacks: Record<string, string[]> = {
-        'ig-post': [
-          'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop',
-          'https://images.unsplash.com/photo-1626785774573-4b799315345d?q=80&w=1000&auto=format&fit=crop',
-          'https://images.unsplash.com/photo-1557804506-669a67965ba0?q=80&w=1000&auto=format&fit=crop'
-        ],
-        'fb-post': [
-          'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop',
-          'https://images.unsplash.com/photo-1626785774573-4b799315345d?q=80&w=1000&auto=format&fit=crop',
-          'https://images.unsplash.com/photo-1557804506-669a67965ba0?q=80&w=1000&auto=format&fit=crop'
-        ],
-        'story': [
-          'https://images.unsplash.com/photo-1551434678-e076c223a692?q=80&w=1000&auto=format&fit=crop',
-          'https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=1000&auto=format&fit=crop',
-          'https://images.unsplash.com/photo-1507679799987-c73779587ccf?q=80&w=1000&auto=format&fit=crop'
-        ],
-        'ig-portrait': [
-          'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000&auto=format&fit=crop',
-          'https://images.unsplash.com/photo-1626785774573-4b799315345d?q=80&w=1000&auto=format&fit=crop',
-          'https://images.unsplash.com/photo-1557804506-669a67965ba0?q=80&w=1000&auto=format&fit=crop'
-        ],
-        'fb-cover': [
-          'https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=1000&auto=format&fit=crop',
-          'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=1000&auto=format&fit=crop',
-          'https://images.unsplash.com/photo-1557804506-669a67965ba0?q=80&w=1000&auto=format&fit=crop'
-        ],
-        'li-post': [
-          'https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=1000&auto=format&fit=crop',
-          'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=1000&auto=format&fit=crop',
-          'https://images.unsplash.com/photo-1557804506-669a67965ba0?q=80&w=1000&auto=format&fit=crop'
-        ]
-      };
-
-      const fallbackList = formatFallbacks[format] || formatFallbacks['ig-post'];
-      const selectedFallbacks = fallbackList.slice(0, count);
-      while (selectedFallbacks.length < count) {
-        selectedFallbacks.push(fallbackList[0]);
-      }
-
-      if (company_id) {
-        await supabase.from('ai_generated_flyers').insert({
-          company_id,
-          prompt_used: prompt + " (FALLBACK)",
-          format,
-          tone,
-          image_urls: selectedFallbacks,
-          credits_spent: count,
-        });
-      }
-
-      let creditsRemaining = null;
-      if (company_id) {
-        const { data: creditRow } = await supabase
-          .from('ai_generation_credits')
-          .select('credits_used, credits_limit')
-          .eq('company_id', company_id)
-          .order('period_start', { ascending: false })
-          .limit(1)
-          .single();
-        if (creditRow) {
-          creditsRemaining = creditRow.credits_limit - creditRow.credits_used;
-        }
-      }
-
-      return new Response(JSON.stringify({
-        variants: selectedFallbacks,
-        count: selectedFallbacks.length,
-        credits_remaining: creditsRemaining,
-        is_fallback: true
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      const errorDetails = errors.join(' | ');
+      console.error('All variants failed:', errorDetails);
+      return new Response(JSON.stringify({ error: 'Error generando imagen. Por favor intenta de nuevo.', details: errorDetails }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
