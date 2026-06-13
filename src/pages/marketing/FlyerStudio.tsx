@@ -15,6 +15,7 @@ import { toPng } from 'html-to-image';
 import { RenderFlyer, FreeLogo, TEMPLATE_LIST } from './FlyerTemplates';
 import type { FlyerData } from './FlyerTemplates';
 import { FlyerTemplateA, FlyerTemplateB } from '../../components/flyers/FlyerTemplates';
+import { brandingService } from '../../services/branding';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 const FORMATS = [
@@ -69,6 +70,26 @@ const getFlyerDimensions = (formatId: string) => {
   }
 };
 
+async function urlToBase64(url: string): Promise<string> {
+  if (!url) return '';
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('Failed to convert blob to base64'));
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.error('Error fetching and converting image to base64:', error);
+    return '';
+  }
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function FlyerStudio() {
   const { profile } = useAuth();
@@ -77,6 +98,7 @@ export default function FlyerStudio() {
   const templateRefA = useRef<HTMLDivElement>(null);
   const templateRefB = useRef<HTMLDivElement>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<'A' | 'B'>('B');
+  const [previewMode, setPreviewMode] = useState<'template' | 'ai'>('template');
 
   // Form & Content States
   const [prompt, setPrompt] = useState('');
@@ -117,8 +139,21 @@ export default function FlyerStudio() {
 
   useEffect(() => {
     if (!profile?.company_id) return;
-    supabase.from('companies').select('name').eq('id', profile.company_id).single()
-      .then(({ data }) => { if (data?.name) setCompanyName(data.name); });
+    
+    brandingService.getMyCompany()
+      .then(async (data) => {
+        if (data) {
+          if (data.name) setCompanyName(data.name);
+          if (data.phone) setPhone(data.phone || '+503 7971-8911');
+          if (data.website) setWebsite(data.website || 'www.ariasdefense.com');
+          if (data.logo_url) {
+            const base64 = await urlToBase64(data.logo_url);
+            setLogoPreview(base64);
+          }
+        }
+      })
+      .catch((err) => console.error('Error loading branding:', err));
+
     supabase.from('ai_generation_credits')
       .select('credits_used,credits_limit').eq('company_id', profile.company_id)
       .order('period_start', { ascending: false }).limit(1).single()
@@ -149,6 +184,7 @@ export default function FlyerStudio() {
       if (error || !data?.variants?.length) throw new Error(error?.message || data?.error || 'Error generando');
       setVariants(data.variants);
       setSelected(0);
+      setPreviewMode('ai');
       if (data.credits_remaining != null) setCredits(data.credits_remaining);
     } catch (e: any) {
       toast.error(e.message);
@@ -158,24 +194,7 @@ export default function FlyerStudio() {
   }
 
   async function generateFromTemplate() {
-    if (!prompt.trim()) { toast.error('Describe qué quieres promocionar'); return; }
-    setGenerating(true);
-    setVariants([]);
-    try {
-      // Small delay to let React commit template state updates (e.g. logo, price, colors) to DOM
-      await new Promise(resolve => setTimeout(resolve, 350));
-      
-      const ref = selectedTemplate === 'A' ? templateRefA : templateRefB;
-      if (!ref.current) throw new Error('Template not ready');
-      const dataUrl = await toPng(ref.current, { pixelRatio: 1, cacheBust: true });
-      setVariants([dataUrl]);
-      setSelected(0);
-      toast.success('¡Flyer profesional generado!');
-    } catch (e: any) {
-      toast.error('Error generando flyer: ' + e.message);
-    } finally {
-      setGenerating(false);
-    }
+    await handleDownload();
   }
 
   async function optimizeWithMetaAI() {
@@ -219,16 +238,35 @@ export default function FlyerStudio() {
   }
 
   async function handleDownload() {
-    if (!flyerRef.current) return;
     setGenerating(true);
     try {
-      const canvas = await html2canvas(flyerRef.current, {
-        useCORS: true,
-        allowTaint: true,
-        scale: 2,
-        backgroundColor: null
-      });
-      const dataUrl = canvas.toDataURL('image/png');
+      let dataUrl = '';
+      if (previewMode === 'ai' && variants.length > 0) {
+        if (logoPreview && flyerRef.current) {
+          const canvas = await html2canvas(flyerRef.current, {
+            useCORS: true,
+            allowTaint: true,
+            scale: 2,
+            backgroundColor: null
+          });
+          dataUrl = canvas.toDataURL('image/png');
+        } else {
+          dataUrl = await urlToBase64(variants[selected]);
+        }
+      } else if (bgUploadPreview) {
+        if (!flyerRef.current) { toast.error('Flyer no está listo'); return; }
+        const canvas = await html2canvas(flyerRef.current, {
+          useCORS: true,
+          allowTaint: true,
+          scale: 2,
+          backgroundColor: null
+        });
+        dataUrl = canvas.toDataURL('image/png');
+      } else {
+        const ref = selectedTemplate === 'A' ? templateRefA : templateRefB;
+        if (!ref.current) throw new Error('Template not ready');
+        dataUrl = await toPng(ref.current, { pixelRatio: 2, cacheBust: true });
+      }
       const a = document.createElement('a');
       a.href = dataUrl;
       a.download = `flyer-${format}-${Date.now()}.png`;
@@ -236,7 +274,7 @@ export default function FlyerStudio() {
       toast.success('Flyer personalizado descargado con éxito');
     } catch (err: any) {
       console.error('Error al capturar flyer:', err);
-      toast.error('Error al generar la descarga del flyer');
+      toast.error('Error al generar la descarga del flyer: ' + err.message);
     } finally {
       setGenerating(false);
     }
@@ -245,24 +283,42 @@ export default function FlyerStudio() {
   async function sendToSocialHub() {
     setGenerating(true);
     try {
-      let dataUrl: string;
-      // If we have a generated variant (data URL from template), use it directly
-      if (variants.length > 0 && variants[selected]) {
-        dataUrl = variants[selected];
-      } else if (flyerRef.current) {
-        // Fall back to html2canvas for uploaded images
+      let dataUrl = '';
+      if (previewMode === 'ai' && variants.length > 0) {
+        if (logoPreview && flyerRef.current) {
+          const canvas = await html2canvas(flyerRef.current, {
+            useCORS: true, allowTaint: true, scale: 2, backgroundColor: null
+          });
+          dataUrl = canvas.toDataURL('image/png');
+        } else {
+          dataUrl = await urlToBase64(variants[selected]);
+        }
+      } else if (bgUploadPreview) {
+        if (!flyerRef.current) { toast.error('Flyer no está listo'); return; }
         const canvas = await html2canvas(flyerRef.current, {
           useCORS: true, allowTaint: true, scale: 2, backgroundColor: null
         });
         dataUrl = canvas.toDataURL('image/png');
       } else {
-        toast.error('No hay flyer para enviar'); return;
+        const ref = selectedTemplate === 'A' ? templateRefA : templateRefB;
+        if (!ref.current) throw new Error('Template not ready');
+        dataUrl = await toPng(ref.current, { pixelRatio: 2, cacheBust: true });
       }
       sessionStorage.setItem('socialhub_prefill_image', dataUrl);
+      
+      // Save metadata to enable correct context parsing in SocialHub
+      const meta = {
+        prompt,
+        title: prompt.split('—')[0]?.trim() || '',
+        colors,
+      };
+      sessionStorage.setItem('socialhub_prefill_meta', JSON.stringify(meta));
+
       navigate('/marketing/social');
       toast.success('✅ Flyer enviado al Panel de Publicidad');
     } catch (err: any) {
-      toast.error('Error al preparar el flyer para publicar');
+      console.error('Error al preparar el flyer:', err);
+      toast.error('Error al preparar el flyer para publicar: ' + err.message);
     } finally {
       setGenerating(false);
     }
@@ -390,7 +446,7 @@ export default function FlyerStudio() {
                 {logoPreview && (
                   <div style={{ position: 'relative', display: 'inline-flex' }}>
                     <img src={logoPreview} alt="logo" style={{ height: 36, width: 36, objectFit: 'contain', borderRadius: 5, border: '1px solid #e2e8f0' }} />
-                    <button onClick={() => { setLogoFile(null); setLogoPreview(''); }} style={{ position: 'absolute', top: -5, right: -5, background: '#ef4444', border: 'none', borderRadius: '50%', width: 14, height: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <button onClick={() => { setLogoFile(null); setLogoPreview(''); if (logoRef.current) logoRef.current.value = ''; }} style={{ position: 'absolute', top: -5, right: -5, background: '#ef4444', border: 'none', borderRadius: '50%', width: 14, height: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <X size={9} color="#fff" />
                     </button>
                   </div>
@@ -570,11 +626,11 @@ export default function FlyerStudio() {
             <div style={{ paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
               {/* Template selector */}
               <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => setSelectedTemplate('A')}
+                <button onClick={() => { setSelectedTemplate('A'); setPreviewMode('template'); }}
                   style={{ flex: 1, border: `2px solid ${selectedTemplate === 'A' ? '#e91e8c' : '#e2e8f0'}`, borderRadius: 8, padding: '8px 10px', background: selectedTemplate === 'A' ? '#fce4ec' : '#f8fafc', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: selectedTemplate === 'A' ? '#c2185b' : '#64748b' }}>
                   🎨 Estilo A (Rosa)
                 </button>
-                <button onClick={() => setSelectedTemplate('B')}
+                <button onClick={() => { setSelectedTemplate('B'); setPreviewMode('template'); }}
                   style={{ flex: 1, border: `2px solid ${selectedTemplate === 'B' ? '#9b1c1c' : '#e2e8f0'}`, borderRadius: 8, padding: '8px 10px', background: selectedTemplate === 'B' ? '#fef2f2' : '#f8fafc', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: selectedTemplate === 'B' ? '#9b1c1c' : '#64748b' }}>
                   🏢 Estilo B (Rojo)
                 </button>
@@ -677,7 +733,8 @@ export default function FlyerStudio() {
                 )}
 
                 {/* ── FLYER CANVAS: Pure image from DALL-E 3 or uploaded flyer ── */}
-                {(bgUploadPreview || variants.length > 0) ? (
+                {/* ── FLYER CANVAS: Live template or uploaded flyer ── */}
+                {(bgUploadPreview || variants.length > 0 || !bgFile) ? (
                   <div style={{ display: 'flex', justifyContent: 'center', width: '100%', userSelect: 'none' }}>
                     <div
                       ref={flyerRef}
@@ -686,7 +743,7 @@ export default function FlyerStudio() {
                         position: 'relative',
                         borderRadius: '14px',
                         overflow: 'hidden',
-                        boxShadow: '0 16px 48px rgba(0,0,0,0.28)',
+                        boxShadow: '0 16px 48px rgba(0,0,0,0.18)',
                         width: '100%',
                         maxWidth: `min(${getFlyerDimensions(format).width}px, 100%)`,
                         maxHeight: '62vh',
@@ -694,33 +751,73 @@ export default function FlyerStudio() {
                         flexShrink: 1,
                         cursor: 'zoom-in',
                         transition: 'transform 0.2s ease',
+                        border: '1px solid #dde1e7',
+                        background: '#fff'
                       }}
                       title="Ver vista previa en pantalla completa"
-                      onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.015)'; }}
+                      onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.01)'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
                     >
-                      {/* The actual AI-generated or uploaded flyer image — full bleed, no HTML overlays */}
-                      <img
-                        src={bgUploadPreview || variants[selected]}
-                        alt="Flyer generado"
-                        crossOrigin="anonymous"
-                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#fff' }}
-                      />
+                      {bgUploadPreview ? (
+                        <img
+                          src={bgUploadPreview}
+                          alt="Flyer personalizado"
+                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#fff' }}
+                        />
+                      ) : (previewMode === 'ai' && variants.length > 0) ? (
+                        <img
+                          src={variants[selected]}
+                          alt="Flyer generado"
+                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#fff' }}
+                        />
+                      ) : (
+                        // Live Template scaled down to fit viewport
+                        <div style={{
+                          transform: `scale(${getFlyerDimensions(format).width / 1080})`,
+                          transformOrigin: 'top left',
+                          width: 1080,
+                          height: 1080,
+                          pointerEvents: 'none'
+                        }}>
+                          {selectedTemplate === 'A' ? (
+                            <FlyerTemplateA data={{
+                              company_name: companyName || 'Mi Empresa',
+                              prompt, cta: cta || 'Contáctanos HOY',
+                              primaryColor: colors[0] || '#e91e8c',
+                              secondaryColor: colors[1] || '#1a1a2e',
+                              phone, website,
+                              logoUrl: logoPreview || undefined,
+                            }} />
+                          ) : (
+                            <FlyerTemplateB data={{
+                              company_name: companyName || 'Mi Empresa',
+                              prompt, cta: cta || 'Activa HOY MISMO',
+                              primaryColor: colors[0] || '#9b1c1c',
+                              secondaryColor: colors[1] || '#1a1a2e',
+                              phone, website,
+                              logoUrl: logoPreview || undefined,
+                            }} />
+                          )}
+                        </div>
+                      )}
+
                       {/* Hover overlay hint */}
                       <div style={{
-                        position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.15)',
+                        position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.06)',
                         opacity: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
                         transition: 'opacity 0.2s',
+                        zIndex: 10
                       }}
-                      onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.opacity = 0; }}
+                      onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.opacity = '0'; }}
                       >
-                        <div style={{ background: 'rgba(255,255,255,0.9)', padding: '8px 16px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: '#0f172a', boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+                        <div style={{ background: 'rgba(255,255,255,0.95)', padding: '8px 16px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 800, color: '#0f172a', boxShadow: '0 4px 12px rgba(0,0,0,0.12)' }}>
                           <span>🔍 Vista Previa Completa</span>
                         </div>
                       </div>
-                      {/* Logo overlay — only if user uploaded a logo AND it's a manual flyer upload (not template) */}
-                      {logoPreview && bgUploadPreview && !variants.length && (
+
+                      {/* Logo overlay — show if user uploaded a logo AND it's a manual flyer upload OR AI generated flyer */}
+                      {logoPreview && (bgUploadPreview || (previewMode === 'ai' && variants.length > 0)) && (
                         <FreeLogo
                           d={{ title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null, logoUrl: logoPreview, industria: '', phone: '', website: '', templateId: 'direct-mockup', containerW: getFlyerDimensions(format).width, containerH: getFlyerDimensions(format).height, logoSize, logoX, logoY }}
                           onMove={(x, y) => { setLogoX(x); setLogoY(y); }}
@@ -730,7 +827,7 @@ export default function FlyerStudio() {
                     </div>
                   </div>
                 ) : (
-                  /* Empty state — premium version matching production */
+                  /* Empty state */
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, padding: '48px 32px', background: '#fff', borderRadius: 16, width: '100%', maxWidth: 420, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
                     <div style={{ width: 64, height: 64, borderRadius: 18, background: 'linear-gradient(135deg,#e0e7ff,#dbeafe)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <Layers size={28} color="#6366f1" />
@@ -739,23 +836,11 @@ export default function FlyerStudio() {
                       <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>Completa el brief y genera</div>
                       <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.6 }}>La IA creará un flyer profesional listo<br />para publicar en tus redes sociales.</div>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>
-                      {[
-                        { icon: '🎯', text: 'Usa un tono acorde a tu audiencia' },
-                        { icon: '🎨', text: 'Agrega tus colores de marca' },
-                        { icon: '📐', text: 'Elige el formato según la red social' },
-                      ].map((tip, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#f8fafc', borderRadius: 10, padding: '10px 14px', border: '1px solid #f1f5f9' }}>
-                          <span style={{ fontSize: 16 }}>{tip.icon}</span>
-                          <span style={{ fontSize: 12, color: '#475569', fontWeight: 500 }}>{tip.text}</span>
-                        </div>
-                      ))}
-                    </div>
                   </div>
                 )}
 
                 {/* Drag hint */}
-                {logoPreview && (
+                {logoPreview && (bgUploadPreview || (previewMode === 'ai' && variants.length > 0)) && (
                   <div style={{ fontSize: 10, color: '#64748b', textAlign: 'center', fontStyle: 'italic' }}>
                     💡 Tip: Puedes arrastrar y redimensionar el logo directamente sobre el flyer.
                   </div>
@@ -868,22 +953,88 @@ export default function FlyerStudio() {
               </span>
             </div>
 
-            {/* Body (The Image) */}
+            {/* Body (The Image or Live template) */}
             <div style={{ 
               background: '#f8fafc', padding: 24, 
               display: 'flex', alignItems: 'center', justifyContent: 'center', 
               overflow: 'auto', flex: 1 
             }}>
-              <img
-                src={bgUploadPreview || variants[selected]}
-                alt="Flyer en Alta Resolución"
-                style={{
-                  maxHeight: '60vh', maxWidth: '100%',
-                  objectFit: 'contain', borderRadius: 10,
-                  boxShadow: '0 10px 30px rgba(0,0,0,0.12)',
-                  display: 'block'
-                }}
-              />
+              {bgUploadPreview || (previewMode === 'ai' && variants.length > 0) ? (
+                <div style={{
+                  position: 'relative',
+                  width: getFlyerDimensions(format).width,
+                  height: getFlyerDimensions(format).height,
+                  borderRadius: 14,
+                  boxShadow: '0 20px 50px rgba(0,0,0,0.15)',
+                  background: '#fff',
+                  overflow: 'hidden'
+                }}>
+                  <img
+                    src={bgUploadPreview || variants[selected]}
+                    alt="Flyer en Alta Resolución"
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                      display: 'block'
+                    }}
+                  />
+                  {logoPreview && (
+                    <FreeLogo
+                      d={{
+                        title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null,
+                        logoUrl: logoPreview, industria: '', phone: '', website: '', templateId: 'direct-mockup',
+                        containerW: getFlyerDimensions(format).width,
+                        containerH: getFlyerDimensions(format).height,
+                        logoSize, logoX, logoY
+                      }}
+                      onMove={(x, y) => { setLogoX(x); setLogoY(y); }}
+                      onResize={(s) => setLogoSize(s)}
+                    />
+                  )}
+                </div>
+              ) : (
+                // Scaled Template inside Modal
+                <div style={{
+                  width: getFlyerDimensions(format).width,
+                  height: getFlyerDimensions(format).height,
+                  overflow: 'hidden',
+                  position: 'relative',
+                  borderRadius: 14,
+                  boxShadow: '0 20px 50px rgba(0,0,0,0.15)',
+                  background: '#fff'
+                }}>
+                  <div style={{
+                    transform: `scale(${getFlyerDimensions(format).width / 1080})`,
+                    transformOrigin: 'top left',
+                    width: 1080,
+                    height: 1080,
+                    pointerEvents: 'none'
+                  }}>
+                    {selectedTemplate === 'A' ? (
+                      <FlyerTemplateA data={{
+                        company_name: companyName || 'Mi Empresa',
+                        prompt, cta: cta || 'Contáctanos HOY',
+                        primaryColor: colors[0] || '#e91e8c',
+                        secondaryColor: colors[1] || '#1a1a2e',
+                        phone, website,
+                        logoUrl: logoPreview || undefined,
+                      }} />
+                    ) : (
+                      <FlyerTemplateB data={{
+                        company_name: companyName || 'Mi Empresa',
+                        prompt, cta: cta || 'Activa HOY MISMO',
+                        primaryColor: colors[0] || '#9b1c1c',
+                        secondaryColor: colors[1] || '#1a1a2e',
+                        phone, website,
+                        logoUrl: logoPreview || undefined,
+                      }} />
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Footer Actions */}

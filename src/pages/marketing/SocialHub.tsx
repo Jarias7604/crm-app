@@ -263,8 +263,35 @@ export default function SocialHub() {
       setImgError(false);
       sessionStorage.removeItem('socialhub_prefill_image');
       toast.success('✅ Flyer cargado desde Flyer Studio');
+
+      // Auto-generate caption instantly based on the prefilled metadata if available
+      const prefillMeta = sessionStorage.getItem('socialhub_prefill_meta');
+      if (prefillMeta && profile?.company_id) {
+        try {
+          const meta = JSON.parse(prefillMeta);
+          sessionStorage.removeItem('socialhub_prefill_meta');
+          const context = meta.title 
+            ? `Flyer titulado "${meta.title}" con diseño: ${meta.prompt || ''}`
+            : (meta.prompt || 'Facturación instantánea y declaraciones para PYMEs');
+          
+          setGeneratingCaption('facebook');
+          Promise.all([
+            socialPublishService.generateCaption('facebook', context, selectedTone, profile.company_id),
+            socialPublishService.generateCaption('instagram', context, selectedTone, profile.company_id)
+          ]).then(([fbText, igText]) => {
+            setCaptions({ facebook: fbText, instagram: igText });
+            toast.success('¡Copy publicitario creado con IA!');
+          }).catch(err => {
+            console.error('Error generating captions from prefill meta:', err);
+          }).finally(() => {
+            setGeneratingCaption(null);
+          });
+        } catch (e) {
+          console.error('Error parsing prefilled metadata:', e);
+        }
+      }
     }
-  }, []);
+  }, [profile?.company_id]);
 
   // Load flyer data and auto-generate captions
   useEffect(() => {
