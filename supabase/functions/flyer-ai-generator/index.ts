@@ -68,94 +68,32 @@ function buildImagePrompt(params: {
   tone?: string;
   variantSeed?: string;
 }): string {
-  const { prompt, company_name, tagline, cta, colors, format, tone, variantSeed } = params;
+  const { prompt, colors, tone, variantSeed } = params;
 
   const primaryColor = (colors && colors.length > 0) ? colors[0] : '#e91e8c';
   const secondaryColor = (colors && colors.length > 1) ? colors[1] : '#1a1a2e';
-  const ctaText = cta || 'Contáctanos hoy';
-  const taglineText = tagline || '';
 
-  const layoutVariants: Record<string, string> = {
-    'A': `LAYOUT — VARIANT A (Classic Corporate):
-TOP SECTION (white background):
-- Small colored badge/pill at top center with text "SOLUCIÓN INTEGRAL PARA TU NEGOCIO" in ${primaryColor}
-- Very large bold black headline (2 lines): derived from "${prompt}" 
-- Subtitle line below in dark gray
-
-MIDDLE SECTION:
-- LEFT COLUMN: 4 feature rows, each with a colored square icon on the left and bold title + description text. Features related to: ${prompt}
-- RIGHT COLUMN: Realistic laptop computer mockup showing a professional dashboard/app screenshot with charts, numbers, graphs inside the screen. Next to it a smartphone showing the mobile version.
-
-BOTTOM SECTION (${primaryColor} colored background area):
-- LEFT: Large price display "DESDE $12.95/mes" in white bold text with "SIN CONTRATOS LARGOS" badge below
-- CENTER: CTA button "${ctaText}" in large white bold text with WhatsApp icon
-- RIGHT: Tagline text in white
-
-FOOTER (dark ${secondaryColor} bar):
-- Company logo placeholder LEFT, WhatsApp number CENTER-LEFT, Email CENTER-RIGHT, Website RIGHT
-- All in white text on dark background`,
-
-    'B': `LAYOUT — VARIANT B (Bold Impact):
-BACKGROUND: Clean white with ${primaryColor} accent elements
-
-TOP: 
-- Attention-grabbing question headline in black: large, bold, 2 lines
-- Company name "${company_name}" in ${primaryColor} color, bold
-
-CENTER:
-- Large laptop mockup showing professional software/dashboard, centered
-- 4 circular icons arranged around the laptop (top-left, top-right, bottom-left, bottom-right) each with icon + label for key features
-
-PRICE BADGE: Prominent badge center showing price, colored in ${primaryColor}
-
-BOTTOM STRIP (${primaryColor} background):
-- 3 benefit boxes side by side, each with small icon and text
-- Final tagline bar in dark color
-
-FOOTER: Contact info row`,
-
-    'C': `LAYOUT — VARIANT C (Minimal Premium):
-Clean white background, bold typography, minimal elements
-
-HEADER: Company badge top-left, social proof text top-right
-HERO: Massive bold headline taking 40% of space, with ${primaryColor} color accent on key word
-SUBTEXT: 2-3 lines explaining the offer from: ${prompt}
-VISUAL: Full-bleed product/service image right side
-FEATURES: 3 horizontal pill-shaped feature highlights
-CTA SECTION: Large "${ctaText}" button in ${primaryColor}
-FOOTER: Minimal contact line`,
+  // Seed variations for background styles
+  const styles: Record<string, string> = {
+    'A': `modern premium corporate aesthetic with abstract fluid shapes, smooth metallic surfaces, high-end advertising concept`,
+    'B': `minimalistic clean design background with elegant glowing neon lines, digital technology grid, professional advertising lighting`,
+    'C': `sophisticated corporate glassmorphism style, atmospheric soft shadows, sleek gradient waves, premium branding background`,
   };
 
-  const layout = layoutVariants[variantSeed || 'A'];
+  const selectedStyle = styles[variantSeed || 'A'];
 
-  return `Design a PIXEL-PERFECT, PRINT-READY professional marketing flyer. Style: like a top agency in Latin America created it for a B2B software company.
+  return `Design a STUNNING, HIGH-FIDELITY commercial advertising background. 
+Style theme: ${selectedStyle}.
+Topic/Sector details: "${prompt}".
+Visual mood: Professional commercial studio photography, sleek lighting, rich colors, premium advertising look.
+Brand colors to integrate: ${primaryColor} and ${secondaryColor}.
+Composition: Perfect B2B backdrop with a lot of clean negative space, designed as an advertising canvas to overlay HTML text and product dashboard mockups.
 
-COMPANY: ${company_name}
-WHAT TO PROMOTE: ${prompt}
-CALL TO ACTION: "${ctaText}"
-${taglineText ? `TAGLINE: "${taglineText}"` : ''}
-PRIMARY COLOR: ${primaryColor}
-SECONDARY COLOR: ${secondaryColor}
-
-${layout}
-
-MANDATORY DESIGN RULES:
-1. CRITICAL — ALL text must be in PERFECT Spanish spelling. Zero tolerance for typos. 
-   CORRECT: "Reportes" (NEVER "Ruportes"), "Tiempo" (NEVER "Tiempò"), "Facturación" (NEVER "Facturacion"), 
-   "Inventario", "Clientes", "Ventas", "Seguridad", "Solución", "Gestión", "Automatización"
-   If unsure of a word, use a simpler synonym. NEVER render garbled or misspelled text.
-2. Typography: Use clean sans-serif fonts (like Inter, Montserrat or similar). Headlines BOLD, body text regular weight
-3. The flyer must look EXACTLY like a professional designer made it — not AI-generated
-4. Include realistic UI/dashboard mockup on a laptop screen (showing charts, numbers, graphs — it represents the software being promoted)
-5. Price must be visible and prominent if mentioned in the prompt
-6. Feature icons must be clean, professional vector-style icons (not clip art)
-7. Color usage: primary color ${primaryColor} for accents, badges, CTA buttons. White for main background. Dark color for text.
-8. High resolution, sharp edges, no blur, no distortion, no warped letters
-9. The final result should be indistinguishable from a Canva Pro or Adobe Express professional template
-10. Include the company name "${company_name}" prominently
-11. NEVER mix fonts mid-word. NEVER render emoji as unicode boxes. NEVER distort text.
-
-This flyer will be published on Instagram/Facebook. It must immediately communicate value and drive action.\`;
+CRITICAL MANDATORY RULES:
+1. STRICTLY NO TEXT, NO LETTERS, NO WORDS, NO WRITING, NO TYPOS, NO ALPHABET, NO CHARACTERS. The image must be 100% clean and free of any text.
+2. NO LAPTOPS, NO SMARTPHONES, NO COMPUTERS, NO HARDWARE. Do not render any electronic devices, screens, or mockups.
+3. Clean empty space. Maintain large solid/gradient areas with soft light so that text can be easily read when overlayed.
+4. No blur, sharp high-fidelity rendering, pixel-perfect.`;
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────

@@ -905,9 +905,9 @@ export default function FlyerStudio() {
                       onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.01)'; }}
                       onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
                     >
-                      {(bgUploadPreview || (previewMode === 'ai' && variants.length > 0)) ? (
+                      {bgUploadPreview ? (
                         <img
-                          src={bgUploadPreview || variants[selected]}
+                          src={bgUploadPreview}
                           alt="Flyer"
                           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#fff' }}
                         />
@@ -930,6 +930,7 @@ export default function FlyerStudio() {
                               secondaryColor: colors[1] || '#1a1a2e',
                               phone, website,
                               logoUrl: logoPreview || undefined,
+                              bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
                             }} />
                           ) : (
                             <FlyerTemplateB data={{
@@ -939,6 +940,7 @@ export default function FlyerStudio() {
                               secondaryColor: colors[1] || '#1a1a2e',
                               phone, website,
                               logoUrl: logoPreview || undefined,
+                              bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
                             }} />
                           )}
                         </div>
@@ -1039,6 +1041,7 @@ export default function FlyerStudio() {
           secondaryColor: colors[1] || '#1a1a2e',
           phone, website,
           logoUrl: logoPreview || undefined,
+          bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
         }} />
         <FlyerTemplateB ref={templateRefB} data={{
           company_name: companyName || 'Mi Empresa',
@@ -1047,6 +1050,7 @@ export default function FlyerStudio() {
           secondaryColor: colors[1] || '#1a1a2e',
           phone, website,
           logoUrl: logoPreview || undefined,
+          bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
         }} />
       </div>
 
@@ -1143,9 +1147,9 @@ export default function FlyerStudio() {
                   boxShadow: '0 20px 50px rgba(0,0,0,0.15)',
                   background: '#fff'
                 }}>
-                  {(bgUploadPreview || (previewMode === 'ai' && variants.length > 0)) ? (
+                  {bgUploadPreview ? (
                     <img
-                      src={bgUploadPreview || variants[selected]}
+                      src={bgUploadPreview}
                       alt="Flyer Vista Previa"
                       style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
                     />
@@ -1165,6 +1169,7 @@ export default function FlyerStudio() {
                           secondaryColor: colors[1] || '#1a1a2e',
                           phone, website,
                           logoUrl: logoPreview || undefined,
+                          bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
                         }} />
                       ) : (
                         <FlyerTemplateB data={{
@@ -1174,6 +1179,7 @@ export default function FlyerStudio() {
                           secondaryColor: colors[1] || '#1a1a2e',
                           phone, website,
                           logoUrl: logoPreview || undefined,
+                          bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
                         }} />
                       )}
                     </div>
