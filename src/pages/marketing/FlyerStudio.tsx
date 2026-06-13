@@ -988,7 +988,7 @@ export default function FlyerStudio() {
                       )}
                     </div>
                   </div>
-                )}
+                ) : null}
 
                 {/* Drag hint */}
                 {logoPreview && (bgUploadPreview || (previewMode === 'ai' && variants.length > 0)) && (
