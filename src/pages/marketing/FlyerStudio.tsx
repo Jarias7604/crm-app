@@ -57,13 +57,13 @@ const css = {
 
 const getFlyerDimensions = (formatId: string) => {
   switch (formatId) {
-    case 'ig-post': return { width: 340, height: 340 };
-    case 'ig-portrait': return { width: 300, height: 375 };
-    case 'fb-post': return { width: 340, height: 283 };
-    case 'story': return { width: 240, height: 426 };
-    case 'fb-cover': return { width: 380, height: 144 };
-    case 'li-post': return { width: 380, height: 200 };
-    default: return { width: 340, height: 340 };
+    case 'ig-post':     return { width: 520, height: 520 };
+    case 'ig-portrait': return { width: 460, height: 575 };
+    case 'fb-post':     return { width: 520, height: 433 };
+    case 'story':       return { width: 370, height: 657 };
+    case 'fb-cover':    return { width: 540, height: 200 };
+    case 'li-post':     return { width: 540, height: 284 };
+    default:            return { width: 520, height: 520 };
   }
 };
 
@@ -577,7 +577,7 @@ export default function FlyerStudio() {
 
             {/* Live Template Preview */}
             {!showSuggestions && !generating && (
-              <div style={{ width: '100%', maxWidth: 440, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {/* Variant selector tabs if there are multiple variants generated */}
                 {variants.length > 1 && (
                   <div style={{ display: 'flex', gap: 8, background: '#fff', padding: 8, borderRadius: 8, border: '1px solid #e2e8f0' }}>
@@ -597,11 +597,12 @@ export default function FlyerStudio() {
                       ref={flyerRef}
                       style={{
                         position: 'relative',
-                        borderRadius: '12px',
+                        borderRadius: '14px',
                         overflow: 'hidden',
-                        boxShadow: '0 10px 30px rgba(0,0,0,0.22)',
-                        width: getFlyerDimensions(format).width,
-                        height: getFlyerDimensions(format).height,
+                        boxShadow: '0 16px 48px rgba(0,0,0,0.28)',
+                        width: '100%',
+                        maxWidth: getFlyerDimensions(format).width,
+                        aspectRatio: `${getFlyerDimensions(format).width} / ${getFlyerDimensions(format).height}`,
                         flexShrink: 0,
                       }}
                     >
