@@ -239,21 +239,25 @@ export default function FlyerStudio() {
   }
 
   async function sendToSocialHub() {
-    if (!flyerRef.current) return;
     setGenerating(true);
     try {
-      const canvas = await html2canvas(flyerRef.current, {
-        useCORS: true,
-        allowTaint: true,
-        scale: 2,
-        backgroundColor: null
-      });
-      const dataUrl = canvas.toDataURL('image/png');
+      let dataUrl: string;
+      // If we have a generated variant (data URL from template), use it directly
+      if (variants.length > 0 && variants[selected]) {
+        dataUrl = variants[selected];
+      } else if (flyerRef.current) {
+        // Fall back to html2canvas for uploaded images
+        const canvas = await html2canvas(flyerRef.current, {
+          useCORS: true, allowTaint: true, scale: 2, backgroundColor: null
+        });
+        dataUrl = canvas.toDataURL('image/png');
+      } else {
+        toast.error('No hay flyer para enviar'); return;
+      }
       sessionStorage.setItem('socialhub_prefill_image', dataUrl);
       navigate('/marketing/social');
       toast.success('✅ Flyer enviado al Panel de Publicidad');
     } catch (err: any) {
-      console.error('Error sending to Social Hub:', err);
       toast.error('Error al preparar el flyer para publicar');
     } finally {
       setGenerating(false);
