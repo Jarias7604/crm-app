@@ -774,7 +774,8 @@ export default function FlyerStudio() {
                   return (
                     <button
                       key={hex}
-                      onClick={() => toggleColor(hex)}
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); toggleColor(hex); }}
                       style={{
                         width: 26,
                         height: 26,
@@ -809,7 +810,8 @@ export default function FlyerStudio() {
                 })}
                 {colors.length > 0 && (
                   <button 
-                    onClick={() => setColors([])} 
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); setColors([]); userSelectedColors.current = true; }} 
                     style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', marginLeft: 6 }}
                   >
                     Limpiar
@@ -1189,7 +1191,7 @@ export default function FlyerStudio() {
                           benefits: aiOptimizedText?.benefits,
                           mockup_info: aiOptimizedText?.mockup_info,
                           primaryColor: colors[0] || '#e91e8c',
-                          secondaryColor: colors[1] || '#1a1a2e',
+                          secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
                           phone, website, logoUrl: logoPreview || undefined,
                           bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
                         }} />
@@ -1206,7 +1208,7 @@ export default function FlyerStudio() {
                           benefits: aiOptimizedText?.benefits,
                           mockup_info: aiOptimizedText?.mockup_info,
                           primaryColor: colors[0] || '#9b1c1c',
-                          secondaryColor: colors[1] || '#1a1a2e',
+                          secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
                           phone, website, logoUrl: logoPreview || undefined,
                           bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
                         }} />
@@ -1255,7 +1257,7 @@ export default function FlyerStudio() {
           benefits: aiOptimizedText?.benefits,
           mockup_info: aiOptimizedText?.mockup_info,
           primaryColor: colors[0] || '#e91e8c',
-          secondaryColor: colors[1] || '#1a1a2e',
+          secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
           phone, website,
           logoUrl: logoPreview || undefined,
           bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
@@ -1273,7 +1275,7 @@ export default function FlyerStudio() {
           benefits: aiOptimizedText?.benefits,
           mockup_info: aiOptimizedText?.mockup_info,
           primaryColor: colors[0] || '#9b1c1c',
-          secondaryColor: colors[1] || '#1a1a2e',
+          secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
           phone, website,
           logoUrl: logoPreview || undefined,
           bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined

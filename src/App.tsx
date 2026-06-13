@@ -62,6 +62,7 @@ const CallBot           = lazy(() => import('./pages/admin/CallBot'));
 const ManualPage        = lazy(() => import('./pages/support/ManualPage'));
 const PWAInstallPrompt  = lazy(() => import('./components/PWAInstallPrompt').then(m => ({ default: m.PWAInstallPrompt })));
 const FlyerStudio       = lazy(() => import('./pages/marketing/FlyerStudio'));
+const TestFlyer         = lazy(() => import('./pages/marketing/TestFlyer'));
 const SocialHub         = lazy(() => import('./pages/marketing/SocialHub'));
 const AiCreditsAdmin    = lazy(() => import('./pages/marketing/AiCreditsAdmin'));
 const SocialAccounts    = lazy(() => import('./pages/company/SocialAccounts'));
@@ -301,6 +302,7 @@ function App() {
               </Route>
 
               {/* Public routes (no auth required) */}
+              <Route path="/test-flyer" element={<TestFlyer />} />
               <Route path="/propuesta/:id" element={<PublicQuoteView />} />
               <Route path="/portal/cliente/:token" element={<ClientPortal />} />
               <Route path="/book/:slug" element={<PublicBookingPage />} />

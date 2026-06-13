@@ -414,7 +414,7 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
   ({ data }, ref) => {
     const parsed = parsePrompt(data.prompt);
     const primary = data.primaryColor || '#e91e8c';
-    const secondary = data.secondaryColor || '#1a1a2e';
+    const secondary = data.secondaryColor || '#0f172a';
     const price = data.price || parsed.price || derivePrice(data.prompt);
     const features = (data.features || parsed.features || deriveFeatures(data.prompt)).slice(0, 3);
     const { h1, h2 } = deriveHeadline(data.prompt, data.company_name);
@@ -618,7 +618,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
   ({ data }, ref) => {
     const parsed = parsePrompt(data.prompt);
     const primary = data.primaryColor || '#9b1c1c';
-    const secondary = data.secondaryColor || '#1a1a2e';
+    const secondary = data.secondaryColor || '#0f172a';
     const price = data.price || parsed.price || derivePrice(data.prompt) || '';
     
     const industry = deriveIndustryContent(data.prompt, data);
