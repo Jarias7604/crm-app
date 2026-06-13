@@ -70,57 +70,88 @@ function buildImagePrompt(params: {
 }): string {
   const { prompt, company_name, tagline, cta, colors, format, tone, variantSeed } = params;
 
-  const toneDirective = TONE_DIRECTIVES[tone || 'moderno'];
-  const colorInstructions = colors && colors.length > 0
-    ? `Brand colors to incorporate: ${colors.join(', ')}.`
-    : 'Use a harmonious, professional color palette.';
+  const primaryColor = (colors && colors.length > 0) ? colors[0] : '#e91e8c';
+  const secondaryColor = (colors && colors.length > 1) ? colors[1] : '#1a1a2e';
+  const ctaText = cta || 'Contáctanos hoy';
+  const taglineText = tagline || '';
 
-  const ctaText = cta || 'Contact us today';
-  const taglineText = tagline ? `Tagline: "${tagline}"` : '';
+  const layoutVariants: Record<string, string> = {
+    'A': `LAYOUT — VARIANT A (Classic Corporate):
+TOP SECTION (white background):
+- Small colored badge/pill at top center with text "SOLUCIÓN INTEGRAL PARA TU NEGOCIO" in ${primaryColor}
+- Very large bold black headline (2 lines): derived from "${prompt}" 
+- Subtitle line below in dark gray
 
-  // Variant differentiation: each variant gets a different layout/composition seed
-  const variantCompositions: Record<string, string> = {
-    'A': 'Composition: Bold headline centered at top, product/service visualization in the middle, CTA button at bottom.',
-    'B': 'Composition: Left-aligned layout, large imagery on the right side, text hierarchy on the left with high contrast.',
-    'C': 'Composition: Diagonal split design, dynamic energy lines, headline breaks across the divider for visual impact.',
+MIDDLE SECTION:
+- LEFT COLUMN: 4 feature rows, each with a colored square icon on the left and bold title + description text. Features related to: ${prompt}
+- RIGHT COLUMN: Realistic laptop computer mockup showing a professional dashboard/app screenshot with charts, numbers, graphs inside the screen. Next to it a smartphone showing the mobile version.
+
+BOTTOM SECTION (${primaryColor} colored background area):
+- LEFT: Large price display "DESDE $12.95/mes" in white bold text with "SIN CONTRATOS LARGOS" badge below
+- CENTER: CTA button "${ctaText}" in large white bold text with WhatsApp icon
+- RIGHT: Tagline text in white
+
+FOOTER (dark ${secondaryColor} bar):
+- Company logo placeholder LEFT, WhatsApp number CENTER-LEFT, Email CENTER-RIGHT, Website RIGHT
+- All in white text on dark background`,
+
+    'B': `LAYOUT — VARIANT B (Bold Impact):
+BACKGROUND: Clean white with ${primaryColor} accent elements
+
+TOP: 
+- Attention-grabbing question headline in black: large, bold, 2 lines
+- Company name "${company_name}" in ${primaryColor} color, bold
+
+CENTER:
+- Large laptop mockup showing professional software/dashboard, centered
+- 4 circular icons arranged around the laptop (top-left, top-right, bottom-left, bottom-right) each with icon + label for key features
+
+PRICE BADGE: Prominent badge center showing price, colored in ${primaryColor}
+
+BOTTOM STRIP (${primaryColor} background):
+- 3 benefit boxes side by side, each with small icon and text
+- Final tagline bar in dark color
+
+FOOTER: Contact info row`,
+
+    'C': `LAYOUT — VARIANT C (Minimal Premium):
+Clean white background, bold typography, minimal elements
+
+HEADER: Company badge top-left, social proof text top-right
+HERO: Massive bold headline taking 40% of space, with ${primaryColor} color accent on key word
+SUBTEXT: 2-3 lines explaining the offer from: ${prompt}
+VISUAL: Full-bleed product/service image right side
+FEATURES: 3 horizontal pill-shaped feature highlights
+CTA SECTION: Large "${ctaText}" button in ${primaryColor}
+FOOTER: Minimal contact line`,
   };
-  const compositionDirective = variantCompositions[variantSeed || 'A'] || variantCompositions['A'];
 
-  return `Create a COMPLETE, PROFESSIONAL, READY-TO-PUBLISH marketing advertisement flyer for social media.
+  const layout = layoutVariants[variantSeed || 'A'];
 
-BUSINESS INFORMATION:
-- Company: ${company_name}
-${taglineText}
-- What to promote: ${prompt}
-- Call to action: "${ctaText}"
+  return `Design a PIXEL-PERFECT, PRINT-READY professional marketing flyer. Style: like a top agency in Latin America created it for a B2B software company.
 
-DESIGN STYLE:
-${toneDirective}
+COMPANY: ${company_name}
+WHAT TO PROMOTE: ${prompt}
+CALL TO ACTION: "${ctaText}"
+${taglineText ? `TAGLINE: "${taglineText}"` : ''}
+PRIMARY COLOR: ${primaryColor}
+SECONDARY COLOR: ${secondaryColor}
 
-COLOR PALETTE:
-${colorInstructions}
+${layout}
 
-TYPOGRAPHY REQUIREMENTS:
-- Main headline: Large, bold, attention-grabbing — clearly readable
-- Supporting text: Clean, legible secondary information
-- CTA button or text: Clearly visible with contrast
-- Company name: Prominently placed, professional
-- ALL TEXT must be spelled correctly and in Spanish unless the prompt is in English
+MANDATORY DESIGN RULES:
+1. ALL text must be in Spanish and spelled perfectly
+2. Typography: Use clean sans-serif fonts (like Inter, Montserrat or similar). Headlines BOLD, body text regular weight
+3. The flyer must look EXACTLY like a professional designer made it — not AI-generated
+4. Include realistic UI/dashboard mockup on a laptop screen (showing charts, numbers, graphs — it represents the software being promoted)
+5. Price must be visible and prominent
+6. Feature icons must be clean, professional vector-style icons (not clip art)
+7. Color usage: primary color ${primaryColor} for accents, badges, CTA buttons. White for main background. Dark color for text.
+8. High resolution, sharp edges, no blur, no distortion
+9. The final result should be indistinguishable from a Canva Pro or Adobe Express professional template
+10. Include the company name "${company_name}" prominently
 
-${compositionDirective}
-
-TECHNICAL REQUIREMENTS:
-- This is a complete finished advertisement — include ALL text, logos placeholder, and design elements
-- Professional print and digital quality
-- No watermarks, no placeholder boxes, no lorem ipsum
-- The flyer must look like it was designed by a professional graphic design studio
-- High contrast between text and background for readability
-- Include visual hierarchy: headline → supporting info → CTA
-
-${variantSeed === 'B' ? 'Make this variation feel more editorial and sophisticated.' : ''}
-${variantSeed === 'C' ? 'Make this variation feel more energetic and dynamic.' : ''}
-
-The final result must be something a business owner would be proud to post on their social media page immediately.`;
+This flyer will be published on Instagram/Facebook. It must immediately communicate value and drive action.`;
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────

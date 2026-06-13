@@ -11,8 +11,10 @@ import {
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../services/supabase';
 import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import { RenderFlyer, FreeLogo, TEMPLATE_LIST } from './FlyerTemplates';
 import type { FlyerData } from './FlyerTemplates';
+import { FlyerTemplateA, FlyerTemplateB } from '../../components/flyers/FlyerTemplates';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 const FORMATS = [
@@ -72,6 +74,9 @@ export default function FlyerStudio() {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const flyerRef = useRef<HTMLDivElement>(null);
+  const templateRefA = useRef<HTMLDivElement>(null);
+  const templateRefB = useRef<HTMLDivElement>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<'A' | 'B'>('B');
 
   // Form & Content States
   const [prompt, setPrompt] = useState('');
@@ -146,6 +151,24 @@ export default function FlyerStudio() {
       if (data.credits_remaining != null) setCredits(data.credits_remaining);
     } catch (e: any) {
       toast.error(e.message);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function generateFromTemplate() {
+    if (!prompt.trim()) { toast.error('Describe qué quieres promocionar'); return; }
+    setGenerating(true);
+    setVariants([]);
+    try {
+      const ref = selectedTemplate === 'A' ? templateRefA : templateRefB;
+      if (!ref.current) throw new Error('Template not ready');
+      const dataUrl = await toPng(ref.current, { pixelRatio: 1, cacheBust: true });
+      setVariants([dataUrl]);
+      setSelected(0);
+      toast.success('¡Flyer profesional generado!');
+    } catch (e: any) {
+      toast.error('Error generando flyer: ' + e.message);
     } finally {
       setGenerating(false);
     }
@@ -494,14 +517,28 @@ export default function FlyerStudio() {
               </div>
             </div>
 
-            {/* Generate button */}
-            <div style={{ paddingTop: 8 }}>
+            {/* Professional Template Buttons */}
+            <div style={{ paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* Template selector */}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setSelectedTemplate('A')}
+                  style={{ flex: 1, border: `2px solid ${selectedTemplate === 'A' ? '#e91e8c' : '#e2e8f0'}`, borderRadius: 8, padding: '8px 10px', background: selectedTemplate === 'A' ? '#fce4ec' : '#f8fafc', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: selectedTemplate === 'A' ? '#c2185b' : '#64748b' }}>
+                  🎨 Estilo A (Rosa)
+                </button>
+                <button onClick={() => setSelectedTemplate('B')}
+                  style={{ flex: 1, border: `2px solid ${selectedTemplate === 'B' ? '#9b1c1c' : '#e2e8f0'}`, borderRadius: 8, padding: '8px 10px', background: selectedTemplate === 'B' ? '#fef2f2' : '#f8fafc', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: selectedTemplate === 'B' ? '#9b1c1c' : '#64748b' }}>
+                  🏢 Estilo B (Rojo)
+                </button>
+              </div>
+              {/* Main generate button */}
+              <button onClick={generateFromTemplate} disabled={generating || !prompt.trim()}
+                style={{ background: 'linear-gradient(135deg,#e91e8c,#9b1c1c)', border: 'none', borderRadius: 8, padding: '13px 20px', fontSize: 13, fontWeight: 800, color: '#fff', cursor: generating || !prompt.trim() ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'center', opacity: generating || !prompt.trim() ? 0.6 : 1, boxShadow: '0 4px 14px rgba(233,30,140,0.35)' }}>
+                {generating ? <><Cpu size={14} style={{ animation: 'spin 1s linear infinite' }} /> Generando...</> : <><Star size={14} fill="#fff" /> Generar Flyer Profesional <ChevronRight size={13} /></>}
+              </button>
+              {/* AI background fallback */}
               <button onClick={generate} disabled={generating || !prompt.trim()}
-                style={{ ...css.btn, opacity: generating || !prompt.trim() ? 0.5 : 1, cursor: generating || !prompt.trim() ? 'not-allowed' : 'pointer', padding: '12px 20px' }}>
-                {generating
-                  ? <><Cpu size={14} style={{ animation: 'spin 1s linear infinite' }} /> Generando Imagen de Fondo con IA...</>
-                  : <><Sparkles size={14} color="#D4AF37" fill="#D4AF37" /> Generar Imagen de Fondo con IA <ChevronRight size={13} /></>
-                }
+                style={{ ...css.btn, opacity: generating || !prompt.trim() ? 0.4 : 0.8, cursor: generating || !prompt.trim() ? 'not-allowed' : 'pointer', padding: '9px 20px', fontSize: 11 }}>
+                <Sparkles size={12} color="#D4AF37" fill="#D4AF37" /> Fondo IA (alternativo)
               </button>
               <style>{`@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
             </div>
@@ -691,6 +728,25 @@ export default function FlyerStudio() {
             )}
           </div>
         </div>
+      </div>
+      {/* Hidden template render area — captured by html-to-image */}
+      <div style={{ position: 'fixed', left: '-9999px', top: 0, pointerEvents: 'none', zIndex: -1 }}>
+        <FlyerTemplateA ref={templateRefA} data={{
+          company_name: companyName || 'Mi Empresa',
+          prompt, cta: cta || 'Contáctanos HOY',
+          primaryColor: colors[0] || '#e91e8c',
+          secondaryColor: colors[1] || '#1a1a2e',
+          phone, website,
+          logoUrl: logoPreview || undefined,
+        }} />
+        <FlyerTemplateB ref={templateRefB} data={{
+          company_name: companyName || 'Mi Empresa',
+          prompt, cta: cta || 'Activa HOY MISMO',
+          primaryColor: colors[0] || '#9b1c1c',
+          secondaryColor: colors[1] || '#1a1a2e',
+          phone, website,
+          logoUrl: logoPreview || undefined,
+        }} />
       </div>
     </div>
   );
