@@ -622,8 +622,8 @@ export default function SocialHub() {
                   const dateLabel = diffDays === 0
                     ? `Hoy ${postDate.toLocaleTimeString('es-SV', { hour: '2-digit', minute: '2-digit' })}`
                     : diffDays === 1
-                    ? 'Ayer'
-                    : postDate.toLocaleDateString('es-SV', { day: '2-digit', month: '2-digit', year: '2-digit' });
+                      ? 'Ayer'
+                      : postDate.toLocaleDateString('es-SV', { day: '2-digit', month: '2-digit', year: '2-digit' });
 
                   return (
                     <div key={p.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, paddingBottom: 10, borderBottom: '1px solid #f4f6f9' }}>
@@ -836,8 +836,8 @@ export default function SocialHub() {
                   background: viralityResult.score >= 75
                     ? 'linear-gradient(90deg, #10b981, #059669)'
                     : viralityResult.score >= 50
-                    ? 'linear-gradient(90deg, #f59e0b, #d97706)'
-                    : 'linear-gradient(90deg, #ef4444, #dc2626)',
+                      ? 'linear-gradient(90deg, #f59e0b, #d97706)'
+                      : 'linear-gradient(90deg, #ef4444, #dc2626)',
                   borderRadius: 99,
                   transition: 'width 0.5s ease',
                 }} />
@@ -1033,7 +1033,7 @@ export default function SocialHub() {
 
             {/* Modal Scrollable Body */}
             <div style={{ padding: '20px', overflowY: 'auto', flex: 1, background: '#f0f2f5', display: 'flex', justifyContent: 'center' }}>
-              
+
               {/* Facebook Card Mockup */}
               {previewPlatform === 'facebook' ? (
                 <div style={{ background: '#ffffff', borderRadius: 8, width: '100%', maxWidth: 500, boxShadow: '0 1px 2px rgba(0,0,0,0.2)', overflow: 'hidden', border: '1px solid #ced0d4' }}>
