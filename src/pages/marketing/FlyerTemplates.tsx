@@ -81,7 +81,7 @@ const BenRow = ({ text, color, s = 1, scale = 1, bold = false }: { text: string;
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: Math.round(10 * s), marginBottom: Math.round(6 * s) }}>
       <div style={{ width: Math.round(22 * s), height: Math.round(22 * s), borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
-        <svg width={Math.round(12 * s)} height={Math.round(12 * s)} viewBox="0 0 12 12" fill="none"><path d="M2 6.5L4.8 9.5L10 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        <svg width={Math.round(12 * s)} height={Math.round(12 * s)} viewBox="0 0 12 12" fill="none"><path d="M2 6.5L4.8 9.5L10 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </div>
       <span style={{ fontSize: Math.round(13 * s * dynScale), fontWeight: bold ? 800 : 600, color: '#fff', lineHeight: 1.35, wordBreak: 'break-word' }}>{text || ''}</span>
     </div>
@@ -94,7 +94,7 @@ const BenRowDark = ({ text, color, s = 1, scale = 1, bold = false }: { text: str
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: Math.round(10 * s), marginBottom: Math.round(8 * s) }}>
       <div style={{ width: Math.round(22 * s), height: Math.round(22 * s), borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 }}>
-        <svg width={Math.round(12 * s)} height={Math.round(12 * s)} viewBox="0 0 12 12" fill="none"><path d="M2 6.5L4.8 9.5L10 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        <svg width={Math.round(12 * s)} height={Math.round(12 * s)} viewBox="0 0 12 12" fill="none"><path d="M2 6.5L4.8 9.5L10 3" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
       </div>
       <span style={{ fontSize: Math.round(13 * s * dynScale), fontWeight: bold ? 800 : 600, color: '#334155', lineHeight: 1.35, wordBreak: 'break-word' }}>{text || ''}</span>
     </div>
@@ -505,6 +505,24 @@ export const Template_FullBleedBold = ({ d }: { d: FlyerData }) => {
   );
 };
 
+// ═══════════════════════════════════════════════════════════════
+// TEMPLATE 11: DIRECT MOCKUP (pure image, no overlays)
+// ═══════════════════════════════════════════════════════════════
+export const Template_DirectMockup = ({ d }: { d: FlyerData }) => {
+  const W = d.containerW || 540, H = d.containerH || 675;
+  return (
+    <div style={{ width: W, height: H, position: 'relative', overflow: 'hidden', boxSizing: 'border-box' }}>
+      {d.bgImageUrl ? (
+        <img src={d.bgImageUrl} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} crossOrigin="anonymous" />
+      ) : (
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(160deg, #1e293b, #0f172a)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', padding: 20 }}>
+          <div style={{ color: '#94a3b8', fontSize: 13, fontWeight: 700, textAlign: 'center' }}>Sube tu flyer diseñado o genera una imagen de fondo con IA</div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── TEMPLATE REGISTRY ────────────────────────────────────────────────────────
 export const TEMPLATES: Record<string, React.ComponentType<{ d: FlyerData }>> = {
   'bold-split': Template_BoldSplit,
@@ -517,20 +535,22 @@ export const TEMPLATES: Record<string, React.ComponentType<{ d: FlyerData }>> = 
   'promo-pop': Template_PromoPop,
   'minimal-editorial': Template_MinimalEditorial,
   'full-bleed': Template_FullBleedBold,
+  'direct-mockup': Template_DirectMockup,
 };
 
 // Lazy forward ref so RenderFlyer can reference TEMPLATES
 Object.assign(RenderFlyer, {});
 
 export const TEMPLATE_LIST = [
-  { id: 'bold-split',        name: '1. Split Asimétrico Bold',      desc: 'Panel color + foto, texto masivo' },
-  { id: 'cinematic',         name: '2. Cinematic Full',             desc: 'Foto top, panel oscuro info' },
-  { id: 'white-card',        name: '3. White Card Editorial',       desc: 'Blanco limpio, foto redondeada' },
-  { id: 'magazine',          name: '4. Magazine Dark',              desc: 'Editorial tipo Forbes/Vogue' },
-  { id: 'center-gradient',   name: '5. Gradient Center Pop',        desc: 'Gradiente vibrante, centrado' },
-  { id: 'corporate-light',   name: '6. Corporate Light',            desc: 'B2B profesional, blanco/color' },
-  { id: 'dark-luxury',       name: '7. Dark Luxury Gold',           desc: 'Oscuro premium, marco dorado' },
-  { id: 'promo-pop',         name: '8. Promo Pop',                  desc: 'Oferta specials, energético' },
-  { id: 'minimal-editorial', name: '9. Minimal Editorial',          desc: 'Clean, tipografía grande' },
-  { id: 'full-bleed',        name: '10. Full Bleed Bold',           desc: 'Foto completa, texto panel' },
+  { id: 'direct-mockup', name: '0. Mockup Directo (Imagen Pura)', desc: 'Muestra la imagen al 100% sin textos encima' },
+  { id: 'bold-split', name: '1. Split Asimétrico Bold', desc: 'Panel color + foto, texto masivo' },
+  { id: 'cinematic', name: '2. Cinematic Full', desc: 'Foto top, panel oscuro info' },
+  { id: 'white-card', name: '3. White Card Editorial', desc: 'Blanco limpio, foto redondeada' },
+  { id: 'magazine', name: '4. Magazine Dark', desc: 'Editorial tipo Forbes/Vogue' },
+  { id: 'center-gradient', name: '5. Gradient Center Pop', desc: 'Gradiente vibrante, centrado' },
+  { id: 'corporate-light', name: '6. Corporate Light', desc: 'B2B profesional, blanco/color' },
+  { id: 'dark-luxury', name: '7. Dark Luxury Gold', desc: 'Oscuro premium, marco dorado' },
+  { id: 'promo-pop', name: '8. Promo Pop', desc: 'Oferta specials, energético' },
+  { id: 'minimal-editorial', name: '9. Minimal Editorial', desc: 'Clean, tipografía grande' },
+  { id: 'full-bleed', name: '10. Full Bleed Bold', desc: 'Foto completa, texto panel' },
 ];

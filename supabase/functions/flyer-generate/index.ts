@@ -129,7 +129,7 @@ function getUnsplashFallback(industria = '') {
     return 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?q=80&w=1080&auto=format&fit=crop';
   }
   if (norm.includes('auto') || norm.includes('taller') || norm.includes('car') || norm.includes('vehículo')) {
-    return 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?q=80&w=1080&auto=format&fit=crop';
+    return 'https://images.unsplash.com/photo-1617788138017-80ad40651399?q=80&w=1080&auto=format&fit=crop';
   }
   if (norm.includes('factura') || norm.includes('contabilidad') || norm.includes('finanzas') || norm.includes('tributo') || norm.includes('impuesto') || norm.includes('billing') || norm.includes('contador') || norm.includes('declaración') || norm.includes('declaracion') || norm.includes('pyme')) {
     return 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?q=80&w=1080&auto=format&fit=crop';
