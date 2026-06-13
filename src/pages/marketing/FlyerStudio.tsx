@@ -254,20 +254,16 @@ export default function FlyerStudio() {
       .trim();
 
     try {
-      const { data, error } = await supabase.functions.invoke('flyer-ai-generator', {
+      const { data, error } = await supabase.functions.invoke('flyer-generate', {
         body: {
-          prompt: `Professional commercial business backdrop graphic for: "${visualTheme}". Clean modern marketing layout design, photorealistic, modern advertising aesthetic, strictly NO TEXT, NO WRITING, NO ALPHABET, NO LETTERS, empty space for overlaying HTML text.`,
-          company_name: companyName || 'Mi Empresa',
-          cta: cta || undefined,
-          colors,
-          format,
-          tone,
-          variant_count: variantCount,
-          company_id: profile?.company_id
+          industria: companyName || 'Negocio',
+          tono: tone,
+          idea: { titulo: visualTheme },
+          customPrompt: `Professional clean commercial business background graphic for: "${visualTheme}". Clean modern marketing layout design, photorealistic, modern advertising aesthetic, strictly NO TEXT, NO WRITING, NO ALPHABET, NO LETTERS, empty space for overlaying HTML text.`
         }
       });
-      if (error || !data?.variants?.length) throw new Error(error?.message || data?.error || 'Error generando');
-      setVariants(data.variants);
+      if (error || !data?.fondo_url) throw new Error(error?.message || data?.error || 'Error generando fondo');
+      setVariants([data.fondo_url]);
       setSelected(0);
       setPreviewMode('ai');
       if (data.credits_remaining != null) setCredits(data.credits_remaining);
@@ -762,15 +758,14 @@ export default function FlyerStudio() {
                   🏢 Estilo B (Rojo)
                 </button>
               </div>
-              {/* Main generate button */}
-              <button onClick={generateFromTemplate} disabled={generating || !prompt.trim()}
-                style={{ background: 'linear-gradient(135deg,#e91e8c,#9b1c1c)', border: 'none', borderRadius: 8, padding: '13px 20px', fontSize: 13, fontWeight: 800, color: '#fff', cursor: generating || !prompt.trim() ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'center', opacity: generating || !prompt.trim() ? 0.6 : 1, boxShadow: '0 4px 14px rgba(233,30,140,0.35)' }}>
-                {generating ? <><Cpu size={14} style={{ animation: 'spin 1s linear infinite' }} /> Generando...</> : <><Star size={14} fill="#fff" /> Generar Flyer Profesional <ChevronRight size={13} /></>}
-              </button>
-              {/* AI background fallback */}
+              {/* Main generate button using clean AI backgrounds */}
               <button onClick={generate} disabled={generating || !prompt.trim()}
-                style={{ ...css.btn, opacity: generating || !prompt.trim() ? 0.4 : 0.8, cursor: generating || !prompt.trim() ? 'not-allowed' : 'pointer', padding: '9px 20px', fontSize: 11 }}>
-                <Sparkles size={12} color="#D4AF37" fill="#D4AF37" /> Fondo IA (alternativo)
+                style={{ background: 'linear-gradient(135deg,#e91e8c,#9b1c1c)', border: 'none', borderRadius: 8, padding: '13px 20px', fontSize: 13, fontWeight: 800, color: '#fff', cursor: generating || !prompt.trim() ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'center', opacity: generating || !prompt.trim() ? 0.6 : 1, boxShadow: '0 4px 14px rgba(233,30,140,0.35)' }}>
+                {generating ? (
+                  <><Cpu size={14} style={{ animation: 'spin 1s linear infinite' }} /> Generando Fondo...</>
+                ) : (
+                  <><Sparkles size={14} color="#D4AF37" fill="#D4AF37" /> Generar Fondo con IA <ChevronRight size={13} /></>
+                )}
               </button>
               <style>{`
                 @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
@@ -873,7 +868,7 @@ export default function FlyerStudio() {
 
                 {/* ── FLYER CANVAS ── */}
                 {/* Show: uploaded flyer | AI generated | live template (only if brief has content) | empty state */}
-                {(bgUploadPreview || variants.length > 0 || prompt.trim().length > 0) ? (
+                {(bgUploadPreview || variants.length > 0) ? (
                   <div style={{ display: 'flex', justifyContent: 'center', width: '100%', userSelect: 'none' }}>
                     <div
                       ref={flyerRef}
@@ -1032,6 +1027,7 @@ export default function FlyerStudio() {
           secondaryColor: colors[1] || '#1a1a2e',
           phone, website,
           logoUrl: logoPreview || undefined,
+          bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
         }} />
         <FlyerTemplateB ref={templateRefB} data={{
           company_name: companyName || 'Mi Empresa',
@@ -1040,6 +1036,7 @@ export default function FlyerStudio() {
           secondaryColor: colors[1] || '#1a1a2e',
           phone, website,
           logoUrl: logoPreview || undefined,
+          bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
         }} />
       </div>
 
@@ -1151,6 +1148,7 @@ export default function FlyerStudio() {
                         secondaryColor: colors[1] || '#1a1a2e',
                         phone, website,
                         logoUrl: logoPreview || undefined,
+                        bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
                       }} />
                     ) : (
                       <FlyerTemplateB data={{
@@ -1160,6 +1158,7 @@ export default function FlyerStudio() {
                         secondaryColor: colors[1] || '#1a1a2e',
                         phone, website,
                         logoUrl: logoPreview || undefined,
+                        bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
                       }} />
                     )}
                   </div>
