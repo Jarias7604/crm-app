@@ -1271,40 +1271,56 @@ export default function FlyerStudio() {
 
             {/* Body (The Image or Live template) */}
             <div style={{ 
-              background: '#f8fafc', padding: 24, 
+              background: '#f8fafc', padding: '16px 24px', 
               display: 'flex', alignItems: 'center', justifyContent: 'center', 
-              overflow: 'auto', flex: 1 
+              overflow: 'hidden'
             }}>
               {bgUploadPreview || (showFullAiResult && variants.length > 0) ? (
-                <div style={{
-                  position: 'relative',
-                  width: getFlyerDimensions(format).width,
-                  height: getFlyerDimensions(format).height,
-                  borderRadius: 14,
-                  boxShadow: '0 20px 50px rgba(0,0,0,0.15)',
-                  background: '#fff',
-                  overflow: 'hidden'
-                }}>
-                  <img
-                    src={bgUploadPreview || variants[selected]}
-                    alt="Flyer en Alta Resolución"
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'contain',
-                      display: 'block'
-                    }}
-                  />
-                  {logoPreview && (
-                    <FreeLogo
-                      d={{ title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null, logoUrl: logoPreview, industria: '', phone: '', website: '', templateId: 'direct-mockup', containerW: getFlyerDimensions(format).width, containerH: getFlyerDimensions(format).height, logoSize, logoX, logoY }}
-                      onMove={(x, y) => { setLogoX(x); setLogoY(y); }}
-                      onResize={(s) => setLogoSize(s)}
-                    />
-                  )}
-                </div>
+                (() => {
+                  // Calcula dimensiones que caben dentro del modal disponible
+                  // Modal disponible: 94vh - header(65px) - footer(70px) - padding(48px)
+                  const availH = Math.min(window.innerHeight * 0.94 - 183, window.innerHeight - 200);
+                  const availW = Math.min(window.innerWidth * 0.88, 760);
+                  const { width: fw, height: fh } = getFlyerDimensions(format);
+                  const ratio = fw / fh;
+                  // Fit by height first, then width
+                  let displayH = availH;
+                  let displayW = displayH * ratio;
+                  if (displayW > availW) {
+                    displayW = availW;
+                    displayH = displayW / ratio;
+                  }
+                  return (
+                    <div style={{
+                      position: 'relative',
+                      width: displayW,
+                      height: displayH,
+                      borderRadius: 14,
+                      boxShadow: '0 20px 50px rgba(0,0,0,0.2)',
+                      background: '#fff',
+                      overflow: 'hidden',
+                      flexShrink: 0
+                    }}>
+                      <img
+                        src={bgUploadPreview || variants[selected]}
+                        alt="Flyer en Alta Resolución"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'contain',
+                          display: 'block'
+                        }}
+                      />
+                      {logoPreview && (
+                        <FreeLogo
+                          d={{ title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null, logoUrl: logoPreview, industria: '', phone: '', website: '', templateId: 'direct-mockup', containerW: displayW, containerH: displayH, logoSize, logoX, logoY }}
+                          onMove={(x, y) => { setLogoX(x); setLogoY(y); }}
+                          onResize={(s) => setLogoSize(s)}
+                        />
+                      )}
+                    </div>
+                  );
+                })()
               ) : (() => {
                 // Scale template to fit within available modal space (no scroll)
                 const maxH = Math.min(window.innerHeight * 0.72, 650);
