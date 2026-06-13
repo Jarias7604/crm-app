@@ -155,7 +155,7 @@ MANDATORY DESIGN RULES:
 10. Include the company name "${company_name}" prominently
 11. NEVER mix fonts mid-word. NEVER render emoji as unicode boxes. NEVER distort text.
 
-This flyer will be published on Instagram/Facebook. It must immediately communicate value and drive action.\`;
+This flyer will be published on Instagram/Facebook. It must immediately communicate value and drive action.`;
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────
