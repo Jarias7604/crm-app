@@ -184,6 +184,13 @@ Deno.serve(async (req) => {
       features: [] as string[],
       cta: cta || 'Contáctanos hoy',
       price: '',
+      highlight_title: '',
+      highlight_desc: '',
+      benefits: [] as { title: string; desc: string; icon: string }[],
+      mockup_info: {
+        title: '',
+        kpis: [] as { label: string; val: string }[]
+      }
     };
 
     try {
@@ -203,9 +210,25 @@ You MUST return a JSON object with this exact structure:
 {
   "headline": "A short, ultra-catchy 2-5 word main title in Spanish",
   "subheadline": "A supporting slogan or dynamic offer of 4-8 words in Spanish",
-  "features": ["Feature 1 (max 4 words)", "Feature 2 (max 4 words)", "Feature 3 (max 4 words)"],
+  "features": ["Feature 1 (max 4 words)", "Feature 2 (max 4 words)", "Feature 3 (max 4 words)", "Feature 4 (max 4 words)"],
   "cta": "WhatsApp / Call to action button text (max 3 words)",
-  "price": "Clean price text if mentioned (e.g. '$18.95/mes' or 'Desde $12.95'), otherwise empty"
+  "price": "Clean price text if mentioned (e.g. '$18.95/mes' or 'Desde $12.95'), otherwise empty",
+  "highlight_title": "A catchy question or statement for the mid-section in Spanish (max 8 words)",
+  "highlight_desc": "A supporting sentence/description for the mid-section in Spanish (max 12 words)",
+  "benefits": [
+    {"title": "Benefit 1 title (max 3 words in Spanish)", "desc": "Benefit 1 description (max 8 words in Spanish)", "icon": "emoji"},
+    {"title": "Benefit 2 title (max 3 words in Spanish)", "desc": "Benefit 2 description (max 8 words in Spanish)", "icon": "emoji"},
+    {"title": "Benefit 3 title (max 3 words in Spanish)", "desc": "Benefit 3 description (max 8 words in Spanish)", "icon": "emoji"}
+  ],
+  "mockup_info": {
+    "title": "Title of the mockup dashboard in Spanish (e.g. 'Control K9', 'Menú Digital') (max 3 words)",
+    "kpis": [
+      {"label": "KPI 1 label (max 2 words)", "val": "KPI 1 value (e.g. '180+', '$2,400', '98%')"},
+      {"label": "KPI 2 label (max 2 words)", "val": "KPI 2 value"},
+      {"label": "KPI 3 label (max 2 words)", "val": "KPI 3 value"},
+      {"label": "KPI 4 label (max 2 words)", "val": "KPI 4 value"}
+    ]
+  }
 }
 CRITICAL: Use PERFECT Spanish spelling. Zero spelling mistakes, zero typos, clean accents. Do not include markdown formatting, just raw JSON.`,
             },
@@ -225,9 +248,13 @@ CRITICAL: Use PERFECT Spanish spelling. Zero spelling mistakes, zero typos, clea
           structuredText = {
             headline: content.headline,
             subheadline: content.subheadline || '',
-            features: Array.isArray(content.features) ? content.features.slice(0, 3) : [],
+            features: Array.isArray(content.features) ? content.features.slice(0, 4) : [],
             cta: content.cta || cta || 'Contáctanos hoy',
             price: content.price || '',
+            highlight_title: content.highlight_title || '',
+            highlight_desc: content.highlight_desc || '',
+            benefits: Array.isArray(content.benefits) ? content.benefits.slice(0, 3) : [],
+            mockup_info: content.mockup_info || { title: '', kpis: [] }
           };
         }
       }
