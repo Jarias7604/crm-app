@@ -501,12 +501,53 @@ export default function FlyerStudio() {
             {/* Brand colors */}
             <div style={css.section}>
               <label style={css.label}>Colores de marca (máx. 3)</label>
-              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' as const }}>
-                {BRAND_COLORS.map(hex => (
-                  <button key={hex} onClick={() => toggleColor(hex)}
-                    style={{ width: 24, height: 24, borderRadius: '50%', background: hex, border: 'none', cursor: 'pointer', outline: colors.includes(hex) ? `2px solid ${hex}` : '2px solid transparent', outlineOffset: 2, boxShadow: '0 1px 3px rgba(0,0,0,0.18)', transition: 'outline 0.1s' }} />
-                ))}
-                {colors.length > 0 && <button onClick={() => setColors([])} style={{ fontSize: 10, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>Limpiar</button>}
+              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' as const, alignItems: 'center' }}>
+                {BRAND_COLORS.map(hex => {
+                  const isSelected = colors.map(c => c.toLowerCase()).includes(hex.toLowerCase());
+                  return (
+                    <button
+                      key={hex}
+                      onClick={() => toggleColor(hex)}
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: '50%',
+                        background: hex,
+                        border: isSelected ? '2px solid #fff' : '1px solid rgba(0,0,0,0.1)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: isSelected 
+                          ? '0 0 0 2px #0070d2, 0 4px 8px rgba(0,0,0,0.15)' 
+                          : '0 1px 3px rgba(0,0,0,0.12)',
+                        transform: isSelected ? 'scale(1.15)' : 'scale(1)',
+                        transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
+                        padding: 0
+                      }}
+                    >
+                      {isSelected && (
+                        <Check 
+                          size={11} 
+                          color={
+                            hex === '#fff' || hex === '#D4AF37' || hex === '#f59e0b' || hex === '#10b981'
+                              ? '#0f172a' 
+                              : '#ffffff'
+                          } 
+                          strokeWidth={3.5} 
+                        />
+                      )}
+                    </button>
+                  );
+                })}
+                {colors.length > 0 && (
+                  <button 
+                    onClick={() => setColors([])} 
+                    style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', marginLeft: 6 }}
+                  >
+                    Limpiar
+                  </button>
+                )}
               </div>
             </div>
 
