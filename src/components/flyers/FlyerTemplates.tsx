@@ -614,7 +614,7 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
     );
   }
 );
-\nexport const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData }>(
+export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData }>(
   ({ data }, ref) => {
     const parsed = parsePrompt(data.prompt);
     const primary = data.primaryColor || '#9b1c1c';
@@ -822,5 +822,5 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
     );
   }
 );
-\nFlyerTemplateA.displayName = 'FlyerTemplateA';
+FlyerTemplateA.displayName = 'FlyerTemplateA';
 FlyerTemplateB.displayName = 'FlyerTemplateB';
