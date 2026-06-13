@@ -845,7 +845,7 @@ export default function FlyerStudio() {
                 }}
               >
                 {generating && isFullAiFlyer ? (
-                  <><Cpu size={16} style={{ animation: 'spin 1s linear infinite' }} /> DALL·E 3 generando tu flyer...</>
+                  <><Cpu size={16} style={{ animation: 'spin 1s linear infinite' }} /> gpt-image-1 creando tu flyer...</>
                 ) : (
                   <><Sparkles size={16} color="#fff" fill="#fff" /> Generar Flyer Profesional con IA</>
                 )}
@@ -853,7 +853,7 @@ export default function FlyerStudio() {
 
               {/* Description */}
               <div style={{ fontSize: 10, color: '#64748b', textAlign: 'center', lineHeight: 1.5, padding: '0 4px' }}>
-                🤖 DALL·E 3 crea una imagen <strong>100% original</strong> con tipografía, diseño y contenido integrado — como si lo hiciera un diseñador profesional
+                ✨ <strong>gpt-image-1</strong> crea una imagen <strong>100% original</strong> con tipografía, diseño y contenido integrado — calidad de agencia profesional
               </div>
 
               {/* Divider */}
