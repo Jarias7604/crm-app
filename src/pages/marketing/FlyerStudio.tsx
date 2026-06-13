@@ -161,6 +161,9 @@ export default function FlyerStudio() {
     setGenerating(true);
     setVariants([]);
     try {
+      // Small delay to let React commit template state updates (e.g. logo, price, colors) to DOM
+      await new Promise(resolve => setTimeout(resolve, 350));
+      
       const ref = selectedTemplate === 'A' ? templateRefA : templateRefB;
       if (!ref.current) throw new Error('Template not ready');
       const dataUrl = await toPng(ref.current, { pixelRatio: 1, cacheBust: true });
@@ -642,9 +645,10 @@ export default function FlyerStudio() {
                         overflow: 'hidden',
                         boxShadow: '0 16px 48px rgba(0,0,0,0.28)',
                         width: '100%',
-                        maxWidth: getFlyerDimensions(format).width,
+                        maxWidth: `min(${getFlyerDimensions(format).width}px, 100%)`,
+                        maxHeight: '62vh',
                         aspectRatio: `${getFlyerDimensions(format).width} / ${getFlyerDimensions(format).height}`,
-                        flexShrink: 0,
+                        flexShrink: 1,
                       }}
                     >
                       {/* The actual AI-generated or uploaded flyer image — full bleed, no HTML overlays */}
@@ -652,10 +656,10 @@ export default function FlyerStudio() {
                         src={bgUploadPreview || variants[selected]}
                         alt="Flyer generado"
                         crossOrigin="anonymous"
-                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#fff' }}
                       />
-                      {/* Logo overlay — only if user uploaded a logo (draggable) */}
-                      {logoPreview && (
+                      {/* Logo overlay — only if user uploaded a logo AND it's a manual flyer upload (not template) */}
+                      {logoPreview && bgUploadPreview && !variants.length && (
                         <FreeLogo
                           d={{ title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null, logoUrl: logoPreview, industria: '', phone: '', website: '', templateId: 'direct-mockup', containerW: getFlyerDimensions(format).width, containerH: getFlyerDimensions(format).height, logoSize, logoX, logoY }}
                           onMove={(x, y) => { setLogoX(x); setLogoY(y); }}
