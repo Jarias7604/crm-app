@@ -297,19 +297,22 @@ export default function FlyerStudio() {
   }
 
   function applySuggestion(idea: any) {
-    // Build enriched prompt from AI suggestion
+    // Merge into existing brief intelligently
     const parts: string[] = [];
-    if (idea.titulo) parts.push(idea.titulo);
+    if (idea.titulo) parts.push(`título: ${idea.titulo}`);
     if (idea.gancho) parts.push(idea.gancho);
-    if (idea.beneficios?.length) parts.push('Beneficios: ' + idea.beneficios.join(', '));
-    if (idea.cta) parts.push('CTA: ' + idea.cta);
-    if (parts.length) setPrompt(parts.join(' — '));
-    if (idea.paleta && idea.paleta.length > 0) {
-      setColors(idea.paleta.slice(0, 3));
+    if (idea.beneficios?.length) parts.push(`incluye: ${idea.beneficios.join(', ')}`);
+    if (idea.cta) parts.push(`cta: ${idea.cta}`);
+    const enriched = parts.join('. ');
+    if (enriched) {
+      setPrompt(enriched);
+      lastAutoOptPrompt.current = enriched; // prevent re-triggering auto-optimize
     }
+    if (idea.paleta && idea.paleta.length > 0) setColors(idea.paleta.slice(0, 3));
+    if (idea.cta && !cta.trim()) setCta(idea.cta);
     if (idea.tono) setTone(idea.tono);
     setShowSuggestions(false);
-    toast.success('Sugerencia de Meta AI aplicada al flyer');
+    toast.success('✨ Propuesta aplicada al brief');
   }
 
   async function handleDownload() {
@@ -496,9 +499,32 @@ export default function FlyerStudio() {
                   </div>
                   {vs.tips.length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      {vs.tips.map((tip, i) => (
-                        <div key={i} style={{ fontSize: 10, color: '#475569', fontWeight: 600, lineHeight: 1.4 }}>{tip}</div>
-                      ))}
+                      <div style={{ fontSize: 9, color: '#94a3b8', fontWeight: 600, marginBottom: 2 }}>👆 Toca una sugerencia para agregarla al brief:</div>
+                      {vs.tips.map((tip, i) => {
+                        // Extract the actionable text after the first colon if present
+                        const parts = tip.split(':');
+                        const snippet = parts.length > 1 ? parts.slice(1).join(':').trim() : tip;
+                        return (
+                          <button
+                            key={i}
+                            onClick={() => {
+                              const addition = snippet.replace(/\(ej:.*/i, '').trim();
+                              setPrompt(prev => prev ? `${prev.trim()}. ${addition}` : addition);
+                            }}
+                            style={{
+                              fontSize: 10, color: '#475569', fontWeight: 600, lineHeight: 1.4,
+                              background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(0,0,0,0.1)',
+                              borderRadius: 6, padding: '4px 8px', cursor: 'pointer',
+                              textAlign: 'left', display: 'block', width: '100%',
+                              transition: 'background 0.15s, transform 0.1s'
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.transform = 'translateX(2px)'; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.7)'; e.currentTarget.style.transform = 'translateX(0)'; }}
+                          >
+                            {tip} <span style={{ color: '#7c3aed', fontSize: 9 }}>→ agregar</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -809,7 +835,7 @@ export default function FlyerStudio() {
             {/* Live Template Preview */}
             {!showSuggestions && !generating && (
               <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {/* Variant selector tabs if there are multiple variants generated */}
+                {/* Variant selector tabs — show when AI generated 2+ variants */}
                 {variants.length > 1 && (
                   <div style={{ display: 'flex', gap: 8, background: '#fff', padding: 8, borderRadius: 8, border: '1px solid #e2e8f0' }}>
                     {variants.map((_, i) => (
@@ -821,9 +847,9 @@ export default function FlyerStudio() {
                   </div>
                 )}
 
-                {/* ── FLYER CANVAS: Pure image from DALL-E 3 or uploaded flyer ── */}
-                {/* ── FLYER CANVAS: Live template or uploaded flyer ── */}
-                {(bgUploadPreview || variants.length > 0 || !bgFile) ? (
+                {/* ── FLYER CANVAS ── */}
+                {/* Show: uploaded flyer | AI generated | live template (only if brief has content) | empty state */}
+                {(bgUploadPreview || variants.length > 0 || prompt.trim().length > 0) ? (
                   <div style={{ display: 'flex', justifyContent: 'center', width: '100%', userSelect: 'none' }}>
                     <div
                       ref={flyerRef}
