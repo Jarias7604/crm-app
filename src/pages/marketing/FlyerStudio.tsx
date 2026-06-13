@@ -170,6 +170,11 @@ export default function FlyerStudio() {
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
+  // Auto-optimize (debounced — fires 2.5s after user stops typing)
+  const [autoOptimizing, setAutoOptimizing] = useState(false);
+  const autoOptRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastAutoOptPrompt = useRef('');
+
   useEffect(() => {
     if (!profile?.company_id) return;
     
@@ -192,6 +197,43 @@ export default function FlyerStudio() {
       .order('period_start', { ascending: false }).limit(1).single()
       .then(({ data }) => setCredits(data ? data.credits_limit - data.credits_used : 20));
   }, [profile]);
+
+  // ── Auto-optimize brief with IA as user types ─────────────────────────────
+  useEffect(() => {
+    if (autoOptRef.current) clearTimeout(autoOptRef.current);
+    // Skip: same as last auto-optimized, too short, or no company
+    if (!prompt.trim() || prompt.trim().length < 40) return;
+    if (prompt === lastAutoOptPrompt.current) return;
+    if (showSuggestions) return;
+
+    autoOptRef.current = setTimeout(async () => {
+      setAutoOptimizing(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('flyer-recommend', {
+          body: { oferta: prompt, tono: tone, industria: 'General', idioma: 'es' }
+        });
+        if (error || !data?.ideas?.length) return;
+        const best = data.ideas[0];
+        const parts: string[] = [];
+        if (best.titulo) parts.push(`título: ${best.titulo}`);
+        if (best.gancho) parts.push(best.gancho);
+        if (best.beneficios?.length) parts.push(`incluye: ${best.beneficios.join(', ')}`);
+        if (best.cta) parts.push(`cta: ${best.cta}`);
+        const enriched = parts.join('. ');
+        if (enriched) {
+          lastAutoOptPrompt.current = enriched;
+          setPrompt(enriched);
+        }
+        if (best.paleta?.length > 0) setColors(best.paleta.slice(0, 3));
+        if (best.cta && !cta.trim()) setCta(best.cta);
+        if (best.tono) setTone(best.tono);
+        toast.success('✨ IA mejoró tu brief automáticamente', { duration: 2000 });
+      } catch (_) { /* silent fail */ }
+      finally { setAutoOptimizing(false); }
+    }, 2500);
+
+    return () => { if (autoOptRef.current) clearTimeout(autoOptRef.current); };
+  }, [prompt]);
 
   function toggleColor(hex: string) {
     setColors(p => p.includes(hex) ? p.filter(c => c !== hex) : p.length < 3 ? [...p, hex] : p);
@@ -413,38 +455,26 @@ export default function FlyerStudio() {
             <div style={css.section}>
               <label style={css.label}>¿Qué quieres promocionar? *</label>
               <textarea
-                style={{ ...css.textarea, minHeight: 120, fontSize: 13, lineHeight: 1.6 }}
-                placeholder={'Ej: Promoción especial de verano — 30% off en todos los servicios. Incluye kit completo de defensa personal...'}
+                style={{ ...css.textarea, minHeight: 120, fontSize: 13, lineHeight: 1.6, border: autoOptimizing ? '1.5px solid #7c3aed' : '1px solid #d8dde6', transition: 'border 0.3s' }}
+                placeholder={'Ej: 30% OFF en servicios de defensa personal este verano — escribe tu idea y la IA la mejorará automáticamente...'}
                 value={prompt}
                 onChange={e => setPrompt(e.target.value)}
               />
-              {prompt.trim().length > 3 && (
+              {/* Auto-optimize status */}
+              {autoOptimizing && (
+                <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#7c3aed', fontWeight: 700 }}>
+                  <Cpu size={10} style={{ animation: 'spin 1s linear infinite' }} />
+                  IA mejorando tu brief...
+                </div>
+              )}
+              {/* Manual regenerate — secondary option */}
+              {!autoOptimizing && prompt.trim().length > 3 && lastAutoOptPrompt.current && (
                 <button
                   onClick={optimizeWithMetaAI}
                   disabled={optimizing}
-                  style={{
-                    marginTop: 8,
-                    background: 'linear-gradient(135deg, #7c3aed, #0070d2)',
-                    border: 'none',
-                    borderRadius: 8,
-                    padding: '8px 14px',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: '#fff',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                    width: '100%',
-                    boxShadow: '0 2px 8px rgba(124,58,237,0.25)'
-                  }}
+                  style={{ marginTop: 6, background: 'none', border: '1px solid #e2e8f0', borderRadius: 6, padding: '5px 10px', fontSize: 10, fontWeight: 700, color: '#7c3aed', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}
                 >
-                  {optimizing ? (
-                    <><Cpu size={12} style={{ animation: 'spin 1s linear infinite' }} /> Analizando con Meta AI...</>
-                  ) : (
-                    <><Sparkles size={12} color="#D4AF37" fill="#D4AF37" /> Optimizar con Meta AI</>
-                  )}
+                  {optimizing ? <><Cpu size={10} style={{ animation: 'spin 1s linear infinite' }} /> Regenerando...</> : <><RefreshCw size={10} /> Regenerar sugerencia</>}
                 </button>
               )}
             </div>
