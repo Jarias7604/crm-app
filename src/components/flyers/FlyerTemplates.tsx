@@ -59,7 +59,7 @@ function derivePrice(prompt: string): string {
   if (match) return match[0] + '/mes';
   const match2 = prompt.match(/([\d,.]+)\s*(dólar|dollar|usd)/i);
   if (match2) return '$' + match2[1] + '/mes';
-  return '$12.95/mes';
+  return ''; // No hardcoded price — only show if user specified it
 }
 
 // ── ICON SVGs ─────────────────────────────────────────────────────────────────
@@ -109,16 +109,18 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
           </div>
           <div style={{ fontSize: 30, fontWeight: 700, color: '#333', marginBottom: 32 }}>{subheadline}</div>
 
-          {/* Price Badge */}
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 12,
-            background: primary, borderRadius: 16, padding: '14px 32px',
-            marginBottom: 40,
-          }}>
-            <span style={{ fontSize: 18, color: '#fff', fontWeight: 700 }}>Desde</span>
-            <span style={{ fontSize: 52, color: '#fff', fontWeight: 900, lineHeight: 1 }}>{price}</span>
-            <span style={{ fontSize: 16, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>+ IVA</span>
-          </div>
+          {/* Price Badge — only shown if price detected in prompt */}
+          {price && (
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 12,
+              background: primary, borderRadius: 16, padding: '14px 32px',
+              marginBottom: 40,
+            }}>
+              <span style={{ fontSize: 18, color: '#fff', fontWeight: 700 }}>Desde</span>
+              <span style={{ fontSize: 52, color: '#fff', fontWeight: 900, lineHeight: 1 }}>{price}</span>
+              <span style={{ fontSize: 16, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>+ IVA</span>
+            </div>
+          )}
         </div>
 
         {/* MIDDLE — Features grid + Laptop mockup */}
@@ -370,15 +372,17 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
           </div>
         </div>
 
-        {/* PRICE + CTA BAR */}
+        {/* PRICE + CTA BAR — conditional on price */}
         <div style={{ background: secondary, padding: '24px 64px', display: 'flex', alignItems: 'center', gap: 48 }}>
-          <div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Desde</div>
-            <div style={{ fontSize: 52, fontWeight: 900, color: '#fff', lineHeight: 1 }}>{price}</div>
-            <div style={{ background: primary, borderRadius: 6, padding: '4px 12px', marginTop: 6, display: 'inline-block' }}>
-              <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>SIN CONTRATOS LARGOS</span>
+          {price && (
+            <div>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Desde</div>
+              <div style={{ fontSize: 52, fontWeight: 900, color: '#fff', lineHeight: 1 }}>{price}</div>
+              <div style={{ background: primary, borderRadius: 6, padding: '4px 12px', marginTop: 6, display: 'inline-block' }}>
+                <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>SIN CONTRATOS LARGOS</span>
+              </div>
             </div>
-          </div>
+          )}
           <div style={{ flex: 1, textAlign: 'center' }}>
             <div style={{ background: primary, borderRadius: 12, padding: '16px 32px', display: 'inline-flex', alignItems: 'center', gap: 12 }}>
               <span style={{ fontSize: 22 }}>💬</span>

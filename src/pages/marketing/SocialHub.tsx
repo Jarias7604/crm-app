@@ -254,6 +254,18 @@ export default function SocialHub() {
 
   useEffect(() => { loadData(); }, [profile?.company_id]);
 
+  // Read flyer from Flyer Studio via sessionStorage
+  useEffect(() => {
+    const prefill = sessionStorage.getItem('socialhub_prefill_image');
+    if (prefill) {
+      setContentUrl(prefill);
+      setContentType('image');
+      setImgError(false);
+      sessionStorage.removeItem('socialhub_prefill_image');
+      toast.success('✅ Flyer cargado desde Flyer Studio');
+    }
+  }, []);
+
   // Load flyer data and auto-generate captions
   useEffect(() => {
     if (profile?.company_id && flyerUrl) {
