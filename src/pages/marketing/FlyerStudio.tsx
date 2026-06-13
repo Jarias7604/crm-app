@@ -865,12 +865,12 @@ export default function FlyerStudio() {
 
               {/* SECONDARY — Template selector + background-only */}
               <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={() => { setSelectedTemplate('A'); setPreviewMode('template'); }}
-                  style={{ flex: 1, border: `1.5px solid ${selectedTemplate === 'A' ? '#e91e8c' : '#e2e8f0'}`, borderRadius: 7, padding: '7px 6px', background: selectedTemplate === 'A' ? '#fce4ec' : '#f8fafc', cursor: 'pointer', fontSize: 10, fontWeight: 700, color: selectedTemplate === 'A' ? '#c2185b' : '#64748b' }}>
+                <button onClick={() => { setSelectedTemplate('A'); setPreviewMode('template'); setShowFullAiResult(false); }}
+                  style={{ flex: 1, border: `1.5px solid ${selectedTemplate === 'A' && !showFullAiResult ? '#e91e8c' : '#e2e8f0'}`, borderRadius: 7, padding: '7px 6px', background: selectedTemplate === 'A' && !showFullAiResult ? '#fce4ec' : '#f8fafc', cursor: 'pointer', fontSize: 10, fontWeight: 700, color: selectedTemplate === 'A' && !showFullAiResult ? '#c2185b' : '#64748b' }}>
                   🎨 Template A
                 </button>
-                <button onClick={() => { setSelectedTemplate('B'); setPreviewMode('template'); }}
-                  style={{ flex: 1, border: `1.5px solid ${selectedTemplate === 'B' ? '#9b1c1c' : '#e2e8f0'}`, borderRadius: 7, padding: '7px 6px', background: selectedTemplate === 'B' ? '#fef2f2' : '#f8fafc', cursor: 'pointer', fontSize: 10, fontWeight: 700, color: selectedTemplate === 'B' ? '#9b1c1c' : '#64748b' }}>
+                <button onClick={() => { setSelectedTemplate('B'); setPreviewMode('template'); setShowFullAiResult(false); }}
+                  style={{ flex: 1, border: `1.5px solid ${selectedTemplate === 'B' && !showFullAiResult ? '#9b1c1c' : '#e2e8f0'}`, borderRadius: 7, padding: '7px 6px', background: selectedTemplate === 'B' && !showFullAiResult ? '#fef2f2' : '#f8fafc', cursor: 'pointer', fontSize: 10, fontWeight: 700, color: selectedTemplate === 'B' && !showFullAiResult ? '#9b1c1c' : '#64748b' }}>
                   🏢 Template B
                 </button>
                 <button onClick={() => generate('background')} disabled={generating || !prompt.trim()}
@@ -1006,20 +1006,48 @@ export default function FlyerStudio() {
               </div>
             )}
 
+            {/* ══ CONTROL BAR (Variants & Layout) ══ */}
+            {!showSuggestions && !generating && variants.length > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', padding: '10px 14px', borderRadius: 10, border: '1px solid #dde1e7', gap: 10, width: '100%', maxWidth: 480, boxSizing: 'border-box' }}>
+                {/* Layout selector */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, color: '#54698d', textTransform: 'uppercase' }}>Diseño:</span>
+                  <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', padding: 3, borderRadius: 6 }}>
+                    <button onClick={() => { setShowFullAiResult(false); setSelectedTemplate('A'); }}
+                      style={{ border: 'none', borderRadius: 4, padding: '4px 8px', fontSize: 10, fontWeight: 700, cursor: 'pointer', background: (!showFullAiResult && selectedTemplate === 'A') ? '#fff' : 'transparent', color: (!showFullAiResult && selectedTemplate === 'A') ? '#0070d2' : '#64748b', boxShadow: (!showFullAiResult && selectedTemplate === 'A') ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
+                      Template A
+                    </button>
+                    <button onClick={() => { setShowFullAiResult(false); setSelectedTemplate('B'); }}
+                      style={{ border: 'none', borderRadius: 4, padding: '4px 8px', fontSize: 10, fontWeight: 700, cursor: 'pointer', background: (!showFullAiResult && selectedTemplate === 'B') ? '#fff' : 'transparent', color: (!showFullAiResult && selectedTemplate === 'B') ? '#0070d2' : '#64748b', boxShadow: (!showFullAiResult && selectedTemplate === 'B') ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
+                      Template B
+                    </button>
+                    <button onClick={() => setShowFullAiResult(true)}
+                      style={{ border: 'none', borderRadius: 4, padding: '4px 8px', fontSize: 10, fontWeight: 700, cursor: 'pointer', background: showFullAiResult ? '#fff' : 'transparent', color: showFullAiResult ? '#0070d2' : '#64748b', boxShadow: showFullAiResult ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
+                      Imagen Pura
+                    </button>
+                  </div>
+                </div>
+
+                {/* Variant selector */}
+                {variants.length > 1 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, color: '#54698d', textTransform: 'uppercase' }}>Variante:</span>
+                    <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', padding: 3, borderRadius: 6 }}>
+                      {variants.map((_, i) => (
+                        <button key={i} onClick={() => setSelected(i)}
+                          style={{ border: 'none', borderRadius: 4, width: 22, height: 22, fontSize: 10, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: selected === i ? '#fff' : 'transparent', color: selected === i ? '#0070d2' : '#64748b', boxShadow: selected === i ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
+                          {i + 1}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* ══ AI RESULT IMAGE ══ */}
             {!showSuggestions && !generating && (showFullAiResult || bgUploadPreview) && variants.length > 0 ? (
               <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {/* Variant tabs */}
-                {variants.length > 1 && (
-                  <div style={{ display: 'flex', gap: 8, background: '#fff', padding: 8, borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                    {variants.map((_, i) => (
-                      <button key={i} onClick={() => setSelected(i)}
-                        style={{ flex: 1, padding: '7px', borderRadius: 6, border: `1.5px solid ${selected === i ? '#7c3aed' : '#e2e8f0'}`, background: selected === i ? '#f5f3ff' : '#f8fafc', cursor: 'pointer', fontSize: 11, fontWeight: 700, color: selected === i ? '#7c3aed' : '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                        {selected === i && <Check size={10} />} Variante {i + 1}
-                      </button>
-                    ))}
-                  </div>
-                )}
                 {/* Full AI Image */}
                 <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
                   <div
