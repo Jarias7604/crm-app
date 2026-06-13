@@ -75,6 +75,7 @@ export default function FlyerStudio() {
 
   // Form & Content States
   const [prompt, setPrompt] = useState('');
+  const [cta, setCta] = useState('');
   const [phone, setPhone] = useState('+503 7971-8911');
   const [website, setWebsite] = useState('www.ariasdefense.com');
   const [format, setFormat] = useState('ig-post');
@@ -290,10 +291,10 @@ export default function FlyerStudio() {
           <div style={css.colBody}>
             {/* Prompt */}
             <div style={css.section}>
-              <label style={css.label}>1. ¿Cuál es tu oferta o idea? *</label>
+              <label style={css.label}>¿Qué quieres promocionar? *</label>
               <textarea
-                style={css.textarea}
-                placeholder="Ej: Descuento de verano en facturación electrónica. 100% en la nube y rápido..."
+                style={{ ...css.textarea, minHeight: 120, fontSize: 13, lineHeight: 1.6 }}
+                placeholder={'Ej: Promoción especial de verano — 30% off en todos los servicios. Incluye kit completo de defensa personal...'}
                 value={prompt}
                 onChange={e => setPrompt(e.target.value)}
               />
@@ -305,8 +306,8 @@ export default function FlyerStudio() {
                     marginTop: 8,
                     background: 'linear-gradient(135deg, #7c3aed, #0070d2)',
                     border: 'none',
-                    borderRadius: 7,
-                    padding: '7px 12px',
+                    borderRadius: 8,
+                    padding: '8px 14px',
                     fontSize: 11,
                     fontWeight: 700,
                     color: '#fff',
@@ -316,21 +317,30 @@ export default function FlyerStudio() {
                     justifyContent: 'center',
                     gap: 6,
                     width: '100%',
-                    boxShadow: '0 2px 5px rgba(124, 58, 237, 0.2)'
+                    boxShadow: '0 2px 8px rgba(124,58,237,0.25)'
                   }}
                 >
                   {optimizing ? (
                     <><Cpu size={12} style={{ animation: 'spin 1s linear infinite' }} /> Analizando con Meta AI...</>
                   ) : (
-                    <><Sparkles size={12} color="#D4AF37" fill="#D4AF37" /> Autocompletar con Meta AI</>
+                    <><Sparkles size={12} color="#D4AF37" fill="#D4AF37" /> Optimizar con Meta AI</>
                   )}
                 </button>
               )}
             </div>
 
-            {/* Contact Info */}
+            {/* CTA */}
             <div style={css.section}>
-              <label style={css.label}>2. Datos de Contacto (Se incluirán en el diseño)</label>
+              <label style={css.label}>Llamada a la Acción (CTA)</label>
+              <input style={css.input} placeholder="Ej: Reserva hoy · Llama ahora · Obtén 30% off"
+                value={cta}
+                onChange={e => setCta(e.target.value)}
+              />
+            </div>
+
+            {/* Contact Details */}
+            <div style={css.section}>
+              <label style={css.label}>Datos de Contacto</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <input style={css.input} placeholder="Teléfono (Ej: 7971-8911)"
                   value={phone} onChange={e => setPhone(e.target.value)} />
@@ -341,7 +351,7 @@ export default function FlyerStudio() {
 
             {/* Logo */}
             <div style={css.section}>
-              <label style={css.label}>7. Logo de la Empresa</label>
+              <label style={css.label}>Logo / Imagen de Referencia</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <button onClick={() => logoRef.current?.click()} style={{ ...css.ghost, fontSize: 11, padding: '7px 12px', flex: 1 }}>
                   <Upload size={12} /> {logoFile ? 'Cambiar logo' : 'Subir logo'}
@@ -358,9 +368,9 @@ export default function FlyerStudio() {
               <input ref={logoRef} type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (!f) return; setLogoFile(f); const r = new FileReader(); r.onload = ev => setLogoPreview(ev.target?.result as string); r.readAsDataURL(f); }} style={{ display: 'none' }} />
             </div>
 
-            {/* Custom Flyer Background Image Upload (Ya hecho) */}
+            {/* Custom Flyer Upload */}
             <div style={css.section}>
-              <label style={css.label}>8. Cargar Flyer ya Diseñado (Ya hecho)</label>
+              <label style={css.label}>Cargar Flyer ya Diseñado (Canva / ChatGPT)</label>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <button onClick={() => bgUploadRef.current?.click()} style={{ ...css.ghost, fontSize: 11, padding: '7px 12px', flex: 1, background: bgUploadPreview ? '#f0fdf4' : '#f4f6f9', borderColor: bgUploadPreview ? '#bbf7d0' : '#d8dde6' }}>
                   <Upload size={12} /> {bgFile ? 'Cambiar flyer' : 'Subir flyer (ChatGPT / Canva)'}
@@ -392,7 +402,7 @@ export default function FlyerStudio() {
 
             {/* Variants */}
             <div style={css.section}>
-              <label style={css.label}>Variantes de Imagen de Fondo (1 crédito c/u)</label>
+              <label style={css.label}>¿Cuántas variantes? (1 crédito c/u)</label>
               <div style={{ display: 'flex', gap: 8 }}>
                 {([1, 2, 3] as const).map(n => (
                   <button key={n} onClick={() => setVariantCount(n)}
@@ -613,17 +623,26 @@ export default function FlyerStudio() {
                     </div>
                   </div>
                 ) : (
-                  /* Empty state — nothing generated yet */
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, padding: 40, background: '#fff', borderRadius: 12, border: '2px dashed #e2e8f0', width: '100%', maxWidth: 400 }}>
-                    <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'linear-gradient(135deg,#0070d2,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Wand2 size={24} color="#fff" />
+                  /* Empty state — premium version matching production */
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, padding: '48px 32px', background: '#fff', borderRadius: 16, width: '100%', maxWidth: 420, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+                    <div style={{ width: 64, height: 64, borderRadius: 18, background: 'linear-gradient(135deg,#e0e7ff,#dbeafe)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Layers size={28} color="#6366f1" />
                     </div>
                     <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', marginBottom: 6 }}>Listo para crear tu flyer</div>
-                      <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>Describe tu flyer en el panel izquierdo<br />y presiona <strong>"Generar Imagen con IA"</strong></div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>Completa el brief y genera</div>
+                      <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.6 }}>La IA creará un flyer profesional listo<br />para publicar en tus redes sociales.</div>
                     </div>
-                    <div style={{ fontSize: 10, color: '#94a3b8', textAlign: 'center', background: '#f8fafc', padding: '8px 16px', borderRadius: 8, border: '1px solid #e2e8f0' }}>
-                      💡 La IA usará el motor de DALL-E 3 (mismo que ChatGPT) para crear un flyer 100% profesional
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%' }}>
+                      {[
+                        { icon: '🎯', text: 'Usa un tono acorde a tu audiencia' },
+                        { icon: '🎨', text: 'Agrega tus colores de marca' },
+                        { icon: '📐', text: 'Elige el formato según la red social' },
+                      ].map((tip, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, background: '#f8fafc', borderRadius: 10, padding: '10px 14px', border: '1px solid #f1f5f9' }}>
+                          <span style={{ fontSize: 16 }}>{tip.icon}</span>
+                          <span style={{ fontSize: 12, color: '#475569', fontWeight: 500 }}>{tip.text}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
