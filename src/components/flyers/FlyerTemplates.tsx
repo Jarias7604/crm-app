@@ -193,21 +193,21 @@ export function deriveIndustryContent(prompt: string, data: Partial<FlyerData>):
     };
   }
 
-  // 5. Default / B2B ERP
+  // 5. Default / B2B SaaS CRM & Business Growth
   return {
-    highlight_title: data.highlight_title || '¿Quieres saber cuánto tienes que pagar de impuesto?',
-    highlight_desc: data.highlight_desc || 'Lleva tu contabilidad al día, facturación electrónica y reportes en tiempo real.',
+    highlight_title: data.highlight_title || '¿Quieres automatizar tu negocio y vender más?',
+    highlight_desc: data.highlight_desc || 'Aumenta la productividad de tu equipo con herramientas inteligentes y control de leads.',
     benefits: data.benefits && data.benefits.length >= 3 ? data.benefits : [
-      { title: 'Declaraciones', desc: 'Preparándote tus declaraciones a tiempo.', icon: '📄' },
-      { title: 'Tranquilidad', desc: 'La tranquilidad y seguridad no se compran.', icon: '⏱️' },
-      { title: 'Crecimiento', desc: 'Lleva el control total de tus ingresos y gastos.', icon: '📈' }
+      { title: 'Eficiencia', desc: 'Automatiza tareas repetitivas y ahorra tiempo.', icon: '⚡' },
+      { title: 'Control Total', desc: 'Gestiona tus clientes y ventas en un solo lugar.', icon: '👥' },
+      { title: 'Crecimiento', desc: 'Incrementa tus conversiones con seguimiento inteligente.', icon: '📈' }
     ],
-    mockup_title: data.mockup_info?.title || 'Dashboard Activo',
+    mockup_title: data.mockup_info?.title || 'Control de Leads',
     kpis: data.mockup_info?.kpis && data.mockup_info.kpis.length >= 4 ? data.mockup_info.kpis : [
-      { label: 'Ventas', val: '$5,234.75' },
-      { label: 'Cobrar', val: '$1,414.55' },
-      { label: 'Gastos', val: '$1,774.55' },
-      { label: 'Utilidad', val: '$2,160.20' }
+      { label: 'Leads Nuevos', val: '240+' },
+      { label: 'Conversión', val: '18.4%' },
+      { label: 'Atención', val: '< 2 min' },
+      { label: 'Satisfacción', val: '4.9 ★' }
     ]
   };
 }
