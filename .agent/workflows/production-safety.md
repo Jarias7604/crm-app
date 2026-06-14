@@ -153,6 +153,16 @@ Si hay resultados → recrear CADA política listada en la misma migración ANTE
 
 ---
 
+## REGLA 11 — NUNCA descartar cambios locales sin stash preventivo
+
+**PROHIBIDO:** Ejecutar comandos de Git destructivos en el directorio de trabajo (tales como `git checkout -- <archivos>`, `git restore <archivos>`, `git reset --hard` o `git clean`) sin haber guardado un stash previo si existen cambios valiosos sin confirmar de la sesión o del cliente.
+
+**OBLIGATORIO:** Antes de restaurar archivos para corregir errores, si hay cambios de código recientes importantes en curso, **ejecutar `git stash`** primero. De esta manera, si la restauración borra más archivos de los esperados o elimina el trabajo del día, se puede recuperar de inmediato con `git stash pop`.
+
+**Incidente real (2026-06-14):** Se ejecutó `git checkout` en `FlyerStudio.tsx` para revertir una falla de compilación, lo que borró por completo todas las refactorizaciones avanzadas y configuraciones que no habían sido guardadas en un commit, perdiéndose horas de trabajo. Se tuvo que realizar una reconstrucción manual a partir de los registros de conversación.
+
+---
+
 ## Historial de incidentes
 
 | Fecha | Causa | Horas perdidas | Regla que lo previene |
@@ -165,3 +175,4 @@ Si hay resultados → recrear CADA política listada en la misma migración ANTE
 | 2026-06-08 | `DROP FUNCTION get_auth_company_id() CASCADE` borró políticas RLS de `client_stage_document_types` y `client_documents` sin que la migración de restore las recuperara | ~3 días invisible | Regla 10 |
 | 2026-06-08 | `get_auth_company_id()` fue reescrita para leer del JWT en vez de `profiles`. JWT sin `company_id` → BD invisible para todos | ~3 días | Regla 9 |
 | 2026-06-11 | Agente aplicó fix en producción sin autorización explícita del usuario | horas de tensión | Regla 5 — Gate de autorización |
+| 2026-06-14 | `git checkout` accidental borró cambios avanzados sin confirmar | ~2 horas (reconstrucción) | Regla 11 |

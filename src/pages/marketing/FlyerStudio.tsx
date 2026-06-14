@@ -37,9 +37,10 @@ const TONES = [
 
 const BRAND_COLORS = [
   '#0070d2', '#7c3aed', '#ef4444', '#f59e0b',
-  '#10b981', '#D4AF37', '#ec4899', '#06b6d4',
-  '#1a1a2e', '#111827',
+  '#10b981', '#ec4899', '#06b6d4', '#111827',
 ];
+
+const DEFAULT_BG_IMAGE = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1080&auto=format&fit=crop';
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const css = {
@@ -260,16 +261,21 @@ export default function FlyerStudio() {
   const [previewMode, setPreviewMode] = useState<'template' | 'ai'>('template');
 
   // Form & Content States
-  const [prompt, setPrompt] = useState('');
-  const [cta, setCta] = useState('');
+  const [prompt, setPrompt] = useState('Flyer promocional para nuestra oferta especial de temporada.');
+  const [cta, setCta] = useState('¡CONTACTAR AHORA!');
   const [phone, setPhone] = useState('+503 7971-8911');
   const [website, setWebsite] = useState('www.ariasdefense.com');
   const [format, setFormat] = useState('ig-post');
   const [tone, setTone] = useState('moderno');
   const [variantCount, setVariantCount] = useState<1 | 2 | 3>(1);
-  const [colors, setColors] = useState<string[]>([]);
+  const [colors, setColors] = useState<string[]>(['#7c3aed']);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState('');
+  const [isFormatModalOpen, setIsFormatModalOpen] = useState(false);
+  const [isToneModalOpen, setIsToneModalOpen] = useState(false);
+  const [isColorModalOpen, setIsColorModalOpen] = useState(false);
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [customHex, setCustomHex] = useState('#7c3aed');
 
   // Custom background upload states
   const [bgFile, setBgFile] = useState<File | null>(null);
@@ -361,10 +367,15 @@ export default function FlyerStudio() {
     document.removeEventListener('mousemove', handleHeaderMouseMove);
     document.removeEventListener('mouseup', handleHeaderMouseUp);
   };
-  const [manualTitle, setManualTitle] = useState('');
-  const [manualSubtitle, setManualSubtitle] = useState('');
-  const [manualFeatures, setManualFeatures] = useState<string[]>(['', '', '', '']);
-  const [manualPrice, setManualPrice] = useState('');
+  const [manualTitle, setManualTitle] = useState('OFERTA ESPECIAL');
+  const [manualSubtitle, setManualSubtitle] = useState('Los mejores servicios y productos profesionales a tu alcance hoy mismo.');
+  const [manualFeatures, setManualFeatures] = useState<string[]>([
+    '✓ Atención Personalizada 24/7',
+    '✓ Calidad 100% Garantizada',
+    '✓ Profesionales Altamente Calificados',
+    '✓ Descuento por Tiempo Limitado'
+  ]);
+  const [manualPrice, setManualPrice] = useState('¡Desde $29.99!');
   const [textScale, setTextScale] = useState(1.0);
   const [subtitleScale, setSubtitleScale] = useState(1.0);
   const [benefitsScale, setBenefitsScale] = useState(1.0);
@@ -404,6 +415,7 @@ export default function FlyerStudio() {
   // Pre-populate manual inputs from basic parsing as the user types, before they generate
   useEffect(() => {
     if (variants.length > 0) return; // Don't overwrite generated/manually modified text
+    if (!prompt.trim() || prompt === 'Flyer promocional para nuestra oferta especial de temporada.') return; // Don't overwrite default placeholder values
     const parsed = parsePrompt(prompt);
     const { h1, h2 } = deriveHeadline(prompt, companyName || 'Mi Empresa');
     setManualTitle(parsed.title || h1 || '');
@@ -981,41 +993,69 @@ export default function FlyerStudio() {
           </div>
 
           <div className="flyer-studio-col" style={css.colBody}>
-            {/* Format (2 Columns) */}
+            {/* Format Selection (Modal Trigger) */}
             <div style={css.section}>
               <label style={css.label}>Formato</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                {FORMATS.map(f => {
-                  const IconComponent = f.icon;
-                  return (
-                    <button key={f.id} onClick={() => setFormat(f.id)}
-                      style={{ ...css.pill(format === f.id), flexDirection: 'row' as const, alignItems: 'center', padding: '8px 10px', gap: 6 }}>
-                      <IconComponent size={13} color={format === f.id ? '#0070d2' : '#54698d'} />
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: format === f.id ? '#0070d2' : '#0f172a', lineHeight: 1.1 }}>{f.label}</span>
-                        <span style={{ fontSize: 9, color: '#94a3b8' }}>{f.tag}</span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
+              <button
+                type="button"
+                onClick={() => setIsFormatModalOpen(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  width: '100%',
+                  padding: '10px 14px',
+                  background: '#fff',
+                  border: '1.5px solid #e2e8f0',
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  boxSizing: 'border-box'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {React.createElement(FORMATS.find(f => f.id === format)?.icon || Smartphone, { size: 16, color: '#7c3aed' })}
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+                    {FORMATS.find(f => f.id === format)?.label}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b', background: '#f1f5f9', padding: '3px 8px', borderRadius: 6 }}>
+                    {FORMATS.find(f => f.id === format)?.tag}
+                  </span>
+                  <ChevronRight size={14} color="#94a3b8" />
+                </div>
+              </button>
             </div>
 
-            {/* Tone (2 Columns) */}
+            {/* Tone Selection (Modal Trigger) */}
             <div style={css.section}>
               <label style={css.label}>Tono de diseño</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                {TONES.map(t => {
-                  const ToneIcon = t.icon;
-                  return (
-                    <button key={t.key} onClick={() => setTone(t.key)}
-                      style={{ ...css.pill(tone === t.key), justifyContent: 'flex-start', gap: 6, padding: '8px 10px' }}>
-                      <ToneIcon size={13} color={tone === t.key ? '#0070d2' : t.color} />
-                      <span style={{ fontSize: 11, fontWeight: 700, color: tone === t.key ? '#0070d2' : '#0f172a' }}>{t.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              <button
+                type="button"
+                onClick={() => setIsToneModalOpen(true)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  width: '100%',
+                  padding: '10px 14px',
+                  background: '#fff',
+                  border: '1.5px solid #e2e8f0',
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  boxSizing: 'border-box'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {React.createElement(TONES.find(t => t.key === tone)?.icon || Sparkles, { size: 16, color: '#0070d2' })}
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+                    {TONES.find(t => t.key === tone)?.label}
+                  </span>
+                </div>
+                <ChevronRight size={14} color="#94a3b8" />
+              </button>
             </div>
 
             {/* Brand colors */}
@@ -1051,7 +1091,7 @@ export default function FlyerStudio() {
                         <Check 
                           size={11} 
                           color={
-                            hex === '#fff' || hex === '#D4AF37' || hex === '#f59e0b' || hex === '#10b981'
+                            hex === '#fff' || hex === '#f59e0b' || hex === '#10b981'
                               ? '#0f172a' 
                               : '#ffffff'
                           } 
@@ -1061,6 +1101,62 @@ export default function FlyerStudio() {
                     </button>
                   );
                 })}
+                {colors.filter(c => !BRAND_COLORS.map(bc => bc.toLowerCase()).includes(c.toLowerCase())).map(hex => {
+                  return (
+                    <button
+                      key={hex}
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); toggleColor(hex); }}
+                      style={{
+                        width: 26,
+                        height: 26,
+                        borderRadius: '50%',
+                        background: hex,
+                        border: '2px solid #fff',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 0 0 2px #0f172a, 0 4px 8px rgba(0,0,0,0.15)',
+                        transform: 'scale(1.15)',
+                        transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
+                        padding: 0
+                      }}
+                    >
+                      <Check 
+                        size={11} 
+                        color={
+                          hex === '#fff' || hex === '#ffffff' || hex === '#f59e0b' || hex === '#10b981'
+                            ? '#0f172a' 
+                            : '#ffffff'
+                        } 
+                        strokeWidth={3.5} 
+                      />
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => setIsColorModalOpen(true)}
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: '50%',
+                    border: '1px dashed #7c3aed',
+                    background: '#f5f3ff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 14,
+                    fontWeight: 'bold',
+                    color: '#7c3aed',
+                    transition: 'all 0.15s ease',
+                    padding: 0
+                  }}
+                >
+                  +
+                </button>
                 {colors.length > 0 && (
                   <button 
                     type="button"
@@ -1072,8 +1168,6 @@ export default function FlyerStudio() {
                 )}
               </div>
             </div>
-
-
 
             {/* ═══════════════════════════════════════════════════════════════
                 AI GENERATION BUTTONS — Primary: Autocorrected Flyer
@@ -1104,13 +1198,13 @@ export default function FlyerStudio() {
                 {generating ? (
                   <><Cpu size={16} style={{ animation: 'spin 1s linear infinite' }} /> Creando diseño con IA...</>
                 ) : (
-                  <><Sparkles size={16} color="#fff" fill="#fff" /> Generar Flyer con IA (Autocorregido)</>
+                  <><Sparkles size={16} color="#fff" fill="#fff" /> Generar Flyer con IA</>
                 )}
               </button>
 
               {/* Description */}
               <div style={{ fontSize: 10, color: '#64748b', textAlign: 'center', lineHeight: 1.5, padding: '0 4px', marginBottom: 4 }}>
-                ✨ <strong>Autocorrección activa:</strong> La IA dibuja un fondo abstracto espectacular y el sistema escribe los textos editables por encima en HTML. ¡Cero errores ortográficos!
+                ✨ La IA dibuja un fondo abstracto espectacular y el sistema escribe los textos editables por encima en HTML. ¡Cero errores ortográficos!
               </div>
 
               {/* FREE STOCK PHOTO BUTTON */}
@@ -1133,48 +1227,39 @@ export default function FlyerStudio() {
                   marginBottom: 8
                 }}
               >
-                <Image size={15} color="#10b981" /> Generar con Fotos Gratis (Sin Créditos)
+                <Image size={15} color="#10b981" /> Generar con Fotos Gratis
               </button>
 
               {/* SELECT TEMPLATE CATALOG */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={css.label}>Selecciona Plantilla (Catálogo Salesforce/HubSpot)</label>
-                <select
+                <label style={css.label}>Plantilla del Flyer</label>
+                <button
+                  type="button"
                   id="select-template"
-                  value={selectedTemplate}
-                  onChange={(e) => {
-                    setSelectedTemplate(e.target.value);
-                    setPreviewMode('template');
-                    setShowFullAiResult(false);
-                  }}
+                  onClick={() => setIsTemplateModalOpen(true)}
                   style={{
-                    ...css.input,
-                    padding: '8px 12px',
-                    fontSize: 12,
-                    fontWeight: 700,
-                    color: '#0f172a',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    width: '100%',
+                    padding: '10px 14px',
+                    background: '#fff',
                     border: '1.5px solid #7c3aed40',
-                    background: '#fcfbfe'
+                    borderRadius: 10,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    boxSizing: 'border-box'
                   }}
                 >
-                  <optgroup label="Plantillas Corporativas Pro (1080x1080)">
-                    <option value="A">✨ Template A — Glow Glassmorphic</option>
-                    <option value="B">🏢 Template B — Editorial Showcase</option>
-                  </optgroup>
-                  <optgroup label="Catálogo Completo de Marketing (Autorescaling)">
-                    <option value="bold-split">1. Split Asimétrico Bold (Panel color + foto)</option>
-                    <option value="cinematic">2. Cinematic Full (Foto top + panel oscuro)</option>
-                    <option value="white-card">3. White Card Editorial (Blanco limpio + foto redondeada)</option>
-                    <option value="magazine">4. Magazine Dark (Editorial Forbes/Vogue)</option>
-                    <option value="center-gradient">5. Gradient Center Pop (Gradiente centrado)</option>
-                    <option value="corporate-light">6. Corporate Light (B2B blanco/color)</option>
-                    <option value="dark-luxury">7. Dark Luxury Gold (Oscuro + dorado)</option>
-                    <option value="promo-pop">8. Promo Pop (Ofertas especiales)</option>
-                    <option value="minimal-editorial">9. Minimal Editorial (Tipografía clean)</option>
-                    <option value="full-bleed">10. Full Bleed Bold (Foto completa + panel texto)</option>
-                    <option value="direct-mockup">11. Mockup Directo (Imagen 100% limpia)</option>
-                  </optgroup>
-                </select>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+                    {selectedTemplate === 'A' 
+                      ? '✨ Template A — Glow Glassmorphic' 
+                      : selectedTemplate === 'B' 
+                      ? '🏢 Template B — Editorial Showcase' 
+                      : TEMPLATE_LIST.find(t => t.id === selectedTemplate)?.name || 'Seleccionar Plantilla'}
+                  </span>
+                  <ChevronRight size={14} color="#94a3b8" />
+                </button>
               </div>
 
               {/* Espaciador estético */}
@@ -1301,25 +1386,7 @@ export default function FlyerStudio() {
               </div>
             )}
 
-            {/* ══ EMPTY STATE — no variants yet ══ */}
-            {!showFullAiResult && !bgUploadPreview && variants.length === 0 && !generating && (
-              <div style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center',
-                justifyContent: 'center', gap: 14, padding: '40px 20px',
-                textAlign: 'center', height: '100%', minHeight: 340
-              }}>
-                <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'linear-gradient(135deg,#7c3aed22,#0070d222)', border: '2px dashed #7c3aed40', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Wand2 size={32} color="#7c3aed" strokeWidth={1.5} />
-                </div>
-                <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>Tu flyer generado por IA aparecerá aquí</div>
-                <div style={{ fontSize: 12, color: '#64748b', maxWidth: 260, lineHeight: 1.6 }}>
-                  Escribe tu brief en la columna izquierda y presiona <strong>"Generar Flyer con IA (Autocorregido)"</strong>. <strong>gpt-image-1</strong> creará un fondo premium y escribirá los textos de forma automática.
-                </div>
-                <div style={{ background: '#f1f5f9', borderRadius: 10, padding: '10px 16px', fontSize: 11, color: '#475569', lineHeight: 1.6, maxWidth: 280 }}>
-                  💡 <strong>Tip:</strong> Cuanto más detallado sea tu brief (tipo de negocio, oferta, colores, tono), mejor será el resultado.
-                </div>
-              </div>
-            )}
+
 
             {/* ══ CONTROL BAR (Variants & Layout) ══ */}
             {!showSuggestions && !generating && variants.length > 0 && (
@@ -1449,7 +1516,7 @@ export default function FlyerStudio() {
             ) : null}
 
             {/* Template preview — shown when user selects Template A or B without full AI result */}
-            {!showSuggestions && !generating && !showFullAiResult && (variants.length > 0 || bgUploadPreview) && (
+            {!showSuggestions && !generating && !showFullAiResult && (
               <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {/* Canvas */}
                 <div style={{ display: 'flex', justifyContent: 'center', width: '100%', userSelect: 'none' }}>
@@ -1475,11 +1542,11 @@ export default function FlyerStudio() {
                       {selectedTemplate === 'A' ? (
                         <FlyerTemplateA data={{
                           company_name: companyName || 'Mi Empresa',
-                          prompt, cta: aiOptimizedText?.cta || cta || 'Contáctanos HOY',
-                          headline: manualTitle,
-                          subheadline: manualSubtitle,
-                          features: manualFeatures,
-                          price: manualPrice,
+                          prompt, cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+                          headline: manualTitle || 'OFERTA INCREÍBLE',
+                          subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+                          features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
+                          price: manualPrice || '¡Precios de Locura!',
                           highlight_title: aiOptimizedText?.highlight_title,
                           highlight_desc: aiOptimizedText?.highlight_desc,
                           benefits: aiOptimizedText?.benefits,
@@ -1487,7 +1554,7 @@ export default function FlyerStudio() {
                           primaryColor: colors[0] || '#e91e8c',
                           secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
                           phone, website, logoUrl: logoPreview || undefined,
-                          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined),
+                          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
                           flyerFont,
                           textScale,
                           subtitleScale,
@@ -1515,11 +1582,11 @@ export default function FlyerStudio() {
                       ) : selectedTemplate === 'B' ? (
                         <FlyerTemplateB data={{
                           company_name: companyName || 'Mi Empresa',
-                          prompt, cta: aiOptimizedText?.cta || cta || 'Activa HOY MISMO',
-                          headline: manualTitle,
-                          subheadline: manualSubtitle,
-                          features: manualFeatures,
-                          price: manualPrice,
+                          prompt, cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+                          headline: manualTitle || 'OFERTA INCREÍBLE',
+                          subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+                          features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
+                          price: manualPrice || '¡Precios de Locura!',
                           highlight_title: aiOptimizedText?.highlight_title,
                           highlight_desc: aiOptimizedText?.highlight_desc,
                           benefits: aiOptimizedText?.benefits,
@@ -1527,7 +1594,7 @@ export default function FlyerStudio() {
                           primaryColor: colors[0] || '#9b1c1c',
                           secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
                           phone, website, logoUrl: logoPreview || undefined,
-                          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined),
+                          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
                           flyerFont,
                           textScale,
                           subtitleScale,
@@ -1555,11 +1622,11 @@ export default function FlyerStudio() {
                       ) : (
                         <RenderFlyer d={{
                           title: manualTitle || 'TU OFERTA',
-                          subtitle: manualSubtitle || '',
+                          subtitle: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
                           cta: aiOptimizedText?.cta || cta || 'COMIENZA HOY',
-                          beneficios: manualFeatures.filter(f => f.trim() !== ''),
+                          beneficios: manualFeatures.filter(f => f.trim() !== '').length > 0 ? manualFeatures.filter(f => f.trim() !== '') : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
                           accent: colors[0] || '#0070d2',
-                          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null),
+                          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null) || DEFAULT_BG_IMAGE,
                           logoUrl: logoPreview || null,
                           industria: companyName || 'Mi Empresa',
                           phone, website, templateId: selectedTemplate,
@@ -1626,11 +1693,11 @@ export default function FlyerStudio() {
         <FlyerTemplateA ref={templateRefA} data={{
           company_name: companyName || 'Mi Empresa',
           prompt,
-          cta: aiOptimizedText?.cta || cta || 'Contáctanos HOY',
-          headline: manualTitle,
-          subheadline: manualSubtitle,
-          features: manualFeatures,
-          price: manualPrice,
+          cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+          headline: manualTitle || 'OFERTA INCREÍBLE',
+          subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+          features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
+          price: manualPrice || '¡Precios de Locura!',
           highlight_title: aiOptimizedText?.highlight_title,
           highlight_desc: aiOptimizedText?.highlight_desc,
           benefits: aiOptimizedText?.benefits,
@@ -1639,7 +1706,7 @@ export default function FlyerStudio() {
           secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
           phone, website,
           logoUrl: logoPreview || undefined,
-          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined),
+          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
           flyerFont,
           textScale,
           subtitleScale,
@@ -1661,11 +1728,11 @@ export default function FlyerStudio() {
         <FlyerTemplateB ref={templateRefB} data={{
           company_name: companyName || 'Mi Empresa',
           prompt,
-          cta: aiOptimizedText?.cta || cta || 'Activa HOY MISMO',
-          headline: manualTitle,
-          subheadline: manualSubtitle,
-          features: manualFeatures,
-          price: manualPrice,
+          cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+          headline: manualTitle || 'OFERTA INCREÍBLE',
+          subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+          features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
+          price: manualPrice || '¡Precios de Locura!',
           highlight_title: aiOptimizedText?.highlight_title,
           highlight_desc: aiOptimizedText?.highlight_desc,
           benefits: aiOptimizedText?.benefits,
@@ -1674,7 +1741,7 @@ export default function FlyerStudio() {
           secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
           phone, website,
           logoUrl: logoPreview || undefined,
-          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined),
+          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
           flyerFont,
           textScale,
           subtitleScale,
@@ -1696,11 +1763,11 @@ export default function FlyerStudio() {
         <div ref={templateRefMarketing}>
           <RenderFlyer d={{
             title: manualTitle || 'TU OFERTA',
-            subtitle: manualSubtitle || '',
+            subtitle: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
             cta: aiOptimizedText?.cta || cta || 'COMIENZA HOY',
-            beneficios: manualFeatures.filter(f => f.trim() !== ''),
+            beneficios: manualFeatures.filter(f => f.trim() !== '').length > 0 ? manualFeatures.filter(f => f.trim() !== '') : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
             accent: colors[0] || '#0070d2',
-            bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null),
+            bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null) || DEFAULT_BG_IMAGE,
             logoUrl: logoPreview || null,
             industria: companyName || 'Mi Empresa',
             phone, website, templateId: selectedTemplate,
@@ -1820,16 +1887,16 @@ export default function FlyerStudio() {
                     {selectedTemplate === 'A' ? (
                       <FlyerTemplateA data={{
                         company_name: companyName || 'Mi Empresa', prompt,
-                        cta: aiOptimizedText?.cta || cta || 'Contáctanos HOY',
-                        headline: manualTitle, subheadline: manualSubtitle,
-                        features: manualFeatures, price: manualPrice,
+                        cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+                        headline: manualTitle || 'OFERTA INCREÍBLE', subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+                        features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'], price: manualPrice || '¡Precios de Locura!',
                         highlight_title: aiOptimizedText?.highlight_title,
                         highlight_desc: aiOptimizedText?.highlight_desc,
                         benefits: aiOptimizedText?.benefits,
                         mockup_info: aiOptimizedText?.mockup_info,
                         primaryColor: colors[0] || '#e91e8c', secondaryColor: colors[1] || '#1a1a2e',
                         phone, website, logoUrl: logoPreview || undefined,
-                        bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined),
+                        bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
                         flyerFont,
                         textScale,
                         subtitleScale,
@@ -1851,16 +1918,16 @@ export default function FlyerStudio() {
                     ) : selectedTemplate === 'B' ? (
                       <FlyerTemplateB data={{
                         company_name: companyName || 'Mi Empresa', prompt,
-                        cta: aiOptimizedText?.cta || cta || 'Activa HOY MISMO',
-                        headline: manualTitle, subheadline: manualSubtitle,
-                        features: manualFeatures, price: manualPrice,
+                        cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+                        headline: manualTitle || 'OFERTA INCREÍBLE', subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+                        features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'], price: manualPrice || '¡Precios de Locura!',
                         highlight_title: aiOptimizedText?.highlight_title,
                         highlight_desc: aiOptimizedText?.highlight_desc,
                         benefits: aiOptimizedText?.benefits,
                         mockup_info: aiOptimizedText?.mockup_info,
                         primaryColor: colors[0] || '#9b1c1c', secondaryColor: colors[1] || '#1a1a2e',
                         phone, website, logoUrl: logoPreview || undefined,
-                        bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined),
+                        bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
                         flyerFont,
                         textScale,
                         subtitleScale,
@@ -1882,11 +1949,11 @@ export default function FlyerStudio() {
                     ) : (
                       <RenderFlyer d={{
                         title: manualTitle || 'TU OFERTA',
-                        subtitle: manualSubtitle || '',
+                        subtitle: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
                         cta: aiOptimizedText?.cta || cta || 'COMIENZA HOY',
-                        beneficios: manualFeatures.filter(f => f.trim() !== ''),
+                        beneficios: manualFeatures.filter(f => f.trim() !== '').length > 0 ? manualFeatures.filter(f => f.trim() !== '') : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
                         accent: colors[0] || '#0070d2',
-                        bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null),
+                        bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null) || DEFAULT_BG_IMAGE,
                         logoUrl: logoPreview || null,
                         industria: companyName || 'Mi Empresa',
                         phone, website, templateId: selectedTemplate,
@@ -2362,6 +2429,305 @@ export default function FlyerStudio() {
               >
                 Listo
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── FORMAT SELECTION MODAL ────────────────────────────────────── */}
+      {isFormatModalOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 3000,
+          background: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'fadeIn 0.2s ease-out'
+        }} onClick={() => setIsFormatModalOpen(false)}>
+          <div style={{
+            background: '#fff',
+            border: '1px solid #e2e8f0',
+            borderRadius: 20,
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+            width: '100%',
+            maxWidth: 440,
+            display: 'flex', flexDirection: 'column',
+            animation: 'scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            overflow: 'hidden'
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(0, 0, 0, 0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 13, fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Selecciona Formato</span>
+              <button onClick={() => setIsFormatModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+                <X size={16} color="#64748b" />
+              </button>
+            </div>
+            <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {FORMATS.map(f => {
+                const IconComponent = f.icon;
+                const active = format === f.id;
+                return (
+                  <button
+                    key={f.id}
+                    onClick={() => { setFormat(f.id); setIsFormatModalOpen(false); }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 16px',
+                      borderRadius: 12,
+                      border: `1.5px solid ${active ? '#7c3aed' : '#e2e8f0'}`,
+                      background: active ? '#7c3aed0a' : '#fff',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      width: '100%',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <IconComponent size={18} color={active ? '#7c3aed' : '#64748b'} />
+                      <span style={{ fontSize: 13, fontWeight: active ? 800 : 600, color: '#0f172a' }}>{f.label}</span>
+                    </div>
+                    <span style={{ fontSize: 11, color: active ? '#7c3aed' : '#94a3b8', fontWeight: 700 }}>{f.tag}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── TONE SELECTION MODAL ──────────────────────────────────────── */}
+      {isToneModalOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 3000,
+          background: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'fadeIn 0.2s ease-out'
+        }} onClick={() => setIsToneModalOpen(false)}>
+          <div style={{
+            background: '#fff',
+            border: '1px solid #e2e8f0',
+            borderRadius: 20,
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+            width: '100%',
+            maxWidth: 440,
+            display: 'flex', flexDirection: 'column',
+            animation: 'scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            overflow: 'hidden'
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(0, 0, 0, 0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 13, fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Selecciona Tono</span>
+              <button onClick={() => setIsToneModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+                <X size={16} color="#64748b" />
+              </button>
+            </div>
+            <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {TONES.map(t => {
+                const IconComponent = t.icon;
+                const active = tone === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    onClick={() => { setTone(t.key); setIsToneModalOpen(false); }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 16px',
+                      borderRadius: 12,
+                      border: `1.5px solid ${active ? '#0070d2' : '#e2e8f0'}`,
+                      background: active ? '#0070d20a' : '#fff',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      width: '100%',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <IconComponent size={18} color={active ? '#0070d2' : t.color} />
+                      <span style={{ fontSize: 13, fontWeight: active ? 800 : 600, color: '#0f172a' }}>{t.label}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── BRAND COLOR PICKER MODAL ──────────────────────────────────── */}
+      {isColorModalOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 3000,
+          background: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'fadeIn 0.2s ease-out'
+        }} onClick={() => setIsColorModalOpen(false)}>
+          <div style={{
+            background: '#fff',
+            border: '1px solid #e2e8f0',
+            borderRadius: 20,
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+            width: '100%',
+            maxWidth: 360,
+            display: 'flex', flexDirection: 'column',
+            animation: 'scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            overflow: 'hidden'
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid rgba(0, 0, 0, 0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 13, fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Color Personalizado</span>
+              <button onClick={() => setIsColorModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+                <X size={16} color="#64748b" />
+              </button>
+            </div>
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <input
+                  type="color"
+                  value={customHex}
+                  onChange={e => setCustomHex(e.target.value)}
+                  style={{
+                    width: 50, height: 50, padding: 0,
+                    border: '1px solid #d8dde6', cursor: 'pointer', borderRadius: 8, flexShrink: 0
+                  }}
+                />
+                <div style={{ flex: 1 }}>
+                  <label style={{ ...css.label, marginBottom: 4 }}>Código HEX</label>
+                  <input
+                    type="text"
+                    placeholder="#000000"
+                    value={customHex}
+                    onChange={e => setCustomHex(e.target.value)}
+                    style={{ ...css.input, textTransform: 'uppercase' }}
+                  />
+                </div>
+              </div>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  let validHex = customHex.trim();
+                  if (!validHex.startsWith('#')) {
+                    validHex = '#' + validHex;
+                  }
+                  if (/^#[0-9A-F]{6}$/i.test(validHex)) {
+                    toggleColor(validHex);
+                    setIsColorModalOpen(false);
+                  } else {
+                    toast.error('Código HEX inválido. Usa el formato #RRGGBB');
+                  }
+                }}
+                style={{ ...css.btn, background: 'linear-gradient(135deg,#7c3aed,#6d28d9)' }}
+              >
+                Aplicar Color de Marca
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── TEMPLATE CATALOG SELECTION MODAL ──────────────────────────── */}
+      {isTemplateModalOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 3000,
+          background: 'rgba(15, 23, 42, 0.4)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'fadeIn 0.2s ease-out'
+        }} onClick={() => setIsTemplateModalOpen(false)}>
+          <div style={{
+            background: '#fff',
+            border: '1px solid #e2e8f0',
+            borderRadius: 24,
+            boxShadow: '0 20px 45px rgba(0, 0, 0, 0.18)',
+            width: '100%',
+            maxWidth: 580,
+            maxHeight: '85vh',
+            display: 'flex', flexDirection: 'column',
+            animation: 'scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            overflow: 'hidden'
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '18px 24px', borderBottom: '1px solid rgba(0, 0, 0, 0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+              <div>
+                <span style={{ fontSize: 14, fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Catálogo de Plantillas</span>
+                <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>Selecciona el diseño base para tu flyer</div>
+              </div>
+              <button onClick={() => setIsTemplateModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
+                <X size={18} color="#64748b" />
+              </button>
+            </div>
+            
+            <div className="flyer-studio-col" style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Plantillas Corporativas Pro</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <button
+                    onClick={() => { setSelectedTemplate('A'); setPreviewMode('template'); setShowFullAiResult(false); setIsTemplateModalOpen(false); }}
+                    style={{
+                      textAlign: 'left',
+                      padding: '12px 14px',
+                      borderRadius: 14,
+                      border: `2px solid ${selectedTemplate === 'A' ? '#7c3aed' : '#e2e8f0'}`,
+                      background: selectedTemplate === 'A' ? '#7c3aed05' : '#fff',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      width: '100%',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <div style={{ fontSize: 12, fontWeight: 850, color: '#0f172a' }}>✨ Template A — Glow Glassmorphic</div>
+                    <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>Diseño moderno con efecto de vidrio esmerilado y luces de neón.</div>
+                  </button>
+                  
+                  <button
+                    onClick={() => { setSelectedTemplate('B'); setPreviewMode('template'); setShowFullAiResult(false); setIsTemplateModalOpen(false); }}
+                    style={{
+                      textAlign: 'left',
+                      padding: '12px 14px',
+                      borderRadius: 14,
+                      border: `2px solid ${selectedTemplate === 'B' ? '#7c3aed' : '#e2e8f0'}`,
+                      background: selectedTemplate === 'B' ? '#7c3aed05' : '#fff',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                      width: '100%',
+                      boxSizing: 'border-box'
+                    }}
+                  >
+                    <div style={{ fontSize: 12, fontWeight: 850, color: '#0f172a' }}>🏢 Template B — Editorial Showcase</div>
+                    <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>Disposición editorial limpia tipo B2B ideal para mostrar marcas corporativas.</div>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 900, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>Catálogo de Marketing (Autorescaling)</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  {TEMPLATE_LIST.map(t => {
+                    const active = selectedTemplate === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => { setSelectedTemplate(t.id); setPreviewMode('template'); setShowFullAiResult(false); setIsTemplateModalOpen(false); }}
+                        style={{
+                          textAlign: 'left',
+                          padding: '12px 14px',
+                          borderRadius: 14,
+                          border: `2px solid ${active ? '#7c3aed' : '#e2e8f0'}`,
+                          background: active ? '#7c3aed05' : '#fff',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          width: '100%',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        <div style={{ fontSize: 12, fontWeight: active ? 850 : 700, color: '#0f172a' }}>{t.name}</div>
+                        <div style={{ fontSize: 10, color: '#64748b', marginTop: 4 }}>{t.desc}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </div>
