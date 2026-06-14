@@ -1322,7 +1322,17 @@ export default function FlyerStudio() {
             )}
           </div>
 
-          <div className="flyer-studio-col" style={{ flex: 1, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 16, alignItems: showSuggestions ? 'stretch' : 'center', justifyContent: showSuggestions ? 'flex-start' : 'center' }}>
+          <div className="flyer-studio-col" style={{
+            position: 'relative',
+            flex: 1,
+            overflowY: 'auto',
+            padding: '24px 20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 16,
+            alignItems: showSuggestions ? 'stretch' : 'center',
+            justifyContent: 'flex-start'
+          }}>
 
             {/* Suggestions View */}
             {showSuggestions && suggestions.length > 0 && (
@@ -1367,12 +1377,17 @@ export default function FlyerStudio() {
             {/* ══ LOADING OVERLAY while generating ══ */}
             {generating && (
               <div id="generating-overlay" style={{
-                position: 'absolute', inset: 0,
+                position: 'absolute',
+                inset: 0,
                 background: 'rgba(7,15,43,0.88)',
                 backdropFilter: 'blur(12px)',
-                display: 'flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center',
-                zIndex: 50, borderRadius: 14, gap: 16,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 50,
+                borderRadius: 14,
+                gap: 16,
                 animation: 'fadeIn 0.3s ease'
               }}>
                 <div style={{ position: 'relative', width: 72, height: 72 }}>
@@ -1386,279 +1401,314 @@ export default function FlyerStudio() {
               </div>
             )}
 
-
-
-            {/* ══ CONTROL BAR (Variants & Layout) ══ */}
-            {!showSuggestions && !generating && variants.length > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', padding: '10px 14px', borderRadius: 10, border: '1px solid #dde1e7', gap: 10, width: '100%', maxWidth: 480, boxSizing: 'border-box' }}>
-                {/* Status indicator */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)',
-                    border: '1px solid #bbf7d0',
-                    padding: '5px 10px', borderRadius: 8,
-                    fontSize: 10, fontWeight: 800, color: '#16a34a',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-                  }}>
-                    <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />
-                    <span>Autocorrección y textos editables activos</span>
-                  </div>
-                </div>
-
-                {/* Variant selector */}
-                {variants.length > 1 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 10, fontWeight: 800, color: '#54698d', textTransform: 'uppercase' }}>Variante:</span>
-                    <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', padding: 3, borderRadius: 6 }}>
-                      {variants.map((_, i) => (
-                        <button key={i} onClick={() => setSelected(i)}
-                          style={{ border: 'none', borderRadius: 4, width: 22, height: 22, fontSize: 10, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: selected === i ? '#fff' : 'transparent', color: selected === i ? '#0070d2' : '#64748b', boxShadow: selected === i ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
-                          {i + 1}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ══ AI RESULT IMAGE ══ */}
-            {!showSuggestions && !generating && showFullAiResult && (variants.length > 0 || bgUploadPreview) ? (
-              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {/* Full AI Image */}
-                <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-                  <div
-                    ref={flyerRef}
-                    onClick={() => setIsPreviewModalOpen(true)}
-                    style={{
-                      position: 'relative', borderRadius: 14, overflow: 'hidden',
-                      boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
-                      width: '100%',
-                      maxWidth: `min(${getFlyerDimensions(format).width}px, 100%)`,
-                      aspectRatio: `${getFlyerDimensions(format).width} / ${getFlyerDimensions(format).height}`,
-                      cursor: 'zoom-in', border: '1px solid #dde1e7',
-                      transition: 'transform 0.2s ease'
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.01)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-                  >
-                    <img
-                      src={bgUploadPreview || variants[selected]}
-                      alt="Flyer Profesional con IA"
-                      style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#fff' }}
-                    />
-                    {/* Logo overlay */}
-                    {logoPreview && (
-                      <FreeLogo
-                        d={{ title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null, logoUrl: logoPreview, industria: '', phone: '', website: '', templateId: 'direct-mockup', containerW: getFlyerDimensions(format).width, containerH: getFlyerDimensions(format).height, logoSize, logoX, logoY }}
-                        onMove={(x, y) => { setLogoX(x); setLogoY(y); }}
-                        onResize={s => setLogoSize(s)}
-                      />
-                    )}
-                    {/* Hover hint */}
-                    <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.05)', opacity: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'opacity 0.2s', zIndex: 10 }}
-                      onMouseEnter={e => { e.currentTarget.style.opacity = '1'; }}
-                      onMouseLeave={e => { e.currentTarget.style.opacity = '0'; }}
-                    >
-                      <div style={{ background: 'rgba(255,255,255,0.95)', padding: '8px 16px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 800, color: '#0f172a', boxShadow: '0 4px 12px rgba(0,0,0,0.12)' }}>
-                        🔍 Vista Previa Completa
+            {/* ══ PREVIEW CONTENT WRAPPER ══ */}
+            {!showSuggestions && !generating && (
+              <div className="flyer-preview-content-wrapper" style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 16,
+                width: '100%',
+                margin: 'auto 0',
+                boxSizing: 'border-box'
+              }}>
+                {/* ══ CONTROL BAR (Variants & Layout) ══ */}
+                {variants.length > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', padding: '10px 14px', borderRadius: 10, border: '1px solid #dde1e7', gap: 10, width: '100%', maxWidth: 480, boxSizing: 'border-box' }}>
+                    {/* Status indicator */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)',
+                        border: '1px solid #bbf7d0',
+                        padding: '5px 10px', borderRadius: 8,
+                        fontSize: 10, fontWeight: 800, color: '#16a34a',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                      }}>
+                        <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />
+                        <span>Autocorrección y textos editables activos</span>
                       </div>
                     </div>
-                  </div>
-                </div>
-                {/* Badge */}
-                <div style={{ textAlign: 'center', fontSize: 10, color: '#10b981', fontWeight: 700 }}>
-                  ✅ Flyer generado con IA — 100% original y único
-                </div>
 
-                {/* Logo drag tip */}
-                {logoPreview && (
-                  <div style={{ fontSize: 10, color: '#64748b', textAlign: 'center', fontStyle: 'italic' }}>
-                    💡 Tip: Puedes arrastrar y redimensionar el logo directamente sobre el flyer.
+                    {/* Variant selector */}
+                    {variants.length > 1 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontSize: 10, fontWeight: 800, color: '#54698d', textTransform: 'uppercase' }}>Variante:</span>
+                        <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', padding: 3, borderRadius: 6 }}>
+                          {variants.map((_, i) => (
+                            <button key={i} onClick={() => setSelected(i)}
+                              style={{ border: 'none', borderRadius: 4, width: 22, height: 22, fontSize: 10, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: selected === i ? '#fff' : 'transparent', color: selected === i ? '#0070d2' : '#64748b', boxShadow: selected === i ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
+                              {i + 1}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* Action buttons */}
-                <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>Acciones de Exportación</div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => setIsPreviewModalOpen(true)}
-                      style={{ ...css.ghost, flex: 1, justifyContent: 'center', background: '#f8fafc', border: '1px solid #cbd5e1' }}>
-                      🔍 Vista Previa Completa
-                    </button>
-                    <button onClick={handleDownload}
-                      style={{ ...css.ghost, flex: 1, justifyContent: 'center', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', fontWeight: 700 }}>
-                      <Download size={13} /> Descargar PNG
-                    </button>
-                  </div>
-                  <button onClick={sendToSocialHub}
-                    style={{ ...css.btn, background: 'linear-gradient(135deg,#0070d2,#005fb2)' }}>
-                    <Send size={13} />
-                    Enviar a Publicación (Redes Sociales)
-                    <ChevronRight size={13} />
-                  </button>
-                  <div style={{ fontSize: 10, color: '#94a3b8', textAlign: 'center', marginTop: 2 }}>
-                    El flyer se abrirá en el Panel de Publicidad listo para publicar
-                  </div>
-                </div>
+                {/* ══ AI RESULT IMAGE ══ */}
+                {showFullAiResult && (variants.length > 0 || bgUploadPreview) ? (
+                  <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {/* Full AI Image */}
+                    <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+                      <div
+                        ref={flyerRef}
+                        onClick={() => setIsPreviewModalOpen(true)}
+                        style={{
+                          position: 'relative', borderRadius: 14, overflow: 'hidden',
+                          boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+                          width: '100%',
+                          maxWidth: `min(${getFlyerDimensions(format).width}px, 100%)`,
+                          aspectRatio: `${getFlyerDimensions(format).width} / ${getFlyerDimensions(format).height}`,
+                          cursor: 'zoom-in', border: '1px solid #dde1e7',
+                          transition: 'transform 0.2s ease'
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.01)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+                      >
+                        <img
+                          src={bgUploadPreview || variants[selected]}
+                          alt="Flyer Profesional con IA"
+                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'contain', display: 'block', background: '#fff' }}
+                        />
+                        {/* Logo overlay */}
+                        {logoPreview && (
+                          <FreeLogo
+                            d={{ title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null, logoUrl: logoPreview, industria: '', phone: '', website: '', templateId: 'direct-mockup', containerW: getFlyerDimensions(format).width, containerH: getFlyerDimensions(format).height, logoSize, logoX, logoY }}
+                            onMove={(x, y) => { setLogoX(x); setLogoY(y); }}
+                            onResize={s => setLogoSize(s)}
+                          />
+                        )}
+                        {/* Hover hint */}
+                        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.05)', opacity: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'opacity 0.2s', zIndex: 10 }}
+                          onMouseEnter={e => { e.currentTarget.style.opacity = '1'; }}
+                          onMouseLeave={e => { e.currentTarget.style.opacity = '0'; }}
+                        >
+                          <div style={{ background: 'rgba(255,255,255,0.95)', padding: '8px 16px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 800, color: '#0f172a', boxShadow: '0 4px 12px rgba(0,0,0,0.12)' }}>
+                            🔍 Vista Previa Completa
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Badge */}
+                    <div style={{ textAlign: 'center', fontSize: 10, color: '#10b981', fontWeight: 700 }}>
+                      ✅ Flyer generado con IA — 100% original y único
+                    </div>
 
-                {/* Credits status */}
-                {credits !== null && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                    <Zap size={11} color={credColor} fill={credColor} />
-                    <span style={{ fontSize: 11, color: '#64748b' }}>
-                      <strong style={{ color: credColor }}>{credits}</strong> créditos restantes este mes
-                    </span>
+                    {/* Logo drag tip */}
+                    {logoPreview && (
+                      <div style={{ fontSize: 10, color: '#64748b', textAlign: 'center', fontStyle: 'italic' }}>
+                        💡 Tip: Puedes arrastrar y redimensionar el logo directamente sobre el flyer.
+                      </div>
+                    )}
+
+                    {/* Action buttons */}
+                    <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>Acciones de Exportación</div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={() => setIsPreviewModalOpen(true)}
+                          style={{ ...css.ghost, flex: 1, justifyContent: 'center', background: '#f8fafc', border: '1px solid #cbd5e1' }}>
+                          🔍 Vista Previa Completa
+                        </button>
+                        <button onClick={handleDownload}
+                          style={{ ...css.ghost, flex: 1, justifyContent: 'center', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', fontWeight: 700 }}>
+                          <Download size={13} /> Descargar PNG
+                        </button>
+                      </div>
+                      <button onClick={sendToSocialHub}
+                        style={{ ...css.btn, background: 'linear-gradient(135deg,#0070d2,#005fb2)' }}>
+                        <Send size={13} />
+                        Enviar a Publicación (Redes Sociales)
+                        <ChevronRight size={13} />
+                      </button>
+                      <div style={{ fontSize: 10, color: '#94a3b8', textAlign: 'center', marginTop: 2 }}>
+                        El flyer se abrirá en el Panel de Publicidad listo para publicar
+                      </div>
+                    </div>
+
+                    {/* Credits status */}
+                    {credits !== null && (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                        <Zap size={11} color={credColor} fill={credColor} />
+                        <span style={{ fontSize: 11, color: '#64748b' }}>
+                          <strong style={{ color: credColor }}>{credits}</strong> créditos restantes este mes
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Template preview — shown when user selects Template A or B without full AI result */
+                  <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {/* Canvas */}
+                    <div style={{ display: 'flex', justifyContent: 'center', width: '100%', userSelect: 'none' }}>
+                      <div
+                        ref={flyerRef}
+                        style={{
+                          position: 'relative', borderRadius: 14, overflow: 'hidden',
+                          boxShadow: '0 16px 48px rgba(0,0,0,0.18)',
+                          width: '100%',
+                          maxWidth: `min(${getFlyerDimensions(format).width}px, 100%)`,
+                          aspectRatio: `${getFlyerDimensions(format).width} / ${getFlyerDimensions(format).height}`,
+                          border: '1px solid #dde1e7', background: '#fff',
+                          transition: 'transform 0.2s ease',
+                          cursor: 'default'
+                        }}
+                      >
+                        <div style={{
+                          position: 'absolute', top: 0, left: 0,
+                          transform: `scale(${getFlyerDimensions(format).width / 1080})`,
+                          transformOrigin: 'top left',
+                          width: 1080, height: 1080, pointerEvents: 'auto'
+                        }}>
+                          {selectedTemplate === 'A' ? (
+                            <FlyerTemplateA data={{
+                              company_name: companyName || 'Mi Empresa',
+                              prompt, cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+                              headline: manualTitle || 'OFERTA INCREÍBLE',
+                              subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+                              features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
+                              price: manualPrice || '¡Precios de Locura!',
+                              highlight_title: aiOptimizedText?.highlight_title,
+                              highlight_desc: aiOptimizedText?.highlight_desc,
+                              benefits: aiOptimizedText?.benefits,
+                              mockup_info: aiOptimizedText?.mockup_info,
+                              primaryColor: colors[0] || '#e91e8c',
+                              secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
+                              phone, website, logoUrl: logoPreview || undefined,
+                              bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
+                              flyerFont,
+                              textScale,
+                              subtitleScale,
+                              benefitsScale,
+                              logoSize,
+                              logoX,
+                              logoY,
+                              titleColor,
+                              subtitleColor,
+                              benefitsColor,
+                              cardBgColor,
+                              ctaBgColor,
+                              ctaTextColor,
+                              textY,
+                              textAlign,
+                              onTitleClick: () => setEditingElement('title'),
+                              onSubtitleClick: () => setEditingElement('subtitle'),
+                              onBenefitsClick: () => setEditingElement('benefits'),
+                              onCtaClick: () => setEditingElement('cta'),
+                              onLogoClick: () => setEditingElement('logo'),
+                              onBgClick: () => setEditingElement('background'),
+                              subtitleBold,
+                              benefitsBold,
+                            }} />
+                          ) : selectedTemplate === 'B' ? (
+                            <FlyerTemplateB data={{
+                              company_name: companyName || 'Mi Empresa',
+                              prompt, cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+                              headline: manualTitle || 'OFERTA INCREÍBLE',
+                              subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+                              features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
+                              price: manualPrice || '¡Precios de Locura!',
+                              highlight_title: aiOptimizedText?.highlight_title,
+                              highlight_desc: aiOptimizedText?.highlight_desc,
+                              benefits: aiOptimizedText?.benefits,
+                              mockup_info: aiOptimizedText?.mockup_info,
+                              primaryColor: colors[0] || '#9b1c1c',
+                              secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
+                              phone, website, logoUrl: logoPreview || undefined,
+                              bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
+                              flyerFont,
+                              textScale,
+                              subtitleScale,
+                              benefitsScale,
+                              logoSize,
+                              logoX,
+                              logoY,
+                              titleColor,
+                              subtitleColor,
+                              benefitsColor,
+                              cardBgColor,
+                              ctaBgColor,
+                              ctaTextColor,
+                              textY,
+                              textAlign,
+                              onTitleClick: () => setEditingElement('title'),
+                              onSubtitleClick: () => setEditingElement('subtitle'),
+                              onBenefitsClick: () => setEditingElement('benefits'),
+                              onCtaClick: () => setEditingElement('cta'),
+                              onLogoClick: () => setEditingElement('logo'),
+                              onBgClick: () => setEditingElement('background'),
+                              subtitleBold,
+                              benefitsBold,
+                            }} />
+                          ) : (
+                            <RenderFlyer d={{
+                              title: manualTitle || 'TU OFERTA',
+                              subtitle: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+                              cta: aiOptimizedText?.cta || cta || 'COMIENZA HOY',
+                              beneficios: manualFeatures.filter(f => f.trim() !== '').length > 0 ? manualFeatures.filter(f => f.trim() !== '') : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
+                              accent: colors[0] || '#0070d2',
+                              bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null) || DEFAULT_BG_IMAGE,
+                              logoUrl: logoPreview || null,
+                              industria: companyName || 'Mi Empresa',
+                              phone, website, templateId: selectedTemplate,
+                              containerW: 1080, containerH: 1080,
+                              logoSize, logoX, logoY,
+                              flyerFont,
+                              textScale,
+                              subtitleScale,
+                              benefitsScale,
+                              titleColor,
+                              subtitleColor,
+                              benefitsColor,
+                              cardBgColor,
+                              ctaBgColor,
+                              ctaTextColor,
+                              textY,
+                              textAlign,
+                              onTitleClick: () => setEditingElement('title'),
+                              onSubtitleClick: () => setEditingElement('subtitle'),
+                              onBenefitsClick: () => setEditingElement('benefits'),
+                              onCtaClick: () => setEditingElement('cta'),
+                              onLogoClick: () => setEditingElement('logo'),
+                              onBgClick: () => setEditingElement('background'),
+                              subtitleBold,
+                              benefitsBold,
+                            }}
+                            onLogoMove={(x, y) => { setLogoX(x); setLogoY(y); }}
+                            onLogoResize={(s) => setLogoSize(s)}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>Acciones de Exportación</div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={() => setIsPreviewModalOpen(true)}
+                          style={{ ...css.ghost, flex: 1, justifyContent: 'center', background: '#f8fafc', border: '1px solid #cbd5e1' }}>
+                          🔍 Vista Previa Completa
+                        </button>
+                        <button onClick={handleDownload}
+                          style={{ ...css.ghost, flex: 1, justifyContent: 'center', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', fontWeight: 700 }}>
+                          <Download size={13} /> Descargar PNG
+                        </button>
+                      </div>
+                      <button
+                        id="btn-send-to-social"
+                        onClick={sendToSocialHub}
+                        style={{ ...css.btn, background: 'linear-gradient(135deg,#0070d2,#005fb2)' }}>
+                        <Send size={13} />
+                        Enviar a Publicación (Redes Sociales)
+                        <ChevronRight size={13} />
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
-            ) : null}
-
-            {/* Template preview — shown when user selects Template A or B without full AI result */}
-            {!showSuggestions && !generating && !showFullAiResult && (
-              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {/* Canvas */}
-                <div style={{ display: 'flex', justifyContent: 'center', width: '100%', userSelect: 'none' }}>
-                  <div
-                    ref={flyerRef}
-                    style={{
-                      position: 'relative', borderRadius: 14, overflow: 'hidden',
-                      boxShadow: '0 16px 48px rgba(0,0,0,0.18)',
-                      width: '100%',
-                      maxWidth: `min(${getFlyerDimensions(format).width}px, 100%)`,
-                      aspectRatio: `${getFlyerDimensions(format).width} / ${getFlyerDimensions(format).height}`,
-                      border: '1px solid #dde1e7', background: '#fff',
-                      transition: 'transform 0.2s ease',
-                      cursor: 'default'
-                    }}
-                  >
-                    <div style={{
-                      position: 'absolute', top: 0, left: 0,
-                      transform: `scale(${getFlyerDimensions(format).width / 1080})`,
-                      transformOrigin: 'top left',
-                      width: 1080, height: 1080, pointerEvents: 'auto'
-                    }}>
-                      {selectedTemplate === 'A' ? (
-                        <FlyerTemplateA data={{
-                          company_name: companyName || 'Mi Empresa',
-                          prompt, cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
-                          headline: manualTitle || 'OFERTA INCREÍBLE',
-                          subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
-                          features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
-                          price: manualPrice || '¡Precios de Locura!',
-                          highlight_title: aiOptimizedText?.highlight_title,
-                          highlight_desc: aiOptimizedText?.highlight_desc,
-                          benefits: aiOptimizedText?.benefits,
-                          mockup_info: aiOptimizedText?.mockup_info,
-                          primaryColor: colors[0] || '#e91e8c',
-                          secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
-                          phone, website, logoUrl: logoPreview || undefined,
-                          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
-                          flyerFont,
-                          textScale,
-                          subtitleScale,
-                          benefitsScale,
-                          logoSize,
-                          logoX,
-                          logoY,
-                          titleColor,
-                          subtitleColor,
-                          benefitsColor,
-                          cardBgColor,
-                          ctaBgColor,
-                          ctaTextColor,
-                          textY,
-                          textAlign,
-                          onTitleClick: () => setEditingElement('title'),
-                          onSubtitleClick: () => setEditingElement('subtitle'),
-                          onBenefitsClick: () => setEditingElement('benefits'),
-                          onCtaClick: () => setEditingElement('cta'),
-                          onLogoClick: () => setEditingElement('logo'),
-                          onBgClick: () => setEditingElement('background'),
-                          subtitleBold,
-                          benefitsBold,
-                        }} />
-                      ) : selectedTemplate === 'B' ? (
-                        <FlyerTemplateB data={{
-                          company_name: companyName || 'Mi Empresa',
-                          prompt, cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
-                          headline: manualTitle || 'OFERTA INCREÍBLE',
-                          subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
-                          features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
-                          price: manualPrice || '¡Precios de Locura!',
-                          highlight_title: aiOptimizedText?.highlight_title,
-                          highlight_desc: aiOptimizedText?.highlight_desc,
-                          benefits: aiOptimizedText?.benefits,
-                          mockup_info: aiOptimizedText?.mockup_info,
-                          primaryColor: colors[0] || '#9b1c1c',
-                          secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
-                          phone, website, logoUrl: logoPreview || undefined,
-                          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
-                          flyerFont,
-                          textScale,
-                          subtitleScale,
-                          benefitsScale,
-                          logoSize,
-                          logoX,
-                          logoY,
-                          titleColor,
-                          subtitleColor,
-                          benefitsColor,
-                          cardBgColor,
-                          ctaBgColor,
-                          ctaTextColor,
-                          textY,
-                          textAlign,
-                          onTitleClick: () => setEditingElement('title'),
-                          onSubtitleClick: () => setEditingElement('subtitle'),
-                          onBenefitsClick: () => setEditingElement('benefits'),
-                          onCtaClick: () => setEditingElement('cta'),
-                          onLogoClick: () => setEditingElement('logo'),
-                          onBgClick: () => setEditingElement('background'),
-                          subtitleBold,
-                          benefitsBold,
-                        }} />
-                      ) : (
-                        <RenderFlyer d={{
-                          title: manualTitle || 'TU OFERTA',
-                          subtitle: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
-                          cta: aiOptimizedText?.cta || cta || 'COMIENZA HOY',
-                          beneficios: manualFeatures.filter(f => f.trim() !== '').length > 0 ? manualFeatures.filter(f => f.trim() !== '') : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
-                          accent: colors[0] || '#0070d2',
-                          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null) || DEFAULT_BG_IMAGE,
-                          logoUrl: logoPreview || null,
-                          industria: companyName || 'Mi Empresa',
-                          phone, website, templateId: selectedTemplate,
-                          containerW: 1080, containerH: 1080,
-                          logoSize, logoX, logoY,
-                          flyerFont,
-                          textScale,
-                          subtitleScale,
-                          benefitsScale,
-                          titleColor,
-                          subtitleColor,
-                          benefitsColor,
-                          cardBgColor,
-                          ctaBgColor,
-                          ctaTextColor,
-                          textY,
-                          textAlign,
-                          onTitleClick: () => setEditingElement('title'),
-                          onSubtitleClick: () => setEditingElement('subtitle'),
-                          onBenefitsClick: () => setEditingElement('benefits'),
-                          onCtaClick: () => setEditingElement('cta'),
-                          onLogoClick: () => setEditingElement('logo'),
-                          onBgClick: () => setEditingElement('background'),
-                          subtitleBold,
-                          benefitsBold,
-                        }}
-                        onLogoMove={(x, y) => { setLogoX(x); setLogoY(y); }}
-                        onLogoResize={(s) => setLogoSize(s)}
-                        />
-                      )}
-                    </div>
-                  </div>
+            )}        </div>
                 </div>
 
                 {/* Action buttons */}
