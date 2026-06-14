@@ -385,6 +385,241 @@ export function getFeatureIcon(f: string): string {
   return '✨';
 }
 
+export function renderApiGearsIcon(color: string): React.ReactNode {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  );
+}
+
+export function renderDataChartsIcon(color: string): React.ReactNode {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10" />
+      <line x1="12" y1="20" x2="12" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+  );
+}
+
+export function renderUserNetworkIcon(color: string): React.ReactNode {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  );
+}
+
+export function renderCloudIcon(color: string): React.ReactNode {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17.5 19A3.5 3.5 0 0 0 21 15.5c0-2.79-2.54-4.5-5-4.5-.42-1.89-1.92-3.5-4-3.5a4.34 4.34 0 0 0-4.1 3.5c-2.42 0-4.4 1.91-4.4 4.25A4.26 4.26 0 0 0 7 19z" />
+    </svg>
+  );
+}
+
+export function renderLockIcon(color: string): React.ReactNode {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+}
+
+export function renderCreditCardIcon(color: string): React.ReactNode {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1" y="4" width="22" height="16" rx="2" ry="2" />
+      <line x1="1" y1="10" x2="23" y2="10" />
+    </svg>
+  );
+}
+
+export function renderSupportIcon(color: string): React.ReactNode {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+      <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+      <line x1="12" y1="22.08" x2="12" y2="12" />
+    </svg>
+  );
+}
+
+export function renderStarIcon(color: string): React.ReactNode {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  );
+}
+
+export interface FeatureBulletData {
+  title: string;
+  bullets: string[];
+  icon: React.ReactNode;
+}
+
+export function getFeatureBullets(f: string, prompt: string, color: string): FeatureBulletData {
+  const lower = (f || '').toLowerCase();
+  
+  if (lower.includes('factur') || lower.includes('dte') || lower.includes('mh') || lower.includes('cumple')) {
+    return {
+      title: 'Facturación Inteligente',
+      bullets: [
+        'Emisión de DTEs en segundos',
+        'Validación directa ante Hacienda',
+        'Envío automático a clientes'
+      ],
+      icon: renderCreditCardIcon(color)
+    };
+  }
+  
+  if (lower.includes('inventario') || lower.includes('bodega') || lower.includes('stock')) {
+    return {
+      title: 'Control de Inventario',
+      bullets: [
+        'Stock sincronizado en tiempo real',
+        'Alertas de stock mínimo y órdenes',
+        'Trazabilidad total de almacén'
+      ],
+      icon: renderCloudIcon(color)
+    };
+  }
+  
+  if (lower.includes('client') || lower.includes('crm') || lower.includes('lead') || lower.includes('contacto') || lower.includes('convers')) {
+    return {
+      title: 'Gestión de Clientes (CRM)',
+      bullets: [
+        'Historial unificado de contactos',
+        'Segmentación inteligente de leads',
+        'Seguimiento automático de embudos'
+      ],
+      icon: renderUserNetworkIcon(color)
+    };
+  }
+  
+  if (lower.includes('report') || lower.includes('analit') || lower.includes('dashboard') || lower.includes('métrica') || lower.includes('gráfico')) {
+    return {
+      title: 'Analíticas Avanzadas',
+      bullets: [
+        'Métricas clave del negocio en vivo',
+        'Reportes exportables al instante',
+        'Monitoreo de metas de ventas'
+      ],
+      icon: renderDataChartsIcon(color)
+    };
+  }
+  
+  if (lower.includes('automat') || lower.includes('bot') || lower.includes('asistente') || lower.includes('inteligencia') || lower.includes('configur') || lower.includes('rapido') || lower.includes('fácil') || lower.includes('facil')) {
+    return {
+      title: 'Automatización & AI Bots',
+      bullets: [
+        'Calificación de leads 24/7 en vivo',
+        'Respuestas inmediatas sin esperas',
+        'Integración directa con WhatsApp'
+      ],
+      icon: renderApiGearsIcon(color)
+    };
+  }
+  
+  if (lower.includes('segur') || lower.includes('segundo') || lower.includes('respaldo') || lower.includes('cifrado')) {
+    return {
+      title: 'Seguridad Grado Enterprise',
+      bullets: [
+        'Encriptación SSL / HTTPS activa',
+        'Respaldos automáticos en la nube',
+        'Cumplimiento HIPAA / GDPR estricto'
+      ],
+      icon: renderLockIcon(color)
+    };
+  }
+  
+  if (lower.includes('nube') || lower.includes('cloud') || lower.includes('web') || lower.includes('acceso')) {
+    return {
+      title: 'Acceso Cloud Multiplataforma',
+      bullets: [
+        'Disponible desde móvil o PC',
+        'Sincronización instantánea',
+        'Sin instalaciones ni servidores'
+      ],
+      icon: renderCloudIcon(color)
+    };
+  }
+  
+  if (lower.includes('soporte') || lower.includes('ayuda') || lower.includes('atencion') || lower.includes('24/7') || lower.includes('premium')) {
+    return {
+      title: 'Soporte Premium 24/7',
+      bullets: [
+        'Especialistas listos para ayudarte',
+        'Tiempos de respuesta inmediatos',
+        'Onboarding personalizado incluido'
+      ],
+      icon: renderSupportIcon(color)
+    };
+  }
+
+  // Fallback depending on prompt industry
+  const type = getIndustryType(prompt);
+  if (type === 'k9') {
+    return {
+      title: f || 'Entrenamiento K9',
+      bullets: [
+        'Seguimiento diario por mascota',
+        'Reportes de conducta y avance',
+        'Alertas de vacunas y clases'
+      ],
+      icon: renderUserNetworkIcon(color)
+    };
+  } else if (type === 'food') {
+    return {
+      title: f || 'Gastronomía y Delivery',
+      bullets: [
+        'Comandas directas en tiempo real',
+        'Control y despacho de delivery',
+        'Menú digital QR autogestionable'
+      ],
+      icon: renderApiGearsIcon(color)
+    };
+  } else if (type === 'security') {
+    return {
+      title: f || 'Vigilancia y Protección',
+      bullets: [
+        'Monitoreo activo perimetral',
+        'Envío inmediato de unidades K9',
+        'Reportes encriptados en la nube'
+      ],
+      icon: renderLockIcon(color)
+    };
+  } else if (type === 'dental') {
+    return {
+      title: f || 'Historial Clínico Dental',
+      bullets: [
+        'Odontograma y citas digitales',
+        'Fichas con radiografías 3D',
+        'Confirmación por WhatsApp'
+      ],
+      icon: renderSupportIcon(color)
+    };
+  }
+
+  return {
+    title: f || 'Optimización SaaS CRM',
+    bullets: [
+      'Centraliza leads y contactos',
+      'Flujos de venta automatizados',
+      'Toma decisiones basadas en datos'
+    ],
+    icon: renderStarIcon(color)
+  };
+}
+
+
 function getIndustryType(prompt: string): 'k9' | 'food' | 'security' | 'dental' | 'saas' {
   const lower = (prompt || '').toLowerCase();
   if (lower.includes('perro') || lower.includes('canin') || lower.includes('mascota') || lower.includes('adiestra') || lower.includes('k9')) {
@@ -666,125 +901,172 @@ function renderChatbotWidget(industry: IndustryDetails, primary: string, hasBg: 
 function renderDashboardMockup(prompt: string, primary: string, hasBg: boolean, industry: IndustryDetails, company: string): React.ReactNode {
   return (
     <div style={{
-      width: 490,
-      height: 310,
+      width: 880,
+      height: 340,
       background: hasBg ? 'rgba(15, 23, 42, 0.65)' : '#ffffff',
       backdropFilter: hasBg ? 'blur(20px)' : 'none',
-      border: hasBg ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid #e2e8f0',
-      borderRadius: 20,
-      boxShadow: hasBg ? '0 20px 50px rgba(0,0,0,0.3)' : '0 15px 30px rgba(15,23,42,0.06)',
+      border: hasBg ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid #dde1e7',
+      borderRadius: 16,
+      boxShadow: hasBg ? '0 25px 60px rgba(0,0,0,0.4)' : '0 20px 40px rgba(15,23,42,0.06)',
       display: 'flex',
+      flexDirection: 'column',
       overflow: 'hidden',
       fontFamily: "'Plus Jakarta Sans', sans-serif"
     }}>
-      {/* Sidebar navigation */}
+      {/* Browser top title bar */}
       <div style={{
-        width: 120,
-        background: hasBg ? 'rgba(30, 41, 59, 0.3)' : '#f8fafc',
-        borderRight: hasBg ? '1px solid rgba(255,255,255,0.08)' : '1px solid #cbd5e1',
-        padding: 12,
+        height: 34,
+        background: hasBg ? 'rgba(30, 41, 59, 0.5)' : '#f8fafc',
+        borderBottom: hasBg ? '1px solid rgba(255,255,255,0.08)' : '1px solid #e2e8f0',
+        padding: '0 16px',
         display: 'flex',
-        flexDirection: 'column',
-        gap: 16
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexShrink: 0
       }}>
-        {/* Brand Label inside sidebar */}
-        <div style={{ fontSize: 10, fontWeight: 900, color: primary, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.04em', textAlign: 'left' }}>
-          🌐 {company}
+        {/* Left window control dots */}
+        <div style={{ display: 'flex', gap: 6 }}>
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ff5f56' }} />
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ffbd2e' }} />
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#27c93f' }} />
         </div>
-        {/* Sidebar menu items */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, textAlign: 'left' }}>
-          {['Dashboard', 'Leads', 'Contactos', 'Pipelines', 'Tareas', 'Automatizaciones', 'Reportes', 'Configuración'].map((link, idx) => (
-            <div key={link} style={{
-              fontSize: 8,
-              fontWeight: 800,
-              padding: '6px 8px',
-              borderRadius: 6,
-              background: idx === 0 ? (hasBg ? 'rgba(255,255,255,0.1)' : `${primary}12`) : 'transparent',
-              color: idx === 0 ? primary : (hasBg ? 'rgba(255,255,255,0.5)' : '#64748b'),
-              cursor: 'pointer'
-            }}>
-              {link}
-            </div>
-          ))}
+        {/* Mock address bar */}
+        <div style={{
+          width: 320,
+          height: 20,
+          background: hasBg ? 'rgba(0,0,0,0.2)' : '#ffffff',
+          border: hasBg ? '1px solid rgba(255,255,255,0.06)' : '1px solid #dde1e7',
+          borderRadius: 6,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 9,
+          color: hasBg ? 'rgba(255,255,255,0.5)' : '#94a3b8',
+          letterSpacing: '0.02em'
+        }}>
+          🔒 app.{company.toLowerCase().replace(/[^a-z0-9]/g, '') || 'saas'}.com
         </div>
+        <div style={{ width: 42 }} /> {/* balance spacers */}
       </div>
 
-      {/* Main Dashboard body */}
-      <div style={{ flex: 1, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {/* Dashboard Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 13, fontWeight: 900, color: hasBg ? '#fff' : '#0f172a' }}>Dashboard</span>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <span style={{ fontSize: 10, opacity: 0.5 }}>🔍</span>
-            <span style={{ fontSize: 10, opacity: 0.5 }}>🔔</span>
-            <span style={{ width: 16, height: 16, borderRadius: '50%', background: primary, color: '#fff', fontSize: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>U</span>
+      {/* Main mockup content area */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        {/* Sidebar navigation */}
+        <div style={{
+          width: 170,
+          background: hasBg ? 'rgba(30, 41, 59, 0.3)' : '#f8fafc',
+          borderRight: hasBg ? '1px solid rgba(255,255,255,0.08)' : '1px solid #dde1e7',
+          padding: '16px 12px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+          flexShrink: 0
+        }}>
+          {/* Brand Label inside sidebar */}
+          <div style={{ fontSize: 10, fontWeight: 900, color: primary, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.05em', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>⚡</span> {company}
+          </div>
+          {/* Sidebar menu items */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, textAlign: 'left' }}>
+            {['Dashboard', 'Leads / Prospectos', 'Automatizaciones', 'Reportes de Conversión', 'Configuración del Sistema'].map((link, idx) => (
+              <div key={link} style={{
+                fontSize: 10,
+                fontWeight: 800,
+                padding: '8px 10px',
+                borderRadius: 6,
+                background: idx === 0 ? (hasBg ? 'rgba(255,255,255,0.1)' : `${primary}12`) : 'transparent',
+                color: idx === 0 ? primary : (hasBg ? 'rgba(255,255,255,0.6)' : '#64748b'),
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6
+              }}>
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: idx === 0 ? primary : (hasBg ? 'rgba(255,255,255,0.2)' : '#94a3b8') }} />
+                <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{link}</span>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* KPI Cards Grid */}
-        <div style={{ display: 'flex', gap: 8 }}>
-          {industry.kpis.map((kpi, idx) => (
-            <div key={idx} style={{
-              flex: 1,
-              background: hasBg ? 'rgba(255,255,255,0.04)' : '#ffffff',
-              border: hasBg ? '1px solid rgba(255,255,255,0.06)' : '1px solid #e2e8f0',
-              borderRadius: 8,
-              padding: 8,
-              textAlign: 'left'
-            }}>
-              <div style={{ fontSize: 7, fontWeight: 700, color: hasBg ? 'rgba(255,255,255,0.6)' : '#64748b', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{kpi.label}</div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginTop: 4 }}>
-                <span style={{ fontSize: 13, fontWeight: 900, color: hasBg ? '#fff' : '#0f172a' }}>{kpi.val}</span>
-                <span style={{ fontSize: 7, color: '#10b981', fontWeight: 800 }}>{kpi.change}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Funnel and Activity grid split */}
-        <div style={{ display: 'flex', gap: 12, flex: 1 }}>
-          {/* Sales Funnel (Left) */}
-          <div style={{
-            width: 170,
-            background: hasBg ? 'rgba(0,0,0,0.15)' : '#f8fafc',
-            border: hasBg ? '1px solid rgba(255,255,255,0.04)' : '1px solid #f1f5f9',
-            borderRadius: 12,
-            padding: 8,
-            display: 'flex',
-            flexDirection: 'column'
-          }}>
-            <div style={{ fontSize: 7, fontWeight: 900, color: hasBg ? 'rgba(255,255,255,0.5)' : '#64748b', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.02em', textAlign: 'left' }}>Embudo de Ventas</div>
-            <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-              <div style={{ width: 85 }}>
-                {renderFunnelSVG(primary)}
-              </div>
-              {renderFunnelLabels(industry.funnelStages)}
+        {/* Main Dashboard body */}
+        <div style={{ flex: 1, padding: 18, display: 'flex', flexDirection: 'column', gap: 14, overflow: 'hidden' }}>
+          {/* Dashboard Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+            <span style={{ fontSize: 15, fontWeight: 900, color: hasBg ? '#fff' : '#0f172a' }}>Panel General</span>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <span style={{ fontSize: 10, opacity: 0.5 }}>🔍</span>
+              <span style={{ fontSize: 10, opacity: 0.5 }}>🔔</span>
+              <span style={{ width: 20, height: 20, borderRadius: '50%', background: primary, color: '#fff', fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>U</span>
             </div>
           </div>
 
-          {/* Recent Activity (Right) */}
-          <div style={{
-            flex: 1,
-            background: hasBg ? 'rgba(0,0,0,0.15)' : '#f8fafc',
-            border: hasBg ? '1px solid rgba(255,255,255,0.04)' : '1px solid #f1f5f9',
-            borderRadius: 12,
-            padding: 8,
-            display: 'flex',
-            flexDirection: 'column'
-          }}>
-            <div style={{ fontSize: 7, fontWeight: 900, color: hasBg ? 'rgba(255,255,255,0.5)' : '#64748b', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.02em', textAlign: 'left' }}>Actividad Reciente</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flex: 1, justifyContent: 'center', textAlign: 'left' }}>
-              {[
-                { label: 'Nuevo lead ingresado', t: 'hace 2 min' },
-                { label: 'AI Bot respondió chat', t: 'hace 5 min' },
-                { label: 'Reunión agendada', t: 'hace 15 min' },
-                { label: 'Negocio cerrado', t: 'hace 1 hora' }
-              ].map((act, i) => (
-                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 7, fontWeight: 600, color: hasBg ? '#cbd5e1' : '#475569' }}>
-                  <span>✓ {act.label}</span>
-                  <span style={{ opacity: 0.6 }}>{act.t}</span>
+          {/* KPI Cards Grid */}
+          <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
+            {industry.kpis.map((kpi, idx) => (
+              <div key={idx} style={{
+                flex: 1,
+                background: hasBg ? 'rgba(255,255,255,0.04)' : '#ffffff',
+                border: hasBg ? '1px solid rgba(255,255,255,0.06)' : '1px solid #e2e8f0',
+                borderRadius: 8,
+                padding: 10,
+                textAlign: 'left'
+              }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: hasBg ? 'rgba(255,255,255,0.6)' : '#64748b', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{kpi.label}</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
+                  <span style={{ fontSize: 16, fontWeight: 900, color: hasBg ? '#fff' : '#0f172a' }}>{kpi.val}</span>
+                  <span style={{ fontSize: 9, color: '#10b981', fontWeight: 800 }}>{kpi.change}</span>
                 </div>
-              ))}
+              </div>
+            ))}
+          </div>
+
+          {/* Funnel and Activity grid split */}
+          <div style={{ display: 'flex', gap: 14, flex: 1, minHeight: 0 }}>
+            {/* Sales Funnel (Left) */}
+            <div style={{
+              width: 320,
+              background: hasBg ? 'rgba(0,0,0,0.15)' : '#f8fafc',
+              border: hasBg ? '1px solid rgba(255,255,255,0.04)' : '1px solid #f1f5f9',
+              borderRadius: 12,
+              padding: 10,
+              display: 'flex',
+              flexDirection: 'column',
+              minHeight: 0
+            }}>
+              <div style={{ fontSize: 8, fontWeight: 900, color: hasBg ? 'rgba(255,255,255,0.5)' : '#64748b', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.02em', textAlign: 'left', flexShrink: 0 }}>Embudo de Conversión</div>
+              <div style={{ display: 'flex', alignItems: 'center', flex: 1, minHeight: 0 }}>
+                <div style={{ width: 120, flexShrink: 0 }}>
+                  {renderFunnelSVG(primary)}
+                </div>
+                {renderFunnelLabels(industry.funnelStages)}
+              </div>
+            </div>
+
+            {/* Recent Activity (Right) */}
+            <div style={{
+              flex: 1,
+              background: hasBg ? 'rgba(0,0,0,0.15)' : '#f8fafc',
+              border: hasBg ? '1px solid rgba(255,255,255,0.04)' : '1px solid #f1f5f9',
+              borderRadius: 12,
+              padding: 10,
+              display: 'flex',
+              flexDirection: 'column',
+              minHeight: 0
+            }}>
+              <div style={{ fontSize: 8, fontWeight: 900, color: hasBg ? 'rgba(255,255,255,0.5)' : '#64748b', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.02em', textAlign: 'left', flexShrink: 0 }}>Actividad de Automatización</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, justifyContent: 'center', textAlign: 'left', minHeight: 0 }}>
+                {[
+                  { label: 'AI Bot: Conversación calificada', t: 'hace 2 min' },
+                  { label: 'Lead calificado & registrado en CRM', t: 'hace 5 min' },
+                  { label: 'Notificación enviada por WhatsApp', t: 'hace 10 min' },
+                  { label: 'Onboarding automatizado iniciado', t: 'hace 30 min' }
+                ].map((act, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, fontWeight: 600, color: hasBg ? '#cbd5e1' : '#475569', gap: 8 }}>
+                    <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>✓ {act.label}</span>
+                    <span style={{ opacity: 0.6, flexShrink: 0 }}>{act.t}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -970,7 +1252,8 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
-        boxSizing: 'border-box'
+        boxSizing: 'border-box',
+        justifyContent: 'space-between'
       }}>
         {/* Load Google Fonts directly in the render flow */}
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Syne:wght@700;800&display=swap" />
@@ -993,98 +1276,95 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
           }} />
         )}
 
-        {/* TOP / MAIN AREA (720px) */}
-        <div style={{ flex: 1, display: 'flex', padding: '54px 64px 0', gap: 40, zIndex: 10, position: 'relative' }}>
-          
-          {/* Left Column: Brand, Headline, Features (480px width) */}
-          <div style={{ width: 440, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'flex-start' }}>
+        {/* 1. TOP MAIN WRAPPER (Header + Hero Area + Feature Grid) */}
+        <div style={{
+          padding: '50px 64px 0 64px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          flex: 1,
+          zIndex: 10,
+          position: 'relative',
+          boxSizing: 'border-box'
+        }}>
+          {/* Header Section */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', width: '100%' }}>
             {/* Tagline */}
-            <div style={{ fontSize: 11, fontWeight: 900, color: secondary, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 12, textAlign: 'left' }}>
+            <div style={{ fontSize: 11, fontWeight: 900, color: secondary, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 8 }}>
               {indData.tagline}
             </div>
 
             {/* Headline */}
             <h1 style={{
-              fontSize: headline.length > 25 ? 38 : 46,
+              fontSize: headline.length > 25 ? 38 : 44,
               fontWeight: 800,
               color: '#0f172a',
-              lineHeight: 1.1,
-              margin: '0 0 14px 0',
-              textAlign: 'left',
+              lineHeight: 1.15,
+              margin: '0 0 8px 0',
               letterSpacing: '-0.02em',
-              display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
             }}>
               {mainTitle} {lastWord && <span style={{ color: primary }}>{lastWord}.</span>}
             </h1>
 
-            {/* Description */}
+            {/* Sub-headline / Value Prop */}
             <p style={{
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: 500,
               color: '#475569',
-              lineHeight: 1.5,
-              margin: '0 0 28px 0',
-              textAlign: 'left',
-              display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+              lineHeight: 1.45,
+              margin: 0,
+              maxWidth: 850,
+              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
             }}>
               {subheadline}
             </p>
-
-            {/* Feature stack */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%' }}>
-              {features.map((feat, idx) => {
-                const industryFeature = indData.features[idx] || { title: feat, desc: 'Centraliza y optimiza tu gestión comercial.' };
-                const checkIcons = ['🎯', '🤖', '📈'];
-                const icon = checkIcons[idx] || '✓';
-                return (
-                  <div key={idx} style={{ display: 'flex', gap: 14, alignItems: 'flex-start', textAlign: 'left' }}>
-                    <div style={{
-                      width: 38, height: 38, borderRadius: 10,
-                      background: `${primary}12`, color: primary,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 18, flexShrink: 0
-                    }}>
-                      {icon}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', marginBottom: 2 }}>{industryFeature.title}</div>
-                      <div style={{ fontSize: 11, color: '#64748b', fontWeight: 500, lineHeight: 1.4 }}>{industryFeature.desc}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
           </div>
 
-          {/* Right Column: Dashboard Mockup & Chatbot Widget */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 24, alignItems: 'flex-end' }}>
-            {/* Dashboard card */}
+          {/* Hero Area: Centered Browser Mockup */}
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', margin: '14px 0' }}>
             {renderDashboardMockup(data.prompt, primary, false, indData, data.company_name)}
+          </div>
 
-            {/* Chatbot & Robot row */}
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginRight: 20 }}>
-              {renderChatbotWidget(indData, primary, false)}
-              {renderRobotSVG(primary)}
-            </div>
+          {/* Feature Grid (3-Column Layout) */}
+          <div style={{ display: 'flex', gap: 32, width: '100%', marginBottom: 20 }}>
+            {features.map((feat, idx) => {
+              const featData = getFeatureBullets(feat, data.prompt, primary);
+              return (
+                <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
+                  {/* Subtle modern minimalist line-art icon & Title */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <div style={{
+                      width: 34, height: 34, borderRadius: 8,
+                      background: `${primary}10`, color: primary,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      {featData.icon}
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
+                      {featData.title}
+                    </span>
+                  </div>
+                  
+                  {/* Bulleted list of 3 high-value technical benefits */}
+                  <ul style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {featData.bullets.map((bullet, bIdx) => (
+                      <li key={bIdx} style={{ fontSize: 11, color: '#475569', fontWeight: 500, lineHeight: 1.35 }}>
+                        {bullet}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* MIDDLE PIPELINE TIMELINE BANNER (100px) */}
-        <div style={{ height: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, zIndex: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>🌙 Tú descansas</span>
-            <span style={{ height: 1, width: 60, borderTop: '2px dashed #cbd5e1' }} />
-            <span style={{ fontSize: 18 }}>🤖</span>
-            <span style={{ height: 1, width: 60, borderTop: '2px dashed #cbd5e1' }} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>💰 Tu negocio vende</span>
-          </div>
-          <div style={{ fontSize: 12, fontWeight: 900, color: primary, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Automatiza. Delega. Escala.</div>
-        </div>
-
-        {/* BOTTOM DARK BANNER (260px) */}
+        {/* 3. BOTTOM DARK BANNER */}
         {renderBottomBanner(primary, secondary, data, indData, false)}
 
-        {/* VERY BOTTOM TECH DETAILS BAR (100px) */}
+        {/* 4. VERY BOTTOM TECH DETAILS BAR */}
         {renderTechStackFooter(data.prompt)}
       </div>
     );
@@ -1122,7 +1402,8 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
-        boxSizing: 'border-box'
+        boxSizing: 'border-box',
+        justifyContent: 'space-between'
       }}>
         {/* Load Google Fonts directly in the render flow */}
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Syne:wght@700;800&display=swap" />
@@ -1135,100 +1416,117 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
           }} />
         )}
 
-        {/* TOP / MAIN AREA (720px) */}
-        <div style={{ flex: 1, display: 'flex', padding: '54px 64px 0', gap: 40, zIndex: 10, position: 'relative' }}>
-          
-          {/* Left Column: Brand, Headline, Features (440px width) */}
-          <div style={{ width: 440, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'flex-start' }}>
+        {/* 1. TOP MAIN WRAPPER (Header + Hero Area + Feature Grid) */}
+        <div style={{
+          padding: '50px 64px 0 64px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          flex: 1,
+          zIndex: 10,
+          position: 'relative',
+          boxSizing: 'border-box'
+        }}>
+          {/* Header Section */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', width: '100%' }}>
             {/* Tagline */}
-            <div style={{ fontSize: 11, fontWeight: 900, color: secondary, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 12, textAlign: 'left' }}>
-              ⚡ {indData.tagline}
+            <div style={{ fontSize: 11, fontWeight: 900, color: secondary, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>⚡</span> {indData.tagline}
             </div>
 
             {/* Headline */}
             <h1 style={{
-              fontSize: headline.length > 25 ? 38 : 46,
+              fontSize: headline.length > 25 ? 38 : 44,
               fontWeight: 800,
               fontFamily: "'Syne', sans-serif",
               color: '#ffffff',
-              lineHeight: 1.1,
-              margin: '0 0 14px 0',
-              textAlign: 'left',
+              lineHeight: 1.15,
+              margin: '0 0 8px 0',
               letterSpacing: '-0.02em',
-              display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
             }}>
               {mainTitle} {lastWord && <span style={{ color: primary }}>{lastWord}.</span>}
             </h1>
 
-            {/* Description */}
+            {/* Sub-headline / Value Prop */}
             <p style={{
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: 500,
               color: 'rgba(255,255,255,0.7)',
-              lineHeight: 1.5,
-              margin: '0 0 28px 0',
-              textAlign: 'left',
-              display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+              lineHeight: 1.45,
+              margin: 0,
+              maxWidth: 850,
+              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
             }}>
               {subheadline}
             </p>
-
-            {/* Feature stack */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%' }}>
-              {features.map((feat, idx) => {
-                const industryFeature = indData.features[idx] || { title: feat, desc: 'Centraliza y optimiza tu gestión comercial.' };
-                const checkIcons = ['🎯', '🤖', '📈'];
-                const icon = checkIcons[idx] || '✓';
-                return (
-                  <div key={idx} style={{ display: 'flex', gap: 14, alignItems: 'flex-start', textAlign: 'left' }}>
-                    <div style={{
-                      width: 38, height: 38, borderRadius: 10,
-                      background: 'rgba(255,255,255,0.06)', color: primary,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 18, flexShrink: 0,
-                      border: '1px solid rgba(255,255,255,0.08)'
-                    }}>
-                      {icon}
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: '#ffffff', marginBottom: 2 }}>{industryFeature.title}</div>
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', fontWeight: 500, lineHeight: 1.4 }}>{industryFeature.desc}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
           </div>
 
-          {/* Right Column: Dark Glassmorphic Dashboard Mockup & Chatbot Widget */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 24, alignItems: 'flex-end' }}>
-            {/* Dashboard card */}
+          {/* Hero Area: Centered Browser Mockup */}
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', margin: '14px 0', position: 'relative' }}>
+            {/* Soft gradient aura behind mockup */}
+            <div style={{
+              position: 'absolute',
+              width: '90%',
+              height: '90%',
+              background: `radial-gradient(circle, ${primary}18 0%, transparent 70%)`,
+              zIndex: -1,
+              pointerEvents: 'none'
+            }} />
             {renderDashboardMockup(data.prompt, primary, true, indData, data.company_name)}
+          </div>
 
-            {/* Chatbot & Robot row */}
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, marginRight: 20 }}>
-              {renderChatbotWidget(indData, primary, true)}
-              {renderRobotSVG(primary)}
-            </div>
+          {/* Feature Grid (3-Column Layout with glassmorphic styling) */}
+          <div style={{ display: 'flex', gap: 24, width: '100%', marginBottom: 20 }}>
+            {features.map((feat, idx) => {
+              const featData = getFeatureBullets(feat, data.prompt, secondary);
+              return (
+                <div key={idx} style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
+                  textAlign: 'left',
+                  background: 'rgba(255, 255, 255, 0.02)',
+                  border: '1px solid rgba(255, 255, 255, 0.06)',
+                  borderRadius: 12,
+                  padding: 16,
+                  boxSizing: 'border-box'
+                }}>
+                  {/* Subtle modern minimalist line-art icon & Title */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <div style={{
+                      width: 32, height: 32, borderRadius: 8,
+                      background: 'rgba(255, 255, 255, 0.04)', color: secondary,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0,
+                      border: '1px solid rgba(255, 255, 255, 0.08)'
+                    }}>
+                      {featData.icon}
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: '#ffffff', lineHeight: 1.2 }}>
+                      {featData.title}
+                    </span>
+                  </div>
+                  
+                  {/* Bulleted list of 3 high-value technical benefits */}
+                  <ul style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {featData.bullets.map((bullet, bIdx) => (
+                      <li key={bIdx} style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', fontWeight: 500, lineHeight: 1.35 }}>
+                        {bullet}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* MIDDLE PIPELINE TIMELINE BANNER (100px) */}
-        <div style={{ height: 80, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, zIndex: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>🌙 Tú descansas</span>
-            <span style={{ height: 1, width: 60, borderTop: '2px dashed rgba(255,255,255,0.2)' }} />
-            <span style={{ fontSize: 18 }}>🤖</span>
-            <span style={{ height: 1, width: 60, borderTop: '2px dashed rgba(255,255,255,0.2)' }} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>💰 Tu negocio vende</span>
-          </div>
-          <div style={{ fontSize: 12, fontWeight: 900, color: primary, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Automatiza. Delega. Escala.</div>
-        </div>
-
-        {/* BOTTOM DARK BANNER (260px) */}
+        {/* 3. BOTTOM DARK BANNER */}
         {renderBottomBanner(primary, secondary, data, indData, true)}
 
-        {/* VERY BOTTOM TECH DETAILS BAR (100px) */}
+        {/* 4. VERY BOTTOM TECH DETAILS BAR */}
         {renderTechStackFooter(data.prompt)}
       </div>
     );
