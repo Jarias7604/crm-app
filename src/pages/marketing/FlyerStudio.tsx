@@ -1708,32 +1708,6 @@ export default function FlyerStudio() {
                   </div>
                 )}
               </div>
-            )}        </div>
-                </div>
-
-                {/* Action buttons */}
-                <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>Acciones de Exportación</div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={() => setIsPreviewModalOpen(true)}
-                      style={{ ...css.ghost, flex: 1, justifyContent: 'center', background: '#f8fafc', border: '1px solid #cbd5e1' }}>
-                      🔍 Vista Previa Completa
-                    </button>
-                    <button onClick={handleDownload}
-                      style={{ ...css.ghost, flex: 1, justifyContent: 'center', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', fontWeight: 700 }}>
-                      <Download size={13} /> Descargar PNG
-                    </button>
-                  </div>
-                  <button
-                    id="btn-send-to-social"
-                    onClick={sendToSocialHub}
-                    style={{ ...css.btn, background: 'linear-gradient(135deg,#0070d2,#005fb2)' }}>
-                    <Send size={13} />
-                    Enviar a Publicación (Redes Sociales)
-                    <ChevronRight size={13} />
-                  </button>
-                </div>
-              </div>
             )}
           </div>
         </div>
