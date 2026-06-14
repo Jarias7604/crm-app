@@ -196,6 +196,63 @@ export default function FlyerStudio() {
   // showFullAiResult: true = imagen DALL-E 3 pura generada, false = mostrar plantilla HTML
   const [showFullAiResult, setShowFullAiResult] = useState(false);
 
+  // Manual text & design overrides (Client Request)
+  const [editingElement, setEditingElement] = useState<'title' | 'subtitle' | 'benefits' | 'cta' | 'logo' | 'background' | null>(null);
+  const [subtitleBold, setSubtitleBold] = useState(false);
+  const [benefitsBold, setBenefitsBold] = useState(false);
+
+  const [modalPos, setModalPos] = useState({ x: 0, y: 0 });
+  const dragStart = useRef({ x: 0, y: 0 });
+  const modalStart = useRef({ x: 0, y: 0 });
+  const isDraggingModal = useRef(false);
+
+  useEffect(() => {
+    if (editingElement) {
+      setModalPos({ x: 0, y: 0 });
+    }
+  }, [editingElement]);
+
+  const handleHeaderMouseDown = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    isDraggingModal.current = true;
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    modalStart.current = { x: modalPos.x, y: modalPos.y };
+    document.addEventListener('mousemove', handleHeaderMouseMove);
+    document.addEventListener('mouseup', handleHeaderMouseUp);
+  };
+
+  const handleHeaderMouseMove = (e: MouseEvent) => {
+    if (!isDraggingModal.current) return;
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    setModalPos({
+      x: modalStart.current.x + dx,
+      y: modalStart.current.y + dy
+    });
+  };
+
+  const handleHeaderMouseUp = () => {
+    isDraggingModal.current = false;
+    document.removeEventListener('mousemove', handleHeaderMouseMove);
+    document.removeEventListener('mouseup', handleHeaderMouseUp);
+  };
+  const [manualTitle, setManualTitle] = useState('');
+  const [manualSubtitle, setManualSubtitle] = useState('');
+  const [manualFeatures, setManualFeatures] = useState<string[]>(['', '', '', '']);
+  const [manualPrice, setManualPrice] = useState('');
+  const [textScale, setTextScale] = useState(1.0);
+  const [subtitleScale, setSubtitleScale] = useState(1.0);
+  const [benefitsScale, setBenefitsScale] = useState(1.0);
+  const [flyerFont, setFlyerFont] = useState('Outfit');
+  const [titleColor, setTitleColor] = useState('');
+  const [subtitleColor, setSubtitleColor] = useState('');
+  const [benefitsColor, setBenefitsColor] = useState('');
+  const [cardBgColor, setCardBgColor] = useState('');
+  const [ctaBgColor, setCtaBgColor] = useState('');
+  const [ctaTextColor, setCtaTextColor] = useState('');
+  const [textY, setTextY] = useState(0);
+  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
+
   useEffect(() => {
     if (!profile?.company_id) return;
     
@@ -218,6 +275,18 @@ export default function FlyerStudio() {
       .order('period_start', { ascending: false }).limit(1).single()
       .then(({ data }) => setCredits(data ? data.credits_limit - data.credits_used : 20));
   }, [profile]);
+
+  // Pre-populate manual inputs from basic parsing as the user types, before they generate
+  useEffect(() => {
+    if (variants.length > 0) return; // Don't overwrite generated/manually modified text
+    const parsed = parsePrompt(prompt);
+    const { h1, h2 } = deriveHeadline(prompt, companyName || 'Mi Empresa');
+    setManualTitle(parsed.title || h1 || '');
+    setManualSubtitle(parsed.subtitle || h2 || '');
+    setManualFeatures(parsed.features && parsed.features.length > 0 ? parsed.features : deriveFeatures(prompt).slice(0, 4));
+    setManualPrice(parsed.price || derivePrice(prompt) || '');
+  }, [prompt, companyName]);
+
 
   // ── Auto-optimize brief with IA as user types ─────────────────────────────
   useEffect(() => {
@@ -306,6 +375,10 @@ export default function FlyerStudio() {
       setVariants(data.variants);
       if (data.structured_text) {
         setAiOptimizedText(data.structured_text);
+        setManualTitle(data.structured_text.headline || '');
+        setManualSubtitle(data.structured_text.subheadline || '');
+        setManualFeatures(data.structured_text.features && data.structured_text.features.length > 0 ? data.structured_text.features : ['', '', '', '']);
+        setManualPrice(data.structured_text.price || '');
       }
       setSelected(0);
       setPreviewMode('ai');
@@ -345,18 +418,95 @@ export default function FlyerStudio() {
       // Also generate optimized copy locally based on basic parsing since openai failed
       const parsed = parsePrompt(prompt);
       const { h1, h2 } = deriveHeadline(prompt, companyName || 'Mi Empresa');
-      setAiOptimizedText({
+      const fallbackText = {
         headline: parsed.title || h1,
         subheadline: parsed.subtitle || h2,
         features: parsed.features || deriveFeatures(prompt).slice(0, 3),
         cta: parsed.cta || cta || 'Contáctanos hoy',
         price: parsed.price || derivePrice(prompt) || ''
-      });
+      };
+      setAiOptimizedText(fallbackText);
+      setManualTitle(fallbackText.headline || '');
+      setManualSubtitle(fallbackText.subheadline || '');
+      setManualFeatures(fallbackText.features && fallbackText.features.length > 0 ? fallbackText.features : ['', '', '', '']);
+      setManualPrice(fallbackText.price || '');
 
       setSelected(0);
       setPreviewMode('ai');
       setShowFullAiResult(false); // Fallback Unsplash → se usa como fondo de la plantilla HTML
       toast.success('✨ Usando imagen temática como fondo. Para flyer IA completo, verifica créditos.');
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function generateFree() {
+    if (!prompt.trim()) { toast.error('Describe qué quieres promocionar'); return; }
+    setGenerating(true);
+    setVariants([]);
+    setAiOptimizedText(null);
+    setIsFullAiFlyer(false);
+    setShowFullAiResult(false);
+
+    try {
+      const lower = prompt.toLowerCase();
+      let fallbackImg = 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1080&q=80'; // tech / general B2B
+      
+      if (/\b(pizza|comida|restaurante|food|pupusa|pupusas|taco|tacos|burger|hamburguesa|sushi)\b/i.test(lower)) {
+        fallbackImg = 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1080&q=80'; // pizza / food
+      } else if (/\b(dentista|dental|diente|dientes|cl[íi]nica|odontolog[íi]a)\b/i.test(lower)) {
+        fallbackImg = 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=1080&q=80'; // dental
+      } else if (/\b(defensa|seguridad|karate|marciales|taekwondo)\b/i.test(lower)) {
+        fallbackImg = 'https://images.unsplash.com/photo-1555597673-b21d5c935865?auto=format&fit=crop&w=1080&q=80'; // martial arts
+      } else if (/\b(taller|auto|carro|veh[íi]culo|mec[aá]nico|motor)\b/i.test(lower)) {
+        fallbackImg = 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=1080&q=80'; // auto workshop
+      } else if (/\b(belleza|salon|sal[oó]n|u[ñn]as|spa|maquillaje|cabello|peluquer[íi]a)\b/i.test(lower)) {
+        fallbackImg = 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1080&q=80'; // beauty salon
+      } else if (/\b(gym|gimnasio|fit|fitness|ejercicio|entrenamiento)\b/i.test(lower)) {
+        fallbackImg = 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=1080&q=80'; // gym
+      } else if (/\b(abogado|legal|firma|consultor[íi]a|leyes|derecho)\b/i.test(lower)) {
+        fallbackImg = 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=1080&q=80'; // law/legal
+      } else if (/\b(cafe|café|panaderia|panader[íi]a|reposter[íi]a|dulce|cafeter[íi]a)\b/i.test(lower)) {
+        fallbackImg = 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=1080&q=80'; // cafe
+      } else if (/\b(casa|inmobiliaria|apartamento|hogar|propiedad|real estate|construccion|construcci[oó]n)\b/i.test(lower)) {
+        fallbackImg = 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=1080&q=80'; // real estate/construction
+      } else if (/\b(perro|gato|mascota|veterinario|veterinaria|animal)\b/i.test(lower)) {
+        fallbackImg = 'https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?auto=format&fit=crop&w=1080&q=80'; // pets
+      } else if (/\b(educacion|educaci[oó]n|escuela|colegio|curso|clases|estudiar)\b/i.test(lower)) {
+        fallbackImg = 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1080&q=80'; // school/education
+      } else if (/\b(limpieza|lavado|limpiar|planchado|orden)\b/i.test(lower)) {
+        fallbackImg = 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=1080&q=80'; // cleaning
+      } else if (/\b(yoga|wellness|meditacion|meditaci[oó]n|relajacion|relajaci[oó]n)\b/i.test(lower)) {
+        fallbackImg = 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1080&q=80'; // yoga
+      } else if (/\b(contable|finanzas|dinero|taxes|impuestos|accounting)\b/i.test(lower)) {
+        fallbackImg = 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=1080&q=80'; // accounting
+      }
+
+      setVariants([fallbackImg]);
+
+      // Parse prompt locally to generate structured copy
+      const parsed = parsePrompt(prompt);
+      const { h1, h2 } = deriveHeadline(prompt, companyName || 'Mi Empresa');
+      const fallbackText = {
+        headline: parsed.title || h1,
+        subheadline: parsed.subtitle || h2,
+        features: parsed.features || deriveFeatures(prompt).slice(0, 3),
+        cta: parsed.cta || cta || 'Contáctanos hoy',
+        price: parsed.price || derivePrice(prompt) || ''
+      };
+      setAiOptimizedText(fallbackText);
+      setManualTitle(fallbackText.headline || '');
+      setManualSubtitle(fallbackText.subheadline || '');
+      setManualFeatures(fallbackText.features && fallbackText.features.length > 0 ? fallbackText.features : ['', '', '', '']);
+      setManualPrice(fallbackText.price || '');
+
+      setSelected(0);
+      setPreviewMode('ai');
+      setShowFullAiResult(false);
+      toast.success('✨ Flyer generado usando imagen temática gratuita');
+    } catch (e: any) {
+      console.error('Error generating free background:', e);
+      toast.error('Error al generar flyer: ' + e.message);
     } finally {
       setGenerating(false);
     }
@@ -456,17 +606,19 @@ export default function FlyerStudio() {
       let dataUrl = '';
       if (showFullAiResult) {
         if (!flyerRef.current) { toast.error('Flyer no está listo'); return; }
+        // Use scale: 1.5 and image/jpeg to compress output size and prevent QuotaExceededError in sessionStorage
         const canvas = await html2canvas(flyerRef.current, {
-          useCORS: true, allowTaint: true, scale: 2, backgroundColor: null
+          useCORS: true, allowTaint: true, scale: 1.5, backgroundColor: null
         });
-        dataUrl = canvas.toDataURL('image/png');
+        dataUrl = canvas.toDataURL('image/jpeg', 0.85);
       } else {
         const ref = selectedTemplate === 'A' ? templateRefA : selectedTemplate === 'B' ? templateRefB : templateRefMarketing;
         if (!ref.current) throw new Error('Template not ready');
+        // Use scale: 1.5 and image/jpeg to compress output size and prevent QuotaExceededError in sessionStorage
         const canvas = await html2canvas(ref.current, {
-          useCORS: true, allowTaint: true, scale: 2, backgroundColor: null
+          useCORS: true, allowTaint: true, scale: 1.5, backgroundColor: null
         });
-        dataUrl = canvas.toDataURL('image/png');
+        dataUrl = canvas.toDataURL('image/jpeg', 0.85);
       }
       sessionStorage.setItem('socialhub_prefill_image', dataUrl);
       
@@ -822,19 +974,7 @@ export default function FlyerStudio() {
               </div>
             </div>
 
-            {/* Adjustments & Fine Tuning */}
-            <div style={css.section}>
-              <label style={css.label}>Ajustes de Escala</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, padding: 10 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#475569', fontWeight: 700 }}>
-                    <span>Tamaño de Logo</span>
-                    <span>{logoSize.toFixed(1)}x</span>
-                  </div>
-                  <input type="range" min="0.4" max="2.5" step="0.1" value={logoSize} onChange={e => setLogoSize(parseFloat(e.target.value))} style={{ width: '100%', height: 4 }} />
-                </div>
-              </div>
-            </div>
+
 
             {/* ═══════════════════════════════════════════════════════════════
                 AI GENERATION BUTTONS — Primary: Autocorrected Flyer
@@ -870,9 +1010,32 @@ export default function FlyerStudio() {
               </button>
 
               {/* Description */}
-              <div style={{ fontSize: 10, color: '#64748b', textAlign: 'center', lineHeight: 1.5, padding: '0 4px', marginBottom: 8 }}>
+              <div style={{ fontSize: 10, color: '#64748b', textAlign: 'center', lineHeight: 1.5, padding: '0 4px', marginBottom: 4 }}>
                 ✨ <strong>Autocorrección activa:</strong> La IA dibuja un fondo abstracto espectacular y el sistema escribe los textos editables por encima en HTML. ¡Cero errores ortográficos!
               </div>
+
+              {/* FREE STOCK PHOTO BUTTON */}
+              <button
+                id="btn-generate-free"
+                className="btn-free-photo"
+                onClick={() => generateFree()}
+                disabled={generating || !prompt.trim()}
+                style={{
+                  border: '1.5px solid #10b981',
+                  borderRadius: 10,
+                  padding: '12px 20px', fontSize: 13, fontWeight: 900,
+                  cursor: generating || !prompt.trim() ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  width: '100%', justifyContent: 'center',
+                  opacity: !prompt.trim() ? 0.5 : 1,
+                  boxShadow: '0 2px 8px rgba(16,185,129,0.1)',
+                  transition: 'all 0.2s ease',
+                  letterSpacing: '0.01em',
+                  marginBottom: 8
+                }}
+              >
+                <Image size={15} color="#10b981" /> Generar con Fotos Gratis (Sin Créditos)
+              </button>
 
               {/* SELECT TEMPLATE CATALOG */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -930,6 +1093,20 @@ export default function FlyerStudio() {
                 .flyer-studio-col::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.25); }
                 .flyer-studio-col { scrollbar-width: thin; scrollbar-color: transparent transparent; }
                 .flyer-studio-col:hover { scrollbar-color: rgba(0,0,0,0.15) transparent; }
+                .btn-free-photo {
+                  background: #fff !important;
+                  border: 1.5px solid #10b981 !important;
+                  color: #10b981 !important;
+                  transition: all 0.2s ease !important;
+                }
+                .btn-free-photo:hover:not(:disabled) {
+                  background: #f0fdf4 !important;
+                  box-shadow: 0 4px 12px rgba(16,185,129,0.15) !important;
+                  transform: translateY(-1px);
+                }
+                .btn-free-photo:active:not(:disabled) {
+                  transform: translateY(0);
+                }
               `}</style>
             </div>
           </div>
@@ -1179,33 +1356,31 @@ export default function FlyerStudio() {
                 <div style={{ display: 'flex', justifyContent: 'center', width: '100%', userSelect: 'none' }}>
                   <div
                     ref={flyerRef}
-                    onClick={() => setIsPreviewModalOpen(true)}
                     style={{
                       position: 'relative', borderRadius: 14, overflow: 'hidden',
                       boxShadow: '0 16px 48px rgba(0,0,0,0.18)',
                       width: '100%',
                       maxWidth: `min(${getFlyerDimensions(format).width}px, 100%)`,
                       aspectRatio: `${getFlyerDimensions(format).width} / ${getFlyerDimensions(format).height}`,
-                      cursor: 'zoom-in', border: '1px solid #dde1e7', background: '#fff',
-                      transition: 'transform 0.2s ease'
+                      border: '1px solid #dde1e7', background: '#fff',
+                      transition: 'transform 0.2s ease',
+                      cursor: 'default'
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.01)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; }}
                   >
                     <div style={{
                       position: 'absolute', top: 0, left: 0,
                       transform: `scale(${getFlyerDimensions(format).width / 1080})`,
                       transformOrigin: 'top left',
-                      width: 1080, height: 1080, pointerEvents: 'none'
+                      width: 1080, height: 1080, pointerEvents: 'auto'
                     }}>
                       {selectedTemplate === 'A' ? (
                         <FlyerTemplateA data={{
                           company_name: companyName || 'Mi Empresa',
                           prompt, cta: aiOptimizedText?.cta || cta || 'Contáctanos HOY',
-                          headline: aiOptimizedText?.headline,
-                          subheadline: aiOptimizedText?.subheadline,
-                          features: aiOptimizedText?.features,
-                          price: aiOptimizedText?.price,
+                          headline: manualTitle,
+                          subheadline: manualSubtitle,
+                          features: manualFeatures,
+                          price: manualPrice,
                           highlight_title: aiOptimizedText?.highlight_title,
                           highlight_desc: aiOptimizedText?.highlight_desc,
                           benefits: aiOptimizedText?.benefits,
@@ -1213,16 +1388,39 @@ export default function FlyerStudio() {
                           primaryColor: colors[0] || '#e91e8c',
                           secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
                           phone, website, logoUrl: logoPreview || undefined,
-                          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined)
+                          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined),
+                          flyerFont,
+                          textScale,
+                          subtitleScale,
+                          benefitsScale,
+                          logoSize,
+                          logoX,
+                          logoY,
+                          titleColor,
+                          subtitleColor,
+                          benefitsColor,
+                          cardBgColor,
+                          ctaBgColor,
+                          ctaTextColor,
+                          textY,
+                          textAlign,
+                          onTitleClick: () => setEditingElement('title'),
+                          onSubtitleClick: () => setEditingElement('subtitle'),
+                          onBenefitsClick: () => setEditingElement('benefits'),
+                          onCtaClick: () => setEditingElement('cta'),
+                          onLogoClick: () => setEditingElement('logo'),
+                          onBgClick: () => setEditingElement('background'),
+                          subtitleBold,
+                          benefitsBold,
                         }} />
                       ) : selectedTemplate === 'B' ? (
                         <FlyerTemplateB data={{
                           company_name: companyName || 'Mi Empresa',
                           prompt, cta: aiOptimizedText?.cta || cta || 'Activa HOY MISMO',
-                          headline: aiOptimizedText?.headline,
-                          subheadline: aiOptimizedText?.subheadline,
-                          features: aiOptimizedText?.features,
-                          price: aiOptimizedText?.price,
+                          headline: manualTitle,
+                          subheadline: manualSubtitle,
+                          features: manualFeatures,
+                          price: manualPrice,
                           highlight_title: aiOptimizedText?.highlight_title,
                           highlight_desc: aiOptimizedText?.highlight_desc,
                           benefits: aiOptimizedText?.benefits,
@@ -1230,21 +1428,64 @@ export default function FlyerStudio() {
                           primaryColor: colors[0] || '#9b1c1c',
                           secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
                           phone, website, logoUrl: logoPreview || undefined,
-                          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined)
+                          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined),
+                          flyerFont,
+                          textScale,
+                          subtitleScale,
+                          benefitsScale,
+                          logoSize,
+                          logoX,
+                          logoY,
+                          titleColor,
+                          subtitleColor,
+                          benefitsColor,
+                          cardBgColor,
+                          ctaBgColor,
+                          ctaTextColor,
+                          textY,
+                          textAlign,
+                          onTitleClick: () => setEditingElement('title'),
+                          onSubtitleClick: () => setEditingElement('subtitle'),
+                          onBenefitsClick: () => setEditingElement('benefits'),
+                          onCtaClick: () => setEditingElement('cta'),
+                          onLogoClick: () => setEditingElement('logo'),
+                          onBgClick: () => setEditingElement('background'),
+                          subtitleBold,
+                          benefitsBold,
                         }} />
                       ) : (
                         <RenderFlyer d={{
-                          title: aiOptimizedText?.headline || parsePrompt(prompt).title || deriveHeadline(prompt, companyName).h1 || 'TU OFERTA',
-                          subtitle: aiOptimizedText?.subheadline || parsePrompt(prompt).subtitle || deriveHeadline(prompt, companyName).h2 || '',
+                          title: manualTitle || 'TU OFERTA',
+                          subtitle: manualSubtitle || '',
                           cta: aiOptimizedText?.cta || cta || 'COMIENZA HOY',
-                          beneficios: aiOptimizedText?.features || parsePrompt(prompt).features || deriveFeatures(prompt) || [],
+                          beneficios: manualFeatures.filter(f => f.trim() !== ''),
                           accent: colors[0] || '#0070d2',
                           bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null),
                           logoUrl: logoPreview || null,
                           industria: companyName || 'Mi Empresa',
                           phone, website, templateId: selectedTemplate,
                           containerW: 1080, containerH: 1080,
-                          logoSize, logoX, logoY
+                          logoSize, logoX, logoY,
+                          flyerFont,
+                          textScale,
+                          subtitleScale,
+                          benefitsScale,
+                          titleColor,
+                          subtitleColor,
+                          benefitsColor,
+                          cardBgColor,
+                          ctaBgColor,
+                          ctaTextColor,
+                          textY,
+                          textAlign,
+                          onTitleClick: () => setEditingElement('title'),
+                          onSubtitleClick: () => setEditingElement('subtitle'),
+                          onBenefitsClick: () => setEditingElement('benefits'),
+                          onCtaClick: () => setEditingElement('cta'),
+                          onLogoClick: () => setEditingElement('logo'),
+                          onBgClick: () => setEditingElement('background'),
+                          subtitleBold,
+                          benefitsBold,
                         }}
                         onLogoMove={(x, y) => { setLogoX(x); setLogoY(y); }}
                         onLogoResize={(s) => setLogoSize(s)}
@@ -1267,7 +1508,9 @@ export default function FlyerStudio() {
                       <Download size={13} /> Descargar PNG
                     </button>
                   </div>
-                  <button onClick={sendToSocialHub}
+                  <button
+                    id="btn-send-to-social"
+                    onClick={sendToSocialHub}
                     style={{ ...css.btn, background: 'linear-gradient(135deg,#0070d2,#005fb2)' }}>
                     <Send size={13} />
                     Enviar a Publicación (Redes Sociales)
@@ -1285,10 +1528,10 @@ export default function FlyerStudio() {
           company_name: companyName || 'Mi Empresa',
           prompt,
           cta: aiOptimizedText?.cta || cta || 'Contáctanos HOY',
-          headline: aiOptimizedText?.headline,
-          subheadline: aiOptimizedText?.subheadline,
-          features: aiOptimizedText?.features,
-          price: aiOptimizedText?.price,
+          headline: manualTitle,
+          subheadline: manualSubtitle,
+          features: manualFeatures,
+          price: manualPrice,
           highlight_title: aiOptimizedText?.highlight_title,
           highlight_desc: aiOptimizedText?.highlight_desc,
           benefits: aiOptimizedText?.benefits,
@@ -1297,16 +1540,33 @@ export default function FlyerStudio() {
           secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
           phone, website,
           logoUrl: logoPreview || undefined,
-          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined)
+          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined),
+          flyerFont,
+          textScale,
+          subtitleScale,
+          benefitsScale,
+          logoSize,
+          logoX,
+          logoY,
+          titleColor,
+          subtitleColor,
+          benefitsColor,
+          cardBgColor,
+          ctaBgColor,
+          ctaTextColor,
+          textY,
+          textAlign,
+          subtitleBold,
+          benefitsBold
         }} />
         <FlyerTemplateB ref={templateRefB} data={{
           company_name: companyName || 'Mi Empresa',
           prompt,
           cta: aiOptimizedText?.cta || cta || 'Activa HOY MISMO',
-          headline: aiOptimizedText?.headline,
-          subheadline: aiOptimizedText?.subheadline,
-          features: aiOptimizedText?.features,
-          price: aiOptimizedText?.price,
+          headline: manualTitle,
+          subheadline: manualSubtitle,
+          features: manualFeatures,
+          price: manualPrice,
           highlight_title: aiOptimizedText?.highlight_title,
           highlight_desc: aiOptimizedText?.highlight_desc,
           benefits: aiOptimizedText?.benefits,
@@ -1315,21 +1575,52 @@ export default function FlyerStudio() {
           secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
           phone, website,
           logoUrl: logoPreview || undefined,
-          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined)
+          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined),
+          flyerFont,
+          textScale,
+          subtitleScale,
+          benefitsScale,
+          logoSize,
+          logoX,
+          logoY,
+          titleColor,
+          subtitleColor,
+          benefitsColor,
+          cardBgColor,
+          ctaBgColor,
+          ctaTextColor,
+          textY,
+          textAlign,
+          subtitleBold,
+          benefitsBold
         }} />
         <div ref={templateRefMarketing}>
           <RenderFlyer d={{
-            title: aiOptimizedText?.headline || parsePrompt(prompt).title || deriveHeadline(prompt, companyName).h1 || 'TU OFERTA',
-            subtitle: aiOptimizedText?.subheadline || parsePrompt(prompt).subtitle || deriveHeadline(prompt, companyName).h2 || '',
+            title: manualTitle || 'TU OFERTA',
+            subtitle: manualSubtitle || '',
             cta: aiOptimizedText?.cta || cta || 'COMIENZA HOY',
-            beneficios: aiOptimizedText?.features || parsePrompt(prompt).features || deriveFeatures(prompt) || [],
+            beneficios: manualFeatures.filter(f => f.trim() !== ''),
             accent: colors[0] || '#0070d2',
             bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null),
             logoUrl: logoPreview || null,
             industria: companyName || 'Mi Empresa',
             phone, website, templateId: selectedTemplate,
             containerW: 1080, containerH: 1080,
-            logoSize, logoX, logoY
+            logoSize, logoX, logoY,
+            flyerFont,
+            textScale,
+            subtitleScale,
+            benefitsScale,
+            titleColor,
+            subtitleColor,
+            benefitsColor,
+            cardBgColor,
+            ctaBgColor,
+            ctaTextColor,
+            textY,
+            textAlign,
+            subtitleBold,
+            benefitsBold
           }} />
         </div>
       </div>
@@ -1431,44 +1722,95 @@ export default function FlyerStudio() {
                       <FlyerTemplateA data={{
                         company_name: companyName || 'Mi Empresa', prompt,
                         cta: aiOptimizedText?.cta || cta || 'Contáctanos HOY',
-                        headline: aiOptimizedText?.headline, subheadline: aiOptimizedText?.subheadline,
-                        features: aiOptimizedText?.features, price: aiOptimizedText?.price,
+                        headline: manualTitle, subheadline: manualSubtitle,
+                        features: manualFeatures, price: manualPrice,
                         highlight_title: aiOptimizedText?.highlight_title,
                         highlight_desc: aiOptimizedText?.highlight_desc,
                         benefits: aiOptimizedText?.benefits,
                         mockup_info: aiOptimizedText?.mockup_info,
                         primaryColor: colors[0] || '#e91e8c', secondaryColor: colors[1] || '#1a1a2e',
                         phone, website, logoUrl: logoPreview || undefined,
-                        bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined)
+                        bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined),
+                        flyerFont,
+                        textScale,
+                        subtitleScale,
+                        benefitsScale,
+                        logoSize,
+                        logoX,
+                        logoY,
+                        titleColor,
+                        subtitleColor,
+                        benefitsColor,
+                        cardBgColor,
+                        ctaBgColor,
+                        ctaTextColor,
+                        textY,
+                        textAlign,
+                        subtitleBold,
+                        benefitsBold
                       }} />
                     ) : selectedTemplate === 'B' ? (
                       <FlyerTemplateB data={{
                         company_name: companyName || 'Mi Empresa', prompt,
                         cta: aiOptimizedText?.cta || cta || 'Activa HOY MISMO',
-                        headline: aiOptimizedText?.headline, subheadline: aiOptimizedText?.subheadline,
-                        features: aiOptimizedText?.features, price: aiOptimizedText?.price,
+                        headline: manualTitle, subheadline: manualSubtitle,
+                        features: manualFeatures, price: manualPrice,
                         highlight_title: aiOptimizedText?.highlight_title,
                         highlight_desc: aiOptimizedText?.highlight_desc,
                         benefits: aiOptimizedText?.benefits,
                         mockup_info: aiOptimizedText?.mockup_info,
                         primaryColor: colors[0] || '#9b1c1c', secondaryColor: colors[1] || '#1a1a2e',
                         phone, website, logoUrl: logoPreview || undefined,
-                        bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined)
+                        bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined),
+                        flyerFont,
+                        textScale,
+                        subtitleScale,
+                        benefitsScale,
+                        logoSize,
+                        logoX,
+                        logoY,
+                        titleColor,
+                        subtitleColor,
+                        benefitsColor,
+                        cardBgColor,
+                        ctaBgColor,
+                        ctaTextColor,
+                        textY,
+                        textAlign,
+                        subtitleBold,
+                        benefitsBold
                       }} />
                     ) : (
                       <RenderFlyer d={{
-                        title: aiOptimizedText?.headline || parsePrompt(prompt).title || deriveHeadline(prompt, companyName).h1 || 'TU OFERTA',
-                        subtitle: aiOptimizedText?.subheadline || parsePrompt(prompt).subtitle || deriveHeadline(prompt, companyName).h2 || '',
+                        title: manualTitle || 'TU OFERTA',
+                        subtitle: manualSubtitle || '',
                         cta: aiOptimizedText?.cta || cta || 'COMIENZA HOY',
-                        beneficios: aiOptimizedText?.features || parsePrompt(prompt).features || deriveFeatures(prompt) || [],
+                        beneficios: manualFeatures.filter(f => f.trim() !== ''),
                         accent: colors[0] || '#0070d2',
                         bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null),
                         logoUrl: logoPreview || null,
                         industria: companyName || 'Mi Empresa',
                         phone, website, templateId: selectedTemplate,
                         containerW: 1080, containerH: 1080,
-                        logoSize, logoX, logoY
-                      }} />
+                        logoSize, logoX, logoY,
+                        flyerFont,
+                        textScale,
+                        subtitleScale,
+                        benefitsScale,
+                        titleColor,
+                        subtitleColor,
+                        benefitsColor,
+                        cardBgColor,
+                        ctaBgColor,
+                        ctaTextColor,
+                        textY,
+                        textAlign,
+                        subtitleBold,
+                        benefitsBold
+                      }}
+                      onLogoMove={(x, y) => { setLogoX(x); setLogoY(y); }}
+                      onLogoResize={(s) => setLogoSize(s)}
+                      />
                     )}
                   </div>
                 </div>
@@ -1495,6 +1837,431 @@ export default function FlyerStudio() {
                 style={{ ...css.btn, padding: '10px 24px', width: 'auto' }}
               >
                 <Send size={13} style={{ marginRight: 6 }} /> Confirmar y Enviar a Redes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── ELEMENT EDIT MODAL ────────────────────────────────────────────────── */}
+      {editingElement !== null && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 2000,
+          background: 'rgba(0, 0, 0, 0.02)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'fadeIn 0.2s ease-out',
+          padding: 20
+        }} onClick={() => setEditingElement(null)}>
+          {/* Prevent click closing when clicking inside the modal card */}
+          <div 
+            style={{
+              background: 'rgba(255, 255, 255, 0.85)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255, 255, 255, 0.4)',
+              borderRadius: 20,
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+              width: '100%',
+              maxWidth: 420,
+              display: 'flex', flexDirection: 'column',
+              transform: `translate(${modalPos.x}px, ${modalPos.y}px)`,
+              animation: 'scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+              overflow: 'hidden'
+            }} 
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div 
+              onMouseDown={handleHeaderMouseDown}
+              style={{ 
+                padding: '16px 20px', 
+                borderBottom: '1px solid rgba(0, 0, 0, 0.08)', 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'center',
+                cursor: 'move',
+                userSelect: 'none'
+              }}
+            >
+              <div>
+                <span style={{ fontSize: 13, fontWeight: 900, color: '#0f172a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  {editingElement === 'title' && '✏️ Editar Título'}
+                  {editingElement === 'subtitle' && '✏️ Editar Subtítulo'}
+                  {editingElement === 'benefits' && '✏️ Editar Beneficios'}
+                  {editingElement === 'cta' && '✏️ Editar Botón CTA'}
+                  {editingElement === 'logo' && '✏️ Ajustar Logo'}
+                  {editingElement === 'background' && '✏️ Ajustar Fondo'}
+                </span>
+                <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>Edición en tiempo real</div>
+              </div>
+              <button 
+                onClick={() => setEditingElement(null)}
+                onMouseDown={e => e.stopPropagation()}
+                style={{
+                  background: 'rgba(0, 0, 0, 0.04)', border: 'none',
+                  borderRadius: '50%', width: 28, height: 28,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', transition: 'background 0.2s'
+                }}
+              >
+                <X size={14} color="#0f172a" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 16, maxHeight: '70vh', overflowY: 'auto' }}>
+              {editingElement === 'title' && (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Texto del Título</span>
+                    <textarea 
+                      style={{ ...css.textarea, minHeight: 60 }} 
+                      value={manualTitle} 
+                      onChange={e => setManualTitle(e.target.value)}
+                      placeholder="Título principal del flyer"
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Tipo de Letra (Fuente)</span>
+                    <select
+                      value={flyerFont}
+                      onChange={e => setFlyerFont(e.target.value)}
+                      style={{ ...css.input, fontWeight: 700 }}
+                    >
+                      <option value="Outfit">Outfit (Moderna & Limpia)</option>
+                      <option value="Montserrat">Montserrat (Geométrica B2B)</option>
+                      <option value="Oswald">Oswald (Condensada Impacto)</option>
+                      <option value="Poppins">Poppins (Redonda Popular)</option>
+                      <option value="Playfair Display">Playfair Display (Serif Elegante)</option>
+                      <option value="Bebas Neue">Bebas Neue (Titulares Sans)</option>
+                      <option value="Raleway">Raleway (Sofisticada Delgado)</option>
+                      <option value="Inter">Inter (Estándar Pro)</option>
+                    </select>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#475569', fontWeight: 800, textTransform: 'uppercase' }}>
+                      <span>Escala de Título</span>
+                      <span>{textScale.toFixed(2)}x</span>
+                    </div>
+                    <input type="range" min="0.5" max="2.0" step="0.05" value={textScale} onChange={e => setTextScale(parseFloat(e.target.value))} style={{ width: '100%' }} />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Color del Título</span>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input 
+                        type="color" 
+                        value={titleColor || '#000000'} 
+                        onChange={e => setTitleColor(e.target.value)} 
+                        style={{ width: 36, height: 36, padding: 0, border: '1px solid #d8dde6', cursor: 'pointer', borderRadius: 6, flexShrink: 0 }} 
+                      />
+                      <input 
+                        type="text" 
+                        value={titleColor} 
+                        onChange={e => setTitleColor(e.target.value)} 
+                        placeholder="Por defecto"
+                        style={css.input} 
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Alineación del Texto</span>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {(['left', 'center', 'right'] as const).map(align => (
+                        <button
+                          key={align}
+                          type="button"
+                          onClick={() => setTextAlign(align)}
+                          style={{
+                            flex: 1, padding: '8px 12px', fontSize: 11, fontWeight: 700, borderRadius: 6,
+                            border: '1px solid #d8dde6',
+                            background: textAlign === align ? '#0f172a' : '#fff',
+                            color: textAlign === align ? '#fff' : '#0f172a',
+                            cursor: 'pointer', transition: 'all 0.2s'
+                          }}
+                        >
+                          {align === 'left' ? 'Izquierda' : align === 'center' ? 'Centro' : 'Derecha'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#475569', fontWeight: 800, textTransform: 'uppercase' }}>
+                      <span>Desplazamiento Vertical</span>
+                      <span>{textY}px</span>
+                    </div>
+                    <input type="range" min="-200" max="200" step="5" value={textY} onChange={e => setTextY(parseInt(e.target.value))} style={{ width: '100%' }} />
+                  </div>
+                </>
+              )}
+
+              {editingElement === 'subtitle' && (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Texto del Subtítulo</span>
+                    <textarea 
+                      style={{ ...css.textarea, minHeight: 60 }} 
+                      value={manualSubtitle} 
+                      onChange={e => setManualSubtitle(e.target.value)}
+                      placeholder="Subtítulo o gancho descriptivo"
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#475569', fontWeight: 800, textTransform: 'uppercase' }}>
+                      <span>Escala de Subtítulo</span>
+                      <span>{subtitleScale.toFixed(2)}x</span>
+                    </div>
+                    <input type="range" min="0.5" max="2.0" step="0.05" value={subtitleScale} onChange={e => setSubtitleScale(parseFloat(e.target.value))} style={{ width: '100%' }} />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Color del Subtítulo</span>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input 
+                        type="color" 
+                        value={subtitleColor || '#000000'} 
+                        onChange={e => setSubtitleColor(e.target.value)} 
+                        style={{ width: 36, height: 36, padding: 0, border: '1px solid #d8dde6', cursor: 'pointer', borderRadius: 6, flexShrink: 0 }} 
+                      />
+                      <input 
+                        type="text" 
+                        value={subtitleColor} 
+                        onChange={e => setSubtitleColor(e.target.value)} 
+                        placeholder="Por defecto"
+                        style={css.input} 
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                    <input 
+                      type="checkbox" 
+                      id="chk-subtitle-bold" 
+                      checked={subtitleBold} 
+                      onChange={e => setSubtitleBold(e.target.checked)}
+                      style={{ width: 16, height: 16, cursor: 'pointer' }}
+                    />
+                    <label htmlFor="chk-subtitle-bold" style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', cursor: 'pointer' }}>
+                      Texto en Negrita (Bold)
+                    </label>
+                  </div>
+                </>
+              )}
+
+              {editingElement === 'benefits' && (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Características / Beneficios</span>
+                    {manualFeatures.map((feat, idx) => (
+                      <input
+                        key={idx}
+                        style={css.input}
+                        value={feat}
+                        onChange={e => {
+                          const copy = [...manualFeatures];
+                          copy[idx] = e.target.value;
+                          setManualFeatures(copy);
+                        }}
+                        placeholder={`Beneficio ${idx + 1}`}
+                      />
+                    ))}
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#475569', fontWeight: 800, textTransform: 'uppercase' }}>
+                      <span>Escala de Beneficios</span>
+                      <span>{benefitsScale.toFixed(2)}x</span>
+                    </div>
+                    <input type="range" min="0.5" max="2.0" step="0.05" value={benefitsScale} onChange={e => setBenefitsScale(parseFloat(e.target.value))} style={{ width: '100%' }} />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Color de Viñetas</span>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input 
+                        type="color" 
+                        value={benefitsColor || '#000000'} 
+                        onChange={e => setBenefitsColor(e.target.value)} 
+                        style={{ width: 36, height: 36, padding: 0, border: '1px solid #d8dde6', cursor: 'pointer', borderRadius: 6, flexShrink: 0 }} 
+                      />
+                      <input 
+                        type="text" 
+                        value={benefitsColor} 
+                        onChange={e => setBenefitsColor(e.target.value)} 
+                        placeholder="Por defecto"
+                        style={css.input} 
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                    <input 
+                      type="checkbox" 
+                      id="chk-benefits-bold" 
+                      checked={benefitsBold} 
+                      onChange={e => setBenefitsBold(e.target.checked)}
+                      style={{ width: 16, height: 16, cursor: 'pointer' }}
+                    />
+                    <label htmlFor="chk-benefits-bold" style={{ fontSize: 12, fontWeight: 700, color: '#0f172a', cursor: 'pointer' }}>
+                      Texto en Negrita (Bold)
+                    </label>
+                  </div>
+                </>
+              )}
+
+              {editingElement === 'cta' && (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Texto del Botón CTA</span>
+                    <input 
+                      style={css.input} 
+                      value={cta} 
+                      onChange={e => setCta(e.target.value)}
+                      placeholder="Ej: REGÍSTRATE HOY"
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Precio (Si aplica)</span>
+                    <input 
+                      style={css.input} 
+                      value={manualPrice} 
+                      onChange={e => setManualPrice(e.target.value)}
+                      placeholder="Ej: Desde $12.95"
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Color de Fondo de Botón</span>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input 
+                        type="color" 
+                        value={ctaBgColor || '#000000'} 
+                        onChange={e => setCtaBgColor(e.target.value)} 
+                        style={{ width: 36, height: 36, padding: 0, border: '1px solid #d8dde6', cursor: 'pointer', borderRadius: 6, flexShrink: 0 }} 
+                      />
+                      <input 
+                        type="text" 
+                        value={ctaBgColor} 
+                        onChange={e => setCtaBgColor(e.target.value)} 
+                        placeholder="Por defecto"
+                        style={css.input} 
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Color del Texto de Botón</span>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input 
+                        type="color" 
+                        value={ctaTextColor || '#000000'} 
+                        onChange={e => setCtaTextColor(e.target.value)} 
+                        style={{ width: 36, height: 36, padding: 0, border: '1px solid #d8dde6', cursor: 'pointer', borderRadius: 6, flexShrink: 0 }} 
+                      />
+                      <input 
+                        type="text" 
+                        value={ctaTextColor} 
+                        onChange={e => setCtaTextColor(e.target.value)} 
+                        placeholder="Por defecto"
+                        style={css.input} 
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {editingElement === 'logo' && (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Reemplazar Logo</span>
+                    <button onClick={() => logoRef.current?.click()} style={{ ...css.btn, background: '#0f172a' }}>
+                      <Upload size={14} /> Subir nueva imagen de Logo
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#475569', fontWeight: 800, textTransform: 'uppercase' }}>
+                      <span>Escala del Logo</span>
+                      <span>{logoSize.toFixed(1)}x</span>
+                    </div>
+                    <input type="range" min="0.4" max="2.5" step="0.1" value={logoSize} onChange={e => setLogoSize(parseFloat(e.target.value))} style={{ width: '100%' }} />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#475569', fontWeight: 800, textTransform: 'uppercase' }}>
+                      <span>Posición Horizontal (X)</span>
+                      <span>{logoX.toFixed(0)}%</span>
+                    </div>
+                    <input type="range" min="0" max="95" step="1" value={logoX} onChange={e => setLogoX(parseInt(e.target.value))} style={{ width: '100%' }} />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#475569', fontWeight: 800, textTransform: 'uppercase' }}>
+                      <span>Posición Vertical (Y)</span>
+                      <span>{logoY.toFixed(0)}%</span>
+                    </div>
+                    <input type="range" min="0" max="95" step="1" value={logoY} onChange={e => setLogoY(parseInt(e.target.value))} style={{ width: '100%' }} />
+                  </div>
+                </>
+              )}
+
+              {editingElement === 'background' && (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Fondo Personalizado (Imagen)</span>
+                    <button onClick={() => bgUploadRef.current?.click()} style={{ ...css.btn, background: '#0f172a' }}>
+                      <Upload size={14} /> Subir Imagen de Fondo
+                    </button>
+                    {bgUploadPreview && (
+                      <button 
+                        onClick={() => { setBgFile(null); setBgUploadPreview(''); }}
+                        style={{ ...css.ghost, border: '1px solid #ef4444', color: '#ef4444', justifyContent: 'center' }}
+                      >
+                        Eliminar Fondo Personalizado
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Color de Tarjeta / Superposición</span>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input 
+                        type="color" 
+                        value={cardBgColor || '#000000'} 
+                        onChange={e => setCardBgColor(e.target.value)} 
+                        style={{ width: 36, height: 36, padding: 0, border: '1px solid #d8dde6', cursor: 'pointer', borderRadius: 6, flexShrink: 0 }} 
+                      />
+                      <input 
+                        type="text" 
+                        value={cardBgColor} 
+                        onChange={e => setCardBgColor(e.target.value)} 
+                        placeholder="Por defecto"
+                        style={css.input} 
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ padding: '14px 20px', borderTop: '1px solid rgba(0, 0, 0, 0.08)', background: 'rgba(0, 0, 0, 0.02)', display: 'flex', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={() => setEditingElement(null)}
+                style={{
+                  ...css.btn,
+                  width: 'auto',
+                  padding: '8px 20px',
+                  background: 'linear-gradient(135deg,#0070d2,#005fb2)',
+                  fontWeight: 800
+                }}
+              >
+                Listo
               </button>
             </div>
           </div>

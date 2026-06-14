@@ -27,7 +27,35 @@ export interface FlyerData {
     title: string;
     kpis: { label: string; val: string; change?: string }[];
   };
+  flyerFont?: string;
+  textScale?: number;
+  subtitleScale?: number;
+  benefitsScale?: number;
+  logoSize?: number;
+  logoX?: number;
+  logoY?: number;
+  containerW?: number;
+  containerH?: number;
+  titleColor?: string;
+  subtitleColor?: string;
+  benefitsColor?: string;
+  cardBgColor?: string;
+  ctaBgColor?: string;
+  ctaTextColor?: string;
+  textY?: number;
+  textAlign?: 'left' | 'center' | 'right';
+  onTitleClick?: () => void;
+  onSubtitleClick?: () => void;
+  onBenefitsClick?: () => void;
+  onCtaClick?: () => void;
+  onLogoClick?: () => void;
+  onBgClick?: () => void;
+  subtitleBold?: boolean;
+  benefitsBold?: boolean;
 }
+
+export const getFontFamily = (f?: string) =>
+  f && f !== 'Outfit' ? `'${f}','Outfit','Inter',sans-serif` : "'Outfit','Inter',sans-serif";
 
 // ── Utility: clean phrases from bullet points or numbers ──────────────────────
 function cleanPhrase(text: string): string {
@@ -1330,13 +1358,13 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
     const price = data.price || parsed.price || derivePrice(data.prompt) || defaultPrice;
     const features = data.features || parsed.features || deriveFeatures(data.prompt);
     
-    // Ensure we have exactly 3 features
-    while (features.length < 3) {
-      const defaults = ['Integración Total', 'Automatización IA', 'Seguridad Avanzada'];
+    // Ensure we have exactly 4 features
+    while (features.length < 4) {
+      const defaults = ['Integración Total', 'Automatización IA', 'Seguridad Avanzada', 'Gestión Simplificada'];
       const next = defaults.find(d => !features.includes(d));
       if (next) features.push(next); else break;
     }
-    const cleanFeatures = features.slice(0, 3);
+    const cleanFeatures = features.slice(0, 4);
 
     const { h1, h2 } = deriveHeadline(data.prompt, data.company_name);
     const headline = data.headline || parsed.title || (h1 && h1 !== 'Diseño Profesional' ? h1 : defaultHeadline);
@@ -1357,19 +1385,24 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
     const mainTitle = titleWords.join(' ');
 
     return (
-      <div ref={ref} style={{
-        width: 1080, height: 1080,
-        background: hasBg 
-          ? `url(${data.bgImageUrl}) center/cover no-repeat` 
-          : `radial-gradient(circle at 90% 10%, ${primary}12 0%, transparent 60%), #ffffff`,
-        fontFamily: "'Plus Jakarta Sans', 'Outfit', sans-serif",
-        position: 'relative',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        boxSizing: 'border-box',
-        justifyContent: 'space-between'
-      }}>
+      <div ref={ref}
+        className={data.onBgClick ? "editable-element" : undefined}
+        onClick={data.onBgClick ? (e) => { e.stopPropagation(); data.onBgClick?.(); } : undefined}
+        style={{
+          width: 1080, height: 1080,
+          background: hasBg 
+            ? `url('${data.bgImageUrl}') center/cover no-repeat` 
+            : `radial-gradient(circle at 90% 10%, ${primary}12 0%, transparent 60%), #ffffff`,
+          fontFamily: data.flyerFont ? getFontFamily(data.flyerFont) : "'Plus Jakarta Sans', 'Outfit', sans-serif",
+          position: 'relative',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          boxSizing: 'border-box',
+          justifyContent: 'space-between',
+          cursor: data.onBgClick ? 'pointer' : 'default'
+        }}
+      >
         {/* Load Google Fonts directly in the render flow */}
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Syne:wght@700;800&display=swap" />
 
@@ -1387,7 +1420,7 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
         <div style={{
           margin: hasBg ? '50px 64px 0 64px' : '0',
           padding: hasBg ? '40px' : '50px 64px 0 64px',
-          background: hasBg ? 'rgba(255, 255, 255, 0.85)' : 'transparent',
+          background: data.cardBgColor || (hasBg ? 'rgba(255, 255, 255, 0.85)' : 'transparent'),
           backdropFilter: hasBg ? 'blur(24px)' : 'none',
           borderRadius: hasBg ? '24px' : '0',
           border: hasBg ? '1px solid rgba(255, 255, 255, 0.4)' : 'none',
@@ -1398,41 +1431,55 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
           flex: 1,
           zIndex: 10,
           position: 'relative',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
+          transform: data.textY ? `translateY(${data.textY}px)` : undefined
         }}>
           {/* Header Section */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', width: '100%' }}>
+          <div style={{ 
+            display: 'flex', flexDirection: 'column', 
+            alignItems: data.textAlign === 'left' ? 'flex-start' : data.textAlign === 'right' ? 'flex-end' : 'center', 
+            textAlign: data.textAlign || 'center', 
+            width: '100%' 
+          }}>
             {/* Tagline */}
             <div style={{ fontSize: 14, fontWeight: 900, color: primary, letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 12 }}>
               {indData.tagline || 'SaaS CRM - CONTROL INTELIGENTE'}
             </div>
 
             {/* Headline */}
-            <h1 style={{
-              fontSize: headline.length > 25 ? 44 : 54,
-              fontWeight: 900,
-              color: '#1a1a1a', // Charcoal
-              lineHeight: 1.1,
-              letterSpacing: '-0.03em', // Tight letter-spacing
-              textTransform: 'uppercase',
-              margin: '0 0 12px 0',
-              width: '100%',
-              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
-            }}>
+            <h1 
+              className={data.onTitleClick ? "editable-element" : undefined}
+              onClick={data.onTitleClick ? (e) => { e.stopPropagation(); data.onTitleClick?.(); } : undefined}
+              style={{
+                fontSize: (headline.length > 25 ? 44 : 54) * (data.textScale ?? 1),
+                fontWeight: 900,
+                color: data.titleColor || '#1a1a1a', // Charcoal / Customizer titleColor
+                lineHeight: 1.1,
+                letterSpacing: '-0.03em', // Tight letter-spacing
+                textTransform: 'uppercase',
+                margin: '0 0 12px 0',
+                width: '100%',
+                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+              }}
+            >
               {headline}
             </h1>
 
             {/* Sub-headline / Value Prop */}
-            <p style={{
-              fontSize: 18,
-              fontWeight: 500,
-              color: '#475569', // Slate Gray
-              lineHeight: 1.4,
-              letterSpacing: '0.01em',
-              margin: 0,
-              maxWidth: 880,
-              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
-            }}>
+            <p 
+              className={data.onSubtitleClick ? "editable-element" : undefined}
+              onClick={data.onSubtitleClick ? (e) => { e.stopPropagation(); data.onSubtitleClick?.(); } : undefined}
+              style={{
+                fontSize: 18 * (data.subtitleScale ?? 1),
+                fontWeight: data.subtitleBold ? 900 : 500,
+                color: data.subtitleColor || '#475569', // Slate Gray / Customizer subtitleColor
+                lineHeight: 1.4,
+                letterSpacing: '0.01em',
+                margin: 0,
+                maxWidth: 880,
+                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+              }}
+            >
               {subheadline}
             </p>
           </div>
@@ -1444,8 +1491,12 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
             </div>
           )}
 
-          {/* Feature Grid (3-Column Layout) */}
-          <div style={{ display: 'flex', gap: 48, width: '100%', marginBottom: 24 }}>
+          {/* Feature Grid (4-Column Layout dynamic gap) */}
+          <div 
+            className={data.onBenefitsClick ? "editable-element" : undefined}
+            onClick={data.onBenefitsClick ? (e) => { e.stopPropagation(); data.onBenefitsClick?.(); } : undefined}
+            style={{ display: 'flex', gap: cleanFeatures.length > 3 ? 24 : 48, width: '100%', marginBottom: 24 }}
+          >
             {cleanFeatures.map((feat, idx) => {
               const featData = getFeatureBullets(feat, data.prompt, primary);
               return (
@@ -1461,13 +1512,13 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
                     {featData.icon}
                   </div>
                   {/* Title */}
-                  <span style={{ fontSize: 16, fontWeight: 900, color: '#1a1a1a', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
+                  <span style={{ fontSize: 16 * (data.benefitsScale ?? 1), fontWeight: data.benefitsBold ? 900 : 800, color: '#1a1a1a', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
                     {featData.title}
                   </span>
                   {/* Bullets */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
                     {featData.bullets.map((bullet, bIdx) => (
-                      <span key={bIdx} style={{ fontSize: 13, color: '#64748b', fontWeight: 500, lineHeight: 1.4, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                      <span key={bIdx} style={{ fontSize: 13 * (data.benefitsScale ?? 1), color: '#64748b', fontWeight: data.benefitsBold ? 800 : 500, lineHeight: 1.4, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
                         • {bullet}
                       </span>
                     ))}
@@ -1487,7 +1538,7 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
           flexDirection: 'column',
           justifyContent: 'space-between',
           boxSizing: 'border-box',
-          fontFamily: "'Plus Jakarta Sans', sans-serif",
+          fontFamily: data.flyerFont ? getFontFamily(data.flyerFont) : "'Plus Jakarta Sans', sans-serif",
           zIndex: 10,
           position: 'relative'
         }}>
@@ -1497,7 +1548,7 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
               <span style={{ fontSize: 12, fontWeight: 900, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.12em' }}>PLAN ENTERPRISE</span>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
-                <span style={{ fontSize: 38, fontWeight: 900, color: '#ffffff' }}>{price}</span>
+                <span style={{ fontSize: 38 * (data.textScale ?? 1), fontWeight: 900, color: '#ffffff' }}>{price}</span>
                 <span style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>/mes</span>
               </div>
             </div>
@@ -1530,19 +1581,23 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
             </div>
 
             {/* Right CTA Button */}
-            <div style={{
-              background: primary,
-              color: '#ffffff',
-              fontWeight: 900,
-              fontSize: 16,
-              letterSpacing: '0.05em',
-              padding: '16px 32px',
-              borderRadius: 50,
-              boxShadow: `0 8px 20px ${primary}30`,
-              border: 'none',
-              cursor: 'pointer',
-              textTransform: 'uppercase'
-            }}>
+            <div 
+              className={data.onCtaClick ? "editable-element" : undefined}
+              onClick={data.onCtaClick ? (e) => { e.stopPropagation(); data.onCtaClick?.(); } : undefined}
+              style={{
+                background: data.ctaBgColor || primary,
+                color: data.ctaTextColor || '#ffffff',
+                fontWeight: 900,
+                fontSize: 16,
+                letterSpacing: '0.05em',
+                padding: '16px 32px',
+                borderRadius: 50,
+                boxShadow: `0 8px 20px ${(data.ctaBgColor || primary)}30`,
+                border: 'none',
+                cursor: 'pointer',
+                textTransform: 'uppercase'
+              }}
+            >
               {cta}
             </div>
           </div>
@@ -1586,13 +1641,13 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
     const price = data.price || parsed.price || derivePrice(data.prompt) || defaultPrice;
     const features = data.features || parsed.features || deriveFeatures(data.prompt);
     
-    // Ensure we have exactly 3 features
-    while (features.length < 3) {
-      const defaults = ['Integración Total', 'Automatización IA', 'Seguridad Avanzada'];
+    // Ensure we have exactly 4 features
+    while (features.length < 4) {
+      const defaults = ['Integración Total', 'Automatización IA', 'Seguridad Avanzada', 'Gestión Simplificada'];
       const next = defaults.find(d => !features.includes(d));
       if (next) features.push(next); else break;
     }
-    const cleanFeatures = features.slice(0, 3);
+    const cleanFeatures = features.slice(0, 4);
 
     const { h1, h2 } = deriveHeadline(data.prompt, data.company_name);
     const headline = data.headline || parsed.title || (h1 && h1 !== 'Diseño Profesional' ? h1 : defaultHeadline);
@@ -1613,19 +1668,24 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
     const mainTitle = titleWords.join(' ');
 
     return (
-      <div ref={ref} style={{
-        width: 1080, height: 1080,
-        background: hasBg 
-          ? `url(${data.bgImageUrl}) center/cover no-repeat` 
-          : `radial-gradient(circle at 10% 90%, ${secondary}08 0%, transparent 60%), #ffffff`,
-        fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif",
-        position: 'relative',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        boxSizing: 'border-box',
-        justifyContent: 'space-between'
-      }}>
+      <div ref={ref}
+        className={data.onBgClick ? "editable-element" : undefined}
+        onClick={data.onBgClick ? (e) => { e.stopPropagation(); data.onBgClick?.(); } : undefined}
+        style={{
+          width: 1080, height: 1080,
+          background: hasBg 
+            ? `url('${data.bgImageUrl}') center/cover no-repeat` 
+            : `radial-gradient(circle at 10% 90%, ${secondary}08 0%, transparent 60%), #ffffff`,
+          fontFamily: data.flyerFont ? getFontFamily(data.flyerFont) : "'Outfit', 'Plus Jakarta Sans', sans-serif",
+          position: 'relative',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          boxSizing: 'border-box',
+          justifyContent: 'space-between',
+          cursor: data.onBgClick ? 'pointer' : 'default'
+        }}
+      >
         {/* Load Google Fonts directly in the render flow */}
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Syne:wght@700;800&display=swap" />
 
@@ -1643,7 +1703,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
         <div style={{
           margin: hasBg ? '50px 64px 0 64px' : '0',
           padding: hasBg ? '40px' : '50px 64px 0 64px',
-          background: hasBg ? 'rgba(15, 23, 42, 0.72)' : 'transparent',
+          background: data.cardBgColor || (hasBg ? 'rgba(15, 23, 42, 0.72)' : 'transparent'),
           backdropFilter: hasBg ? 'blur(24px)' : 'none',
           borderRadius: hasBg ? '24px' : '0',
           border: hasBg ? `1.5px solid ${secondary}40` : 'none',
@@ -1654,42 +1714,56 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
           flex: 1,
           zIndex: 10,
           position: 'relative',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
+          transform: data.textY ? `translateY(${data.textY}px)` : undefined
         }}>
           {/* Header Section */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', width: '100%' }}>
+          <div style={{ 
+            display: 'flex', flexDirection: 'column', 
+            alignItems: data.textAlign === 'left' ? 'flex-start' : data.textAlign === 'right' ? 'flex-end' : 'center', 
+            textAlign: data.textAlign || 'center', 
+            width: '100%' 
+          }}>
             {/* Tagline */}
             <div style={{ fontSize: 14, fontWeight: 900, color: secondary, letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 12 }}>
               ⚡ {indData.tagline || 'SaaS CRM - CONTROL INTELIGENTE'}
             </div>
 
             {/* Headline */}
-            <h1 style={{
-              fontSize: headline.length > 25 ? 44 : 54,
-              fontWeight: 900,
-              fontFamily: "'Syne', sans-serif",
-              color: hasBg ? '#ffffff' : primary, // White text if glass overlay on BG, else Midnight Navy
-              lineHeight: 1.1,
-              letterSpacing: '-0.03em', // Tight letter-spacing
-              textTransform: 'uppercase',
-              margin: '0 0 12px 0',
-              width: '100%',
-              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
-            }}>
+            <h1 
+              className={data.onTitleClick ? "editable-element" : undefined}
+              onClick={data.onTitleClick ? (e) => { e.stopPropagation(); data.onTitleClick?.(); } : undefined}
+              style={{
+                fontSize: (headline.length > 25 ? 44 : 54) * (data.textScale ?? 1),
+                fontWeight: 900,
+                fontFamily: "'Syne', sans-serif",
+                color: data.titleColor || (hasBg ? '#ffffff' : primary), // White text if glass overlay on BG, else Midnight Navy
+                lineHeight: 1.1,
+                letterSpacing: '-0.03em', // Tight letter-spacing
+                textTransform: 'uppercase',
+                margin: '0 0 12px 0',
+                width: '100%',
+                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+              }}
+            >
               {headline}
             </h1>
 
             {/* Sub-headline / Value Prop */}
-            <p style={{
-              fontSize: 18,
-              fontWeight: 500,
-              color: hasBg ? 'rgba(255, 255, 255, 0.85)' : '#475569', // Light text if glass overlay, else Slate Gray
-              lineHeight: 1.4,
-              letterSpacing: '0.01em',
-              margin: 0,
-              maxWidth: 880,
-              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
-            }}>
+            <p 
+              className={data.onSubtitleClick ? "editable-element" : undefined}
+              onClick={data.onSubtitleClick ? (e) => { e.stopPropagation(); data.onSubtitleClick?.(); } : undefined}
+              style={{
+                fontSize: 18 * (data.subtitleScale ?? 1),
+                fontWeight: data.subtitleBold ? 900 : 500,
+                color: data.subtitleColor || (hasBg ? 'rgba(255, 255, 255, 0.85)' : '#475569'), // Light text if glass overlay, else Slate Gray
+                lineHeight: 1.4,
+                letterSpacing: '0.01em',
+                margin: 0,
+                maxWidth: 880,
+                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+              }}
+            >
               {subheadline}
             </p>
           </div>
@@ -1710,8 +1784,12 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
             </div>
           )}
 
-          {/* Feature Grid (3-Column Layout) */}
-          <div style={{ display: 'flex', gap: 48, width: '100%', marginBottom: 24 }}>
+          {/* Feature Grid (4-Column Layout dynamic gap) */}
+          <div 
+            className={data.onBenefitsClick ? "editable-element" : undefined}
+            onClick={data.onBenefitsClick ? (e) => { e.stopPropagation(); data.onBenefitsClick?.(); } : undefined}
+            style={{ display: 'flex', gap: cleanFeatures.length > 3 ? 24 : 48, width: '100%', marginBottom: 24 }}
+          >
             {cleanFeatures.map((feat, idx) => {
               const featData = getFeatureBullets(feat, data.prompt, secondary);
               return (
@@ -1727,13 +1805,13 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
                     {featData.icon}
                   </div>
                   {/* Title */}
-                  <span style={{ fontSize: 16, fontWeight: 900, color: hasBg ? '#ffffff' : primary, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
+                  <span style={{ fontSize: 16 * (data.benefitsScale ?? 1), fontWeight: data.benefitsBold ? 900 : 800, color: hasBg ? '#ffffff' : primary, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
                     {featData.title}
                   </span>
                   {/* Bullets */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
                     {featData.bullets.map((bullet, bIdx) => (
-                      <span key={bIdx} style={{ fontSize: 13, color: hasBg ? 'rgba(255, 255, 255, 0.7)' : '#64748b', fontWeight: 500, lineHeight: 1.4, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                      <span key={bIdx} style={{ fontSize: 13 * (data.benefitsScale ?? 1), color: hasBg ? 'rgba(255, 255, 255, 0.7)' : '#64748b', fontWeight: data.benefitsBold ? 800 : 500, lineHeight: 1.4, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
                         • {bullet}
                       </span>
                     ))}
@@ -1753,7 +1831,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
           flexDirection: 'column',
           justifyContent: 'space-between',
           boxSizing: 'border-box',
-          fontFamily: "'Plus Jakarta Sans', sans-serif",
+          fontFamily: data.flyerFont ? getFontFamily(data.flyerFont) : "'Plus Jakarta Sans', sans-serif",
           zIndex: 10,
           position: 'relative'
         }}>
@@ -1763,7 +1841,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
               <span style={{ fontSize: 12, fontWeight: 900, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.12em' }}>PLAN ENTERPRISE</span>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
-                <span style={{ fontSize: 38, fontWeight: 900, color: secondary }}>{price}</span>
+                <span style={{ fontSize: 38 * (data.textScale ?? 1), fontWeight: 900, color: secondary }}>{price}</span>
                 <span style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>/mes</span>
               </div>
             </div>
@@ -1796,19 +1874,23 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
             </div>
 
             {/* Right CTA Button */}
-            <div style={{
-              background: '#ffffff',
-              color: '#1a1a1a',
-              fontWeight: 900,
-              fontSize: 16,
-              letterSpacing: '0.05em',
-              padding: '16px 32px',
-              borderRadius: 50,
-              boxShadow: '0 8px 20px rgba(255,255,255,0.05)',
-              border: `1.5px solid ${secondary}`,
-              cursor: 'pointer',
-              textTransform: 'uppercase'
-            }}>
+            <div 
+              className={data.onCtaClick ? "editable-element" : undefined}
+              onClick={data.onCtaClick ? (e) => { e.stopPropagation(); data.onCtaClick?.(); } : undefined}
+              style={{
+                background: data.ctaBgColor || '#ffffff',
+                color: data.ctaTextColor || '#1a1a1a',
+                fontWeight: 900,
+                fontSize: 16,
+                letterSpacing: '0.05em',
+                padding: '16px 32px',
+                borderRadius: 50,
+                boxShadow: `0 8px 20px ${(data.ctaBgColor || '#ffffff')}05`,
+                border: `1.5px solid ${secondary}`,
+                cursor: 'pointer',
+                textTransform: 'uppercase'
+              }}
+            >
               {cta}
             </div>
           </div>
@@ -1885,25 +1967,28 @@ export const FreeLogo: React.FC<{
   if (!d.logoUrl) return null;
 
   return (
-    <div style={{
-      position: 'absolute',
-      left: `${d.logoX}%`,
-      top: `${d.logoY}%`,
-      cursor: 'move',
-      zIndex: 40,
-      transform: `scale(${d.logoSize})`,
-      transformOrigin: 'top left',
-      padding: 6,
-      background: 'rgba(255,255,255,0.92)',
-      borderRadius: 12,
-      boxShadow: '0 8px 20px rgba(0,0,0,0.18)',
-      border: '1px solid rgba(255,255,255,0.8)',
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: 6,
-      userSelect: 'none'
-    }}
-    onMouseDown={startDrag}
+    <div 
+      className={d.onLogoClick ? "editable-element" : undefined}
+      onClick={d.onLogoClick ? (e) => { e.stopPropagation(); d.onLogoClick?.(); } : undefined}
+      style={{
+        position: 'absolute',
+        left: `${d.logoX}%`,
+        top: `${d.logoY}%`,
+        cursor: 'move',
+        zIndex: 40,
+        transform: `scale(${d.logoSize})`,
+        transformOrigin: 'top left',
+        padding: 6,
+        background: 'rgba(255,255,255,0.92)',
+        borderRadius: 12,
+        boxShadow: '0 8px 20px rgba(0,0,0,0.18)',
+        border: '1px solid rgba(255,255,255,0.8)',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        userSelect: 'none'
+      }}
+      onMouseDown={startDrag}
     >
       <img src={d.logoUrl} crossOrigin="anonymous" style={{ maxHeight: 34, maxWidth: 110, objectFit: 'contain' }} alt="Logo flotante" />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }} onMouseDown={e => e.stopPropagation()}>

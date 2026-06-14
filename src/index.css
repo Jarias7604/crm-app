@@ -401,4 +401,19 @@ a:active,
 
 .manual-content hr {
     @apply my-10 border-t border-slate-100;
+}
+
+/* Interactive editable canvas elements hover effects */
+.editable-element {
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  user-select: none !important;
+  position: relative !important;
+}
+.editable-element:hover {
+  outline: 2px dashed #7c3aed !important;
+  outline-offset: 3px !important;
+  background: rgba(124, 58, 237, 0.04) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.1) !important;
 }
