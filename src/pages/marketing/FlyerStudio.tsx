@@ -267,7 +267,7 @@ export default function FlyerStudio() {
       if (exists) {
         return p.filter(c => c.toLowerCase() !== lower);
       } else {
-        return p.length < 3 ? [...p, hex] : p;
+        return p.length < 3 ? [...p, hex] : [...p.slice(1), hex];
       }
     });
   }
@@ -308,9 +308,9 @@ export default function FlyerStudio() {
       }
       setSelected(0);
       setPreviewMode('ai');
-      // Modo 'full': la imagen de DALL-E ES el flyer — mostrarlo como imagen pura
+      // Modo 'full': la imagen de DALL-E ES el flyer — mostrarlo como imagen pura (ahora por defecto mostramos plantilla)
       // Modo 'background': usarla como fondo de la plantilla HTML
-      setShowFullAiResult(mode === 'full');
+      setShowFullAiResult(false);
       if (data.credits_remaining != null) setCredits(data.credits_remaining);
       if (mode === 'full') {
         toast.success('✨ ¡Flyer Profesional con IA generado!');
@@ -416,7 +416,7 @@ export default function FlyerStudio() {
     setGenerating(true);
     try {
       let dataUrl = '';
-      if (bgUploadPreview || (previewMode === 'ai' && variants.length > 0)) {
+      if (showFullAiResult) {
         if (!flyerRef.current) { toast.error('Flyer no está listo'); return; }
         const canvas = await html2canvas(flyerRef.current, {
           useCORS: true,
@@ -453,7 +453,7 @@ export default function FlyerStudio() {
     setGenerating(true);
     try {
       let dataUrl = '';
-      if (bgUploadPreview || (previewMode === 'ai' && variants.length > 0)) {
+      if (showFullAiResult) {
         if (!flyerRef.current) { toast.error('Flyer no está listo'); return; }
         const canvas = await html2canvas(flyerRef.current, {
           useCORS: true, allowTaint: true, scale: 2, backgroundColor: null
@@ -787,7 +787,7 @@ export default function FlyerStudio() {
                         alignItems: 'center',
                         justifyContent: 'center',
                         boxShadow: isSelected 
-                          ? '0 0 0 2px #0070d2, 0 4px 8px rgba(0,0,0,0.15)' 
+                          ? '0 0 0 2px #0f172a, 0 4px 8px rgba(0,0,0,0.15)' 
                           : '0 1px 3px rgba(0,0,0,0.12)',
                         transform: isSelected ? 'scale(1.15)' : 'scale(1)',
                         transition: 'all 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
@@ -1061,7 +1061,7 @@ export default function FlyerStudio() {
             )}
 
             {/* ══ AI RESULT IMAGE ══ */}
-            {!showSuggestions && !generating && (showFullAiResult || bgUploadPreview) && variants.length > 0 ? (
+            {!showSuggestions && !generating && showFullAiResult && (variants.length > 0 || bgUploadPreview) ? (
               <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {/* Full AI Image */}
                 <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
@@ -1153,7 +1153,7 @@ export default function FlyerStudio() {
             ) : null}
 
             {/* Template preview — shown when user selects Template A or B without full AI result */}
-            {!showSuggestions && !generating && !showFullAiResult && !bgUploadPreview && variants.length > 0 && (
+            {!showSuggestions && !generating && !showFullAiResult && (variants.length > 0 || bgUploadPreview) && (
               <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {/* Canvas */}
                 <div style={{ display: 'flex', justifyContent: 'center', width: '100%', userSelect: 'none' }}>
@@ -1193,7 +1193,7 @@ export default function FlyerStudio() {
                           primaryColor: colors[0] || '#e91e8c',
                           secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
                           phone, website, logoUrl: logoPreview || undefined,
-                          bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
+                          bgImageUrl: bgUploadPreview || ((previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined)
                         }} />
                       ) : (
                         <FlyerTemplateB data={{
@@ -1210,7 +1210,7 @@ export default function FlyerStudio() {
                           primaryColor: colors[0] || '#9b1c1c',
                           secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
                           phone, website, logoUrl: logoPreview || undefined,
-                          bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
+                          bgImageUrl: bgUploadPreview || ((previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined)
                         }} />
                       )}
                     </div>
@@ -1260,7 +1260,7 @@ export default function FlyerStudio() {
           secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
           phone, website,
           logoUrl: logoPreview || undefined,
-          bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
+          bgImageUrl: bgUploadPreview || ((previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined)
         }} />
         <FlyerTemplateB ref={templateRefB} data={{
           company_name: companyName || 'Mi Empresa',
@@ -1278,7 +1278,7 @@ export default function FlyerStudio() {
           secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
           phone, website,
           logoUrl: logoPreview || undefined,
-          bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
+          bgImageUrl: bgUploadPreview || ((previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined)
         }} />
       </div>
 
@@ -1336,7 +1336,7 @@ export default function FlyerStudio() {
               flex: 1,
               minHeight: 0
             }}>
-              {bgUploadPreview || (showFullAiResult && variants.length > 0) ? (
+              {showFullAiResult && (variants.length > 0 || bgUploadPreview) ? (
                 <div style={{
                   position: 'relative',
                   maxWidth: 'min(82vw, 680px)',
@@ -1374,41 +1374,37 @@ export default function FlyerStudio() {
                   width: fitW, height: fitH, overflow: 'hidden', position: 'relative',
                   borderRadius: 14, boxShadow: '0 20px 50px rgba(0,0,0,0.15)', background: '#fff'
                 }}>
-                  {bgUploadPreview ? (
-                    <img src={bgUploadPreview} alt="Flyer Vista Previa" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
-                  ) : (
-                    <div style={{ transform: `scale(${sc})`, transformOrigin: 'top left', width: 1080, height: 1080, pointerEvents: 'none' }}>
-                      {selectedTemplate === 'A' ? (
-                        <FlyerTemplateA data={{
-                          company_name: companyName || 'Mi Empresa', prompt,
-                          cta: aiOptimizedText?.cta || cta || 'Contáctanos HOY',
-                          headline: aiOptimizedText?.headline, subheadline: aiOptimizedText?.subheadline,
-                          features: aiOptimizedText?.features, price: aiOptimizedText?.price,
-                          highlight_title: aiOptimizedText?.highlight_title,
-                          highlight_desc: aiOptimizedText?.highlight_desc,
-                          benefits: aiOptimizedText?.benefits,
-                          mockup_info: aiOptimizedText?.mockup_info,
-                          primaryColor: colors[0] || '#e91e8c', secondaryColor: colors[1] || '#1a1a2e',
-                          phone, website, logoUrl: logoPreview || undefined,
-                          bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
-                        }} />
-                      ) : (
-                        <FlyerTemplateB data={{
-                          company_name: companyName || 'Mi Empresa', prompt,
-                          cta: aiOptimizedText?.cta || cta || 'Activa HOY MISMO',
-                          headline: aiOptimizedText?.headline, subheadline: aiOptimizedText?.subheadline,
-                          features: aiOptimizedText?.features, price: aiOptimizedText?.price,
-                          highlight_title: aiOptimizedText?.highlight_title,
-                          highlight_desc: aiOptimizedText?.highlight_desc,
-                          benefits: aiOptimizedText?.benefits,
-                          mockup_info: aiOptimizedText?.mockup_info,
-                          primaryColor: colors[0] || '#9b1c1c', secondaryColor: colors[1] || '#1a1a2e',
-                          phone, website, logoUrl: logoPreview || undefined,
-                          bgImageUrl: (previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined
-                        }} />
-                      )}
-                    </div>
-                  )}
+                  <div style={{ transform: `scale(${sc})`, transformOrigin: 'top left', width: 1080, height: 1080, pointerEvents: 'none' }}>
+                    {selectedTemplate === 'A' ? (
+                      <FlyerTemplateA data={{
+                        company_name: companyName || 'Mi Empresa', prompt,
+                        cta: aiOptimizedText?.cta || cta || 'Contáctanos HOY',
+                        headline: aiOptimizedText?.headline, subheadline: aiOptimizedText?.subheadline,
+                        features: aiOptimizedText?.features, price: aiOptimizedText?.price,
+                        highlight_title: aiOptimizedText?.highlight_title,
+                        highlight_desc: aiOptimizedText?.highlight_desc,
+                        benefits: aiOptimizedText?.benefits,
+                        mockup_info: aiOptimizedText?.mockup_info,
+                        primaryColor: colors[0] || '#e91e8c', secondaryColor: colors[1] || '#1a1a2e',
+                        phone, website, logoUrl: logoPreview || undefined,
+                        bgImageUrl: bgUploadPreview || ((previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined)
+                      }} />
+                    ) : (
+                      <FlyerTemplateB data={{
+                        company_name: companyName || 'Mi Empresa', prompt,
+                        cta: aiOptimizedText?.cta || cta || 'Activa HOY MISMO',
+                        headline: aiOptimizedText?.headline, subheadline: aiOptimizedText?.subheadline,
+                        features: aiOptimizedText?.features, price: aiOptimizedText?.price,
+                        highlight_title: aiOptimizedText?.highlight_title,
+                        highlight_desc: aiOptimizedText?.highlight_desc,
+                        benefits: aiOptimizedText?.benefits,
+                        mockup_info: aiOptimizedText?.mockup_info,
+                        primaryColor: colors[0] || '#9b1c1c', secondaryColor: colors[1] || '#1a1a2e',
+                        phone, website, logoUrl: logoPreview || undefined,
+                        bgImageUrl: bgUploadPreview || ((previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined)
+                      }} />
+                    )}
+                  </div>
                 </div>
                 );
               })()}
