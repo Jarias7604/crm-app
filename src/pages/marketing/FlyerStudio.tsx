@@ -306,6 +306,8 @@ export default function FlyerStudio() {
   const [colors, setColors] = useState<string[]>(['#7c3aed']);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState(DEFAULT_LOGO_SVG);
+  const [isLogoCustomized, setIsLogoCustomized] = useState(false);
+  const brandingLoaded = useRef(false);
   const [isFormatModalOpen, setIsFormatModalOpen] = useState(false);
   const [isToneModalOpen, setIsToneModalOpen] = useState(false);
   const [isColorModalOpen, setIsColorModalOpen] = useState(false);
@@ -684,25 +686,28 @@ export default function FlyerStudio() {
   useEffect(() => {
     if (!profile?.company_id) return;
     
-    brandingService.getMyCompany()
-      .then(async (data) => {
-        if (data) {
-          if (data.name) setCompanyName(data.name);
-          if (data.phone) setPhone(data.phone || '+503 7971-8911');
-          if (data.website) setWebsite(data.website || 'www.ariasdefense.com');
-          if (data.logo_url) {
-            const base64 = await urlToBase64(data.logo_url);
-            setLogoPreview(base64);
+    if (!brandingLoaded.current) {
+      brandingLoaded.current = true;
+      brandingService.getMyCompany()
+        .then(async (data) => {
+          if (data) {
+            if (data.name) setCompanyName(data.name);
+            if (data.phone) setPhone(data.phone || '+503 7971-8911');
+            if (data.website) setWebsite(data.website || 'www.ariasdefense.com');
+            if (data.logo_url && !isLogoCustomized) {
+              const base64 = await urlToBase64(data.logo_url);
+              setLogoPreview(base64);
+            }
           }
-        }
-      })
-      .catch((err) => console.error('Error loading branding:', err));
+        })
+        .catch((err) => console.error('Error loading branding:', err));
+    }
 
     supabase.from('ai_generation_credits')
       .select('credits_used,credits_limit').eq('company_id', profile.company_id)
       .order('period_start', { ascending: false }).limit(1).single()
       .then(({ data }) => setCredits(data ? data.credits_limit - data.credits_used : 20));
-  }, [profile]);
+  }, [profile, isLogoCustomized]);
 
   // Pre-populate manual inputs from basic parsing as the user types, before they generate
   useEffect(() => {
@@ -1223,7 +1228,7 @@ export default function FlyerStudio() {
                 {logoPreview && (
                   <div style={{ position: 'relative', display: 'inline-flex' }}>
                     <img src={logoPreview} alt="logo" style={{ height: 36, width: 36, objectFit: 'contain', borderRadius: 5, border: '1px solid #e2e8f0' }} />
-                    <button onClick={() => { setLogoFile(null); setLogoPreview(''); if (logoRef.current) logoRef.current.value = ''; }} style={{ position: 'absolute', top: -5, right: -5, background: '#ef4444', border: 'none', borderRadius: '50%', width: 14, height: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <button onClick={() => { setLogoFile(null); setLogoPreview(''); setIsLogoCustomized(true); if (logoRef.current) logoRef.current.value = ''; }} style={{ position: 'absolute', top: -5, right: -5, background: '#ef4444', border: 'none', borderRadius: '50%', width: 14, height: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <X size={9} color="#fff" />
                     </button>
                   </div>
@@ -1245,7 +1250,7 @@ export default function FlyerStudio() {
                   ⚙️ Ajustar posición y tamaño de Logo
                 </button>
               )}
-              <input ref={logoRef} type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (!f) return; setLogoFile(f); const r = new FileReader(); r.onload = ev => setLogoPreview(ev.target?.result as string); r.readAsDataURL(f); }} style={{ display: 'none' }} />
+              <input ref={logoRef} type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (!f) return; setLogoFile(f); setIsLogoCustomized(true); const r = new FileReader(); r.onload = ev => setLogoPreview(ev.target?.result as string); r.readAsDataURL(f); }} style={{ display: 'none' }} />
             </div>
 
             {/* Custom Flyer Upload */}
