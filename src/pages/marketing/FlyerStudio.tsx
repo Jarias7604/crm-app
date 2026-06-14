@@ -519,7 +519,8 @@ export default function FlyerStudio() {
       console.warn('AI generation failed, applying premium stock fallback:', e);
       // Fallback: search for keywords in the prompt to match beautiful Unsplash stock images
       const fallbackImgs = getThematicImages(prompt);
-      setVariants(fallbackImgs);
+      const shuffled = [...fallbackImgs].sort(() => Math.random() - 0.5);
+      setVariants(shuffled);
       
       // Also generate optimized copy locally based on basic parsing since openai failed
       const parsed = parsePrompt(prompt);
@@ -556,7 +557,8 @@ export default function FlyerStudio() {
 
     try {
       const fallbackImgs = getThematicImages(prompt);
-      setVariants(fallbackImgs);
+      const shuffled = [...fallbackImgs].sort(() => Math.random() - 0.5);
+      setVariants(shuffled);
 
       // Parse prompt locally to generate structured copy
       const parsed = parsePrompt(prompt);
