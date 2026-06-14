@@ -147,5 +147,26 @@ export const storageService = {
             .getPublicUrl(filePath);
 
         return publicUrl;
+    },
+
+    async uploadFlyerThumbnail(companyId: string, blob: Blob) {
+        const fileName = `${companyId}-flyer-${Date.now()}.jpg`;
+        const filePath = `flyers/${fileName}`;
+
+        const { error } = await supabase.storage
+            .from('avatars')
+            .upload(filePath, blob, {
+                contentType: 'image/jpeg',
+                cacheControl: '3600',
+                upsert: true
+            });
+
+        if (error) throw error;
+
+        const { data: { publicUrl } } = supabase.storage
+            .from('avatars')
+            .getPublicUrl(filePath);
+
+        return publicUrl;
     }
 };

@@ -6,7 +6,8 @@ import {
   Zap, Image, Check, ChevronRight, ChevronDown, Upload, X, Eye,
   BarChart3, Wand2, Layers, Palette, Type, Layout,
   ExternalLink, Star, Cpu, Crown, Smile, Building2,
-  Instagram, Facebook, Linkedin, Smartphone, Video
+  Instagram, Facebook, Linkedin, Smartphone, Video,
+  FolderOpen, Save, Loader2, Trash2
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../services/supabase';
@@ -16,6 +17,7 @@ import { RenderFlyer, FreeLogo, TEMPLATE_LIST } from './FlyerTemplates';
 import type { FlyerData } from './FlyerTemplates';
 import { FlyerTemplateA, FlyerTemplateB, parsePrompt, deriveHeadline, deriveFeatures, derivePrice } from '../../components/flyers/FlyerTemplates';
 import { brandingService } from '../../services/branding';
+import { storageService } from '../../services/storage';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 const FORMATS = [
@@ -385,6 +387,13 @@ export default function FlyerStudio() {
   const [contactFont, setContactFont] = useState('Outfit');
   const [syncFonts, setSyncFonts] = useState(false);
   const [isFontDropdownOpen, setIsFontDropdownOpen] = useState(false);
+  // Saved designs states
+  const [savedFlyers, setSavedFlyers] = useState<any[]>([]);
+  const [loadingSavedFlyers, setLoadingSavedFlyers] = useState(false);
+  const [savingFlyer, setSavingFlyer] = useState(false);
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [isGalleryModalOpen, setIsGalleryModalOpen] = useState(false);
+  const [newDesignName, setNewDesignName] = useState('');
 
   const updateFont = (val: string, element: 'title' | 'subtitle' | 'benefits' | 'cta' | 'contact') => {
     if (syncFonts) {
@@ -981,6 +990,214 @@ export default function FlyerStudio() {
     toast.success('✨ Propuesta aplicada al brief');
   }
 
+  async function fetchSavedFlyers() {
+    if (!profile?.company_id) return;
+    setLoadingSavedFlyers(true);
+    try {
+      const { data, error } = await supabase
+        .from('marketing_flyers')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setSavedFlyers(data || []);
+    } catch (e: any) {
+      console.error('Error fetching saved flyers:', e);
+      toast.error('Error al cargar diseños: ' + e.message);
+    } finally {
+      setLoadingSavedFlyers(false);
+    }
+  }
+
+  // Load saved designs once profile is loaded
+  useEffect(() => {
+    if (profile?.company_id) {
+      fetchSavedFlyers();
+    }
+  }, [profile]);
+
+  async function handleSaveFlyer(nameToSave: string) {
+    if (!profile?.company_id) return;
+    const name = nameToSave.trim() || `Flyer ${new Date().toLocaleDateString()}`;
+    setSavingFlyer(true);
+    try {
+      // 1. Generate thumbnail
+      let thumbnailUrl = '';
+      try {
+        const ref = selectedTemplate === 'A' ? templateRefA : selectedTemplate === 'B' ? templateRefB : templateRefMarketing;
+        const targetRef = showFullAiResult ? flyerRef : ref;
+        if (targetRef.current) {
+          const canvas = await html2canvas(targetRef.current, {
+            useCORS: true,
+            allowTaint: true,
+            scale: 0.6, // Lightweight thumbnail
+            backgroundColor: null
+          });
+          const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.7));
+          if (blob) {
+            thumbnailUrl = await storageService.uploadFlyerThumbnail(profile.company_id, blob);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to generate preview thumbnail, proceeding without it:', err);
+      }
+
+      // 2. Prepare settings payload
+      const settings = {
+        manualTitle,
+        manualSubtitle,
+        manualFeatures,
+        manualPrice,
+        cta,
+        colors,
+        bgUploadPreview, // custom uploaded background URL
+        logoPreview, // logo URL
+        logoX,
+        logoY,
+        logoSize,
+        textY,
+        textAlign,
+        titleScale,
+        subtitleScale,
+        benefitsScale,
+        ctaScale,
+        titleFont,
+        subtitleFont,
+        benefitsFont,
+        ctaFont,
+        contactFont,
+        titleColor,
+        highlightColor,
+        subtitleColor,
+        benefitsColor,
+        ctaBgColor,
+        ctaTextColor,
+        contactColor,
+        cardBgColor,
+        phone,
+        website,
+        syncFonts,
+        keepCustomText,
+        isLogoCustomized
+      };
+
+      const currentImg = bgUploadPreview || (variants.length > 0 ? variants[selected] : lastGeneratedImg.current);
+
+      const { data, error } = await supabase
+        .from('marketing_flyers')
+        .insert({
+          company_id: profile.company_id,
+          created_by: profile.id,
+          name,
+          format,
+          template_id: selectedTemplate,
+          bg_image_url: currentImg || null,
+          settings,
+          thumbnail_url: thumbnailUrl || null
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      toast.success('✨ ¡Diseño guardado con éxito!');
+      setIsSaveModalOpen(false);
+      setNewDesignName('');
+      fetchSavedFlyers();
+    } catch (e: any) {
+      console.error('Error saving flyer:', e);
+      toast.error('Error al guardar el diseño: ' + e.message);
+    } finally {
+      setSavingFlyer(false);
+    }
+  }
+
+  function handleLoadFlyer(flyer: any) {
+    try {
+      const s = flyer.settings;
+      if (!s) throw new Error('No settings found');
+
+      // Set formats and template
+      setFormat(flyer.format || 'ig-post');
+      setSelectedTemplate(flyer.template_id || 'bold-split');
+      
+      // Restore states
+      if (s.manualTitle !== undefined) setManualTitle(s.manualTitle);
+      if (s.manualSubtitle !== undefined) setManualSubtitle(s.manualSubtitle);
+      if (s.manualFeatures !== undefined) setManualFeatures(s.manualFeatures);
+      if (s.manualPrice !== undefined) setManualPrice(s.manualPrice);
+      if (s.cta !== undefined) setCta(s.cta);
+      if (s.colors !== undefined) setColors(s.colors);
+      
+      if (s.bgUploadPreview !== undefined) setBgUploadPreview(s.bgUploadPreview);
+      if (s.logoPreview !== undefined) setLogoPreview(s.logoPreview);
+      if (s.logoX !== undefined) setLogoX(s.logoX);
+      if (s.logoY !== undefined) setLogoY(s.logoY);
+      if (s.logoSize !== undefined) setLogoSize(s.logoSize);
+      if (s.textY !== undefined) setTextY(s.textY);
+      if (s.textAlign !== undefined) setTextAlign(s.textAlign);
+      
+      if (s.titleScale !== undefined) setTitleScale(s.titleScale);
+      if (s.subtitleScale !== undefined) setSubtitleScale(s.subtitleScale);
+      if (s.benefitsScale !== undefined) setBenefitsScale(s.benefitsScale);
+      if (s.ctaScale !== undefined) setCtaScale(s.ctaScale);
+      
+      if (s.titleFont !== undefined) setTitleFont(s.titleFont);
+      if (s.subtitleFont !== undefined) setSubtitleFont(s.subtitleFont);
+      if (s.benefitsFont !== undefined) setBenefitsFont(s.benefitsFont);
+      if (s.ctaFont !== undefined) setCtaFont(s.ctaFont);
+      if (s.contactFont !== undefined) setContactFont(s.contactFont);
+      
+      if (s.titleColor !== undefined) setTitleColor(s.titleColor);
+      if (s.highlightColor !== undefined) setHighlightColor(s.highlightColor);
+      if (s.subtitleColor !== undefined) setSubtitleColor(s.subtitleColor);
+      if (s.benefitsColor !== undefined) setBenefitsColor(s.benefitsColor);
+      if (s.ctaBgColor !== undefined) setCtaBgColor(s.ctaBgColor);
+      if (s.ctaTextColor !== undefined) setCtaTextColor(s.ctaTextColor);
+      if (s.contactColor !== undefined) setContactColor(s.contactColor);
+      if (s.cardBgColor !== undefined) setCardBgColor(s.cardBgColor);
+      
+      if (s.phone !== undefined) setPhone(s.phone);
+      if (s.website !== undefined) setWebsite(s.website);
+      if (s.syncFonts !== undefined) setSyncFonts(s.syncFonts);
+      if (s.keepCustomText !== undefined) setKeepCustomText(s.keepCustomText);
+      if (s.isLogoCustomized !== undefined) setIsLogoCustomized(s.isLogoCustomized);
+
+      // Handle background image in variants
+      if (flyer.bg_image_url) {
+        lastGeneratedImg.current = flyer.bg_image_url;
+        setVariants([flyer.bg_image_url]);
+        setSelected(0);
+        setPreviewMode('ai');
+      } else {
+        setVariants([]);
+        setPreviewMode('template');
+      }
+
+      setIsGalleryModalOpen(false);
+      toast.success(`📂 Diseño "${flyer.name}" cargado correctamente.`);
+    } catch (err: any) {
+      console.error('Error loading flyer settings:', err);
+      toast.error('Error al cargar el diseño: ' + err.message);
+    }
+  }
+
+  async function handleDeleteFlyer(id: string) {
+    if (!window.confirm('¿Estás seguro de que quieres eliminar este diseño?')) return;
+    try {
+      const { error } = await supabase
+        .from('marketing_flyers')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      toast.success('Diseño eliminado con éxito.');
+      setSavedFlyers(prev => prev.filter(f => f.id !== id));
+    } catch (e: any) {
+      console.error('Error deleting flyer:', e);
+      toast.error('Error al eliminar diseño: ' + e.message);
+    }
+  }
+
   async function handleDownload() {
     setGenerating(true);
     try {
@@ -1090,6 +1307,54 @@ export default function FlyerStudio() {
           )}
           <button onClick={() => navigate('/marketing/ai-credits')} style={{ ...css.ghost, padding: '6px 12px', fontSize: 11 }}>
             <BarChart3 size={12} /> Uso
+          </button>
+
+          <div style={{ height: 16, width: 1, background: '#cbd5e1', margin: '0 4px' }} />
+
+          <button
+            onClick={() => {
+              fetchSavedFlyers();
+              setIsGalleryModalOpen(true);
+            }}
+            style={{
+              background: '#fff',
+              border: '1px solid #d8dde6',
+              borderRadius: 8,
+              padding: '6px 12px',
+              fontSize: 11,
+              fontWeight: 700,
+              color: '#475569',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <FolderOpen size={12} color="#64748b" />
+            Mis Diseños
+          </button>
+
+          <button
+            onClick={() => setIsSaveModalOpen(true)}
+            style={{
+              background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+              border: 'none',
+              borderRadius: 8,
+              padding: '7px 14px',
+              fontSize: 11,
+              fontWeight: 800,
+              color: '#fff',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              boxShadow: '0 2px 6px rgba(124, 58, 237, 0.15)',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <Save size={12} color="#fff" />
+            Guardar Diseño
           </button>
         </div>
       </header>
@@ -3537,6 +3802,225 @@ export default function FlyerStudio() {
                   })}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── SAVE FLYER MODAL ────────────────────────────────────────────────── */}
+      {isSaveModalOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16
+        }}>
+          <div style={{
+            background: '#ffffff', borderRadius: 24, border: '1px solid #e2e8f0',
+            width: '100%', maxWidth: 420, overflow: 'hidden',
+            boxShadow: '0 20px 50px rgba(15, 23, 42, 0.15)',
+            display: 'flex', flexDirection: 'column'
+          }}>
+            <div style={{ padding: '24px 24px 16px 24px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 900, color: '#0f172a', margin: 0 }}>Guardar Diseño</h3>
+                <p style={{ fontSize: 10, color: '#64748b', margin: '4px 0 0 0' }}>Dale un nombre descriptivo a tu publicidad</p>
+              </div>
+              <button 
+                onClick={() => setIsSaveModalOpen(false)}
+                style={{ background: 'rgba(0,0,0,0.04)', border: 'none', borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={14} color="#0f172a" />
+              </button>
+            </div>
+            
+            <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <label style={{ fontSize: 10, fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Nombre del diseño</label>
+                <input 
+                  type="text" 
+                  value={newDesignName}
+                  onChange={e => setNewDesignName(e.target.value)}
+                  placeholder={`Ej: Flyer Oferta Verano ${new Date().toLocaleDateString()}`}
+                  style={{ ...css.input, height: 42 }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleSaveFlyer(newDesignName);
+                  }}
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div style={{ padding: '16px 24px 24px 24px', background: '#f8fafc', display: 'flex', gap: 10, justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9' }}>
+              <button
+                onClick={() => setIsSaveModalOpen(false)}
+                style={{ background: '#fff', border: '1px solid #d8dde6', borderRadius: 10, padding: '10px 16px', fontSize: 12, fontWeight: 800, color: '#475569', cursor: 'pointer' }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleSaveFlyer(newDesignName)}
+                disabled={savingFlyer}
+                style={{
+                  background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                  border: 'none', borderRadius: 10,
+                  padding: '10px 20px', fontSize: 12, fontWeight: 850,
+                  color: '#fff',
+                  cursor: savingFlyer ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 6
+                }}
+              >
+                {savingFlyer ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Guardando...</> : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── GALLERY MODAL ("MIS DISEÑOS") ────────────────────────────────────── */}
+      {isGalleryModalOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          background: 'rgba(15, 23, 42, 0.4)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+        }}>
+          <div style={{
+            background: '#ffffff', borderRadius: 28, border: '1px solid #e2e8f0',
+            width: '100%', maxWidth: 880, maxHeight: '85vh', overflow: 'hidden',
+            boxShadow: '0 25px 60px rgba(15, 23, 42, 0.2)',
+            display: 'flex', flexDirection: 'column'
+          }}>
+            {/* Modal Header */}
+            <div style={{ padding: '24px 28px', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ fontSize: 18, fontWeight: 900, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <FolderOpen size={20} color="#7c3aed" /> Mis Diseños Guardados
+                </h3>
+                <p style={{ fontSize: 11, color: '#64748b', margin: '4px 0 0 0' }}>Historial de flyers y plantillas personalizadas de tu empresa</p>
+              </div>
+              <button 
+                onClick={() => setIsGalleryModalOpen(false)}
+                style={{ background: 'rgba(0,0,0,0.04)', border: 'none', borderRadius: '50%', width: 32, height: 32, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <X size={16} color="#0f172a" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: 28, overflowY: 'auto', flex: 1, background: '#f8fafc' }}>
+              {loadingSavedFlyers ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 80, gap: 12 }}>
+                  <Loader2 size={36} color="#7c3aed" style={{ animation: 'spin 1s linear infinite' }} />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#64748b' }}>Cargando tus diseños...</span>
+                </div>
+              ) : savedFlyers.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 40px', gap: 12, textAlign: 'center' }}>
+                  <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#f5f3ff', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}>
+                    <FolderOpen size={24} color="#7c3aed" />
+                  </div>
+                  <h4 style={{ fontSize: 15, fontWeight: 900, color: '#334155', margin: 0 }}>No tienes diseños guardados</h4>
+                  <p style={{ fontSize: 12, color: '#64748b', margin: 0, maxWidth: 300 }}>Personaliza cualquier plantilla en el canvas y haz clic en "Guardar Diseño" en la barra superior.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 20 }}>
+                  {savedFlyers.map((flyer) => {
+                    const parsedDate = new Date(flyer.created_at).toLocaleDateString('es-ES', {
+                      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+                    });
+                    const aspectLabel = FORMATS.find(f => f.id === flyer.format)?.label || flyer.format;
+
+                    return (
+                      <div 
+                        key={flyer.id}
+                        style={{
+                          background: '#fff', borderRadius: 20, border: '1px solid #e2e8f0',
+                          overflow: 'hidden', display: 'flex', flexDirection: 'column',
+                          boxShadow: '0 4px 12px rgba(15, 23, 42, 0.03)',
+                          transition: 'all 0.2s ease',
+                          position: 'relative'
+                        }}
+                      >
+                        {/* Flyer Preview Thumbnail / Placeholder */}
+                        <div style={{
+                          height: 180, background: '#f1f5f9', display: 'flex',
+                          alignItems: 'center', justifyContent: 'center',
+                          position: 'relative', overflow: 'hidden', borderBottom: '1px solid #f1f5f9'
+                        }}>
+                          {flyer.thumbnail_url ? (
+                            <img 
+                              src={flyer.thumbnail_url} 
+                              alt={flyer.name} 
+                              style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 8 }}
+                            />
+                          ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: '#94a3b8' }}>
+                              <Image size={24} />
+                              <span style={{ fontSize: 9, fontWeight: 700 }}>Sin vista previa</span>
+                            </div>
+                          )}
+                          <div style={{
+                            position: 'absolute', bottom: 8, left: 8,
+                            background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(4px)',
+                            borderRadius: 6, padding: '3px 6px', fontSize: 8, fontWeight: 800, color: '#fff',
+                            textTransform: 'uppercase', letterSpacing: '0.05em'
+                          }}>
+                            {aspectLabel}
+                          </div>
+                        </div>
+
+                        {/* Card Info */}
+                        <div style={{ padding: 14, display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between' }}>
+                          <div style={{ marginBottom: 12 }}>
+                            <h4 style={{ fontSize: 13, fontWeight: 900, color: '#1e293b', margin: '0 0 4px 0', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={flyer.name}>
+                              {flyer.name}
+                            </h4>
+                            <div style={{ fontSize: 9, color: '#94a3b8', fontWeight: 600 }}>
+                              Creado: {parsedDate}
+                            </div>
+                            <div style={{ fontSize: 9, color: '#7c3aed', fontWeight: 700, marginTop: 4 }}>
+                              Plantilla: {flyer.template_id === 'A' ? 'Glow Glassmorphic' : flyer.template_id === 'B' ? 'Editorial Showcase' : flyer.template_id}
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          <div style={{ display: 'flex', gap: 8, borderTop: '1px solid #f1f5f9', paddingTop: 10 }}>
+                            <button
+                              onClick={() => handleLoadFlyer(flyer)}
+                              style={{
+                                flex: 1, background: '#f5f3ff', border: '1px solid #ddd6fe',
+                                borderRadius: 8, padding: '7px 0', fontSize: 11, fontWeight: 800,
+                                color: '#7c3aed', cursor: 'pointer', display: 'flex', alignItems: 'center',
+                                justifyContent: 'center', gap: 4, transition: 'all 0.15s ease'
+                              }}
+                            >
+                              Cargar
+                            </button>
+                            <button
+                              onClick={() => handleDeleteFlyer(flyer.id)}
+                              style={{
+                                width: 28, height: 28, background: '#fef2f2', border: '1px solid #fecaca',
+                                borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                cursor: 'pointer', color: '#ef4444', transition: 'all 0.15s ease'
+                              }}
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ padding: '16px 28px', background: '#f8fafc', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setIsGalleryModalOpen(false)}
+                style={{ background: '#fff', border: '1px solid #d8dde6', borderRadius: 10, padding: '8px 16px', fontSize: 11, fontWeight: 800, color: '#475569', cursor: 'pointer' }}
+              >
+                Cerrar
+              </button>
             </div>
           </div>
         </div>
