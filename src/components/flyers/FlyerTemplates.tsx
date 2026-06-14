@@ -619,6 +619,99 @@ export function getFeatureBullets(f: string, prompt: string, color: string): Fea
   };
 }
 
+export function renderIsometricTechVisual(primary: string, secondary: string): React.ReactNode {
+  return (
+    <svg width="880" height="340" viewBox="0 0 880 340" style={{ display: 'block', overflow: 'visible' }}>
+      <defs>
+        {/* Soft dropshadow for glass panels */}
+        <filter id="glassShadow" x="-10%" y="-10%" width="130%" height="130%">
+          <feDropShadow dx="0" dy="16" stdDeviation="20" floodColor="#0f172a" floodOpacity="0.1" />
+        </filter>
+        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="10" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+        {/* Gradients */}
+        <linearGradient id="glassGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.25" />
+          <stop offset="100%" stopColor="#ffffff" stopOpacity="0.05" />
+        </linearGradient>
+        <linearGradient id="glassBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.5" />
+          <stop offset="100%" stopColor="#ffffff" stopOpacity="0.1" />
+        </linearGradient>
+        <linearGradient id="lineGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor={primary} stopOpacity="0.8" />
+          <stop offset="100%" stopColor={secondary} stopOpacity="0.2" />
+        </linearGradient>
+      </defs>
+
+      {/* Ambient background glow center */}
+      <circle cx="440" cy="170" r="160" fill={primary} opacity="0.06" style={{ filter: 'url(#glow)' }} />
+
+      {/* Central Hub Node (Base) */}
+      <ellipse cx="440" cy="170" rx="90" ry="45" fill="none" stroke="rgba(255, 255, 255, 0.15)" strokeWidth="1" strokeDasharray="5,5" />
+      <ellipse cx="440" cy="170" rx="140" ry="70" fill="none" stroke="rgba(255, 255, 255, 0.1)" strokeWidth="1" />
+
+      {/* Interconnecting synchronization flow lines */}
+      {/* Connector left to center */}
+      <path d="M 230 200 C 300 200, 360 170, 440 170" fill="none" stroke="url(#lineGrad)" strokeWidth="2" strokeDasharray="6,4" />
+      {/* Connector center to right */}
+      <path d="M 440 170 C 520 170, 580 140, 650 140" fill="none" stroke="url(#lineGrad)" strokeWidth="2" />
+      {/* Connector top to center */}
+      <path d="M 440 80 L 440 170" fill="none" stroke={primary} strokeWidth="1.5" strokeDasharray="4,4" opacity="0.5" />
+
+      {/* Tilted Floating Panel 1 (Left - Database & Integration) */}
+      <g filter="url(#glassShadow)">
+        {/* Panel background */}
+        <polygon points="120,130 260,90 260,230 120,270" fill="url(#glassGrad)" stroke="url(#glassBorder)" strokeWidth="1.5" />
+        {/* Mini UI Details inside Panel 1 */}
+        {/* Simulated data blocks */}
+        <polygon points="140,150 200,133 200,153 140,170" fill={primary} opacity="0.15" />
+        <polygon points="140,180 240,152 240,162 140,190" fill="rgba(15,23,42,0.1)" />
+        <polygon points="140,200 220,177 220,187 140,210" fill="rgba(15,23,42,0.1)" />
+        {/* Accent indicator */}
+        <circle cx="230" cy="120" r="4" fill={primary} />
+        <line x1="220" y1="123" x2="240" y2="117" stroke="rgba(15,23,42,0.2)" strokeWidth="2" />
+      </g>
+
+      {/* Tilted Floating Panel 2 (Center-Top - Flow Automation) */}
+      <g filter="url(#glassShadow)">
+        <polygon points="360,70 520,30 520,130 360,170" fill="url(#glassGrad)" stroke="url(#glassBorder)" strokeWidth="1.5" />
+        {/* Nodes flow visual inside Panel 2 */}
+        <circle cx="400" cy="120" r="5" fill={primary} />
+        <circle cx="480" cy="70" r="5" fill={secondary} />
+        <path d="M 400 120 L 480 70" stroke="rgba(15,23,42,0.15)" strokeWidth="2" />
+        {/* Glass panel mini graph */}
+        <path d="M 380 145 L 420 125 L 460 115 L 500 85" fill="none" stroke={primary} strokeWidth="2" />
+        <circle cx="500" cy="85" r="3" fill={primary} />
+      </g>
+
+      {/* Tilted Floating Panel 3 (Right - Reporting & Analytics) */}
+      <g filter="url(#glassShadow)">
+        <polygon points="620,110 760,70 760,210 620,250" fill="url(#glassGrad)" stroke="url(#glassBorder)" strokeWidth="1.5" />
+        {/* Bar chart inside Panel 3 */}
+        {/* Bar 1 */}
+        <polygon points="640,210 660,204 660,154 640,160" fill="rgba(15,23,42,0.1)" />
+        {/* Bar 2 */}
+        <polygon points="675,200 695,194 695,124 675,130" fill={primary} opacity="0.8" />
+        {/* Bar 3 */}
+        <polygon points="710,190 730,184 730,104 710,110" fill={secondary} opacity="0.8" />
+      </g>
+
+      {/* Foreground glowing connection nodes */}
+      <circle cx="230" cy="200" r="6" fill={primary} style={{ filter: 'url(#glow)' }} />
+      <circle cx="230" cy="200" r="3" fill="#ffffff" />
+
+      <circle cx="440" cy="170" r="8" fill={secondary} style={{ filter: 'url(#glow)' }} />
+      <circle cx="440" cy="170" r="4" fill="#ffffff" />
+
+      <circle cx="650" cy="140" r="6" fill={primary} style={{ filter: 'url(#glow)' }} />
+      <circle cx="650" cy="140" r="3" fill="#ffffff" />
+    </svg>
+  );
+}
+
 
 function getIndustryType(prompt: string): 'k9' | 'food' | 'security' | 'dental' | 'saas' {
   const lower = (prompt || '').toLowerCase();
@@ -1225,13 +1318,30 @@ function renderBottomBanner(primary: string, secondary: string, data: FlyerData,
 export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData }>(
   ({ data }, ref) => {
     const parsed = parsePrompt(data.prompt);
-    const primary = data.primaryColor || '#0070d2';
-    const secondary = data.secondaryColor || '#7c3aed';
-    const price = data.price || parsed.price || derivePrice(data.prompt);
-    const features = (data.features || parsed.features || deriveFeatures(data.prompt)).slice(0, 3);
+    const primary = data.primaryColor || '#0052FF'; // Vibrant tech blue
+    const secondary = data.secondaryColor || '#0f172a'; // Midnight navy
+    
+    // Default values matching User Request
+    const defaultHeadline = 'REVOLUCIONA TU WORKFLOW.';
+    const defaultSubheadline = 'CRM Inteligente de Leads y Automatización Total.';
+    const defaultCta = 'SOLICITA TU DEMO GRATIS';
+    const defaultPrice = 'Desde $12.95';
+
+    const price = data.price || parsed.price || derivePrice(data.prompt) || defaultPrice;
+    const features = data.features || parsed.features || deriveFeatures(data.prompt);
+    
+    // Ensure we have exactly 3 features
+    while (features.length < 3) {
+      const defaults = ['Integración Total', 'Automatización IA', 'Seguridad Avanzada'];
+      const next = defaults.find(d => !features.includes(d));
+      if (next) features.push(next); else break;
+    }
+    const cleanFeatures = features.slice(0, 3);
+
     const { h1, h2 } = deriveHeadline(data.prompt, data.company_name);
-    const headline = data.headline || parsed.title || h1;
-    const subheadline = data.subheadline || parsed.subtitle || h2;
+    const headline = data.headline || parsed.title || (h1 && h1 !== 'Diseño Profesional' ? h1 : defaultHeadline);
+    const subheadline = data.subheadline || parsed.subtitle || (h2 && h2 !== data.company_name ? h2 : defaultSubheadline);
+    const cta = data.cta || parsed.cta || deriveCta(data.prompt) || defaultCta;
     
     const hasBg = !!data.bgImageUrl;
     const indData = getIndustryData(data.prompt);
@@ -1246,7 +1356,7 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
         width: 1080, height: 1080,
         background: hasBg 
           ? `url(${data.bgImageUrl}) center/cover no-repeat` 
-          : `radial-gradient(circle at 80% 20%, ${primary}12 0%, transparent 60%), radial-gradient(circle at 20% 80%, ${secondary}08 0%, transparent 60%), #ffffff`,
+          : `radial-gradient(circle at 90% 10%, ${primary}12 0%, transparent 60%), #ffffff`,
         fontFamily: "'Plus Jakarta Sans', 'Outfit', sans-serif",
         position: 'relative',
         overflow: 'hidden',
@@ -1261,9 +1371,9 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
         {!hasBg && (
           <div style={{
             position: 'absolute', inset: 0,
-            backgroundImage: 'radial-gradient(#e2e8f0 1.2px, transparent 1.2px)',
-            backgroundSize: '35px 35px',
-            opacity: 0.45,
+            backgroundImage: 'radial-gradient(#f1f5f9 1.5px, transparent 1.5px)',
+            backgroundSize: '40px 40px',
+            opacity: 0.8,
             pointerEvents: 'none'
           }} />
         )}
@@ -1288,31 +1398,34 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
           boxSizing: 'border-box'
         }}>
           {/* Header Section */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', width: '100%' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', width: '100%' }}>
             {/* Tagline */}
-            <div style={{ fontSize: 11, fontWeight: 900, color: secondary, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 8 }}>
-              {indData.tagline}
+            <div style={{ fontSize: 11, fontWeight: 900, color: primary, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 10 }}>
+              {indData.tagline || 'SaaS CRM - CONTROL INTELIGENTE'}
             </div>
 
             {/* Headline */}
             <h1 style={{
-              fontSize: headline.length > 25 ? 38 : 44,
-              fontWeight: 800,
-              color: '#0f172a',
-              lineHeight: 1.15,
-              margin: '0 0 8px 0',
-              letterSpacing: '-0.02em',
+              fontSize: headline.length > 25 ? 44 : 52,
+              fontWeight: 900,
+              color: '#1a1a1a', // Charcoal
+              lineHeight: 1.05,
+              letterSpacing: '-0.03em', // Tight letter-spacing
+              textTransform: 'uppercase',
+              margin: '0 0 10px 0',
+              width: '100%',
               display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
             }}>
-              {mainTitle} {lastWord && <span style={{ color: primary }}>{lastWord}.</span>}
+              {headline}
             </h1>
 
             {/* Sub-headline / Value Prop */}
             <p style={{
-              fontSize: 14,
-              fontWeight: 500,
-              color: '#475569',
-              lineHeight: 1.45,
+              fontSize: 16,
+              fontWeight: 400,
+              color: '#475569', // Slate Gray
+              lineHeight: 1.4,
+              letterSpacing: '0.01em',
               margin: 0,
               maxWidth: 850,
               display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
@@ -1323,48 +1436,124 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
 
           {/* Hero Area: Centered Browser Mockup */}
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', margin: '14px 0' }}>
-            {renderDashboardMockup(data.prompt, primary, false, indData, data.company_name)}
+            {renderIsometricTechVisual(primary, '#00d4ff')}
           </div>
 
           {/* Feature Grid (3-Column Layout) */}
-          <div style={{ display: 'flex', gap: 32, width: '100%', marginBottom: 20 }}>
-            {features.map((feat, idx) => {
+          <div style={{ display: 'flex', gap: 48, width: '100%', marginBottom: 20 }}>
+            {cleanFeatures.map((feat, idx) => {
               const featData = getFeatureBullets(feat, data.prompt, primary);
               return (
-                <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
-                  {/* Subtle modern minimalist line-art icon & Title */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <div style={{
-                      width: 34, height: 34, borderRadius: 8,
-                      background: `${primary}10`, color: primary,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      flexShrink: 0
-                    }}>
-                      {featData.icon}
-                    </div>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', lineHeight: 1.2 }}>
-                      {featData.title}
-                    </span>
+                <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                  {/* Subtle modern minimalist line-art icon */}
+                  <div style={{
+                    width: 44, height: 44, borderRadius: '50%',
+                    background: '#f8fafc', border: '1px solid #dde1e7', color: primary,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    marginBottom: 12, flexShrink: 0
+                  }}>
+                    {featData.icon}
                   </div>
-                  
-                  {/* Bulleted list of 3 high-value technical benefits */}
-                  <ul style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {/* Title */}
+                  <span style={{ fontSize: 13, fontWeight: 900, color: '#1a1a1a', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                    {featData.title}
+                  </span>
+                  {/* Bullets */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
                     {featData.bullets.map((bullet, bIdx) => (
-                      <li key={bIdx} style={{ fontSize: 11, color: '#475569', fontWeight: 500, lineHeight: 1.35 }}>
-                        {bullet}
-                      </li>
+                      <span key={bIdx} style={{ fontSize: 11, color: '#64748b', fontWeight: 500, lineHeight: 1.4, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                        • {bullet}
+                      </span>
                     ))}
-                  </ul>
+                  </div>
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* 3. BOTTOM DARK BANNER */}
-        {renderBottomBanner(primary, secondary, data, indData, false)}
+        {/* 2. BOTTOM CONTRACTING SOLID BANNER BLOCK */}
+        <div style={{
+          height: 190,
+          background: '#0f172a', // Midnight navy
+          padding: '24px 64px 16px 64px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          boxSizing: 'border-box',
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
+          zIndex: 10,
+          position: 'relative'
+        }}>
+          {/* Main banner elements */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {/* Left pricing */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
+              <span style={{ fontSize: 9, fontWeight: 900, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.1em' }}>PLAN ENTERPRISE</span>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                <span style={{ fontSize: 30, fontWeight: 900, color: '#ffffff' }}>{price}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>/mes</span>
+              </div>
+            </div>
 
-        {/* 4. VERY BOTTOM TECH DETAILS BAR */}
+            {/* Center QR Code */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 52, height: 52,
+                background: '#ffffff',
+                padding: 5,
+                borderRadius: 8,
+                border: `2px solid ${primary}`,
+                boxSizing: 'border-box',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(5, 1fr)',
+                gap: 2
+              }}>
+                {[1,0,1,1,0, 0,1,0,0,1, 1,1,0,1,0, 0,0,1,1,1, 1,0,1,0,1].map((v, i) => (
+                  <div key={i} style={{ background: v ? '#0f172a' : '#fff' }} />
+                ))}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
+                <span style={{ fontSize: 8, fontWeight: 800, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.05em' }}>DEMO EN VIVO</span>
+                <span style={{ fontSize: 11, fontWeight: 900, color: '#ffffff' }}>{data.website || 'ariasdefense.com'}</span>
+              </div>
+            </div>
+
+            {/* Right CTA Button */}
+            <div style={{
+              background: primary,
+              color: '#ffffff',
+              fontWeight: 900,
+              fontSize: 12,
+              letterSpacing: '0.05em',
+              padding: '12px 24px',
+              borderRadius: 50,
+              boxShadow: `0 8px 20px ${primary}30`,
+              border: 'none',
+              cursor: 'pointer',
+              textTransform: 'uppercase'
+            }}>
+              {cta}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div style={{ height: 1, width: '100%', background: 'rgba(255,255,255,0.08)' }} />
+
+          {/* Trust anchors */}
+          <div style={{
+            textAlign: 'center',
+            fontSize: 9,
+            fontWeight: 800,
+            color: 'rgba(255,255,255,0.4)',
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase'
+          }}>
+            Soporte 24/7 • Prueba de 14 Días
+          </div>
+        </div>
+
+        {/* 3. VERY BOTTOM TECH DETAILS BAR */}
         {renderTechStackFooter(data.prompt)}
       </div>
     );
@@ -1375,13 +1564,30 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
 export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData }>(
   ({ data }, ref) => {
     const parsed = parsePrompt(data.prompt);
-    const primary = data.primaryColor || '#635bff'; // Stripe purple/blue
-    const secondary = data.secondaryColor || '#00d4ff'; // Cyan
-    const price = data.price || parsed.price || derivePrice(data.prompt) || '';
-    const features = (data.features || parsed.features || deriveFeatures(data.prompt)).slice(0, 3);
+    const primary = data.primaryColor || '#0f172a'; // Midnight navy
+    const secondary = data.secondaryColor || '#D4AF37'; // Brushed Gold
+    
+    // Default values matching User Request
+    const defaultHeadline = 'REVOLUCIONA TU WORKFLOW.';
+    const defaultSubheadline = 'CRM Inteligente de Leads y Automatización Total.';
+    const defaultCta = 'SOLICITA TU DEMO GRATIS';
+    const defaultPrice = 'Desde $12.95';
+
+    const price = data.price || parsed.price || derivePrice(data.prompt) || defaultPrice;
+    const features = data.features || parsed.features || deriveFeatures(data.prompt);
+    
+    // Ensure we have exactly 3 features
+    while (features.length < 3) {
+      const defaults = ['Integración Total', 'Automatización IA', 'Seguridad Avanzada'];
+      const next = defaults.find(d => !features.includes(d));
+      if (next) features.push(next); else break;
+    }
+    const cleanFeatures = features.slice(0, 3);
+
     const { h1, h2 } = deriveHeadline(data.prompt, data.company_name);
-    const headline = data.headline || parsed.title || h1;
-    const subheadline = data.subheadline || parsed.subtitle || h2;
+    const headline = data.headline || parsed.title || (h1 && h1 !== 'Diseño Profesional' ? h1 : defaultHeadline);
+    const subheadline = data.subheadline || parsed.subtitle || (h2 && h2 !== data.company_name ? h2 : defaultSubheadline);
+    const cta = data.cta || parsed.cta || deriveCta(data.prompt) || defaultCta;
     
     const hasBg = !!data.bgImageUrl;
     const indData = getIndustryData(data.prompt);
@@ -1396,7 +1602,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
         width: 1080, height: 1080,
         background: hasBg 
           ? `url(${data.bgImageUrl}) center/cover no-repeat` 
-          : `radial-gradient(circle at 90% 10%, ${primary}20 0%, transparent 60%), radial-gradient(circle at 10% 90%, ${secondary}15 0%, transparent 60%), #090d16`,
+          : `radial-gradient(circle at 10% 90%, ${secondary}08 0%, transparent 60%), #ffffff`,
         fontFamily: "'Outfit', 'Plus Jakarta Sans', sans-serif",
         position: 'relative',
         overflow: 'hidden',
@@ -1408,10 +1614,20 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
         {/* Load Google Fonts directly in the render flow */}
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Syne:wght@700;800&display=swap" />
 
+        {!hasBg && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            backgroundImage: 'radial-gradient(#f1f5f9 1.5px, transparent 1.5px)',
+            backgroundSize: '40px 40px',
+            opacity: 0.8,
+            pointerEvents: 'none'
+          }} />
+        )}
+        
         {hasBg && (
           <div style={{
             position: 'absolute', inset: 0,
-            background: 'linear-gradient(to bottom, rgba(9,13,22,0.9) 0%, rgba(9,13,22,0.65) 45%, rgba(9,13,22,0.95) 100%)',
+            background: 'linear-gradient(to bottom, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.4) 45%, rgba(255,255,255,0.95) 100%)',
             pointerEvents: 'none', zIndex: 1
           }} />
         )}
@@ -1428,32 +1644,35 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
           boxSizing: 'border-box'
         }}>
           {/* Header Section */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', width: '100%' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', width: '100%' }}>
             {/* Tagline */}
-            <div style={{ fontSize: 11, fontWeight: 900, color: secondary, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span>⚡</span> {indData.tagline}
+            <div style={{ fontSize: 11, fontWeight: 900, color: secondary, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 10 }}>
+              ⚡ {indData.tagline || 'SaaS CRM - CONTROL INTELIGENTE'}
             </div>
 
             {/* Headline */}
             <h1 style={{
-              fontSize: headline.length > 25 ? 38 : 44,
-              fontWeight: 800,
+              fontSize: headline.length > 25 ? 44 : 52,
+              fontWeight: 900,
               fontFamily: "'Syne', sans-serif",
-              color: '#ffffff',
-              lineHeight: 1.15,
-              margin: '0 0 8px 0',
-              letterSpacing: '-0.02em',
+              color: primary, // Midnight Navy
+              lineHeight: 1.05,
+              letterSpacing: '-0.03em', // Tight letter-spacing
+              textTransform: 'uppercase',
+              margin: '0 0 10px 0',
+              width: '100%',
               display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
             }}>
-              {mainTitle} {lastWord && <span style={{ color: primary }}>{lastWord}.</span>}
+              {headline}
             </h1>
 
             {/* Sub-headline / Value Prop */}
             <p style={{
-              fontSize: 14,
-              fontWeight: 500,
-              color: 'rgba(255,255,255,0.7)',
-              lineHeight: 1.45,
+              fontSize: 16,
+              fontWeight: 400,
+              color: '#475569', // Slate Gray
+              lineHeight: 1.4,
+              letterSpacing: '0.01em',
               margin: 0,
               maxWidth: 850,
               display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
@@ -1462,71 +1681,135 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
             </p>
           </div>
 
-          {/* Hero Area: Centered Browser Mockup */}
+          {/* Hero Area: Centered Browser Mockup (Now SVG isometric visual) */}
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', margin: '14px 0', position: 'relative' }}>
-            {/* Soft gradient aura behind mockup */}
+            {/* Ambient background glow center */}
             <div style={{
               position: 'absolute',
               width: '90%',
               height: '90%',
-              background: `radial-gradient(circle, ${primary}18 0%, transparent 70%)`,
+              background: `radial-gradient(circle, ${secondary}08 0%, transparent 70%)`,
               zIndex: -1,
               pointerEvents: 'none'
             }} />
-            {renderDashboardMockup(data.prompt, primary, true, indData, data.company_name)}
+            {renderIsometricTechVisual(primary, secondary)}
           </div>
 
-          {/* Feature Grid (3-Column Layout with glassmorphic styling) */}
-          <div style={{ display: 'flex', gap: 24, width: '100%', marginBottom: 20 }}>
-            {features.map((feat, idx) => {
+          {/* Feature Grid (3-Column Layout) */}
+          <div style={{ display: 'flex', gap: 48, width: '100%', marginBottom: 20 }}>
+            {cleanFeatures.map((feat, idx) => {
               const featData = getFeatureBullets(feat, data.prompt, secondary);
               return (
-                <div key={idx} style={{
-                  flex: 1,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'flex-start',
-                  textAlign: 'left',
-                  background: 'rgba(255, 255, 255, 0.02)',
-                  border: '1px solid rgba(255, 255, 255, 0.06)',
-                  borderRadius: 12,
-                  padding: 16,
-                  boxSizing: 'border-box'
-                }}>
-                  {/* Subtle modern minimalist line-art icon & Title */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                    <div style={{
-                      width: 32, height: 32, borderRadius: 8,
-                      background: 'rgba(255, 255, 255, 0.04)', color: secondary,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      flexShrink: 0,
-                      border: '1px solid rgba(255, 255, 255, 0.08)'
-                    }}>
-                      {featData.icon}
-                    </div>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: '#ffffff', lineHeight: 1.2 }}>
-                      {featData.title}
-                    </span>
+                <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                  {/* Subtle modern minimalist line-art icon */}
+                  <div style={{
+                    width: 44, height: 44, borderRadius: '50%',
+                    background: '#f8fafc', border: '1px solid #dde1e7', color: secondary,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    marginBottom: 12, flexShrink: 0
+                  }}>
+                    {featData.icon}
                   </div>
-                  
-                  {/* Bulleted list of 3 high-value technical benefits */}
-                  <ul style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {/* Title */}
+                  <span style={{ fontSize: 13, fontWeight: 900, color: primary, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                    {featData.title}
+                  </span>
+                  {/* Bullets */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
                     {featData.bullets.map((bullet, bIdx) => (
-                      <li key={bIdx} style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', fontWeight: 500, lineHeight: 1.35 }}>
-                        {bullet}
-                      </li>
+                      <span key={bIdx} style={{ fontSize: 11, color: '#64748b', fontWeight: 500, lineHeight: 1.4, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                        • {bullet}
+                      </span>
                     ))}
-                  </ul>
+                  </div>
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* 3. BOTTOM DARK BANNER */}
-        {renderBottomBanner(primary, secondary, data, indData, true)}
+        {/* 2. BOTTOM CONTRACTING SOLID BANNER BLOCK */}
+        <div style={{
+          height: 190,
+          background: '#1a1a1a', // Rich charcoal
+          padding: '24px 64px 16px 64px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          boxSizing: 'border-box',
+          fontFamily: "'Plus Jakarta Sans', sans-serif",
+          zIndex: 10,
+          position: 'relative'
+        }}>
+          {/* Main banner elements */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {/* Left pricing */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
+              <span style={{ fontSize: 9, fontWeight: 900, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.1em' }}>PLAN ENTERPRISE</span>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                <span style={{ fontSize: 30, fontWeight: 900, color: secondary }}>{price}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>/mes</span>
+              </div>
+            </div>
 
-        {/* 4. VERY BOTTOM TECH DETAILS BAR */}
+            {/* Center QR Code */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 52, height: 52,
+                background: '#ffffff',
+                padding: 5,
+                borderRadius: 8,
+                border: `2px solid ${secondary}`,
+                boxSizing: 'border-box',
+                display: 'grid',
+                gridTemplateColumns: 'repeat(5, 1fr)',
+                gap: 2
+              }}>
+                {[1,0,1,1,0, 0,1,0,0,1, 1,1,0,1,0, 0,0,1,1,1, 1,0,1,0,1].map((v, i) => (
+                  <div key={i} style={{ background: v ? '#1a1a1a' : '#fff' }} />
+                ))}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
+                <span style={{ fontSize: 8, fontWeight: 800, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.05em' }}>DEMO EN VIVO</span>
+                <span style={{ fontSize: 11, fontWeight: 900, color: '#ffffff' }}>{data.website || 'ariasdefense.com'}</span>
+              </div>
+            </div>
+
+            {/* Right CTA Button */}
+            <div style={{
+              background: '#ffffff',
+              color: '#1a1a1a',
+              fontWeight: 900,
+              fontSize: 12,
+              letterSpacing: '0.05em',
+              padding: '12px 24px',
+              borderRadius: 50,
+              boxShadow: '0 8px 20px rgba(255,255,255,0.05)',
+              border: `1.5px solid ${secondary}`,
+              cursor: 'pointer',
+              textTransform: 'uppercase'
+            }}>
+              {cta}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div style={{ height: 1, width: '100%', background: 'rgba(255,255,255,0.08)' }} />
+
+          {/* Trust anchors */}
+          <div style={{
+            textAlign: 'center',
+            fontSize: 9,
+            fontWeight: 800,
+            color: 'rgba(255,255,255,0.4)',
+            letterSpacing: '0.1em',
+            textTransform: 'uppercase'
+          }}>
+            Soporte 24/7 • Prueba de 14 Días
+          </div>
+        </div>
+
+        {/* 3. VERY BOTTOM TECH DETAILS BAR */}
         {renderTechStackFooter(data.prompt)}
       </div>
     );
