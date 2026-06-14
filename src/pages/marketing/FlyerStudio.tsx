@@ -1681,8 +1681,7 @@ export default function FlyerStudio() {
                               onLogoClick: () => setEditingElement('logo'),
                               onBgClick: () => setEditingElement('background'),
                               subtitleBold,
-                              benefitsBold,
-                            , titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }} />
+                              benefitsBold, titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }} />
                           ) : selectedTemplate === 'B' ? (
                             <FlyerTemplateB data={{
                               company_name: companyName || 'Mi Empresa',
@@ -1721,8 +1720,7 @@ export default function FlyerStudio() {
                               onLogoClick: () => setEditingElement('logo'),
                               onBgClick: () => setEditingElement('background'),
                               subtitleBold,
-                              benefitsBold,
-                            , titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }} />
+                              benefitsBold, titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }} />
                           ) : (
                             <RenderFlyer d={{
                               title: manualTitle || 'TU OFERTA',
@@ -1755,8 +1753,7 @@ export default function FlyerStudio() {
                               onLogoClick: () => setEditingElement('logo'),
                               onBgClick: () => setEditingElement('background'),
                               subtitleBold,
-                              benefitsBold,
-                            , titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }}
+                              benefitsBold, titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }}
                             onLogoMove={(x, y) => { setLogoX(x); setLogoY(y); }}
                             onLogoResize={(s) => setLogoSize(s)}
                             />
