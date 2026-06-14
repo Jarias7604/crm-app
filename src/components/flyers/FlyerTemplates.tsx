@@ -1172,10 +1172,10 @@ function renderDashboardMockup(prompt: string, primary: string, hasBg: boolean, 
 function renderTechStackFooter(prompt: string): React.ReactNode {
   return (
     <div style={{
-      height: 100,
+      height: 120,
       background: '#ffffff',
       borderTop: '1px solid #e2e8f0',
-      padding: '12px 64px',
+      padding: '16px 64px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -1183,31 +1183,31 @@ function renderTechStackFooter(prompt: string): React.ReactNode {
       fontFamily: "'Plus Jakarta Sans', sans-serif"
     }}>
       {/* Left: Stack icons */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
-        <span style={{ fontSize: 8, fontWeight: 900, color: '#94a3b8', letterSpacing: '0.05em' }}>STACK UTILIZADO</span>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <span style={{ fontSize: 11, fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 4 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-start' }}>
+        <span style={{ fontSize: 11, fontWeight: 900, color: '#94a3b8', letterSpacing: '0.08em' }}>STACK UTILIZADO</span>
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+          <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
             ⚛️ React
           </span>
-          <span style={{ fontSize: 11, fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
             📘 TS
           </span>
-          <span style={{ fontSize: 11, fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
             🌊 Tailwind
           </span>
-          <span style={{ fontSize: 11, fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
             🟢 Express
           </span>
-          <span style={{ fontSize: 11, fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ fontSize: 14, fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
             🍃 MongoDB
           </span>
         </div>
       </div>
 
       {/* Center: Build list */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'flex-start' }}>
-        <span style={{ fontSize: 8, fontWeight: 900, color: '#94a3b8', letterSpacing: '0.05em' }}>¿CÓMO LO CONSTRUI?</span>
-        <div style={{ fontSize: 9, color: '#475569', fontWeight: 600, display: 'flex', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+        <span style={{ fontSize: 11, fontWeight: 900, color: '#94a3b8', letterSpacing: '0.08em' }}>¿CÓMO LO CONSTRUI?</span>
+        <div style={{ fontSize: 12, color: '#475569', fontWeight: 600, display: 'flex', gap: 12 }}>
           <span>• Frontend React + TypeScript</span>
           <span>• UI/UX limpio y responsive</span>
           <span>• Backend en Node.js + Express</span>
@@ -1215,14 +1215,14 @@ function renderTechStackFooter(prompt: string): React.ReactNode {
       </div>
 
       {/* Right: Prompt terminal */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end', maxWidth: '30%' }}>
-        <span style={{ fontSize: 8, fontWeight: 900, color: '#94a3b8', letterSpacing: '0.05em' }}>PROMPT UTILIZADO PARA GOOGLE ANTIGRAVITY</span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end', maxWidth: '30%' }}>
+        <span style={{ fontSize: 11, fontWeight: 900, color: '#94a3b8', letterSpacing: '0.08em' }}>PROMPT UTILIZADO PARA GOOGLE ANTIGRAVITY</span>
         <div style={{
           background: '#f8fafc',
           border: '1px solid #e2e8f0',
           borderRadius: 6,
-          padding: '4px 8px',
-          fontSize: 7,
+          padding: '6px 10px',
+          fontSize: 10,
           color: '#334155',
           fontFamily: 'monospace',
           whiteSpace: 'nowrap',
@@ -1346,6 +1346,11 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
     const hasBg = !!data.bgImageUrl;
     const indData = getIndustryData(data.prompt);
 
+    // Dynamic scannable QR code API integration
+    const qrUrl = data.website || 'www.ariasdefense.com';
+    const formattedQrUrl = qrUrl.startsWith('http://') || qrUrl.startsWith('https://') ? qrUrl : `https://${qrUrl}`;
+    const qrCodeApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(formattedQrUrl)}`;
+
     // Split title to apply gradient color to last word
     const titleWords = headline.split(' ');
     const lastWord = titleWords.length > 1 ? titleWords.pop() : '';
@@ -1377,106 +1382,100 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
             pointerEvents: 'none'
           }} />
         )}
-        
-        {hasBg && (
-          <div style={{
-            position: 'absolute', inset: 0,
-            background: 'linear-gradient(to bottom, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.4) 45%, rgba(255,255,255,0.95) 100%)',
-            pointerEvents: 'none', zIndex: 1
-          }} />
-        )}
 
-        {/* 1. TOP MAIN WRAPPER (Header + Hero Area + Feature Grid) */}
-        <div style={{
-          padding: '50px 64px 0 64px',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          flex: 1,
-          zIndex: 10,
-          position: 'relative',
-          boxSizing: 'border-box'
-        }}>
-          {/* Header Section */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', width: '100%' }}>
-            {/* Tagline */}
-            <div style={{ fontSize: 11, fontWeight: 900, color: primary, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 10 }}>
-              {indData.tagline || 'SaaS CRM - CONTROL INTELIGENTE'}
+        {/* 1. TOP MAIN WRAPPER (Header + Hero Area + Feature Grid) — HIDDEN IF BACKGROUND FLYER IS ACTIVE */}
+        {!hasBg && (
+          <div style={{
+            padding: '50px 64px 0 64px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            flex: 1,
+            zIndex: 10,
+            position: 'relative',
+            boxSizing: 'border-box'
+          }}>
+            {/* Header Section */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', width: '100%' }}>
+              {/* Tagline */}
+              <div style={{ fontSize: 14, fontWeight: 900, color: primary, letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 12 }}>
+                {indData.tagline || 'SaaS CRM - CONTROL INTELIGENTE'}
+              </div>
+
+              {/* Headline */}
+              <h1 style={{
+                fontSize: headline.length > 25 ? 48 : 58,
+                fontWeight: 900,
+                color: '#1a1a1a', // Charcoal
+                lineHeight: 1.05,
+                letterSpacing: '-0.03em', // Tight letter-spacing
+                textTransform: 'uppercase',
+                margin: '0 0 12px 0',
+                width: '100%',
+                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+              }}>
+                {headline}
+              </h1>
+
+              {/* Sub-headline / Value Prop */}
+              <p style={{
+                fontSize: 20,
+                fontWeight: 500,
+                color: '#475569', // Slate Gray
+                lineHeight: 1.4,
+                letterSpacing: '0.01em',
+                margin: 0,
+                maxWidth: 880,
+                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+              }}>
+                {subheadline}
+              </p>
             </div>
 
-            {/* Headline */}
-            <h1 style={{
-              fontSize: headline.length > 25 ? 44 : 52,
-              fontWeight: 900,
-              color: '#1a1a1a', // Charcoal
-              lineHeight: 1.05,
-              letterSpacing: '-0.03em', // Tight letter-spacing
-              textTransform: 'uppercase',
-              margin: '0 0 10px 0',
-              width: '100%',
-              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
-            }}>
-              {headline}
-            </h1>
+            {/* Hero Area: Centered Browser Mockup */}
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', margin: '18px 0' }}>
+              {renderIsometricTechVisual(primary, '#00d4ff')}
+            </div>
 
-            {/* Sub-headline / Value Prop */}
-            <p style={{
-              fontSize: 16,
-              fontWeight: 400,
-              color: '#475569', // Slate Gray
-              lineHeight: 1.4,
-              letterSpacing: '0.01em',
-              margin: 0,
-              maxWidth: 850,
-              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
-            }}>
-              {subheadline}
-            </p>
-          </div>
-
-          {/* Hero Area: Centered Browser Mockup */}
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', margin: '14px 0' }}>
-            {renderIsometricTechVisual(primary, '#00d4ff')}
-          </div>
-
-          {/* Feature Grid (3-Column Layout) */}
-          <div style={{ display: 'flex', gap: 48, width: '100%', marginBottom: 20 }}>
-            {cleanFeatures.map((feat, idx) => {
-              const featData = getFeatureBullets(feat, data.prompt, primary);
-              return (
-                <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                  {/* Subtle modern minimalist line-art icon */}
-                  <div style={{
-                    width: 44, height: 44, borderRadius: '50%',
-                    background: '#f8fafc', border: '1px solid #dde1e7', color: primary,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    marginBottom: 12, flexShrink: 0
-                  }}>
-                    {featData.icon}
+            {/* Feature Grid (3-Column Layout) */}
+            <div style={{ display: 'flex', gap: 48, width: '100%', marginBottom: 24 }}>
+              {cleanFeatures.map((feat, idx) => {
+                const featData = getFeatureBullets(feat, data.prompt, primary);
+                return (
+                  <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                    {/* Subtle modern minimalist line-art icon */}
+                    <div style={{
+                      width: 56, height: 56, borderRadius: '50%',
+                      background: '#f8fafc', border: '1px solid #dde1e7', color: primary,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      marginBottom: 14, flexShrink: 0
+                    }}>
+                      {featData.icon}
+                    </div>
+                    {/* Title */}
+                    <span style={{ fontSize: 16, fontWeight: 900, color: '#1a1a1a', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
+                      {featData.title}
+                    </span>
+                    {/* Bullets */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+                      {featData.bullets.map((bullet, bIdx) => (
+                        <span key={bIdx} style={{ fontSize: 13, color: '#64748b', fontWeight: 500, lineHeight: 1.4, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                          • {bullet}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  {/* Title */}
-                  <span style={{ fontSize: 13, fontWeight: 900, color: '#1a1a1a', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
-                    {featData.title}
-                  </span>
-                  {/* Bullets */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-                    {featData.bullets.map((bullet, bIdx) => (
-                      <span key={bIdx} style={{ fontSize: 11, color: '#64748b', fontWeight: 500, lineHeight: 1.4, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                        • {bullet}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* 2. BOTTOM CONTRACTING SOLID BANNER BLOCK */}
         <div style={{
-          height: 190,
+          height: 240,
           background: '#0f172a', // Midnight navy
-          padding: '24px 64px 16px 64px',
+          padding: '28px 64px 20px 64px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
@@ -1489,33 +1488,37 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             {/* Left pricing */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
-              <span style={{ fontSize: 9, fontWeight: 900, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.1em' }}>PLAN ENTERPRISE</span>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                <span style={{ fontSize: 30, fontWeight: 900, color: '#ffffff' }}>{price}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>/mes</span>
+              <span style={{ fontSize: 12, fontWeight: 900, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.12em' }}>PLAN ENTERPRISE</span>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
+                <span style={{ fontSize: 38, fontWeight: 900, color: '#ffffff' }}>{price}</span>
+                <span style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>/mes</span>
               </div>
             </div>
 
             {/* Center QR Code */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{
-                width: 52, height: 52,
+                width: 80, height: 80,
                 background: '#ffffff',
-                padding: 5,
+                padding: 4,
                 borderRadius: 8,
                 border: `2px solid ${primary}`,
                 boxSizing: 'border-box',
-                display: 'grid',
-                gridTemplateColumns: 'repeat(5, 1fr)',
-                gap: 2
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden'
               }}>
-                {[1,0,1,1,0, 0,1,0,0,1, 1,1,0,1,0, 0,0,1,1,1, 1,0,1,0,1].map((v, i) => (
-                  <div key={i} style={{ background: v ? '#0f172a' : '#fff' }} />
-                ))}
+                <img 
+                  src={qrCodeApiUrl} 
+                  crossOrigin="anonymous" 
+                  style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+                  alt="QR Code" 
+                />
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
-                <span style={{ fontSize: 8, fontWeight: 800, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.05em' }}>DEMO EN VIVO</span>
-                <span style={{ fontSize: 11, fontWeight: 900, color: '#ffffff' }}>{data.website || 'ariasdefense.com'}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', gap: 2 }}>
+                <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em' }}>DEMO EN VIVO</span>
+                <span style={{ fontSize: 15, fontWeight: 900, color: '#ffffff', letterSpacing: '0.02em' }}>{data.website || 'ariasdefense.com'}</span>
               </div>
             </div>
 
@@ -1524,9 +1527,9 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
               background: primary,
               color: '#ffffff',
               fontWeight: 900,
-              fontSize: 12,
+              fontSize: 16,
               letterSpacing: '0.05em',
-              padding: '12px 24px',
+              padding: '16px 32px',
               borderRadius: 50,
               boxShadow: `0 8px 20px ${primary}30`,
               border: 'none',
@@ -1543,10 +1546,10 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
           {/* Trust anchors */}
           <div style={{
             textAlign: 'center',
-            fontSize: 9,
+            fontSize: 13,
             fontWeight: 800,
             color: 'rgba(255,255,255,0.4)',
-            letterSpacing: '0.1em',
+            letterSpacing: '0.12em',
             textTransform: 'uppercase'
           }}>
             Soporte 24/7 • Prueba de 14 Días
@@ -1592,6 +1595,11 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
     const hasBg = !!data.bgImageUrl;
     const indData = getIndustryData(data.prompt);
 
+    // Dynamic scannable QR code API integration
+    const qrUrl = data.website || 'www.ariasdefense.com';
+    const formattedQrUrl = qrUrl.startsWith('http://') || qrUrl.startsWith('https://') ? qrUrl : `https://${qrUrl}`;
+    const qrCodeApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(formattedQrUrl)}`;
+
     // Split title to apply gradient color to last word
     const titleWords = headline.split(' ');
     const lastWord = titleWords.length > 1 ? titleWords.pop() : '';
@@ -1623,116 +1631,110 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
             pointerEvents: 'none'
           }} />
         )}
-        
-        {hasBg && (
-          <div style={{
-            position: 'absolute', inset: 0,
-            background: 'linear-gradient(to bottom, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.4) 45%, rgba(255,255,255,0.95) 100%)',
-            pointerEvents: 'none', zIndex: 1
-          }} />
-        )}
 
-        {/* 1. TOP MAIN WRAPPER (Header + Hero Area + Feature Grid) */}
-        <div style={{
-          padding: '50px 64px 0 64px',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          flex: 1,
-          zIndex: 10,
-          position: 'relative',
-          boxSizing: 'border-box'
-        }}>
-          {/* Header Section */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', width: '100%' }}>
-            {/* Tagline */}
-            <div style={{ fontSize: 11, fontWeight: 900, color: secondary, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 10 }}>
-              ⚡ {indData.tagline || 'SaaS CRM - CONTROL INTELIGENTE'}
+        {/* 1. TOP MAIN WRAPPER (Header + Hero Area + Feature Grid) — HIDDEN IF BACKGROUND FLYER IS ACTIVE */}
+        {!hasBg && (
+          <div style={{
+            padding: '50px 64px 0 64px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            flex: 1,
+            zIndex: 10,
+            position: 'relative',
+            boxSizing: 'border-box'
+          }}>
+            {/* Header Section */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', width: '100%' }}>
+              {/* Tagline */}
+              <div style={{ fontSize: 14, fontWeight: 900, color: secondary, letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 12 }}>
+                ⚡ {indData.tagline || 'SaaS CRM - CONTROL INTELIGENTE'}
+              </div>
+
+              {/* Headline */}
+              <h1 style={{
+                fontSize: headline.length > 25 ? 48 : 58,
+                fontWeight: 900,
+                fontFamily: "'Syne', sans-serif",
+                color: primary, // Midnight Navy
+                lineHeight: 1.05,
+                letterSpacing: '-0.03em', // Tight letter-spacing
+                textTransform: 'uppercase',
+                margin: '0 0 12px 0',
+                width: '100%',
+                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+              }}>
+                {headline}
+              </h1>
+
+              {/* Sub-headline / Value Prop */}
+              <p style={{
+                fontSize: 20,
+                fontWeight: 500,
+                color: '#475569', // Slate Gray
+                lineHeight: 1.4,
+                letterSpacing: '0.01em',
+                margin: 0,
+                maxWidth: 880,
+                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+              }}>
+                {subheadline}
+              </p>
             </div>
 
-            {/* Headline */}
-            <h1 style={{
-              fontSize: headline.length > 25 ? 44 : 52,
-              fontWeight: 900,
-              fontFamily: "'Syne', sans-serif",
-              color: primary, // Midnight Navy
-              lineHeight: 1.05,
-              letterSpacing: '-0.03em', // Tight letter-spacing
-              textTransform: 'uppercase',
-              margin: '0 0 10px 0',
-              width: '100%',
-              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
-            }}>
-              {headline}
-            </h1>
+            {/* Hero Area: Centered Browser Mockup (Now SVG isometric visual) */}
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', margin: '18px 0', position: 'relative' }}>
+              {/* Ambient background glow center */}
+              <div style={{
+                position: 'absolute',
+                width: '90%',
+                height: '90%',
+                background: `radial-gradient(circle, ${secondary}08 0%, transparent 70%)`,
+                zIndex: -1,
+                pointerEvents: 'none'
+              }} />
+              {renderIsometricTechVisual(primary, secondary)}
+            </div>
 
-            {/* Sub-headline / Value Prop */}
-            <p style={{
-              fontSize: 16,
-              fontWeight: 400,
-              color: '#475569', // Slate Gray
-              lineHeight: 1.4,
-              letterSpacing: '0.01em',
-              margin: 0,
-              maxWidth: 850,
-              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
-            }}>
-              {subheadline}
-            </p>
-          </div>
-
-          {/* Hero Area: Centered Browser Mockup (Now SVG isometric visual) */}
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', margin: '14px 0', position: 'relative' }}>
-            {/* Ambient background glow center */}
-            <div style={{
-              position: 'absolute',
-              width: '90%',
-              height: '90%',
-              background: `radial-gradient(circle, ${secondary}08 0%, transparent 70%)`,
-              zIndex: -1,
-              pointerEvents: 'none'
-            }} />
-            {renderIsometricTechVisual(primary, secondary)}
-          </div>
-
-          {/* Feature Grid (3-Column Layout) */}
-          <div style={{ display: 'flex', gap: 48, width: '100%', marginBottom: 20 }}>
-            {cleanFeatures.map((feat, idx) => {
-              const featData = getFeatureBullets(feat, data.prompt, secondary);
-              return (
-                <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                  {/* Subtle modern minimalist line-art icon */}
-                  <div style={{
-                    width: 44, height: 44, borderRadius: '50%',
-                    background: '#f8fafc', border: '1px solid #dde1e7', color: secondary,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    marginBottom: 12, flexShrink: 0
-                  }}>
-                    {featData.icon}
+            {/* Feature Grid (3-Column Layout) */}
+            <div style={{ display: 'flex', gap: 48, width: '100%', marginBottom: 24 }}>
+              {cleanFeatures.map((feat, idx) => {
+                const featData = getFeatureBullets(feat, data.prompt, secondary);
+                return (
+                  <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                    {/* Subtle modern minimalist line-art icon */}
+                    <div style={{
+                      width: 56, height: 56, borderRadius: '50%',
+                      background: '#f8fafc', border: '1px solid #dde1e7', color: secondary,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      marginBottom: 14, flexShrink: 0
+                    }}>
+                      {featData.icon}
+                    </div>
+                    {/* Title */}
+                    <span style={{ fontSize: 16, fontWeight: 900, color: primary, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
+                      {featData.title}
+                    </span>
+                    {/* Bullets */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+                      {featData.bullets.map((bullet, bIdx) => (
+                        <span key={bIdx} style={{ fontSize: 13, color: '#64748b', fontWeight: 500, lineHeight: 1.4, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                          • {bullet}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  {/* Title */}
-                  <span style={{ fontSize: 13, fontWeight: 900, color: primary, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
-                    {featData.title}
-                  </span>
-                  {/* Bullets */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
-                    {featData.bullets.map((bullet, bIdx) => (
-                      <span key={bIdx} style={{ fontSize: 11, color: '#64748b', fontWeight: 500, lineHeight: 1.4, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                        • {bullet}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* 2. BOTTOM CONTRACTING SOLID BANNER BLOCK */}
         <div style={{
-          height: 190,
+          height: 240,
           background: '#1a1a1a', // Rich charcoal
-          padding: '24px 64px 16px 64px',
+          padding: '28px 64px 20px 64px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
@@ -1745,33 +1747,37 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             {/* Left pricing */}
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
-              <span style={{ fontSize: 9, fontWeight: 900, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.1em' }}>PLAN ENTERPRISE</span>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                <span style={{ fontSize: 30, fontWeight: 900, color: secondary }}>{price}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>/mes</span>
+              <span style={{ fontSize: 12, fontWeight: 900, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.12em' }}>PLAN ENTERPRISE</span>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
+                <span style={{ fontSize: 38, fontWeight: 900, color: secondary }}>{price}</span>
+                <span style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.5)' }}>/mes</span>
               </div>
             </div>
 
             {/* Center QR Code */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{
-                width: 52, height: 52,
+                width: 80, height: 80,
                 background: '#ffffff',
-                padding: 5,
+                padding: 4,
                 borderRadius: 8,
                 border: `2px solid ${secondary}`,
                 boxSizing: 'border-box',
-                display: 'grid',
-                gridTemplateColumns: 'repeat(5, 1fr)',
-                gap: 2
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                overflow: 'hidden'
               }}>
-                {[1,0,1,1,0, 0,1,0,0,1, 1,1,0,1,0, 0,0,1,1,1, 1,0,1,0,1].map((v, i) => (
-                  <div key={i} style={{ background: v ? '#1a1a1a' : '#fff' }} />
-                ))}
+                <img 
+                  src={qrCodeApiUrl} 
+                  crossOrigin="anonymous" 
+                  style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+                  alt="QR Code" 
+                />
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
-                <span style={{ fontSize: 8, fontWeight: 800, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.05em' }}>DEMO EN VIVO</span>
-                <span style={{ fontSize: 11, fontWeight: 900, color: '#ffffff' }}>{data.website || 'ariasdefense.com'}</span>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', gap: 2 }}>
+                <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em' }}>DEMO EN VIVO</span>
+                <span style={{ fontSize: 15, fontWeight: 900, color: '#ffffff', letterSpacing: '0.02em' }}>{data.website || 'ariasdefense.com'}</span>
               </div>
             </div>
 
@@ -1780,9 +1786,9 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
               background: '#ffffff',
               color: '#1a1a1a',
               fontWeight: 900,
-              fontSize: 12,
+              fontSize: 16,
               letterSpacing: '0.05em',
-              padding: '12px 24px',
+              padding: '16px 32px',
               borderRadius: 50,
               boxShadow: '0 8px 20px rgba(255,255,255,0.05)',
               border: `1.5px solid ${secondary}`,
@@ -1799,10 +1805,10 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
           {/* Trust anchors */}
           <div style={{
             textAlign: 'center',
-            fontSize: 9,
+            fontSize: 13,
             fontWeight: 800,
             color: 'rgba(255,255,255,0.4)',
-            letterSpacing: '0.1em',
+            letterSpacing: '0.12em',
             textTransform: 'uppercase'
           }}>
             Soporte 24/7 • Prueba de 14 Días
