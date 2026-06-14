@@ -123,6 +123,130 @@ async function urlToBase64(url: string): Promise<string> {
   }
 }
 
+function getThematicImages(prompt: string): string[] {
+  const lower = prompt.toLowerCase();
+  
+  if (/\b(pizza|comida|restaurante|food|pupusa|pupusas|taco|tacos|burger|hamburguesa|sushi)\b/i.test(lower)) {
+    return [
+      'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1080&q=80'
+    ];
+  }
+  if (/\b(dentista|dental|diente|dientes|cl[íi]nica|odontolog[íi]a)\b/i.test(lower)) {
+    return [
+      'https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1471864190281-a93a3070b6de?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1579684389782-64d84b5e901a?auto=format&fit=crop&w=1080&q=80'
+    ];
+  }
+  if (/\b(defensa|seguridad|karate|marciales|taekwondo)\b/i.test(lower)) {
+    return [
+      'https://images.unsplash.com/photo-1555597673-b21d5c935865?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1544045560-723f24137ade?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1599058917212-d750089bc07e?auto=format&fit=crop&w=1080&q=80'
+    ];
+  }
+  if (/\b(taller|auto|carro|veh[íi]culo|mec[aá]nico|motor)\b/i.test(lower)) {
+    return [
+      'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1517524206127-48bbd363f3d7?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1507767439269-2c64f107e609?auto=format&fit=crop&w=1080&q=80'
+    ];
+  }
+  if (/\b(belleza|salon|sal[oó]n|u[ñn]as|spa|maquillaje|cabello|peluquer[íi]a)\b/i.test(lower)) {
+    return [
+      'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1607779097040-26e80aa78e66?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1519699047748-de8e457a634e?auto=format&fit=crop&w=1080&q=80'
+    ];
+  }
+  if (/\b(gym|gimnasio|fit|fitness|ejercicio|entrenamiento)\b/i.test(lower)) {
+    return [
+      'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1541534741688-6078c6bfb5c5?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1571902943202-507ec2618e8f?auto=format&fit=crop&w=1080&q=80'
+    ];
+  }
+  if (/\b(abogado|legal|firma|consultor[íi]a|leyes|derecho)\b/i.test(lower)) {
+    return [
+      'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1505664194779-8bebcb95c02e?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1453728013993-6d66e9c9123a?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=1080&q=80'
+    ];
+  }
+  if (/\b(cafe|café|panaderia|panader[íi]a|reposter[íi]a|dulce|cafeter[íi]a)\b/i.test(lower)) {
+    return [
+      'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=1080&q=80'
+    ];
+  }
+  if (/\b(casa|inmobiliaria|apartamento|hogar|propiedad|real estate|construccion|construcci[oó]n)\b/i.test(lower)) {
+    return [
+      'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1080&q=80'
+    ];
+  }
+  if (/\b(perro|gato|mascota|veterinario|veterinaria|animal)\b/i.test(lower)) {
+    return [
+      'https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1543466835-00a7907e9de1?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1576201836106-db1758fd1c97?auto=format&fit=crop&w=1080&q=80'
+    ];
+  }
+  if (/\b(educacion|educaci[oó]n|escuela|colegio|curso|clases|estudiar)\b/i.test(lower)) {
+    return [
+      'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1080&q=80'
+    ];
+  }
+  if (/\b(limpieza|lavado|limpiar|planchado|orden)\b/i.test(lower)) {
+    return [
+      'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1563453392212-326f5e854473?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1584820927498-cfe5211fd8bf?auto=format&fit=crop&w=1080&q=80'
+    ];
+  }
+  if (/\b(yoga|wellness|meditacion|meditaci[oó]n|relajacion|relajaci[oó]n)\b/i.test(lower)) {
+    return [
+      'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1508672019048-805c876b67e2?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=1080&q=80'
+    ];
+  }
+  if (/\b(contable|finanzas|dinero|taxes|impuestos|accounting)\b/i.test(lower)) {
+    return [
+      'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?auto=format&fit=crop&w=1080&q=80',
+      'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1080&q=80'
+    ];
+  }
+
+  return [
+    'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1080&q=80',
+    'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1080&q=80',
+    'https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1080&q=80',
+    'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1080&q=80'
+  ];
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function FlyerStudio() {
   const { profile } = useAuth();
@@ -393,27 +517,9 @@ export default function FlyerStudio() {
       }
     } catch (e: any) {
       console.warn('AI generation failed, applying premium stock fallback:', e);
-      // Fallback: search for keywords in the prompt to match a beautiful Unsplash stock image
-      const lower = prompt.toLowerCase();
-      let fallbackImg = 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1080&q=80'; // tech / general B2B
-      
-      if (/\b(pizza|comida|restaurante|food|pupusa|pupusas|taco|tacos|burger|hamburguesa|sushi)\b/i.test(lower)) {
-        fallbackImg = 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1080&q=80'; // pizza / food
-      } else if (/\b(dentista|dental|diente|dientes|cl[íi]nica|odontolog[íi]a)\b/i.test(lower)) {
-        fallbackImg = 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=1080&q=80'; // dental
-      } else if (/\b(defensa|seguridad|karate|marciales|taekwondo)\b/i.test(lower)) {
-        fallbackImg = 'https://images.unsplash.com/photo-1555597673-b21d5c935865?auto=format&fit=crop&w=1080&q=80'; // martial arts
-      } else if (/\b(taller|auto|carro|veh[íi]culo|mec[aá]nico|motor)\b/i.test(lower)) {
-        fallbackImg = 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=1080&q=80'; // auto workshop
-      } else if (/\b(belleza|salon|sal[oó]n|u[ñn]as|spa|maquillaje|cabello|peluquer[íi]a)\b/i.test(lower)) {
-        fallbackImg = 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1080&q=80'; // beauty salon
-      } else if (/\b(gym|gimnasio|fit|fitness|ejercicio|entrenamiento)\b/i.test(lower)) {
-        fallbackImg = 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=1080&q=80'; // gym
-      } else if (/\b(abogado|legal|firma|consultor[íi]a|leyes|derecho)\b/i.test(lower)) {
-        fallbackImg = 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=1080&q=80'; // law/legal
-      }
-
-      setVariants([fallbackImg]);
+      // Fallback: search for keywords in the prompt to match beautiful Unsplash stock images
+      const fallbackImgs = getThematicImages(prompt);
+      setVariants(fallbackImgs);
       
       // Also generate optimized copy locally based on basic parsing since openai failed
       const parsed = parsePrompt(prompt);
@@ -449,40 +555,8 @@ export default function FlyerStudio() {
     setShowFullAiResult(false);
 
     try {
-      const lower = prompt.toLowerCase();
-      let fallbackImg = 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1080&q=80'; // tech / general B2B
-      
-      if (/\b(pizza|comida|restaurante|food|pupusa|pupusas|taco|tacos|burger|hamburguesa|sushi)\b/i.test(lower)) {
-        fallbackImg = 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1080&q=80'; // pizza / food
-      } else if (/\b(dentista|dental|diente|dientes|cl[íi]nica|odontolog[íi]a)\b/i.test(lower)) {
-        fallbackImg = 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=1080&q=80'; // dental
-      } else if (/\b(defensa|seguridad|karate|marciales|taekwondo)\b/i.test(lower)) {
-        fallbackImg = 'https://images.unsplash.com/photo-1555597673-b21d5c935865?auto=format&fit=crop&w=1080&q=80'; // martial arts
-      } else if (/\b(taller|auto|carro|veh[íi]culo|mec[aá]nico|motor)\b/i.test(lower)) {
-        fallbackImg = 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?auto=format&fit=crop&w=1080&q=80'; // auto workshop
-      } else if (/\b(belleza|salon|sal[oó]n|u[ñn]as|spa|maquillaje|cabello|peluquer[íi]a)\b/i.test(lower)) {
-        fallbackImg = 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1080&q=80'; // beauty salon
-      } else if (/\b(gym|gimnasio|fit|fitness|ejercicio|entrenamiento)\b/i.test(lower)) {
-        fallbackImg = 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=1080&q=80'; // gym
-      } else if (/\b(abogado|legal|firma|consultor[íi]a|leyes|derecho)\b/i.test(lower)) {
-        fallbackImg = 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=1080&q=80'; // law/legal
-      } else if (/\b(cafe|café|panaderia|panader[íi]a|reposter[íi]a|dulce|cafeter[íi]a)\b/i.test(lower)) {
-        fallbackImg = 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=1080&q=80'; // cafe
-      } else if (/\b(casa|inmobiliaria|apartamento|hogar|propiedad|real estate|construccion|construcci[oó]n)\b/i.test(lower)) {
-        fallbackImg = 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=1080&q=80'; // real estate/construction
-      } else if (/\b(perro|gato|mascota|veterinario|veterinaria|animal)\b/i.test(lower)) {
-        fallbackImg = 'https://images.unsplash.com/photo-1583511655857-d19b40a7a54e?auto=format&fit=crop&w=1080&q=80'; // pets
-      } else if (/\b(educacion|educaci[oó]n|escuela|colegio|curso|clases|estudiar)\b/i.test(lower)) {
-        fallbackImg = 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=1080&q=80'; // school/education
-      } else if (/\b(limpieza|lavado|limpiar|planchado|orden)\b/i.test(lower)) {
-        fallbackImg = 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=1080&q=80'; // cleaning
-      } else if (/\b(yoga|wellness|meditacion|meditaci[oó]n|relajacion|relajaci[oó]n)\b/i.test(lower)) {
-        fallbackImg = 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1080&q=80'; // yoga
-      } else if (/\b(contable|finanzas|dinero|taxes|impuestos|accounting)\b/i.test(lower)) {
-        fallbackImg = 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=1080&q=80'; // accounting
-      }
-
-      setVariants([fallbackImg]);
+      const fallbackImgs = getThematicImages(prompt);
+      setVariants(fallbackImgs);
 
       // Parse prompt locally to generate structured copy
       const parsed = parsePrompt(prompt);
