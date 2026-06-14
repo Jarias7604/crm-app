@@ -72,15 +72,24 @@ function buildImagePrompt(params: {
 }): string {
   const { prompt, company_name, colors, tone, variantSeed, mode = 'background', structuredText } = params;
 
+  const isDark = tone === 'premium';
   const primaryColor = (colors && colors.length > 0) ? colors[0] : '#e91e8c';
-  const secondaryColor = (colors && colors.length > 1) ? colors[1] : '#1a1a2e';
+  const secondaryColor = (colors && colors.length > 1) 
+    ? colors[1] 
+    : (isDark ? '#1a1a2e' : '#ffffff');
 
-  // Seed variations for background styles
-  const styles: Record<string, string> = {
-    'A': `modern premium corporate aesthetic with abstract fluid shapes, smooth metallic surfaces, high-end advertising concept`,
-    'B': `minimalistic clean design background with elegant glowing neon lines, digital technology grid, professional advertising lighting`,
-    'C': `sophisticated corporate glassmorphism style, atmospheric soft shadows, sleek gradient waves, premium branding background`,
-  };
+  // Seed variations for background styles based on whether tone is dark/premium vs bright/vibrant
+  const styles: Record<string, string> = isDark 
+    ? {
+        'A': `ultra-premium luxury aesthetic with elegant dark marble textures, abstract fluid shapes, smooth metallic surfaces, gold details, dramatic studio lighting`,
+        'B': `sophisticated dark luxury background, minimalistic clean lines, elegant glowing golden lines, digital technology grid, professional advertising lighting`,
+        'C': `high-end corporate glassmorphism style, atmospheric soft shadows, dark slate and navy colors, sleek gradient waves, premium branding background`,
+      }
+    : {
+        'A': `clean minimalist tech startup aesthetic, bright white and light gray background, abstract fluid glass shapes, vibrant colorful gradients, bright sunny studio lighting`,
+        'B': `modern clean design background, white space, elegant light glowing lines, vibrant pastel colors, professional bright high-key lighting`,
+        'C': `sophisticated bright corporate glassmorphism style, soft light shadows, clean white/gray surfaces, sleek colorful gradient waves, premium bright branding backdrop`,
+      };
 
   let selectedStyle = styles[variantSeed || 'A'];
   if (mode === 'full') {
@@ -111,15 +120,16 @@ Instructions: Generate a complete, ready-to-publish marketing flyer. The image i
   return `Design a STUNNING, HIGH-FIDELITY commercial advertising background. 
 Style theme: ${selectedStyle}.
 Topic/Sector details: "${prompt}".
-Visual mood: Professional commercial studio photography, sleek lighting, rich colors, premium advertising look.
+Visual mood: Professional commercial studio photography, ${isDark ? 'elegant dark and golden lighting, premium luxury mood' : 'bright and vibrant lighting, clean high-key illumination, colorful and inviting aesthetic'}.
 Brand colors to integrate: ${primaryColor} and ${secondaryColor}.
 Composition: Perfect B2B backdrop with a lot of clean negative space, designed as an advertising canvas to overlay HTML text and product dashboard mockups.
 
 CRITICAL MANDATORY RULES:
 1. STRICTLY NO TEXT, NO LETTERS, NO WORDS, NO WRITING, NO TYPOS, NO ALPHABET, NO CHARACTERS. The image must be 100% clean and free of any text.
-2. NO LAPTOPS, NO SMARTPHONES, NO COMPUTERS, NO HARDWARE. Do not render any electronic devices, screens, or mockups.
+2. NO TEXT ON SCREENS: Laptops, office hardware, and screens are allowed. Their screens must display a beautiful, bright, colorful abstract gradient, a vibrant glowing chart pattern, or a clean modern visual background. Strictly avoid any text, letters, numbers, or readable user interface elements, but make the screen content look bright, colorful, and active.
 3. Clean empty space. Maintain large solid/gradient areas with soft light so that text can be easily read when overlayed.
-4. No blur, sharp high-fidelity rendering, pixel-perfect.`;
+4. No blur, sharp high-fidelity rendering, pixel-perfect.
+5. ${isDark ? 'Rich dark textures are allowed.' : 'AVOID gloomy, muddy, or excessively dark/black background layouts. Ensure the composition feels open, bright, and highly professional.'}`;
 }
 
 // ── Main handler ──────────────────────────────────────────────────────────────

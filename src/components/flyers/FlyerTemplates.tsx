@@ -1383,93 +1383,100 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
           }} />
         )}
 
-        {/* 1. TOP MAIN WRAPPER (Header + Hero Area + Feature Grid) — HIDDEN IF BACKGROUND FLYER IS ACTIVE */}
-        {!hasBg && (
-          <div style={{
-            padding: '50px 64px 0 64px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            flex: 1,
-            zIndex: 10,
-            position: 'relative',
-            boxSizing: 'border-box'
-          }}>
-            {/* Header Section */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', width: '100%' }}>
-              {/* Tagline */}
-              <div style={{ fontSize: 14, fontWeight: 900, color: primary, letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 12 }}>
-                {indData.tagline || 'SaaS CRM - CONTROL INTELIGENTE'}
-              </div>
-
-              {/* Headline */}
-              <h1 style={{
-                fontSize: headline.length > 25 ? 48 : 58,
-                fontWeight: 900,
-                color: '#1a1a1a', // Charcoal
-                lineHeight: 1.05,
-                letterSpacing: '-0.03em', // Tight letter-spacing
-                textTransform: 'uppercase',
-                margin: '0 0 12px 0',
-                width: '100%',
-                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
-              }}>
-                {headline}
-              </h1>
-
-              {/* Sub-headline / Value Prop */}
-              <p style={{
-                fontSize: 20,
-                fontWeight: 500,
-                color: '#475569', // Slate Gray
-                lineHeight: 1.4,
-                letterSpacing: '0.01em',
-                margin: 0,
-                maxWidth: 880,
-                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
-              }}>
-                {subheadline}
-              </p>
+        {/* 1. TOP MAIN WRAPPER (Header + Hero Area + Feature Grid) */}
+        <div style={{
+          margin: hasBg ? '50px 64px 0 64px' : '0',
+          padding: hasBg ? '40px' : '50px 64px 0 64px',
+          background: hasBg ? 'rgba(255, 255, 255, 0.85)' : 'transparent',
+          backdropFilter: hasBg ? 'blur(24px)' : 'none',
+          borderRadius: hasBg ? '24px' : '0',
+          border: hasBg ? '1px solid rgba(255, 255, 255, 0.4)' : 'none',
+          boxShadow: hasBg ? '0 20px 50px rgba(0,0,0,0.12)' : 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          flex: 1,
+          zIndex: 10,
+          position: 'relative',
+          boxSizing: 'border-box'
+        }}>
+          {/* Header Section */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', width: '100%' }}>
+            {/* Tagline */}
+            <div style={{ fontSize: 14, fontWeight: 900, color: primary, letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 12 }}>
+              {indData.tagline || 'SaaS CRM - CONTROL INTELIGENTE'}
             </div>
 
-            {/* Hero Area: Centered Browser Mockup */}
+            {/* Headline */}
+            <h1 style={{
+              fontSize: headline.length > 25 ? 44 : 54,
+              fontWeight: 900,
+              color: '#1a1a1a', // Charcoal
+              lineHeight: 1.1,
+              letterSpacing: '-0.03em', // Tight letter-spacing
+              textTransform: 'uppercase',
+              margin: '0 0 12px 0',
+              width: '100%',
+              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+            }}>
+              {headline}
+            </h1>
+
+            {/* Sub-headline / Value Prop */}
+            <p style={{
+              fontSize: 18,
+              fontWeight: 500,
+              color: '#475569', // Slate Gray
+              lineHeight: 1.4,
+              letterSpacing: '0.01em',
+              margin: 0,
+              maxWidth: 880,
+              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+            }}>
+              {subheadline}
+            </p>
+          </div>
+
+          {/* Hero Area: Centered Browser Mockup (HIDDEN IF BACKGROUND ACTIVE) */}
+          {!hasBg && (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', margin: '18px 0' }}>
               {renderIsometricTechVisual(primary, '#00d4ff')}
             </div>
+          )}
 
-            {/* Feature Grid (3-Column Layout) */}
-            <div style={{ display: 'flex', gap: 48, width: '100%', marginBottom: 24 }}>
-              {cleanFeatures.map((feat, idx) => {
-                const featData = getFeatureBullets(feat, data.prompt, primary);
-                return (
-                  <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                    {/* Subtle modern minimalist line-art icon */}
-                    <div style={{
-                      width: 56, height: 56, borderRadius: '50%',
-                      background: '#f8fafc', border: '1px solid #dde1e7', color: primary,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      marginBottom: 14, flexShrink: 0
-                    }}>
-                      {featData.icon}
-                    </div>
-                    {/* Title */}
-                    <span style={{ fontSize: 16, fontWeight: 900, color: '#1a1a1a', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
-                      {featData.title}
-                    </span>
-                    {/* Bullets */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
-                      {featData.bullets.map((bullet, bIdx) => (
-                        <span key={bIdx} style={{ fontSize: 13, color: '#64748b', fontWeight: 500, lineHeight: 1.4, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                          • {bullet}
-                        </span>
-                      ))}
-                    </div>
+          {/* Feature Grid (3-Column Layout) */}
+          <div style={{ display: 'flex', gap: 48, width: '100%', marginBottom: 24 }}>
+            {cleanFeatures.map((feat, idx) => {
+              const featData = getFeatureBullets(feat, data.prompt, primary);
+              return (
+                <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                  {/* Subtle modern minimalist line-art icon */}
+                  <div style={{
+                    width: 56, height: 56, borderRadius: '50%',
+                    background: hasBg ? 'rgba(255, 255, 255, 0.5)' : '#f8fafc',
+                    border: '1px solid #dde1e7', color: primary,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    marginBottom: 14, flexShrink: 0
+                  }}>
+                    {featData.icon}
                   </div>
-                );
-              })}
-            </div>
+                  {/* Title */}
+                  <span style={{ fontSize: 16, fontWeight: 900, color: '#1a1a1a', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
+                    {featData.title}
+                  </span>
+                  {/* Bullets */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+                    {featData.bullets.map((bullet, bIdx) => (
+                      <span key={bIdx} style={{ fontSize: 13, color: '#64748b', fontWeight: 500, lineHeight: 1.4, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                        • {bullet}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        )}
+        </div>
 
         {/* 2. BOTTOM CONTRACTING SOLID BANNER BLOCK */}
         <div style={{
@@ -1632,57 +1639,63 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
           }} />
         )}
 
-        {/* 1. TOP MAIN WRAPPER (Header + Hero Area + Feature Grid) — HIDDEN IF BACKGROUND FLYER IS ACTIVE */}
-        {!hasBg && (
-          <div style={{
-            padding: '50px 64px 0 64px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            flex: 1,
-            zIndex: 10,
-            position: 'relative',
-            boxSizing: 'border-box'
-          }}>
-            {/* Header Section */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', width: '100%' }}>
-              {/* Tagline */}
-              <div style={{ fontSize: 14, fontWeight: 900, color: secondary, letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 12 }}>
-                ⚡ {indData.tagline || 'SaaS CRM - CONTROL INTELIGENTE'}
-              </div>
-
-              {/* Headline */}
-              <h1 style={{
-                fontSize: headline.length > 25 ? 48 : 58,
-                fontWeight: 900,
-                fontFamily: "'Syne', sans-serif",
-                color: primary, // Midnight Navy
-                lineHeight: 1.05,
-                letterSpacing: '-0.03em', // Tight letter-spacing
-                textTransform: 'uppercase',
-                margin: '0 0 12px 0',
-                width: '100%',
-                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
-              }}>
-                {headline}
-              </h1>
-
-              {/* Sub-headline / Value Prop */}
-              <p style={{
-                fontSize: 20,
-                fontWeight: 500,
-                color: '#475569', // Slate Gray
-                lineHeight: 1.4,
-                letterSpacing: '0.01em',
-                margin: 0,
-                maxWidth: 880,
-                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
-              }}>
-                {subheadline}
-              </p>
+        {/* 1. TOP MAIN WRAPPER (Header + Hero Area + Feature Grid) */}
+        <div style={{
+          margin: hasBg ? '50px 64px 0 64px' : '0',
+          padding: hasBg ? '40px' : '50px 64px 0 64px',
+          background: hasBg ? 'rgba(15, 23, 42, 0.72)' : 'transparent',
+          backdropFilter: hasBg ? 'blur(24px)' : 'none',
+          borderRadius: hasBg ? '24px' : '0',
+          border: hasBg ? `1.5px solid ${secondary}40` : 'none',
+          boxShadow: hasBg ? '0 20px 50px rgba(0,0,0,0.3)' : 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          flex: 1,
+          zIndex: 10,
+          position: 'relative',
+          boxSizing: 'border-box'
+        }}>
+          {/* Header Section */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', width: '100%' }}>
+            {/* Tagline */}
+            <div style={{ fontSize: 14, fontWeight: 900, color: secondary, letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: 12 }}>
+              ⚡ {indData.tagline || 'SaaS CRM - CONTROL INTELIGENTE'}
             </div>
 
-            {/* Hero Area: Centered Browser Mockup (Now SVG isometric visual) */}
+            {/* Headline */}
+            <h1 style={{
+              fontSize: headline.length > 25 ? 44 : 54,
+              fontWeight: 900,
+              fontFamily: "'Syne', sans-serif",
+              color: hasBg ? '#ffffff' : primary, // White text if glass overlay on BG, else Midnight Navy
+              lineHeight: 1.1,
+              letterSpacing: '-0.03em', // Tight letter-spacing
+              textTransform: 'uppercase',
+              margin: '0 0 12px 0',
+              width: '100%',
+              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+            }}>
+              {headline}
+            </h1>
+
+            {/* Sub-headline / Value Prop */}
+            <p style={{
+              fontSize: 18,
+              fontWeight: 500,
+              color: hasBg ? 'rgba(255, 255, 255, 0.85)' : '#475569', // Light text if glass overlay, else Slate Gray
+              lineHeight: 1.4,
+              letterSpacing: '0.01em',
+              margin: 0,
+              maxWidth: 880,
+              display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+            }}>
+              {subheadline}
+            </p>
+          </div>
+
+          {/* Hero Area: Centered Browser Mockup (Now SVG isometric visual) */}
+          {!hasBg && (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', margin: '18px 0', position: 'relative' }}>
               {/* Ambient background glow center */}
               <div style={{
@@ -1695,40 +1708,41 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
               }} />
               {renderIsometricTechVisual(primary, secondary)}
             </div>
+          )}
 
-            {/* Feature Grid (3-Column Layout) */}
-            <div style={{ display: 'flex', gap: 48, width: '100%', marginBottom: 24 }}>
-              {cleanFeatures.map((feat, idx) => {
-                const featData = getFeatureBullets(feat, data.prompt, secondary);
-                return (
-                  <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                    {/* Subtle modern minimalist line-art icon */}
-                    <div style={{
-                      width: 56, height: 56, borderRadius: '50%',
-                      background: '#f8fafc', border: '1px solid #dde1e7', color: secondary,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      marginBottom: 14, flexShrink: 0
-                    }}>
-                      {featData.icon}
-                    </div>
-                    {/* Title */}
-                    <span style={{ fontSize: 16, fontWeight: 900, color: primary, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
-                      {featData.title}
-                    </span>
-                    {/* Bullets */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
-                      {featData.bullets.map((bullet, bIdx) => (
-                        <span key={bIdx} style={{ fontSize: 13, color: '#64748b', fontWeight: 500, lineHeight: 1.4, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
-                          • {bullet}
-                        </span>
-                      ))}
-                    </div>
+          {/* Feature Grid (3-Column Layout) */}
+          <div style={{ display: 'flex', gap: 48, width: '100%', marginBottom: 24 }}>
+            {cleanFeatures.map((feat, idx) => {
+              const featData = getFeatureBullets(feat, data.prompt, secondary);
+              return (
+                <div key={idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                  {/* Subtle modern minimalist line-art icon */}
+                  <div style={{
+                    width: 56, height: 56, borderRadius: '50%',
+                    background: hasBg ? 'rgba(255, 255, 255, 0.08)' : '#f8fafc',
+                    border: hasBg ? `1px solid ${secondary}30` : '1px solid #dde1e7', color: secondary,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    marginBottom: 14, flexShrink: 0
+                  }}>
+                    {featData.icon}
                   </div>
-                );
-              })}
-            </div>
+                  {/* Title */}
+                  <span style={{ fontSize: 16, fontWeight: 900, color: hasBg ? '#ffffff' : primary, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
+                    {featData.title}
+                  </span>
+                  {/* Bullets */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+                    {featData.bullets.map((bullet, bIdx) => (
+                      <span key={bIdx} style={{ fontSize: 13, color: hasBg ? 'rgba(255, 255, 255, 0.7)' : '#64748b', fontWeight: 500, lineHeight: 1.4, textTransform: 'uppercase', letterSpacing: '0.02em' }}>
+                        • {bullet}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        )}
+        </div>
 
         {/* 2. BOTTOM CONTRACTING SOLID BANNER BLOCK */}
         <div style={{

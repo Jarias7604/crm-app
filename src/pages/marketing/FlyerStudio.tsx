@@ -544,6 +544,7 @@ export default function FlyerStudio() {
             <div style={css.section}>
               <label style={css.label}>¿Qué quieres promocionar? *</label>
               <textarea
+                id="textarea-prompt"
                 style={{ ...css.textarea, minHeight: 120, fontSize: 13, lineHeight: 1.6, border: autoOptimizing ? '1.5px solid #7c3aed' : '1px solid #d8dde6', transition: 'border 0.3s' }}
                 placeholder={'Ej: 30% OFF en servicios de defensa personal este verano — escribe tu idea y la IA la mejorará automáticamente...'}
                 value={prompt}
@@ -836,13 +837,14 @@ export default function FlyerStudio() {
             </div>
 
             {/* ═══════════════════════════════════════════════════════════════
-                AI GENERATION BUTTONS — Primary: Full DALL-E 3 flyer
+                AI GENERATION BUTTONS — Primary: Autocorrected Flyer
             ═══════════════════════════════════════════════════════════════ */}
             <div style={{ paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
 
-              {/* MAIN BUTTON — Full AI Flyer via DALL-E 3 */}
+              {/* MAIN BUTTON — AI Flyer with Autocorrected HTML overlay */}
               <button
-                onClick={() => generate('full')}
+                id="btn-generate-flyer"
+                onClick={() => generate('background')}
                 disabled={generating || !prompt.trim()}
                 style={{
                   background: generating
@@ -860,29 +862,23 @@ export default function FlyerStudio() {
                   letterSpacing: '0.01em'
                 }}
               >
-                {generating && isFullAiFlyer ? (
-                  <><Cpu size={16} style={{ animation: 'spin 1s linear infinite' }} /> gpt-image-1 creando tu flyer...</>
+                {generating ? (
+                  <><Cpu size={16} style={{ animation: 'spin 1s linear infinite' }} /> Creando diseño con IA...</>
                 ) : (
-                  <><Sparkles size={16} color="#fff" fill="#fff" /> Generar Flyer Profesional con IA</>
+                  <><Sparkles size={16} color="#fff" fill="#fff" /> Generar Flyer con IA (Autocorregido)</>
                 )}
               </button>
 
               {/* Description */}
-              <div style={{ fontSize: 10, color: '#64748b', textAlign: 'center', lineHeight: 1.5, padding: '0 4px' }}>
-                ✨ <strong>gpt-image-1</strong> crea una imagen <strong>100% original</strong> con tipografía, diseño y contenido integrado — calidad de agencia profesional
-              </div>
-
-              {/* Divider */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '2px 0' }}>
-                <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
-                <span style={{ fontSize: 9, color: '#94a3b8', fontWeight: 700, letterSpacing: '0.06em' }}>O BIEN</span>
-                <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
+              <div style={{ fontSize: 10, color: '#64748b', textAlign: 'center', lineHeight: 1.5, padding: '0 4px', marginBottom: 8 }}>
+                ✨ <strong>Autocorrección activa:</strong> La IA dibuja un fondo abstracto espectacular y el sistema escribe los textos editables por encima en HTML. ¡Cero errores ortográficos!
               </div>
 
               {/* SELECT TEMPLATE CATALOG */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <label style={css.label}>Selecciona Plantilla (Catálogo Salesforce/HubSpot)</label>
                 <select
+                  id="select-template"
                   value={selectedTemplate}
                   onChange={(e) => {
                     setSelectedTemplate(e.target.value);
@@ -919,35 +915,8 @@ export default function FlyerStudio() {
                 </select>
               </div>
 
-              {/* Action buttons under select */}
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button
-                  onClick={() => generate('background')}
-                  disabled={generating || !prompt.trim()}
-                  style={{
-                    flex: 1,
-                    background: '#f8fafc',
-                    border: '1.5px solid #7c3aed50',
-                    borderRadius: 8,
-                    padding: '10px 12px',
-                    fontSize: 12,
-                    fontWeight: 800,
-                    color: '#475569',
-                    cursor: generating || !prompt.trim() ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                    opacity: generating || !prompt.trim() ? 0.5 : 1
-                  }}
-                >
-                  {generating && !isFullAiFlyer ? (
-                    <><Cpu size={12} style={{ animation: 'spin 1s linear infinite' }} /> Cargando...</>
-                  ) : (
-                    <><Image size={12} color="#7c3aed" /> Generar Fondo con IA (Sin Textos)</>
-                  )}
-                </button>
-              </div>
+              {/* Espaciador estético */}
+              <div style={{ height: 4 }} />
 
               <style>{`
                 @keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
@@ -1036,7 +1005,7 @@ export default function FlyerStudio() {
 
             {/* ══ LOADING OVERLAY while generating ══ */}
             {generating && (
-              <div style={{
+              <div id="generating-overlay" style={{
                 position: 'absolute', inset: 0,
                 background: 'rgba(7,15,43,0.88)',
                 backdropFilter: 'blur(12px)',
@@ -1068,7 +1037,7 @@ export default function FlyerStudio() {
                 </div>
                 <div style={{ fontSize: 15, fontWeight: 800, color: '#0f172a' }}>Tu flyer generado por IA aparecerá aquí</div>
                 <div style={{ fontSize: 12, color: '#64748b', maxWidth: 260, lineHeight: 1.6 }}>
-                  Escribe tu brief en la columna izquierda y presiona <strong>"Generar Flyer Profesional con IA"</strong>. <strong>gpt-image-1</strong> creará una imagen completa y única.
+                  Escribe tu brief en la columna izquierda y presiona <strong>"Generar Flyer con IA (Autocorregido)"</strong>. <strong>gpt-image-1</strong> creará un fondo premium y escribirá los textos de forma automática.
                 </div>
                 <div style={{ background: '#f1f5f9', borderRadius: 10, padding: '10px 16px', fontSize: 11, color: '#475569', lineHeight: 1.6, maxWidth: 280 }}>
                   💡 <strong>Tip:</strong> Cuanto más detallado sea tu brief (tipo de negocio, oferta, colores, tono), mejor será el resultado.
@@ -1079,18 +1048,18 @@ export default function FlyerStudio() {
             {/* ══ CONTROL BAR (Variants & Layout) ══ */}
             {!showSuggestions && !generating && variants.length > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', padding: '10px 14px', borderRadius: 10, border: '1px solid #dde1e7', gap: 10, width: '100%', maxWidth: 480, boxSizing: 'border-box' }}>
-                {/* Layout selector */}
+                {/* Status indicator */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 10, fontWeight: 800, color: '#54698d', textTransform: 'uppercase' }}>Diseño:</span>
-                  <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', padding: 3, borderRadius: 6 }}>
-                    <button onClick={() => setShowFullAiResult(false)}
-                      style={{ border: 'none', borderRadius: 4, padding: '4px 8px', fontSize: 10, fontWeight: 700, cursor: 'pointer', background: !showFullAiResult ? '#fff' : 'transparent', color: !showFullAiResult ? '#0070d2' : '#64748b', boxShadow: !showFullAiResult ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
-                      Con Plantilla
-                    </button>
-                    <button onClick={() => setShowFullAiResult(true)}
-                      style={{ border: 'none', borderRadius: 4, padding: '4px 8px', fontSize: 10, fontWeight: 700, cursor: 'pointer', background: showFullAiResult ? '#fff' : 'transparent', color: showFullAiResult ? '#0070d2' : '#64748b', boxShadow: showFullAiResult ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
-                      Imagen Pura
-                    </button>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)',
+                    border: '1px solid #bbf7d0',
+                    padding: '5px 10px', borderRadius: 8,
+                    fontSize: 10, fontWeight: 800, color: '#16a34a',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                  }}>
+                    <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />
+                    <span>Autocorrección y textos editables activos</span>
                   </div>
                 </div>
 
@@ -1244,7 +1213,7 @@ export default function FlyerStudio() {
                           primaryColor: colors[0] || '#e91e8c',
                           secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
                           phone, website, logoUrl: logoPreview || undefined,
-                          bgImageUrl: bgUploadPreview || ((previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined)
+                          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined)
                         }} />
                       ) : selectedTemplate === 'B' ? (
                         <FlyerTemplateB data={{
@@ -1261,7 +1230,7 @@ export default function FlyerStudio() {
                           primaryColor: colors[0] || '#9b1c1c',
                           secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
                           phone, website, logoUrl: logoPreview || undefined,
-                          bgImageUrl: bgUploadPreview || ((previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined)
+                          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined)
                         }} />
                       ) : (
                         <RenderFlyer d={{
@@ -1270,7 +1239,7 @@ export default function FlyerStudio() {
                           cta: aiOptimizedText?.cta || cta || 'COMIENZA HOY',
                           beneficios: aiOptimizedText?.features || parsePrompt(prompt).features || deriveFeatures(prompt) || [],
                           accent: colors[0] || '#0070d2',
-                          bgImageUrl: bgUploadPreview || ((previewMode === 'ai' && variants.length > 0) ? variants[selected] : null),
+                          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null),
                           logoUrl: logoPreview || null,
                           industria: companyName || 'Mi Empresa',
                           phone, website, templateId: selectedTemplate,
@@ -1328,7 +1297,7 @@ export default function FlyerStudio() {
           secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
           phone, website,
           logoUrl: logoPreview || undefined,
-          bgImageUrl: bgUploadPreview || ((previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined)
+          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined)
         }} />
         <FlyerTemplateB ref={templateRefB} data={{
           company_name: companyName || 'Mi Empresa',
@@ -1346,7 +1315,7 @@ export default function FlyerStudio() {
           secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
           phone, website,
           logoUrl: logoPreview || undefined,
-          bgImageUrl: bgUploadPreview || ((previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined)
+          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined)
         }} />
         <div ref={templateRefMarketing}>
           <RenderFlyer d={{
@@ -1355,7 +1324,7 @@ export default function FlyerStudio() {
             cta: aiOptimizedText?.cta || cta || 'COMIENZA HOY',
             beneficios: aiOptimizedText?.features || parsePrompt(prompt).features || deriveFeatures(prompt) || [],
             accent: colors[0] || '#0070d2',
-            bgImageUrl: bgUploadPreview || ((previewMode === 'ai' && variants.length > 0) ? variants[selected] : null),
+            bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null),
             logoUrl: logoPreview || null,
             industria: companyName || 'Mi Empresa',
             phone, website, templateId: selectedTemplate,
@@ -1470,7 +1439,7 @@ export default function FlyerStudio() {
                         mockup_info: aiOptimizedText?.mockup_info,
                         primaryColor: colors[0] || '#e91e8c', secondaryColor: colors[1] || '#1a1a2e',
                         phone, website, logoUrl: logoPreview || undefined,
-                        bgImageUrl: bgUploadPreview || ((previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined)
+                        bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined)
                       }} />
                     ) : selectedTemplate === 'B' ? (
                       <FlyerTemplateB data={{
@@ -1484,7 +1453,7 @@ export default function FlyerStudio() {
                         mockup_info: aiOptimizedText?.mockup_info,
                         primaryColor: colors[0] || '#9b1c1c', secondaryColor: colors[1] || '#1a1a2e',
                         phone, website, logoUrl: logoPreview || undefined,
-                        bgImageUrl: bgUploadPreview || ((previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined)
+                        bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined)
                       }} />
                     ) : (
                       <RenderFlyer d={{
@@ -1493,7 +1462,7 @@ export default function FlyerStudio() {
                         cta: aiOptimizedText?.cta || cta || 'COMIENZA HOY',
                         beneficios: aiOptimizedText?.features || parsePrompt(prompt).features || deriveFeatures(prompt) || [],
                         accent: colors[0] || '#0070d2',
-                        bgImageUrl: bgUploadPreview || ((previewMode === 'ai' && variants.length > 0) ? variants[selected] : null),
+                        bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : null),
                         logoUrl: logoPreview || null,
                         industria: companyName || 'Mi Empresa',
                         phone, website, templateId: selectedTemplate,
