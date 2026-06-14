@@ -1270,6 +1270,9 @@ export default function FlyerStudio() {
                 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
                 @keyframes scaleIn{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}
                 @keyframes pulse-ring{0%{transform:scale(0.8);opacity:1}100%{transform:scale(2.4);opacity:0}}
+                @media (max-width: 768px) {
+                  .hidden-mobile { display: none !important; }
+                }
                 .flyer-studio-col::-webkit-scrollbar { width: 5px; }
                 .flyer-studio-col::-webkit-scrollbar-track { background: transparent; }
                 .flyer-studio-col::-webkit-scrollbar-thumb { background: transparent; border-radius: 10px; }
@@ -1315,10 +1318,113 @@ export default function FlyerStudio() {
                 Cerrar
               </button>
             )}
-            {!showSuggestions && variants.length > 0 && (
-              <button onClick={() => setVariants([])} style={{ ...css.ghost, padding: '5px 10px', fontSize: 11 }}>
-                <RefreshCw size={11} /> Nuevo
-              </button>
+            {!showSuggestions && !generating && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {/* Vista Previa Completa */}
+                <button
+                  onClick={() => setIsPreviewModalOpen(true)}
+                  title="Vista Previa Completa"
+                  style={{
+                    ...css.ghost,
+                    padding: '6px 10px',
+                    fontSize: 11,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    color: '#475569',
+                    background: '#f8fafc',
+                    border: '1px solid #cbd5e1',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#f8fafc'; }}
+                >
+                  <Eye size={13} color="#475569" />
+                  <span className="hidden-mobile">Vista Previa</span>
+                </button>
+
+                {/* Descargar PNG */}
+                <button
+                  onClick={handleDownload}
+                  title="Descargar PNG"
+                  style={{
+                    ...css.ghost,
+                    padding: '6px 10px',
+                    fontSize: 11,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    color: '#166534',
+                    background: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    fontWeight: 700
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#dcfce7'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#f0fdf4'; }}
+                >
+                  <Download size={13} color="#166534" />
+                  <span className="hidden-mobile">Descargar</span>
+                </button>
+
+                {/* Enviar a Social Hub */}
+                <button
+                  id="btn-header-send"
+                  onClick={sendToSocialHub}
+                  title="Enviar a Redes Sociales"
+                  style={{
+                    ...css.ghost,
+                    padding: '6px 10px',
+                    fontSize: 11,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    color: '#fff',
+                    background: 'linear-gradient(135deg, #0070d2, #005fb2)',
+                    border: 'none',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    fontWeight: 700
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.filter = 'brightness(1.05)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.filter = 'none'; }}
+                >
+                  <Send size={13} color="#fff" />
+                  <span className="hidden-mobile">Publicar</span>
+                </button>
+
+                {/* Nuevo (Clear variants if generated) */}
+                {variants.length > 0 && (
+                  <button
+                    onClick={() => setVariants([])}
+                    title="Nuevo diseño"
+                    style={{
+                      ...css.ghost,
+                      padding: '6px 10px',
+                      fontSize: 11,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      color: '#64748b',
+                      background: '#f1f5f9',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 8,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#e2e8f0'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#f1f5f9'; }}
+                  >
+                    <RefreshCw size={11} />
+                    <span className="hidden-mobile">Nuevo</span>
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
@@ -1503,33 +1609,9 @@ export default function FlyerStudio() {
                       </div>
                     )}
 
-                    {/* Action buttons */}
-                    <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>Acciones de Exportación</div>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button onClick={() => setIsPreviewModalOpen(true)}
-                          style={{ ...css.ghost, flex: 1, justifyContent: 'center', background: '#f8fafc', border: '1px solid #cbd5e1' }}>
-                          🔍 Vista Previa Completa
-                        </button>
-                        <button onClick={handleDownload}
-                          style={{ ...css.ghost, flex: 1, justifyContent: 'center', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', fontWeight: 700 }}>
-                          <Download size={13} /> Descargar PNG
-                        </button>
-                      </div>
-                      <button onClick={sendToSocialHub}
-                        style={{ ...css.btn, background: 'linear-gradient(135deg,#0070d2,#005fb2)' }}>
-                        <Send size={13} />
-                        Enviar a Publicación (Redes Sociales)
-                        <ChevronRight size={13} />
-                      </button>
-                      <div style={{ fontSize: 10, color: '#94a3b8', textAlign: 'center', marginTop: 2 }}>
-                        El flyer se abrirá en el Panel de Publicidad listo para publicar
-                      </div>
-                    </div>
-
                     {/* Credits status */}
                     {credits !== null && (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8 }}>
                         <Zap size={11} color={credColor} fill={credColor} />
                         <span style={{ fontSize: 11, color: '#64748b' }}>
                           <strong style={{ color: credColor }}>{credits}</strong> créditos restantes este mes
@@ -1683,28 +1765,6 @@ export default function FlyerStudio() {
                       </div>
                     </div>
 
-                    {/* Action buttons */}
-                    <div style={{ background: '#fff', borderRadius: 10, border: '1px solid #e2e8f0', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: '#0f172a', marginBottom: 2 }}>Acciones de Exportación</div>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button onClick={() => setIsPreviewModalOpen(true)}
-                          style={{ ...css.ghost, flex: 1, justifyContent: 'center', background: '#f8fafc', border: '1px solid #cbd5e1' }}>
-                          🔍 Vista Previa Completa
-                        </button>
-                        <button onClick={handleDownload}
-                          style={{ ...css.ghost, flex: 1, justifyContent: 'center', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', fontWeight: 700 }}>
-                          <Download size={13} /> Descargar PNG
-                        </button>
-                      </div>
-                      <button
-                        id="btn-send-to-social"
-                        onClick={sendToSocialHub}
-                        style={{ ...css.btn, background: 'linear-gradient(135deg,#0070d2,#005fb2)' }}>
-                        <Send size={13} />
-                        Enviar a Publicación (Redes Sociales)
-                        <ChevronRight size={13} />
-                      </button>
-                    </div>
                   </div>
                 )}
               </div>
