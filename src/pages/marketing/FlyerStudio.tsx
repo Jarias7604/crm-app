@@ -363,6 +363,7 @@ export default function FlyerStudio() {
   const [showFullAiResult, setShowFullAiResult] = useState(false);
 
   const [manualTitle, setManualTitle] = useState('OFERTA ESPECIAL');
+  const [keepCustomText, setKeepCustomText] = useState(false);
   const [manualSubtitle, setManualSubtitle] = useState('Los mejores servicios y productos profesionales a tu alcance hoy mismo.');
   const [manualFeatures, setManualFeatures] = useState<string[]>([
     '✓ Atención Personalizada 24/7',
@@ -556,6 +557,7 @@ export default function FlyerStudio() {
   const [ctaBgColor, setCtaBgColor] = useState('');
   const [ctaTextColor, setCtaTextColor] = useState('');
   const [contactColor, setContactColor] = useState('');
+  const [highlightColor, setHighlightColor] = useState('#FFD700');
   const [textY, setTextY] = useState(0);
   const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
 
@@ -704,6 +706,7 @@ export default function FlyerStudio() {
 
   // Pre-populate manual inputs from basic parsing as the user types, before they generate
   useEffect(() => {
+    if (keepCustomText) return; // Don't overwrite manually customized text
     if (variants.length > 0) return; // Don't overwrite generated/manually modified text
     if (!prompt.trim() || prompt === 'Flyer promocional para nuestra oferta especial de temporada.') return; // Don't overwrite default placeholder values
     const parsed = parsePrompt(prompt);
@@ -712,7 +715,7 @@ export default function FlyerStudio() {
     setManualSubtitle(parsed.subtitle || h2 || '');
     setManualFeatures(parsed.features && parsed.features.length > 0 ? parsed.features : deriveFeatures(prompt).slice(0, 4));
     setManualPrice(parsed.price || derivePrice(prompt) || '');
-  }, [prompt, companyName]);
+  }, [prompt, companyName, keepCustomText]);
   // Reset font dropdown open state when switching edit elements or closing modals
   useEffect(() => {
     setIsFontDropdownOpen(false);
@@ -808,10 +811,12 @@ export default function FlyerStudio() {
       setVariants(data.variants);
       if (data.structured_text) {
         setAiOptimizedText(data.structured_text);
-        setManualTitle(data.structured_text.headline || '');
-        setManualSubtitle(data.structured_text.subheadline || '');
-        setManualFeatures(data.structured_text.features && data.structured_text.features.length > 0 ? data.structured_text.features : ['', '', '', '']);
-        setManualPrice(data.structured_text.price || '');
+        if (!keepCustomText) {
+          setManualTitle(data.structured_text.headline || '');
+          setManualSubtitle(data.structured_text.subheadline || '');
+          setManualFeatures(data.structured_text.features && data.structured_text.features.length > 0 ? data.structured_text.features : ['', '', '', '']);
+          setManualPrice(data.structured_text.price || '');
+        }
       }
       setSelected(0);
       setPreviewMode('ai');
@@ -850,10 +855,12 @@ export default function FlyerStudio() {
         price: parsed.price || derivePrice(prompt) || ''
       };
       setAiOptimizedText(fallbackText);
-      setManualTitle(fallbackText.headline || '');
-      setManualSubtitle(fallbackText.subheadline || '');
-      setManualFeatures(fallbackText.features && fallbackText.features.length > 0 ? fallbackText.features : ['', '', '', '']);
-      setManualPrice(fallbackText.price || '');
+      if (!keepCustomText) {
+        setManualTitle(fallbackText.headline || '');
+        setManualSubtitle(fallbackText.subheadline || '');
+        setManualFeatures(fallbackText.features && fallbackText.features.length > 0 ? fallbackText.features : ['', '', '', '']);
+        setManualPrice(fallbackText.price || '');
+      }
 
       setSelected(0);
       setPreviewMode('ai');
@@ -899,10 +906,12 @@ export default function FlyerStudio() {
         price: parsed.price || derivePrice(prompt) || ''
       };
       setAiOptimizedText(fallbackText);
-      setManualTitle(fallbackText.headline || '');
-      setManualSubtitle(fallbackText.subheadline || '');
-      setManualFeatures(fallbackText.features && fallbackText.features.length > 0 ? fallbackText.features : ['', '', '', '']);
-      setManualPrice(fallbackText.price || '');
+      if (!keepCustomText) {
+        setManualTitle(fallbackText.headline || '');
+        setManualSubtitle(fallbackText.subheadline || '');
+        setManualFeatures(fallbackText.features && fallbackText.features.length > 0 ? fallbackText.features : ['', '', '', '']);
+        setManualPrice(fallbackText.price || '');
+      }
 
       setSelected(0);
       setPreviewMode('ai');
@@ -1481,6 +1490,39 @@ export default function FlyerStudio() {
             {/* ═══════════════════════════════════════════════════════════════
                 AI GENERATION BUTTONS — Primary: Autocorrected Flyer
             ═══════════════════════════════════════════════════════════════ */}
+            <div style={{
+              margin: '8px 0 12px 0',
+              padding: '10px 12px',
+              background: keepCustomText ? '#f5f3ff' : '#f8fafc',
+              border: keepCustomText ? '1.5px solid #c084fc' : '1px solid #e2e8f0',
+              borderRadius: 10,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+              transition: 'all 0.2s ease'
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <span style={{ fontSize: 11, fontWeight: 800, color: keepCustomText ? '#6b21a8' : '#334155' }}>
+                  Conservar mis textos
+                </span>
+                <span style={{ fontSize: 9, color: keepCustomText ? '#7e22ce' : '#64748b' }}>
+                  No sobrescribir títulos ni detalles al generar fondo
+                </span>
+              </div>
+              <input 
+                type="checkbox" 
+                checked={keepCustomText} 
+                onChange={e => setKeepCustomText(e.target.checked)}
+                style={{
+                  width: 16,
+                  height: 16,
+                  cursor: 'pointer',
+                  accentColor: '#7c3aed'
+                }}
+              />
+            </div>
+
             <div style={{ paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
 
               {/* MAIN BUTTON — AI Flyer with Autocorrected HTML overlay */}
@@ -1984,6 +2026,7 @@ export default function FlyerStudio() {
                                 logoX,
                                 logoY,
                                 titleColor,
+                                highlightColor,
                                 subtitleColor,
                                 benefitsColor,
                                 cardBgColor,
@@ -2041,6 +2084,7 @@ export default function FlyerStudio() {
                                 logoX,
                                 logoY,
                                 titleColor,
+                                highlightColor,
                                 subtitleColor,
                                 benefitsColor,
                                 cardBgColor,
@@ -2089,6 +2133,7 @@ export default function FlyerStudio() {
                               subtitleScale,
                               benefitsScale,
                               titleColor,
+                              highlightColor,
                               subtitleColor,
                               benefitsColor,
                               cardBgColor,
@@ -2288,6 +2333,7 @@ export default function FlyerStudio() {
             containerW: 1080,
             containerH: canvasH,
             titleColor,
+            highlightColor,
             subtitleColor,
             benefitsColor,
             cardBgColor,
@@ -2351,6 +2397,7 @@ export default function FlyerStudio() {
             containerW: 1080,
             containerH: canvasH,
             titleColor,
+            highlightColor,
             subtitleColor,
             benefitsColor,
             cardBgColor,
@@ -2404,6 +2451,7 @@ export default function FlyerStudio() {
             subtitleScale,
             benefitsScale,
             titleColor,
+            highlightColor,
             subtitleColor,
             benefitsColor,
             cardBgColor,
@@ -2554,6 +2602,7 @@ export default function FlyerStudio() {
                           containerW: 1080,
                           containerH: canvasH,
                           titleColor,
+                          highlightColor,
                           subtitleColor,
                           benefitsColor,
                           cardBgColor,
@@ -2598,6 +2647,7 @@ export default function FlyerStudio() {
                           containerW: 1080,
                           containerH: canvasH,
                           titleColor,
+                          highlightColor,
                           subtitleColor,
                           benefitsColor,
                           cardBgColor,
@@ -2636,6 +2686,7 @@ export default function FlyerStudio() {
                         subtitleScale,
                         benefitsScale,
                         titleColor,
+                        highlightColor,
                         subtitleColor,
                         benefitsColor,
                         cardBgColor,
@@ -2748,9 +2799,15 @@ export default function FlyerStudio() {
                     <textarea 
                       style={{ ...css.textarea, minHeight: 60 }} 
                       value={manualTitle} 
-                      onChange={e => setManualTitle(e.target.value)}
+                      onChange={e => {
+                        setManualTitle(e.target.value);
+                        setKeepCustomText(true);
+                      }}
                       placeholder="Título principal del flyer"
                     />
+                    <span style={{ fontSize: 10, color: '#64748b', fontStyle: 'italic', marginTop: -2 }}>
+                      💡 Tip: Coloca asteriscos **alrededor del texto** que deseas destacar (ej. **cuentas por cobrar**).
+                    </span>
                   </div>
 
                   {renderFontSelector(titleFont, 'title')}
@@ -2777,6 +2834,25 @@ export default function FlyerStudio() {
                         value={titleColor} 
                         onChange={e => setTitleColor(e.target.value)} 
                         placeholder="Por defecto"
+                        style={css.input} 
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Color de Texto Resaltado</span>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input 
+                        type="color" 
+                        value={highlightColor} 
+                        onChange={e => setHighlightColor(e.target.value)} 
+                        style={{ width: 36, height: 36, padding: 0, border: '1px solid #d8dde6', cursor: 'pointer', borderRadius: 6, flexShrink: 0 }} 
+                      />
+                      <input 
+                        type="text" 
+                        value={highlightColor} 
+                        onChange={e => setHighlightColor(e.target.value)} 
+                        placeholder="#FFD700"
                         style={css.input} 
                       />
                     </div>
@@ -2821,7 +2897,10 @@ export default function FlyerStudio() {
                     <textarea 
                       style={{ ...css.textarea, minHeight: 60 }} 
                       value={manualSubtitle} 
-                      onChange={e => setManualSubtitle(e.target.value)}
+                      onChange={e => {
+                        setManualSubtitle(e.target.value);
+                        setKeepCustomText(true);
+                      }}
                       placeholder="Subtítulo o gancho descriptivo"
                     />
                   </div>
@@ -2883,6 +2962,7 @@ export default function FlyerStudio() {
                           const copy = [...manualFeatures];
                           copy[idx] = e.target.value;
                           setManualFeatures(copy);
+                          setKeepCustomText(true);
                         }}
                         placeholder={`Beneficio ${idx + 1}`}
                       />
@@ -2940,7 +3020,10 @@ export default function FlyerStudio() {
                     <input 
                       style={css.input} 
                       value={cta} 
-                      onChange={e => setCta(e.target.value)}
+                      onChange={e => {
+                        setCta(e.target.value);
+                        setKeepCustomText(true);
+                      }}
                       placeholder="Ej: REGÍSTRATE HOY"
                     />
                   </div>
@@ -2952,7 +3035,10 @@ export default function FlyerStudio() {
                     <input 
                       style={css.input} 
                       value={manualPrice} 
-                      onChange={e => setManualPrice(e.target.value)}
+                      onChange={e => {
+                        setManualPrice(e.target.value);
+                        setKeepCustomText(true);
+                      }}
                       placeholder="Ej: Desde $12.95"
                     />
                   </div>

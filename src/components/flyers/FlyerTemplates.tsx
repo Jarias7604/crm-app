@@ -3,6 +3,7 @@
 // Captured to PNG using html-to-image library
 
 import React from 'react';
+import { renderTitleWithHighlights } from '../../pages/marketing/FlyerTemplates';
 
 export interface FlyerData {
   company_name: string;
@@ -34,6 +35,7 @@ export interface FlyerData {
   logoSize?: number;
   logoX?: number;
   logoY?: number;
+  highlightColor?: string;
   containerW?: number;
   containerH?: number;
   titleColor?: string;
@@ -1490,7 +1492,7 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
                 transform: (data.titleX || data.titleY) ? `translate(${data.titleX ?? 0}px, ${data.titleY ?? 0}px)` : undefined
               }}
             >
-              {headline}
+              {headline.includes('**') ? renderTitleWithHighlights(headline, data.titleColor || '#1a1a1a', data.highlightColor) : headline}
             </h1>
 
             {/* Sub-headline / Value Prop */}
@@ -1803,7 +1805,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
                 transform: (data.titleX || data.titleY) ? `translate(${data.titleX ?? 0}px, ${data.titleY ?? 0}px)` : undefined
               }}
             >
-              {headline}
+              {headline.includes('**') ? renderTitleWithHighlights(headline, data.titleColor || (hasBg ? '#ffffff' : primary), data.highlightColor) : headline}
             </h1>
 
             {/* Sub-headline / Value Prop */}
