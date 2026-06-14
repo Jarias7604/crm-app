@@ -43,6 +43,26 @@ export interface FlyerData {
   onCtaClick?: () => void;
   onLogoClick?: () => void;
   onBgClick?: () => void;
+  titleScale?: number;
+  titleX?: number;
+  titleY?: number;
+  subtitleX?: number;
+  subtitleY?: number;
+  benefitsX?: number;
+  benefitsY?: number;
+  ctaScale?: number;
+  ctaX?: number;
+  ctaY?: number;
+  contactScale?: number;
+  contactX?: number;
+  contactY?: number;
+  contactColor?: string;
+  onContactClick?: () => void;
+  titleFont?: string;
+  subtitleFont?: string;
+  benefitsFont?: string;
+  ctaFont?: string;
+  contactFont?: string;
 }
 
 // ─── PHOTO HELPERS ────────────────────────────────────────────────────────────
@@ -88,9 +108,9 @@ const PillBtn = ({ label, bg1, bg2, color = '#fff', style = {}, s = 1 }: {
   </div>
 );
 
-const BenRow = ({ text, color, s = 1, scale = 1, bold = false }: { text: string; color: string; s?: number; scale?: number; bold?: boolean }) => {
+const BenRow = ({ text, color, s = 1, scale = 1, bold = false, maxLen }: { text: string; color: string; s?: number; scale?: number; bold?: boolean; maxLen?: number }) => {
   // Dynamically shrink font as text grows longer so everything fits
-  const len = (text || '').length;
+  const len = maxLen !== undefined ? maxLen : (text || '').length;
   const dynScale = len > 40 ? scale * 0.82 : len > 25 ? scale * 0.91 : scale;
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: Math.round(10 * s), marginBottom: Math.round(6 * s) }}>
@@ -102,8 +122,8 @@ const BenRow = ({ text, color, s = 1, scale = 1, bold = false }: { text: string;
   );
 };
 
-const BenRowDark = ({ text, color, s = 1, scale = 1, bold = false }: { text: string; color: string; s?: number; scale?: number; bold?: boolean }) => {
-  const len = (text || '').length;
+const BenRowDark = ({ text, color, s = 1, scale = 1, bold = false, maxLen }: { text: string; color: string; s?: number; scale?: number; bold?: boolean; maxLen?: number }) => {
+  const len = maxLen !== undefined ? maxLen : (text || '').length;
   const dynScale = len > 40 ? scale * 0.82 : len > 25 ? scale * 0.91 : scale;
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: Math.round(10 * s), marginBottom: Math.round(8 * s) }}>
@@ -135,23 +155,48 @@ export const FreeLogo = ({ d, onMove, onResize }: {
 }) => {
   if (!d.logoUrl || d.logoX === undefined) return null;
   const W = d.containerW || 540, H = d.containerH || 675;
-  const sz = Math.round(64 * (d.logoSize ?? 1));
+  const sz = Math.round(150 * (d.logoSize ?? 1));
   const x = (d.logoX / 100) * W, y = (d.logoY ?? 5) / 100 * H;
   return (
     <div 
       className={d.onLogoClick ? "editable-element" : undefined}
       onClick={d.onLogoClick ? (e) => { e.stopPropagation(); d.onLogoClick?.(); } : undefined}
-      style={{ position: 'absolute', left: x, top: y, width: sz, height: sz, cursor: onMove ? 'move' : 'default', zIndex: 20, userSelect: 'none' }}
+      style={{ 
+        position: 'absolute', 
+        left: x, 
+        top: y, 
+        width: sz, 
+        cursor: onMove ? 'move' : 'default', 
+        zIndex: 20, 
+        userSelect: 'none',
+        display: 'inline-flex'
+      }}
       onMouseDown={e => {
         if (!onMove) return;
         e.preventDefault();
-        const startX = e.clientX - x, startY = e.clientY - y;
-        const move = (ev: MouseEvent) => onMove(Math.min(95, Math.max(0, ((ev.clientX - startX) / W) * 100)), Math.min(95, Math.max(0, ((ev.clientY - startY) / H) * 100)));
+        const parent = e.currentTarget.parentElement;
+        if (!parent) return;
+        const rect = parent.getBoundingClientRect();
+        const logoRect = e.currentTarget.getBoundingClientRect();
+        const offsetX = e.clientX - logoRect.left;
+        const offsetY = e.clientY - logoRect.top;
+        
+        const move = (ev: MouseEvent) => {
+          const currentLeft = ev.clientX - rect.left - offsetX;
+          const currentTop = ev.clientY - rect.top - offsetY;
+          const pctX = Math.min(100, Math.max(0, (currentLeft / rect.width) * 100));
+          const pctY = Math.min(100, Math.max(0, (currentTop / rect.height) * 100));
+          onMove(pctX, pctY);
+        };
         const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); };
         window.addEventListener('mousemove', move); window.addEventListener('mouseup', up);
       }}
     >
-      <div style={{ width: '100%', height: '100%', backgroundImage: `url('${d.logoUrl}')`, backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat', borderRadius: 8, pointerEvents: 'none' }} />
+      <img 
+        src={d.logoUrl} 
+        alt="Logo"
+        style={{ width: '100%', height: 'auto', objectFit: 'contain', borderRadius: 8, pointerEvents: 'none' }} 
+      />
       {onResize && (
         <div style={{ position: 'absolute', bottom: -4, right: -4, width: 14, height: 14, background: '#D4AF37', borderRadius: '50%', cursor: 'se-resize', zIndex: 21 }}
           onMouseDown={e => {
@@ -173,7 +218,16 @@ export const RenderFlyer = ({ d, onLogoMove, onLogoResize }: {
 }) => {
   const Tmpl = TEMPLATES[d.templateId] || Template_BoldSplit;
   return (
-    <div style={{ position: 'relative', width: d.containerW || 540, height: d.containerH || 675 }}>
+    <div style={{ 
+      position: 'relative', 
+      width: d.containerW || 540, 
+      height: d.containerH || 675,
+      '--flyer-title-font': getFontFamily(d.titleFont || d.flyerFont),
+      '--flyer-subtitle-font': getFontFamily(d.subtitleFont || d.flyerFont),
+      '--flyer-benefits-font': getFontFamily(d.benefitsFont || d.flyerFont),
+      '--flyer-cta-font': getFontFamily(d.ctaFont || d.flyerFont),
+      '--flyer-contact-font': getFontFamily(d.contactFont || d.flyerFont),
+    } as React.CSSProperties}>
       <Tmpl d={d} />
       <FreeLogo d={d} onMove={onLogoMove} onResize={onLogoResize} />
     </div>
@@ -189,6 +243,7 @@ export const Template_BoldSplit = ({ d }: { d: FlyerData }) => {
   const acc = d.accent || '#1a56db';
   const title = (d.title || 'TU OFERTA').toUpperCase();
   const isBg = !!d.bgImageUrl;
+  const maxLen = Math.max(...(d.beneficios || []).slice(0, 4).map(b => (b || '').length), 0);
   return (
     <div 
       onClick={d.onBgClick ? (e) => { e.stopPropagation(); d.onBgClick?.(); } : undefined}
@@ -246,23 +301,23 @@ export const Template_BoldSplit = ({ d }: { d: FlyerData }) => {
           <div 
             data-element-id="benefits" className={d.onBenefitsClick ? "editable-element flyer-benefits-element" : "flyer-benefits-element"}
             onClick={d.onBenefitsClick ? (e) => { e.stopPropagation(); d.onBenefitsClick?.(); } : undefined}
-            style={{ marginBottom: Math.round(6 * s), display: 'flex', flexDirection: 'column', alignItems: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start', transform: d.benefitsY ? `translateY(${d.benefitsY}px)` : undefined }}
+            style={{ marginBottom: Math.round(6 * s), display: 'flex', flexDirection: 'column', alignSelf: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start', alignItems: 'flex-start', transform: d.benefitsY ? `translateY(${d.benefitsY}px)` : undefined }}
           >
-            {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRow key={i} text={b} scale={d.benefitsScale ?? 1} bold={!!d.benefitsBold} color={acc} s={s} />)}
+            {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRow key={i} text={b} scale={d.benefitsScale ?? 1} bold={!!d.benefitsBold} color={d.benefitsColor || acc} s={s} maxLen={maxLen} />)}
           </div>
           <div 
             data-element-id="cta" className={d.onCtaClick ? "editable-element flyer-cta-element" : "flyer-cta-element"}
             onClick={d.onCtaClick ? (e) => { e.stopPropagation(); d.onCtaClick?.(); } : undefined}
             style={{ display: 'inline-block', width: '100%', transform: d.ctaY ? `translateY(${d.ctaY}px)` : undefined }}
           >
-            <PillBtn label={d.cta || 'CONTACTAR'} bg1={d.ctaBgColor || '#fff'} bg2={d.ctaBgColor ? d.ctaBgColor + 'dd' : 'rgba(255,255,255,0.85)'} color={d.ctaTextColor || (isBg ? '#0f172a' : acc)} s={s * (d.ctaScale ?? 1)} style={{ fontSize: Math.round(12 * s), padding: `${Math.round(12 * s)}px ${Math.round(20 * s)}px`, width: '100%', boxSizing: 'border-box' }} />
+            <PillBtn label={d.cta || 'CONTACTAR'} bg1={d.ctaBgColor || '#fff'} bg2={d.ctaBgColor ? d.ctaBgColor + 'dd' : 'rgba(255,255,255,0.85)'} color={d.ctaTextColor || (isBg ? '#0f172a' : acc)} s={s * (d.ctaScale ?? 1)} style={{ fontSize: Math.round(12 * s * (d.ctaScale ?? 1)), padding: `${Math.round(12 * s * (d.ctaScale ?? 1))}px ${Math.round(20 * s * (d.ctaScale ?? 1))}px`, width: '100%', boxSizing: 'border-box' }} />
           </div>
         </div>
       </div>
       
       {/* Footer phone & website bar */}
       <div data-element-id="contact" className={d.onContactClick ? "editable-element flyer-contact-element" : "flyer-contact-element"} onClick={d.onContactClick ? (e) => { e.stopPropagation(); d.onContactClick?.(); } : undefined} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: Math.round(40 * s), background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 , transform: d.contactY ? `translateY(${d.contactY}px)` : undefined, cursor: d.onContactClick ? 'pointer' : 'default' }}>
-        <span style={{  color: '#fff', fontWeight: 800, fontSize: Math.round(13 * s * (d.contactScale ?? 1)), letterSpacing: '0.04em'  }}>
+        <span style={{  color: d.contactColor || '#fff', fontWeight: 800, fontSize: Math.round(13 * s * (d.contactScale ?? 1)), letterSpacing: '0.04em'  }}>
           {d.phone || '+503 7XXX-XXXX'}{d.website ? ` · ${d.website}` : ''}
         </span>
       </div>
@@ -348,13 +403,13 @@ export const Template_Cinematic = ({ d }: { d: FlyerData }) => {
           onClick={d.onCtaClick ? (e) => { e.stopPropagation(); d.onCtaClick?.(); } : undefined}
           style={{ display: 'inline-block', transform: d.ctaY ? `translateY(${d.ctaY}px)` : undefined }}
         >
-          <PillBtn label={d.cta || 'VER MÁS'} bg1={d.ctaBgColor || acc} bg2={d.ctaBgColor ? d.ctaBgColor + 'dd' : acc + 'cc'} color={d.ctaTextColor || '#000'} s={s * (d.ctaScale ?? 1)} style={{ fontSize: Math.round(12 * s), alignSelf: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start', padding: `${Math.round(10 * s)}px ${Math.round(24 * s)}px` }} />
+          <PillBtn label={d.cta || 'VER MÁS'} bg1={d.ctaBgColor || acc} bg2={d.ctaBgColor ? d.ctaBgColor + 'dd' : acc + 'cc'} color={d.ctaTextColor || '#000'} s={s * (d.ctaScale ?? 1)} style={{ fontSize: Math.round(12 * s * (d.ctaScale ?? 1)), alignSelf: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start', padding: `${Math.round(10 * s * (d.ctaScale ?? 1))}px ${Math.round(24 * s * (d.ctaScale ?? 1))}px` }} />
         </div>
       </div>
 
       {/* Footer bar */}
       <div data-element-id="contact" className={d.onContactClick ? "editable-element flyer-contact-element" : "flyer-contact-element"} onClick={d.onContactClick ? (e) => { e.stopPropagation(); d.onContactClick?.(); } : undefined} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: Math.round(38 * s), background: acc, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 , transform: d.contactY ? `translateY(${d.contactY}px)` : undefined, cursor: d.onContactClick ? 'pointer' : 'default' }}>
-        <span style={{  color: '#000', fontWeight: 900, fontSize: Math.round(13 * s * (d.contactScale ?? 1)), letterSpacing: '0.05em'  }}>
+        <span style={{  color: d.contactColor || '#000', fontWeight: 900, fontSize: Math.round(13 * s * (d.contactScale ?? 1)), letterSpacing: '0.05em'  }}>
           {d.phone || '+503 7XXX-XXXX'}{d.website ? ` · ${d.website}` : ''}
         </span>
       </div>
@@ -370,6 +425,7 @@ export const Template_WhiteCard = ({ d }: { d: FlyerData }) => {
   const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#3b82f6';
   const isBg = !!d.bgImageUrl;
+  const maxLen = Math.max(...(d.beneficios || []).slice(0, 4).map(b => (b || '').length), 0);
   return (
     <div 
       onClick={d.onBgClick ? (e) => { e.stopPropagation(); d.onBgClick?.(); } : undefined}
@@ -435,7 +491,7 @@ export const Template_WhiteCard = ({ d }: { d: FlyerData }) => {
           onClick={d.onBenefitsClick ? (e) => { e.stopPropagation(); d.onBenefitsClick?.(); } : undefined}
           style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: `${Math.round(4 * s)}px ${Math.round(8 * s)}px`, margin: `${Math.round(4 * s)}px 0`, width: '100%', transform: d.benefitsY ? `translateY(${d.benefitsY}px)` : undefined }}
         >
-          {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRowDark key={i} text={b} scale={d.benefitsScale ?? 1} bold={!!d.benefitsBold} color={acc} s={s} />)}
+          {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRowDark key={i} text={b} scale={d.benefitsScale ?? 1} bold={!!d.benefitsBold} color={d.benefitsColor || acc} s={s} maxLen={maxLen} />)}
         </div>
         
         <div 
@@ -443,13 +499,13 @@ export const Template_WhiteCard = ({ d }: { d: FlyerData }) => {
           onClick={d.onCtaClick ? (e) => { e.stopPropagation(); d.onCtaClick?.(); } : undefined}
           style={{ display: 'inline-block', transform: d.ctaY ? `translateY(${d.ctaY}px)` : undefined }}
         >
-          <PillBtn label={d.cta || 'CONTACTAR'} bg1={d.ctaBgColor || acc} bg2={d.ctaBgColor ? d.ctaBgColor + 'dd' : acc + 'cc'} color={d.ctaTextColor || '#fff'} s={s * (d.ctaScale ?? 1)} style={{ marginTop: Math.round(4 * s), alignSelf: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start', fontSize: Math.round(13 * s) }} />
+          <PillBtn label={d.cta || 'CONTACTAR'} bg1={d.ctaBgColor || acc} bg2={d.ctaBgColor ? d.ctaBgColor + 'dd' : acc + 'cc'} color={d.ctaTextColor || '#fff'} s={s * (d.ctaScale ?? 1)} style={{ marginTop: Math.round(4 * s), alignSelf: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start', fontSize: Math.round(13 * s * (d.ctaScale ?? 1)) }} />
         </div>
       </div>
 
       {/* Footer bar */}
       <div data-element-id="contact" className={d.onContactClick ? "editable-element flyer-contact-element" : "flyer-contact-element"} onClick={d.onContactClick ? (e) => { e.stopPropagation(); d.onContactClick?.(); } : undefined} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: Math.round(38 * s), background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 , transform: d.contactY ? `translateY(${d.contactY}px)` : undefined, cursor: d.onContactClick ? 'pointer' : 'default' }}>
-        <span style={{  color: '#fff', fontWeight: 800, fontSize: Math.round(12 * s * (d.contactScale ?? 1))  }}>
+        <span style={{  color: d.contactColor || '#fff', fontWeight: 800, fontSize: Math.round(12 * s * (d.contactScale ?? 1))  }}>
           {d.phone || '+503 7XXX-XXXX'}{d.website ? ` · ${d.website}` : ''}
         </span>
       </div>
@@ -466,6 +522,7 @@ export const Template_Magazine = ({ d }: { d: FlyerData }) => {
   const acc = d.accent || '#ef4444';
   const title = (d.title || 'TU OFERTA').toUpperCase();
   const isBg = !!d.bgImageUrl;
+  const maxLen = Math.max(...(d.beneficios || []).slice(0, 4).map(b => (b || '').length), 0);
   return (
     <div 
       onClick={d.onBgClick ? (e) => { e.stopPropagation(); d.onBgClick?.(); } : undefined}
@@ -536,19 +593,19 @@ export const Template_Magazine = ({ d }: { d: FlyerData }) => {
           <div 
             data-element-id="benefits" className={d.onBenefitsClick ? "editable-element flyer-benefits-element" : "flyer-benefits-element"}
             onClick={d.onBenefitsClick ? (e) => { e.stopPropagation(); d.onBenefitsClick?.(); } : undefined}
-            style={{ display: 'flex', flexDirection: 'column', gap: Math.round(4 * s), alignItems: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start', transform: d.benefitsY ? `translateY(${d.benefitsY}px)` : undefined }}
+            style={{ display: 'flex', flexDirection: 'column', gap: Math.round(4 * s), alignItems: 'flex-start', transform: d.benefitsY ? `translateY(${d.benefitsY}px)` : undefined }}
           >
-            {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRow key={i} text={b} scale={d.benefitsScale ?? 1} bold={!!d.benefitsBold} color={d.benefitsColor || acc} s={s} />)}
+            {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRow key={i} text={b} scale={d.benefitsScale ?? 1} bold={!!d.benefitsBold} color={d.benefitsColor || acc} s={s} maxLen={maxLen} />)}
           </div>
           <div 
             data-element-id="cta" className={d.onCtaClick ? "editable-element flyer-cta-element" : "flyer-cta-element"}
             onClick={d.onCtaClick ? (e) => { e.stopPropagation(); d.onCtaClick?.(); } : undefined}
             style={{ display: 'inline-block', transform: d.ctaY ? `translateY(${d.ctaY}px)` : undefined }}
           >
-            <PillBtn label={d.cta || 'MÁS INFO'} bg1={d.ctaBgColor || acc} bg2={d.ctaBgColor ? d.ctaBgColor + 'bb' : acc + 'bb'} color={d.ctaTextColor || '#fff'} s={s * (d.ctaScale ?? 1)} style={{ fontSize: Math.round(12 * s), padding: `${Math.round(10 * s)}px ${Math.round(16 * s)}px`, alignSelf: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start' }} />
+            <PillBtn label={d.cta || 'MÁS INFO'} bg1={d.ctaBgColor || acc} bg2={d.ctaBgColor ? d.ctaBgColor + 'bb' : acc + 'bb'} color={d.ctaTextColor || '#fff'} s={s * (d.ctaScale ?? 1)} style={{ fontSize: Math.round(12 * s * (d.ctaScale ?? 1)), padding: `${Math.round(10 * s * (d.ctaScale ?? 1))}px ${Math.round(16 * s * (d.ctaScale ?? 1))}px`, alignSelf: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start' }} />
           </div>
           
-          <div data-element-id="contact" className={d.onContactClick ? "editable-element flyer-contact-element" : "flyer-contact-element"} onClick={d.onContactClick ? (e) => { e.stopPropagation(); d.onContactClick?.(); } : undefined} style={{ fontSize: Math.round(11 * s * (d.contactScale ?? 1)), color: 'rgba(255,255,255,0.5)', fontWeight: 600, transform: d.contactY ? `translateY(${d.contactY}px)` : undefined, cursor: d.onContactClick ? 'pointer' : 'default' }}>
+          <div data-element-id="contact" className={d.onContactClick ? "editable-element flyer-contact-element" : "flyer-contact-element"} onClick={d.onContactClick ? (e) => { e.stopPropagation(); d.onContactClick?.(); } : undefined} style={{ fontSize: Math.round(11 * s * (d.contactScale ?? 1)), color: d.contactColor || 'rgba(255,255,255,0.5)', fontWeight: 600, transform: d.contactY ? `translateY(${d.contactY}px)` : undefined, cursor: d.onContactClick ? 'pointer' : 'default' }}>
           {d.phone || '+503 7XXX-XXXX'}{d.website ? ` · ${d.website}` : ''}
           </div>
         </div>
@@ -638,13 +695,13 @@ export const Template_CenterGradient = ({ d }: { d: FlyerData }) => {
           onClick={d.onCtaClick ? (e) => { e.stopPropagation(); d.onCtaClick?.(); } : undefined}
           style={{ display: 'inline-block', transform: d.ctaY ? `translateY(${d.ctaY}px)` : undefined }}
         >
-          <PillBtn label={d.cta || 'EMPEZAR'} bg1={d.ctaBgColor || 'rgba(255,255,255,0.98)'} bg2={d.ctaBgColor ? d.ctaBgColor + 'dd' : 'rgba(255,255,255,0.85)'} color={d.ctaTextColor || acc} s={s * (d.ctaScale ?? 1)} style={{ fontSize: Math.round(13 * s), minWidth: Math.round(180 * s), alignSelf: d.textAlign === 'left' ? 'flex-start' : d.textAlign === 'right' ? 'flex-end' : 'center' }} />
+          <PillBtn label={d.cta || 'EMPEZAR'} bg1={d.ctaBgColor || 'rgba(255,255,255,0.98)'} bg2={d.ctaBgColor ? d.ctaBgColor + 'dd' : 'rgba(255,255,255,0.85)'} color={d.ctaTextColor || acc} s={s * (d.ctaScale ?? 1)} style={{ fontSize: Math.round(13 * s * (d.ctaScale ?? 1)), minWidth: Math.round(180 * s * (d.ctaScale ?? 1)), alignSelf: d.textAlign === 'left' ? 'flex-start' : d.textAlign === 'right' ? 'flex-end' : 'center' }} />
         </div>
       </div>
 
       {/* Footer bar */}
       <div data-element-id="contact" className={d.onContactClick ? "editable-element flyer-contact-element" : "flyer-contact-element"} onClick={d.onContactClick ? (e) => { e.stopPropagation(); d.onContactClick?.(); } : undefined} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: Math.round(38 * s), background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 , transform: d.contactY ? `translateY(${d.contactY}px)` : undefined, cursor: d.onContactClick ? 'pointer' : 'default' }}>
-        <span style={{  color: '#fff', fontWeight: 800, fontSize: Math.round(13 * s * (d.contactScale ?? 1))  }}>
+        <span style={{  color: d.contactColor || '#fff', fontWeight: 800, fontSize: Math.round(13 * s * (d.contactScale ?? 1))  }}>
           {d.phone || '+503 7XXX-XXXX'}{d.website ? ` · ${d.website}` : ''}
         </span>
       </div>
@@ -660,6 +717,7 @@ export const Template_CorporateLight = ({ d }: { d: FlyerData }) => {
   const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#1e40af';
   const isBg = !!d.bgImageUrl;
+  const maxLen = Math.max(...(d.beneficios || []).slice(0, 4).map(b => (b || '').length), 0);
   return (
     <div 
       onClick={d.onBgClick ? (e) => { e.stopPropagation(); d.onBgClick?.(); } : undefined}
@@ -722,18 +780,29 @@ export const Template_CorporateLight = ({ d }: { d: FlyerData }) => {
           <div 
             data-element-id="benefits" className={d.onBenefitsClick ? "editable-element flyer-benefits-element" : "flyer-benefits-element"}
             onClick={d.onBenefitsClick ? (e) => { e.stopPropagation(); d.onBenefitsClick?.(); } : undefined}
-            style={{ display: 'flex', flexDirection: 'column', gap: Math.round(4 * s), alignItems: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start', transform: d.benefitsY ? `translateY(${d.benefitsY}px)` : undefined }}
+            style={{ display: 'flex', flexDirection: 'column', gap: Math.round(4 * s), alignItems: 'flex-start', transform: d.benefitsY ? `translateY(${d.benefitsY}px)` : undefined }}
           >
-            {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRowDark key={i} text={b} scale={d.benefitsScale ?? 1} bold={!!d.benefitsBold} color={d.benefitsColor || acc} s={s} />)}
+            {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRowDark key={i} text={b} scale={d.benefitsScale ?? 1} bold={!!d.benefitsBold} color={d.benefitsColor || acc} s={s} maxLen={maxLen} />)}
           </div>
           <div 
             data-element-id="cta" className={d.onCtaClick ? "editable-element flyer-cta-element" : "flyer-cta-element"}
             onClick={d.onCtaClick ? (e) => { e.stopPropagation(); d.onCtaClick?.(); } : undefined}
             style={{ display: 'inline-block', transform: d.ctaY ? `translateY(${d.ctaY}px)` : undefined }}
           >
-            <PillBtn label={d.cta || 'CONTACTAR'} bg1={d.ctaBgColor || acc} bg2={d.ctaBgColor ? d.ctaBgColor + 'cc' : acc + 'cc'} color={d.ctaTextColor || '#fff'} s={s * (d.ctaScale ?? 1)} style={{ fontSize: Math.round(12 * s), padding: `${Math.round(12 * s)}px ${Math.round(20 * s)}px`, alignSelf: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start' }} />
+            <PillBtn label={d.cta || 'CONTACTAR'} bg1={d.ctaBgColor || acc} bg2={d.ctaBgColor ? d.ctaBgColor + 'cc' : acc + 'cc'} color={d.ctaTextColor || '#fff'} s={s * (d.ctaScale ?? 1)} style={{ fontSize: Math.round(12 * s * (d.ctaScale ?? 1)), padding: `${Math.round(12 * s * (d.ctaScale ?? 1))}px ${Math.round(20 * s * (d.ctaScale ?? 1))}px`, alignSelf: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start' }} />
           </div>
-          <div style={{ fontSize: 11, color: '#475569', fontWeight: 700 }}>
+          <div 
+            data-element-id="contact" 
+            className={d.onContactClick ? "editable-element flyer-contact-element" : "flyer-contact-element"} 
+            onClick={d.onContactClick ? (e) => { e.stopPropagation(); d.onContactClick?.(); } : undefined} 
+            style={{ 
+              fontSize: Math.round(11 * s * (d.contactScale ?? 1)), 
+              color: d.contactColor || '#475569', 
+              fontWeight: 700, 
+              cursor: d.onContactClick ? 'pointer' : 'default',
+              transform: (d.contactX || d.contactY) ? `translate(${d.contactX ?? 0}px, ${d.contactY ?? 0}px)` : undefined 
+            }}
+          >
             {d.phone || '+503 7XXX-XXXX'}{d.website ? ` · ${d.website}` : ''}
           </div>
         </div>
@@ -817,7 +886,7 @@ export const Template_DarkLuxury = ({ d }: { d: FlyerData }) => {
         <div 
           data-element-id="benefits" className={d.onBenefitsClick ? "editable-element flyer-benefits-element" : "flyer-benefits-element"}
           onClick={d.onBenefitsClick ? (e) => { e.stopPropagation(); d.onBenefitsClick?.(); } : undefined}
-          style={{ display: 'flex', flexDirection: 'column', gap: Math.round(6 * s), margin: `${Math.round(6 * s)}px 0`, textAlign: d.textAlign || 'left', width: '100%', alignItems: d.textAlign === 'left' ? 'flex-start' : d.textAlign === 'right' ? 'flex-end' : 'center', transform: d.benefitsY ? `translateY(${d.benefitsY}px)` : undefined }}
+          style={{ display: 'flex', flexDirection: 'column', gap: Math.round(6 * s), margin: `${Math.round(6 * s)}px 0`, alignSelf: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start', alignItems: 'flex-start', transform: d.benefitsY ? `translateY(${d.benefitsY}px)` : undefined }}
         >
           {(d.beneficios || []).slice(0, 4).map((b, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: Math.round(8 * s), background: 'rgba(255,255,255,0.04)', border: d.benefitsColor ? `1px solid ${d.benefitsColor}` : `1px solid ${acc}22`, borderRadius: Math.round(8 * s), padding: `${Math.round(6 * s)}px ${Math.round(12 * s)}px` }}>
@@ -832,13 +901,13 @@ export const Template_DarkLuxury = ({ d }: { d: FlyerData }) => {
           onClick={d.onCtaClick ? (e) => { e.stopPropagation(); d.onCtaClick?.(); } : undefined}
           style={{ display: 'inline-block', transform: d.ctaY ? `translateY(${d.ctaY}px)` : undefined }}
         >
-          <PillBtn label={d.cta || 'CONTACTAR'} bg1={d.ctaBgColor || acc} bg2={d.ctaBgColor ? d.ctaBgColor + 'bb' : acc + 'bb'} color={d.ctaTextColor || '#000'} s={s * (d.ctaScale ?? 1)} style={{ fontSize: Math.round(13 * s), minWidth: Math.round(180 * s), alignSelf: d.textAlign === 'left' ? 'flex-start' : d.textAlign === 'right' ? 'flex-end' : 'center' }} />
+          <PillBtn label={d.cta || 'CONTACTAR'} bg1={d.ctaBgColor || acc} bg2={d.ctaBgColor ? d.ctaBgColor + 'bb' : acc + 'bb'} color={d.ctaTextColor || '#000'} s={s * (d.ctaScale ?? 1)} style={{ fontSize: Math.round(13 * s * (d.ctaScale ?? 1)), minWidth: Math.round(180 * s * (d.ctaScale ?? 1)), alignSelf: d.textAlign === 'left' ? 'flex-start' : d.textAlign === 'right' ? 'flex-end' : 'center' }} />
         </div>
       </div>
 
       {/* Footer bar */}
       <div data-element-id="contact" className={d.onContactClick ? "editable-element flyer-contact-element" : "flyer-contact-element"} onClick={d.onContactClick ? (e) => { e.stopPropagation(); d.onContactClick?.(); } : undefined} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: Math.round(38 * s), background: `linear-gradient(90deg, ${acc}, ${acc}bb)`, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 , transform: d.contactY ? `translateY(${d.contactY}px)` : undefined, cursor: d.onContactClick ? 'pointer' : 'default' }}>
-        <span style={{  color: '#000', fontWeight: 900, fontSize: Math.round(13 * s * (d.contactScale ?? 1)), letterSpacing: '0.05em'  }}>
+        <span style={{  color: d.contactColor || '#000', fontWeight: 900, fontSize: Math.round(13 * s * (d.contactScale ?? 1)), letterSpacing: '0.05em'  }}>
           {d.phone || '+503 7XXX-XXXX'}
         </span>
       </div>
@@ -854,6 +923,7 @@ export const Template_PromoPop = ({ d }: { d: FlyerData }) => {
   const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#f59e0b';
   const isBg = !!d.bgImageUrl;
+  const maxLen = Math.max(...(d.beneficios || []).slice(0, 4).map(b => (b || '').length), 0);
   return (
     <div 
       onClick={d.onBgClick ? (e) => { e.stopPropagation(); d.onBgClick?.(); } : undefined}
@@ -921,20 +991,20 @@ export const Template_PromoPop = ({ d }: { d: FlyerData }) => {
           onClick={d.onBenefitsClick ? (e) => { e.stopPropagation(); d.onBenefitsClick?.(); } : undefined}
           style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: `${Math.round(4 * s)}px ${Math.round(8 * s)}px`, margin: `${Math.round(4 * s)}px 0`, width: '100%', transform: d.benefitsY ? `translateY(${d.benefitsY}px)` : undefined }}
         >
-          {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRowDark key={i} text={b} scale={d.benefitsScale ?? 1} bold={!!d.benefitsBold} color={d.benefitsColor || acc} s={s} />)}
+          {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRowDark key={i} text={b} scale={d.benefitsScale ?? 1} bold={!!d.benefitsBold} color={d.benefitsColor || acc} s={s} maxLen={maxLen} />)}
         </div>
         <div 
           data-element-id="cta" className={d.onCtaClick ? "editable-element flyer-cta-element" : "flyer-cta-element"}
           onClick={d.onCtaClick ? (e) => { e.stopPropagation(); d.onCtaClick?.(); } : undefined}
           style={{ display: 'inline-block', transform: d.ctaY ? `translateY(${d.ctaY}px)` : undefined }}
         >
-          <PillBtn label={d.cta || 'OBTENER OFERTA'} bg1={d.ctaBgColor || acc} bg2={d.ctaBgColor ? d.ctaBgColor + 'cc' : acc + 'cc'} color={d.ctaTextColor || '#000'} s={s * (d.ctaScale ?? 1)} style={{ fontSize: Math.round(12 * s), marginTop: Math.round(4 * s), alignSelf: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start' }} />
+          <PillBtn label={d.cta || 'OBTENER OFERTA'} bg1={d.ctaBgColor || acc} bg2={d.ctaBgColor ? d.ctaBgColor + 'cc' : acc + 'cc'} color={d.ctaTextColor || '#000'} s={s * (d.ctaScale ?? 1)} style={{ fontSize: Math.round(12 * s * (d.ctaScale ?? 1)), marginTop: Math.round(4 * s), alignSelf: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start' }} />
         </div>
       </div>
 
       {/* Footer bar */}
       <div data-element-id="contact" className={d.onContactClick ? "editable-element flyer-contact-element" : "flyer-contact-element"} onClick={d.onContactClick ? (e) => { e.stopPropagation(); d.onContactClick?.(); } : undefined} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: Math.round(38 * s), background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 , transform: d.contactY ? `translateY(${d.contactY}px)` : undefined, cursor: d.onContactClick ? 'pointer' : 'default' }}>
-        <span style={{  color: '#fff', fontWeight: 800, fontSize: Math.round(12 * s * (d.contactScale ?? 1))  }}>
+        <span style={{  color: d.contactColor || '#fff', fontWeight: 800, fontSize: Math.round(12 * s * (d.contactScale ?? 1))  }}>
           {d.phone || '+503 7XXX-XXXX'}{d.website ? ` · ${d.website}` : ''}
         </span>
       </div>
@@ -950,6 +1020,7 @@ export const Template_MinimalEditorial = ({ d }: { d: FlyerData }) => {
   const s = getFontScale(W, H, d.textScale ?? 1);
   const acc = d.accent || '#0ea5e9';
   const isBg = !!d.bgImageUrl;
+  const maxLen = Math.max(...(d.beneficios || []).slice(0, 4).map(b => (b || '').length), 0);
   return (
     <div 
       onClick={d.onBgClick ? (e) => { e.stopPropagation(); d.onBgClick?.(); } : undefined}
@@ -1016,7 +1087,7 @@ export const Template_MinimalEditorial = ({ d }: { d: FlyerData }) => {
           onClick={d.onBenefitsClick ? (e) => { e.stopPropagation(); d.onBenefitsClick?.(); } : undefined}
           style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: `${Math.round(4 * s)}px ${Math.round(8 * s)}px`, margin: `${Math.round(4 * s)}px 0`, width: '100%', transform: d.benefitsY ? `translateY(${d.benefitsY}px)` : undefined }}
         >
-          {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRowDark key={i} text={b} scale={d.benefitsScale ?? 1} bold={!!d.benefitsBold} color={d.benefitsColor || acc} s={s} />)}
+          {(d.beneficios || []).slice(0, 4).map((b, i) => <BenRowDark key={i} text={b} scale={d.benefitsScale ?? 1} bold={!!d.benefitsBold} color={d.benefitsColor || acc} s={s} maxLen={maxLen} />)}
         </div>
         
         <div 
@@ -1024,13 +1095,13 @@ export const Template_MinimalEditorial = ({ d }: { d: FlyerData }) => {
           onClick={d.onCtaClick ? (e) => { e.stopPropagation(); d.onCtaClick?.(); } : undefined}
           style={{ display: 'inline-block', transform: d.ctaY ? `translateY(${d.ctaY}px)` : undefined }}
         >
-          <PillBtn label={d.cta || 'SABER MÁS'} bg1={d.ctaBgColor || acc} bg2={d.ctaBgColor ? d.ctaBgColor + 'bb' : acc + 'bb'} color={d.ctaTextColor || '#fff'} s={s * (d.ctaScale ?? 1)} style={{ fontSize: Math.round(12 * s), marginTop: Math.round(4 * s), alignSelf: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start' }} />
+          <PillBtn label={d.cta || 'SABER MÁS'} bg1={d.ctaBgColor || acc} bg2={d.ctaBgColor ? d.ctaBgColor + 'bb' : acc + 'bb'} color={d.ctaTextColor || '#fff'} s={s * (d.ctaScale ?? 1)} style={{ fontSize: Math.round(12 * s * (d.ctaScale ?? 1)), marginTop: Math.round(4 * s), alignSelf: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start' }} />
         </div>
       </div>
 
       {/* Footer bar */}
       <div data-element-id="contact" className={d.onContactClick ? "editable-element flyer-contact-element" : "flyer-contact-element"} onClick={d.onContactClick ? (e) => { e.stopPropagation(); d.onContactClick?.(); } : undefined} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: Math.round(36 * s), background: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 , transform: d.contactY ? `translateY(${d.contactY}px)` : undefined, cursor: d.onContactClick ? 'pointer' : 'default' }}>
-        <span style={{  color: '#fff', fontWeight: 800, fontSize: Math.round(12 * s * (d.contactScale ?? 1))  }}>
+        <span style={{  color: d.contactColor || '#fff', fontWeight: 800, fontSize: Math.round(12 * s * (d.contactScale ?? 1))  }}>
           {d.phone || '+503 7XXX-XXXX'}{d.website ? ` · ${d.website}` : ''}
         </span>
       </div>
@@ -1122,13 +1193,13 @@ export const Template_FullBleedBold = ({ d }: { d: FlyerData }) => {
           onClick={d.onCtaClick ? (e) => { e.stopPropagation(); d.onCtaClick?.(); } : undefined}
           style={{ display: 'inline-block', transform: d.ctaY ? `translateY(${d.ctaY}px)` : undefined }}
         >
-          <PillBtn label={d.cta || 'VER MÁS'} bg1={d.ctaBgColor || acc} bg2={d.ctaBgColor ? d.ctaBgColor + 'bb' : acc + 'bb'} color={d.ctaTextColor || '#000'} s={s * (d.ctaScale ?? 1)} style={{ fontSize: Math.round(12 * s), alignSelf: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start', padding: `${Math.round(10 * s)}px ${Math.round(24 * s)}px` }} />
+          <PillBtn label={d.cta || 'VER MÁS'} bg1={d.ctaBgColor || acc} bg2={d.ctaBgColor ? d.ctaBgColor + 'bb' : acc + 'bb'} color={d.ctaTextColor || '#000'} s={s * (d.ctaScale ?? 1)} style={{ fontSize: Math.round(12 * s * (d.ctaScale ?? 1)), alignSelf: d.textAlign === 'center' ? 'center' : d.textAlign === 'right' ? 'flex-end' : 'flex-start', padding: `${Math.round(10 * s * (d.ctaScale ?? 1))}px ${Math.round(24 * s * (d.ctaScale ?? 1))}px` }} />
         </div>
       </div>
 
       {/* Footer bar */}
       <div data-element-id="contact" className={d.onContactClick ? "editable-element flyer-contact-element" : "flyer-contact-element"} onClick={d.onContactClick ? (e) => { e.stopPropagation(); d.onContactClick?.(); } : undefined} style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: Math.round(38 * s), background: acc, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 , transform: d.contactY ? `translateY(${d.contactY}px)` : undefined, cursor: d.onContactClick ? 'pointer' : 'default' }}>
-        <span style={{  color: '#000', fontWeight: 900, fontSize: Math.round(12 * s * (d.contactScale ?? 1)), letterSpacing: '0.04em'  }}>
+        <span style={{  color: d.contactColor || '#000', fontWeight: 900, fontSize: Math.round(12 * s * (d.contactScale ?? 1)), letterSpacing: '0.04em'  }}>
           {d.phone || '+503 7XXX-XXXX'}{d.website ? ` · ${d.website}` : ''}
         </span>
       </div>

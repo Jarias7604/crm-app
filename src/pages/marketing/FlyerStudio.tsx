@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   ArrowLeft, Sparkles, Download, Send, RefreshCw,
-  Zap, Image, Check, ChevronRight, Upload, X, Eye,
+  Zap, Image, Check, ChevronRight, ChevronDown, Upload, X, Eye,
   BarChart3, Wand2, Layers, Palette, Type, Layout,
   ExternalLink, Star, Cpu, Crown, Smile, Building2,
   Instagram, Facebook, Linkedin, Smartphone, Video
@@ -42,6 +42,8 @@ const BRAND_COLORS = [
 
 const DEFAULT_BG_IMAGE = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1080&auto=format&fit=crop';
 
+const DEFAULT_LOGO_SVG = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCI+PHBvbHlnb24gcG9pbnRzPSI1MCwxNSA5MCw4MCAxMCw4MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjN2MzYWVkIiBzdHJva2Utd2lkdGg9IjgiLz48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIxNSIgZmlsbD0iIzdjM2FlZCIvPjwvc3ZnPg==';
+
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const css = {
   page: { height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column' as const, background: '#f0f2f5', fontFamily: 'system-ui,-apple-system,sans-serif', overflow: 'hidden' },
@@ -52,6 +54,27 @@ const css = {
   colBody: { flex: 1, overflowY: 'auto' as const, padding: '16px 18px' },
   label: { fontSize: 10, fontWeight: 800, color: '#54698d', letterSpacing: '0.1em', textTransform: 'uppercase' as const, marginBottom: 6, display: 'block' },
   input: { width: '100%', border: '1px solid #d8dde6', borderRadius: 7, padding: '9px 12px', fontSize: 13, color: '#0f172a', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' as const, background: '#fff' },
+  select: {
+    width: '100%',
+    border: '1px solid #cbd5e1',
+    borderRadius: '8px',
+    padding: '10px 14px',
+    fontSize: '13px',
+    color: '#0f172a',
+    outline: 'none',
+    fontFamily: 'inherit',
+    boxSizing: 'border-box' as const,
+    background: '#ffffff',
+    cursor: 'pointer',
+    transition: 'border-color 0.15s, box-shadow 0.15s',
+    fontWeight: 700,
+    appearance: 'none' as const,
+    backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'></polyline></svg>")`,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 12px center',
+    backgroundSize: '16px 16px',
+    paddingRight: '36px',
+  },
   textarea: { width: '100%', border: '1px solid #d8dde6', borderRadius: 7, padding: '10px 12px', fontSize: 13, color: '#0f172a', outline: 'none', resize: 'vertical' as const, minHeight: 100, fontFamily: 'inherit', boxSizing: 'border-box' as const },
   section: { marginBottom: 20 },
   pill: (active: boolean, accent = '#0070d2') => ({ border: `1.5px solid ${active ? accent : '#e2e8f0'}`, borderRadius: 7, padding: '7px 10px', cursor: 'pointer', background: active ? `${accent}10` : '#f8fafc', transition: 'all 0.12s', display: 'flex', alignItems: 'center', gap: 5 }),
@@ -248,6 +271,17 @@ function getThematicImages(prompt: string): string[] {
   ];
 }
 
+const FONT_OPTIONS = [
+  { value: 'Outfit', name: 'Outfit', desc: 'Moderna & Limpia' },
+  { value: 'Montserrat', name: 'Montserrat', desc: 'Geométrica B2B' },
+  { value: 'Oswald', name: 'Oswald', desc: 'Condensada Impacto' },
+  { value: 'Poppins', name: 'Poppins', desc: 'Redonda Popular' },
+  { value: 'Playfair Display', name: 'Playfair Display', desc: 'Serif Elegante' },
+  { value: 'Bebas Neue', name: 'Bebas Neue', desc: 'Titulares Sans' },
+  { value: 'Raleway', name: 'Raleway', desc: 'Sofisticada Delgado' },
+  { value: 'Inter', name: 'Inter', desc: 'Estándar Pro' },
+];
+
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function FlyerStudio() {
   const { profile } = useAuth();
@@ -266,11 +300,12 @@ export default function FlyerStudio() {
   const [phone, setPhone] = useState('+503 7971-8911');
   const [website, setWebsite] = useState('www.ariasdefense.com');
   const [format, setFormat] = useState('ig-post');
+  const canvasH = Math.round(1080 * (getFlyerDimensions(format).height / getFlyerDimensions(format).width));
   const [tone, setTone] = useState('moderno');
   const [variantCount, setVariantCount] = useState<1 | 2 | 3>(1);
   const [colors, setColors] = useState<string[]>(['#7c3aed']);
   const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [logoPreview, setLogoPreview] = useState('');
+  const [logoPreview, setLogoPreview] = useState(DEFAULT_LOGO_SVG);
   const [isFormatModalOpen, setIsFormatModalOpen] = useState(false);
   const [isToneModalOpen, setIsToneModalOpen] = useState(false);
   const [isColorModalOpen, setIsColorModalOpen] = useState(false);
@@ -327,10 +362,229 @@ export default function FlyerStudio() {
   // showFullAiResult: true = imagen DALL-E 3 pura generada, false = mostrar plantilla HTML
   const [showFullAiResult, setShowFullAiResult] = useState(false);
 
+  const [manualTitle, setManualTitle] = useState('OFERTA ESPECIAL');
+  const [manualSubtitle, setManualSubtitle] = useState('Los mejores servicios y productos profesionales a tu alcance hoy mismo.');
+  const [manualFeatures, setManualFeatures] = useState<string[]>([
+    '✓ Atención Personalizada 24/7',
+    '✓ Calidad 100% Garantizada',
+    '✓ Profesionales Altamente Calificados',
+    '✓ Descuento por Tiempo Limitado'
+  ]);
+  const [manualPrice, setManualPrice] = useState('¡Desde $29.99!');
+  const [textScale, setTextScale] = useState(1.0);
+  const [subtitleScale, setSubtitleScale] = useState(1.0);
+  const [benefitsScale, setBenefitsScale] = useState(1.0);
+  const [flyerFont, setFlyerFont] = useState('Outfit');
+  const [titleFont, setTitleFont] = useState('Outfit');
+  const [subtitleFont, setSubtitleFont] = useState('Outfit');
+  const [benefitsFont, setBenefitsFont] = useState('Outfit');
+  const [ctaFont, setCtaFont] = useState('Outfit');
+  const [contactFont, setContactFont] = useState('Outfit');
+  const [syncFonts, setSyncFonts] = useState(false);
+  const [isFontDropdownOpen, setIsFontDropdownOpen] = useState(false);
+
+  const updateFont = (val: string, element: 'title' | 'subtitle' | 'benefits' | 'cta' | 'contact') => {
+    if (syncFonts) {
+      setFlyerFont(val);
+      setTitleFont(val);
+      setSubtitleFont(val);
+      setBenefitsFont(val);
+      setCtaFont(val);
+      setContactFont(val);
+    } else {
+      if (element === 'title') setTitleFont(val);
+      else if (element === 'subtitle') setSubtitleFont(val);
+      else if (element === 'benefits') setBenefitsFont(val);
+      else if (element === 'cta') setCtaFont(val);
+      else if (element === 'contact') setContactFont(val);
+    }
+  };
+
+  const toggleSyncFonts = (checked: boolean) => {
+    setSyncFonts(checked);
+    if (checked) {
+      let activeFont = flyerFont;
+      if (editingElement === 'title') activeFont = titleFont;
+      else if (editingElement === 'subtitle') activeFont = subtitleFont;
+      else if (editingElement === 'benefits') activeFont = benefitsFont;
+      else if (editingElement === 'cta') activeFont = ctaFont;
+      else if (editingElement === 'contact') activeFont = contactFont;
+
+      setFlyerFont(activeFont);
+      setTitleFont(activeFont);
+      setSubtitleFont(activeFont);
+      setBenefitsFont(activeFont);
+      setCtaFont(activeFont);
+      setContactFont(activeFont);
+    }
+  };
+
+  const renderFontSelector = (currentValue: string, element: 'title' | 'subtitle' | 'benefits' | 'cta' | 'contact') => {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Tipo de Letra (Fuente)</span>
+        <div style={{ position: 'relative', width: '100%' }}>
+          <button
+            type="button"
+            onClick={() => setIsFontDropdownOpen(!isFontDropdownOpen)}
+            style={{
+              width: '100%',
+              border: isFontDropdownOpen ? '1px solid #7c3aed' : '1px solid #cbd5e1',
+              borderRadius: '8px',
+              padding: '10px 14px',
+              fontSize: '13px',
+              color: '#0f172a',
+              outline: 'none',
+              background: '#ffffff',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontWeight: 700,
+              boxShadow: isFontDropdownOpen ? '0 0 0 3px rgba(124, 58, 237, 0.1)' : 'none',
+              transition: 'all 0.15s ease',
+              fontFamily: `"${currentValue}", sans-serif`,
+            }}
+          >
+            <span>{FONT_OPTIONS.find(o => o.value === currentValue)?.name || currentValue}</span>
+            <ChevronDown size={16} style={{ color: '#475569', transform: isFontDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+          </button>
+
+          {isFontDropdownOpen && (
+            <>
+              {/* Invisible backdrop to catch outside clicks */}
+              <div 
+                style={{ position: 'fixed', inset: 0, zIndex: 9999, cursor: 'default' }} 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsFontDropdownOpen(false);
+                }} 
+              />
+              {/* Custom Options List */}
+              <div style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                marginTop: 6,
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                maxHeight: 180,
+                overflowY: 'auto',
+                zIndex: 10000,
+                padding: '4px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+              }}>
+                {FONT_OPTIONS.map(opt => {
+                  const isSelected = opt.value === currentValue;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        updateFont(opt.value, element);
+                        setIsFontDropdownOpen(false);
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        background: isSelected ? '#f5f3ff' : 'transparent',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        textAlign: 'left',
+                        fontFamily: `"${opt.value}", sans-serif`,
+                        fontSize: '13px',
+                        fontWeight: isSelected ? 800 : 500,
+                        color: isSelected ? '#7c3aed' : '#334155',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseOver={e => {
+                        if (!isSelected) {
+                          e.currentTarget.style.background = '#f8fafc';
+                          e.currentTarget.style.color = '#0f172a';
+                        }
+                      }}
+                      onMouseOut={e => {
+                        if (!isSelected) {
+                          e.currentTarget.style.background = 'transparent';
+                          e.currentTarget.style.color = '#334155';
+                        }
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <span style={{ fontSize: '13px' }}>{opt.name}</span>
+                        <span style={{ fontSize: '9px', color: isSelected ? '#a78bfa' : '#94a3b8', fontWeight: 400 }}>{opt.desc}</span>
+                      </div>
+                      {isSelected && <Check size={14} style={{ color: '#7c3aed' }} />}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, cursor: 'pointer', fontSize: 11, fontWeight: 700, color: '#475569', userSelect: 'none' }}>
+          <input 
+            type="checkbox" 
+            checked={syncFonts} 
+            onChange={e => toggleSyncFonts(e.target.checked)} 
+            style={{ 
+              width: 14, 
+              height: 14, 
+              cursor: 'pointer',
+              accentColor: '#7c3aed',
+            }}
+          />
+          Aplicar la misma fuente a todos los textos
+        </label>
+      </div>
+    );
+  };
+  const [titleColor, setTitleColor] = useState('');
+  const [subtitleColor, setSubtitleColor] = useState('');
+  const [benefitsColor, setBenefitsColor] = useState('');
+  const [cardBgColor, setCardBgColor] = useState('');
+  const [ctaBgColor, setCtaBgColor] = useState('');
+  const [ctaTextColor, setCtaTextColor] = useState('');
+  const [contactColor, setContactColor] = useState('');
+  const [textY, setTextY] = useState(0);
+  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
+
   // Manual text & design overrides (Client Request)
-  const [editingElement, setEditingElement] = useState<'title' | 'subtitle' | 'benefits' | 'cta' | 'logo' | 'background' | null>(null);
+  const [editingElement, setEditingElement] = useState<'title' | 'logo' | 'background' | 'subtitle' | 'benefits' | 'cta' | 'contact' | null>(null);
   const [subtitleBold, setSubtitleBold] = useState(false);
   const [benefitsBold, setBenefitsBold] = useState(false);
+
+  // Scaling states
+  const [titleScale, setTitleScale] = useState(1.0);
+  const [ctaScale, setCtaScale] = useState(1.0);
+  const [contactScale, setContactScale] = useState(1.0);
+
+  // Y Translation states
+  const [titleY, setTitleY] = useState(0);
+  const [subtitleY, setSubtitleY] = useState(0);
+  const [benefitsY, setBenefitsY] = useState(0);
+  const [ctaY, setCtaY] = useState(0);
+  const [contactY, setContactY] = useState(0);
+
+  // X Translation states
+  const [titleX, setTitleX] = useState(0);
+  const [subtitleX, setSubtitleX] = useState(0);
+  const [benefitsX, setBenefitsX] = useState(0);
+  const [ctaX, setCtaX] = useState(0);
+  const [contactX, setContactX] = useState(0);
+
+  // Bounding rect for active element overlay
+  const [overlayRect, setOverlayRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
 
   const [modalPos, setModalPos] = useState({ x: 0, y: 0 });
   const dragStart = useRef({ x: 0, y: 0 });
@@ -342,6 +596,62 @@ export default function FlyerStudio() {
       setModalPos({ x: 0, y: 0 });
     }
   }, [editingElement]);
+
+  useEffect(() => {
+    if (!editingElement || !flyerRef.current) {
+      setOverlayRect(null);
+      return;
+    }
+
+    const updateOverlay = () => {
+      if (!flyerRef.current) return;
+      const container = flyerRef.current;
+      const el = container.querySelector(`[data-element-id="${editingElement}"]`);
+      if (el) {
+        const containerRect = container.getBoundingClientRect();
+        const rect = el.getBoundingClientRect();
+        setOverlayRect({
+          top: rect.top - containerRect.top,
+          left: rect.left - containerRect.left,
+          width: rect.width,
+          height: rect.height
+        });
+      } else {
+        setOverlayRect(null);
+      }
+    };
+
+    updateOverlay();
+    const timer = setTimeout(updateOverlay, 50);
+    return () => clearTimeout(timer);
+  }, [
+    editingElement,
+    selectedTemplate,
+    format,
+    titleScale,
+    subtitleScale,
+    benefitsScale,
+    ctaScale,
+    contactScale,
+    titleX,
+    subtitleX,
+    benefitsX,
+    ctaX,
+    contactX,
+    titleY,
+    subtitleY,
+    benefitsY,
+    ctaY,
+    contactY,
+    logoX,
+    logoY,
+    logoSize,
+    manualTitle,
+    manualSubtitle,
+    manualFeatures,
+    manualPrice,
+    contactColor
+  ]);
 
   const handleHeaderMouseDown = (e: React.MouseEvent) => {
     if (e.button !== 0) return;
@@ -367,27 +677,7 @@ export default function FlyerStudio() {
     document.removeEventListener('mousemove', handleHeaderMouseMove);
     document.removeEventListener('mouseup', handleHeaderMouseUp);
   };
-  const [manualTitle, setManualTitle] = useState('OFERTA ESPECIAL');
-  const [manualSubtitle, setManualSubtitle] = useState('Los mejores servicios y productos profesionales a tu alcance hoy mismo.');
-  const [manualFeatures, setManualFeatures] = useState<string[]>([
-    '✓ Atención Personalizada 24/7',
-    '✓ Calidad 100% Garantizada',
-    '✓ Profesionales Altamente Calificados',
-    '✓ Descuento por Tiempo Limitado'
-  ]);
-  const [manualPrice, setManualPrice] = useState('¡Desde $29.99!');
-  const [textScale, setTextScale] = useState(1.0);
-  const [subtitleScale, setSubtitleScale] = useState(1.0);
-  const [benefitsScale, setBenefitsScale] = useState(1.0);
-  const [flyerFont, setFlyerFont] = useState('Outfit');
-  const [titleColor, setTitleColor] = useState('');
-  const [subtitleColor, setSubtitleColor] = useState('');
-  const [benefitsColor, setBenefitsColor] = useState('');
-  const [cardBgColor, setCardBgColor] = useState('');
-  const [ctaBgColor, setCtaBgColor] = useState('');
-  const [ctaTextColor, setCtaTextColor] = useState('');
-  const [textY, setTextY] = useState(0);
-  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
+
 
   useEffect(() => {
     if (!profile?.company_id) return;
@@ -423,7 +713,10 @@ export default function FlyerStudio() {
     setManualFeatures(parsed.features && parsed.features.length > 0 ? parsed.features : deriveFeatures(prompt).slice(0, 4));
     setManualPrice(parsed.price || derivePrice(prompt) || '');
   }, [prompt, companyName]);
-
+  // Reset font dropdown open state when switching edit elements or closing modals
+  useEffect(() => {
+    setIsFontDropdownOpen(false);
+  }, [editingElement]);
 
   // ── Auto-optimize brief with IA as user types ─────────────────────────────
   useEffect(() => {
@@ -927,6 +1220,22 @@ export default function FlyerStudio() {
                   </div>
                 )}
               </div>
+              {logoPreview && (
+                <button
+                  type="button"
+                  onClick={() => setEditingElement('logo')}
+                  style={{
+                    ...css.btn,
+                    marginTop: 8,
+                    fontSize: 11,
+                    padding: '8px 12px',
+                    background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                    fontWeight: 700
+                  }}
+                >
+                  ⚙️ Ajustar posición y tamaño de Logo
+                </button>
+              )}
               <input ref={logoRef} type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (!f) return; setLogoFile(f); const r = new FileReader(); r.onload = ev => setLogoPreview(ev.target?.result as string); r.readAsDataURL(f); }} style={{ display: 'none' }} />
             </div>
 
@@ -1641,86 +1950,122 @@ export default function FlyerStudio() {
                           position: 'absolute', top: 0, left: 0,
                           transform: `scale(${getFlyerDimensions(format).width / 1080})`,
                           transformOrigin: 'top left',
-                          width: 1080, height: 1080, pointerEvents: 'auto'
+                          width: 1080, height: canvasH, pointerEvents: 'auto'
                         }}>
                           {selectedTemplate === 'A' ? (
-                            <FlyerTemplateA data={{
-                              company_name: companyName || 'Mi Empresa',
-                              prompt, cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
-                              headline: manualTitle || 'OFERTA INCREÍBLE',
-                              subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
-                              features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
-                              price: manualPrice || '¡Precios de Locura!',
-                              highlight_title: aiOptimizedText?.highlight_title,
-                              highlight_desc: aiOptimizedText?.highlight_desc,
-                              benefits: aiOptimizedText?.benefits,
-                              mockup_info: aiOptimizedText?.mockup_info,
-                              primaryColor: colors[0] || '#e91e8c',
-                              secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
-                              phone, website, logoUrl: logoPreview || undefined,
-                              bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
-                              flyerFont,
-                              textScale,
-                              subtitleScale,
-                              benefitsScale,
-                              logoSize,
-                              logoX,
-                              logoY,
-                              titleColor,
-                              subtitleColor,
-                              benefitsColor,
-                              cardBgColor,
-                              ctaBgColor,
-                              ctaTextColor,
-                              textY,
-                              textAlign,
-                              onTitleClick: () => setEditingElement('title'),
-                              onSubtitleClick: () => setEditingElement('subtitle'),
-                              onBenefitsClick: () => setEditingElement('benefits'),
-                              onCtaClick: () => setEditingElement('cta'),
-                              onLogoClick: () => setEditingElement('logo'),
-                              onBgClick: () => setEditingElement('background'),
-                              subtitleBold,
-                              benefitsBold, titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }} />
+                            <div style={{ position: 'relative', width: 1080, height: canvasH }}>
+                              <FlyerTemplateA data={{
+                                company_name: companyName || 'Mi Empresa',
+                                containerW: 1080,
+                                containerH: canvasH,
+                                prompt, cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+                                headline: manualTitle || 'OFERTA INCREÍBLE',
+                                subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+                                features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
+                                price: manualPrice || '¡Precios de Locura!',
+                                highlight_title: aiOptimizedText?.highlight_title,
+                                highlight_desc: aiOptimizedText?.highlight_desc,
+                                benefits: aiOptimizedText?.benefits,
+                                mockup_info: aiOptimizedText?.mockup_info,
+                                primaryColor: colors[0] || '#e91e8c',
+                                secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
+                                phone, website, logoUrl: undefined,
+                                bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
+                                flyerFont,
+                                titleFont,
+                                subtitleFont,
+                                benefitsFont,
+                                ctaFont,
+                                contactFont,
+                                textScale,
+                                subtitleScale,
+                                benefitsScale,
+                                logoSize,
+                                logoX,
+                                logoY,
+                                titleColor,
+                                subtitleColor,
+                                benefitsColor,
+                                cardBgColor,
+                                ctaBgColor,
+                                ctaTextColor,
+                                textY,
+                                textAlign,
+                                onTitleClick: () => setEditingElement('title'),
+                                onSubtitleClick: () => setEditingElement('subtitle'),
+                                onBenefitsClick: () => setEditingElement('benefits'),
+                                onCtaClick: () => setEditingElement('cta'),
+                                onLogoClick: () => setEditingElement('logo'),
+                                onBgClick: () => setEditingElement('background'),
+                                subtitleBold,
+                                benefitsBold, titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact'),
+                                titleX, subtitleX, benefitsX, ctaX, contactX, contactColor
+                              }} />
+                              {logoPreview && (
+                                <FreeLogo
+                                  d={{ title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null, logoUrl: logoPreview, industria: companyName || 'Mi Empresa', phone, website, templateId: 'A', containerW: 1080, containerH: canvasH, logoSize, logoX, logoY, onLogoClick: () => setEditingElement('logo') }}
+                                  onMove={(x, y) => { setLogoX(x); setLogoY(y); }}
+                                  onResize={(s) => setLogoSize(s)}
+                                />
+                              )}
+                            </div>
                           ) : selectedTemplate === 'B' ? (
-                            <FlyerTemplateB data={{
-                              company_name: companyName || 'Mi Empresa',
-                              prompt, cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
-                              headline: manualTitle || 'OFERTA INCREÍBLE',
-                              subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
-                              features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
-                              price: manualPrice || '¡Precios de Locura!',
-                              highlight_title: aiOptimizedText?.highlight_title,
-                              highlight_desc: aiOptimizedText?.highlight_desc,
-                              benefits: aiOptimizedText?.benefits,
-                              mockup_info: aiOptimizedText?.mockup_info,
-                              primaryColor: colors[0] || '#9b1c1c',
-                              secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
-                              phone, website, logoUrl: logoPreview || undefined,
-                              bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
-                              flyerFont,
-                              textScale,
-                              subtitleScale,
-                              benefitsScale,
-                              logoSize,
-                              logoX,
-                              logoY,
-                              titleColor,
-                              subtitleColor,
-                              benefitsColor,
-                              cardBgColor,
-                              ctaBgColor,
-                              ctaTextColor,
-                              textY,
-                              textAlign,
-                              onTitleClick: () => setEditingElement('title'),
-                              onSubtitleClick: () => setEditingElement('subtitle'),
-                              onBenefitsClick: () => setEditingElement('benefits'),
-                              onCtaClick: () => setEditingElement('cta'),
-                              onLogoClick: () => setEditingElement('logo'),
-                              onBgClick: () => setEditingElement('background'),
-                              subtitleBold,
-                              benefitsBold, titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }} />
+                            <div style={{ position: 'relative', width: 1080, height: canvasH }}>
+                              <FlyerTemplateB data={{
+                                company_name: companyName || 'Mi Empresa',
+                                containerW: 1080,
+                                containerH: canvasH,
+                                prompt, cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+                                headline: manualTitle || 'OFERTA INCREÍBLE',
+                                subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+                                features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
+                                price: manualPrice || '¡Precios de Locura!',
+                                highlight_title: aiOptimizedText?.highlight_title,
+                                highlight_desc: aiOptimizedText?.highlight_desc,
+                                benefits: aiOptimizedText?.benefits,
+                                mockup_info: aiOptimizedText?.mockup_info,
+                                primaryColor: colors[0] || '#9b1c1c',
+                                secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
+                                phone, website, logoUrl: undefined,
+                                bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
+                                flyerFont,
+                                titleFont,
+                                subtitleFont,
+                                benefitsFont,
+                                ctaFont,
+                                contactFont,
+                                textScale,
+                                subtitleScale,
+                                benefitsScale,
+                                logoSize,
+                                logoX,
+                                logoY,
+                                titleColor,
+                                subtitleColor,
+                                benefitsColor,
+                                cardBgColor,
+                                ctaBgColor,
+                                ctaTextColor,
+                                textY,
+                                textAlign,
+                                onTitleClick: () => setEditingElement('title'),
+                                onSubtitleClick: () => setEditingElement('subtitle'),
+                                onBenefitsClick: () => setEditingElement('benefits'),
+                                onCtaClick: () => setEditingElement('cta'),
+                                onLogoClick: () => setEditingElement('logo'),
+                                onBgClick: () => setEditingElement('background'),
+                                subtitleBold,
+                                benefitsBold, titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact'),
+                                titleX, subtitleX, benefitsX, ctaX, contactX, contactColor
+                              }} />
+                              {logoPreview && (
+                                <FreeLogo
+                                  d={{ title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null, logoUrl: logoPreview, industria: companyName || 'Mi Empresa', phone, website, templateId: 'B', containerW: 1080, containerH: canvasH, logoSize, logoX, logoY, onLogoClick: () => setEditingElement('logo') }}
+                                  onMove={(x, y) => { setLogoX(x); setLogoY(y); }}
+                                  onResize={(s) => setLogoSize(s)}
+                                />
+                              )}
+                            </div>
                           ) : (
                             <RenderFlyer d={{
                               title: manualTitle || 'TU OFERTA',
@@ -1732,9 +2077,14 @@ export default function FlyerStudio() {
                               logoUrl: logoPreview || null,
                               industria: companyName || 'Mi Empresa',
                               phone, website, templateId: selectedTemplate,
-                              containerW: 1080, containerH: 1080,
+                              containerW: 1080, containerH: canvasH,
                               logoSize, logoX, logoY,
                               flyerFont,
+                              titleFont,
+                              subtitleFont,
+                              benefitsFont,
+                              ctaFont,
+                              contactFont,
                               textScale,
                               subtitleScale,
                               benefitsScale,
@@ -1753,7 +2103,8 @@ export default function FlyerStudio() {
                               onLogoClick: () => setEditingElement('logo'),
                               onBgClick: () => setEditingElement('background'),
                               subtitleBold,
-                              benefitsBold, titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }}
+                              benefitsBold, titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact'),
+                              titleX, subtitleX, benefitsX, ctaX, contactX, contactColor }}
                             onLogoMove={(x, y) => { setLogoX(x); setLogoY(y); }}
                             onLogoResize={(s) => setLogoSize(s)}
                             />
@@ -1779,7 +2130,14 @@ export default function FlyerStudio() {
                             onMouseDown={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
+                              const startX = e.clientX;
                               const startY = e.clientY;
+                              const initialX = 
+                                editingElement === 'title' ? titleX :
+                                editingElement === 'subtitle' ? subtitleX :
+                                editingElement === 'benefits' ? benefitsX :
+                                editingElement === 'cta' ? ctaX :
+                                editingElement === 'contact' ? contactX : 0;
                               const initialY = 
                                 editingElement === 'title' ? titleY :
                                 editingElement === 'subtitle' ? subtitleY :
@@ -1790,15 +2148,18 @@ export default function FlyerStudio() {
                               const scale = getFlyerDimensions(format).width / 1080;
 
                               const handleMouseMove = (moveEvent: MouseEvent) => {
+                                const dx = moveEvent.clientX - startX;
                                 const dy = moveEvent.clientY - startY;
+                                const canvasDx = dx / scale;
                                 const canvasDy = dy / scale;
+                                const newX = initialX + canvasDx;
                                 const newY = initialY + canvasDy;
                                 
-                                if (editingElement === 'title') setTitleY(newY);
-                                else if (editingElement === 'subtitle') setSubtitleY(newY);
-                                else if (editingElement === 'benefits') setBenefitsY(newY);
-                                else if (editingElement === 'cta') setCtaY(newY);
-                                else if (editingElement === 'contact') setContactY(newY);
+                                if (editingElement === 'title') { setTitleX(newX); setTitleY(newY); }
+                                else if (editingElement === 'subtitle') { setSubtitleX(newX); setSubtitleY(newY); }
+                                else if (editingElement === 'benefits') { setBenefitsX(newX); setBenefitsY(newY); }
+                                else if (editingElement === 'cta') { setCtaX(newX); setCtaY(newY); }
+                                else if (editingElement === 'contact') { setContactX(newX); setContactY(newY); }
                               };
 
                               const handleMouseUp = () => {
@@ -1854,7 +2215,7 @@ export default function FlyerStudio() {
                                 e.preventDefault();
                                 const startX = e.clientX;
                                 const initialScale = 
-                                  editingElement === 'title' ? textScale :
+                                  editingElement === 'title' ? titleScale :
                                   editingElement === 'subtitle' ? subtitleScale :
                                   editingElement === 'benefits' ? benefitsScale :
                                   editingElement === 'cta' ? ctaScale :
@@ -1864,7 +2225,7 @@ export default function FlyerStudio() {
                                   const dx = moveEvent.clientX - startX;
                                   const newScale = Math.max(0.4, Math.min(3.0, initialScale + dx / 150));
                                   
-                                  if (editingElement === 'title') setTextScale(newScale);
+                                  if (editingElement === 'title') setTitleScale(newScale);
                                   else if (editingElement === 'subtitle') setSubtitleScale(newScale);
                                   else if (editingElement === 'benefits') setBenefitsScale(newScale);
                                   else if (editingElement === 'cta') setCtaScale(newScale);
@@ -1894,76 +2255,132 @@ export default function FlyerStudio() {
       </div>
       {/* Hidden template render area — captured by html-to-image */}
       <div style={{ position: 'fixed', left: '-9999px', top: 0, pointerEvents: 'none', zIndex: -1 }}>
-        <FlyerTemplateA ref={templateRefA} data={{
-          company_name: companyName || 'Mi Empresa',
-          prompt,
-          cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
-          headline: manualTitle || 'OFERTA INCREÍBLE',
-          subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
-          features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
-          price: manualPrice || '¡Precios de Locura!',
-          highlight_title: aiOptimizedText?.highlight_title,
-          highlight_desc: aiOptimizedText?.highlight_desc,
-          benefits: aiOptimizedText?.benefits,
-          mockup_info: aiOptimizedText?.mockup_info,
-          primaryColor: colors[0] || '#e91e8c',
-          secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
-          phone, website,
-          logoUrl: logoPreview || undefined,
-          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
-          flyerFont,
-          textScale,
-          subtitleScale,
-          benefitsScale,
-          logoSize,
-          logoX,
-          logoY,
-          titleColor,
-          subtitleColor,
-          benefitsColor,
-          cardBgColor,
-          ctaBgColor,
-          ctaTextColor,
-          textY,
-          textAlign,
-          subtitleBold,
-          benefitsBold
-        , titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }} />
-        <FlyerTemplateB ref={templateRefB} data={{
-          company_name: companyName || 'Mi Empresa',
-          prompt,
-          cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
-          headline: manualTitle || 'OFERTA INCREÍBLE',
-          subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
-          features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
-          price: manualPrice || '¡Precios de Locura!',
-          highlight_title: aiOptimizedText?.highlight_title,
-          highlight_desc: aiOptimizedText?.highlight_desc,
-          benefits: aiOptimizedText?.benefits,
-          mockup_info: aiOptimizedText?.mockup_info,
-          primaryColor: colors[0] || '#9b1c1c',
-          secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
-          phone, website,
-          logoUrl: logoPreview || undefined,
-          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
-          flyerFont,
-          textScale,
-          subtitleScale,
-          benefitsScale,
-          logoSize,
-          logoX,
-          logoY,
-          titleColor,
-          subtitleColor,
-          benefitsColor,
-          cardBgColor,
-          ctaBgColor,
-          ctaTextColor,
-          textY,
-          textAlign,
-          subtitleBold,
-          benefitsBold
-        , titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }} />
+        <div ref={templateRefA} style={{ position: 'relative', width: 1080, height: canvasH }}>
+          <FlyerTemplateA data={{
+            company_name: companyName || 'Mi Empresa',
+            prompt,
+            cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+            headline: manualTitle || 'OFERTA INCREÍBLE',
+            subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+            features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
+            price: manualPrice || '¡Precios de Locura!',
+            highlight_title: aiOptimizedText?.highlight_title,
+            highlight_desc: aiOptimizedText?.highlight_desc,
+            benefits: aiOptimizedText?.benefits,
+            mockup_info: aiOptimizedText?.mockup_info,
+            primaryColor: colors[0] || '#e91e8c',
+            secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
+            phone, website,
+            logoUrl: undefined,
+            bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
+            flyerFont,
+            titleFont,
+            subtitleFont,
+            benefitsFont,
+            ctaFont,
+            contactFont,
+            textScale,
+            subtitleScale,
+            benefitsScale,
+            logoSize,
+            logoX,
+            logoY,
+            containerW: 1080,
+            containerH: canvasH,
+            titleColor,
+            subtitleColor,
+            benefitsColor,
+            cardBgColor,
+            ctaBgColor,
+            ctaTextColor,
+            textY,
+            textAlign,
+            subtitleBold,
+            benefitsBold,
+            titleScale,
+            titleY,
+            subtitleY,
+            benefitsY,
+            ctaScale,
+            ctaY,
+            contactScale,
+            contactY,
+            onContactClick: () => setEditingElement('contact'),
+            titleX,
+            subtitleX,
+            benefitsX,
+            ctaX,
+            contactX,
+            contactColor
+          }} />
+          {logoPreview && (
+            <FreeLogo d={{ title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null, logoUrl: logoPreview, industria: companyName || 'Mi Empresa', phone, website, templateId: 'A', containerW: 1080, containerH: canvasH, logoSize, logoX, logoY }} />
+          )}
+        </div>
+
+        <div ref={templateRefB} style={{ position: 'relative', width: 1080, height: canvasH }}>
+          <FlyerTemplateB data={{
+            company_name: companyName || 'Mi Empresa',
+            prompt,
+            cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+            headline: manualTitle || 'OFERTA INCREÍBLE',
+            subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+            features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'],
+            price: manualPrice || '¡Precios de Locura!',
+            highlight_title: aiOptimizedText?.highlight_title,
+            highlight_desc: aiOptimizedText?.highlight_desc,
+            benefits: aiOptimizedText?.benefits,
+            mockup_info: aiOptimizedText?.mockup_info,
+            primaryColor: colors[0] || '#9b1c1c',
+            secondaryColor: colors[1] || (colors[0] ? '#0f172a' : '#1a1a2e'),
+            phone, website,
+            logoUrl: undefined,
+            bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
+            flyerFont,
+            titleFont,
+            subtitleFont,
+            benefitsFont,
+            ctaFont,
+            contactFont,
+            textScale,
+            subtitleScale,
+            benefitsScale,
+            logoSize,
+            logoX,
+            logoY,
+            containerW: 1080,
+            containerH: canvasH,
+            titleColor,
+            subtitleColor,
+            benefitsColor,
+            cardBgColor,
+            ctaBgColor,
+            ctaTextColor,
+            textY,
+            textAlign,
+            subtitleBold,
+            benefitsBold,
+            titleScale,
+            titleY,
+            subtitleY,
+            benefitsY,
+            ctaScale,
+            ctaY,
+            contactScale,
+            contactY,
+            onContactClick: () => setEditingElement('contact'),
+            titleX,
+            subtitleX,
+            benefitsX,
+            ctaX,
+            contactX,
+            contactColor
+          }} />
+          {logoPreview && (
+            <FreeLogo d={{ title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null, logoUrl: logoPreview, industria: companyName || 'Mi Empresa', phone, website, templateId: 'B', containerW: 1080, containerH: canvasH, logoSize, logoX, logoY }} />
+          )}
+        </div>
+
         <div ref={templateRefMarketing}>
           <RenderFlyer d={{
             title: manualTitle || 'TU OFERTA',
@@ -1975,9 +2392,14 @@ export default function FlyerStudio() {
             logoUrl: logoPreview || null,
             industria: companyName || 'Mi Empresa',
             phone, website, templateId: selectedTemplate,
-            containerW: 1080, containerH: 1080,
+            containerW: 1080, containerH: canvasH,
             logoSize, logoX, logoY,
             flyerFont,
+            titleFont,
+            subtitleFont,
+            benefitsFont,
+            ctaFont,
+            contactFont,
             textScale,
             subtitleScale,
             benefitsScale,
@@ -1990,8 +2412,23 @@ export default function FlyerStudio() {
             textY,
             textAlign,
             subtitleBold,
-            benefitsBold
-          , titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }} />
+            benefitsBold,
+            titleScale,
+            titleY,
+            subtitleY,
+            benefitsY,
+            ctaScale,
+            ctaY,
+            contactScale,
+            contactY,
+            onContactClick: () => setEditingElement('contact'),
+            titleX,
+            subtitleX,
+            benefitsX,
+            ctaX,
+            contactX,
+            contactColor
+          }} />
         </div>
       </div>
 
@@ -2069,7 +2506,7 @@ export default function FlyerStudio() {
                   />
                   {logoPreview && (
                     <FreeLogo
-                      d={{ title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null, logoUrl: logoPreview, industria: '', phone: '', website: '', templateId: 'direct-mockup', containerW: 600, containerH: 600, logoSize, logoX, logoY }}
+                      d={{ title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null, logoUrl: logoPreview, industria: '', phone: '', website: '', templateId: 'direct-mockup', containerW: 600, containerH: Math.round(600 * (getFlyerDimensions(format).height / getFlyerDimensions(format).width)), logoSize, logoX, logoY }}
                       onMove={(x, y) => { setLogoX(x); setLogoY(y); }}
                       onResize={(s) => setLogoSize(s)}
                     />
@@ -2087,69 +2524,95 @@ export default function FlyerStudio() {
                   width: fitW, height: fitH, overflow: 'hidden', position: 'relative',
                   borderRadius: 14, boxShadow: '0 20px 50px rgba(0,0,0,0.15)', background: '#fff'
                 }}>
-                  <div style={{ transform: `scale(${sc})`, transformOrigin: 'top left', width: 1080, height: 1080, pointerEvents: 'none' }}>
+                  <div style={{ transform: `scale(${sc})`, transformOrigin: 'top left', width: 1080, height: canvasH, pointerEvents: 'none' }}>
                     {selectedTemplate === 'A' ? (
-                      <FlyerTemplateA data={{
-                        company_name: companyName || 'Mi Empresa', prompt,
-                        cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
-                        headline: manualTitle || 'OFERTA INCREÍBLE', subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
-                        features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'], price: manualPrice || '¡Precios de Locura!',
-                        highlight_title: aiOptimizedText?.highlight_title,
-                        highlight_desc: aiOptimizedText?.highlight_desc,
-                        benefits: aiOptimizedText?.benefits,
-                        mockup_info: aiOptimizedText?.mockup_info,
-                        primaryColor: colors[0] || '#e91e8c', secondaryColor: colors[1] || '#1a1a2e',
-                        phone, website, logoUrl: logoPreview || undefined,
-                        bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
-                        flyerFont,
-                        textScale,
-                        subtitleScale,
-                        benefitsScale,
-                        logoSize,
-                        logoX,
-                        logoY,
-                        titleColor,
-                        subtitleColor,
-                        benefitsColor,
-                        cardBgColor,
-                        ctaBgColor,
-                        ctaTextColor,
-                        textY,
-                        textAlign,
-                        subtitleBold,
-                        benefitsBold
-                      , titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }} />
+                      <div style={{ position: 'relative', width: 1080, height: canvasH }}>
+                        <FlyerTemplateA data={{
+                          company_name: companyName || 'Mi Empresa', prompt,
+                          cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+                          headline: manualTitle || 'OFERTA INCREÍBLE', subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+                          features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'], price: manualPrice || '¡Precios de Locura!',
+                          highlight_title: aiOptimizedText?.highlight_title,
+                          highlight_desc: aiOptimizedText?.highlight_desc,
+                          benefits: aiOptimizedText?.benefits,
+                          mockup_info: aiOptimizedText?.mockup_info,
+                          primaryColor: colors[0] || '#e91e8c', secondaryColor: colors[1] || '#1a1a2e',
+                          phone, website, logoUrl: undefined,
+                          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
+                          flyerFont,
+                          titleFont,
+                          subtitleFont,
+                          benefitsFont,
+                          ctaFont,
+                          contactFont,
+                          textScale,
+                          subtitleScale,
+                          benefitsScale,
+                          logoSize,
+                          logoX,
+                          logoY,
+                          containerW: 1080,
+                          containerH: canvasH,
+                          titleColor,
+                          subtitleColor,
+                          benefitsColor,
+                          cardBgColor,
+                          ctaBgColor,
+                          ctaTextColor,
+                          textY,
+                          textAlign,
+                          subtitleBold,
+                          benefitsBold,
+                          titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact'),
+                          titleX, subtitleX, benefitsX, ctaX, contactX, contactColor }} />
+                        {logoPreview && (
+                          <FreeLogo d={{ title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null, logoUrl: logoPreview, industria: companyName || 'Mi Empresa', phone, website, templateId: 'A', containerW: 1080, containerH: canvasH, logoSize, logoX, logoY }} />
+                        )}
+                      </div>
                     ) : selectedTemplate === 'B' ? (
-                      <FlyerTemplateB data={{
-                        company_name: companyName || 'Mi Empresa', prompt,
-                        cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
-                        headline: manualTitle || 'OFERTA INCREÍBLE', subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
-                        features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'], price: manualPrice || '¡Precios de Locura!',
-                        highlight_title: aiOptimizedText?.highlight_title,
-                        highlight_desc: aiOptimizedText?.highlight_desc,
-                        benefits: aiOptimizedText?.benefits,
-                        mockup_info: aiOptimizedText?.mockup_info,
-                        primaryColor: colors[0] || '#9b1c1c', secondaryColor: colors[1] || '#1a1a2e',
-                        phone, website, logoUrl: logoPreview || undefined,
-                        bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
-                        flyerFont,
-                        textScale,
-                        subtitleScale,
-                        benefitsScale,
-                        logoSize,
-                        logoX,
-                        logoY,
-                        titleColor,
-                        subtitleColor,
-                        benefitsColor,
-                        cardBgColor,
-                        ctaBgColor,
-                        ctaTextColor,
-                        textY,
-                        textAlign,
-                        subtitleBold,
-                        benefitsBold
-                      , titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }} />
+                      <div style={{ position: 'relative', width: 1080, height: canvasH }}>
+                        <FlyerTemplateB data={{
+                          company_name: companyName || 'Mi Empresa', prompt,
+                          cta: aiOptimizedText?.cta || cta || '¡CONTÁCTANOS HOY!',
+                          headline: manualTitle || 'OFERTA INCREÍBLE', subheadline: manualSubtitle || 'Soluciones profesionales a la medida de tu negocio.',
+                          features: manualFeatures.some(f => f.trim() !== '') ? manualFeatures : ['✓ Garantía por Escrito', '✓ Soporte Técnico 24/7', '✓ Profesionales Expertos', '✓ Cobertura Inmediata'], price: manualPrice || '¡Precios de Locura!',
+                          highlight_title: aiOptimizedText?.highlight_title,
+                          highlight_desc: aiOptimizedText?.highlight_desc,
+                          benefits: aiOptimizedText?.benefits,
+                          mockup_info: aiOptimizedText?.mockup_info,
+                          primaryColor: colors[0] || '#9b1c1c', secondaryColor: colors[1] || '#1a1a2e',
+                          phone, website, logoUrl: undefined,
+                          bgImageUrl: bgUploadPreview || (variants.length > 0 ? variants[selected] : undefined) || DEFAULT_BG_IMAGE,
+                          flyerFont,
+                          titleFont,
+                          subtitleFont,
+                          benefitsFont,
+                          ctaFont,
+                          contactFont,
+                          textScale,
+                          subtitleScale,
+                          benefitsScale,
+                          logoSize,
+                          logoX,
+                          logoY,
+                          containerW: 1080,
+                          containerH: canvasH,
+                          titleColor,
+                          subtitleColor,
+                          benefitsColor,
+                          cardBgColor,
+                          ctaBgColor,
+                          ctaTextColor,
+                          textY,
+                          textAlign,
+                          subtitleBold,
+                          benefitsBold,
+                          titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact'),
+                          titleX, subtitleX, benefitsX, ctaX, contactX, contactColor }} />
+                        {logoPreview && (
+                          <FreeLogo d={{ title: '', subtitle: '', cta: '', beneficios: [], accent: '', bgImageUrl: null, logoUrl: logoPreview, industria: companyName || 'Mi Empresa', phone, website, templateId: 'B', containerW: 1080, containerH: canvasH, logoSize, logoX, logoY }} />
+                        )}
+                      </div>
                     ) : (
                       <RenderFlyer d={{
                         title: manualTitle || 'TU OFERTA',
@@ -2161,9 +2624,14 @@ export default function FlyerStudio() {
                         logoUrl: logoPreview || null,
                         industria: companyName || 'Mi Empresa',
                         phone, website, templateId: selectedTemplate,
-                        containerW: 1080, containerH: 1080,
+                        containerW: 1080, containerH: canvasH,
                         logoSize, logoX, logoY,
                         flyerFont,
+                        titleFont,
+                        subtitleFont,
+                        benefitsFont,
+                        ctaFont,
+                        contactFont,
                         textScale,
                         subtitleScale,
                         benefitsScale,
@@ -2176,10 +2644,9 @@ export default function FlyerStudio() {
                         textY,
                         textAlign,
                         subtitleBold,
-                        benefitsBold
-                      , titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }}
-                      onLogoMove={(x, y) => { setLogoX(x); setLogoY(y); }}
-                      onLogoResize={(s) => setLogoSize(s)}
+                        benefitsBold,
+                        titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact'),
+                        titleX, subtitleX, benefitsX, ctaX, contactX, contactColor }}
                       />
                     )}
                   </div>
@@ -2215,30 +2682,25 @@ export default function FlyerStudio() {
 
       {/* ── ELEMENT EDIT MODAL ────────────────────────────────────────────────── */}
       {editingElement !== null && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 2000,
-          background: 'rgba(0, 0, 0, 0.02)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          animation: 'fadeIn 0.2s ease-out',
-          padding: 20
-        }} onClick={() => setEditingElement(null)}>
-          {/* Prevent click closing when clicking inside the modal card */}
-          <div 
-            style={{
-              background: 'rgba(255, 255, 255, 0.85)',
-              backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255, 255, 255, 0.4)',
-              borderRadius: 20,
-              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
-              width: '100%',
-              maxWidth: 420,
-              display: 'flex', flexDirection: 'column',
-              transform: `translate(${modalPos.x}px, ${modalPos.y}px)`,
-              animation: 'scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-              overflow: 'hidden'
-            }} 
-            onClick={e => e.stopPropagation()}
-          >
+        <div 
+          style={{
+            position: 'fixed',
+            bottom: 40,
+            right: 40,
+            zIndex: 1999, // Render on top of normal UI, but does not block canvas pointer-events
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(0, 0, 0, 0.1)',
+            borderRadius: 24,
+            boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
+            width: 380,
+            display: 'flex', flexDirection: 'column',
+            transform: `translate(${modalPos.x}px, ${modalPos.y}px)`,
+            animation: 'scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+            overflow: 'hidden'
+          }} 
+          onClick={e => e.stopPropagation()}
+        >
             {/* Modal Header */}
             <div 
               onMouseDown={handleHeaderMouseDown}
@@ -2291,30 +2753,14 @@ export default function FlyerStudio() {
                     />
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Tipo de Letra (Fuente)</span>
-                    <select
-                      value={flyerFont}
-                      onChange={e => setFlyerFont(e.target.value)}
-                      style={{ ...css.input, fontWeight: 700 }}
-                    >
-                      <option value="Outfit">Outfit (Moderna & Limpia)</option>
-                      <option value="Montserrat">Montserrat (Geométrica B2B)</option>
-                      <option value="Oswald">Oswald (Condensada Impacto)</option>
-                      <option value="Poppins">Poppins (Redonda Popular)</option>
-                      <option value="Playfair Display">Playfair Display (Serif Elegante)</option>
-                      <option value="Bebas Neue">Bebas Neue (Titulares Sans)</option>
-                      <option value="Raleway">Raleway (Sofisticada Delgado)</option>
-                      <option value="Inter">Inter (Estándar Pro)</option>
-                    </select>
-                  </div>
+                  {renderFontSelector(titleFont, 'title')}
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#475569', fontWeight: 800, textTransform: 'uppercase' }}>
                       <span>Escala de Título</span>
-                      <span>{textScale.toFixed(2)}x</span>
+                      <span>{titleScale.toFixed(2)}x</span>
                     </div>
-                    <input type="range" min="0.5" max="2.0" step="0.05" value={textScale} onChange={e => setTextScale(parseFloat(e.target.value))} style={{ width: '100%' }} />
+                    <input type="range" min="0.5" max="2.0" step="0.05" value={titleScale} onChange={e => setTitleScale(parseFloat(e.target.value))} style={{ width: '100%' }} />
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -2380,6 +2826,8 @@ export default function FlyerStudio() {
                     />
                   </div>
 
+                  {renderFontSelector(subtitleFont, 'subtitle')}
+
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#475569', fontWeight: 800, textTransform: 'uppercase' }}>
                       <span>Escala de Subtítulo</span>
@@ -2441,6 +2889,8 @@ export default function FlyerStudio() {
                     ))}
                   </div>
 
+                  {renderFontSelector(benefitsFont, 'benefits')}
+
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#475569', fontWeight: 800, textTransform: 'uppercase' }}>
                       <span>Escala de Beneficios</span>
@@ -2495,6 +2945,8 @@ export default function FlyerStudio() {
                     />
                   </div>
 
+                  {renderFontSelector(ctaFont, 'cta')}
+
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Precio (Si aplica)</span>
                     <input 
@@ -2542,6 +2994,14 @@ export default function FlyerStudio() {
                       />
                     </div>
                   </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#475569', fontWeight: 800, textTransform: 'uppercase' }}>
+                      <span>Escala del Botón</span>
+                      <span>{ctaScale.toFixed(2)}x</span>
+                    </div>
+                    <input type="range" min="0.5" max="3.0" step="0.05" value={ctaScale} onChange={e => setCtaScale(parseFloat(e.target.value))} style={{ width: '100%' }} />
+                  </div>
                 </>
               )}
 
@@ -2567,7 +3027,7 @@ export default function FlyerStudio() {
                       <span>Posición Horizontal (X)</span>
                       <span>{logoX.toFixed(0)}%</span>
                     </div>
-                    <input type="range" min="0" max="95" step="1" value={logoX} onChange={e => setLogoX(parseInt(e.target.value))} style={{ width: '100%' }} />
+                    <input type="range" min="0" max="100" step="1" value={logoX} onChange={e => setLogoX(parseInt(e.target.value))} style={{ width: '100%' }} />
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -2575,7 +3035,7 @@ export default function FlyerStudio() {
                       <span>Posición Vertical (Y)</span>
                       <span>{logoY.toFixed(0)}%</span>
                     </div>
-                    <input type="range" min="0" max="95" step="1" value={logoY} onChange={e => setLogoY(parseInt(e.target.value))} style={{ width: '100%' }} />
+                    <input type="range" min="0" max="100" step="1" value={logoY} onChange={e => setLogoY(parseInt(e.target.value))} style={{ width: '100%' }} />
                   </div>
                 </>
               )}
@@ -2604,12 +3064,33 @@ export default function FlyerStudio() {
                     />
                   </div>
 
+                  {renderFontSelector(contactFont, 'contact')}
+
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#475569', fontWeight: 800, textTransform: 'uppercase' }}>
                       <span>Escala de Contacto</span>
                       <span>{contactScale.toFixed(2)}x</span>
                     </div>
                     <input type="range" min="0.5" max="3.0" step="0.05" value={contactScale} onChange={e => setContactScale(parseFloat(e.target.value))} style={{ width: '100%' }} />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Color del Texto de Contacto</span>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input 
+                        type="color" 
+                        value={contactColor || '#ffffff'} 
+                        onChange={e => setContactColor(e.target.value)} 
+                        style={{ width: 36, height: 36, padding: 0, border: '1px solid #d8dde6', cursor: 'pointer', borderRadius: 6, flexShrink: 0 }} 
+                      />
+                      <input 
+                        type="text" 
+                        value={contactColor} 
+                        onChange={e => setContactColor(e.target.value)} 
+                        placeholder="Por defecto"
+                        style={css.input} 
+                      />
+                    </div>
                   </div>
                 </>
               )}
@@ -2669,7 +3150,6 @@ export default function FlyerStudio() {
               </button>
             </div>
           </div>
-        </div>
       )}
 
       {/* ── FORMAT SELECTION MODAL ────────────────────────────────────── */}

@@ -53,14 +53,26 @@ export interface FlyerData {
   subtitleBold?: boolean;
   benefitsBold?: boolean;
   titleScale?: number;
+  titleX?: number;
   titleY?: number;
+  subtitleX?: number;
   subtitleY?: number;
+  benefitsX?: number;
   benefitsY?: number;
   ctaScale?: number;
+  ctaX?: number;
   ctaY?: number;
   contactScale?: number;
+  contactX?: number;
   contactY?: number;
+  contactColor?: string;
+  textX?: number;
   onContactClick?: () => void;
+  titleFont?: string;
+  subtitleFont?: string;
+  benefitsFont?: string;
+  ctaFont?: string;
+  contactFont?: string;
 }
 
 export const getFontFamily = (f?: string) =>
@@ -1398,7 +1410,7 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
         className={data.onBgClick ? "editable-element" : undefined}
         onClick={data.onBgClick ? (e) => { e.stopPropagation(); data.onBgClick?.(); } : undefined}
         style={{
-          width: 1080, height: 1080,
+          width: 1080, height: data.containerH || 1080,
           background: hasBg 
             ? `url('${data.bgImageUrl}') center/cover no-repeat` 
             : `radial-gradient(circle at 90% 10%, ${primary}12 0%, transparent 60%), #ffffff`,
@@ -1409,8 +1421,13 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
           flexDirection: 'column',
           boxSizing: 'border-box',
           justifyContent: 'space-between',
-          cursor: data.onBgClick ? 'pointer' : 'default'
-        }}
+          cursor: data.onBgClick ? 'pointer' : 'default',
+          '--flyer-title-font': getFontFamily(data.titleFont || data.flyerFont),
+          '--flyer-subtitle-font': getFontFamily(data.subtitleFont || data.flyerFont),
+          '--flyer-benefits-font': getFontFamily(data.benefitsFont || data.flyerFont),
+          '--flyer-cta-font': getFontFamily(data.ctaFont || data.flyerFont),
+          '--flyer-contact-font': getFontFamily(data.contactFont || data.flyerFont),
+        } as React.CSSProperties}
       >
         {/* Load Google Fonts directly in the render flow */}
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Syne:wght@700;800&display=swap" />
@@ -1457,10 +1474,11 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
 
             {/* Headline */}
             <h1 
-              className={data.onTitleClick ? "editable-element" : undefined}
+              data-element-id="title"
+              className={data.onTitleClick ? "editable-element flyer-title-element" : "flyer-title-element"}
               onClick={data.onTitleClick ? (e) => { e.stopPropagation(); data.onTitleClick?.(); } : undefined}
               style={{
-                fontSize: (headline.length > 25 ? 44 : 54) * (data.textScale ?? 1),
+                fontSize: (headline.length > 25 ? 44 : 54) * (data.titleScale ?? data.textScale ?? 1),
                 fontWeight: 900,
                 color: data.titleColor || '#1a1a1a', // Charcoal / Customizer titleColor
                 lineHeight: 1.1,
@@ -1468,7 +1486,8 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
                 textTransform: 'uppercase',
                 margin: '0 0 12px 0',
                 width: '100%',
-                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                transform: (data.titleX || data.titleY) ? `translate(${data.titleX ?? 0}px, ${data.titleY ?? 0}px)` : undefined
               }}
             >
               {headline}
@@ -1476,7 +1495,8 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
 
             {/* Sub-headline / Value Prop */}
             <p 
-              className={data.onSubtitleClick ? "editable-element" : undefined}
+              data-element-id="subtitle"
+              className={data.onSubtitleClick ? "editable-element flyer-subtitle-element" : "flyer-subtitle-element"}
               onClick={data.onSubtitleClick ? (e) => { e.stopPropagation(); data.onSubtitleClick?.(); } : undefined}
               style={{
                 fontSize: 18 * (data.subtitleScale ?? 1),
@@ -1486,7 +1506,8 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
                 letterSpacing: '0.01em',
                 margin: 0,
                 maxWidth: 880,
-                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                transform: (data.subtitleX || data.subtitleY) ? `translate(${data.subtitleX ?? 0}px, ${data.subtitleY ?? 0}px)` : undefined
               }}
             >
               {subheadline}
@@ -1502,9 +1523,13 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
 
           {/* Feature Grid (4-Column Layout dynamic gap) */}
           <div 
-            className={data.onBenefitsClick ? "editable-element" : undefined}
+            data-element-id="benefits"
+            className={data.onBenefitsClick ? "editable-element flyer-benefits-element" : "flyer-benefits-element"}
             onClick={data.onBenefitsClick ? (e) => { e.stopPropagation(); data.onBenefitsClick?.(); } : undefined}
-            style={{ display: 'flex', gap: cleanFeatures.length > 3 ? 24 : 48, width: '100%', marginBottom: 24 }}
+            style={{ 
+              display: 'flex', gap: cleanFeatures.length > 3 ? 24 : 48, width: '100%', marginBottom: 24,
+              transform: (data.benefitsX || data.benefitsY) ? `translate(${data.benefitsX ?? 0}px, ${data.benefitsY ?? 0}px)` : undefined
+            }}
           >
             {cleanFeatures.map((feat, idx) => {
               const featData = getFeatureBullets(feat, data.prompt, primary);
@@ -1563,7 +1588,19 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
             </div>
 
             {/* Center QR Code */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div 
+              data-element-id="contact"
+              className={data.onContactClick ? "editable-element flyer-contact-element" : "flyer-contact-element"}
+              onClick={data.onContactClick ? (e) => { e.stopPropagation(); data.onContactClick?.(); } : undefined}
+              style={{ 
+                display: 'flex', alignItems: 'center', gap: 16,
+                cursor: data.onContactClick ? 'pointer' : 'default',
+                transform: (data.contactX || data.contactY || data.contactScale) 
+                  ? `translate(${data.contactX ?? 0}px, ${data.contactY ?? 0}px) scale(${data.contactScale ?? 1})` 
+                  : undefined,
+                transformOrigin: 'center'
+              }}
+            >
               <div style={{
                 width: 80, height: 80,
                 background: '#ffffff',
@@ -1585,26 +1622,30 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', gap: 2 }}>
                 <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em' }}>DEMO EN VIVO</span>
-                <span style={{ fontSize: 15, fontWeight: 900, color: '#ffffff', letterSpacing: '0.02em' }}>{data.website || 'ariasdefense.com'}</span>
+                <span style={{ fontSize: 15, fontWeight: 900, color: data.contactColor || '#ffffff', letterSpacing: '0.02em' }}>
+                  {data.phone ? `${data.phone} · ` : ''}{data.website || 'ariasdefense.com'}
+                </span>
               </div>
             </div>
 
             {/* Right CTA Button */}
             <div 
-              className={data.onCtaClick ? "editable-element" : undefined}
+              data-element-id="cta"
+              className={data.onCtaClick ? "editable-element flyer-cta-element" : "flyer-cta-element"}
               onClick={data.onCtaClick ? (e) => { e.stopPropagation(); data.onCtaClick?.(); } : undefined}
               style={{
                 background: data.ctaBgColor || primary,
                 color: data.ctaTextColor || '#ffffff',
                 fontWeight: 900,
-                fontSize: 16,
+                fontSize: 16 * (data.ctaScale ?? 1),
                 letterSpacing: '0.05em',
                 padding: '16px 32px',
                 borderRadius: 50,
                 boxShadow: `0 8px 20px ${(data.ctaBgColor || primary)}30`,
                 border: 'none',
                 cursor: 'pointer',
-                textTransform: 'uppercase'
+                textTransform: 'uppercase',
+                transform: (data.ctaX || data.ctaY) ? `translate(${data.ctaX ?? 0}px, ${data.ctaY ?? 0}px)` : undefined
               }}
             >
               {cta}
@@ -1681,7 +1722,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
         className={data.onBgClick ? "editable-element" : undefined}
         onClick={data.onBgClick ? (e) => { e.stopPropagation(); data.onBgClick?.(); } : undefined}
         style={{
-          width: 1080, height: 1080,
+          width: 1080, height: data.containerH || 1080,
           background: hasBg 
             ? `url('${data.bgImageUrl}') center/cover no-repeat` 
             : `radial-gradient(circle at 10% 90%, ${secondary}08 0%, transparent 60%), #ffffff`,
@@ -1692,8 +1733,13 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
           flexDirection: 'column',
           boxSizing: 'border-box',
           justifyContent: 'space-between',
-          cursor: data.onBgClick ? 'pointer' : 'default'
-        }}
+          cursor: data.onBgClick ? 'pointer' : 'default',
+          '--flyer-title-font': getFontFamily(data.titleFont || data.flyerFont),
+          '--flyer-subtitle-font': getFontFamily(data.subtitleFont || data.flyerFont),
+          '--flyer-benefits-font': getFontFamily(data.benefitsFont || data.flyerFont),
+          '--flyer-cta-font': getFontFamily(data.ctaFont || data.flyerFont),
+          '--flyer-contact-font': getFontFamily(data.contactFont || data.flyerFont),
+        } as React.CSSProperties}
       >
         {/* Load Google Fonts directly in the render flow */}
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Syne:wght@700;800&display=swap" />
@@ -1740,10 +1786,11 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
 
             {/* Headline */}
             <h1 
-              className={data.onTitleClick ? "editable-element" : undefined}
+              data-element-id="title"
+              className={data.onTitleClick ? "editable-element flyer-title-element" : "flyer-title-element"}
               onClick={data.onTitleClick ? (e) => { e.stopPropagation(); data.onTitleClick?.(); } : undefined}
               style={{
-                fontSize: (headline.length > 25 ? 44 : 54) * (data.textScale ?? 1),
+                fontSize: (headline.length > 25 ? 44 : 54) * (data.titleScale ?? data.textScale ?? 1),
                 fontWeight: 900,
                 fontFamily: "'Syne', sans-serif",
                 color: data.titleColor || (hasBg ? '#ffffff' : primary), // White text if glass overlay on BG, else Midnight Navy
@@ -1752,7 +1799,8 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
                 textTransform: 'uppercase',
                 margin: '0 0 12px 0',
                 width: '100%',
-                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                transform: (data.titleX || data.titleY) ? `translate(${data.titleX ?? 0}px, ${data.titleY ?? 0}px)` : undefined
               }}
             >
               {headline}
@@ -1760,7 +1808,8 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
 
             {/* Sub-headline / Value Prop */}
             <p 
-              className={data.onSubtitleClick ? "editable-element" : undefined}
+              data-element-id="subtitle"
+              className={data.onSubtitleClick ? "editable-element flyer-subtitle-element" : "flyer-subtitle-element"}
               onClick={data.onSubtitleClick ? (e) => { e.stopPropagation(); data.onSubtitleClick?.(); } : undefined}
               style={{
                 fontSize: 18 * (data.subtitleScale ?? 1),
@@ -1770,7 +1819,8 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
                 letterSpacing: '0.01em',
                 margin: 0,
                 maxWidth: 880,
-                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                transform: (data.subtitleX || data.subtitleY) ? `translate(${data.subtitleX ?? 0}px, ${data.subtitleY ?? 0}px)` : undefined
               }}
             >
               {subheadline}
@@ -1795,9 +1845,13 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
 
           {/* Feature Grid (4-Column Layout dynamic gap) */}
           <div 
-            className={data.onBenefitsClick ? "editable-element" : undefined}
+            data-element-id="benefits"
+            className={data.onBenefitsClick ? "editable-element flyer-benefits-element" : "flyer-benefits-element"}
             onClick={data.onBenefitsClick ? (e) => { e.stopPropagation(); data.onBenefitsClick?.(); } : undefined}
-            style={{ display: 'flex', gap: cleanFeatures.length > 3 ? 24 : 48, width: '100%', marginBottom: 24 }}
+            style={{ 
+              display: 'flex', gap: cleanFeatures.length > 3 ? 24 : 48, width: '100%', marginBottom: 24,
+              transform: (data.benefitsX || data.benefitsY) ? `translate(${data.benefitsX ?? 0}px, ${data.benefitsY ?? 0}px)` : undefined
+            }}
           >
             {cleanFeatures.map((feat, idx) => {
               const featData = getFeatureBullets(feat, data.prompt, secondary);
@@ -1856,7 +1910,19 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
             </div>
 
             {/* Center QR Code */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div 
+              data-element-id="contact"
+              className={data.onContactClick ? "editable-element flyer-contact-element" : "flyer-contact-element"}
+              onClick={data.onContactClick ? (e) => { e.stopPropagation(); data.onContactClick?.(); } : undefined}
+              style={{ 
+                display: 'flex', alignItems: 'center', gap: 16,
+                cursor: data.onContactClick ? 'pointer' : 'default',
+                transform: (data.contactX || data.contactY || data.contactScale) 
+                  ? `translate(${data.contactX ?? 0}px, ${data.contactY ?? 0}px) scale(${data.contactScale ?? 1})` 
+                  : undefined,
+                transformOrigin: 'center'
+              }}
+            >
               <div style={{
                 width: 80, height: 80,
                 background: '#ffffff',
@@ -1878,26 +1944,30 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', gap: 2 }}>
                 <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em' }}>DEMO EN VIVO</span>
-                <span style={{ fontSize: 15, fontWeight: 900, color: '#ffffff', letterSpacing: '0.02em' }}>{data.website || 'ariasdefense.com'}</span>
+                <span style={{ fontSize: 15, fontWeight: 900, color: data.contactColor || '#ffffff', letterSpacing: '0.02em' }}>
+                  {data.phone ? `${data.phone} · ` : ''}{data.website || 'ariasdefense.com'}
+                </span>
               </div>
             </div>
 
             {/* Right CTA Button */}
             <div 
-              className={data.onCtaClick ? "editable-element" : undefined}
+              data-element-id="cta"
+              className={data.onCtaClick ? "editable-element flyer-cta-element" : "flyer-cta-element"}
               onClick={data.onCtaClick ? (e) => { e.stopPropagation(); data.onCtaClick?.(); } : undefined}
               style={{
                 background: data.ctaBgColor || '#ffffff',
                 color: data.ctaTextColor || '#1a1a1a',
                 fontWeight: 900,
-                fontSize: 16,
+                fontSize: 16 * (data.ctaScale ?? 1),
                 letterSpacing: '0.05em',
                 padding: '16px 32px',
                 borderRadius: 50,
                 boxShadow: `0 8px 20px ${(data.ctaBgColor || '#ffffff')}05`,
                 border: `1.5px solid ${secondary}`,
                 cursor: 'pointer',
-                textTransform: 'uppercase'
+                textTransform: 'uppercase',
+                transform: (data.ctaX || data.ctaY) ? `translate(${data.ctaX ?? 0}px, ${data.ctaY ?? 0}px)` : undefined
               }}
             >
               {cta}
@@ -1944,27 +2014,27 @@ export const FreeLogo: React.FC<{
 }> = ({ d, onMove, onResize }) => {
   const isDragging = React.useRef(false);
   const dragStart = React.useRef({ x: 0, y: 0 });
-  const positionStart = React.useRef({ x: 0, y: 0 });
+  const parentRect = React.useRef<DOMRect | null>(null);
 
   const startDrag = (e: React.MouseEvent) => {
     isDragging.current = true;
-    dragStart.current = { x: e.clientX, y: e.clientY };
-    positionStart.current = { x: d.logoX, y: d.logoY };
+    const parent = e.currentTarget.parentElement;
+    if (parent) {
+      parentRect.current = parent.getBoundingClientRect();
+      const logoRect = e.currentTarget.getBoundingClientRect();
+      dragStart.current = { x: e.clientX - logoRect.left, y: e.clientY - logoRect.top };
+    }
     document.addEventListener('mousemove', onDrag);
     document.addEventListener('mouseup', endDrag);
   };
 
   const onDrag = (e: MouseEvent) => {
-    if (!isDragging.current) return;
-    const dx = e.clientX - dragStart.current.x;
-    const dy = e.clientY - dragStart.current.y;
-    // Calculate percentage shift relative to container width/height
-    const pctX = (dx / d.containerW) * 100;
-    const pctY = (dy / d.containerH) * 100;
-    
-    let newX = Math.min(Math.max(positionStart.current.x + pctX, 0), 90);
-    let newY = Math.min(Math.max(positionStart.current.y + pctY, 0), 90);
-    onMove(newX, newY);
+    if (!isDragging.current || !parentRect.current) return;
+    const currentLeft = e.clientX - parentRect.current.left - dragStart.current.x;
+    const currentTop = e.clientY - parentRect.current.top - dragStart.current.y;
+    const pctX = Math.min(100, Math.max(0, (currentLeft / parentRect.current.width) * 100));
+    const pctY = Math.min(100, Math.max(0, (currentTop / parentRect.current.height) * 100));
+    onMove(pctX, pctY);
   };
 
   const endDrag = () => {

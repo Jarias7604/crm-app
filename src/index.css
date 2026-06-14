@@ -408,7 +408,7 @@ a:active,
   cursor: pointer !important;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
   user-select: none !important;
-  position: relative !important;
+  position: relative;
 }
 .editable-element:hover {
   outline: 2px dashed #7c3aed !important;
@@ -416,4 +416,21 @@ a:active,
   background: rgba(124, 58, 237, 0.04) !important;
   border-radius: 6px !important;
   box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.1) !important;
+}
+
+/* Custom font family overrides for editable flyer text elements */
+.flyer-title-element {
+  font-family: var(--flyer-title-font, inherit) !important;
+}
+.flyer-subtitle-element {
+  font-family: var(--flyer-subtitle-font, inherit) !important;
+}
+.flyer-benefits-element, .flyer-benefits-element * {
+  font-family: var(--flyer-benefits-font, inherit) !important;
+}
+.flyer-cta-element, .flyer-cta-element * {
+  font-family: var(--flyer-cta-font, inherit) !important;
+}
+.flyer-contact-element, .flyer-contact-element * {
+  font-family: var(--flyer-contact-font, inherit) !important;
 }
