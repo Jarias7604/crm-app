@@ -130,7 +130,8 @@ export default function FlyerStudio() {
   const flyerRef = useRef<HTMLDivElement>(null);
   const templateRefA = useRef<HTMLDivElement>(null);
   const templateRefB = useRef<HTMLDivElement>(null);
-  const [selectedTemplate, setSelectedTemplate] = useState<'A' | 'B'>('B');
+  const templateRefMarketing = useRef<HTMLDivElement>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('bold-split');
   const [previewMode, setPreviewMode] = useState<'template' | 'ai'>('template');
 
   // Form & Content States
@@ -426,7 +427,7 @@ export default function FlyerStudio() {
         });
         dataUrl = canvas.toDataURL('image/png');
       } else {
-        const ref = selectedTemplate === 'A' ? templateRefA : templateRefB;
+        const ref = selectedTemplate === 'A' ? templateRefA : selectedTemplate === 'B' ? templateRefB : templateRefMarketing;
         if (!ref.current) throw new Error('Template not ready');
         const canvas = await html2canvas(ref.current, {
           useCORS: true,
@@ -460,7 +461,7 @@ export default function FlyerStudio() {
         });
         dataUrl = canvas.toDataURL('image/png');
       } else {
-        const ref = selectedTemplate === 'A' ? templateRefA : templateRefB;
+        const ref = selectedTemplate === 'A' ? templateRefA : selectedTemplate === 'B' ? templateRefB : templateRefMarketing;
         if (!ref.current) throw new Error('Template not ready');
         const canvas = await html2canvas(ref.current, {
           useCORS: true, allowTaint: true, scale: 2, backgroundColor: null
@@ -878,19 +879,73 @@ export default function FlyerStudio() {
                 <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
               </div>
 
-              {/* SECONDARY — Template selector + background-only */}
+              {/* SELECT TEMPLATE CATALOG */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={css.label}>Selecciona Plantilla (Catálogo Salesforce/HubSpot)</label>
+                <select
+                  value={selectedTemplate}
+                  onChange={(e) => {
+                    setSelectedTemplate(e.target.value);
+                    setPreviewMode('template');
+                    setShowFullAiResult(false);
+                  }}
+                  style={{
+                    ...css.input,
+                    padding: '8px 12px',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: '#0f172a',
+                    border: '1.5px solid #7c3aed40',
+                    background: '#fcfbfe'
+                  }}
+                >
+                  <optgroup label="Plantillas Corporativas Pro (1080x1080)">
+                    <option value="A">✨ Template A — Glow Glassmorphic</option>
+                    <option value="B">🏢 Template B — Editorial Showcase</option>
+                  </optgroup>
+                  <optgroup label="Catálogo Completo de Marketing (Autorescaling)">
+                    <option value="bold-split">1. Split Asimétrico Bold (Panel color + foto)</option>
+                    <option value="cinematic">2. Cinematic Full (Foto top + panel oscuro)</option>
+                    <option value="white-card">3. White Card Editorial (Blanco limpio + foto redondeada)</option>
+                    <option value="magazine">4. Magazine Dark (Editorial Forbes/Vogue)</option>
+                    <option value="center-gradient">5. Gradient Center Pop (Gradiente centrado)</option>
+                    <option value="corporate-light">6. Corporate Light (B2B blanco/color)</option>
+                    <option value="dark-luxury">7. Dark Luxury Gold (Oscuro + dorado)</option>
+                    <option value="promo-pop">8. Promo Pop (Ofertas especiales)</option>
+                    <option value="minimal-editorial">9. Minimal Editorial (Tipografía clean)</option>
+                    <option value="full-bleed">10. Full Bleed Bold (Foto completa + panel texto)</option>
+                    <option value="direct-mockup">11. Mockup Directo (Imagen 100% limpia)</option>
+                  </optgroup>
+                </select>
+              </div>
+
+              {/* Action buttons under select */}
               <div style={{ display: 'flex', gap: 6 }}>
-                <button onClick={() => { setSelectedTemplate('A'); setPreviewMode('template'); setShowFullAiResult(false); }}
-                  style={{ flex: 1, border: `1.5px solid ${selectedTemplate === 'A' && !showFullAiResult ? '#e91e8c' : '#e2e8f0'}`, borderRadius: 7, padding: '7px 6px', background: selectedTemplate === 'A' && !showFullAiResult ? '#fce4ec' : '#f8fafc', cursor: 'pointer', fontSize: 10, fontWeight: 700, color: selectedTemplate === 'A' && !showFullAiResult ? '#c2185b' : '#64748b' }}>
-                  🎨 Template A
-                </button>
-                <button onClick={() => { setSelectedTemplate('B'); setPreviewMode('template'); setShowFullAiResult(false); }}
-                  style={{ flex: 1, border: `1.5px solid ${selectedTemplate === 'B' && !showFullAiResult ? '#9b1c1c' : '#e2e8f0'}`, borderRadius: 7, padding: '7px 6px', background: selectedTemplate === 'B' && !showFullAiResult ? '#fef2f2' : '#f8fafc', cursor: 'pointer', fontSize: 10, fontWeight: 700, color: selectedTemplate === 'B' && !showFullAiResult ? '#9b1c1c' : '#64748b' }}>
-                  🏢 Template B
-                </button>
-                <button onClick={() => generate('background')} disabled={generating || !prompt.trim()}
-                  style={{ flex: 1.4, background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: 7, padding: '7px 8px', fontSize: 10, fontWeight: 700, color: '#475569', cursor: generating || !prompt.trim() ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, opacity: generating || !prompt.trim() ? 0.5 : 1 }}>
-                  {generating && !isFullAiFlyer ? <><Cpu size={10} style={{ animation: 'spin 1s linear infinite' }} /> Cargando...</> : <><Image size={10} color="#6366f1" /> Fondo IA</>}
+                <button
+                  onClick={() => generate('background')}
+                  disabled={generating || !prompt.trim()}
+                  style={{
+                    flex: 1,
+                    background: '#f8fafc',
+                    border: '1.5px solid #7c3aed50',
+                    borderRadius: 8,
+                    padding: '10px 12px',
+                    fontSize: 12,
+                    fontWeight: 800,
+                    color: '#475569',
+                    cursor: generating || !prompt.trim() ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    opacity: generating || !prompt.trim() ? 0.5 : 1
+                  }}
+                >
+                  {generating && !isFullAiFlyer ? (
+                    <><Cpu size={12} style={{ animation: 'spin 1s linear infinite' }} /> Cargando...</>
+                  ) : (
+                    <><Image size={12} color="#7c3aed" /> Generar Fondo con IA (Sin Textos)</>
+                  )}
                 </button>
               </div>
 
@@ -1028,13 +1083,9 @@ export default function FlyerStudio() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontSize: 10, fontWeight: 800, color: '#54698d', textTransform: 'uppercase' }}>Diseño:</span>
                   <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', padding: 3, borderRadius: 6 }}>
-                    <button onClick={() => { setShowFullAiResult(false); setSelectedTemplate('A'); }}
-                      style={{ border: 'none', borderRadius: 4, padding: '4px 8px', fontSize: 10, fontWeight: 700, cursor: 'pointer', background: (!showFullAiResult && selectedTemplate === 'A') ? '#fff' : 'transparent', color: (!showFullAiResult && selectedTemplate === 'A') ? '#0070d2' : '#64748b', boxShadow: (!showFullAiResult && selectedTemplate === 'A') ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
-                      Template A
-                    </button>
-                    <button onClick={() => { setShowFullAiResult(false); setSelectedTemplate('B'); }}
-                      style={{ border: 'none', borderRadius: 4, padding: '4px 8px', fontSize: 10, fontWeight: 700, cursor: 'pointer', background: (!showFullAiResult && selectedTemplate === 'B') ? '#fff' : 'transparent', color: (!showFullAiResult && selectedTemplate === 'B') ? '#0070d2' : '#64748b', boxShadow: (!showFullAiResult && selectedTemplate === 'B') ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
-                      Template B
+                    <button onClick={() => setShowFullAiResult(false)}
+                      style={{ border: 'none', borderRadius: 4, padding: '4px 8px', fontSize: 10, fontWeight: 700, cursor: 'pointer', background: !showFullAiResult ? '#fff' : 'transparent', color: !showFullAiResult ? '#0070d2' : '#64748b', boxShadow: !showFullAiResult ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
+                      Con Plantilla
                     </button>
                     <button onClick={() => setShowFullAiResult(true)}
                       style={{ border: 'none', borderRadius: 4, padding: '4px 8px', fontSize: 10, fontWeight: 700, cursor: 'pointer', background: showFullAiResult ? '#fff' : 'transparent', color: showFullAiResult ? '#0070d2' : '#64748b', boxShadow: showFullAiResult ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.15s' }}>
@@ -1195,7 +1246,7 @@ export default function FlyerStudio() {
                           phone, website, logoUrl: logoPreview || undefined,
                           bgImageUrl: bgUploadPreview || ((previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined)
                         }} />
-                      ) : (
+                      ) : selectedTemplate === 'B' ? (
                         <FlyerTemplateB data={{
                           company_name: companyName || 'Mi Empresa',
                           prompt, cta: aiOptimizedText?.cta || cta || 'Activa HOY MISMO',
@@ -1212,6 +1263,23 @@ export default function FlyerStudio() {
                           phone, website, logoUrl: logoPreview || undefined,
                           bgImageUrl: bgUploadPreview || ((previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined)
                         }} />
+                      ) : (
+                        <RenderFlyer d={{
+                          title: aiOptimizedText?.headline || parsePrompt(prompt).title || deriveHeadline(prompt, companyName).h1 || 'TU OFERTA',
+                          subtitle: aiOptimizedText?.subheadline || parsePrompt(prompt).subtitle || deriveHeadline(prompt, companyName).h2 || '',
+                          cta: aiOptimizedText?.cta || cta || 'COMIENZA HOY',
+                          beneficios: aiOptimizedText?.features || parsePrompt(prompt).features || deriveFeatures(prompt) || [],
+                          accent: colors[0] || '#0070d2',
+                          bgImageUrl: bgUploadPreview || ((previewMode === 'ai' && variants.length > 0) ? variants[selected] : null),
+                          logoUrl: logoPreview || null,
+                          industria: companyName || 'Mi Empresa',
+                          phone, website, templateId: selectedTemplate,
+                          containerW: 1080, containerH: 1080,
+                          logoSize, logoX, logoY
+                        }}
+                        onLogoMove={(x, y) => { setLogoX(x); setLogoY(y); }}
+                        onLogoResize={(s) => setLogoSize(s)}
+                        />
                       )}
                     </div>
                   </div>
@@ -1280,6 +1348,21 @@ export default function FlyerStudio() {
           logoUrl: logoPreview || undefined,
           bgImageUrl: bgUploadPreview || ((previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined)
         }} />
+        <div ref={templateRefMarketing}>
+          <RenderFlyer d={{
+            title: aiOptimizedText?.headline || parsePrompt(prompt).title || deriveHeadline(prompt, companyName).h1 || 'TU OFERTA',
+            subtitle: aiOptimizedText?.subheadline || parsePrompt(prompt).subtitle || deriveHeadline(prompt, companyName).h2 || '',
+            cta: aiOptimizedText?.cta || cta || 'COMIENZA HOY',
+            beneficios: aiOptimizedText?.features || parsePrompt(prompt).features || deriveFeatures(prompt) || [],
+            accent: colors[0] || '#0070d2',
+            bgImageUrl: bgUploadPreview || ((previewMode === 'ai' && variants.length > 0) ? variants[selected] : null),
+            logoUrl: logoPreview || null,
+            industria: companyName || 'Mi Empresa',
+            phone, website, templateId: selectedTemplate,
+            containerW: 1080, containerH: 1080,
+            logoSize, logoX, logoY
+          }} />
+        </div>
       </div>
 
       {/* ── HIGH FIDELITY MODAL PREVIEW ────────────────────────────────────────── */}
@@ -1389,7 +1472,7 @@ export default function FlyerStudio() {
                         phone, website, logoUrl: logoPreview || undefined,
                         bgImageUrl: bgUploadPreview || ((previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined)
                       }} />
-                    ) : (
+                    ) : selectedTemplate === 'B' ? (
                       <FlyerTemplateB data={{
                         company_name: companyName || 'Mi Empresa', prompt,
                         cta: aiOptimizedText?.cta || cta || 'Activa HOY MISMO',
@@ -1402,6 +1485,20 @@ export default function FlyerStudio() {
                         primaryColor: colors[0] || '#9b1c1c', secondaryColor: colors[1] || '#1a1a2e',
                         phone, website, logoUrl: logoPreview || undefined,
                         bgImageUrl: bgUploadPreview || ((previewMode === 'ai' && variants.length > 0) ? variants[selected] : undefined)
+                      }} />
+                    ) : (
+                      <RenderFlyer d={{
+                        title: aiOptimizedText?.headline || parsePrompt(prompt).title || deriveHeadline(prompt, companyName).h1 || 'TU OFERTA',
+                        subtitle: aiOptimizedText?.subheadline || parsePrompt(prompt).subtitle || deriveHeadline(prompt, companyName).h2 || '',
+                        cta: aiOptimizedText?.cta || cta || 'COMIENZA HOY',
+                        beneficios: aiOptimizedText?.features || parsePrompt(prompt).features || deriveFeatures(prompt) || [],
+                        accent: colors[0] || '#0070d2',
+                        bgImageUrl: bgUploadPreview || ((previewMode === 'ai' && variants.length > 0) ? variants[selected] : null),
+                        logoUrl: logoPreview || null,
+                        industria: companyName || 'Mi Empresa',
+                        phone, website, templateId: selectedTemplate,
+                        containerW: 1080, containerH: 1080,
+                        logoSize, logoX, logoY
                       }} />
                     )}
                   </div>
