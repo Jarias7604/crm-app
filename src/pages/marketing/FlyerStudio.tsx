@@ -1682,7 +1682,7 @@ export default function FlyerStudio() {
                               onBgClick: () => setEditingElement('background'),
                               subtitleBold,
                               benefitsBold,
-                            }} />
+                            , titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }} />
                           ) : selectedTemplate === 'B' ? (
                             <FlyerTemplateB data={{
                               company_name: companyName || 'Mi Empresa',
@@ -1722,7 +1722,7 @@ export default function FlyerStudio() {
                               onBgClick: () => setEditingElement('background'),
                               subtitleBold,
                               benefitsBold,
-                            }} />
+                            , titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }} />
                           ) : (
                             <RenderFlyer d={{
                               title: manualTitle || 'TU OFERTA',
@@ -1756,12 +1756,135 @@ export default function FlyerStudio() {
                               onBgClick: () => setEditingElement('background'),
                               subtitleBold,
                               benefitsBold,
-                            }}
+                            , titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }}
                             onLogoMove={(x, y) => { setLogoX(x); setLogoY(y); }}
                             onLogoResize={(s) => setLogoSize(s)}
                             />
                           )}
                         </div>
+                        {/* Interactive Drag & Resize Overlay Box */}
+                        {overlayRect && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: overlayRect.top,
+                              left: overlayRect.left,
+                              width: overlayRect.width,
+                              height: overlayRect.height,
+                              border: '2px dashed #7c3aed',
+                              boxSizing: 'border-box',
+                              zIndex: 30,
+                              pointerEvents: 'auto',
+                              cursor: 'move',
+                              boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.15)',
+                              borderRadius: 4
+                            }}
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const startY = e.clientY;
+                              const initialY = 
+                                editingElement === 'title' ? titleY :
+                                editingElement === 'subtitle' ? subtitleY :
+                                editingElement === 'benefits' ? benefitsY :
+                                editingElement === 'cta' ? ctaY :
+                                editingElement === 'contact' ? contactY : 0;
+                                
+                              const scale = getFlyerDimensions(format).width / 1080;
+
+                              const handleMouseMove = (moveEvent: MouseEvent) => {
+                                const dy = moveEvent.clientY - startY;
+                                const canvasDy = dy / scale;
+                                const newY = initialY + canvasDy;
+                                
+                                if (editingElement === 'title') setTitleY(newY);
+                                else if (editingElement === 'subtitle') setSubtitleY(newY);
+                                else if (editingElement === 'benefits') setBenefitsY(newY);
+                                else if (editingElement === 'cta') setCtaY(newY);
+                                else if (editingElement === 'contact') setContactY(newY);
+                              };
+
+                              const handleMouseUp = () => {
+                                window.removeEventListener('mousemove', handleMouseMove);
+                                window.removeEventListener('mouseup', handleMouseUp);
+                              };
+
+                              window.addEventListener('mousemove', handleMouseMove);
+                              window.addEventListener('mouseup', handleMouseUp);
+                            }}
+                          >
+                            {/* Label */}
+                            <div style={{
+                              position: 'absolute',
+                              top: -24,
+                              left: 0,
+                              background: '#7c3aed',
+                              color: '#fff',
+                              fontSize: 10,
+                              fontWeight: 900,
+                              padding: '4px 8px',
+                              borderRadius: '4px 4px 0 0',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.05em',
+                              whiteSpace: 'nowrap',
+                              userSelect: 'none',
+                              pointerEvents: 'none'
+                            }}>
+                              {editingElement === 'title' && 'Título'}
+                              {editingElement === 'subtitle' && 'Subtítulo'}
+                              {editingElement === 'benefits' && 'Beneficios'}
+                              {editingElement === 'cta' && 'Botón CTA'}
+                              {editingElement === 'contact' && 'Contacto'}
+                            </div>
+
+                            {/* Resize Handle */}
+                            <div
+                              style={{
+                                position: 'absolute',
+                                bottom: -6,
+                                right: -6,
+                                width: 14,
+                                height: 14,
+                                background: '#fff',
+                                border: '3px solid #7c3aed',
+                                borderRadius: '50%',
+                                cursor: 'se-resize',
+                                zIndex: 31,
+                                boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
+                              }}
+                              onMouseDown={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                const startX = e.clientX;
+                                const initialScale = 
+                                  editingElement === 'title' ? textScale :
+                                  editingElement === 'subtitle' ? subtitleScale :
+                                  editingElement === 'benefits' ? benefitsScale :
+                                  editingElement === 'cta' ? ctaScale :
+                                  editingElement === 'contact' ? contactScale : 1.0;
+
+                                const handleMouseMove = (moveEvent: MouseEvent) => {
+                                  const dx = moveEvent.clientX - startX;
+                                  const newScale = Math.max(0.4, Math.min(3.0, initialScale + dx / 150));
+                                  
+                                  if (editingElement === 'title') setTextScale(newScale);
+                                  else if (editingElement === 'subtitle') setSubtitleScale(newScale);
+                                  else if (editingElement === 'benefits') setBenefitsScale(newScale);
+                                  else if (editingElement === 'cta') setCtaScale(newScale);
+                                  else if (editingElement === 'contact') setContactScale(newScale);
+                                };
+
+                                const handleMouseUp = () => {
+                                  window.removeEventListener('mousemove', handleMouseMove);
+                                  window.removeEventListener('mouseup', handleMouseUp);
+                                };
+
+                                window.addEventListener('mousemove', handleMouseMove);
+                                window.addEventListener('mouseup', handleMouseUp);
+                              }}
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -1808,7 +1931,7 @@ export default function FlyerStudio() {
           textAlign,
           subtitleBold,
           benefitsBold
-        }} />
+        , titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }} />
         <FlyerTemplateB ref={templateRefB} data={{
           company_name: companyName || 'Mi Empresa',
           prompt,
@@ -1843,7 +1966,7 @@ export default function FlyerStudio() {
           textAlign,
           subtitleBold,
           benefitsBold
-        }} />
+        , titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }} />
         <div ref={templateRefMarketing}>
           <RenderFlyer d={{
             title: manualTitle || 'TU OFERTA',
@@ -1871,7 +1994,7 @@ export default function FlyerStudio() {
             textAlign,
             subtitleBold,
             benefitsBold
-          }} />
+          , titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }} />
         </div>
       </div>
 
@@ -1998,7 +2121,7 @@ export default function FlyerStudio() {
                         textAlign,
                         subtitleBold,
                         benefitsBold
-                      }} />
+                      , titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }} />
                     ) : selectedTemplate === 'B' ? (
                       <FlyerTemplateB data={{
                         company_name: companyName || 'Mi Empresa', prompt,
@@ -2029,7 +2152,7 @@ export default function FlyerStudio() {
                         textAlign,
                         subtitleBold,
                         benefitsBold
-                      }} />
+                      , titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }} />
                     ) : (
                       <RenderFlyer d={{
                         title: manualTitle || 'TU OFERTA',
@@ -2057,7 +2180,7 @@ export default function FlyerStudio() {
                         textAlign,
                         subtitleBold,
                         benefitsBold
-                      }}
+                      , titleScale, titleY, subtitleY, benefitsY, ctaScale, ctaY, contactScale, contactY, onContactClick: () => setEditingElement('contact') }}
                       onLogoMove={(x, y) => { setLogoX(x); setLogoY(y); }}
                       onLogoResize={(s) => setLogoSize(s)}
                       />
@@ -2456,6 +2579,40 @@ export default function FlyerStudio() {
                       <span>{logoY.toFixed(0)}%</span>
                     </div>
                     <input type="range" min="0" max="95" step="1" value={logoY} onChange={e => setLogoY(parseInt(e.target.value))} style={{ width: '100%' }} />
+                  </div>
+                </>
+              )}
+
+              {editingElement === 'contact' && (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Teléfono</span>
+                    <input 
+                      style={css.input} 
+                      type="text" 
+                      value={phone} 
+                      onChange={e => setPhone(e.target.value)}
+                      placeholder="Teléfono de contacto"
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#475569', textTransform: 'uppercase' }}>Sitio Web / Email</span>
+                    <input 
+                      style={css.input} 
+                      type="text" 
+                      value={website} 
+                      onChange={e => setWebsite(e.target.value)}
+                      placeholder="www.tuempresa.com"
+                    />
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#475569', fontWeight: 800, textTransform: 'uppercase' }}>
+                      <span>Escala de Contacto</span>
+                      <span>{contactScale.toFixed(2)}x</span>
+                    </div>
+                    <input type="range" min="0.5" max="3.0" step="0.05" value={contactScale} onChange={e => setContactScale(parseFloat(e.target.value))} style={{ width: '100%' }} />
                   </div>
                 </>
               )}

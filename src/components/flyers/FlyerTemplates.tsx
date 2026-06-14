@@ -52,6 +52,15 @@ export interface FlyerData {
   onBgClick?: () => void;
   subtitleBold?: boolean;
   benefitsBold?: boolean;
+  titleScale?: number;
+  titleY?: number;
+  subtitleY?: number;
+  benefitsY?: number;
+  ctaScale?: number;
+  ctaY?: number;
+  contactScale?: number;
+  contactY?: number;
+  onContactClick?: () => void;
 }
 
 export const getFontFamily = (f?: string) =>
