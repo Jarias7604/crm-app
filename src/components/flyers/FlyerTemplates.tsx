@@ -152,7 +152,7 @@ export function deriveIndustryContent(prompt: string, data: Partial<FlyerData>):
       ]
     };
   }
-
+  
   // 3. Security / Guard / Defense
   if (lower.includes('segurid') || lower.includes('guardia') || lower.includes('vigilan') || lower.includes('patrulla') || lower.includes('defens')) {
     return {
@@ -172,11 +172,11 @@ export function deriveIndustryContent(prompt: string, data: Partial<FlyerData>):
       ]
     };
   }
-
+  
   // 4. Dental / Odontology / Clinics
   if (lower.includes('dent') || lower.includes('odont') || lower.includes('dient') || lower.includes('sonris') || lower.includes('ortodon')) {
     return {
-      highlight_title: data.highlight_title || '¿Quieres la sonrisa de tus sueños?',
+      highlight_title: data.highlight_title || '¿Quieres la sonrisa de tus dreams?',
       highlight_desc: data.highlight_desc || 'Tratamientos dentales avanzados para toda tu familia con especialistas.',
       benefits: data.benefits && data.benefits.length >= 3 ? data.benefits : [
         { title: 'Odontólogos Pro', desc: 'Profesionales con amplia experiencia.', icon: '🦷' },
@@ -192,7 +192,7 @@ export function deriveIndustryContent(prompt: string, data: Partial<FlyerData>):
       ]
     };
   }
-
+  
   // 5. Default / B2B SaaS CRM & Business Growth
   return {
     highlight_title: data.highlight_title || '¿Quieres automatizar tu negocio y vender más?',
@@ -224,6 +224,325 @@ export function getFeatureIcon(f: string): string {
   if (lower.includes('segur') || lower.includes('segundo') || lower.includes('respaldo')) return '🔒';
   if (lower.includes('configur') || lower.includes('rapido') || lower.includes('fácil') || lower.includes('facil')) return '⚡';
   return '✨';
+}
+
+function getIndustryType(prompt: string): 'k9' | 'food' | 'security' | 'dental' | 'saas' {
+  const lower = (prompt || '').toLowerCase();
+  if (lower.includes('perro') || lower.includes('canin') || lower.includes('mascota') || lower.includes('adiestra') || lower.includes('k9')) {
+    return 'k9';
+  }
+  if (lower.includes('pizz') || lower.includes('hamburgue') || lower.includes('taco') || lower.includes('comida') || lower.includes('restauran') || lower.includes('sabor') || lower.includes('chef') || lower.includes('cocin')) {
+    return 'food';
+  }
+  if (lower.includes('segurid') || lower.includes('guardia') || lower.includes('vigilan') || lower.includes('patrulla') || lower.includes('defens')) {
+    return 'security';
+  }
+  if (lower.includes('dent') || lower.includes('odont') || lower.includes('dient') || lower.includes('sonris') || lower.includes('ortodon')) {
+    return 'dental';
+  }
+  return 'saas';
+}
+
+export function renderIndustryMockup(prompt: string, primary: string, secondary: string, hasBg: boolean): React.ReactNode {
+  const type = getIndustryType(prompt);
+  
+  const cardStyle: React.CSSProperties = {
+    width: 380,
+    borderRadius: 24,
+    padding: '24px',
+    boxSizing: 'border-box',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16,
+    transition: 'all 0.3s ease',
+    fontFamily: "'Plus Jakarta Sans', 'Outfit', sans-serif",
+    background: hasBg ? 'rgba(15, 23, 42, 0.65)' : '#ffffff',
+    backdropFilter: hasBg ? 'blur(20px)' : 'none',
+    border: hasBg ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid #e2e8f0',
+    boxShadow: hasBg 
+      ? '0 20px 45px rgba(0, 0, 0, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.15)' 
+      : '0 15px 30px rgba(15, 23, 42, 0.05)',
+    color: hasBg ? '#ffffff' : '#0f172a',
+    textAlign: 'left'
+  };
+
+  const textPrimary = hasBg ? '#ffffff' : '#0f172a';
+  const textSecondary = hasBg ? 'rgba(255, 255, 255, 0.7)' : '#475569';
+  const borderLight = hasBg ? 'rgba(255, 255, 255, 0.08)' : '#f1f5f9';
+  const bgBadge = hasBg ? 'rgba(255, 255, 255, 0.1)' : `${primary}10`;
+  const textBadge = hasBg ? '#ffffff' : primary;
+
+  if (type === 'k9') {
+    return (
+      <div style={cardStyle}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 52, height: 52, borderRadius: '50%',
+              background: `linear-gradient(135deg, ${primary}, ${secondary})`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 26, position: 'relative'
+            }}>
+              🐕
+              <span style={{
+                position: 'absolute', bottom: 0, right: 0,
+                width: 12, height: 12, borderRadius: '50%',
+                background: '#10b981', border: `2px solid ${hasBg ? '#1e293b' : '#fff'}`
+              }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: textPrimary }}>Apolo</div>
+              <div style={{ fontSize: 11, color: textSecondary, fontWeight: 500 }}>Pastor Alemán · 10 meses</div>
+            </div>
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#f59e0b', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span>★</span> 5.0
+          </div>
+        </div>
+
+        {/* Badge */}
+        <div style={{
+          alignSelf: 'flex-start',
+          background: bgBadge, color: textBadge,
+          padding: '6px 12px', borderRadius: 12,
+          fontSize: 11, fontWeight: 700, border: hasBg ? '1px solid rgba(255,255,255,0.06)' : 'none'
+        }}>
+          🏅 Adiestramiento K9 Certificado
+        </div>
+
+        {/* Progress tracks */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+          {[
+            { name: 'Obediencia Básica', val: 100 },
+            { name: 'Socialización', val: 95 },
+            { name: 'Agilidad & Destreza', val: 90 }
+          ].map((t, idx) => (
+            <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 700, color: textPrimary }}>
+                <span>{t.name}</span>
+                <span>{t.val}%</span>
+              </div>
+              <div style={{ height: 6, background: hasBg ? 'rgba(255,255,255,0.1)' : '#f1f5f9', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${t.val}%`, background: `linear-gradient(90deg, ${primary}, ${secondary})`, borderRadius: 3 }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (type === 'food') {
+    return (
+      <div style={cardStyle}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', gap: 14 }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: 16,
+              background: `linear-gradient(135deg, ${primary}20, ${primary}40)`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 32
+            }}>
+              🍕
+            </div>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: textPrimary, marginBottom: 4 }}>Pizza Especial</div>
+              <div style={{ fontSize: 11, color: textSecondary, fontWeight: 500, lineHeight: 1.3 }}>Masa madre de fermentación lenta & salsa artesanal.</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `1px solid ${borderLight}`, borderBottom: `1px solid ${borderLight}`, padding: '12px 0', margin: '4px 0' }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: 10, color: textSecondary, textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em' }}>Precio Especial</span>
+            <span style={{ fontSize: 24, fontWeight: 900, color: primary }}>$12.90</span>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b', marginBottom: 2 }}>★ 4.9</div>
+            <div style={{ fontSize: 10, color: textSecondary, fontWeight: 500 }}>240+ opiniones</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {['100% Ingredientes Frescos', 'Horneado a la Leña', 'Envío Gratis en la zona'].map((tag, idx) => (
+            <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 600, color: textPrimary }}>
+              <span style={{ color: '#10b981' }}>✓</span> {tag}
+            </div>
+          ))}
+        </div>
+
+        <div style={{
+          background: `linear-gradient(135deg, ${primary}, ${primary}dd)`,
+          borderRadius: 14, padding: '10px 16px', color: '#fff',
+          fontSize: 12, fontWeight: 800, textAlign: 'center',
+          boxShadow: `0 8px 20px ${primary}30`, cursor: 'pointer', marginTop: 4,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
+        }}>
+          Pedir Ahora ⚡
+        </div>
+      </div>
+    );
+  }
+
+  if (type === 'security') {
+    return (
+      <div style={cardStyle}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 48, height: 48, borderRadius: 14,
+              background: `linear-gradient(135deg, ${primary}, ${secondary})`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24
+            }}>
+              🛡️
+            </div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: textPrimary }}>Centro de Mando</div>
+              <div style={{ fontSize: 11, color: textSecondary, fontWeight: 500 }}>Monitoreo en tiempo real</div>
+            </div>
+          </div>
+          <div style={{
+            background: hasBg ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5',
+            border: `1px solid ${hasBg ? 'rgba(16, 185, 129, 0.3)' : '#a7f3d0'}`,
+            borderRadius: 20,
+            padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 5
+          }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: '50%', background: '#10b981',
+              display: 'inline-block'
+            }} />
+            <span style={{ fontSize: 10, fontWeight: 800, color: hasBg ? '#34d399' : '#065f46' }}>ONLINE</span>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, background: hasBg ? 'rgba(255,255,255,0.05)' : '#f8fafc', padding: 12, borderRadius: 16, border: `1px solid ${borderLight}` }}>
+          <div>
+            <div style={{ fontSize: 10, color: textSecondary, fontWeight: 600 }}>Cámaras Activas</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: textPrimary }}>8 Dispositivos</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 10, color: textSecondary, fontWeight: 600 }}>Tiempo Respuesta</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: primary }}>&lt; 3 min</div>
+          </div>
+        </div>
+
+        {/* Activity Log */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: textSecondary, letterSpacing: '0.03em', textTransform: 'uppercase' }}>Registro de Actividad</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: hasBg ? 'rgba(0,0,0,0.2)' : '#f1f5f9', padding: '10px 12px', borderRadius: 12 }}>
+            <div style={{ fontSize: 11, color: textPrimary, display: 'flex', justifyContent: 'space-between' }}>
+              <span>✓ Perímetro Verificado</span>
+              <span style={{ opacity: 0.6 }}>12:40</span>
+            </div>
+            <div style={{ fontSize: 11, color: textPrimary, display: 'flex', justifyContent: 'space-between' }}>
+              <span>✓ Conexión Segura VPN</span>
+              <span style={{ opacity: 0.6 }}>12:15</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (type === 'dental') {
+    return (
+      <div style={cardStyle}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 50, height: 50, borderRadius: '50%',
+              background: `linear-gradient(135deg, ${primary}20, ${primary}50)`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24
+            }}>
+              👩‍⚕️
+            </div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: textPrimary }}>Dra. Sofía Mendoza</div>
+              <div style={{ fontSize: 11, color: textSecondary, fontWeight: 500 }}>Odontología Estética</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Booking slot */}
+        <div style={{
+          background: hasBg ? 'rgba(16, 185, 129, 0.15)' : '#ecfdf5',
+          border: `1px solid ${hasBg ? 'rgba(16, 185, 129, 0.3)' : '#a7f3d0'}`,
+          borderRadius: 14, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+        }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: hasBg ? '#34d399' : '#047857' }}>● Próxima Cita Disponible</span>
+          <span style={{ fontSize: 11, fontWeight: 800, color: hasBg ? '#fff' : '#065f46', background: hasBg ? 'rgba(255,255,255,0.1)' : '#fff', padding: '2px 8px', borderRadius: 6 }}>HOY 15:30</span>
+        </div>
+
+        {/* Rating & Reviews */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `1px solid ${borderLight}`, borderBottom: `1px solid ${borderLight}`, padding: '10px 0' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: textPrimary }}>Valoración</span>
+          <span style={{ fontSize: 12, fontWeight: 800, color: '#f59e0b' }}>★ 5.0 (420+ opiniones)</span>
+        </div>
+
+        {/* Treatments grid */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {['Blanqueamiento', 'Implantes', 'Ortodoncia'].map((tag, idx) => (
+            <span key={idx} style={{
+              background: hasBg ? 'rgba(255, 255, 255, 0.08)' : '#f1f5f9',
+              color: textPrimary, fontSize: 10, fontWeight: 700,
+              padding: '6px 12px', borderRadius: 20, border: `1px solid ${borderLight}`
+            }}>{tag}</span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // default / saas
+  return (
+    <div style={cardStyle}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: textPrimary }}>Lead Control Hub</div>
+          <div style={{ fontSize: 10, color: textSecondary, fontWeight: 500 }}>Ventas y conversiones del mes</div>
+        </div>
+        <div style={{
+          background: bgBadge, color: textBadge,
+          padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 800
+        }}>
+          SaaS Dashboard
+        </div>
+      </div>
+
+      {/* SVG Line Chart */}
+      <div style={{ position: 'relative', width: '100%' }}>
+        <svg viewBox="0 0 100 30" style={{ width: '100%', height: 70, display: 'block', overflow: 'visible' }}>
+          <defs>
+            <linearGradient id="chart-glow" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={primary} stopOpacity={hasBg ? 0.35 : 0.2} />
+              <stop offset="100%" stopColor={primary} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <path d="M 0 25 Q 15 10 30 18 T 60 5 T 90 12 L 100 2 L 100 30 L 0 30 Z" fill="url(#chart-glow)" />
+          <path d="M 0 25 Q 15 10 30 18 T 60 5 T 90 12 L 100 2" fill="none" stroke={primary} strokeWidth="2.5" strokeLinecap="round" />
+          <circle cx="100" cy="2" r="3.5" fill="#fff" stroke={primary} strokeWidth="2" />
+        </svg>
+      </div>
+
+      {/* Key Metrics */}
+      <div style={{ display: 'flex', gap: 12 }}>
+        <div style={{ flex: 1, background: hasBg ? 'rgba(255,255,255,0.04)' : '#f8fafc', padding: 10, borderRadius: 14, border: `1px solid ${borderLight}` }}>
+          <div style={{ fontSize: 9, color: textSecondary, fontWeight: 700, textTransform: 'uppercase' }}>Leads Nuevos</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: textPrimary, marginTop: 2 }}>240+ <span style={{ color: '#10b981', fontSize: 11, fontWeight: 700 }}>↑ 24%</span></div>
+        </div>
+        <div style={{ flex: 1, background: hasBg ? 'rgba(255,255,255,0.04)' : '#f8fafc', padding: 10, borderRadius: 14, border: `1px solid ${borderLight}` }}>
+          <div style={{ fontSize: 9, color: textSecondary, fontWeight: 700, textTransform: 'uppercase' }}>Conversión</div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: textPrimary, marginTop: 2 }}>18.4%</div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ── Utility: derive headline from prompt ──────────────────────────────────────
@@ -357,7 +676,7 @@ export function deriveFeatures(prompt: string): string[] {
 
 // ── Utility: derive price from prompt ─────────────────────────────────────────
 export function derivePrice(prompt: string): string {
-  const match = prompt.match(/\$[\d,.]+/);
+  const match = prompt.match(/\$[d\d,.]+/);
   if (match) return match[0];
   const match2 = prompt.match(/([\d,.]+)\s*(d[oó]lar|d[oó]lares|dollar|usd)/i);
   if (match2) return '$' + match2[1];
@@ -426,23 +745,29 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
     
     const industry = deriveIndustryContent(data.prompt, data);
     const hasBg = !!data.bgImageUrl;
+    const indType = getIndustryType(data.prompt);
 
     return (
       <div ref={ref} style={{
         width: 1080, height: 1080,
-        background: hasBg ? `url(${data.bgImageUrl}) center/cover no-repeat` : `radial-gradient(circle at 100% 0%, ${primary}08 0%, rgba(255,255,255,0) 45%), radial-gradient(circle at 0% 100%, ${secondary}05 0%, rgba(255,255,255,0) 45%), #ffffff`,
-        fontFamily: "'Outfit', 'Inter', 'Segoe UI', Arial, sans-serif",
+        background: hasBg 
+          ? `url(${data.bgImageUrl}) center/cover no-repeat` 
+          : `radial-gradient(circle at 80% 20%, ${primary}18 0%, transparent 60%), radial-gradient(circle at 20% 80%, ${secondary}12 0%, transparent 60%), #fafafa`,
+        fontFamily: "'Plus Jakarta Sans', 'Outfit', 'Segoe UI', Arial, sans-serif",
         position: 'relative',
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
       }}>
+        {/* Load Google Fonts directly in the render flow */}
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Syne:wght@700;800&display=swap" />
+
         {!hasBg && (
           <div style={{
             position: 'absolute', inset: 0,
             backgroundImage: 'radial-gradient(#e2e8f0 1.2px, transparent 1.2px)',
-            backgroundSize: '30px 30px',
-            opacity: 0.35,
+            backgroundSize: '35px 35px',
+            opacity: 0.4,
             pointerEvents: 'none'
           }} />
         )}
@@ -450,51 +775,61 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
         {hasBg && (
           <div style={{
             position: 'absolute', inset: 0,
-            background: 'linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.2) 40%, rgba(0,0,0,0.75) 100%)',
+            background: 'linear-gradient(to bottom, rgba(15,23,42,0.7) 0%, rgba(15,23,42,0.15) 45%, rgba(15,23,42,0.85) 100%)',
             pointerEvents: 'none', zIndex: 1
           }} />
         )}
 
         {/* TOP SECTION */}
-        <div style={{ padding: '52px 64px 24px', flex: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 10 }}>
-          <div style={{ flex: 1, marginRight: 32, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '54px 64px 20px', flex: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 10 }}>
+          <div style={{ flex: 1, marginRight: 32, display: 'flex', flexDirection: 'column', textAlign: 'left' }}>
             <div style={{
-              fontSize: headline.length > 30 ? 38 : 48,
+              fontSize: 12, fontWeight: 900, color: hasBg ? '#ffffff' : primary,
+              textTransform: 'uppercase', letterSpacing: '0.18em', marginBottom: 12,
+              opacity: 0.95, textShadow: hasBg ? '0 2px 4px rgba(0,0,0,0.5)' : 'none'
+            }}>
+              ⭐ Propuesta Premium · {indType.toUpperCase()}
+            </div>
+            
+            <div style={{
+              fontSize: headline.length > 30 ? 38 : 46,
               fontWeight: 900,
               color: hasBg ? '#ffffff' : '#0f172a',
-              textShadow: hasBg ? '0 4px 10px rgba(0,0,0,0.8)' : 'none',
+              textShadow: hasBg ? '0 4px 12px rgba(0,0,0,0.85)' : 'none',
               lineHeight: 1.1,
               marginBottom: 12,
               display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
             }}>
               {headline}
             </div>
+            
             <div style={{
-              fontSize: 22,
-              fontWeight: 700,
-              color: hasBg ? '#f8fafc' : '#475569',
+              fontSize: 20,
+              fontWeight: 600,
+              color: hasBg ? '#e2e8f0' : '#475569',
               textShadow: hasBg ? '0 2px 6px rgba(0,0,0,0.8)' : 'none',
               marginBottom: 24,
+              lineHeight: 1.4,
               display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
             }}>{subheadline}</div>
 
             {price && (
               <div style={{
                 display: 'inline-flex', alignItems: 'center', gap: 14,
-                background: `linear-gradient(135deg, ${primary}, ${primary}dd)`, borderRadius: 16, padding: '14px 32px',
+                background: `linear-gradient(135deg, ${primary}, ${primary}dd)`, borderRadius: 16, padding: '12px 30px',
                 boxShadow: `0 10px 25px ${primary}35`, border: '1px solid rgba(255,255,255,0.15)',
                 alignSelf: 'flex-start'
               }}>
-                <span style={{ fontSize: 16, color: '#fff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Desde</span>
-                <span style={{ fontSize: 44, color: '#fff', fontWeight: 900, lineHeight: 1 }}>{price}</span>
-                <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>+ IVA</span>
+                <span style={{ fontSize: 13, color: '#fff', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Desde</span>
+                <span style={{ fontSize: 40, color: '#fff', fontWeight: 900, lineHeight: 1 }}>{price}</span>
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}>+ IVA</span>
               </div>
             )}
           </div>
 
           <div style={{ flexShrink: 0, textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
             {data.logoUrl ? (
-              <div style={{ background: hasBg ? 'rgba(255,255,255,0.95)' : 'transparent', padding: hasBg ? 12 : 0, borderRadius: 16, boxShadow: hasBg ? '0 4px 12px rgba(0,0,0,0.15)' : 'none' }}>
+              <div style={{ background: hasBg ? 'rgba(255,255,255,0.95)' : 'transparent', padding: hasBg ? 12 : 0, borderRadius: 18, boxShadow: hasBg ? '0 8px 20px rgba(0,0,0,0.18)' : 'none' }}>
                 <img src={data.logoUrl} crossOrigin="anonymous" style={{ maxHeight: 80, maxWidth: 200, objectFit: 'contain' }} alt="Logo" />
               </div>
             ) : (
@@ -505,86 +840,66 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
           </div>
         </div>
 
-        {/* MIDDLE SECTION: Features & Optional Laptop */}
+        {/* MIDDLE SECTION: Features on left, custom mockup card on right */}
         <div style={{ flex: 1, display: 'flex', padding: '0 64px', gap: 48, zIndex: 10, alignItems: 'center' }}>
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 20, justifyContent: 'center' }}>
+          {/* Features Column */}
+          <div style={{ flex: 1.1, display: 'flex', flexDirection: 'column', gap: 20, justifyContent: 'center' }}>
             {features.map((f, i) => (
               <div key={i} style={{
                 display: 'flex', alignItems: 'flex-start', gap: 16,
-                background: hasBg ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.6)',
-                backdropFilter: 'blur(10px)',
-                border: '1px solid rgba(226, 232, 240, 0.8)', borderRadius: 20,
-                padding: '18px 22px', boxShadow: '0 8px 24px rgba(15,23,42,0.06)'
+                background: hasBg ? 'rgba(15, 23, 42, 0.45)' : 'rgba(255, 255, 255, 0.7)',
+                backdropFilter: 'blur(16px)',
+                border: hasBg ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid rgba(226, 232, 240, 0.8)', borderRadius: 20,
+                padding: '20px 24px', boxShadow: hasBg ? '0 10px 30px rgba(0,0,0,0.2)' : '0 8px 24px rgba(15,23,42,0.04)',
+                textAlign: 'left'
               }}>
                 <div style={{
                   width: 48, height: 48, borderRadius: 14,
-                  background: `linear-gradient(135deg, ${primary}12, ${primary}25)`, flexShrink: 0,
+                  background: hasBg ? `linear-gradient(135deg, ${primary}30, ${primary}80)` : `linear-gradient(135deg, ${primary}12, ${primary}25)`, flexShrink: 0,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 22, color: primary
+                  fontSize: 22, color: hasBg ? '#fff' : primary
                 }}>
                   {getFeatureIcon(f)}
                 </div>
                 <div style={{ flex: 1, overflow: 'hidden' }}>
-                  <div style={{ fontSize: 17, fontWeight: 800, color: '#0f172a', marginBottom: 3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{f}</div>
-                  <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.4, fontWeight: 500, display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                    Solución ideal para tu negocio.
+                  <div style={{ fontSize: 17, fontWeight: 800, color: hasBg ? '#fff' : '#0f172a', marginBottom: 3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{f}</div>
+                  <div style={{ fontSize: 13, color: hasBg ? 'rgba(255, 255, 255, 0.7)' : '#475569', lineHeight: 1.4, fontWeight: 500, display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    Garantía de calidad y soporte profesional.
                   </div>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* LAPTOP ONLY IF NO BACKGROUND IMAGE */}
-          {!hasBg && (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-              <div style={{ position: 'relative', width: 400, filter: 'drop-shadow(0 25px 50px rgba(0,0,0,0.12))' }}>
-                <div style={{ background: '#1e293b', borderRadius: '16px 16px 0 0', padding: '12px 12px 0', border: '1px solid rgba(255,255,255,0.12)', borderBottom: 'none' }}>
-                  <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                    <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#ff5f57' }} />
-                    <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#febc2e' }} />
-                    <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#28c840' }} />
-                  </div>
-                  <div style={{ background: '#f8fafc', borderRadius: 8, padding: 12, height: 230, border: '1px solid rgba(0,0,0,0.04)' }}>
-                    <div style={{ background: secondary, borderRadius: 6, padding: '8px 12px', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ color: '#fff', fontSize: 10, fontWeight: 800 }}>{industry.mockup_title}</span>
-                      <span style={{ color: primary, fontSize: 14, fontWeight: 900 }}>●</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-                      {industry.kpis.map((kpi, idx) => (
-                        <div key={idx} style={{ flex: 1, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: 6, textAlign: 'center' }}>
-                          <div style={{ fontSize: 8, color: '#64748b', marginBottom: 2, fontWeight: 700 }}>{kpi.label}</div>
-                          <div style={{ fontSize: 10, fontWeight: 800, color: '#0f172a' }}>{kpi.val}</div>
-                        </div>
-                      ))}
-                    </div>
-                    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, padding: 6, marginBottom: 8, display: 'flex', alignItems: 'flex-end', gap: 4, height: 62 }}>
-                      {[35, 55, 45, 75, 50, 85, 65, 95].map((h, idx) => (
-                        <div key={idx} style={{ flex: 1, background: idx === 7 ? primary : `${primary}45`, borderRadius: '2px 2px 0 0', height: `${h}%` }} />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div style={{ background: '#e2e8f0', height: 12, borderRadius: '0 0 4px 4px', border: '1px solid #cbd5e1' }} />
-                <div style={{ background: '#cbd5e1', height: 6, borderRadius: '0 0 10px 10px', width: '110%', marginLeft: '-5%' }} />
-              </div>
-            </div>
-          )}
+          {/* Dynamic Mockup Card Column */}
+          <div style={{ flex: 0.9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {renderIndustryMockup(data.prompt, primary, secondary, hasBg)}
+          </div>
         </div>
 
-        {/* BOTTOM BENEFITS (Always visible, adapted) */}
-        <div style={{ background: hasBg ? 'rgba(15,23,42,0.85)' : '#f8fafc', borderTop: hasBg ? 'none' : '1px solid #e2e8f0', padding: '22px 48px', display: 'flex', gap: 18, zIndex: 10, backdropFilter: hasBg ? 'blur(10px)' : 'none' }}>
-          {features.slice(0, 3).map((feat, idx) => (
+        {/* BOTTOM BENEFITS (Horizontal clean ribbon) */}
+        <div style={{ 
+          background: hasBg ? 'rgba(15,23,42,0.4)' : '#f8fafc', 
+          borderTop: hasBg ? '1px solid rgba(255,255,255,0.06)' : '1px solid #e2e8f0', 
+          padding: '20px 48px', 
+          display: 'flex', 
+          gap: 20, 
+          zIndex: 10, 
+          backdropFilter: hasBg ? 'blur(20px)' : 'none' 
+        }}>
+          {industry.benefits.slice(0, 3).map((item, idx) => (
             <div key={idx} style={{
               flex: 1, display: 'flex', alignItems: 'center', gap: 12,
-              background: hasBg ? 'rgba(255,255,255,0.1)' : '#fff',
-              border: hasBg ? '1px solid rgba(255,255,255,0.1)' : '1px solid #e2e8f0',
-              borderRadius: 14, padding: '14px 18px',
-              boxShadow: hasBg ? 'none' : '0 4px 12px rgba(15,23,42,0.03)'
+              background: hasBg ? 'rgba(15, 23, 42, 0.35)' : '#fff',
+              border: hasBg ? '1px solid rgba(255, 255, 255, 0.06)' : '1px solid #e2e8f0',
+              borderRadius: 16, padding: '14px 18px',
+              boxShadow: hasBg ? '0 10px 25px rgba(0,0,0,0.15)' : '0 4px 12px rgba(15,23,42,0.03)',
+              textAlign: 'left'
             }}>
-              <span style={{ fontSize: 24, flexShrink: 0 }}>{getFeatureIcon(feat)}</span>
+              <span style={{ fontSize: 24, flexShrink: 0 }}>{item.icon}</span>
               <div style={{ overflow: 'hidden' }}>
-                <div style={{ fontSize: 14, fontWeight: 800, color: hasBg ? '#fff' : primary, marginBottom: 2, display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{feat}</div>
-                <div style={{ fontSize: 11, color: hasBg ? 'rgba(255,255,255,0.7)' : '#64748b', fontWeight: 500 }}>Rápido y profesional.</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: hasBg ? '#fff' : primary, marginBottom: 2, display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.title}</div>
+                <div style={{ fontSize: 11, color: hasBg ? 'rgba(255,255,255,0.7)' : '#64748b', fontWeight: 600, display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.desc}</div>
               </div>
             </div>
           ))}
@@ -592,7 +907,7 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
 
         {/* FOOTER */}
         <div style={{ background: secondary, padding: '18px 48px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 10, flexWrap: 'nowrap', gap: 16 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0, maxWidth: '40%' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0, maxWidth: '45%', textAlign: 'left' }}>
             <div style={{ color: '#fff', fontSize: 18, fontWeight: 900, lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{data.company_name}</div>
             <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
               {phone && <span style={{ color: 'rgba(255,255,255,0.85)', fontSize: 13, fontWeight: 700 }}>📱 {phone}</span>}
@@ -601,7 +916,7 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
           </div>
           <div style={{
             background: `linear-gradient(135deg, ${primary}, ${primary}cc)`,
-            borderRadius: 10, padding: '12px 24px',
+            borderRadius: 12, padding: '12px 28px',
             color: '#fff', fontWeight: 800, fontSize: 13,
             boxShadow: `0 6px 15px ${primary}40`,
             whiteSpace: 'nowrap', flexShrink: 0,
@@ -614,6 +929,8 @@ export const FlyerTemplateA = React.forwardRef<HTMLDivElement, { data: FlyerData
     );
   }
 );
+
+// ── TEMPLATE B — Studio Bold / Minimal Editorial ──────────────────────────────────
 export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData }>(
   ({ data }, ref) => {
     const parsed = parsePrompt(data.prompt);
@@ -635,22 +952,28 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
     const cta = data.cta || parsed.cta || deriveCta(data.prompt, `Todo con ${data.company_name}`);
 
     const hasBg = !!data.bgImageUrl;
+    const indType = getIndustryType(data.prompt);
 
     return (
       <div ref={ref} style={{
         width: 1080, height: 1080,
-        background: hasBg ? `url(${data.bgImageUrl}) center/cover no-repeat` : '#f8fafc',
-        fontFamily: "'Outfit', 'Inter', 'Segoe UI', Arial, sans-serif",
+        background: hasBg 
+          ? `url(${data.bgImageUrl}) center/cover no-repeat` 
+          : `radial-gradient(circle at 10% 10%, ${secondary}15 0%, transparent 60%), radial-gradient(circle at 90% 90%, ${primary}12 0%, transparent 60%), #ffffff`,
+        fontFamily: "'Outfit', 'Plus Jakarta Sans', Arial, sans-serif",
         position: 'relative',
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
       }}>
+        {/* Load Google Fonts directly in the render flow */}
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Syne:wght@700;800&display=swap" />
+
         {!hasBg && (
           <div style={{
             position: 'absolute', inset: 0,
             backgroundImage: 'radial-gradient(#e2e8f0 1.5px, transparent 1.5px)',
-            backgroundSize: '24px 24px', opacity: 0.5, pointerEvents: 'none'
+            backgroundSize: '28px 28px', opacity: 0.5, pointerEvents: 'none'
           }} />
         )}
         
@@ -669,9 +992,20 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
               <img src={data.logoUrl} crossOrigin="anonymous" style={{ maxHeight: 70, maxWidth: 200, objectFit: 'contain' }} alt="Logo" />
             </div>
           )}
+          
+          <div style={{
+            fontSize: 11, fontWeight: 900, color: hasBg ? '#f8fafc' : primary,
+            textTransform: 'uppercase', letterSpacing: '0.22em', marginBottom: 10,
+            background: hasBg ? 'rgba(255,255,255,0.15)' : `${primary}10`,
+            padding: '4px 14px', borderRadius: 20
+          }}>
+            🏢 EDITORIAL DESIGN · {indType.toUpperCase()}
+          </div>
+          
           <h1 style={{
-            fontSize: headline.length > 30 ? 40 : 50,
-            fontWeight: 900,
+            fontSize: headline.length > 30 ? 42 : 52,
+            fontWeight: 800,
+            fontFamily: "'Syne', 'Outfit', sans-serif",
             color: hasBg ? '#ffffff' : '#0f172a',
             textAlign: 'center', margin: 0, lineHeight: 1.1,
             textShadow: hasBg ? '0 4px 12px rgba(0,0,0,0.8)' : 'none',
@@ -679,8 +1013,9 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
           }}>
             {headline}
           </h1>
+          
           <p style={{
-            fontSize: 22, fontWeight: 700,
+            fontSize: 20, fontWeight: 600,
             color: hasBg ? '#f1f5f9' : '#334155',
             textAlign: 'center', margin: '12px 0 0 0',
             textShadow: hasBg ? '0 2px 6px rgba(0,0,0,0.8)' : 'none',
@@ -690,109 +1025,86 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
           </p>
         </div>
 
-        {/* MAIN CONTENT AREA */}
-        <div style={{ flex: 1, position: 'relative', zIndex: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 60px' }}>
+        {/* MAIN CONTENT AREA: Features on left, Custom mockup card on right */}
+        <div style={{ flex: 1, zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 64px', gap: 40 }}>
           
-          {price && (
-            <div style={{
-              background: primary, color: '#fff',
-              padding: '12px 32px', borderRadius: 16,
-              fontWeight: 900, fontSize: 32,
-              boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
-              display: 'flex', alignItems: 'baseline', gap: 8,
-              marginBottom: 30, transform: 'rotate(-2deg)'
-            }}>
-              <span style={{ fontSize: 16, fontWeight: 700, textTransform: 'uppercase' }}>Desde</span>
-              <span>{price}</span>
-            </div>
-          )}
+          {/* Left Side: Elegant Stacked Editorial Cards */}
+          <div style={{ flex: 1.1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {price && (
+              <div style={{
+                background: `linear-gradient(135deg, ${primary}, ${primary}dd)`, color: '#fff',
+                padding: '12px 30px', borderRadius: 16,
+                fontWeight: 900, fontSize: 28,
+                boxShadow: `0 8px 24px ${primary}30`,
+                display: 'flex', alignItems: 'baseline', gap: 8,
+                alignSelf: 'flex-start', marginBottom: 6,
+                border: '1px solid rgba(255,255,255,0.12)'
+              }}>
+                <span style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase' }}>Desde</span>
+                <span>{price}</span>
+              </div>
+            )}
 
-          {/* If no background, show the laptop layout. If background, show a beautiful Grid of features */}
-          {hasBg ? (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, width: '100%', maxWidth: 800 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {features.map((feat, i) => (
                 <div key={i} style={{
-                  background: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(10px)',
-                  padding: '24px', borderRadius: 20,
-                  display: 'flex', alignItems: 'center', gap: 16,
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.15)'
+                  background: hasBg ? 'rgba(15, 23, 42, 0.4)' : '#ffffff',
+                  borderLeft: `5px solid ${primary}`,
+                  borderTop: hasBg ? '1px solid rgba(255,255,255,0.06)' : '1px solid #e2e8f0',
+                  borderRight: hasBg ? '1px solid rgba(255,255,255,0.06)' : '1px solid #e2e8f0',
+                  borderBottom: hasBg ? '1px solid rgba(255,255,255,0.06)' : '1px solid #e2e8f0',
+                  padding: '16px 20px', borderRadius: '0 16px 16px 0',
+                  display: 'flex', alignItems: 'center', gap: 14,
+                  boxShadow: hasBg ? '0 10px 25px rgba(0,0,0,0.15)' : '0 4px 12px rgba(15,23,42,0.02)',
+                  textAlign: 'left'
                 }}>
-                  <div style={{ width: 64, height: 64, borderRadius: '50%', background: `${primary}15`, color: primary, fontSize: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <div style={{ width: 44, height: 44, borderRadius: '50%', background: hasBg ? 'rgba(255,255,255,0.1)' : `${primary}10`, color: hasBg ? '#fff' : primary, fontSize: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     {getFeatureIcon(feat)}
                   </div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: '#0f172a', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{feat}</div>
+                  <div style={{ fontSize: 17, fontWeight: 800, color: hasBg ? '#ffffff' : '#1e293b', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{feat}</div>
                 </div>
               ))}
             </div>
-          ) : (
-             <div style={{ position: 'relative', width: '100%', height: 400, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                <div style={{ position: 'absolute', top: 20, left: 0, width: 220, textAlign: 'center' }}>
-                  <div style={{ width: 70, height: 70, borderRadius: '50%', background: '#fff', border: `3px solid ${primary}`, color: primary, fontSize: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px', boxShadow: '0 6px 16px rgba(0,0,0,0.08)' }}>{getFeatureIcon(features[0])}</div>
-                  <span style={{ fontSize: 16, fontWeight: 800, color: '#1e293b' }}>{features[0]}</span>
-                </div>
-                <div style={{ position: 'absolute', bottom: 20, left: 0, width: 220, textAlign: 'center' }}>
-                  <div style={{ width: 70, height: 70, borderRadius: '50%', background: '#fff', border: `3px solid ${primary}`, color: primary, fontSize: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px', boxShadow: '0 6px 16px rgba(0,0,0,0.08)' }}>{getFeatureIcon(features[1])}</div>
-                  <span style={{ fontSize: 16, fontWeight: 800, color: '#1e293b' }}>{features[1]}</span>
-                </div>
-                <div style={{ position: 'absolute', top: 20, right: 0, width: 220, textAlign: 'center' }}>
-                  <div style={{ width: 70, height: 70, borderRadius: '50%', background: '#fff', border: `3px solid ${primary}`, color: primary, fontSize: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px', boxShadow: '0 6px 16px rgba(0,0,0,0.08)' }}>{getFeatureIcon(features[2])}</div>
-                  <span style={{ fontSize: 16, fontWeight: 800, color: '#1e293b' }}>{features[2]}</span>
-                </div>
-                <div style={{ position: 'absolute', bottom: 20, right: 0, width: 220, textAlign: 'center' }}>
-                  <div style={{ width: 70, height: 70, borderRadius: '50%', background: '#fff', border: `3px solid ${primary}`, color: primary, fontSize: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px', boxShadow: '0 6px 16px rgba(0,0,0,0.08)' }}>{getFeatureIcon(features[3])}</div>
-                  <span style={{ fontSize: 16, fontWeight: 800, color: '#1e293b' }}>{features[3]}</span>
-                </div>
+          </div>
 
-                {/* Laptop Center */}
-                <div style={{ width: 440, filter: 'drop-shadow(0 20px 35px rgba(0,0,0,0.12))', zIndex: 5 }}>
-                  <div style={{ background: '#1e293b', borderRadius: '16px 16px 0 0', padding: '10px 10px 0', border: '1px solid rgba(255,255,255,0.12)', borderBottom: 'none' }}>
-                    <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#ff5f57' }} />
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#febc2e' }} />
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#28c840' }} />
-                    </div>
-                    <div style={{ background: '#f8fafc', borderRadius: 8, padding: 12, height: 200, border: '1px solid rgba(0,0,0,0.04)', overflow: 'hidden' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '6px 10px', marginBottom: 8, borderRadius: 5 }}>
-                        <span style={{ fontSize: 9, fontWeight: 800, color: '#334155' }}>{industry.mockup_title}</span>
-                      </div>
-                      <div style={{ display: 'flex', gap: 5, marginBottom: 8 }}>
-                        {industry.kpis.map((kpi, idx) => (
-                          <div key={idx} style={{ flex: 1, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 5, padding: '5px 6px' }}>
-                            <div style={{ fontSize: 6, color: '#64748b', fontWeight: 700, marginBottom: 2 }}>{kpi.label}</div>
-                            <div style={{ fontSize: 9, fontWeight: 900, color: '#0f172a' }}>{kpi.val}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ background: '#cbd5e1', height: 12, borderRadius: '0 0 4px 4px', border: '1px solid #94a3b8' }} />
-                  <div style={{ background: '#94a3b8', height: 6, borderRadius: '0 0 10px 10px', width: '112%', marginLeft: '-6%', borderTop: 'none' }} />
-                </div>
-             </div>
-          )}
+          {/* Right Side: Mockup Card */}
+          <div style={{ flex: 0.9, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            {renderIndustryMockup(data.prompt, primary, secondary, hasBg)}
+          </div>
         </div>
 
-        {/* PROMPTED TEXT */}
-        <div style={{ padding: '20px 100px', textAlign: 'center', zIndex: 10 }}>
-          <h2 style={{ fontSize: 28, fontWeight: 800, color: hasBg ? '#fff' : '#0f172a', margin: 0, textShadow: hasBg ? '0 2px 8px rgba(0,0,0,0.8)' : 'none' }}>
-            {industry.highlight_title}
+        {/* PROMPTED QUOTE TEXT */}
+        <div style={{ padding: '0 100px 18px', textAlign: 'center', zIndex: 10 }}>
+          <h2 style={{ 
+            fontSize: 24, 
+            fontWeight: 800, 
+            fontFamily: "'Syne', 'Outfit', sans-serif",
+            color: hasBg ? '#fff' : '#0f172a', 
+            margin: 0, 
+            textShadow: hasBg ? '0 2px 8px rgba(0,0,0,0.85)' : 'none' 
+          }}>
+            ★ {industry.highlight_title} ★
           </h2>
         </div>
 
-        {/* BOTTOM CARDS */}
-        <div style={{ display: 'flex', gap: 20, zIndex: 10, padding: '0 60px 40px' }}>
+        {/* BOTTOM BENEFITS CARDS */}
+        <div style={{ display: 'flex', gap: 18, zIndex: 10, padding: '0 60px 36px' }}>
           {industry.benefits.slice(0, 3).map((item, idx) => (
             <div key={idx} style={{
-              flex: 1, background: hasBg ? 'rgba(255,255,255,0.9)' : '#fff', border: '1px solid #e2e8f0',
-              borderRadius: 16, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14,
-              boxShadow: hasBg ? '0 8px 24px rgba(0,0,0,0.3)' : '0 4px 12px rgba(15,23,42,0.04)'
+              flex: 1,
+              background: hasBg ? 'rgba(15, 23, 42, 0.35)' : '#fff',
+              backdropFilter: hasBg ? 'blur(12px)' : 'none',
+              border: hasBg ? '1px solid rgba(255, 255, 255, 0.06)' : '1px solid #e2e8f0',
+              borderRadius: 18, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14,
+              boxShadow: hasBg ? '0 10px 25px rgba(0,0,0,0.15)' : '0 4px 12px rgba(15,23,42,0.04)',
+              textAlign: 'left'
             }}>
-              <div style={{ width: 48, height: 48, borderRadius: 12, background: `${primary}15`, color: primary, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: hasBg ? 'rgba(255, 255, 255, 0.1)' : `${primary}15`, color: hasBg ? '#fff' : primary, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
                 {item.icon}
               </div>
               <div style={{ overflow: 'hidden' }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: primary, marginBottom: 2, display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.title}</div>
-                <div style={{ fontSize: 11, color: '#475569', fontWeight: 600, display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.desc}</div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: hasBg ? '#fff' : primary, marginBottom: 2, display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.title}</div>
+                <div style={{ fontSize: 11, color: hasBg ? 'rgba(255,255,255,0.7)' : '#475569', fontWeight: 600, display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.desc}</div>
               </div>
             </div>
           ))}
@@ -803,7 +1115,7 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
           height: 72, background: primary, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '0 48px', zIndex: 10, flexShrink: 0
         }}>
-          <div style={{ color: '#fff', fontSize: 16, fontWeight: 800, flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+          <div style={{ color: '#fff', fontSize: 16, fontWeight: 800, flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', textAlign: 'left' }}>
             {data.company_name}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexShrink: 0 }}>
@@ -822,5 +1134,96 @@ export const FlyerTemplateB = React.forwardRef<HTMLDivElement, { data: FlyerData
     );
   }
 );
-FlyerTemplateA.displayName = 'FlyerTemplateA';
-FlyerTemplateB.displayName = 'FlyerTemplateB';
+export const RenderFlyer: React.FC<{ data: FlyerData; templateId?: string }> = ({ data, templateId }) => {
+  return templateId === 'B' ? <FlyerTemplateB data={data} /> : <FlyerTemplateA data={data} />;
+};
+
+export const FreeLogo: React.FC<{
+  d: FlyerData & {
+    containerW: number;
+    containerH: number;
+    logoSize: number;
+    logoX: number;
+    logoY: number;
+    templateId: string;
+  };
+  onMove: (x: number, y: number) => void;
+  onResize: (s: number) => void;
+}> = ({ d, onMove, onResize }) => {
+  const isDragging = React.useRef(false);
+  const dragStart = React.useRef({ x: 0, y: 0 });
+  const positionStart = React.useRef({ x: 0, y: 0 });
+
+  const startDrag = (e: React.MouseEvent) => {
+    isDragging.current = true;
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    positionStart.current = { x: d.logoX, y: d.logoY };
+    document.addEventListener('mousemove', onDrag);
+    document.addEventListener('mouseup', endDrag);
+  };
+
+  const onDrag = (e: MouseEvent) => {
+    if (!isDragging.current) return;
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    // Calculate percentage shift relative to container width/height
+    const pctX = (dx / d.containerW) * 100;
+    const pctY = (dy / d.containerH) * 100;
+    
+    let newX = Math.min(Math.max(positionStart.current.x + pctX, 0), 90);
+    let newY = Math.min(Math.max(positionStart.current.y + pctY, 0), 90);
+    onMove(newX, newY);
+  };
+
+  const endDrag = () => {
+    isDragging.current = false;
+    document.removeEventListener('mousemove', onDrag);
+    document.removeEventListener('mouseup', endDrag);
+  };
+
+  if (!d.logoUrl) return null;
+
+  return (
+    <div style={{
+      position: 'absolute',
+      left: `${d.logoX}%`,
+      top: `${d.logoY}%`,
+      cursor: 'move',
+      zIndex: 40,
+      transform: `scale(${d.logoSize})`,
+      transformOrigin: 'top left',
+      padding: 6,
+      background: 'rgba(255,255,255,0.92)',
+      borderRadius: 12,
+      boxShadow: '0 8px 20px rgba(0,0,0,0.18)',
+      border: '1px solid rgba(255,255,255,0.8)',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 6,
+      userSelect: 'none'
+    }}
+    onMouseDown={startDrag}
+    >
+      <img src={d.logoUrl} crossOrigin="anonymous" style={{ maxHeight: 34, maxWidth: 110, objectFit: 'contain' }} alt="Logo flotante" />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }} onMouseDown={e => e.stopPropagation()}>
+        <button 
+          onClick={() => onResize(Math.min(d.logoSize + 0.1, 2.5))}
+          style={{ width: 14, height: 14, fontSize: 8, fontWeight: 900, background: '#fff', border: '1px solid #d8dde6', borderRadius: 3, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          +
+        </button>
+        <button 
+          onClick={() => onResize(Math.max(d.logoSize - 0.1, 0.4))}
+          style={{ width: 14, height: 14, fontSize: 8, fontWeight: 900, background: '#fff', border: '1px solid #d8dde6', borderRadius: 3, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          -
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export const TEMPLATE_LIST = [
+  { id: 'A', name: 'Flyer Moderno A (Glow Glassmorphic)' },
+  { id: 'B', name: 'Flyer Bold B (Editorial Showcase)' }
+];
