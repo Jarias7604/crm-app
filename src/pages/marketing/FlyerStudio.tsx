@@ -255,6 +255,7 @@ export default function FlyerStudio() {
   const templateRefA = useRef<HTMLDivElement>(null);
   const templateRefB = useRef<HTMLDivElement>(null);
   const templateRefMarketing = useRef<HTMLDivElement>(null);
+  const lastGeneratedImg = useRef<string>('');
   const [selectedTemplate, setSelectedTemplate] = useState<string>('bold-split');
   const [previewMode, setPreviewMode] = useState<'template' | 'ai'>('template');
 
@@ -468,8 +469,11 @@ export default function FlyerStudio() {
 
   async function generate(mode: 'full' | 'background' = 'background') {
     if (!prompt.trim()) { toast.error('Describe qué quieres promocionar'); return; }
+    const currentImg = bgUploadPreview || (variants.length > 0 ? variants[selected] : lastGeneratedImg.current);
     setGenerating(true);
     setVariants([]);
+    setBgFile(null);
+    setBgUploadPreview('');
     setAiOptimizedText(null); // Clear previous B2B structured copy
     setIsFullAiFlyer(mode === 'full');
     setShowFullAiResult(false); // Reset — se activa solo cuando DALL-E responde con éxito
@@ -519,7 +523,15 @@ export default function FlyerStudio() {
       console.warn('AI generation failed, applying premium stock fallback:', e);
       // Fallback: search for keywords in the prompt to match beautiful Unsplash stock images
       const fallbackImgs = getThematicImages(prompt);
-      const shuffled = [...fallbackImgs].sort(() => Math.random() - 0.5);
+      let shuffled = [...fallbackImgs].sort(() => Math.random() - 0.5);
+      if (currentImg && fallbackImgs.length > 1) {
+        let attempts = 0;
+        while (shuffled[0] === currentImg && attempts < 10) {
+          shuffled = [...fallbackImgs].sort(() => Math.random() - 0.5);
+          attempts++;
+        }
+      }
+      lastGeneratedImg.current = shuffled[0];
       setVariants(shuffled);
       
       // Also generate optimized copy locally based on basic parsing since openai failed
@@ -549,15 +561,26 @@ export default function FlyerStudio() {
 
   async function generateFree() {
     if (!prompt.trim()) { toast.error('Describe qué quieres promocionar'); return; }
+    const currentImg = bgUploadPreview || (variants.length > 0 ? variants[selected] : lastGeneratedImg.current);
     setGenerating(true);
     setVariants([]);
+    setBgFile(null);
+    setBgUploadPreview('');
     setAiOptimizedText(null);
     setIsFullAiFlyer(false);
     setShowFullAiResult(false);
 
     try {
       const fallbackImgs = getThematicImages(prompt);
-      const shuffled = [...fallbackImgs].sort(() => Math.random() - 0.5);
+      let shuffled = [...fallbackImgs].sort(() => Math.random() - 0.5);
+      if (currentImg && fallbackImgs.length > 1) {
+        let attempts = 0;
+        while (shuffled[0] === currentImg && attempts < 10) {
+          shuffled = [...fallbackImgs].sort(() => Math.random() - 0.5);
+          attempts++;
+        }
+      }
+      lastGeneratedImg.current = shuffled[0];
       setVariants(shuffled);
 
       // Parse prompt locally to generate structured copy
