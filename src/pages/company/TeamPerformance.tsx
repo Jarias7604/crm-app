@@ -23,6 +23,7 @@ import { teamsService, type Team } from '../../services/teams';
 import { performanceGoalsService, type PerformanceGoal } from '../../services/performanceGoals';
 import { forecastService, type ForecastWithActual } from '../../services/forecastService';
 import { callActivityService, type CallActivitySummary, type CallGoal, type ContactActivitySummary, ACTION_TYPE_CONFIG } from '../../services/callActivity';
+import { supabase } from '../../services/supabase';
 
 // === CONSTANTS ===
 const PERIODS = [
@@ -424,6 +425,7 @@ export default function TeamPerformancePage() {
                     companyId={profile?.company_id || ''}
                     isAdmin={isAdmin}
                     onGoalsSaved={() => loadData()}
+                    filters={filters}
                 />
             ) : activeTab === 'forecast' ? (
                 <ForecastSection companyId={profile?.company_id || ''} isAdmin={isAdmin} />
@@ -1869,6 +1871,7 @@ function CallActivitySection({
     companyId,
     isAdmin,
     onGoalsSaved,
+    filters,
 }: {
     callSummary: CallActivitySummary[];
     callGoals: CallGoal[];
@@ -1879,11 +1882,71 @@ function CallActivitySection({
     companyId: string;
     isAdmin: boolean;
     onGoalsSaved: () => void;
+    filters: PerformanceFilters;
 }) {
     const navigate = useNavigate();
     const [isGoalPanelOpen, setIsGoalPanelOpen] = useState(false);
     const [editGoals, setEditGoals] = useState<Record<string, number>>({});
     const [savingGoals, setSavingGoals] = useState(false);
+
+    const handleCallClick = async (userId: string, type: 'all' | 'connected' | 'no_answer' | 'unique' | 'status_change') => {
+        try {
+            const dateRange = getDateRange(filters);
+            const dateFrom = dateRange.start?.toISOString();
+            const dateTo = dateRange.end?.toISOString();
+
+            let query = supabase
+                .from('call_activities')
+                .select('lead_id, outcome, status_before, status_after')
+                .eq('user_id', userId);
+
+            if (dateFrom) query = query.gte('call_date', dateFrom);
+            if (dateTo) query = query.lte('call_date', dateTo);
+
+            const { data, error } = await query;
+            if (error) throw error;
+
+            let filtered = data || [];
+            if (type === 'connected') {
+                filtered = filtered.filter(c => c.outcome === 'connected');
+            } else if (type === 'no_answer') {
+                filtered = filtered.filter(c => c.outcome !== 'connected');
+            } else if (type === 'status_change') {
+                filtered = filtered.filter(c => c.status_before && c.status_after && c.status_before !== c.status_after);
+            }
+
+            const leadIds = [...new Set(filtered.map(c => c.lead_id))];
+            navigate('/leads', { state: { assignedFilter: userId, leadIds } });
+        } catch (err) {
+            console.error('Error filtering leads by call activity:', err);
+            navigate('/leads', { state: { assignedFilter: userId } });
+        }
+    };
+
+    const handleChannelClick = async (actionType: string) => {
+        try {
+            const dateRange = getDateRange(filters);
+            const dateFrom = dateRange.start?.toISOString();
+            const dateTo = dateRange.end?.toISOString();
+
+            let query = supabase
+                .from('call_activities')
+                .select('lead_id')
+                .eq('action_type', actionType);
+
+            if (dateFrom) query = query.gte('call_date', dateFrom);
+            if (dateTo) query = query.lte('call_date', dateTo);
+
+            const { data, error } = await query;
+            if (error) throw error;
+
+            const leadIds = data ? [...new Set(data.map(r => r.lead_id))] : [];
+            navigate('/leads', { state: { leadIds } });
+        } catch (err) {
+            console.error('Error filtering leads by channel activity:', err);
+            navigate('/leads', { state: { actionTypeFilter: actionType } });
+        }
+    };
 
     // Totals from legacy summary
     const totalCalls = callSummary.reduce((s, u) => s + u.calls_total, 0);
@@ -1959,7 +2022,7 @@ function CallActivitySection({
                         {channelBreakdown.map(ch => (
                             <button
                                 key={ch.type}
-                                onClick={() => navigate('/leads', { state: { actionTypeFilter: ch.type } })}
+                                onClick={() => handleChannelClick(ch.type)}
                                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl ${ch.bgColor} border border-white/50 hover:scale-105 hover:shadow-md transition-all duration-150 cursor-pointer`}
                             >
                                 <span className="text-lg">{ch.icon}</span>
@@ -2131,7 +2194,7 @@ function CallActivitySection({
                                     {/* Total Calls */}
                                     <div className="col-span-1 text-center">
                                         {user.calls_total > 0 ? (
-                                            <button onClick={(e) => { e.stopPropagation(); navigate('/leads', { state: { assignedFilter: user.user_id } }); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-gray-100 transition-all cursor-pointer border border-transparent hover:border-gray-200">
+                                            <button onClick={(e) => { e.stopPropagation(); handleCallClick(user.user_id, 'all'); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-gray-100 transition-all cursor-pointer border border-transparent hover:border-gray-200">
                                                 <span className="text-[13px] font-black text-gray-700 group-hover:text-[#4449AA] transition-colors">{user.calls_total}</span>
                                                 <ArrowUpRight className="w-3.5 h-3.5 text-[#4449AA] opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
                                             </button>
@@ -2141,7 +2204,7 @@ function CallActivitySection({
                                     {/* Connected */}
                                     <div className="col-span-1 text-center">
                                         {user.calls_connected > 0 ? (
-                                            <button onClick={(e) => { e.stopPropagation(); navigate('/leads', { state: { assignedFilter: user.user_id } }); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-emerald-50 transition-all cursor-pointer border border-transparent hover:border-emerald-100">
+                                            <button onClick={(e) => { e.stopPropagation(); handleCallClick(user.user_id, 'connected'); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-emerald-50 transition-all cursor-pointer border border-transparent hover:border-emerald-100">
                                                 <span className="text-[13px] font-black text-emerald-600 group-hover:text-emerald-700 transition-colors">{user.calls_connected}</span>
                                                 <ArrowUpRight className="w-3.5 h-3.5 text-emerald-600 opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
                                             </button>
@@ -2151,7 +2214,7 @@ function CallActivitySection({
                                     {/* No Answer */}
                                     <div className="col-span-1 text-center">
                                         {user.calls_no_answer > 0 ? (
-                                            <button onClick={(e) => { e.stopPropagation(); navigate('/leads', { state: { assignedFilter: user.user_id } }); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-red-50 transition-all cursor-pointer border border-transparent hover:border-red-100">
+                                            <button onClick={(e) => { e.stopPropagation(); handleCallClick(user.user_id, 'no_answer'); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-red-50 transition-all cursor-pointer border border-transparent hover:border-red-100">
                                                 <span className="text-[13px] font-black text-red-400 group-hover:text-red-600 transition-colors">{user.calls_no_answer}</span>
                                                 <ArrowUpRight className="w-3.5 h-3.5 text-red-500 opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
                                             </button>
@@ -2171,7 +2234,7 @@ function CallActivitySection({
                                     {/* Unique Leads */}
                                     <div className="col-span-2 text-center">
                                         {user.unique_leads_called > 0 ? (
-                                            <button onClick={(e) => { e.stopPropagation(); navigate('/leads', { state: { assignedFilter: user.user_id } }); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-gray-100 transition-all cursor-pointer border border-transparent hover:border-gray-200">
+                                            <button onClick={(e) => { e.stopPropagation(); handleCallClick(user.user_id, 'unique'); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-gray-100 transition-all cursor-pointer border border-transparent hover:border-gray-200">
                                                 <span className="text-[13px] font-black text-gray-600 group-hover:text-[#4449AA] transition-colors">{user.unique_leads_called}</span>
                                                 <ArrowUpRight className="w-3.5 h-3.5 text-[#4449AA] opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
                                             </button>
@@ -2181,7 +2244,7 @@ function CallActivitySection({
                                     {/* Status Changes */}
                                     <div className="col-span-2 text-center">
                                         {user.leads_with_status_change > 0 ? (
-                                            <button onClick={(e) => { e.stopPropagation(); navigate('/leads', { state: { assignedFilter: user.user_id } }); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-violet-50 transition-all cursor-pointer border border-transparent hover:border-violet-100">
+                                            <button onClick={(e) => { e.stopPropagation(); handleCallClick(user.user_id, 'status_change'); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-violet-50 transition-all cursor-pointer border border-transparent hover:border-violet-100">
                                                 <span className="text-[13px] font-black text-[#4449AA] group-hover:text-violet-700 transition-colors">{user.leads_with_status_change}</span>
                                                 <ArrowUpRight className="w-3.5 h-3.5 text-violet-600 opacity-0 w-0 -ml-1 group-hover:w-3.5 group-hover:opacity-100 group-hover:ml-1 transition-all" />
                                             </button>
