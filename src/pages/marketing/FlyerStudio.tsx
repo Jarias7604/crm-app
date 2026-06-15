@@ -739,46 +739,7 @@ export default function FlyerStudio() {
     setIsFontDropdownOpen(false);
   }, [editingElement]);
 
-  // ── Auto-optimize brief with IA as user types ─────────────────────────────
-  useEffect(() => {
-    // Skip: same as last auto-optimized, too short, no company, or already structured/edited
-    if (!prompt.trim() || prompt.trim().length < 40) return;
-    if (prompt === lastAutoOptPrompt.current) return;
-    if (/t[íi]tulo:|incluye:|cta:/i.test(prompt)) return; // Don't overwrite manually customized/structured text
-    if (showSuggestions) return;
-
-    autoOptRef.current = setTimeout(async () => {
-      setAutoOptimizing(true);
-      try {
-        const { data, error } = await supabase.functions.invoke('flyer-recommend', {
-          body: { oferta: prompt, tono: tone, industria: 'General', idioma: 'es' }
-        });
-        if (error || !data?.ideas?.length) return;
-        const best = data.ideas[0];
-        const parts: string[] = [];
-        if (best.titulo) parts.push(`título: ${best.titulo}`);
-        if (best.gancho) parts.push(best.gancho);
-        if (best.beneficios?.length) parts.push(`incluye: ${best.beneficios.join(', ')}`);
-        if (best.cta) parts.push(`cta: ${best.cta}`);
-        const enriched = parts.join('. ');
-        if (enriched) {
-          lastAutoOptPrompt.current = enriched;
-          setPrompt(enriched);
-        }
-        if (best.paleta?.length > 0 && !userSelectedColors.current) setColors(best.paleta.slice(0, 3));
-        if (best.cta && !cta.trim()) setCta(best.cta);
-        if (best.tono) setTone(best.tono);
-        // CRITICAL: clear stale AI variants — they don't match the new brief
-        setVariants([]);
-        setSelected(0);
-        setPreviewMode('template');
-        toast.success('✨ IA mejoró tu brief automáticamente', { duration: 2000 });
-      } catch (_) { /* silent fail */ }
-      finally { setAutoOptimizing(false); }
-    }, 2500);
-
-    return () => { if (autoOptRef.current) clearTimeout(autoOptRef.current); };
-  }, [prompt]);
+  // Auto-optimize debounced effect removed to prevent overriding user typing. A manual button is now used instead.
 
   function toggleColor(hex: string) {
     userSelectedColors.current = true;
@@ -1516,8 +1477,17 @@ export default function FlyerStudio() {
               <label style={css.label}>¿Qué quieres promocionar? *</label>
               <textarea
                 id="textarea-prompt"
-                style={{ ...css.textarea, minHeight: 120, fontSize: 13, lineHeight: 1.6, border: autoOptimizing ? '1.5px solid #7c3aed' : '1px solid #d8dde6', transition: 'border 0.3s' }}
-                placeholder={'Ej: 30% OFF en servicios de defensa personal este verano — escribe tu idea y la IA la mejorará automáticamente...'}
+                style={{
+                  ...css.textarea,
+                  minHeight: 120,
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  border: optimizing ? '1.5px solid #7c3aed' : '1px solid #d8dde6',
+                  borderRadius: 10,
+                  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.02)',
+                  transition: 'border 0.3s, box-shadow 0.3s'
+                }}
+                placeholder={'Ej: 30% de descuento en Facturación Electrónica para Pymes este mes — escribe tu idea y haz clic en "Optimizar con IA"...'}
                 value={prompt}
                 onChange={e => {
                   setPrompt(e.target.value);
@@ -1529,45 +1499,99 @@ export default function FlyerStudio() {
                   }
                 }}
               />
-              {/* Auto-optimize status */}
-              {autoOptimizing && (
-                <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#7c3aed', fontWeight: 700 }}>
-                  <Cpu size={10} style={{ animation: 'spin 1s linear infinite' }} />
-                  IA mejorando tu brief...
-                </div>
-              )}
-              {/* Manual regenerate — secondary option */}
-              {!autoOptimizing && prompt.trim().length > 3 && lastAutoOptPrompt.current && (
+              
+              {/* Manual AI Optimization Button */}
+              {prompt.trim().length > 3 && (
                 <button
                   onClick={optimizeWithMetaAI}
                   disabled={optimizing}
-                  style={{ marginTop: 6, background: 'none', border: '1px solid #e2e8f0', borderRadius: 6, padding: '5px 10px', fontSize: 10, fontWeight: 700, color: '#7c3aed', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}
+                  style={{
+                    marginTop: 8,
+                    background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                    border: 'none',
+                    borderRadius: 10,
+                    padding: '10px 16px',
+                    fontSize: 11,
+                    fontWeight: 800,
+                    color: '#fff',
+                    cursor: optimizing ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    boxShadow: '0 4px 12px rgba(124, 58, 237, 0.15)',
+                    transition: 'all 0.2s ease',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }}
+                  onMouseEnter={e => {
+                    if (!optimizing) {
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(124, 58, 237, 0.25)';
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (!optimizing) {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(124, 58, 237, 0.15)';
+                    }
+                  }}
                 >
-                  {optimizing ? <><Cpu size={10} style={{ animation: 'spin 1s linear infinite' }} /> Regenerando...</> : <><RefreshCw size={10} /> Regenerar sugerencia</>}
+                  {optimizing ? (
+                    <>
+                      <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+                      <span>Analizando con Meta AI...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={12} color="#fff" />
+                      <span>Optimizar con IA</span>
+                    </>
+                  )}
                 </button>
               )}
             </div>
 
-            {/* ── VIRALITY SCORE — shown BEFORE generating ── */}
+            {/* ── VIRALITY SCORE — AIDA Copywriting Audit ── */}
             {(() => {
               const vs = calcViralScore(prompt, cta, phone, website);
               if (vs.score === 0) return null;
               const color = vs.level === 'viral' ? '#10b981' : vs.level === 'bueno' ? '#3b82f6' : vs.level === 'mejorable' ? '#f59e0b' : '#ef4444';
               const label = vs.level === 'viral' ? '🔥 Alto impacto' : vs.level === 'bueno' ? '👍 Buen potencial' : vs.level === 'mejorable' ? '⚠️ Mejorable' : '📉 Bajo impacto';
               return (
-                <div style={{ marginBottom: 20, background: `${color}08`, border: `1.5px solid ${color}30`, borderRadius: 10, padding: '12px 14px' }}>
+                <div style={{
+                  marginBottom: 20,
+                  background: 'linear-gradient(180deg, #ffffff, #f8fafc)',
+                  border: `1.5px solid #e2e8f0`,
+                  borderRadius: 14,
+                  padding: '14px 16px',
+                  boxShadow: '0 4px 12px rgba(15, 23, 42, 0.03)'
+                }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <span style={{ fontSize: 10, fontWeight: 900, color: '#0f172a', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Score de Viralidad</span>
-                    <span style={{ fontSize: 11, fontWeight: 900, color }}>{vs.score}/100 · {label}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: 9, fontWeight: 900, color: '#64748b', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Auditoría AIDA</span>
+                      <span style={{ fontSize: 13, fontWeight: 900, color: '#0f172a', marginTop: 1 }}>Score de Viralidad</span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                      <span style={{ fontSize: 14, fontWeight: 900, color }}>{vs.score}/100</span>
+                      <span style={{ fontSize: 9, fontWeight: 800, color, textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 1 }}>{label}</span>
+                    </div>
                   </div>
-                  <div style={{ height: 6, background: '#e2e8f0', borderRadius: 10, overflow: 'hidden', marginBottom: vs.tips.length > 0 ? 10 : 0 }}>
-                    <div style={{ height: '100%', width: `${vs.score}%`, background: `linear-gradient(90deg, ${color}, ${color}cc)`, borderRadius: 10, transition: 'width 0.4s ease' }} />
+                  
+                  {/* Progress bar */}
+                  <div style={{ height: 6, background: '#f1f5f9', borderRadius: 10, overflow: 'hidden', marginBottom: 10 }}>
+                    <div style={{ height: '100%', width: `${vs.score}%`, background: `linear-gradient(90deg, ${color}, ${color}cc)`, borderRadius: 10, transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)' }} />
                   </div>
+                  
+                  <div style={{ fontSize: 9, color: '#64748b', lineHeight: 1.4, marginBottom: 10, background: '#f8fafc', padding: '6px 10px', borderRadius: 8, border: '1px solid #edf2f7', display: 'flex', gap: 4 }}>
+                    <span>ℹ️</span>
+                    <span>Analiza de forma matemática la estructura del brief (descuentos, urgencia, beneficios, CTA) usando la metodología de conversión AIDA.</span>
+                  </div>
+
                   {vs.tips.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <div style={{ fontSize: 9, color: '#94a3b8', fontWeight: 600, marginBottom: 2 }}>👆 Toca una sugerencia para agregarla al brief:</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ fontSize: 9, color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sugerencias de mejora:</div>
                       {vs.tips.map((tip, i) => {
-                        // Extract the actionable text after the first colon if present
                         const parts = tip.split(':');
                         const snippet = parts.length > 1 ? parts.slice(1).join(':').trim() : tip;
                         return (
@@ -1576,20 +1600,32 @@ export default function FlyerStudio() {
                             onClick={() => {
                               const addition = snippet.replace(/\(ej:.*/i, '').trim();
                               setPrompt(prev => prev ? `${prev.trim()}. ${addition}` : addition);
-                              // Clear stale AI variants
                               if (variants.length > 0) { setVariants([]); setSelected(0); setPreviewMode('template'); }
                             }}
                             style={{
-                              fontSize: 10, color: '#475569', fontWeight: 600, lineHeight: 1.4,
-                              background: 'rgba(255,255,255,0.7)', border: '1px solid rgba(0,0,0,0.1)',
-                              borderRadius: 6, padding: '4px 8px', cursor: 'pointer',
-                              textAlign: 'left', display: 'block', width: '100%',
-                              transition: 'background 0.15s, transform 0.1s'
+                              fontSize: 10, color: '#334155', fontWeight: 700, lineHeight: 1.4,
+                              background: '#fff', border: '1px solid #e2e8f0',
+                              borderRadius: 8, padding: '8px 12px', cursor: 'pointer',
+                              textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%',
+                              boxSizing: 'border-box', boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                              transition: 'all 0.2s ease'
                             }}
-                            onMouseEnter={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.transform = 'translateX(2px)'; }}
-                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.7)'; e.currentTarget.style.transform = 'translateX(0)'; }}
+                            onMouseEnter={e => {
+                              e.currentTarget.style.borderColor = '#7c3aed';
+                              e.currentTarget.style.background = '#f5f3ff';
+                              e.currentTarget.style.transform = 'translateX(2px)';
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.borderColor = '#e2e8f0';
+                              e.currentTarget.style.background = '#fff';
+                              e.currentTarget.style.transform = 'translateX(0)';
+                            }}
                           >
-                            {tip} <span style={{ color: '#7c3aed', fontSize: 9 }}>→ agregar</span>
+                            <span style={{ flex: 1, paddingRight: 8 }}>{tip}</span>
+                            <span style={{
+                              color: '#7c3aed', fontSize: 8, fontWeight: 900, textTransform: 'uppercase',
+                              background: '#f3e8ff', padding: '2px 6px', borderRadius: 6, flexShrink: 0
+                            }}>+ Agregar</span>
                           </button>
                         );
                       })}
