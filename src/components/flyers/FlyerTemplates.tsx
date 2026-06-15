@@ -158,9 +158,9 @@ export function deriveHeadline(prompt: string, company: string): { h1: string; h
     return { h1: 'Diseño Profesional', h2: company };
   }
 
-  // 1. Look for explicit tags like Título/Subtítulo or Headline/Subheadline
-  const titleMatch = prompt.match(/(?:t[íi]tulo|headline|t[íi]tulo del flyer|t[íi]tulo principal)\s*[:：]\s*([^\n|;.-]+)/i);
-  const subMatch = prompt.match(/(?:subt[íi]tulo|subheadline|descripci[oó]n corta)\s*[:：]\s*([^\n|;.-]+)/i);
+  // 1. Look for explicit tags like Título/Subtítulo or Headline/Subheadline. Allow punctuation within tags.
+  const titleMatch = prompt.match(/(?:t[íi]tulo|headline|t[íi]tulo del flyer|t[íi]tulo principal)\s*[:：]\s*([^\n|]+)/i);
+  const subMatch = prompt.match(/(?:subt[íi]tulo|subheadline|descripci[oó]n corta)\s*[:：]\s*([^\n|]+)/i);
 
   let h1 = '';
   let h2 = '';
@@ -174,42 +174,102 @@ export function deriveHeadline(prompt: string, company: string): { h1: string; h
 
   if (h1 && h2) return { h1, h2 };
 
-  // 2. Look for splitters like double newlines or single newlines
+  // Connectors helper for smart splitting in Spanish
+  const isConnector = (word: string) => {
+    const w = word.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return ['para', 'con', 'de', 'y', 'en', 'o', 'a', 'que', 'como', 'sin', 'sobre', 'del', 'al', 'por', 'desde', 'e', 'u'].includes(w);
+  };
+
+  // 2. Look for splitters like newlines
   const lines = prompt.split(/\n+/).map(l => l.trim()).filter(l => l.length > 0);
-  if (!h1 && lines.length > 0 && lines[0].split(/\s+/).length <= 10) {
-    h1 = cleanPhrase(lines[0]);
-    if (!h2 && lines.length > 1) {
-      h2 = cleanPhrase(lines[1]);
+  if (!h1 && lines.length > 0) {
+    const firstLine = lines[0];
+    const firstLineWords = firstLine.split(/\s+/);
+    
+    if (firstLineWords.length <= 14) {
+      // If the first line is reasonably short (<= 14 words), keep it entirely as h1
+      h1 = cleanPhrase(firstLine);
+      if (!h2 && lines.length > 1) {
+        h2 = cleanPhrase(lines[1]);
+      }
+    } else {
+      // If the first line is long (> 14 words), split it dynamically using connectors
+      let splitIdx = -1;
+      // Search for a connector to split before, ideally between word 4 and 9
+      for (let i = 4; i <= 9 && i < firstLineWords.length; i++) {
+        if (isConnector(firstLineWords[i])) {
+          splitIdx = i;
+          break;
+        }
+      }
+      
+      if (splitIdx !== -1) {
+        h1 = cleanPhrase(firstLineWords.slice(0, splitIdx).join(' '));
+        if (!h2) {
+          h2 = cleanPhrase(firstLineWords.slice(splitIdx).join(' '));
+        }
+      } else {
+        // Fallback split in the middle (between 6 and 8 words)
+        const mid = Math.min(8, Math.max(5, Math.floor(firstLineWords.length / 2)));
+        h1 = cleanPhrase(firstLineWords.slice(0, mid).join(' '));
+        if (!h2) {
+          h2 = cleanPhrase(firstLineWords.slice(mid).join(' '));
+        }
+      }
     }
   }
 
-  // 3. Look for dashes or bullets as separators
+  // 3. Look for dashes or bullets as separators if h1 is still empty
   if (!h1) {
     const parts = prompt.split(/[—|•]|\s{2,}/);
-    if (parts.length > 1 && parts[0].trim().split(/\s+/).length <= 10) {
-      h1 = cleanPhrase(parts[0]);
-      h2 = cleanPhrase(parts[1]);
+    if (parts.length > 1) {
+      const firstPartWords = parts[0].trim().split(/\s+/);
+      if (firstPartWords.length <= 14) {
+        h1 = cleanPhrase(parts[0]);
+        if (!h2) {
+          h2 = cleanPhrase(parts[1]);
+        }
+      }
     }
   }
 
-  // Fallbacks
+  // 4. Fallbacks if h1 is still empty
   if (!h1) {
     const words = prompt.trim().split(/\s+/);
-    h1 = words.slice(0, 6).join(' ');
-    h1 = cleanPhrase(h1);
+    if (words.length <= 12) {
+      h1 = cleanPhrase(prompt);
+    } else {
+      // Try to find a connector to split on
+      let splitIdx = -1;
+      for (let i = 4; i <= 9 && i < words.length; i++) {
+        if (isConnector(words[i])) {
+          splitIdx = i;
+          break;
+        }
+      }
+      if (splitIdx !== -1) {
+        h1 = cleanPhrase(words.slice(0, splitIdx).join(' '));
+        if (!h2) {
+          h2 = cleanPhrase(words.slice(splitIdx).join(' '));
+        }
+      } else {
+        h1 = cleanPhrase(words.slice(0, 8).join(' '));
+      }
+    }
   }
 
+  // Fallback for h2 if still empty
   if (!h2) {
     const words = prompt.trim().split(/\s+/);
-    if (words.length > 6) {
-      h2 = words.slice(6, 15).join(' ');
-      h2 = cleanPhrase(h2);
+    const h1WordsCount = h1.split(/\s+/).length;
+    if (words.length > h1WordsCount) {
+      h2 = cleanPhrase(words.slice(h1WordsCount, h1WordsCount + 12).join(' '));
     } else {
       h2 = `${company} — Innovación a tu alcance`;
     }
   }
 
-  // Capitalize first letter
+  // Capitalize first letter of each sentence
   if (h1.length > 0) h1 = h1.charAt(0).toUpperCase() + h1.slice(1);
   if (h2.length > 0) h2 = h2.charAt(0).toUpperCase() + h2.slice(1);
 

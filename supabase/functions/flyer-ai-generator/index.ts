@@ -218,7 +218,7 @@ Deno.serve(async (req) => {
               content: `You are an expert copywriter. Your task is to extract and optimize advertising copy in Spanish from a raw prompt description. 
 You MUST return a JSON object with this exact structure:
 {
-  "headline": "A short, ultra-catchy 2-5 word main title in Spanish",
+  "headline": "A short, ultra-catchy 3-8 word main title in Spanish",
   "subheadline": "A supporting slogan or dynamic offer of 4-8 words in Spanish",
   "features": ["Feature 1 (max 4 words)", "Feature 2 (max 4 words)", "Feature 3 (max 4 words)", "Feature 4 (max 4 words)"],
   "cta": "WhatsApp / Call to action button text (max 3 words)",
