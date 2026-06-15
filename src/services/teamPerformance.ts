@@ -48,7 +48,7 @@ export interface CompanySummary {
 }
 
 export interface PerformanceFilters {
-    period: 'week' | 'month' | 'quarter' | 'year' | 'all' | 'custom';
+    period: 'today' | 'week' | 'month' | 'quarter' | 'year' | 'all' | 'custom';
     team_id?: string;
     date_from?: string;
     date_to?: string;
@@ -67,6 +67,11 @@ export function getDateRange(filters: PerformanceFilters): { start: Date | null;
     let end: Date | null = null;
 
     switch (filters.period) {
+        case 'today': {
+            start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+            end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+            break;
+        }
         case 'week': {
             start = new Date(now);
             start.setDate(start.getDate() - 7);
@@ -107,6 +112,12 @@ export function getPreviousPeriodFilters(filters: PerformanceFilters): Performan
     if (filters.period === 'all' || filters.period === 'custom') return null;
     const now = new Date();
     switch (filters.period) {
+        case 'today': {
+            const prev = new Date(now);
+            prev.setDate(prev.getDate() - 1);
+            const dateStr = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}-${String(prev.getDate()).padStart(2, '0')}`;
+            return { period: 'custom', date_from: dateStr, date_to: dateStr };
+        }
         case 'week': {
             const s = new Date(now); s.setDate(s.getDate() - 14);
             const e = new Date(now); e.setDate(e.getDate() - 7);

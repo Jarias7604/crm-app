@@ -26,6 +26,7 @@ import { callActivityService, type CallActivitySummary, type CallGoal, type Cont
 
 // === CONSTANTS ===
 const PERIODS = [
+    { value: 'today', label: 'Hoy', icon: '☀️' },
     { value: 'week', label: 'Última Semana', icon: '📅' },
     { value: 'month', label: 'Este Mes', icon: '📆' },
     { value: 'quarter', label: 'Este Trimestre', icon: '📊' },
@@ -51,6 +52,8 @@ function formatPercent(value: number): string {
 /** Monthly goals are scaled based on the active period filter */
 function getGoalScale(period: string): number {
     switch (period) {
+        case 'today':
+            return 1 / 30;
         case 'week':
             return 1;
         case 'month':
@@ -70,6 +73,8 @@ function getGoalScale(period: string): number {
 
 function getGoalPeriodLabel(period: string): string {
     switch (period) {
+        case 'today':
+            return 'diario';
         case 'quarter':
             return 'trimestral';
         case 'year':
@@ -520,7 +525,7 @@ function UserPerformanceTable({ data, getUserGoal, periodLabel, companySummary, 
             {hasAnyGoals && (
                 <div className="px-6 py-2 bg-violet-50/50 border-b border-violet-100">
                     <p className="text-[9px] font-black text-violet-500 uppercase tracking-widest">
-                        📊 Metas {periodLabel}es activas — las barras de progreso muestran el avance vs meta
+                        📊 Metas {periodLabel === 'diario' ? 'diarias' : `${periodLabel}es`} activas — las barras de progreso muestran el avance vs meta
                     </p>
                 </div>
             )}
