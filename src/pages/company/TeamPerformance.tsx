@@ -50,6 +50,19 @@ function formatPercent(value: number): string {
     return `${value.toFixed(1)}%`;
 }
 
+function formatResponseTime(hours?: number): string {
+    if (hours === undefined || hours === null || hours === 0 || isNaN(hours)) return '—';
+    if (hours < 1) {
+        const mins = Math.round(hours * 60);
+        return `${mins} min`;
+    }
+    if (hours < 24) {
+        return `${hours.toFixed(1)} h`;
+    }
+    const days = hours / 24;
+    return `${days.toFixed(1)} d`;
+}
+
 /** Monthly goals are scaled based on the active period filter */
 function getGoalScale(period: string): number {
     switch (period) {
@@ -561,10 +574,21 @@ function UserPerformanceTable({ data, getUserGoal, periodLabel, companySummary, 
                 <div className="col-span-1 text-center">Ganados</div>
                 <div className="col-span-1 text-center">Perdidos</div>
                 <div className="col-span-1 text-center">Tasa</div>
+                <div className="col-span-1 text-center flex items-center justify-center gap-1">
+                    Abordaje
+                    <span className="relative group inline-block cursor-help text-gray-400 hover:text-gray-650 transition-colors">
+                        <span className="w-3.5 h-3.5 rounded-full border border-gray-300 hover:border-gray-400 flex items-center justify-center text-[9px] font-black leading-none font-sans">!</span>
+                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-900 text-white text-[10px] rounded-xl p-3.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-normal leading-normal font-medium normal-case">
+                            <p className="font-black border-b border-white/10 pb-1 mb-1 text-white uppercase tracking-wider text-[8px]">Tiempo de Abordaje Promedio</p>
+                            <p className="text-white/90 text-left">Tiempo transcurrido desde la asignación del lead hasta el registro del primer seguimiento. ¡Un abordaje rápido evita que los leads se enfríen e incrementa la conversión en más de 300%!</p>
+                            <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+                        </span>
+                    </span>
+                </div>
                 <div className="col-span-1 text-center">Días/Cierre</div>
                 <div className="col-span-1 text-right">Avg Deal</div>
                 <div className="col-span-1 text-right">Pipeline</div>
-                <div className="col-span-2 text-right">Monto Cerrado</div>
+                <div className="col-span-1 text-right">Monto Cerrado</div>
             </div>
             <div className="divide-y divide-gray-50">
                 {data.map((user, index) => {
@@ -631,6 +655,12 @@ function UserPerformanceTable({ data, getUserGoal, periodLabel, companySummary, 
                             <div className="col-span-1 text-center">
                                 <WinRateBadge rate={user.win_rate} />
                             </div>
+                            {/* Abordaje */}
+                            <div className="col-span-1 text-center">
+                                <span className={`text-[12px] font-black ${user.avg_response_time && user.avg_response_time > 0 ? (user.avg_response_time <= 2 ? 'text-emerald-650' : user.avg_response_time <= 24 ? 'text-amber-600' : 'text-rose-600') : 'text-gray-300'}`}>
+                                    {formatResponseTime(user.avg_response_time)}
+                                </span>
+                            </div>
                             {/* Días/Cierre */}
                             <div className="col-span-1 text-center">
                                 {user.avg_days_to_close > 0 ? (
@@ -654,7 +684,7 @@ function UserPerformanceTable({ data, getUserGoal, periodLabel, companySummary, 
                                 <span className="text-[11px] font-black text-gray-500">{formatCurrency(user.total_value)}</span>
                             </div>
                             {/* Closing Amount + Trend */}
-                            <div className="col-span-2 text-right">
+                            <div className="col-span-1 text-right">
                                 <div className="flex items-center justify-end gap-1">
                                     <span className="text-[13px] font-black text-[#4449AA]">{formatCurrency(user.total_closing_amount)}</span>
                                     {closingDiff !== null && closingDiff !== 0 && (
@@ -2089,33 +2119,33 @@ function CallActivitySection({
         return `${formatDateSimple(range.start)} al ${formatDateSimple(range.end)}`;
     };
 
-    const getRecommendation = (userName: string, actual: number, periodGoal: number) => {
-        if (periodGoal === 0) {
+    const getRecommendation = (userName: string, actual: number, goalUpToDate: number) => {
+        if (goalUpToDate === 0) {
             return `Asignar una meta diaria de llamadas a ${userName} para medir su rendimiento.`;
         }
-        const percent = (actual / periodGoal) * 100;
+        const percent = (actual / goalUpToDate) * 100;
         if (percent >= 100) {
-            return `Excelente desempeño. ${userName} superó la meta por un ${Math.round(percent - 100)}%. Seguir así.`;
+            return `Excelente desempeño a la fecha. ${userName} superó la meta proporcional por un ${Math.round(percent - 100)}%. Seguir así.`;
         } else if (percent >= 80) {
-            return `Buen ritmo de llamadas (${Math.round(percent)}%). Le falta poco para el 100%. Incrementar ligeramente el ritmo diario.`;
+            return `Buen ritmo de llamadas a la fecha (${Math.round(percent)}%). Le falta poco para el 100% del proporcional. Incrementar ligeramente el ritmo diario.`;
         } else if (percent > 0) {
-            return `Bajo cumplimiento (${Math.round(percent)}%). Se recomienda revisar bloqueos de agenda y priorizar llamadas diarias.`;
+            return `Bajo cumplimiento a la fecha (${Math.round(percent)}%). Se recomienda revisar bloqueos de agenda y priorizar llamadas diarias.`;
         } else {
-            return `Crítico: 0 llamadas registradas. Validar si ${userName} tiene problemas con la telefonía o reasignar tareas.`;
+            return `Crítico: 0 llamadas registradas a la fecha. Validar si ${userName} tiene problemas con la telefonía o reasignar tareas.`;
         }
     };
 
-    const getGlobalRecommendation = (actual: number, totalGoal: number) => {
-        if (totalGoal === 0) {
+    const getGlobalRecommendation = (actual: number, totalGoalUpToDate: number, totalPeriodGoal: number) => {
+        if (totalGoalUpToDate === 0) {
             return "Configure las metas de actividad de llamadas para el equipo de ventas para habilitar las recomendaciones automáticas.";
         }
-        const percent = (actual / totalGoal) * 100;
+        const percent = (actual / totalGoalUpToDate) * 100;
         if (percent >= 100) {
-            return `🎉 ¡Felicidades! El equipo ha alcanzado el ${Math.round(percent)}% del objetivo de contacto. La prospección está en un nivel saludable para garantizar el cierre de tratos.`;
+            return `🎉 ¡Felicidades! El equipo ha alcanzado el ${Math.round(percent)}% del objetivo de contacto a la fecha (Meta a la fecha: ${totalGoalUpToDate} de ${totalPeriodGoal} totales). La prospección está en un nivel saludable para garantizar el cierre de tratos.`;
         } else if (percent >= 80) {
-            return `📈 Buen avance global del ${Math.round(percent)}%. Para asegurar el cumplimiento del embudo de ventas, incentive a los asesores a realizar 2 o 3 llamadas más por día.`;
+            return `📈 Buen avance global del ${Math.round(percent)}% a la fecha (Meta a la fecha: ${totalGoalUpToDate} de ${totalPeriodGoal} totales). Para asegurar el cumplimiento del embudo de ventas, incentive a los asesores a realizar 2 o 3 llamadas más por día.`;
         } else {
-            return `🚨 Alerta de Prospección: El equipo está al ${Math.round(percent)}% de la meta de llamadas. Un bajo volumen de contacto impactará directamente en la creación de cotizaciones y cierres. Se recomienda una sesión de alineación con el equipo.`;
+            return `🚨 Alerta de Prospección: El equipo está al ${Math.round(percent)}% de la meta de llamadas a la fecha (Meta a la fecha: ${totalGoalUpToDate} de ${totalPeriodGoal} totales). Un bajo volumen de contacto impactará directamente en la creación de cotizaciones y cierres. Se recomienda una sesión de alineación con el equipo.`;
         }
     };
 
@@ -2180,6 +2210,7 @@ function CallActivitySection({
         userName: string,
         dailyGoal: number,
         days: number,
+        goalUpToDate: number,
         totalCalls: number,
         totalConnected: number,
         daysRange: Date[],
@@ -2190,16 +2221,20 @@ function CallActivitySection({
         }
         
         const periodGoal = dailyGoal * days;
-        const totalPct = periodGoal > 0 ? (totalCalls / periodGoal) * 100 : 0;
+        const totalPct = goalUpToDate > 0 ? (totalCalls / goalUpToDate) * 100 : 0;
         const connectRate = totalCalls > 0 ? (totalConnected / totalCalls) * 100 : 0;
         
         if (totalCalls === 0) {
             return `🚨 Alerta Crítica: ${userName} no registra llamadas en este periodo. Se requiere supervisión inmediata para verificar fallas técnicas o reasignación de prioridades.`;
         }
         
-        let text = `🎯 Desempeño: Completó el ${Math.round(totalPct)}% de la meta acumulada del periodo (${totalCalls} de ${periodGoal} llamadas). `;
+        let text = `🎯 Desempeño: Completó el ${Math.round(totalPct)}% de la meta a la fecha (${totalCalls} de ${goalUpToDate} llamadas, meta del periodo completo: ${periodGoal}). `;
         
-        // Consistency check
+        // Consistency check to date
+        const progress = getPeriodProgress();
+        const elapsedWorkingDays = progress.ratio * days;
+        const elapsedWorkingDaysRounded = Math.max(1, Math.round(elapsedWorkingDays));
+        
         let activeDays = 0;
         let metGoalDays = 0;
         daysRange.forEach(date => {
@@ -2212,13 +2247,13 @@ function CallActivitySection({
             }
         });
         
-        const consistencyPct = (metGoalDays / days) * 100;
+        const consistencyPct = (metGoalDays / elapsedWorkingDaysRounded) * 100;
         if (consistencyPct >= 80) {
-            text += `Excelente constancia, alcanzando la meta diaria en ${metGoalDays} de ${Math.round(days)} días laborales. `;
+            text += `Excelente constancia, alcanzando la meta diaria en ${metGoalDays} de ${elapsedWorkingDaysRounded} días laborales transcurridos. `;
         } else if (consistencyPct >= 40) {
-            text += `Consistencia moderada. Cumplió la meta en ${metGoalDays} días laborales, pero se observan fluctuaciones. `;
+            text += `Consistencia moderada. Cumplió la meta en ${metGoalDays} de ${elapsedWorkingDaysRounded} días laborales transcurridos, pero se observan fluctuaciones. `;
         } else {
-            text += `Baja constancia. Solo cumplió la meta diaria en ${metGoalDays} de ${Math.round(days)} días laborales. Se recomienda establecer bloqueos de horario fijos para prospección. `;
+            text += `Baja constancia. Solo cumplió la meta diaria en ${metGoalDays} de ${elapsedWorkingDaysRounded} días laborales transcurridos. Se recomienda establecer bloqueos de horario fijos para prospección. `;
         }
         
         if (connectRate >= 45) {
@@ -2354,6 +2389,7 @@ function CallActivitySection({
     }
 
     const days = getDaysInPeriod();
+    const progress = getPeriodProgress();
     const tempReportData = userPerformance.map(user => {
         const summary = callSummary.find(s => s.user_id === user.user_id) || {
             calls_total: 0,
@@ -2369,10 +2405,15 @@ function CallActivitySection({
         const dailyGoal = getUserCallGoal(user.user_id);
         const userPeriodWorkingDays = getWorkingDaysInPeriod(user.user_id);
         const periodGoal = Math.round(dailyGoal * userPeriodWorkingDays);
+        
+        // Pro-rated target to-date
+        const elapsedWorkingDays = progress.ratio * userPeriodWorkingDays;
+        const goalUpToDate = Math.round(dailyGoal * elapsedWorkingDays);
+        
         const actual = summary.calls_total;
         const actualConnected = summary.calls_connected;
-        const deviation = actual - periodGoal;
-        const percent = periodGoal > 0 ? (actual / periodGoal) * 100 : 0;
+        const deviation = actual - goalUpToDate;
+        const percent = goalUpToDate > 0 ? (actual / goalUpToDate) * 100 : 0;
         const userName = user.full_name || user.email.split('@')[0];
         const avatarUrl = user.avatar_url;
         
@@ -2382,18 +2423,26 @@ function CallActivitySection({
             avatarUrl,
             dailyGoal,
             periodGoal,
+            goalUpToDate,
             actual,
             actualConnected,
             deviation,
             percent,
-            recommendation: getRecommendation(userName, actual, periodGoal)
+            recommendation: getRecommendation(userName, actual, goalUpToDate),
+            avgResponseTime: user.avg_response_time || 0,
         };
     });
+
+    const activeUsersWithResponse = userPerformance.filter(u => u.avg_response_time && u.avg_response_time > 0);
+    const globalAvgResponseTime = activeUsersWithResponse.length > 0 
+        ? activeUsersWithResponse.reduce((s, u) => s + (u.avg_response_time || 0), 0) / activeUsersWithResponse.length
+        : 0;
     
     const totalPeriodGoal = tempReportData.reduce((s, r) => s + r.periodGoal, 0);
+    const totalGoalUpToDate = tempReportData.reduce((s, r) => s + r.goalUpToDate, 0);
     const totalActualCalls = tempReportData.reduce((s, r) => s + r.actual, 0);
-    const globalPercent = totalPeriodGoal > 0 ? (totalActualCalls / totalPeriodGoal) * 100 : 0;
-    const globalDeviation = totalActualCalls - totalPeriodGoal;
+    const globalPercent = totalGoalUpToDate > 0 ? (totalActualCalls / totalGoalUpToDate) * 100 : 0;
+    const globalDeviation = totalActualCalls - totalGoalUpToDate;
 
     const globalWon = userPerformance.reduce((s, p) => s + p.leads_won, 0);
     const globalClosing = userPerformance.reduce((s, p) => s + p.total_closing_amount, 0);
@@ -2405,7 +2454,7 @@ function CallActivitySection({
         const leadsWon = uPerf ? uPerf.leads_won : 0;
         const totalClosingAmount = uPerf ? uPerf.total_closing_amount : 0;
         
-        const deficit = Math.max(0, row.periodGoal - row.actual);
+        const deficit = Math.max(0, row.goalUpToDate - row.actual);
         const callsPerClose = leadsWon > 0 ? (row.actual / leadsWon) : 0;
         const finalCallsPerClose = callsPerClose > 0 ? Math.max(10, callsPerClose) : Math.max(10, companyCallsPerClose);
         const avgDealSize = leadsWon > 0 ? (totalClosingAmount / leadsWon) : 0;
@@ -2479,7 +2528,7 @@ function CallActivitySection({
                         </div>
                     )}
                     {/* KPI Summary Cards */}
-                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
                         <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] p-5 hover:shadow-[0_12px_40px_rgb(0,0,0,0.04)] transition-all duration-300 hover:-translate-y-0.5">
                             <div className="flex items-center gap-4">
                                 <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500/10 to-indigo-500/10 flex items-center justify-center border border-blue-100/30 shrink-0">
@@ -2535,6 +2584,29 @@ function CallActivitySection({
                                 </div>
                             </div>
                         </div>
+                        <div className="bg-white rounded-2xl border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] p-5 hover:shadow-[0_12px_40px_rgb(0,0,0,0.04)] transition-all duration-300 hover:-translate-y-0.5">
+                            <div className="flex items-center gap-4">
+                                <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-orange-500/10 to-amber-500/10 flex items-center justify-center border border-orange-100/30 shrink-0">
+                                    <Sparkles className="w-5 h-5 text-orange-655 animate-pulse" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-1.5 mb-1">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Abordaje Prom.</p>
+                                        <span className="relative group inline-block cursor-help text-slate-405 hover:text-slate-650 transition-colors">
+                                            <span className="w-3.5 h-3.5 rounded-full border border-slate-305 hover:border-slate-400 flex items-center justify-center text-[9px] font-black leading-none font-sans">!</span>
+                                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-900 text-white text-[10px] rounded-xl p-3.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-normal leading-normal font-medium normal-case">
+                                                <p className="font-black border-b border-white/10 pb-1 mb-1 text-white uppercase tracking-wider text-[8px]">Tiempo de Abordaje Promedio</p>
+                                                <p className="text-white/90 text-left">Tiempo promedio transcurrido desde la asignación del lead hasta registrar el primer seguimiento. Responder rápido evita que el lead se enfríe y optimiza la conversión.</p>
+                                                <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+                                            </span>
+                                        </span>
+                                    </div>
+                                    <p className={`text-2xl lg:text-3xl font-black tracking-tight leading-none ${globalAvgResponseTime > 0 ? (globalAvgResponseTime <= 2 ? 'text-emerald-600' : globalAvgResponseTime <= 24 ? 'text-amber-600' : 'text-rose-650') : 'text-slate-350'}`}>
+                                        {formatResponseTime(globalAvgResponseTime)}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Admin: Set Call Goals */}
@@ -2560,12 +2632,23 @@ function CallActivitySection({
                         {/* Header */}
                         <div className="grid grid-cols-12 gap-2 px-6 py-3.5 bg-slate-50/50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                             <div className="col-span-1 text-center">#</div>
-                            <div className="col-span-3">Vendedor</div>
+                            <div className="col-span-2">Vendedor</div>
+                            <div className="col-span-2 text-center flex items-center justify-center gap-1">
+                                Abordaje
+                                <span className="relative group inline-block cursor-help text-slate-400 hover:text-slate-650 transition-colors">
+                                    <span className="w-3.5 h-3.5 rounded-full border border-slate-305 hover:border-slate-400 flex items-center justify-center text-[9px] font-black leading-none font-sans">!</span>
+                                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-900 text-white text-[10px] rounded-xl p-3.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-normal leading-normal font-medium normal-case">
+                                        <p className="font-black border-b border-white/10 pb-1 mb-1 text-white uppercase tracking-wider text-[8px]">Tiempo de Abordaje</p>
+                                        <p className="text-white/90 text-left">Tiempo promedio transcurrido desde la asignación del lead hasta registrar el primer seguimiento. Responder rápido evita que el lead se enfríe y optimiza la conversión.</p>
+                                        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+                                    </span>
+                                </span>
+                            </div>
                             <div className="col-span-1 text-center">Llamadas</div>
                             <div className="col-span-1 text-center">Conectadas</div>
                             <div className="col-span-1 text-center">Sin Resp.</div>
                             <div className="col-span-1 text-center">Tasa</div>
-                            <div className="col-span-2 text-center">Leads Únicos</div>
+                            <div className="col-span-1 text-center">Leads Únicos</div>
                             <div className="col-span-2 text-center">Cambios Estado</div>
                         </div>
 
@@ -2578,6 +2661,8 @@ function CallActivitySection({
                                     const connectRate = user.calls_total > 0 ? (user.calls_connected / user.calls_total) * 100 : 0;
                                     const userName = profileNames[user.user_id] || 'Desconocido';
                                     const avatarUrl = profileAvatars[user.user_id];
+                                    const uPerf = userPerformance.find(p => p.user_id === user.user_id);
+                                    const avgResponseTime = uPerf?.avg_response_time || 0;
 
                                     return (
                                         <div key={user.user_id} className="grid grid-cols-12 gap-2 px-6 py-5 items-center hover:bg-slate-50/50 transition-colors">
@@ -2601,7 +2686,7 @@ function CallActivitySection({
                                             </div>
 
                                             {/* User Info */}
-                                            <div className="col-span-3 flex items-center gap-3 min-w-0">
+                                            <div className="col-span-2 flex items-center gap-3 min-w-0">
                                                 <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center overflow-hidden shrink-0 border border-slate-200/40">
                                                     {avatarUrl ? (
                                                         <img src={avatarUrl} className="w-full h-full object-cover" alt="" />
@@ -2625,6 +2710,18 @@ function CallActivitySection({
                                                         </div>
                                                     )}
                                                 </div>
+                                            </div>
+
+                                            {/* Abordaje */}
+                                            <div className="col-span-2 text-center">
+                                                <span className={`inline-flex items-center justify-center text-xs font-bold px-2.5 py-1 rounded-full ${
+                                                    avgResponseTime === 0 ? 'bg-slate-50 text-slate-400' :
+                                                    avgResponseTime <= 2 ? 'bg-emerald-50 text-emerald-700' :
+                                                    avgResponseTime <= 24 ? 'bg-amber-50 text-amber-700' :
+                                                    'bg-rose-50 text-rose-650'
+                                                }`}>
+                                                    {formatResponseTime(avgResponseTime)}
+                                                </span>
                                             </div>
 
                                             {/* Total Calls */}
@@ -2668,7 +2765,7 @@ function CallActivitySection({
                                             </div>
 
                                             {/* Unique Leads */}
-                                            <div className="col-span-2 text-center">
+                                            <div className="col-span-1 text-center">
                                                 {user.unique_leads_called > 0 ? (
                                                     <button onClick={(e) => { e.stopPropagation(); handleCallClick(user.user_id, 'unique'); }} className="group inline-flex items-center justify-center px-3 py-1.5 rounded-xl hover:bg-slate-100 transition-all cursor-pointer border border-transparent hover:border-slate-200">
                                                         <span className="text-[15px] font-bold text-slate-700 group-hover:text-indigo-650 transition-colors">{user.unique_leads_called}</span>
@@ -2785,15 +2882,17 @@ function CallActivitySection({
                             <p className="text-[10px] text-slate-400 mt-2 font-medium">Rango: {getFormattedDateRange()}</p>
                         </div>
                         <div className="border-r border-slate-100 last:border-0 px-4">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Meta Acumulada</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Meta del Periodo</p>
                             <p className="text-2xl font-black text-slate-800">{totalPeriodGoal} <span className="text-xs text-slate-400 font-semibold">llamadas</span></p>
-                            <p className="text-[10px] text-slate-400 mt-2 font-medium">Meta de llamadas del equipo</p>
+                            <p className="text-[10px] text-slate-400 mt-2 font-medium">
+                                Meta a la fecha: <span className="font-extrabold text-slate-650">{totalGoalUpToDate}</span>
+                            </p>
                         </div>
                         <div className="border-r border-slate-100 last:border-0 px-4">
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Llamadas Realizadas</p>
-                            <p className="text-2xl font-black text-indigo-600">{totalActualCalls} <span className="text-xs text-indigo-400 font-semibold">hechas</span></p>
+                            <p className="text-2xl font-black text-indigo-650">{totalActualCalls} <span className="text-xs text-indigo-400 font-semibold">hechas</span></p>
                             <p className="text-[10px] text-slate-400 mt-2 font-medium">
-                                Desviación: <span className={globalDeviation >= 0 ? 'text-emerald-600 font-extrabold' : 'text-rose-600 font-extrabold'}>
+                                Desviación a la fecha: <span className={globalDeviation >= 0 ? 'text-emerald-600 font-extrabold' : 'text-rose-600 font-extrabold'}>
                                     {globalDeviation >= 0 ? `+${globalDeviation}` : globalDeviation}
                                 </span>
                             </p>
@@ -2811,6 +2910,9 @@ function CallActivitySection({
                                     style={{ width: `${Math.min(globalPercent, 100)}%` }}
                                 />
                             </div>
+                            <p className="text-[9px] text-slate-400 mt-2 font-medium">
+                                Medido vs. meta a la fecha
+                            </p>
                         </div>
                     </div>
 
@@ -2822,7 +2924,7 @@ function CallActivitySection({
                         <div>
                             <h4 className="text-[10px] font-bold text-teal-850 uppercase tracking-wider mb-1">Recomendación General de Sofía AI (Equipo)</h4>
                             <p className="text-[13px] font-semibold text-slate-700 leading-relaxed">
-                                {getGlobalRecommendation(totalActualCalls, totalPeriodGoal)}
+                                {getGlobalRecommendation(totalActualCalls, totalGoalUpToDate, totalPeriodGoal)}
                             </p>
                         </div>
                     </div>
@@ -2849,7 +2951,7 @@ function CallActivitySection({
                                     </span>
                                 </div>
                                 <p className="text-[13px] font-bold text-slate-700 leading-relaxed">
-                                    Por no realizar las llamadas de seguimiento programadas ({Math.abs(globalDeviation)} llamadas de déficit), el equipo ha dejado de capturar aproximadamente <span className="font-extrabold text-rose-600">{totalLostLeadsEst.toFixed(1)} cierres de venta</span>, lo que representa una pérdida estimada de <span className="font-extrabold text-rose-600">{formatCurrency(totalLostRevenueEst)} USD</span> en facturación para este periodo.
+                                    Por no realizar las llamadas de seguimiento programadas ({Math.abs(globalDeviation)} llamadas de déficit a la fecha), el equipo ha dejado de capturar aproximadamente <span className="font-extrabold text-rose-600">{totalLostLeadsEst.toFixed(1)} cierres de venta</span>, lo que representa una pérdida estimada de <span className="font-extrabold text-rose-600">{formatCurrency(totalLostRevenueEst)} USD</span> en facturación para este periodo.
                                 </p>
                             </div>
                         </div>
@@ -2911,6 +3013,7 @@ function CallActivitySection({
                                 row.userName,
                                 row.dailyGoal,
                                 getWorkingDaysInPeriod(row.userId),
+                                row.goalUpToDate,
                                 row.actual,
                                 row.actualConnected,
                                 daysRange,
@@ -2956,6 +3059,10 @@ function CallActivitySection({
                                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Meta Periodo</p>
                                                 <p className="text-lg font-extrabold text-slate-700 mt-1">{row.periodGoal}</p>
                                             </div>
+                                            <div className="bg-slate-50/70 px-5 py-2.5 rounded-2xl text-center border border-slate-100 min-w-[95px] hover:bg-slate-100/50 transition-colors">
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Meta a la Fecha</p>
+                                                <p className="text-lg font-extrabold text-slate-700 mt-1">{row.goalUpToDate}</p>
+                                            </div>
                                             <div className="bg-indigo-50/40 px-5 py-2.5 rounded-2xl text-center border border-indigo-100/50 min-w-[95px] hover:bg-indigo-50/70 transition-colors">
                                                 <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Llamadas Real.</p>
                                                 <p className="text-2xl font-black text-indigo-650 mt-1">{row.actual}</p>
@@ -2966,13 +3073,32 @@ function CallActivitySection({
                                                     {row.deviation >= 0 ? `+${row.deviation}` : row.deviation}
                                                 </p>
                                             </div>
+                                            <div className="bg-slate-50/70 px-5 py-2.5 rounded-2xl text-center border border-slate-100 min-w-[95px] hover:bg-slate-100/50 transition-colors">
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Abordaje</p>
+                                                    <span className="relative group inline-block cursor-help text-slate-400 hover:text-slate-650 transition-colors">
+                                                        <span className="w-3.5 h-3.5 rounded-full border border-slate-300 hover:border-slate-400 flex items-center justify-center text-[8px] font-black leading-none font-sans">!</span>
+                                                        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-900 text-white text-[10px] rounded-xl p-3.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-normal leading-normal font-medium normal-case">
+                                                            <p className="font-black border-b border-white/10 pb-1 mb-1 text-white uppercase tracking-wider text-[8px]">Tiempo de Respuesta</p>
+                                                            <p className="text-white/90 text-left">Tiempo promedio desde la asignación del lead hasta registrar el primer seguimiento. Responder rápido evita que el lead se enfríe y optimiza la conversión.</p>
+                                                            <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+                                                        </span>
+                                                    </span>
+                                                </div>
+                                                <p className={`text-lg font-extrabold mt-1 ${
+                                                    row.avgResponseTime === 0 ? 'text-slate-400' :
+                                                    row.avgResponseTime <= 2 ? 'text-emerald-600' :
+                                                    row.avgResponseTime <= 24 ? 'text-amber-600' :
+                                                    'text-rose-650'
+                                                }`}>{formatResponseTime(row.avgResponseTime)}</p>
+                                            </div>
                                             <div className={`${
                                                 row.dailyGoal === 0 ? 'bg-slate-50 border-slate-100 text-slate-650' :
                                                 row.percent >= 100 ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white border-transparent shadow-sm shadow-emerald-100' :
                                                 row.percent >= 80 ? 'bg-gradient-to-r from-amber-400 to-orange-400 text-white border-transparent shadow-sm shadow-amber-100' :
                                                 'bg-gradient-to-r from-rose-500 to-red-500 text-white border-transparent shadow-sm shadow-rose-100'
                                             } px-5 py-3 rounded-2xl text-center border flex items-center justify-center font-extrabold text-xs min-w-[115px]`}>
-                                                {row.dailyGoal === 0 ? 'SIN META' : `${Math.round(row.percent)}% CUMP.`}
+                                                {row.dailyGoal === 0 ? 'SIN META' : `${Math.round(row.percent)}% CUMP. A HOY`}
                                             </div>
                                             
                                             {/* Expand/Collapse Chevron (Hidden in print mode) */}
@@ -3050,9 +3176,9 @@ function CallActivitySection({
                                                                 <span className="w-3.5 h-3.5 rounded-full border border-slate-300 hover:border-slate-400 flex items-center justify-center text-[9px] font-black leading-none">!</span>
                                                                 <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-900 text-white text-[10px] rounded-xl p-3.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl whitespace-normal leading-normal font-medium normal-case">
                                                                     <p className="font-black border-b border-white/10 pb-1 mb-1 text-white uppercase tracking-wider text-[8px]">Fórmula & Variables</p>
-                                                                    <p className="text-white/90">Llamadas pendientes para alcanzar el objetivo proporcional a los días laborales del periodo.</p>
+                                                                    <p className="text-white/90">Llamadas pendientes para alcanzar el objetivo a la fecha (proporcional a los días laborales transcurridos).</p>
                                                                     <p className="mt-1.5 font-bold text-amber-300">Cálculo:</p>
-                                                                    <p className="font-mono text-[9px] bg-black/30 p-1 rounded mt-0.5 text-emerald-400">Meta Periodo ({row.periodGoal}) - Realizadas ({row.actual}) = Déficit ({row.deficit})</p>
+                                                                    <p className="font-mono text-[9px] bg-black/30 p-1 rounded mt-0.5 text-emerald-400">Meta a la Fecha ({row.goalUpToDate}) - Realizadas ({row.actual}) = Déficit ({row.deficit})</p>
                                                                     <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
                                                                 </span>
                                                             </span>

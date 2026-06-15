@@ -19,6 +19,7 @@ export interface UserPerformance {
     total_closing_amount: number;
     avg_deal_size: number;
     avg_days_to_close: number; // Average days from lead creation to won
+    avg_response_time?: number; // Average response time in hours
 }
 
 export interface TeamPerformance {
@@ -235,7 +236,7 @@ export const teamPerformanceService = {
         // 3a. Get leads created in period (pipeline metrics: total, active, value)
         let leadsQuery = supabase
             .from('leads')
-            .select('id, assigned_to, status, value, closing_amount, created_at')
+            .select('id, assigned_to, status, value, closing_amount, created_at, first_follow_up_at')
             .eq('company_id', companyId);
 
         if (start) {
@@ -307,15 +308,21 @@ export const teamPerformanceService = {
         const { data: lostLeads } = await lostQuery;
 
         // 4. Aggregate per user
-        const userStats: Record<string, {
+                const userStats: Record<string, {
             total: number; won: number; lost: number; active: number; erroneous: number;
             totalValue: number; totalClosing: number;
             totalDaysToClose: number; wonWithDate: number;
+            totalResponseTimeHours: number;
+            leadsWithResponseTime: number;
         }> = {};
 
         const ensureUser = (uid: string) => {
             if (!userStats[uid]) {
-                userStats[uid] = { total: 0, won: 0, lost: 0, active: 0, erroneous: 0, totalValue: 0, totalClosing: 0, totalDaysToClose: 0, wonWithDate: 0 };
+                userStats[uid] = {
+                    total: 0, won: 0, lost: 0, active: 0, erroneous: 0,
+                    totalValue: 0, totalClosing: 0, totalDaysToClose: 0, wonWithDate: 0,
+                    totalResponseTimeHours: 0, leadsWithResponseTime: 0
+                };
             }
         };
 
@@ -336,6 +343,16 @@ export const teamPerformanceService = {
                 // Active pipeline leads only
                 userStats[uid].active++;
                 userStats[uid].totalValue += Number(lead.value || 0);
+            }
+
+            // Lead response time calculation: creation/assignment to first follow up
+            if (lead.first_follow_up_at && lead.created_at) {
+                const diffMs = new Date(lead.first_follow_up_at).getTime() - new Date(lead.created_at).getTime();
+                const diffHours = diffMs / (1000 * 60 * 60);
+                if (diffHours >= 0) {
+                    userStats[uid].totalResponseTimeHours += diffHours;
+                    userStats[uid].leadsWithResponseTime++;
+                }
             }
         });
 
@@ -369,12 +386,17 @@ export const teamPerformanceService = {
         // 5. Build results
         return profiles
             .map(p => {
-                const stats = userStats[p.id] || { total: 0, won: 0, lost: 0, active: 0, erroneous: 0, totalValue: 0, totalClosing: 0, totalDaysToClose: 0, wonWithDate: 0 };
+                const stats = userStats[p.id] || {
+                    total: 0, won: 0, lost: 0, active: 0, erroneous: 0,
+                    totalValue: 0, totalClosing: 0, totalDaysToClose: 0, wonWithDate: 0,
+                    totalResponseTimeHours: 0, leadsWithResponseTime: 0
+                };
                 // Win rate = won / (won + lost) — only decided deals, same logic as Salesforce/HubSpot
                 const decidedDeals = stats.won + stats.lost;
                 const winRate = decidedDeals > 0 ? (stats.won / decidedDeals) * 100 : 0;
                 const avgDeal = stats.won > 0 ? stats.totalClosing / stats.won : 0;
                 const avgDaysToClose = stats.wonWithDate > 0 ? Math.round(stats.totalDaysToClose / stats.wonWithDate) : 0;
+                const avgResponseTime = stats.leadsWithResponseTime > 0 ? stats.totalResponseTimeHours / stats.leadsWithResponseTime : 0;
                 const teams = userTeams[p.id] || { names: [], colors: [] };
 
                 return {
@@ -395,6 +417,7 @@ export const teamPerformanceService = {
                     total_closing_amount: stats.totalClosing,
                     avg_deal_size: Math.round(avgDeal * 100) / 100,
                     avg_days_to_close: avgDaysToClose,
+                    avg_response_time: avgResponseTime,
                 };
             })
             .sort((a, b) => b.leads_won - a.leads_won || b.win_rate - a.win_rate);
