@@ -22,5 +22,8 @@ description: Pendientes priorizados del CRM — retomar en próxima sesión
 5. **Expansión de Conocimiento:** Se crearon capítulos nuevos directamente en `content.md` sobre "Calendario", "Telegram (Fase 8d)" y "Webhooks Meta". El bot memorizó esto al instante sin requerir entrenamiento.
 
 **Siguiente Reto en la Próxima Sesión:**
+- **Alineación de Ambientes (Limpieza de Arquitectura) [CRÍTICO]:**
+  - Actualmente, el entorno local conecta a `ikofyypxphrqkncimszt` (etiquetado como "CRM App Production" en el panel) debido a un OpenAI API key inválido en `crm-app-testing`.
+  - Debemos corregir la API Key de OpenAI en el proyecto online de pruebas (`ubqscyfefgfbmndnypbp` / `crm-app-testing`).
+  - Re-apuntar las variables de entorno `.env.local` al ambiente de pruebas oficial (`crm-app-testing`) para restablecer las mejores prácticas de arquitectura de 3 ambientes (Local, Testing, Producción).
 - **Manual del Usuario:** Seguir enriqueciendo `content.md` con nuevos módulos conforme se liberen nuevas versiones del CRM. Específicamente agregar capítulos para el Módulo de Clientes, Pipeline y Permisos.
-*(Nota: Pipeline revertir etapa, notificaciones Telegram y estabilización de build ya fueron resueltos en sesiones anteriores).*

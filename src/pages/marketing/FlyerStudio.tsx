@@ -7,7 +7,7 @@ import {
   BarChart3, Wand2, Layers, Palette, Type, Layout,
   ExternalLink, Star, Cpu, Crown, Smile, Building2,
   Instagram, Facebook, Linkedin, Smartphone, Video,
-  FolderOpen, Save, Loader2, Trash2
+  FolderOpen, Save, Loader2, Trash2, Edit2
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthProvider';
 import { supabase } from '../../services/supabase';
@@ -394,6 +394,10 @@ export default function FlyerStudio() {
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isGalleryModalOpen, setIsGalleryModalOpen] = useState(false);
   const [newDesignName, setNewDesignName] = useState('');
+  const [loadedFlyerId, setLoadedFlyerId] = useState<string | null>(null);
+  const [loadedFlyerName, setLoadedFlyerName] = useState<string | null>(null);
+  const [editingFlyerId, setEditingFlyerId] = useState<string | null>(null);
+  const [editingFlyerName, setEditingFlyerName] = useState('');
 
   const updateFont = (val: string, element: 'title' | 'subtitle' | 'benefits' | 'cta' | 'contact') => {
     if (syncFonts) {
@@ -1016,7 +1020,85 @@ export default function FlyerStudio() {
     }
   }, [profile]);
 
-  async function handleSaveFlyer(nameToSave: string) {
+  async function handleRenameFlyer(id: string, newName: string) {
+    if (!newName.trim()) return;
+    try {
+      const { error } = await supabase
+        .from('marketing_flyers')
+        .update({ name: newName.trim() })
+        .eq('id', id);
+
+      if (error) throw error;
+      toast.success('Nombre de diseño actualizado');
+      setSavedFlyers(prev => prev.map(f => f.id === id ? { ...f, name: newName.trim() } : f));
+      if (loadedFlyerId === id) {
+        setLoadedFlyerName(newName.trim());
+      }
+      setEditingFlyerId(null);
+    } catch (e: any) {
+      console.error('Error renaming flyer:', e);
+      toast.error('Error al renombrar diseño: ' + e.message);
+    }
+  }
+
+  function handleResetEditor() {
+    if (!window.confirm('¿Quieres limpiar el editor para empezar un diseño nuevo?')) return;
+    
+    // Reset loaded design info
+    setLoadedFlyerId(null);
+    setLoadedFlyerName(null);
+    
+    // Reset all texts
+    setManualTitle('');
+    setManualSubtitle('');
+    setManualFeatures(['', '', '', '']);
+    setManualPrice('');
+    setCta('');
+    
+    // Reset styling
+    setColors(BRAND_COLORS);
+    setBgUploadPreview('');
+    setLogoPreview(DEFAULT_LOGO_SVG);
+    setLogoX(50);
+    setLogoY(10);
+    setLogoSize(120);
+    setTextY(30);
+    setTextAlign('center');
+    
+    // Reset scales
+    setTitleScale(1);
+    setSubtitleScale(1);
+    setBenefitsScale(1);
+    setCtaScale(1);
+    
+    // Reset fonts
+    setTitleFont('Outfit');
+    setSubtitleFont('Inter');
+    setBenefitsFont('Inter');
+    setCtaFont('Outfit');
+    setContactFont('Inter');
+    
+    // Reset colors
+    setTitleColor('#1e293b');
+    setHighlightColor('#7c3aed');
+    setSubtitleColor('#475569');
+    setBenefitsColor('#334155');
+    setCtaBgColor('#7c3aed');
+    setCtaTextColor('#ffffff');
+    setContactColor('#475569');
+    setCardBgColor('#ffffff');
+    
+    // Reset templates and options
+    setFormat('ig-post');
+    setSelectedTemplate('bold-split');
+    setVariants([]);
+    setSelected(0);
+    setPreviewMode('template');
+    
+    toast.success('✨ Editor restablecido a nuevo diseño');
+  }
+
+  async function handleSaveFlyer(nameToSave: string, overwrite = false) {
     if (!profile?.company_id) return;
     const name = nameToSave.trim() || `Flyer ${new Date().toLocaleDateString()}`;
     setSavingFlyer(true);
@@ -1083,23 +1165,49 @@ export default function FlyerStudio() {
 
       const currentImg = bgUploadPreview || (variants.length > 0 ? variants[selected] : lastGeneratedImg.current);
 
-      const { data, error } = await supabase
-        .from('marketing_flyers')
-        .insert({
-          company_id: profile.company_id,
-          created_by: profile.id,
-          name,
-          format,
-          template_id: selectedTemplate,
-          bg_image_url: currentImg || null,
-          settings,
-          thumbnail_url: thumbnailUrl || null
-        })
-        .select()
-        .single();
+      if (overwrite && loadedFlyerId) {
+        // Update existing flyer
+        const { error } = await supabase
+          .from('marketing_flyers')
+          .update({
+            name,
+            format,
+            template_id: selectedTemplate,
+            bg_image_url: currentImg || null,
+            settings,
+            thumbnail_url: thumbnailUrl || null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', loadedFlyerId);
 
-      if (error) throw error;
-      toast.success('✨ ¡Diseño guardado con éxito!');
+        if (error) throw error;
+        toast.success('✨ ¡Diseño actualizado con éxito!');
+        setLoadedFlyerName(name);
+      } else {
+        // Insert new flyer
+        const { data, error } = await supabase
+          .from('marketing_flyers')
+          .insert({
+            company_id: profile.company_id,
+            created_by: profile.id,
+            name,
+            format,
+            template_id: selectedTemplate,
+            bg_image_url: currentImg || null,
+            settings,
+            thumbnail_url: thumbnailUrl || null
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        toast.success('✨ ¡Diseño guardado con éxito!');
+        if (data) {
+          setLoadedFlyerId(data.id);
+          setLoadedFlyerName(data.name);
+        }
+      }
+
       setIsSaveModalOpen(false);
       setNewDesignName('');
       fetchSavedFlyers();
@@ -1172,6 +1280,11 @@ export default function FlyerStudio() {
         setVariants([]);
         setPreviewMode('template');
       }
+
+      // Track loaded flyer
+      setLoadedFlyerId(flyer.id);
+      setLoadedFlyerName(flyer.name);
+      setNewDesignName(flyer.name);
 
       setIsGalleryModalOpen(false);
       toast.success(`📂 Diseño "${flyer.name}" cargado correctamente.`);
@@ -1293,7 +1406,25 @@ export default function FlyerStudio() {
             </div>
             <div>
               <div style={{ fontSize: 8, fontWeight: 900, color: '#D4AF37', letterSpacing: '0.12em' }}>ARIAS CRM · SOCIAL MEDIA HUB</div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: '#081c3b' }}>AI Flyer Studio</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#081c3b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                AI Flyer Studio
+                {loadedFlyerName && (
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, color: '#7c3aed', background: '#f5f3ff',
+                    border: '1px solid #ddd6fe', borderRadius: 6, padding: '2px 8px',
+                    display: 'inline-flex', alignItems: 'center', gap: 4, marginLeft: 6
+                  }}>
+                    • {loadedFlyerName}
+                    <button 
+                      onClick={handleResetEditor} 
+                      title="Cerrar y empezar nuevo" 
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', padding: 1, color: '#7c3aed' }}
+                    >
+                      <X size={10} />
+                    </button>
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -1336,7 +1467,12 @@ export default function FlyerStudio() {
           </button>
 
           <button
-            onClick={() => setIsSaveModalOpen(true)}
+            onClick={() => {
+              if (loadedFlyerName && !newDesignName) {
+                setNewDesignName(loadedFlyerName);
+              }
+              setIsSaveModalOpen(true);
+            }}
             style={{
               background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
               border: 'none',
@@ -3843,34 +3979,66 @@ export default function FlyerStudio() {
                   placeholder={`Ej: Flyer Oferta Verano ${new Date().toLocaleDateString()}`}
                   style={{ ...css.input, height: 42 }}
                   onKeyDown={e => {
-                    if (e.key === 'Enter') handleSaveFlyer(newDesignName);
+                    if (e.key === 'Enter') handleSaveFlyer(newDesignName, !!loadedFlyerId);
                   }}
                   autoFocus
                 />
               </div>
             </div>
 
-            <div style={{ padding: '16px 24px 24px 24px', background: '#f8fafc', display: 'flex', gap: 10, justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9' }}>
+            <div style={{ padding: '16px 24px 24px 24px', background: '#f8fafc', display: 'flex', gap: 10, justifyContent: 'flex-end', borderTop: '1px solid #f1f5f9', flexWrap: 'wrap' }}>
               <button
                 onClick={() => setIsSaveModalOpen(false)}
                 style={{ background: '#fff', border: '1px solid #d8dde6', borderRadius: 10, padding: '10px 16px', fontSize: 12, fontWeight: 800, color: '#475569', cursor: 'pointer' }}
               >
                 Cancelar
               </button>
-              <button
-                onClick={() => handleSaveFlyer(newDesignName)}
-                disabled={savingFlyer}
-                style={{
-                  background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
-                  border: 'none', borderRadius: 10,
-                  padding: '10px 20px', fontSize: 12, fontWeight: 850,
-                  color: '#fff',
-                  cursor: savingFlyer ? 'not-allowed' : 'pointer',
-                  display: 'flex', alignItems: 'center', gap: 6
-                }}
-              >
-                {savingFlyer ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Guardando...</> : 'Guardar'}
-              </button>
+              {loadedFlyerId ? (
+                <>
+                  <button
+                    onClick={() => handleSaveFlyer(newDesignName, false)}
+                    disabled={savingFlyer}
+                    style={{
+                      background: '#fff', border: '1px solid #ddd6fe', borderRadius: 10,
+                      padding: '10px 16px', fontSize: 12, fontWeight: 800, color: '#7c3aed',
+                      cursor: savingFlyer ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    Guardar como Copia
+                  </button>
+                  <button
+                    onClick={() => handleSaveFlyer(newDesignName, true)}
+                    disabled={savingFlyer}
+                    style={{
+                      background: 'linear-gradient(135deg, #10b981, #059669)',
+                      border: 'none', borderRadius: 10,
+                      padding: '10px 16px', fontSize: 12, fontWeight: 850,
+                      color: '#fff',
+                      cursor: savingFlyer ? 'not-allowed' : 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
+                    }}
+                  >
+                    {savingFlyer ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Guardando...</> : 'Actualizar Existente'}
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => handleSaveFlyer(newDesignName, false)}
+                  disabled={savingFlyer}
+                  style={{
+                    background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                    border: 'none', borderRadius: 10,
+                    padding: '10px 20px', fontSize: 12, fontWeight: 850,
+                    color: '#fff',
+                    cursor: savingFlyer ? 'not-allowed' : 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    boxShadow: '0 4px 12px rgba(124, 58, 237, 0.2)'
+                  }}
+                >
+                  {savingFlyer ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Guardando...</> : 'Guardar'}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -3970,9 +4138,53 @@ export default function FlyerStudio() {
                         {/* Card Info */}
                         <div style={{ padding: 14, display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between' }}>
                           <div style={{ marginBottom: 12 }}>
-                            <h4 style={{ fontSize: 13, fontWeight: 900, color: '#1e293b', margin: '0 0 4px 0', lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={flyer.name}>
-                              {flyer.name}
-                            </h4>
+                            {editingFlyerId === flyer.id ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+                                <input
+                                  type="text"
+                                  value={editingFlyerName}
+                                  onChange={e => setEditingFlyerName(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') handleRenameFlyer(flyer.id, editingFlyerName);
+                                    if (e.key === 'Escape') setEditingFlyerId(null);
+                                  }}
+                                  style={{
+                                    fontSize: 12, fontWeight: 800, color: '#1e293b',
+                                    border: '1px solid #7c3aed', borderRadius: 6, padding: '3px 8px',
+                                    width: '100%', outline: 'none', background: '#fff', boxSizing: 'border-box'
+                                  }}
+                                  autoFocus
+                                />
+                                <button
+                                  onClick={() => handleRenameFlyer(flyer.id, editingFlyerName)}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', color: '#10b981' }}
+                                >
+                                  <Check size={14} />
+                                </button>
+                                <button
+                                  onClick={() => setEditingFlyerId(null)}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', color: '#ef4444' }}
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 6 }}>
+                                <h4 style={{ fontSize: 13, fontWeight: 900, color: '#1e293b', margin: 0, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={flyer.name}>
+                                  {flyer.name}
+                                </h4>
+                                <button
+                                  onClick={() => {
+                                    setEditingFlyerId(flyer.id);
+                                    setEditingFlyerName(flyer.name);
+                                  }}
+                                  title="Editar nombre"
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', color: '#94a3b8', transition: 'color 0.15s ease' }}
+                                >
+                                  <Edit2 size={11} />
+                                </button>
+                              </div>
+                            )}
                             <div style={{ fontSize: 9, color: '#94a3b8', fontWeight: 600 }}>
                               Creado: {parsedDate}
                             </div>
@@ -3989,10 +4201,11 @@ export default function FlyerStudio() {
                                 flex: 1, background: '#f5f3ff', border: '1px solid #ddd6fe',
                                 borderRadius: 8, padding: '7px 0', fontSize: 11, fontWeight: 800,
                                 color: '#7c3aed', cursor: 'pointer', display: 'flex', alignItems: 'center',
-                                justifyContent: 'center', gap: 4, transition: 'all 0.15s ease'
+                                justifyContent: 'center', gap: 6, transition: 'all 0.15s ease'
                               }}
                             >
-                              Cargar
+                              <FolderOpen size={12} />
+                              Cargar y Editar
                             </button>
                             <button
                               onClick={() => handleDeleteFlyer(flyer.id)}

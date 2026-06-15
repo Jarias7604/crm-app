@@ -151,7 +151,7 @@ export const storageService = {
 
     async uploadFlyerThumbnail(companyId: string, blob: Blob) {
         const fileName = `${companyId}-flyer-${Date.now()}.jpg`;
-        const filePath = `flyers/${fileName}`;
+        const filePath = `public/flyers/${fileName}`;
 
         const { error } = await supabase.storage
             .from('avatars')
