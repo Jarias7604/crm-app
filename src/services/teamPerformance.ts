@@ -236,7 +236,7 @@ export const teamPerformanceService = {
         // 3a. Get leads created in period (pipeline metrics: total, active, value)
         let leadsQuery = supabase
             .from('leads')
-            .select('id, assigned_to, status, value, closing_amount, created_at, first_follow_up_at')
+            .select('id, assigned_to, status, value, closing_amount, created_at, first_follow_up_at, assigned_at')
             .eq('company_id', companyId);
 
         if (start) {
@@ -345,9 +345,10 @@ export const teamPerformanceService = {
                 userStats[uid].totalValue += Number(lead.value || 0);
             }
 
-            // Lead response time calculation: creation/assignment to first follow up
-            if (lead.first_follow_up_at && lead.created_at) {
-                const diffMs = new Date(lead.first_follow_up_at).getTime() - new Date(lead.created_at).getTime();
+            // Lead response time calculation: assignment (or creation if not explicitly assigned) to first follow up
+            const baseTime = lead.assigned_at || lead.created_at;
+            if (lead.first_follow_up_at && baseTime) {
+                const diffMs = new Date(lead.first_follow_up_at).getTime() - new Date(baseTime).getTime();
                 const diffHours = diffMs / (1000 * 60 * 60);
                 if (diffHours >= 0) {
                     userStats[uid].totalResponseTimeHours += diffHours;

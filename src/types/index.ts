@@ -117,6 +117,7 @@ export interface Lead {
     call_bot_data?: Record<string, unknown> | null;
     last_follow_up_at?: string | null;    // Last time any follow-up was registered
     first_follow_up_at?: string | null;   // First time a follow-up was registered
+    assigned_at?: string | null;          // Time when lead was assigned
     created_at: string;
 
 }

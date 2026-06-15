@@ -120,7 +120,7 @@ export function PipelineIntelligenceBar({ leads, activeFilter, onFilterChange, c
 
     const withFirstContact = active.filter(l => l.first_follow_up_at);
     const avgFirstContactDays = withFirstContact.length > 0
-      ? Math.round(withFirstContact.reduce((s, l) => s + differenceInDays(new Date(l.first_follow_up_at!), new Date(l.created_at)), 0) / withFirstContact.length)
+      ? Math.round(withFirstContact.reduce((s, l) => s + differenceInDays(new Date(l.first_follow_up_at!), new Date(l.assigned_at || l.created_at)), 0) / withFirstContact.length)
       : null;
 
     const withLastContact = active.filter(l => l.last_follow_up_at);
